@@ -1,110 +1,75 @@
-# Version 1.00 Update Brief
+# Version 1.00 Update Brief – Edulure Full Ecosystem Release
 
-## Executive Overview
-Version 1.00 cements Edulure as a production-ready learning, commerce, and community platform that spans web and Flutter clients. The release blends a hardened infrastructure core with high-impact feature pillars: Cloudflare R2 powered content delivery, a deep social graph with modular profiles, Communities 2.0 monetisation, a Meilisearch explorer, rigorous release management, and full mobile parity. Current delivery sequencing keeps every workstream gated behind the foundational upgrades captured in Task 1 and aligns execution with the milestone roadmap through Week 18. Outside of documentation groundwork in Task 6, development workstreams remain in planning or backlog refinement; this brief defines how the cross-functional teams will activate, validate, and launch the update.
+## 1. Executive Overview
+Version 1.00 converts Edulure into a production-ready learning, commerce, and community operating system that unifies every capability from the Full Functions List across web, backend, and Flutter experiences. The release is organised into seven delivery tasks captured in the [Update Plan](update_plan.md), cross-sequenced through five milestones in the [Milestone Plan](update_milestone_list.md), and governed by the [Task List](update_task_list.md) plus the [Progress Tracker](update_progress_tracker.md). Platform hardening (Task 1) is 10% complete and Cloudflare-driven commerce foundations (Task 2) have started at 5%, establishing the security, storage, and payment primitives required for downstream launches. Communities, explorer search, dashboards, mobile parity, QA, and launch operations will progress once these baselines are ratified by governance reviews.
 
-## Objectives & Success Criteria
-- **Platform Integrity:** Finish Task 1 subtasks 1.1–1.5 to lock configuration validation, shared API contracts, dependency governance, database migrations, and orchestration layers that unblock downstream teams.
-- **Content Excellence:** Execute Task 2 to migrate assets to Cloudflare R2, deliver PowerPoint and ebook pipelines, and achieve analytics-compliant viewers on web and mobile clients.
-- **Social & Community Growth:** Complete Tasks 3 and 4 to introduce the follow graph, profile component system, Communities 2.0 experiences, chat upgrades, and affiliate monetisation across user/provider applications.
-- **Discovery & Release Confidence:** Deliver Task 5’s Meilisearch explorer alongside Task 6 QA, documentation, and release management so production reliability and knowledge transfer meet Version 1.00 exit criteria.
-- **Mobile Readiness:** Use Task 7 to close feature parity, performance, offline, and store compliance gaps so the Flutter learner and provider apps ship in lockstep with web.
-- **Design Alignment:** Progress Task 8 to freeze cross-platform tokens, publish annotated specs, and package design QA artefacts that ensure engineering receives production-ready UI guidance.
+## 2. Release Objectives
+- **Deliver the General Area suite** – Ship live feed aggregation, course and ebook purchasing, Agora-powered live classrooms (free and ticketed), and tutor hourly hire tied to Stripe/PayPal commerce pipelines.
+- **Activate Communities 2.0** – Provide community feeds, role management, calendars, maps, subscription paywalls, leaderboards, affiliate monetisation, chat upgrades, location tracking, and moderation across learner and provider interfaces.
+- **Modernise dashboards** – Rebuild user and instructor dashboards with profile editing, followers, finance, settings, widgets, statistics, ID verification, community switcher, classroom management, pricing, analytics, and chat inbox experiences.
+- **Launch Explorer & Ads intelligence** – Deliver Meilisearch-powered explorer search covering communities, profiles, courses, ebooks, tutors, ads, and policies alongside the Edulure Ads PPC/PPI/PPConversion suite with targeting, budgeting, campaign forecasting, and traffic predictions.
+- **Strengthen governance** – Complete policy centre, privacy, notifications, spam/bad word detection, admin/customer service panels, calendars, and Cloudflare R2 storage governance with security controls.
+- **Achieve Flutter parity** – Implement learner and provider mobile apps covering communities, courses, ebooks, live classes, tutors, ads, notifications, explorer, and ad management.
+- **Guarantee quality** – Execute integration testing across backend, front-end, user phone app, provider phone app, database, API, logic, and design as required by the plan, culminating in an error-free production launch.
 
-## Workstream Scope & Deliverables
-### Task 1 – Platform Hardening & Governance (100% Complete)
-- Harden Express services, environment validation, rate limiting, and error masking.
-- Publish OpenAPI contracts and shared DTO packages for web/mobile clients.
-- Operationalise dependency audits, workspace tooling, and migration frameworks.
-- Stand up orchestration services that pre-wire feeds, notifications, and moderation domains.
+## 3. Workstream Breakdown & Current Status
+| Task | Scope Highlights | Current Readiness |
+| --- | --- | --- |
+| **Task 1 – Platform Hardening & Governance Foundations** | Security baselines, dependency governance, observability, migration framework, feature flag/config service spanning backend, front-end, Flutter, provider app, database, API, logic, and design. | 10% complete; security, observability, and configuration subtasks underway; progress tracker shows 30% security, 16% overall. |
+| **Task 2 – Content, Commerce & Live Learning Delivery** | Cloudflare R2 storage, course PowerPoints & drip content, ebook reader, live classrooms, tutor hire, Stripe/PayPal commerce, reviews, analytics. | 5% complete; R2 setup and Agora ticketing planning initiated; 5% overall readiness in tracker. |
+| **Task 3 – Communities, Social Graph & Engagement Systems** | Community schemas, roles, paywalls, chat, calendars, maps, streaks, leaderboards, affiliate marketplace, follow graph, recommendations, moderation. | 0% complete; gated until Task 1 artefacts are consumed. |
+| **Task 4 – Explorer Search, Ads & Intelligence Platform** | Meilisearch clusters, ETL pipelines, explorer UI (web & Flutter), ads campaign builder, targeting, metrics, predictions, anomaly detection. | 0% complete; pending infrastructure provisioning. |
+| **Task 5 – Dashboards, Profiles & Operational Consoles** | Profile components, user dashboard modules, instructor dashboards, admin panel, customer service panel, policy hub, ID verification, notifications. | 0% complete; requirements baselined from features_to_add and issue reports. |
+| **Task 6 – Mobile Parity & Store Readiness** | Flutter architecture, learner modules, instructor modules, performance/offline handling, store compliance, push notifications, deep links. | 0% complete; awaiting API contracts and mobile architecture decisions. |
+| **Task 7 – Quality Assurance, Policies & Launch Operations** | Automated tests, integration/UAT cycles, policy rollouts, documentation, release calendar, war room, post-launch monitoring. | 0% complete; QA scaffolding and risk register to be initiated in Milestone 5. |
 
-### Task 2 – Cloudflare R2 & Learning Content Pipelines (100% Complete)
-- Provision R2 buckets, IAM, lifecycle rules, monitoring, and signed URL flows.
-- Implement conversion workers for PowerPoints and ebooks with analytics emitters.
-- Launch React and Flutter viewers with offline caching, download management, and accessibility controls.
-- Instrument dashboards and retention policies that satisfy DRM and compliance requirements.
+## 4. Milestone Schedule
+| Milestone | Weeks | Included Tasks | Key Deliverables |
+| --- | --- | --- | --- |
+| **1 – Platform Foundations & Governance** | 1–3 | Task 1 | Security & dependency baselines, observability dashboards, migration/feature flag services. |
+| **2 – Content Commerce & Learning Experiences** | 2–6 | Task 2 | R2 asset fabric, course & ebook enablement, live classrooms, tutor hire, commerce stack. |
+| **3 – Communities, Social Graph & Dashboards** | 5–10 | Tasks 3 & 5 | Community core, roles/paywalls/affiliates, chat, leaderboards, dashboards, admin & customer service panels, ID verification. |
+| **4 – Explorer, Ads & Intelligence** | 8–12 | Task 4 | Meilisearch infrastructure, ETL pipelines, explorer UX, Edulure Ads suite, analytics dashboards. |
+| **5 – Mobile Parity, QA & Launch** | 10–18 | Tasks 6 & 7 | Flutter learner/provider parity, store submissions, automated/regression testing, policy rollout, release operations. |
 
-### Task 3 – Social Graph & Profile Component System (0% Complete)
-- Design relationship/privacy schemas, feed aggregation, and notification services.
-- Construct reusable profile components, documentation, and visual regression coverage.
-- Build cross-platform social UX with optimistic follow interactions and dashboards.
-- Deliver recommendation engines and analytics reporting for adoption metrics.
+## 5. Integration Strategy
+- **Backend:** Expand Express services with modular domains for storage, commerce, communities, search, notifications, and analytics while enforcing rate limits, authentication guards, and logging.
+- **Front-end (React):** Introduce shared API client, state management, responsive layouts, accessibility, and error boundaries for live feeds, commerce funnels, community management, explorer, ads dashboards, and admin panels.
+- **User Phone App (Flutter Learner):** Adopt dio + Riverpod/Bloc architecture, offline caching, secure storage, and parity modules for communities, courses, ebooks, live classrooms, chat, explorer, notifications, and ads.
+- **Provider Phone App:** Mirror instructor dashboard, community management, pricing, analytics, chat inbox, and ad management with secure workflows and offline resilience.
+- **Database:** Extend schemas for assets, courses, ebooks, progress tracking, quizzes/exams, communities, roles, chat, paywalls, ads, notifications, finance, policies, and telemetry with migrations and rollback drills.
+- **API:** Publish OpenAPI/GraphQL specs covering storage, commerce, community, explorer, ads, notifications, policies, admin, and support operations; include pagination, filtering, and error standards.
+- **Logic & Automation:** Implement PPT/ebook conversion workers, drip content schedulers, tutor availability, recommendation engines, ranking algorithms, spam filters, notification dispatchers, and analytics collectors.
+- **Design:** Finalise design tokens, component libraries, accessibility standards, localisation guidance, and annotated specs for every surface (web + mobile) as captured in Tasks 5, 6, 8, and 9 of the plan.
 
-### Task 4 – Communities 2.0 & Monetisation Suite (0% Complete)
-- Rebuild community schemas, RBAC, gamification, and paywall entitlements.
-- Ship engagement modules (feeds, polls, resources), chat upgrades, and scheduling.
-- Integrate payment gateway flows, affiliate tracking, payouts, and financial reporting.
-- Release mirrored experiences on web, Flutter user, and provider apps with accessibility sign-off.
+## 6. Testing & Quality Coverage
+- Follow the integration testing requirements embedded in each task: backend unit/integration/load/security, React regression/accessibility, Flutter device matrix, provider app UAT, database migration rehearsals, API contract tests, logic workflow verification, and design QA reviews.
+- Implement automation pipelines per Task 7, ensuring continuous validation for live feed, commerce, community, explorer, ads, chat, notifications, policies, and calendar functionality.
+- Schedule milestone-specific test suites: Milestone 2 focuses on commerce and learning flows; Milestone 3 adds community/social/regulation tests; Milestone 4 validates search/ads ranking accuracy; Milestone 5 delivers full-system regression, beta cohorts, and store compliance.
 
-### Task 5 – Explorer & Search Platform (0% Complete)
-- Deploy Meilisearch clusters with disaster recovery and observability.
-- Build ingestion pipelines, ranking experiments, and zero-result dashboards.
-- Implement explorer navigation, filters, cards, saved searches, and mobile voice search.
-- Surface provider-facing insights and actionable analytics inside explorer tooling.
+## 7. Risks & Mitigations
+- **Dependency Drift:** Mitigated by Task 1 dependency governance and CI audits; blockers escalated in milestone reviews.
+- **Compliance & Payments:** Stripe/PayPal paywalls, tutor payouts, and affiliate campaigns require legal/finance sign-off; integrate approval checkpoints before Milestone 3 exits.
+- **Search & Ads Accuracy:** Meilisearch relevance and ad targeting depend on analytics quality; configure monitoring and anomaly alerts in Task 4.5.
+- **Mobile Store Timelines:** Store submission lead times could impact launch; Task 6.5 mandates early asset preparation and phased rollout plans.
+- **Design/Engineering Misalignment:** Task 5 and Task 8 coordination prevents duplicate component work; host joint reviews and maintain token governance logs.
+- **Quality Debt:** Progress tracker highlights remaining gaps; no milestone closes until all six metrics reach 80%+, with launch gated at 100%.
 
-### Task 6 – Quality Assurance, Documentation & Release Readiness (3% Overall)
-- Run end-to-end automated test suites, load/security scans, and accessibility audits.
-- Orchestrate beta programmes with telemetry, surveys, and defect burndown.
-- Publish documentation, enablement packs, release notes, and change control processes.
-- Stand up monitoring dashboards, on-call rotations, and the final update report.
-- Current progress: documentation/testing plan baseline published (Subtask 6.3 at 5% overall).
+## 8. Immediate Next Actions
+1. Finalise Task 1 observability dashboards and feature flag services so Task 2/3 squads can consume them.
+2. Complete Cloudflare R2 provisioning playbook and Agora integration proofs for live classrooms.
+3. Kick off community schema design workshops covering roles, paywalls, affiliate earnings, and moderation per Task 3.
+4. Draft Meilisearch infrastructure plan, including security keys, replication, and ETL sequencing for Task 4.
+5. Align dashboard/profile requirements with design tokens and analytics to unblock Task 5 build.
+6. Prepare Flutter architecture RFC covering dio, Riverpod/Bloc, secure storage, and feature flag integration for Task 6.
+7. Stand up QA automation roadmap (Task 7) tying regression suites to milestone exits and progress tracker metrics.
 
-### Task 7 – Mobile Application Completion & Store Launch (0% Complete)
-- Close feature parity gaps across content, social, community, explorer, and payments.
-- Profile and optimise mobile performance, offline caching, and startup metrics.
-- Prepare App Store/Play Store submissions, privacy statements, and localisation packs.
-- Execute device certification, accessibility audits, and support playbooks for go-live.
+## 9. Launch Readiness Criteria
+Version 1.00 will be cleared for release when:
+- Every task reports 100% across security, completion, integration, functionality, error-free, and production metrics in the progress tracker.
+- Cloudflare R2, commerce, community, explorer, ads, and dashboard capabilities pass end-to-end tests on web and both Flutter apps.
+- Policies, notifications, spam controls, admin/customer service panels, and calendars are operational with documented SOPs.
+- App Store and Play Store submissions (learner + provider) are approved, with monitoring, crash analytics, and on-call rotations active.
+- The changelog, knowledge base, update brief, and end-of-update report are finalised, and rollout war room staffing is confirmed.
 
-### Task 8 – Design System Integration & UI Handoff (36% Overall)
-- Complete research alignment, persona updates, and telemetry requirement mapping.
-- Consolidate cross-platform tokens, component kits, motion guidelines, and governance.
-- Deliver high-fidelity mobile and web flows for home, media, communities, profiles, and settings.
-- Package redlines, accessibility/localisation audits, analytics matrices, and QA-ready handoff documentation.
-
-## Milestone Alignment & Schedule
-- **Milestone 1 – Platform Foundations Locked (Week 4, Complete):** Confirms Task 1 exit criteria covering security validation, OpenAPI contracts, dependency governance, migration rehearsals, and orchestration scaffolding.
-- **Milestone 2 – Cloud-Native Content Delivery (Week 8, Complete):** Validates Task 2 content pipelines, cross-platform viewers, offline support, and analytics dashboards.
-- **Milestone 3 – Social Graph & Profile System (Week 10, Pending):** Dependent on Milestones 1–2 assets; exits when social schemas, feeds, components, and analytics are live with usability and accessibility sign-off.
-- **Milestone 4 – Communities 2.0 & Monetisation Launch (Week 13, Pending):** Relies on social data and design tokens to ship community modules, chat upgrades, monetisation flows, and accessibility/localisation audits.
-- **Milestone 5 – Explorer & Release Readiness (Week 16, Pending):** Bundles Task 5 delivery with Task 6 QA/readiness artefacts, ensuring Meilisearch, ingestion pipelines, explorer UX, and release documentation are production-ready.
-- **Milestone 6 – Mobile Application Completion & Store Launch (Week 18, Pending):** Requires prior milestones for data/services; exits when parity matrix, device QA, store submissions, and monitoring are completed.
-- **Milestone 7 – Design Readiness & Handoff (Week 8, 20% Complete):** Tracks Task 8 phases from discovery to QA handoff, ensuring engineering receives finalised specs and accessibility guidance.
-
-## Progress Snapshot (from Progress Tracker)
-- **Completed:** All Task 1 and Task 2 subtasks (100% across security, completion, integration, functionality, error-free, production).
-- **In Progress:** Task 6 overall at 3% due to testing plan baseline; Task 8 averaging 36% with subtasks ranging 23–42% overall.
-- **Not Started:** Tasks 3, 4, 5, and 7 remain at 0% across all metrics pending activation after readiness reviews.
-- **Quality Metrics:** Content pipeline subtasks (2.1–2.5) hold 95% "Error Free" scores due to outstanding CloudConvert credential provisioning; remediation tracked as part of production readiness.
-
-## Testing & Quality Strategy
-- Adopt the published Version 1.10 testing plan as the QA charter for regression, contract, performance, security, and accessibility coverage.
-- Execute Task 6.1 suites in CI/CD, including backend contract tests, frontend regression/visual tests, and Flutter device farm runs.
-- Run staged beta programmes (Task 6.2) with telemetry dashboards, surveys, and defect SLAs.
-- Maintain documentation, release notes, runbooks, and training assets (Task 6.3–6.5) to support enablement and post-launch operations.
-- Extend Task 7.4 mobile QA to cover offline/online transitions, crash analytics, and assistive technology validation before store submissions.
-
-## Dependencies & Risk Management
-- Downstream tasks (2–7) cannot start without Task 1 gate approvals on security, API contracts, and migration frameworks; enforce readiness reviews before handoff.
-- Coordinate shared data contracts, analytics schemas, and design tokens between Tasks 2–5 and Task 8 to prevent rework and ensure UI consistency.
-- Manage monetisation and mobile launch risk via feature flags, rollback scripts, phased rollout plans, and financial compliance reviews.
-- Track CloudConvert credential provisioning (Task 2 error-free delta) and ensure staging parity before additional content ingestion.
-- Maintain a central risk register updated weekly with mitigation owners, contingency plans, and escalation triggers aligned to milestone checkpoints.
-
-## Next Steps & Action Items
-1. **Readiness Reviews:** Schedule cross-team reviews to confirm Task 1 artefacts are consumed by frontend/mobile squads and to greenlight Task 3 development.
-2. **Social Graph Kick-off:** Finalise schema designs, moderation workflows, and caching strategies; prepare migration scripts and privacy impact assessments.
-3. **Community & Monetisation Prep:** Align payment gateway integration tasks with finance/compliance, and draft affiliate payout runbooks ahead of implementation.
-4. **Explorer Foundations:** Provision Meilisearch environments, define ingestion data contracts, and outline ranking experiment KPIs in collaboration with analytics.
-5. **QA Infrastructure:** Expand automated test scaffolding, connect telemetry dashboards, and integrate beta feedback loops into the defect backlog.
-6. **Mobile Parity Planning:** Compile gap analyses for Flutter learner/provider apps, map required API enhancements, and outline store asset production schedule.
-7. **Design Handoff:** Continue Task 8 momentum by locking tokens, delivering annotated specs, and booking engineering/design QA walkthroughs.
-
-## Launch Criteria Summary
-The Version 1.00 update is production-ready when:
-- All tasks reach 100% across security, integration, functionality, error-free, production, and overall metrics.
-- Cloudflare R2 pipelines operate with zero outstanding credential or compliance gaps.
-- Social, community, explorer, monetisation, and mobile experiences pass accessibility, localisation, and usability audits.
-- Documentation, release notes, support playbooks, and monitoring dashboards are delivered and reviewed with operations.
-- App store submissions for learner and provider apps are approved, with crash monitoring and on-call rotations active for post-launch support.
-
-This brief remains the authoritative reference for steering committee decisions, cross-functional coordination, and quality gates as Version 1.00 progresses from planning into implementation and launch.
+This brief is the authoritative reference for steering committee reviews and cross-functional execution of the Version 1.00 programme.
