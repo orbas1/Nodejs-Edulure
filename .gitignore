@@ -1,0 +1,17 @@
+# Node
+node_modules/
+
+# Build outputs
+frontend-reactjs/dist/
+backend-nodejs/dist/
+
+# Env files
+backend-nodejs/.env
+
+# Flutter
+Edulure-Flutter/build/
+.dart_tool/
+.packages
+
+# Misc
+.DS_Store
