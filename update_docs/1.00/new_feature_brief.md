@@ -1,108 +1,103 @@
-# Version 1.00 Feature Brief
+# Version 1.00 Feature Brief – Edulure Full Ecosystem Release
 
 ## Executive Summary
-Version 1.00 of Edulure formalises the platform as a full-spectrum learning, commerce, and community ecosystem available on web and Flutter. The release blends transactional course and ebook experiences with Agora-powered live instruction, an expanded social graph, a Skool-inspired community layer, and a discovery suite driven by Meilisearch. Every surface—profiles, dashboards, admin consoles, and mobile clients—is re-architected as reusable components with end-to-end observability, ensuring operational resilience while giving learners, instructors, and administrators a unified journey.
+Version 1.00 transforms Edulure into an always-on learning, commerce, and community operating system that is available on web and Flutter. The update consolidates storage on Cloudflare R2, modernises course and ebook delivery with PowerPoint and interactive readers, unlocks a Skool-class social layer with communities and follower graphs, and equips explorers and admins with Meilisearch-powered discovery. Every surface—from instructor dashboards to learner mobile screens—is rebuilt as modular components that can evolve rapidly without regressions.
 
 ## Strategic Objectives
-- **Frictionless Learning & Purchasing:** Streamline course and ebook commerce with modern viewers, PowerPoint delivery, and tutor hiring so that learners can move from discovery to engagement in minutes.
-- **High-Engagement Communities:** Introduce Communities 2.0 with live feeds, chat, leaderboards, role-based governance, and subscription paywalls that mirror Skool-class experiences on both web and mobile.
-- **Scalable Infrastructure:** Adopt Cloudflare R2, Meilisearch, and modular backend services for content, search, social, and communities with automated migrations, seeders, and monitoring.
-- **Cross-Platform Consistency:** Rebuild the profile system, dashboards, and explorer using shared design tokens, ensuring parity between React web, Flutter, and future native clients.
-- **Actionable Insights & Compliance:** Deliver analytics widgets, finance dashboards, and moderation tooling while reinforcing privacy, anti-spam, and policy enforcement across the stack.
+1. **Unified Content & Storage Fabric** – Migrate media, documents, and recordings to Cloudflare R2 with lifecycle automation, antivirus scans, and signed URL delivery for secure global performance.
+2. **Immersive Learning Modalities** – Deliver componentised PowerPoint viewers, upgraded ebook readers, and live classrooms that work seamlessly across browsers and phones.
+3. **High-Retention Social Graph** – Activate follow relationships, recommendations, and notifications that drive learners back into the ecosystem daily.
+4. **Communities-as-a-Platform** – Redesign the community hub to rival Skool with role-based governance, paywalls, affiliate marketplaces, chat upgrades, and admin oversight on web and mobile.
+5. **Explorer & Intelligence** – Launch a Meilisearch-backed explorer that unifies search across communities, courses, ebooks, tutors, profiles, and ads with analytics instrumentation.
+6. **Component-Based Experiences** – Rebuild the profile area and dashboards as reusable components with complete backend, frontend, styling, and mobile parity.
 
-## Target Users & Value
-| Persona | Key Pain Points Today | Value Delivered in 1.00 |
+## Stakeholder Value Proposition
+| Persona | Critical Pain Today | Value Delivered in v1.00 |
 | --- | --- | --- |
-| **Students / Learners** | Fragmented content formats, no central feed, limited tutor options. | Unified feed, course/ebook storefront, live classrooms, upgraded readers, follow recommendations, and responsive mobile parity. |
-| **Instructors / Tutors** | Siloed creation tools, limited monetisation, lack of analytics. | Component-based profile builder, community management console, revenue analytics, live session scheduling, affiliate controls, and R2-backed asset workflows. |
-| **Community Managers** | Disconnected feeds, no tiering or paywalls, weak moderation. | Communities hub with tier points, leaderboards, chat, maps, subscription tiers, affiliate marketplace, and admin oversight. |
-| **Administrators / Support** | Insufficient visibility into content quality, payments, and policies. | Admin panel with search, moderation, finance, policy enforcement, spam/bad word scanning, notification controls, and customer service tools. |
-| **Mobile Learners** | Limited feature coverage in Flutter app. | Flutter parity for communities, courses, ebooks, tutors, ads, notifications, explorer, and chat. |
+| **Learner / Student** | Fragmented content types, no single feed, poor discovery, basic ebook reader. | PowerPoint playback, upgraded ebook reader, personal feed, explorer search, follower-based recommendations, Flutter parity. |
+| **Instructor / Community Owner** | Disconnected tools for courses, communities, and monetisation. | Component-based profile, community management console, subscription tiers, affiliate marketplace, analytics dashboards, R2 asset workflows. |
+| **Community Manager / Moderator** | Limited governance, weak moderation, no paywalls or tiering, poor visibility. | Roles, tier points, leaderboards, chat, paywalls, moderation queues, admin extensions, mobile oversight. |
+| **Administrators / Support** | Lack of observability, compliance controls, and unified operations. | R2 monitoring, policy hub, notification centre, support panel, analytics, incident response runbooks, explorer telemetry. |
+| **Mobile User** | Feature parity gaps, inconsistent navigation. | Dedicated Flutter modules for profiles, communities, explorer, chat, notifications, and payment flows. |
 
-## Feature Overview
-### 1. General Area Enhancements
-- **Live Feed:** Real-time aggregation of course updates, community posts, tutor availability, and promotional announcements with follow-based personalisation.
-- **Course Purchase:** Bundled catalog with categories, drip schedules, PowerPoint/recording previews, secure checkout via Stripe and PayPal, and learning progress indicators.
-- **E-book Purchase:** Enhanced storefront with reader previews, pricing tiers, upsell bundles, DRM-lite protections, and Cloudflare R2-backed delivery.
-- **Live Classrooms (Agora):** Ticketed and free sessions using Agora’s free tier; scheduling via calendars, recording storage in R2, live quizzes, polls, and post-session analytics.
-- **Tutor Hourly Hire:** Marketplace for tutor profiles including hourly rates, availability maps, booking workflow, chat initiation, and review/verification badges.
+## Feature Pillars & Scope
+### 1. Cloudflare R2 Storage Fabric
+- Multi-bucket strategy for courses, ebooks, communities, marketing, and analytics exports.
+- Lifecycle rules (archival, deletion), geo-replication, signed URLs, presigned upload flows, and checksum validation.
+- Upload service orchestrating antivirus scans, PPT-to-PDF/HTML conversions, media transcoding, and metadata enrichment.
+- Monitoring dashboards for latency, error rates, storage cost, and bandwidth per feature.
 
-### 2. Social Graph & Following
-- Relationship model covering follow, unfollow, block, mute, and privacy settings, with notifications and moderation escalations.
-- Feed integration for follows: course completions, community milestones, tutor availability, and leaderboard achievements.
-- Recommendation engine using shared courses, mutual communities, search history, and tier points.
+### 2. Course PowerPoint Enablement
+- PowerPoint ingestion pipeline (R2 upload, conversion service, slide thumbnails, transcript extraction).
+- Course builder components for attaching decks to modules, scheduling slide-based live sessions, and reusing decks in communities.
+- Web/Flutter PowerPoint player with annotations, presenter notes, dual-mode (self-paced vs instructor-led), and offline caching.
+- Analytics capturing slide engagement, drop-off points, and reuse metrics across communities and courses.
 
-### 3. Profile Area Redesign (Component Based)
-- Modular components for profile headers, badges, course progress, community memberships, affiliate widgets, financial snapshots, and timeline posts.
-- Tailored experiences per user type (Student vs Instructor) with quick actions (hire tutor, create course, manage community).
-- Full stack updates: database migrations, seeders, backend aggregation services, GraphQL/REST endpoints, React components, Flutter widgets, styling tokens, and analytics instrumentation.
-- Mobile app integration: navigation routes, API connectors, offline caching, push notifications for profile updates.
+### 3. Ebook Upgrade Programme
+- Reader redesign with typography controls, audio narration, inline quizzes, highlights, bookmarks, and watermarking (DRM-lite).
+- Author console for chapter organisation, bulk import/export, accessibility checks (contrast, alt text), and revenue dashboards.
+- Integration with profiles and communities (share excerpts, embed in posts, attach to lessons).
+- R2-backed asset pipelines with preview generation, device binding, and expiry policies.
 
-### 4. Communities 2.0 (Skool-Inspired)
-- **Core Hub:** Redesigned community home with hero, announcements, feed filters, maps, classroom links, tier badges, about section, and affiliate highlights.
-- **Content & Engagement:** Posts, categories, comments, replies, polls, maps, embedded classrooms, calendars, streaks, tier points, leaderboards, and badges.
-- **Roles & Permissions:** Members, admins, moderators, community owners, and affiliate partners with granular permissions and audit logs.
-- **Monetisation:** Subscription/paywall tiers, Stripe billing, campaign management, PPC/PPI/PPConversion ad placements, and revenue dashboards.
-- **Communication:** Upgraded chat/inbox with channels, direct messages, Agora live hooks, notifications, online status tracker, and moderation tools.
-- **Affiliate & Management:** Affiliate section in user dashboards, link creation, earnings tracking, withdrawals, and instructor dashboard integration for community creation/management.
-- **Admin & Support:** Admin panel extensions for community oversight, incident response, spam/bad word enforcement, and customer service workflows.
-- **Mobile Parity:** Flutter screens for feeds, maps, chat, leaderboards, paywalls, admin controls, and notifications.
+### 4. Follow Graph & Social Signals
+- Relationship model covering follow, unfollow, block, mute, and reporting; includes privacy settings and audit logs.
+- Recommendation engine using shared courses, mutual communities, search history, tutor ratings, and tier points.
+- Notification centre for follows, mentions, feed highlights, leaderboard changes, and tutor availability.
+- Feed ranking service that merges course milestones, community posts, ads, and affiliate promotions based on the follow graph.
 
-### 5. Explorer & Search Engine
-- Global navigation addition for Explorer with saved searches, filters, and breadcrumbs.
-- Meilisearch integration with light matching engine, synonyms, typo tolerance, scoring signals (followers, ratings, tier points) and analytics dashboards.
-- Indexing pipelines for communities, profiles, courses, ebooks, tutors, ads, and events with queue-driven updates, seeders, and monitoring.
-- Front-end explorer with entity tabs, call-to-action cards, map previews, and quick joins; mobile version includes voice search and offline recents.
+### 5. Profile Area Redesign (Component Architecture)
+- Component catalogue: hero header, role badges, course/ebook shelves, community memberships, affiliate widgets, revenue stats, timelines, actions.
+- Support for multiple user types (Student, Instructor) with tailored quick actions, access controls, and dashboards.
+- Backend aggregation layer with caching, analytics hooks, and search indexing.
+- Full stack delivery: database migrations, seeders, API endpoints, React components, Flutter widgets, styling tokens, localization, accessibility.
 
-### 6. Dashboards & Panels
-- **User Dashboard:** Modules for profile editing, followers, settings, finance, instructor onboarding, ID verification, community listings, ebook/courses library, widgets, statistics, and notifications.
-- **Instructor Dashboard:** Community management suite, course creation (drip content, modules, live classrooms), ebook authoring, pricing, leadership boards, chat inbox, analytics graphs, stats, and finance tools.
-- **Admin Panel:** Site-wide management including content approvals, policy enforcement, ad management, subscription oversight, search analytics, and security controls.
-- **Customer Service Panel:** Ticket queues, chat escalation, refund processing, policy violation handling, and telemetry-driven responses.
+### 6. Communities 2.0 (Skool-class)
+- Community home redesign with hero, announcements, feed filters, classroom integration, map views, tier badges, streaks, and resources.
+- Content lifecycle including posts, polls, comments, replies, maps, events, calendars, classroom sessions, and document libraries.
+- Governance (members, admins, moderators, owners), tier points, leaderboards, subscription/paywall tiers, role actions, and audit trails.
+- Affiliate marketplace and earnings withdrawal for community owners and members.
+- Upgraded chat/inbox with channels, DMs, notifications, Agora live hooks, online tracker, moderation tools.
+- Admin panel extensions for community oversight, incident management, compliance, and analytics.
+- Flutter parity: feeds, chat, maps, leaderboards, admin tooling, affiliate management, notifications.
 
-### 7. Learning Content & Delivery
-- **Courses:** Progress tracking, assignments, categories, course profile pages, live classroom schedules, recordings, notes, quizzes, live quizzes, exams, grades, video, PowerPoint, docs, and drip content.
-- **Ebooks:** Advanced viewer with annotations, highlights, bookmarks, multimedia, analytics, DRM-lite, and profile integration.
-- **Tutor Hire:** Booking, session management, live classroom integration, reviews, and payment flows.
+### 7. Explorer & Search Engine
+- Explorer entry in navigation and header with saved searches, breadcrumbs, and personalised quick filters.
+- Meilisearch integration with synonyms, typo tolerance, ranking rules using follow graph, ratings, tier points, tutor availability, recency, and ad signals.
+- ETL pipelines for communities, profiles, courses, ebooks, tutors, ads, events; queue-based incremental updates and scheduled reindexing.
+- Explorer UI (web + Flutter) with entity tabs, map previews, voice search, offline recents, deep links to detail pages, and analytics instrumentation.
 
-### 8. Commerce & Advertising
-- **Edulure Ads:** PPC/PPI/PPConversion campaigns, metrics dashboards, targeting controls, ad types, budgets, predictions, and traffic forecasting.
-- **Stripe & PayPal Integration:** Unified payment service for courses, ebooks, live classrooms, subscriptions, and tutor hires with reconciliation workflows.
+### 8. Cross-Cutting Enablers
+- Notification centre with granular preferences, push/web/mobile integration, and fallback email digests.
+- Policy hub for privacy, terms, guidelines, spam/bad word detection, moderation, and compliance dashboards.
+- Analytics observability: dashboards for storage, feed engagement, community health, search adoption, revenue, and churn.
+- Admin & support consoles for approvals, incident response, refunds, and customer success automation.
 
-### 9. Notifications, Policies, & Security
-- Centralised notification centre covering follows, chat, classrooms, paywalls, ads, and moderation events with granular preferences.
-- Policy hub including privacy policy, terms, community guidelines, and enforcement workflows.
-- Spam and bad word detection integrated into feeds, chat, reviews, and community posts with moderation tooling.
-- Security hardening: IAM least privilege, audit trails, encryption, penetration testing, incident response runbooks.
-
-### 10. Infrastructure & Operations
-- Cloudflare R2 for asset storage with lifecycle rules, regional replication, signed URLs, and monitoring.
-- Observability stack covering latency, throughput, cost, community health, search adoption, and ad performance.
-- Automated migrations, database seeders, background workers, CI/CD pipelines, and staged rollouts via feature flags.
-
-### 11. Flutter App Parity
-- Flutter modules covering communities, courses, ebooks, live class viewing, tutor discovery, ad management, notifications, explorer, and profile editing.
-- Shared API clients, caching strategies, offline modes, and push notification integration with backend services.
-
-## Architecture & Integration Considerations
-- **Service Domains:** Storage, Content, Commerce, Social, Communities, Search, Notifications, Ads, Analytics, and Mobile API gateway.
-- **Data Management:** Schema migrations for profiles, communities, ads, explorer indexes; dual-write strategies during cutovers; seeder scripts for test data.
-- **API Strategy:** Versioned REST/GraphQL endpoints with documentation, SDK updates, and mobile compatibility shims.
-- **Compliance & Governance:** Privacy impact assessment, content licensing for ebooks/courses, payment compliance (PCI), and accessibility audits (WCAG 2.1 AA).
-- **Reliability:** Autoscaling policies, background job orchestration, caching (Redis/Cloudflare KV), and disaster recovery drills for R2 and Meilisearch.
+## Architecture Considerations
+- **Service Domains:** Storage (R2), Content (courses, ebooks, powerpoints), Social (follows, feeds), Communities, Search (Meilisearch), Commerce (payments, paywalls), Notifications, Analytics, Mobile API gateway.
+- **Data Strategy:** Versioned migrations, seeders, rollback playbooks, fixture datasets for QA, and data governance (PII masking, retention).
+- **Integration Contracts:** REST + GraphQL endpoints with OpenAPI, mobile SDK updates, webhook contracts for payments and community events.
+- **Scalability & Reliability:** Autoscaling workers, background jobs, caching (Redis/Cloudflare KV), CDN optimisation, blue/green deployments, feature flags per capability.
 
 ## Success Metrics
-- 98.5%+ availability and <250ms median latency for R2-served assets across target regions.
-- 35% increase in course/ebook conversions driven by explorer and live feed personalisation.
-- 30% uplift in community engagement (posts, comments, live sessions) and 25% growth in follower connections within 60 days.
-- <2% zero-result searches and <300ms average explorer query response.
-- 90% feature parity between web and Flutter within launch week.
-- Reduction of spam/bad-word incidents by 50% through automated moderation and policy enforcement.
+- 99% success rate and <250ms median latency for R2 asset delivery across regions.
+- 40% uplift in course/ebook engagement due to PowerPoint and reader upgrades.
+- 30% increase in social interactions (follows, comments, chat) within 60 days of launch.
+- 25% growth in community retention measured by tier points and leaderboards.
+- <2% zero-result explorer searches and <300ms median response time.
+- 90% Flutter parity coverage within two sprints post-launch.
 
-## Rollout & Change Management
-1. **Internal Enablement:** Train support, sales, and instructor success teams on new workflows (communities, ads, explorer, profiles).
-2. **Beta Programme:** Staff → instructor champions → selected learners for live classrooms, communities, and explorer; collect telemetry and surveys.
-3. **Marketing & Communication:** Launch microsite, release notes, email campaigns, social teasers, webinars, and in-product walkthroughs spotlighting new features.
-4. **Launch Governance:** Feature flags for R2, explorer, follow graph, communities, ads, and notifications; staged rollout by region and segment.
-5. **Post-Launch Monitoring:** Daily war room reviewing dashboards, incident queues, feedback backlog, and adoption metrics; sprint planning for follow-up versions 1.01+.
-6. **Continuous Improvement:** Document lessons learned, backlog enhancements, and cross-team retrospectives to fuel subsequent releases.
+## Risk & Mitigation Snapshot
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| R2 migration downtime | Content inaccessible | Dual-write adapters, phased migration, rollback scripts, synthetic testing. |
+| Meilisearch schema drift | Search accuracy degradation | Automated schema validation, contract tests, versioned indexes. |
+| Community paywall compliance | Revenue leakage or legal exposure | Stripe audit, tax/VAT calculators, legal review, sandbox testing. |
+| Mobile parity slippage | Feature inconsistency | Dedicated Flutter squad, weekly parity reviews, shared component specs. |
+| Moderation overload | Policy breaches | Automated spam/bad word filters, escalation SLAs, admin dashboards, training. |
+
+## Launch & Change Management
+1. **Enablement** – Train support, instructor success, and community managers on new profiles, paywalls, and explorer workflows; publish SOPs and video walkthroughs.
+2. **Beta Cohorts** – Roll out to internal staff → instructor champions → select learner groups; monitor telemetry, collect qualitative feedback, and iterate.
+3. **Marketing & Communications** – Release microsite, power user webinars, community spotlights, social teasers, and in-product tours emphasising R2 speed, communities, and explorer.
+4. **Rollout Strategy** – Use feature flags for R2, follow graph, communities, paywalls, and explorer; stagger release by geography and user type.
+5. **Post-Launch Operations** – War room for the first 30 days reviewing dashboards, incident queues, NPS, and adoption KPIs; backlog grooming for Version 1.01 improvements.
