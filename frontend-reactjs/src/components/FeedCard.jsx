@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 export default function FeedCard({ post }) {
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -38,3 +40,16 @@ export default function FeedCard({ post }) {
     </article>
   );
 }
+
+FeedCard.propTypes = {
+  post: PropTypes.shape({
+    avatar: PropTypes.string.isRequired,
+    author: PropTypes.string.isRequired,
+    role: PropTypes.string.isRequired,
+    postedAt: PropTypes.string.isRequired,
+    content: PropTypes.string.isRequired,
+    tags: PropTypes.arrayOf(PropTypes.string).isRequired,
+    likes: PropTypes.number.isRequired,
+    comments: PropTypes.number.isRequired
+  }).isRequired
+};

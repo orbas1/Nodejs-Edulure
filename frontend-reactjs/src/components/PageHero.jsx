@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 export default function PageHero({ title, description, cta }) {
   return (
     <section className="bg-gradient-to-br from-white via-white to-primary/5">
@@ -31,3 +33,9 @@ export default function PageHero({ title, description, cta }) {
     </section>
   );
 }
+
+PageHero.propTypes = {
+  title: PropTypes.string.isRequired,
+  description: PropTypes.string.isRequired,
+  cta: PropTypes.node.isRequired
+};

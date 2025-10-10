@@ -1,18 +1,26 @@
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Disclosure, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
-
-const navigation = [
-  { name: 'Home', to: '/' },
-  { name: 'Live Feed', to: '/feed' },
-  { name: 'Search', to: '/search' },
-  { name: 'Profile', to: '/profile' },
-  { name: 'Admin', to: '/admin' }
-];
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function MainLayout() {
   const location = useLocation();
+  const { isAuthenticated, session, logout } = useAuth();
+
+  const navigation = useMemo(() => {
+    const base = [
+      { name: 'Home', to: '/' },
+      { name: 'Live Feed', to: '/feed' },
+      { name: 'Search', to: '/search' },
+      { name: 'Profile', to: '/profile' },
+      { name: 'Admin', to: '/admin' }
+    ];
+    if (isAuthenticated) {
+      return [...base, { name: 'Content', to: '/content' }];
+    }
+    return base;
+  }, [isAuthenticated]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -41,18 +49,35 @@ export default function MainLayout() {
             ))}
           </nav>
           <div className="hidden items-center gap-3 md:flex">
-            <NavLink
-              to="/login"
-              className="rounded-full border border-primary/30 px-5 py-2 text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
-            >
-              Log in
-            </NavLink>
-            <NavLink
-              to="/register"
-              className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card hover:bg-primary-dark"
-            >
-              Join the Community
-            </NavLink>
+            {isAuthenticated ? (
+              <>
+                <div className="rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
+                  {session?.user?.firstName ?? session?.user?.email}
+                </div>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="rounded-full border border-primary/30 px-5 py-2 text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
+                >
+                  Log out
+                </button>
+              </>
+            ) : (
+              <>
+                <NavLink
+                  to="/login"
+                  className="rounded-full border border-primary/30 px-5 py-2 text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
+                >
+                  Log in
+                </NavLink>
+                <NavLink
+                  to="/register"
+                  className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card hover:bg-primary-dark"
+                >
+                  Join the Community
+                </NavLink>
+              </>
+            )}
           </div>
           <Disclosure as="div" className="md:hidden">
             {({ open }) => (
@@ -90,18 +115,30 @@ export default function MainLayout() {
                         </NavLink>
                       ))}
                       <div className="mt-4 flex flex-col gap-3">
-                        <NavLink
-                          to="/login"
-                          className="rounded-full border border-primary/30 px-5 py-2 text-center text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
-                        >
-                          Log in
-                        </NavLink>
-                        <NavLink
-                          to="/register"
-                          className="rounded-full bg-primary px-5 py-2 text-center text-sm font-semibold text-white shadow-card hover:bg-primary-dark"
-                        >
-                          Join the Community
-                        </NavLink>
+                        {isAuthenticated ? (
+                          <button
+                            type="button"
+                            onClick={logout}
+                            className="rounded-full border border-primary/30 px-5 py-2 text-center text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
+                          >
+                            Log out
+                          </button>
+                        ) : (
+                          <>
+                            <NavLink
+                              to="/login"
+                              className="rounded-full border border-primary/30 px-5 py-2 text-center text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
+                            >
+                              Log in
+                            </NavLink>
+                            <NavLink
+                              to="/register"
+                              className="rounded-full bg-primary px-5 py-2 text-center text-sm font-semibold text-white shadow-card hover:bg-primary-dark"
+                            >
+                              Join the Community
+                            </NavLink>
+                          </>
+                        )}
                       </div>
                     </div>
                   </Disclosure.Panel>

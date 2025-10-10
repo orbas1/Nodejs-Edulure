@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 import { leaderboards } from '../data/mockData.js';
 
 export default function CommunityProfile({ community }) {
@@ -59,3 +61,16 @@ export default function CommunityProfile({ community }) {
     </div>
   );
 }
+
+CommunityProfile.propTypes = {
+  community: PropTypes.shape({
+    id: PropTypes.string,
+    image: PropTypes.string,
+    name: PropTypes.string,
+    description: PropTypes.string,
+    members: PropTypes.number,
+    online: PropTypes.number,
+    admins: PropTypes.string,
+    link: PropTypes.string
+  })
+};

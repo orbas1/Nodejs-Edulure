@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { Menu, Transition } from '@headlessui/react';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 
@@ -49,3 +50,19 @@ export default function CommunitySwitcher({ communities, selected, onSelect }) {
     </Menu>
   );
 }
+
+CommunitySwitcher.propTypes = {
+  communities: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      name: PropTypes.string.isRequired,
+      description: PropTypes.string
+    })
+  ).isRequired,
+  selected: PropTypes.shape({
+    id: PropTypes.string,
+    name: PropTypes.string,
+    description: PropTypes.string
+  }),
+  onSelect: PropTypes.func.isRequired
+};

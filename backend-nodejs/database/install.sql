@@ -1,4 +1,4 @@
-CREATE DATABASE IF NOT EXISTS edulure CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'edulure_user'@'%' IDENTIFIED BY 'edulure_password';
-GRANT ALL PRIVILEGES ON edulure.* TO 'edulure_user'@'%';
-FLUSH PRIVILEGES;
+-- Legacy placeholder retained for historical reference.
+-- Database provisioning is now handled via scripts/install-db.js, which
+-- creates the target schema using environment-specific credentials and
+-- runs Knex migrations. This file intentionally contains no executable SQL.

@@ -2,7 +2,7 @@ import UserModel from '../models/UserModel.js';
 
 export default class UserService {
   static async list(limit, offset) {
-    return UserModel.list(limit, offset);
+    return UserModel.list({ limit, offset });
   }
 
   static async getById(id) {

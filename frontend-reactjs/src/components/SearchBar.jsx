@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
 export default function SearchBar({ placeholder = 'Search across courses, communities, lessons...' }) {
@@ -12,3 +13,7 @@ export default function SearchBar({ placeholder = 'Search across courses, commun
     </div>
   );
 }
+
+SearchBar.propTypes = {
+  placeholder: PropTypes.string
+};

@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
 import CommunitySwitcher from './CommunitySwitcher.jsx';
 import SearchBar from './SearchBar.jsx';
@@ -31,3 +32,19 @@ export default function TopBar({ communities, selectedCommunity, onCommunityChan
     </div>
   );
 }
+
+TopBar.propTypes = {
+  communities: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      name: PropTypes.string.isRequired,
+      description: PropTypes.string
+    })
+  ).isRequired,
+  selectedCommunity: PropTypes.shape({
+    id: PropTypes.string,
+    name: PropTypes.string,
+    description: PropTypes.string
+  }),
+  onCommunityChange: PropTypes.func.isRequired
+};
