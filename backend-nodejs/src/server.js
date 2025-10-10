@@ -1,24 +1,33 @@
-import dotenv from 'dotenv';
 import app from './app.js';
+import { env } from './config/env.js';
 import logger from './config/logger.js';
-import pool from './config/database.js';
-
-dotenv.config();
-
-const PORT = Number(process.env.PORT ?? 4000);
+import db from './config/database.js';
+import assetIngestionService from './services/AssetIngestionService.js';
 
 async function start() {
   try {
-    await pool.getConnection();
-    logger.info('Database connection pool initialised');
+    await db.raw('select 1');
+    await db.migrate.latest();
+    logger.info('Database connected and migrations applied');
   } catch (error) {
-    logger.error({ err: error }, 'Failed to initialise database connection');
+    logger.error({ err: error }, 'Failed to initialise database');
     process.exit(1);
   }
 
-  app.listen(PORT, () => {
-    logger.info(`Server listening on port ${PORT}`);
+  const port = env.app.port;
+  app.listen(port, () => {
+    logger.info(`Server listening on port ${port}`);
+    assetIngestionService.start();
   });
+
+  const shutdown = () => {
+    assetIngestionService.stop();
+    logger.info('Shutting down gracefully');
+    process.exit(0);
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 }
 
 start();

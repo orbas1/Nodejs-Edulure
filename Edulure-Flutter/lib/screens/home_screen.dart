@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import '../services/session_manager.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -55,19 +58,35 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          ListTile(
-            leading: const Icon(Icons.dashboard_customize_outlined),
-            title: const Text('Live feed'),
-            subtitle: const Text('Stay up to date with every community in a unified stream.'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.pushNamed(context, '/feed'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.person_outline),
-            title: const Text('Profile'),
-            subtitle: const Text('Personalise your instructor and member presence.'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.pushNamed(context, '/profile'),
+          ValueListenableBuilder(
+            valueListenable: SessionManager.assetsCache.listenable(),
+            builder: (context, box, _) {
+              return Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.dashboard_customize_outlined),
+                    title: const Text('Live feed'),
+                    subtitle: const Text('Stay up to date with every community in a unified stream.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/feed'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.person_outline),
+                    title: const Text('Profile'),
+                    subtitle: const Text('Personalise your instructor and member presence.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.library_books_outlined),
+                    title: const Text('Content library'),
+                    subtitle: const Text('Download decks and ebooks with offline support.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/content'),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),

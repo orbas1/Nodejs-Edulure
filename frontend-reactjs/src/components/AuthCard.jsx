@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 export default function AuthCard({ title, subtitle, children }) {
   return (
     <div className="mx-auto flex min-h-[calc(100vh-180px)] max-w-6xl items-center justify-center px-6 py-16">
@@ -30,7 +32,7 @@ export default function AuthCard({ title, subtitle, children }) {
         <div className="space-y-8">
           {children}
           <p className="text-xs text-slate-500">
-            By continuing you agree to Edulure's{' '}
+            By continuing you agree to Edulure&apos;s{' '}
             <a href="/terms" className="font-semibold text-primary">
               Terms
             </a>{' '}
@@ -45,3 +47,9 @@ export default function AuthCard({ title, subtitle, children }) {
     </div>
   );
 }
+
+AuthCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  subtitle: PropTypes.string.isRequired,
+  children: PropTypes.node.isRequired
+};

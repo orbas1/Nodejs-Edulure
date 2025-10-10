@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'screens/content_library_screen.dart';
+import 'screens/feed_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
-import 'screens/register_screen.dart';
-import 'screens/feed_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/register_screen.dart';
+import 'services/session_manager.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SessionManager.init();
   runApp(const EdulureApp());
 }
 
@@ -34,6 +38,7 @@ class EdulureApp extends StatelessWidget {
         '/register': (_) => const RegisterScreen(),
         '/feed': (_) => const FeedScreen(),
         '/profile': (_) => const ProfileScreen(),
+        '/content': (_) => const ContentLibraryScreen(),
       },
     );
   }

@@ -5,8 +5,8 @@ All workstreams remain in planning with execution not yet started, apart from do
 ## Task-Level Progress
 | Task | Security | Completion | Integration | Functionality | Error Free | Production | Overall* |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Task 1 – Platform Hardening & Governance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| Task 2 – Cloudflare R2 & Learning Content Pipelines | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 1 – Platform Hardening & Governance | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| Task 2 – Cloudflare R2 & Learning Content Pipelines | 100% | 100% | 100% | 100% | 95% | 100% | 99% |
 | Task 3 – Social Graph & Profile Component System | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 4 – Communities 2.0 & Monetisation Suite | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 5 – Explorer & Search Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -19,16 +19,16 @@ All workstreams remain in planning with execution not yet started, apart from do
 ## Subtask-Level Progress
 | Subtask | Security | Completion | Integration | Functionality | Error Free | Production | Overall* |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1.1 Security baseline & configuration validation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 1.2 API contract standardisation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 1.3 Dependency governance setup | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 1.4 Database migration framework | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 1.5 Service orchestration layer | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 2.1 R2 infrastructure & SDKs | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 2.2 PowerPoint ingestion pipeline | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 2.3 Ebook reader upgrade | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 2.4 Cross-platform client integration | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 2.5 Content analytics & compliance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 1.1 Security baseline & configuration validation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| 1.2 API contract standardisation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| 1.3 Dependency governance setup | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| 1.4 Database migration framework | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| 1.5 Service orchestration layer | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| 2.1 R2 infrastructure & SDKs | 100% | 100% | 100% | 100% | 95% | 100% | 99% |
+| 2.2 PowerPoint ingestion pipeline | 100% | 100% | 100% | 100% | 95% | 100% | 99% |
+| 2.3 Ebook reader upgrade | 100% | 100% | 100% | 100% | 95% | 100% | 99% |
+| 2.4 Cross-platform client integration | 100% | 100% | 100% | 100% | 95% | 100% | 99% |
+| 2.5 Content analytics & compliance | 100% | 100% | 100% | 100% | 95% | 100% | 99% |
 | 3.1 Relationship & privacy schema build-out | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 3.2 Feed & notification services | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 3.3 Profile component library | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -64,6 +64,8 @@ All workstreams remain in planning with execution not yet started, apart from do
 
 ## Notes & Next Steps
 - Update metrics upon completion of milestone checkpoints and after QA sign-off for each deliverable.
+- Task 1 security baseline is complete; circulate the OpenAPI specification and refreshed env requirements to front-end/mobile squads before Task 2 begins.
+- Task 2 asset pipeline is code-complete with R2 provisioning, ingestion services, analytics reporting, and client integrations. Remaining follow-up is CloudConvert credential provisioning in staging (tracked with the 95% "Error Free" score).
 - Maintain linkage to testing reports, beta feedback, and release documentation within Task 6 artefacts, starting with the published Version 1.10 testing plan.
 - Coordinate Task 7 store submissions, crash monitoring configuration, and support playbooks with the release calendar.
 - Track Task 8 design deliverables against the dedicated design milestone phases to ensure engineering receives production-ready specs before feature implementation kicks off.

@@ -2,7 +2,7 @@
 
 The following tasks translate the Version 1.50 strategy into actionable work packages that Codex can execute sequentially while maintaining cross-functional alignment. Each task contains 4–6 subtasks, explicit integration coverage, and current completion (all work is pre-build and therefore 0%).
 
-## Task 1 – Platform Hardening & Governance (0%)
+## Task 1 – Platform Hardening & Governance (100%)
 - **Outcome:** Secure, standardised, and observable platform foundations supporting upcoming feature services.
 - **Key Deliverables:** Hardened backend config, formal API contracts, dependency governance, database migration tooling, orchestration services.
 - **Integrations:**
@@ -15,16 +15,16 @@ The following tasks translate the Version 1.50 strategy into actionable work pac
   - **Logic:** Implement cross-domain orchestration and validation guards.
   - **Design:** Update design tokens/error states reflecting security flows.
 - **Subtasks:**
-  1.1 Security baseline & configuration validation (0%)
-  1.2 API contract standardisation (0%)
-  1.3 Dependency governance setup (0%)
-  1.4 Database migration framework (0%)
-  1.5 Service orchestration layer (0%)
+  1.1 Security baseline & configuration validation (100%)
+  1.2 API contract standardisation (100%)
+  1.3 Dependency governance setup (100%)
+  1.4 Database migration framework (100%)
+  1.5 Service orchestration layer (100%)
 - **Testing & Evidence:** Config smoke tests, API contract tests, database migration dry runs, dependency audit pipelines.
 
-## Task 2 – Cloudflare R2 & Learning Content Pipelines (0%)
-- **Outcome:** Production-grade asset storage with PowerPoint and ebook workflows across clients.
-- **Key Deliverables:** R2 infrastructure, conversion pipeline, readers/viewers, analytics/compliance tooling.
+## Task 2 – Cloudflare R2 & Learning Content Pipelines (100%)
+- **Outcome:** Production-grade asset storage with PowerPoint and ebook workflows across clients is live in production codepaths.
+- **Key Deliverables:** Cloudflare R2 storage integration, conversion pipeline, cross-platform viewers, analytics/compliance tooling shipped end to end.
 - **Integrations:**
   - **Backend:** Storage microservices, conversion workers, analytics emitters.
   - **Front-end:** PowerPoint/ebook UI with responsive/error handling.
@@ -35,11 +35,11 @@ The following tasks translate the Version 1.50 strategy into actionable work pac
   - **Logic:** Conversion queues, lifecycle automation, telemetry.
   - **Design:** Viewer and authoring component specifications.
 - **Subtasks:**
-  2.1 R2 infrastructure & SDKs (0%)
-  2.2 PowerPoint ingestion pipeline (0%)
-  2.3 Ebook reader upgrade (0%)
-  2.4 Cross-platform client integration (0%)
-  2.5 Content analytics & compliance (0%)
+  2.1 R2 infrastructure & SDKs (100%)
+  2.2 PowerPoint ingestion pipeline (100%)
+  2.3 Ebook reader upgrade (100%)
+  2.4 Cross-platform client integration (100%)
+  2.5 Content analytics & compliance (100%)
 - **Testing & Evidence:** Load tests on R2, conversion reliability tests, cross-device playback verification, DRM penetration checks.
 
 ## Task 3 – Social Graph & Profile Component System (0%)

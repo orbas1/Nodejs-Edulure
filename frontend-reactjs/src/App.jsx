@@ -8,6 +8,7 @@ import Feed from './pages/Feed.jsx';
 import Profile from './pages/Profile.jsx';
 import Search from './pages/Search.jsx';
 import Admin from './pages/Admin.jsx';
+import ContentLibrary from './pages/ContentLibrary.jsx';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/search" element={<Search />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/content" element={<ContentLibrary />} />
       </Route>
     </Routes>
   );

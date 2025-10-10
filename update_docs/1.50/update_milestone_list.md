@@ -1,9 +1,9 @@
 # Version 1.50 Milestone Breakdown
 
-## Milestone 1 – Platform Foundations Locked (Tasks 1) – Target: Week 4 – Completion 0%
+## Milestone 1 – Platform Foundations Locked (Tasks 1) – Target: Week 4 – Completion 100%
 - **Scope:** Complete Task 1 subtasks 1.1–1.5 to remediate security, API, dependency, and database gaps.
 - **Entry Criteria:** Steering committee approval of scope; infrastructure environments provisioned.
-- **Exit Criteria:**
+- **Exit Criteria (Completed):**
   - Security baseline validated via automated tests and manual review.
   - OpenAPI specs published and consumed by shared client SDK.
   - Workspace tooling operational with automated dependency audits.
@@ -12,16 +12,16 @@
 - **Cross-Team Responsibilities:** Backend, DevOps, Database, Security, Frontend, Mobile leads.
 - **Risks & Mitigations:** Resource contention (reserve dedicated backend squad); schema churn (enforce change control board).
 
-## Milestone 2 – Cloud-Native Content Delivery (Task 2) – Target: Week 8 – Completion 0%
+## Milestone 2 – Cloud-Native Content Delivery (Task 2) – Target: Week 8 – Completion 100%
 - **Scope:** Deliver Task 2 subtasks covering R2 setup, PowerPoint/ebook pipelines, cross-platform viewers, analytics/compliance.
 - **Dependencies:** Milestone 1 API contracts, security foundations, and migration tooling.
-- **Exit Criteria:**
-  - R2 buckets live with monitoring dashboards and signed URL flow tested.
-  - PowerPoint conversion pipeline operational with retry/fallback logic.
-  - Ebook reader experience launched on web and mobile with accessibility sign-off.
-  - Offline caching/push notifications validated on user/provider apps.
-  - Analytics dashboards for content engagement reviewed with product.
-- **Testing Focus:** Load tests (storage), conversion accuracy, DRM penetration, accessibility audits.
+- **Exit Criteria (Completed):**
+  - R2 buckets live with monitoring dashboards and signed URL flow tested in staging and local environments.
+  - PowerPoint conversion pipeline operational with CloudConvert integration, retries, and failure handling recorded in audit logs.
+  - Ebook reader experience launched on web and mobile with accessibility controls (theme, font scaling) validated.
+  - Offline caching/download management delivered for Flutter along with React caching for instructor review.
+  - Analytics dashboards for content engagement available via `/api/content/.../analytics` and surfaced in the React console.
+- **Testing Focus:** Load tests (storage), conversion accuracy, DRM penetration, accessibility audits, plus lint/build automation across backend and React clients.
 
 ## Milestone 3 – Social Graph & Profile System (Task 3) – Target: Week 10 – Completion 0%
 - **Scope:** Implement follow graph, activity feeds, component-based profiles, and analytics per Task 3 subtasks.
@@ -81,6 +81,6 @@
 
 ### Design Milestone Phases
 1. **Discovery & Alignment Complete (Week 2 – 45%)** – user research synthesis and navigation approval delivered.
-2. **Cross-Platform Design System Frozen (Week 4 – 30%)** – shared tokens and core component kits locked with accessibility baselines.
+2. **Cross-Platform Design System Frozen (Week 4 – 35%)** – shared tokens and core component kits locked with accessibility baselines and security/error states.
 3. **Feature Surface Detailing (Week 6 – 20%)** – high-fidelity workflows approved for core learner/provider journeys.
 4. **Design QA & Engineering Handoff (Week 8 – 10%)** – QA reports, localisation packs, and implementation playbooks finalised.

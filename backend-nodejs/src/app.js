@@ -1,33 +1,97 @@
-import express from 'express';
+import { readFileSync } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import compression from 'compression';
 import cors from 'cors';
+import express from 'express';
+import expressRateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
+import hpp from 'hpp';
+import pinoHttp from 'pino-http';
+import swaggerUi from 'swagger-ui-express';
+
+import { env } from './config/env.js';
+import logger from './config/logger.js';
+import { healthcheck } from './config/database.js';
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import communityRoutes from './routes/community.routes.js';
+import contentRoutes from './routes/content.routes.js';
 import errorHandler from './middleware/errorHandler.js';
+import { success } from './utils/httpResponse.js';
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
 
 const app = express();
 
-app.use(helmet());
-app.use(
-  cors({
-    origin: process.env.APP_URL?.split(',') ?? '*',
-    credentials: true
-  })
-);
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+const limiter = expressRateLimit({
+  windowMs: env.security.rateLimitWindowMinutes * 60 * 1000,
+  max: env.security.rateLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
+const corsOrigins = new Set(env.app.corsOrigins);
+
+app.use(
+  pinoHttp({
+    logger,
+    autoLogging: {
+      ignorePaths: ['/health']
+    }
+  })
+);
+app.use(limiter);
+app.use(hpp());
+app.use(
+  helmet({
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+  })
+);
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || corsOrigins.has(origin)) {
+        return callback(null, true);
+      }
+      const error = new Error(`Origin ${origin} not allowed by CORS policy`);
+      error.status = 403;
+      return callback(error);
+    },
+    credentials: true,
+    optionsSuccessStatus: 200
+  })
+);
+app.use(compression());
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+app.get('/health', async (_req, res, next) => {
+  try {
+    await healthcheck();
+    return success(res, {
+      data: {
+        status: 'ok',
+        timestamp: new Date().toISOString()
+      },
+      message: 'Service healthy'
+    });
+  } catch (error) {
+    error.status = 503;
+    return next(error);
+  }
+});
+
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/communities', communityRoutes);
+app.use('/api/content', contentRoutes);
 
 app.use(errorHandler);
 

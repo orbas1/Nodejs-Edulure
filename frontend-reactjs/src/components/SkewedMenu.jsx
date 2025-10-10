@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import clsx from 'clsx';
 
 const menuStates = {
@@ -31,3 +32,9 @@ export default function SkewedMenu({ activeState = 'all', onSelect, activeItem }
     </div>
   );
 }
+
+SkewedMenu.propTypes = {
+  activeState: PropTypes.oneOf(Object.keys(menuStates)),
+  onSelect: PropTypes.func,
+  activeItem: PropTypes.string
+};
