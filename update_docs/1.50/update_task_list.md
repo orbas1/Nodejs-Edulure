@@ -141,3 +141,21 @@ The following tasks translate the Version 1.50 strategy into actionable work pac
   7.4 Mobile QA & device certification (0%)
   7.5 Support playbooks & release operations (0%)
 - **Testing & Evidence:** Device farm reports, performance profiles, store readiness checklists, support playbooks, monitoring dashboards.
+
+## Task 8 – Design System Integration & UI Handoff (25%)
+- **Outcome:** Unified design assets ready for development, covering research synthesis, token governance, high-fidelity screens, and QA-ready handoff packages.
+- **Key Deliverables:** Discovery readout, shared token/component library, annotated mobile/web specs, accessibility/localisation reports, analytics tagging matrix.
+- **Integrations:**
+  - **Design:** Figma/Zeplin libraries, component governance, motion patterns, change logs.
+  - **Front-end:** Responsive specs, dark-mode guidance, component documentation for React.
+  - **User Phone App:** Flutter-ready navigation, dashboard, media, and settings flows with offline/error states.
+  - **Provider Phone App:** Provider dashboards, Communities 2.0 tooling, monetisation and moderation specs.
+  - **Backend/Data:** Telemetry instrumentation matrix, compliance copy, and error messaging guidelines.
+  - **QA & Compliance:** Accessibility, localisation, and legal checklists tied to release criteria.
+- **Subtasks:**
+  8.1 Research & experience alignment (45%)
+  8.2 Cross-platform design system consolidation (30%)
+  8.3 Application experience detailing (25%)
+  8.4 Web experience detailing (20%)
+  8.5 Design QA & engineering handoff preparation (10%)
+- **Testing & Evidence:** Usability study reports, accessibility audit findings, localisation reviews, design QA checklists, analytics instrumentation documentation.

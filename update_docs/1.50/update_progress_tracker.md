@@ -12,6 +12,7 @@ All workstreams remain in planning with execution not yet started, apart from do
 | Task 5 – Explorer & Search Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 6 – Quality Assurance, Documentation & Release Readiness | 0% | 10% | 5% | 0% | 0% | 0% | 3% |
 | Task 7 – Mobile Application Completion & Store Launch | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 8 – Design System Integration & UI Handoff | 50% | 28% | 45% | 40% | 35% | 20% | 36% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
 
@@ -53,6 +54,11 @@ All workstreams remain in planning with execution not yet started, apart from do
 | 7.3 Store compliance & submission assets | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 7.4 Mobile QA & device certification | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 7.5 Support playbooks & release operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.1 Research & experience alignment | 50% | 45% | 55% | 45% | 35% | 20% | 42% |
+| 8.2 Cross-platform design system consolidation | 45% | 30% | 50% | 35% | 30% | 15% | 34% |
+| 8.3 Application experience detailing | 40% | 25% | 45% | 35% | 30% | 15% | 32% |
+| 8.4 Web experience detailing | 42% | 20% | 40% | 30% | 28% | 12% | 29% |
+| 8.5 Design QA & engineering handoff preparation | 35% | 10% | 35% | 25% | 25% | 10% | 23% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
 
@@ -60,3 +66,4 @@ All workstreams remain in planning with execution not yet started, apart from do
 - Update metrics upon completion of milestone checkpoints and after QA sign-off for each deliverable.
 - Maintain linkage to testing reports, beta feedback, and release documentation within Task 6 artefacts, starting with the published Version 1.10 testing plan.
 - Coordinate Task 7 store submissions, crash monitoring configuration, and support playbooks with the release calendar.
+- Track Task 8 design deliverables against the dedicated design milestone phases to ensure engineering receives production-ready specs before feature implementation kicks off.

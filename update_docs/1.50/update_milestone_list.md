@@ -67,3 +67,20 @@
   - Mobile crash/error monitoring configured with alerting and runbooks delivered to support.
   - Post-launch support playbooks, training, and escalation paths published.
 - **Risk Controls:** Coordinate release windows with backend rollout; maintain rollback toggles and phased rollout plan across stores.
+
+## Milestone 7 – Design Readiness & Handoff (Task 8) – Target: Week 8 – Completion 20%
+- **Scope:** Execute the dedicated design programme covering research alignment, system freeze, feature detailing, and engineering handoff deliverables.
+- **Dependencies:** Inputs from product discovery, branding, and compliance teams; coordination with engineering to validate feasibility and analytics requirements.
+- **Exit Criteria:**
+  - Discovery readout approved with prioritised backlog and telemetry requirements.
+  - Cross-platform design system frozen with shared tokens, responsive components, and accessibility baselines documented.
+  - High-fidelity specs for mobile and web (home, explorer, Communities 2.0, media, profiles, settings) reviewed with engineering and content stakeholders.
+  - Accessibility, localisation, and legal checklists executed with remediation backlog logged.
+  - Handoff package (redlines, interaction videos, analytics matrix, QA checklist) distributed to implementing squads.
+- **Risk Controls:** Reserve design QA capacity, enforce token governance to prevent drift, and maintain a change-control log for scope adjustments emerging from discovery findings.
+
+### Design Milestone Phases
+1. **Discovery & Alignment Complete (Week 2 – 45%)** – user research synthesis and navigation approval delivered.
+2. **Cross-Platform Design System Frozen (Week 4 – 30%)** – shared tokens and core component kits locked with accessibility baselines.
+3. **Feature Surface Detailing (Week 6 – 20%)** – high-fidelity workflows approved for core learner/provider journeys.
+4. **Design QA & Engineering Handoff (Week 8 – 10%)** – QA reports, localisation packs, and implementation playbooks finalised.

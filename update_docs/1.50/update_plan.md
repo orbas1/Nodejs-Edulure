@@ -132,10 +132,27 @@
      7.4 **Mobile QA & Device Certification** – execute device farm tests, accessibility audits, and UAT sign-offs for learner/provider apps. (0%)
      7.5 **Support Playbooks & Release Operations** – document support workflows, incident playbooks, rollout stages, and analytics dashboards. (0%)
 
+8. **Design System Integration & UI Handoff** (25% complete)
+   - **Objective:** Align mobile and web design deliverables with Version 1.50 feature scope, freeze shared tokens, and package production-ready specs for engineering.
+   - **Integration Coverage:**
+     - *Design:* Govern shared tokens, component libraries, and interaction principles across Figma/Zeplin deliverables.
+     - *Front-end:* Provide React teams with responsive specs, dark-mode guidance, and analytics instrumentation notes.
+     - *User Phone App:* Supply Flutter squads with navigation, home/dashboard, media viewer, and settings flows including offline states.
+     - *Provider Phone App:* Detail provider-centric dashboards, Communities 2.0 tooling, monetisation settings, and moderation drawers.
+     - *Backend/Data:* Document telemetry IDs, compliance copy, and moderation escalation triggers to guide API instrumentation.
+     - *QA & Compliance:* Prepare accessibility, localisation, and legal review checklists for pre-implementation sign-off.
+   - **Subtasks:**
+     8.1 **Research & Experience Alignment** – complete usability synthesis, persona updates, and telemetry requirements. (45%)
+     8.2 **Cross-Platform Design System Consolidation** – finalise shared tokens, component kits, motion, and governance. (30%)
+     8.3 **Application Experience Detailing** – deliver mobile high-fidelity screens and logic maps for home, media, communities, profiles, and settings. (25%)
+     8.4 **Web Experience Detailing** – publish responsive web specs for navigation, explorer, communities, profiles, and compliance settings. (20%)
+     8.5 **Design QA & Engineering Handoff Preparation** – package redlines, accessibility audits, localisation packs, and analytics matrices. (10%)
+
 ## Risk & Dependency Highlights
 - Sequencing foundational hardening (Task 1) before feature delivery is mandatory to avoid compounding security and data issues.
 - Tasks 2–5 depend on shared API contracts, migrations, and telemetry from Task 1; cross-team syncs must validate readiness at each integration gate.
 - Tasks 6–7 require upstream tasks to supply testable builds, documentation inputs, and release artefacts; allocate QA and mobile engineering resources early to parallelise validation.
+- Task 8 requires timely feedback from product, compliance, and engineering squads; delays in approving tokens or microcopy can block downstream implementation despite development readiness.
 
 ## Testing & Quality Strategy
 - Embed automated pipelines (CI/CD) per task, including contract tests between backend and clients, mobile device farm runs, and design review checkpoints.
