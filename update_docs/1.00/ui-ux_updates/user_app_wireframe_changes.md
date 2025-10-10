@@ -58,3 +58,24 @@
 ## Offline & Sync States
 - Downloads manager accessible via Profile > Offline. Shows storage usage, queued items, and retry controls.
 - Offline indicator at top of app when connection drops; actions requiring network disabled with tooltip explaining limitation.
+
+## Onboarding & Subscription Flows
+- **Goal setup:** After initial questionnaire, screen summarises suggested tracks with toggle to customise goal frequency. Includes progress indicator and CTA to start first lesson.
+- **Subscription paywall:** Modular layout with plan cards, benefits list, and FAQ accordion. CTA buttons for monthly/annual toggle. Payment sheet includes saved methods, add new card form, and coupon field.
+- **Trial reminder:** Dashboard banner showing days remaining, upgrade CTA, and link to manage billing.
+
+## Support & Safety
+- **Report & block flow:** Multi-step sheet with reason selection, optional text input, and confirmation screen referencing community guidelines.
+- **Guardian controls:** For younger learners, parental consent screen with toggle for enabling safe chat and viewing activity summary.
+
+## Accessibility & Personalisation Surfaces
+- **Theme selector:** Settings screen offering light/dark/contrast themes with preview tiles and apply button. Includes system default toggle.
+- **Font & display controls:** Sheet with slider for text scaling, toggle for dyslexia-friendly font, preview paragraph updating in real time.
+- **Audio narration:** On content screens, floating toggle enabling audio narration with playback controls and download option.
+
+## Achievement & Progress Visualisations
+- **Milestone timeline:** Vertical timeline with milestone cards, badges, and celebration animation placeholder. Includes share buttons and option to set new goal.
+- **Insights dashboard:** Section showing weekly learning time chart, streak calendar, and skill mastery heatmap with button linking to recommended actions.
+
+## Error, Empty & Edge States
+- Documented states for empty communities, no saved items, failed downloads, assessment lockouts, and maintenance downtime. Each wireframe defines illustration placement, primary/secondary copy, and relevant actions (retry, explore, contact support).

@@ -13,6 +13,31 @@ Version 1.00 formalises the unified Edulure web experience. The workstream intro
 | Settings & Support | Tabbed settings dashboard, notification matrix, security overview, support shortcuts. | Streamline account management and compliance requirements. | Web App |
 | Profile & Community | Enhanced profile hero, stats, timeline, achievements; community hub layout with events and chat dock. | Encourage engagement, provide social proof, align with brand. | Web App |
 
+## Accessibility & Compliance Enhancements
+- **WCAG 2.1 AA coverage:** All colour pairings validated with contrast ratios logged in `accessibility_tokens.md`. Focus order rewired to follow visual hierarchy, skip links surfaced on keyboard focus, and motion preferences honoured by toggling to reduced-motion variants.
+- **Assistive technology support:** ARIA roles added to composite components (mega menus, carousels, tabsets) with live-region announcements for asynchronous updates (notifications, task completion, quiz feedback).
+- **Regional compliance:** Consent management platform integrated across marketing and in-app experiences; banner variants documented for EU, US, APAC to reflect differing legal requirements. Data export/import flows reworked for GDPR portability with explicit confirmation screens.
+
+## Interaction & Motion Patterns
+- **Micro-interaction library:** Documented hover, focus, pressed, and loading states for primary components alongside motion durations/easing curves. New `motion_tokens.md` enumerates tokens for fade, scale, parallax, and skeleton loading.
+- **Feedback choreography:** Introduced standardised toast placements per platform, error recovery flows, and system banners. Motion sync ensures sequential reveals (e.g., analytics cards animating in cascading order) to reinforce hierarchy.
+- **Input affordances:** All forms adopt floating labels with inline validation states and assistive copy. Error banners link directly to offending field via anchored focus jump.
+
+## Documentation & Handoff
+- **Figma → Dev handoff:** Component variants and auto-layout specs exported with redlines in `dev_handoff/figma_exports`. Tokens mapped to CSS variables, Flutter theming, and Tailwind configuration to streamline implementation.
+- **Usage guidelines:** Companion docs outline do/don't usage scenarios, accessibility checklists, and QA acceptance criteria per component.
+- **Version control:** Change log cross-referenced with Jira epics and test plan IDs to maintain traceability between design updates, engineering tasks, and QA coverage.
+
+## Risks & Mitigations
+- **Performance regressions:** Heavier imagery and motion mitigated via lazy loading, responsive images, and caching strategy updates captured in `performance_considerations.md`.
+- **Scope creep:** Introduced approval gates at milestone checkpoints with stakeholder sign-off recorded in `Design_update_progress_tracker.md`.
+- **Consistency drift:** Enforced design system adoption by auditing existing screens; flagged deviations tracked in backlog for remediation.
+
+## Cross-Platform Alignment
+- **Token parity:** Colours, typography, and spacing tokens synced across web, Flutter, and React implementations to prevent divergence.
+- **Shared components:** Navigation bars, card layouts, and form modules now share blueprint references to ensure parity between provider, learner, and marketing experiences.
+- **QA test matrix:** Unified visual regression suite planned for desktop, tablet, mobile breakpoints ensuring responsive integrity across app surfaces.
+
 ## Detailed Changes
 - **Component Specifications:** Comprehensive updates in `component_types.md`, `component_functions.md`, `buttons.md`, `Forms.md`, and `Cards.md` detailing dimensions, states, and behaviours.
 - **Visual Language:** Refresh of `colours.md`, `Fonts.md`, `Stylings.md`, `Css.md`, `Scss.md` establishing tokens, gradients, and implementation layering.

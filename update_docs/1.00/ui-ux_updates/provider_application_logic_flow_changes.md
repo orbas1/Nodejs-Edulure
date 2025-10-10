@@ -65,3 +65,25 @@
 1. Mobile layout surfaces primary actions via bottom nav; tapping Create reveals sheet with same options as desktop.
 2. Modals present as full-screen; progress saved when user swipes down to close to prevent data loss.
 3. Background sync keeps analytics and tasks updated; offline mode caches drafts and retries on reconnect.
+
+## 11. Financial Operations & Compliance Handling
+1. Payout centre aggregates transactions; when provider requests payout, system validates bank verification and tax compliance before queuing disbursement job.
+2. Disbursement status updates propagate to payout timeline; anomalies trigger alert banner and open incident detail drawer.
+3. Invoice resend action triggers email service call and logs event; download initiates signed URL creation with expiry timer displayed to user.
+4. Compliance checklist tracks completion state; uploading document stores metadata, triggers review workflow, and displays pending approval badge.
+
+## 12. Promotion & Marketplace Workflow
+1. Creating promotion opens stepper; each step autosaves draft to prevent loss. Audience selection queries segmentation service for eligible cohorts.
+2. Incentive configuration enforces guardrails (max discount, date ranges). Review step previews learner-facing card using dynamic data.
+3. Publishing promotion schedules notifications per channel; analytics service records baseline metrics for control group comparison.
+4. Pausing or editing live campaign triggers confirmation modal and updates all dependent notifications to prevent stale messaging.
+
+## 13. Support & Incident Response
+1. Help centre dock surfaces relevant articles using current route context; selecting contact option pre-fills ticket form with metadata.
+2. Status incidents broadcast via websocket; provider acknowledgement dismisses banner and logs event for audit.
+3. Support tickets sync bi-directionally with CRM; updates reflect in-app with status timeline and option to add notes for success manager.
+
+## 14. Experimentation & QA
+1. When provider enables experiment, system duplicates baseline entity, stores variant metadata, and starts traffic allocation job.
+2. Analytics service collects conversion metrics; UI displays significance indicator and recommendation (promote, continue, stop).
+3. Approval of QA checklist transitions content state from `in_review` to `ready_to_publish`, unlocking publish button and notifying assigned reviewers.

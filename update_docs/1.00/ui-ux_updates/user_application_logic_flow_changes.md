@@ -55,3 +55,27 @@
 1. Help widget invoked from question mark icon; search query returns curated FAQ results.
 2. If issue unresolved, learner submits ticket with category and optional screenshot. Confirmation toast displays case ID.
 3. Reporting content flow captures context (post ID, timestamp). Moderation service acknowledges and updates learner via notification when resolved.
+
+## 11. Billing & Subscription Management
+1. When encountering paywalled content, system checks entitlement; if expired, presents paywall with plan options and trial eligibility message.
+2. Selecting plan opens payment sheet; saved cards retrieved securely, new card input tokenised before submission.
+3. Successful purchase updates entitlements instantly, unlocks content, and sends receipt email. Failure surfaces inline errors and offers retry or alternate method.
+4. Learners can manage subscription in settings; downgrades scheduled for period end with confirmation banner summarising remaining access.
+
+## 12. Guardian & Safety Controls
+1. For underage profiles, guardian approval required; invitation email includes secure link to approve features.
+2. Guardian dashboard allows toggling messaging, community access, and bedtime quiet hours. Changes propagate across learner session with toast messaging.
+3. Safety incidents (reports filed, blocks) notify guardian with summary and recommended actions.
+
+## 13. Analytics & Insight Generation
+1. Weekly insights generated from progress data; system aggregates metrics, composes charts, and surfaces personalised suggestions.
+2. Learner interaction with insights (e.g., accepting recommendation) logs events to improve future suggestions.
+3. Downloading data export triggers job creation; status updates via notification and email when ready.
+
+## 14. Offline Conflict Resolution
+1. When syncing after offline session, conflicts flagged (e.g., note edited on two devices). Merge prompt displays side-by-side comparison with accept/override options.
+2. If sync fails due to authentication expiry, app prompts re-authentication while retaining offline progress in secure storage.
+
+## 15. Accessibility Preferences Sync
+1. Accessibility settings updates propagate to server; other devices fetch preferences on login and apply instantly.
+2. Reduced motion preference disables auto-play of animations and carousels; ensures consistent experience across sessions.

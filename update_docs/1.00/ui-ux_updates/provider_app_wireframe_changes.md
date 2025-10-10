@@ -60,3 +60,28 @@
 - Dashboard widgets stack vertically with collapse/expand accordions on mobile web.
 - Navigation transforms into bottom tab bar with five primaries (Home, Content, Communities, Monetise, More) plus floating “Create” action.
 - Modals convert to full-screen sheets with top progress indicators on small screens.
+
+## Financial Operations & Compliance Screens
+- **Payout centre:** Dedicated dashboard tab featuring summary banner (next payout date, amount), transactions table with filters (status, date range, currency), and anomaly alerts. Includes side panel for bank account verification and tax document uploads.
+- **Invoice manager:** Grid of invoices with status pills, download buttons, and resend email action. Detail drawer shows line items, learner info, and payment history timeline.
+- **Compliance checklist:** Accordion layout enumerating region-specific requirements (KYC, DRM, accessibility statements). Each item links to inline form or document upload with status icons.
+
+## Marketplace & Promotion Surfaces
+- **Offer builder:** Canvas with stepper (Audience → Incentive → Schedule → Review). Each step features preview panel showing learner-facing card, with ability to toggle channels (email, in-app banner, push).
+- **Promo analytics:** Dual-column layout combining conversion funnel chart and table of campaign performance metrics. Includes filter chips for channel, segment, and date.
+- **Affiliate resources:** Library of pre-built assets (banners, copy, tracking links) presented as cards with quick copy buttons and download CTA.
+
+## Support & Knowledge Base Integration
+- **Help centre dock:** Persistent question mark tab reveals contextual articles and quick links to webinars/documentation based on current module. Includes “contact success manager” CTA with scheduling widget.
+- **Status & incidents:** Banner area reserved for platform incident notifications; clicking opens modal with incident timeline and mitigations.
+
+## Quality Assurance & Review Workflows
+- **Content QA queue:** Table listing lessons flagged for review with severity tags, reviewer assignment, due date. Detail drawer shows reviewer checklist, inline comment thread, and approval buttons.
+- **A/B experiment setup:** Wizard supporting variant creation for course landing pages. Wireframe shows variant cards, traffic allocation sliders, and success metric dropdown.
+
+## Documentation & Asset Governance
+- **Brand kit:** Section housing logos, fonts, palettes with download controls. Wireframe includes preview area and usage guidelines accordion.
+- **Template library:** Grid view of lesson templates with preview thumbnails, metadata (length, format), and quick actions (Duplicate, Customise).
+
+## Error & Empty States
+- Documented screens for empty analytics (invite learners CTA), zero revenue (connect payment provider), and no communities (create community walkthrough). Each state includes illustration placement, supportive copy, and primary CTA positioning for clarity across breakpoints.
