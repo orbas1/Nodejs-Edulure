@@ -104,7 +104,7 @@ The following tasks translate the Version 1.50 strategy into actionable work pac
 
 ## Task 6 – Quality Assurance, Documentation & Release Readiness (0%)
 - **Outcome:** Verified release, informed stakeholders, and monitored production rollout.
-- **Key Deliverables:** Automated/regression tests, beta programme outputs, documentation suite, release/change assets, post-launch monitoring.
+- **Key Deliverables:** Automated/regression tests, beta programme outputs, documentation suite (including the Version 1.10 testing plan), release/change assets, post-launch monitoring.
 - **Integrations:**
   - **Backend:** Automated test suites, monitoring hooks.
   - **Front-end:** Regression, accessibility, visual testing.
@@ -117,7 +117,7 @@ The following tasks translate the Version 1.50 strategy into actionable work pac
 - **Subtasks:**
   6.1 Comprehensive test suite execution (0%)
   6.2 Beta programme & feedback loop (0%)
-  6.3 Documentation & enablement pack (0%)
+  6.3 Documentation & enablement pack (20% – testing plan baseline published)
   6.4 Release management & change control (0%)
   6.5 Post-launch monitoring & handover (0%)
 - **Testing & Evidence:** Test reports, beta feedback summaries, release readiness checklist, post-launch dashboards.
