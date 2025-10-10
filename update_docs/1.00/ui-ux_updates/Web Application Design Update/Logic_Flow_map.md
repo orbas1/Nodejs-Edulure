@@ -1,34 +1,42 @@
-# Logic Flow Map
+# Logic Flow Map – Web Application v1.00
 
-## Primary Navigation Routes
-- `/home`
-  - Fetch personalised feed modules → Render hero + resume + community highlights.
-- `/explorer`
-  - Load global search overlay → Query Meilisearch service → Display results tabs (Courses, Communities, People, Assets).
-- `/dashboard`
-  - Determine role (provider/admin) → Load analytics widgets → Provide export & filters.
-- `/communities/:id`
-  - Fetch hub layout → Render modular widgets → Provide action drawers for create/manage.
-- `/assets`
-  - Fetch asset library by type → Display grid/list view → Provide upload drawer.
-- `/settings`
-  - Load profile summary → Render tabbed settings forms → Access audit logs.
+## High-Level Journey
+```
+Visitor → Audience Selection → Home Hero CTA → (Onboard | Resume) → Dashboard → (Learn Library ↔ Course Detail ↔ Lesson Player) ↔ Community Hub → Settings
+```
 
-## Interaction Flow Diagram (Textual)
-1. **User logs in** → system resolves role → loads global navigation with appropriate shortcuts.
-2. **User selects module from nav** → route guard ensures prerequisites (e.g., provider onboarding complete) → fetch relevant data → display skeleton until data resolves.
-3. **User interacts (filters, create, edit)** → UI triggers service call → optimistic update → on success show toast; on failure revert state and highlight issue.
-4. **Background events** (upload complete, follow request) → push notification → user opens drawer → acts (approve, view details).
-5. **User toggles theme or layout** → update CSS variables → persist preference to account settings.
+## Detailed Nodes
+1. **Visitor Landing**
+   - Detect role preference from cookie/local storage.
+   - Show segmented navigation, set default audience.
+2. **Home Hero CTA**
+   - Decision: new vs returning user. If new → onboarding wizard; else → resume course.
+3. **Onboarding Wizard**
+   - Steps: Goals → Skills → Schedule → Summary.
+   - Output: personalised plan, recommended communities.
+4. **Dashboard**
+   - Branch to: Learn Library (when selecting module), Communities (via highlights), Settings (via alerts).
+5. **Learn Library**
+   - Filter interactions update query params.
+   - Selecting course triggers prefetch of lesson content.
+6. **Course Detail**
+   - If enrolled → resume; else -> enrol flow.
+7. **Lesson Player**
+   - Completion returns to course detail with next lesson highlighted.
+8. **Community Hub**
+   - Post creation -> updates feed + analytics event.
+   - Event registration -> adds to calendar + sends notification.
+9. **Settings**
+   - Completed changes update profile state and may trigger dashboard alerts (e.g., security warnings cleared).
 
-## Service Dependencies
-- Authentication service for session state.
-- Recommendation service for home feed.
-- Meilisearch for explorer results.
-- Analytics pipeline for dashboards.
-- Messaging service for community chat and notifications.
+## System Integrations
+- Authentication ensures secure access before Dashboard.
+- Analytics instrumentation at each node transitions.
+- Notification service triggered by actions (enrol, post, setting change).
 
-## Error Handling
-- Standardised error boundary per route with support article links.
-- Offline mode caches last successful fetch for read-only viewing.
-- Provide retry buttons on cards when API call fails.
+## Error Handling Paths
+- If data fetch fails at Dashboard, show retry card and fallback dataset.
+- If onboarding incomplete, show reminder banner on Dashboard until completion.
+
+## Visual Mapping
+- Diagram stored in Figma frame `Web v1.00 / Flow Map` with swimlanes for Learner, Provider, System.

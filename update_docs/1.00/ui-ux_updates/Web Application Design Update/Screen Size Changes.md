@@ -1,18 +1,32 @@
-# Responsive & Screen Size Adjustments
+# Responsive Behaviour & Screen Size Adjustments – Web Application v1.00
 
 ## Breakpoints
-- **XS (≤480px):** Mobile portrait. Bottom navigation bar, collapsible hero, stacked sections.
-- **SM (481–768px):** Mobile landscape/tablet portrait. Navigation collapses to hamburger, carousels become horizontal scroll.
-- **MD (769–1024px):** Tablet landscape/small desktop. Sidebar collapsible, two-column layouts introduced.
-- **LG (1025–1440px):** Standard desktop. Full navigation, 12-column grid, card gutters 24px.
-- **XL (≥1441px):** Wide desktop. Increase max width to 1440px; hero expands, apply max width wrappers to text blocks.
+- **XS:** 0–479px
+- **SM:** 480–767px
+- **MD:** 768–1023px
+- **LG:** 1024–1439px
+- **XL:** 1440px+
 
-## Adaptive Behaviour
-- Auto-detect device orientation to adjust hero height.
-- Chart tooltips reposition to avoid clipping on smaller screens.
-- Buttons expand to full width on mobile; icon labels hidden when width limited.
+## Layout Adjustments
+| Component | XS | SM | MD | LG | XL |
+| --- | --- | --- | --- | --- | --- |
+| Header | 56px height, hamburger menu | 64px height, compact search | 72px height, segmented nav collapsed | 88px height, full nav | 88px height + parallax background |
+| Sidebar | Hidden, accessible via bottom nav | Hidden | Collapsible overlay | 256px persistent | 256px persistent |
+| Hero | Stack vertical, centre text | Stack vertical, image below | 60/40 split | 60/40 split | 60/40 with parallax |
+| Cards | Full width | 2 per row | 2 per row | 3 per row | 3 per row |
+| Dashboard Modules | Single column stack | Single column stack | 2 columns (8/4) | 2 columns (8/4) | 3 columns when space allows |
+| Footer | Accordion sections | 2 columns | 3 columns | 4 columns | 4 columns |
+
+## Typography Scaling
+- Use CSS clamp for hero (`clamp(32px, 5vw, 56px)`), headings reduce by 2px per breakpoint drop.
+- Body text remains 16px to maintain readability.
+
+## Interaction Changes
+- Carousel navigation becomes swipe gestures on touch devices.
+- Tooltips replaced with inline helper text on XS/SM.
+- Tables convert to card layouts with labelled rows on XS/SM.
 
 ## Performance Considerations
-- Lazy load below-the-fold modules on mobile.
-- Use responsive images with `srcset` to deliver appropriate resolution.
-- Defer non-critical animations when `prefers-reduced-motion` true.
+- Lazy-load hero illustration on XS to reduce payload.
+- Serve lower resolution images (768px) on SM.
+- Disable heavy animations when `prefers-reduced-motion` or when device memory <2GB (via JS heuristics).

@@ -1,24 +1,33 @@
-# Profile Styling Guidelines
+# Profile Styling Guidelines – Web Application v1.00
 
-## Typography & Colour
-- Headline (name) uses `--font-lg` at weight 700.
-- Secondary info uses `--text-secondary` colour.
-- Buttons adopt accent palette consistent with button spec.
+## Typography
+- Name: Clash Display 32px/38px, -0.01em letter spacing.
+- Role/Headline: Inter SemiBold 16px uppercase.
+- Bio: Inter Regular 16px/26px, max width 640px.
+- Timeline items: Title 18px/26px, body 16px/24px.
+
+## Colours
+- Header overlay: `rgba(11,17,32,0.72)` gradient.
+- Avatar border: `linear-gradient(135deg, #4C7DFF, #A78BFA)`.
+- Stats cards background: `rgba(76,125,255,0.12)` with border `rgba(76,125,255,0.24)`.
+- Timeline line: `rgba(148,163,184,0.32)` with accent nodes `#4C7DFF`.
+
+## Components
+- Badge carousel uses 80px circles with drop shadow `0 16px 32px rgba(8,18,36,0.32)`.
+- Skills chips: pill style, background `rgba(167,139,250,0.16)`, text `#A78BFA`.
+- Quick action buttons: Secondary variant (ghost) with icons left.
 
 ## Layout
-- Two-column layout on desktop: main column (8 units) for content, side column (4 units) for badges and affiliations.
-- On tablet/mobile, stack sections with sticky CTA bar at bottom for follow/message.
+- Content card overlaps cover by -64px, padding 32px, radius 24px.
+- Stats row uses CSS grid with `grid-template-columns: repeat(auto-fit, minmax(140px, 1fr))`.
+- Timeline uses 2-column layout: left for metadata (80px width), right for content.
 
-## Component Styling
-- Stats chips: 12px radius, background `rgba(76, 125, 255, 0.12)`, icon + label.
-- Highlight carousel cards adopt card styling with accent border when featured.
-- Activity timeline uses vertical line with accent dots per entry.
-
-## Interaction States
-- Follow button toggles between primary and outline state; include transition.
-- Sticky CTA bar shrinks to icon-only when user scrolls past 60% page height.
-- Provide focus outlines for keyboard navigation around sub-nav links.
+## Interactions
+- Hover on badges reveals tooltip (delay 120ms) with achievements details.
+- Timeline items expand/collapse for long content with smooth 180ms height animation.
+- Quick actions show ripple effect (8px spread) using pseudo-element.
 
 ## Accessibility
-- Ensure contrast ratio > 4.5:1 for text on hero backgrounds; apply gradient overlay if needed.
-- Provide skip-to-content link to jump past hero.
+- Provide alt text for cover images via `profile.coverAlt` field.
+- Ensure high contrast for text on overlay (check ratio >4.5:1).
+- Focus states use `outline: 2px solid #38BDF8; outline-offset: 4px`.

@@ -1,34 +1,55 @@
-# Card Patterns
+# Card Components – Web Application v1.00
 
-## General Structure
-- 16px padding, 12px border radius, `--shadow-low` by default.
-- Header area includes avatar or icon, title, and action menu.
-- Body area supports text, charts, progress bars, and tags; footers hold CTA buttons or metadata.
+## Universal Specifications
+- Radius: 20px outer, 16px inner for nested content.
+- Border: `1px solid rgba(148,163,184,0.16)`.
+- Shadow: `0 32px 64px rgba(8,18,36,0.42)` default, reduce to `0 24px 48px rgba(8,18,36,0.32)` on hover for subtle lift.
+- Background: `var(--surface-card)`; highlight states layer gradient overlay `linear-gradient(180deg, rgba(76,125,255,0.14) 0%, rgba(167,139,250,0.08) 100%)`.
+- Padding: `24px` desktop, `20px` tablet, `16px` mobile.
+- Layout: Use CSS grid `grid-template-columns: auto 1fr` for cards with media.
 
-## Course Card
-- Hero thumbnail 16:9 ratio with overlay badge for status (Draft, Published, Scheduled).
-- Title + author, rating stars, enrolment count, quick actions (Preview, Share, Promote).
-- Progress bar when learner uses card to resume.
+## Card Types
+### 1. Course Spotlight Card
+- Dimensions: 320×360px desktop.
+- Hero media: 16:9 thumbnail (corner radius 16px) using course cover from CDN.
+- Content stack: Title (22px/30px, 2 lines max), instructor (16px/24px), rating stars (icons 16px with 4px gap), modules count chips.
+- CTA row: Primary button (medium) + tertiary link "Preview" with arrow.
+- Footer: Progress bar 6px height, gradient from `#34D399` to `#A78BFA`.
 
-## Community Card
-- Banner gradient background, community avatar, tier badges.
-- Shows member count, active events, trending topic chips.
-- CTA defaults to "Enter Hub" for members, "Join Community" for prospects.
+### 2. Community Pulse Card
+- Size: 280×320px; collapses to full width on mobile.
+- Header: Avatar group (40px, 32px, 24px overlapping) with border `2px solid #0B1120`.
+- Body: Activity graph 120px height sparkline + top metrics (posts, new members, events).
+- Interaction: Hover reveals quick actions (View, Message Admin, Share) sliding up from bottom with 160ms fade.
 
-## Asset Card (Deck/Ebook)
-- File type icon, conversion status chip (Processing, Ready, Error).
-- Displays version timeline button and quick share toggle.
-- When in grid view, include storage usage indicator.
+### 3. KPI Insight Card
+- Dimensions: 320×220px.
+- Metric label (14px uppercase), metric value (48px), delta badge (16px pill) with arrow icon.
+- Chart area: Inline sparkline using accent tokens.
+- Additional info: Tooltip icon top-right linking to methodology.
 
-## People Card
-- Avatar, follower count, expertise tags, mutual communities.
-- Buttons: Follow/Unfollow, Message (if allowed), View Profile.
+### 4. Content Feed Card
+- Full-width 720×auto at desktop.
+- Structure: Header (poster avatar 48px, name, timestamp), body text (18px/28px up to 6 lines), attachments (image grid 2×2 with 12px gap), reactions bar.
+- Comments preview: up to 2 comments collapsed with "View thread" tertiary button.
 
-## Analytics Insight Card
-- Metric value, delta indicator, spark-line; drop-down to change time frame.
-- Quick link to analytics dashboard detail.
+### 5. Announcement Banner Card
+- Height 120px, full width.
+- Background gradient `linear-gradient(135deg, #F59E0B 0%, #FDE68A 100%)` with overlay pattern `noise_overlay_01.png` at 8% opacity.
+- Contains icon (32px), headline (24px/32px), description (16px/24px), CTA button (small secondary).
 
-## States
-- **Hover:** Elevate to `--shadow-mid`, accent border.
-- **Selected:** Outline with `--accent-electric`, show checkmark for bulk actions.
-- **Empty:** Display placeholder icon and CTA to create/import.
+## Responsive Behaviour
+- Cards stack vertically with `24px` spacing at <768px.
+- Course & community cards become horizontally scrollable within container with snap alignment.
+- Ensure `aspect-ratio` property used for thumbnails to prevent layout shift.
+
+## Accessibility & States
+- Cards are `article` elements with `aria-labelledby` referencing card title.
+- Focus state: 2px outline `#38BDF8` with offset 4px.
+- Loading skeleton replicates layout: grey blocks for text, gradient shimmer left-to-right in 1200ms cycle.
+
+## Data Sources & Dependencies
+- Course cards query `/api/courses?featured=true`.
+- Community cards query `/api/communities/pulse`.
+- KPI cards pull from `/api/insights` with metric parameter.
+- Feed cards integrate GraphQL subscription `feedUpdates` for live comments.

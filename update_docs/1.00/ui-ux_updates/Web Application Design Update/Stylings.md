@@ -1,46 +1,62 @@
-# Styling Principles & Tokens
+# Styling Directives – Web Application v1.00
 
-## Layout & Spacing
-- **Grid:** 12-column layout with 16px gutters desktop, 12px tablet, 8px mobile; maximum content width 1280px.
-- **Spacing Scale:** 4px base spacing increments (4, 8, 12, 16, 24, 32, 40, 56, 72) applied via CSS custom properties (`--space-xx`).
-- **Elevation:** Three elevation levels using box-shadow tokens (`--shadow-low`, `--shadow-mid`, `--shadow-high`) aligned with component hierarchy.
+## Layout Rhythm
+- Base spacing unit: 8px. Apply multiples to maintain vertical rhythm.
+- Section padding: 80px top/bottom desktop, 64px tablet, 48px mobile.
+- Use consistent `gap` tokens (`var(--space-lg)`, etc.) to align with CSS variables.
 
-## Colour Application
-- **Surface Tokens:** Light theme uses `--surface-base (#0F172A)`, `--surface-card (#111C3B)`, dark surfaces lighten to maintain contrast; dark theme inverts with tinted overlays.
-- **Accent Usage:** Primary accent `--accent-electric (#4C7DFF)` for CTAs, secondary accent `--accent-lilac (#A78BFA)` for highlights, tertiary `--accent-sun (#F59E0B)` for warning emphasis.
-- **State Colours:** Success `#10B981`, Warning `#FBBF24`, Danger `#F87171`, Info `#38BDF8`. Paired with accessible 4.5:1 text contrast.
+## Corners & Shadows
+| Level | Radius | Shadow |
+| --- | --- | --- |
+| Shell | 0 | `0 12px 24px rgba(8,18,36,0.36)` (header shadow when sticky) |
+| Cards/Modals | 20px | `0 32px 64px rgba(8,18,36,0.42)` |
+| Buttons | 12–16px | `0 18px 40px rgba(76,125,255,0.24)` hover |
+| Chips | 999px | none |
 
-## Typography
-- **Primary Font:** "Inter" for UI, `font-feature-settings: 'cv05', 'cv09'` for clarity; fallback `system-ui`.
-- **Display Font:** "Clash Display" for hero and marketing headings; fallback `"Poppins", sans-serif`.
-- **Type Scale:** `--font-size` tokens map to 14, 16, 18, 20, 24, 32, 40, 56 with consistent line-height (1.4 for body, 1.25 for headings).
+## Borders & Dividers
+- Use `1px solid rgba(148,163,184,0.16)` for light separators.
+- Use `2px` accent borders for active states, e.g., selected tab indicator `#4C7DFF`.
+- Divider spacing: 32px above and below to maintain readability.
 
-## Iconography & Imagery
-- **Icon Style:** 24px rounded outline icons; use consistent stroke weight (1.5px). Provide filled variants for active states.
-- **Illustrations:** Soft gradients using brand palette; maintain consistent corner radius (16px) and drop shadow for hero imagery.
-- **Avatars:** Circular, 40px default, 64px for profile headers; integrate status badges (online, verified) using accent tokens.
+## Background Treatments
+- Apply gradient overlays to hero modules using tokens defined in `colours.md`.
+- For cards, use `background-blend-mode: screen` when layering noise texture.
+- Dashboard backgrounds include subtle grid pattern `url('../patterns/grid_8.svg')` at 6% opacity.
 
-## Motion & Interaction
-- **Duration:** Standard transition 150ms ease-out for hover, 250ms ease-in-out for modals/drawers.
-- **Easing:** Use cubic-bezier(0.4, 0, 0.2, 1) to maintain material-inspired feel.
-- **Micro-interactions:** Buttons include scale(0.98) on active; cards elevate by `--shadow-mid` on hover; skeletons shimmer via linear gradient animation.
+## Imagery & Masks
+- Hero illustrations masked with 24px corner radius to align with cards.
+- Avatar images use 2px border `rgba(15,23,42,0.88)` to stand out on dark backgrounds.
+- Use CSS `mask-image` for layered shape cutouts on marketing sections.
 
-## Accessibility
-- Maintain minimum text size 14px for body, 12px only for secondary labels.
-- Provide focus states using 2px outline with `--accent-electric` or high-contrast white on dark background.
-- Support high-contrast mode by swapping surfaces to `#FFFFFF`/`#0B1120` and accent to `#2563EB`.
+## Iconography
+- Standard icon size 20px in buttons, 24px in navigation, 32px for hero callouts.
+- Maintain 8px spacing between icon and label.
+- Use monotone icons tinted via `currentColor` to ensure theme compatibility.
 
-## Theme Tokens
-```
-:root {
-  --surface-page: #0B1120;
-  --surface-card: #111C3B;
-  --surface-alt: rgba(15, 23, 42, 0.75);
-  --accent-electric: #4C7DFF;
-  --accent-lilac: #A78BFA;
-  --accent-sun: #F59E0B;
-  --text-primary: #F8FAFC;
-  --text-secondary: #CBD5F5;
-  --border-soft: rgba(148, 163, 184, 0.24);
-}
-```
+## Motion Styling
+- Use transform-based animations (translate/scale) rather than layout properties for performance.
+- Provide subtle 2% scale-up on card hover with `transform: translateY(-4px) scale(1.01)`.
+- Delay sequential list items by 60ms for entrance animations.
+- Provide `prefers-reduced-motion` fallback: disable transforms, only fade opacity.
+
+## State Styling
+- Focus: 2px outline `#38BDF8`, 4px offset, maintain across components.
+- Hover: lighten backgrounds by 10% or increase shadow depth.
+- Active: compress component by `translateY(2px)` with darker gradient.
+- Disabled: reduce opacity to 48% and remove shadows.
+
+## Typography Styling
+- Maintain optical alignment; align headings to baseline grid.
+- Body text `font-weight: 400`, letter spacing 0. Paragraph margins 16px bottom.
+- Links: `color: #38BDF8`, underline on hover, focus states as above.
+
+## Responsive Considerations
+- Breakpoint-specific adjustments documented in `Screen Size Changes.md`.
+- Avoid text smaller than 14px on mobile.
+- Buttons span full width on mobile when part of forms or hero modules.
+
+## Implementation Checklist
+1. Audit components against design tokens in Storybook.
+2. Validate responsive layout in Chrome, Safari, Firefox, Edge.
+3. Run Lighthouse to ensure minimal layout shifts (<0.05 CLS).
+4. Document deviations in `design_change_log.md` with rationale.
