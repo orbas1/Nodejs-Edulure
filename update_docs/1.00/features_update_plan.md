@@ -1,117 +1,123 @@
-# Version 1.50 Feature Update Plan
+# Version 1.00 Feature Update Plan
 
-## Phase 0 – Foundations & Governance (Weeks 0-2)
-1. **Program Kick-off & Scope Lock**
-   - Confirm cross-functional pods (Infrastructure, Content, Social, Communities, Explorer, Mobile, QA, DevOps, Data).
-   - Finalise OKRs, budget envelopes, and release timeline milestones; align stakeholders on non-negotiables.
-   - Establish definition of done for each feature stream including performance, accessibility, localisation, and mobile parity.
-2. **Architecture, Security & Compliance Readiness**
-   - Run architecture review boards covering R2 topology, Meilisearch cluster design, component library standards, and service boundaries.
-   - Complete DPIA/PIA for new social/affiliate data flows; update data retention policies and consent mechanisms.
-   - Schedule penetration testing, threat modelling for communities/paywalls, and accessibility audits.
-3. **Tooling, Environments & Automation**
-   - Provision sandbox/staging environments: dedicated R2 buckets, Meilisearch cluster, feature flag service, CI pipelines for migrations/seeders.
-   - Update CI/CD to include cross-platform (web, mobile, API) regression packs, visual diffing for component library, and load-test harnesses.
-   - Create telemetry schemas for metrics (asset latency, follow adoption, community engagement, search conversions).
+## Phase 0 – Programme Mobilisation (Weeks 0-2)
+1. **Scope & Governance**
+   - Confirm feature inventory across General Area, Communities 2.0, Explorer, Dashboards, Commerce, Ads, Flutter parity, and supporting infrastructure.
+   - Establish cross-functional squads (Infrastructure, Learning Content, Social & Profiles, Communities, Discovery, Commerce, Mobile, QA/Compliance, Data & Analytics).
+   - Lock definition of done (performance, accessibility, localisation, mobile parity, documentation, analytics).
+2. **Architecture & Compliance Foundations**
+   - Run architecture review boards for Cloudflare R2 topology, Agora live classrooms, Meilisearch cluster, profile component architecture, and admin panel extensions.
+   - Complete privacy impact assessments, PCI readiness for Stripe/PayPal, DRM/legal reviews for ebooks, and policy updates for spam/bad word enforcement.
+   - Define API versioning strategy, service boundaries, database migration approach, and rollback protocols.
+3. **Environment Preparation & Tooling**
+   - Provision dev/staging environments: R2 buckets, Meilisearch clusters, Agora sandboxes, feature flagging, CI/CD pipelines, and infrastructure-as-code templates.
+   - Update automated testing suites (unit, integration, contract, end-to-end, load) for backend, frontend, and Flutter.
+   - Instrument observability stack (metrics, logs, tracing) with dashboards for asset latency, community engagement, search adoption, payments, and ads.
 
-## Phase 1 – Infrastructure Enablement (Weeks 2-5)
-1. **Cloudflare R2 Integration**
-   - Configure buckets per domain (courses, communities, ebooks, marketing) with IAM roles, encryption, lifecycle policies, and monitoring tags.
-   - Develop upload microservice with signed URL issuance, antivirus scanning, media processing triggers, and audit logging.
-   - Implement dual-write adapters so legacy storage and R2 run in parallel; execute migration scripts with checksum verification and fallbacks.
-   - Update backend file abstraction layer, CDN cache rules, and mobile SDK endpoints; document SDK usage for instructors.
-2. **Monitoring, Observability & Cost Controls**
-   - Build Grafana dashboards for latency, error rate, throughput, and cost per bucket; configure SLO alerts via PagerDuty/Slack.
-   - Add synthetic tests across priority geographies and run chaos drills for bucket failures, ensuring graceful degradation.
-   - Produce runbooks for incident response, rollback, and access management.
+## Phase 1 – Infrastructure & Platform Enablement (Weeks 2-5)
+1. **Cloudflare R2 Migration Layer**
+   - Configure domain-specific buckets, IAM policies, lifecycle rules, multi-region replication, signed URL services, and monitoring alerts.
+   - Build upload microservice with antivirus scanning, media conversion triggers (PowerPoints, recordings), and checksum validation.
+   - Implement dual-write adapters, migration scripts, and rollback tooling; execute pilot migrations for sample courses/ebooks.
+2. **Core Backend Services**
+   - Establish service scaffolding for Content (courses/ebooks/powerpoints), Social (follows/feeds), Communities, Explorer/Search, Ads, and Notifications.
+   - Define GraphQL/REST endpoints, DTOs, event schemas, and background job orchestration (queues, workers, schedulers).
+   - Create database migrations, seeders, and test datasets covering user types, roles, communities, ads, and search indexes.
+3. **Security & Compliance Controls**
+   - Implement IAM least-privilege roles, audit logging, data retention policies, encryption (at-rest/in-transit), and incident response runbooks.
+   - Integrate spam/bad word detection services into feeds, chat, reviews, and community posts; schedule penetration tests.
 
-## Phase 2 – Learning Content Enhancements (Weeks 4-8)
-1. **PowerPoint Pipeline**
-   - Implement ingestion workflow: upload validation, conversion workers (slide images + HTML5), thumbnail generation, and metadata tagging.
-   - Extend course schema for deck references, lesson sequencing, and revision history; write migrations/seeders for sample decks.
-   - Develop instructor UI: deck library, slide previews, speaker notes, interactive quizzes, assignment to lessons, and reuse library.
-   - Build learner experience: responsive viewer, captions, transcript sync, keyboard/mobile gestures, notes, and progress tracking.
-   - Update mobile clients with offline caching, delta updates, and push notifications when new decks publish.
-   - QA: cross-browser/device testing, accessibility checks, performance profiling for large decks.
-2. **Ebook Upgrade**
-   - Redesign reader UI with typography controls, dyslexia font, theming, multimedia embedding, and inline glossary.
-   - Backend services for bookmarks, annotations, highlights, reading streaks, sync jobs, and analytics pipelines.
-   - DRM-lite implementation: watermarking, download limits, device binding, content expiry, and offline revocation.
-   - Author dashboard upgrades: chapter management, asset embedding, accessibility validator, pre-publication preview.
-   - Mobile parity: Flutter reader modules, offline storage encryption, background sync, and push reminders.
-   - QA: content migration tests, localisation review, analytics verification, and penetration test for DRM bypass.
+## Phase 2 – General Area & Learning Experiences (Weeks 4-8)
+1. **Live Feed & Social Signals**
+   - Design feed aggregation rules, ranking algorithms, moderation queues, and notification triggers for course, community, tutor, and ad updates.
+   - Develop feed UI (web + Flutter) with filters, highlights, CTA widgets, and personalised recommendations driven by follow graph.
+2. **Course Commerce & Delivery**
+   - Build storefront UI (categories, bundles, previews), checkout flows (Stripe/PayPal), and order management.
+   - Implement course management: module builder, drip scheduling, PowerPoint ingestion, recordings storage, quizzes, assignments, notes, exams, grading, and progress tracking.
+   - Integrate Agora for live classrooms with scheduling, ticketing (free/paid), interactive quizzes, recordings storage, and post-session analytics.
+3. **Ebook Upgrade Programme**
+   - Redesign ebook storefront and reader (typography controls, theming, multimedia, annotations, highlights, offline mode).
+   - Deliver author tools (chapter management, accessibility checker, preview, DRM-lite with watermarking/device binding).
+   - Sync reading analytics to dashboards; ensure Flutter reader parity.
+4. **Tutor Hourly Hire**
+   - Build tutor marketplace with profile pages, availability calendars, maps, pricing, verification badges, chat initiation, booking, and review flows.
+   - Integrate payments, refund logic, notifications, and live classroom hooks.
 
 ## Phase 3 – Social Graph & Profile System (Weeks 6-10)
-1. **Followers & Activity Feeds**
-   - Data model: follow relationships, privacy settings, follower suggestions, block/mute lists, and audit trails.
-   - API layer: REST/GraphQL endpoints for follow/unfollow, follower listings, activity feeds, rate limiting, and moderation escalation.
-   - UI integration: follow buttons, follower counts, suggestions modules, notifications, and moderation workflows across web/mobile.
-   - Backend processing: feed aggregation jobs, notification dispatchers, analytics tracking (follow conversion funnels).
-   - QA: load testing for follow events, abuse simulations, privacy regression, and localisation coverage.
-2. **Profile Area Redesign (Component-Based)**
-   - Design system: token definitions, responsive layout grid, motion guidelines, accessibility rules.
-   - Component build-out: profile headers, bio cards, achievements, course/community carousels, affiliate widgets, timeline posts.
-   - Backend aggregation services: compile stats (followers, completions, revenue, tier points) with caching/invalidation strategy.
-   - Database migrations and seeders for achievements, affiliate data, user preferences; create rollback scripts.
-   - Mobile implementation: Flutter/React Native components mirroring web behaviour, navigation flows, deep links, analytics events.
-   - QA: visual regression testing, responsive audits, offline support validation, and user acceptance testing with instructors/students.
+1. **Follow Graph Infrastructure**
+   - Model follow/unfollow/block/mute relationships, privacy settings, and audit logs; update user settings UI.
+   - Expose API endpoints and integrate with notifications, recommendations, and moderation workflows.
+2. **Component-Based Profile Redesign**
+   - Finalise design tokens, component library (headers, stats, achievements, community cards, affiliate widgets, timelines).
+   - Implement backend aggregation services (followers, course progress, revenue, tier points, ads performance) with caching.
+   - Deliver responsive React components, Flutter widgets, CSS styling, accessibility conformance, and localisation.
+   - Run migration scripts for new profile tables, achievements, preferences; create seeding utilities and rollback plans.
+3. **Dashboard Integration**
+   - Update user and instructor dashboards with new profile components, finance modules, analytics widgets, ID verification, instructor onboarding, and community listings.
+   - Extend admin panel with profile moderation, affiliate oversight, and analytics.
 
 ## Phase 4 – Communities 2.0 Overhaul (Weeks 8-14)
-1. **Core Platform & Governance**
-   - Schema redesign for communities, roles (members/admins/moderators), tier points, subscription/paywall tiers, and content entities.
-   - Feature build: feed aggregation, posts with multimedia, comments, replies, moderation queue, polls, maps, classroom integration, calendar, leaderboards, online presence indicators.
-   - Develop classroom module integration (course linking, session replays), map-based member discovery, and resource library management.
-   - Implement notification centre enhancements, real-time chat/inbox upgrades, and event reminders.
-   - QA: load tests for feeds/chat, moderation workflow validation, security review for role permissions.
-2. **Affiliate, Monetisation & Admin Tools**
-   - Affiliate marketplace: catalog UI, commission configuration, referral link generator, earnings tracking, withdrawal workflows.
-   - Instructor dashboard integration: community management panel (create/manage communities, analytics, member invites, paywall controls).
-   - Admin console enhancements: global moderation dashboards, incident response tooling, audit log viewer, analytics for community health.
-   - Subscription/paywall integration with payment gateway, entitlement checks, proration handling, and refund flows.
-   - QA: financial reconciliation tests, payout sandbox validation, legal/compliance review, and customer support runbooks.
-3. **Mobile Parity & Experience**
-   - Build mobile screens for community home, feed, posts, chat, maps, calendar, leaderboards, affiliates, and admin actions.
-   - Implement offline caching, delta sync, push notifications, deep links, and accessibility gestures.
-   - Conduct usability testing with pilot groups; refine navigation and micro-interactions for small screens.
+1. **Community Core & Content**
+   - Redesign schemas for communities, posts, categories, comments, replies, maps, classrooms, calendars, tier points, leaderboards, streaks, and paywalls.
+   - Implement content lifecycle (create, edit, schedule, archive), moderation queue, reporting tools, and audit logs.
+   - Build community feed with filters, pinned posts, hero/announcement blocks, map embeds, classroom integration, and resource library.
+2. **Roles, Governance & Monetisation**
+   - Configure role management (members, admins, moderators, owners), permissions matrix, onboarding flows, and escalation paths.
+   - Launch subscription/paywall tiers with Stripe integration, entitlement checks, proration, refunds, and analytics.
+   - Build affiliate marketplace (link creation, commission settings, earnings dashboard, withdrawals, instructor dashboard integration).
+3. **Communication & Engagement**
+   - Upgrade chat/inbox with channels, DMs, read receipts, Agora hooks, notifications, and spam filtering.
+   - Implement calendar syncing, event reminders, online presence tracker, classroom scheduling, and leaderboard calculations.
+   - Add ad placements, community affiliates section, and admin panel oversight.
+4. **Mobile Parity**
+   - Deliver Flutter screens for all community features (feed, posts, maps, chat, calendars, leaderboards, admin tools, affiliates, paywalls).
+   - Implement offline caching, push notifications, deep links, and analytics tracking.
 
-## Phase 5 – Explorer & Search Engine (Weeks 10-15)
+## Phase 5 – Explorer & Search (Weeks 10-15)
 1. **Navigation & UX**
-   - Update global navigation with Explorer entry, quick filter chips, saved searches, and contextual breadcrumbs; update documentation.
-   - Design explorer layout variations (desktop, tablet, mobile), card patterns per entity type, and call-to-action placements.
-   - Integrate explorer into onboarding flows, homepage hero modules, and email/push campaigns.
-2. **Search Infrastructure & Data Pipelines**
-   - Deploy Meilisearch cluster with replication, snapshots, and observability instrumentation.
-   - Build indexing pipelines: batch import for existing data, real-time updates via event queues, and scheduled reindex jobs.
-   - Implement relevance tuning: synonyms, typo tolerance, boosting signals (followers, community tier, course ratings), and experimentation harness.
-   - Connect explorer to social/community systems for contextual recommendations and follow/join actions.
+   - Add Explorer to global navigation, header, and onboarding flows; design saved searches, quick filters, and breadcrumbs.
+   - Create desktop/tablet/mobile layouts with entity cards (communities, profiles, courses, ebooks, tutors, ads) including CTAs.
+2. **Search Infrastructure**
+   - Deploy Meilisearch cluster with replication, backup, monitoring, and security controls.
+   - Build ETL pipelines for data ingestion (initial imports, incremental updates via queues, scheduled reindexing); include analytics instrumentation.
+   - Implement ranking logic using popularity, follow graph, tier points, course ratings, tutor availability, and geolocation.
 3. **Front-End & Mobile Integration**
-   - Develop search components (auto-complete, facets, filters, sorting, infinite scroll) for web.
-   - Build Flutter/React Native explorer screens with voice search hooks, offline recent searches, and deep linking to content/community/profile views.
-   - QA: cross-browser testing, mobile performance profiling, analytics validation, and privacy compliance (search history controls).
+   - Develop React components (autocomplete, facets, filters, sort, infinite scroll, voice search toggle).
+   - Build Flutter explorer module with offline recent searches, voice search, deep links into communities/courses/tutors, and analytics.
+   - Connect explorer to notifications, follow suggestions, and ad placement.
 
-## Phase 6 – Quality Assurance, Readiness & Launch (Weeks 13-16)
-1. **Comprehensive Testing & Certification**
-   - Execute unit, integration, contract, and end-to-end tests across backend, web, and mobile; include smoke tests for feature flags.
-   - Run load/stress tests for R2 delivery, community feeds/chat, and Meilisearch queries; document SLO/SLA outcomes.
-   - Perform accessibility audits (WCAG 2.1 AA), localisation verification, security/penetration tests, and privacy impact checks.
-2. **Data Seeding, Migration Validation & Content Prep**
-   - Populate staging with representative data sets (communities, courses, ebooks, PowerPoints, followers) via automated seeders.
-   - Validate migrations (profiles, communities, followers), run rollback drills, and verify telemetry dashboards.
-   - Collaborate with content teams to prepare launch-ready decks, ebooks, community templates, and marketing assets stored in R2.
-3. **Beta Programme & Feedback Loops**
-   - Launch closed beta (staff → instructor champions → selected learners); collect feedback via surveys, in-app prompts, and telemetry.
-   - Prioritise defects/enhancements, run daily triage, and track readiness metrics (defect burndown, adoption KPIs).
-   - Update knowledge base, support scripts, and training materials based on beta learnings.
-4. **Release Management & Post-Launch Operations**
-   - Finalise release notes, change logs, marketing messaging, tutorials, and in-product onboarding tours.
-   - Coordinate launch calendar (web, mobile app store submissions, communications) and ensure feature flags allow staged rollout.
-   - Monitor dashboards post-launch (asset latency, follow growth, community engagement, search conversions); schedule war room.
-   - Plan post-launch sprints for optimisation, backlog grooming, and handover to support/operations teams.
+## Phase 6 – Commerce, Ads & Finance (Weeks 12-16)
+1. **Payments & Subscriptions**
+   - Finalise Stripe/PayPal integration across courses, ebooks, live classrooms, tutor bookings, and community paywalls.
+   - Implement finance dashboards, reconciliation scripts, payout workflows, tax/VAT handling, and refund automation.
+   - Integrate ID verification and KYC flows for instructors and affiliates.
+2. **Edulure Ads Suite**
+   - Build advertiser dashboard (campaign creation, budgets, targeting, ad types, creatives management).
+   - Implement PPC/PPI/PPConversion tracking, metrics dashboards, traffic predictions, and recommendation engine for placements.
+   - Integrate ads into feeds, explorer, communities, and dashboards with compliance checks.
+3. **Analytics & Reporting**
+   - Deliver widgets for statistics, graphs, community health, course performance, ebook engagement, search conversions, tutor utilisation, and ad ROI.
+   - Provide export capabilities, scheduled reports, and admin insights.
+
+## Phase 7 – Quality Assurance & Launch (Weeks 14-18)
+1. **Comprehensive Testing**
+   - Execute unit, integration, contract, and end-to-end suites across backend, frontend, Flutter; include smoke tests for feature flags.
+   - Perform load/stress testing for R2 delivery, Agora live classrooms, community feeds/chat, Meilisearch queries, and ad serving.
+   - Run accessibility (WCAG 2.1 AA), localisation, usability, penetration, and privacy compliance tests.
+2. **Data Validation & Seeding**
+   - Populate staging with representative datasets (communities, ads, courses, ebooks, tutors, followers, paywalls) using automated seeders.
+   - Validate migrations, run rollback drills, verify analytics dashboards, and rehearse incident response scenarios.
+3. **Go-Live Readiness**
+   - Produce release notes, update documentation, knowledge base, support scripts, and training assets.
+   - Conduct beta programme (staff → champions → public), collect feedback, triage defects, and monitor readiness KPIs.
+   - Coordinate launch calendar across web deployment and Flutter app store submissions; ensure feature flags for staged rollout.
+4. **Post-Launch Operations**
+   - Establish war room with daily telemetry reviews, customer feedback loops, and escalation pathways.
+   - Transition ownership to support/operations with runbooks, SLAs, and backlog grooming for Version 1.01 enhancements.
 
 ## Cross-Phase Enablers
-- **Documentation:** Maintain living documentation (ADR, API specs, component guidelines, runbooks) updated each phase.
-- **Change Control:** Weekly steering committee to review progress, risks, dependency blockers, and approve scope changes.
-- **Analytics & Experimentation:** Instrument feature usage, set up A/B tests (e.g., explorer ranking variants, follow suggestions), and monitor KPIs.
-- **Training & Enablement:** Provide workshops/webinars for instructors, community managers, support, and sales to adopt new tooling.
-- **Risk Mitigation:** Maintain risk register with owners, impact/probability scoring, and mitigation/contingency plans.
-
+- **Documentation:** Maintain living ADRs, API specs, component guidelines, migration playbooks, and training manuals.
+- **Change Control:** Weekly steering committee reviewing progress, risks, dependency blockers, and scope adjustments.
+- **Risk Management:** Maintain risk register with mitigation/contingency plans (infrastructure, compliance, mobile parity, payments).
+- **Training & Enablement:** Workshops for instructors, community managers, support, sales, and admins covering new tooling.
+- **Telemetry & Experimentation:** Configure dashboards, alerts, A/B testing harnesses (explorer ranking, follow recommendations, ad placements), and feedback pipelines.
