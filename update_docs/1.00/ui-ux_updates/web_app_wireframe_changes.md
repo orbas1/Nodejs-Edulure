@@ -59,3 +59,24 @@
 - Colour contrast meets WCAG 2.1 AA with default theme; high-contrast toggle added to footer.
 - Keyboard focus order matches visual order; skip-to-content link appears on focus.
 - Responsive typography scale (clamp) ensures comfortable reading width across breakpoints.
+
+## Additional Landing & Campaign Pages
+- **Webinars & events landing:** Hero with registration form, agenda timeline, speaker cards, and countdown timer. Includes sticky CTA and testimonial strip.
+- **Partner programme page:** Two-column layout describing benefits, tier cards, and application form with required company info. FAQ accordion and success metrics grid support credibility.
+- **Customer stories:** Masonry grid of case studies with filter chips (industry, size). Detail page features stats header, challenge/solution/outcome sections, and pull quotes.
+
+## Checkout & Self-Serve Trial Flow
+- **Free trial signup:** Modal overlay with short form (name, work email, organisation size) and consent checkboxes. Confirmation page outlines next steps and link to onboarding call scheduler.
+- **Checkout summary:** Sidebar shows plan, seats, billing frequency, tax estimate, promo code field. Main content includes payment method selector, billing address, and terms acknowledgement.
+- **Post-purchase screen:** Success state with onboarding checklist, invite teammates CTA, and download apps links.
+
+## SEO & Content Infrastructure
+- **Pillar pages:** Long-form layout with sticky secondary navigation, inline CTA banners, and related resources sections between content blocks.
+- **Glossary:** Alphabetised list with quick index, search, and dynamic definition cards displayed via right panel.
+
+## Error & System States
+- **Maintenance mode:** Full-screen message with estimated downtime, status link, and contact support CTA.
+- **404 & 500 pages:** Illustration, search input, and suggested links to return user to key areas. 500 page includes “report issue” button.
+
+## Documentation of Embedded Apps
+- **Interactive demo containers:** Wireframe includes frame dimensions, tab controls for different personas, and annotation callouts to describe functionality. Loading state documented with skeleton screen.

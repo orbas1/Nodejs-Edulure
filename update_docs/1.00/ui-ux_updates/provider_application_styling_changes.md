@@ -60,3 +60,24 @@
 - Tablet view reduces card padding to 20px, compresses typography scale by 1 step.
 - Mobile view uses light theme variant (`#F8FAFC` background, `#1E293B` text) for readability outdoors; accent colours remain consistent.
 - Dark/light theme toggle persists preference via local storage and server profile flag.
+
+## Form Patterns & Validation Styling
+- **Grouped inputs:** Multi-column forms collapse to stacked layout with section headers; each group separated by 1px divider using `provider.border.default`.
+- **Validation states:** Error outlines combine red border and subtle inner shadow; success states use thin `provider.feedback.success` underline with check icon appended to label.
+- **Helper text:** 12px Inter 500, colour `#8EA2C9`, positioned 4px below field. Tooltip icons use accent secondary fill with 8px padding.
+- **Inline attachments:** File pills use dark background (#1B2336) with accent border and close icon hover states.
+
+## Data Visualisation Styling
+- **Charts:** Palette extends to categorical series using tints of primary accent (#4B5DFF, #A5B4FF, #5AC8FA, #22C55E). Gridlines at 1px `rgba(148, 163, 184, 0.16)`; axis labels Inter 500 12px.
+- **Heatmaps:** Use diverging colours (#0EA5E9 → #6366F1 → #F43F5E) with legend chips and accessible text overlays for top/bottom performers.
+- **KPIs:** Metric cards feature glow effect behind value when trending positive; delta badges use arrow icons with accent-coded backgrounds.
+
+## Notifications & Messaging Styling
+- **Drawer items:** 16px padding with subtle 2px left accent bar for unread state. Hover transitions lighten background to `#1A2537`.
+- **Message bubbles:** Provider messages use dark gradient (#243047 → #1B253B) with white text; system messages use neutral background (#111827) and smaller typography.
+- **Composer:** Rounded 20px input, attachments appear as chips above send button. Send button uses accent primary with icon only state on mobile.
+
+## Documentation & Empty State Styling
+- **Empty states:** Illustrations tinted with accent secondary at 60% opacity. Copy uses Inter 500 16px with 8px spacing before CTA.
+- **Guided walkthroughs:** Step banners use gradient background (#4B5DFF → #5AC8FA) with white text and icon avatar.
+- **Tooltips:** Dark background (#0B162B) with 12px radius, arrow indicator, and 14px text; appear with fade/slide animation.

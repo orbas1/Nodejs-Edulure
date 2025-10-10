@@ -60,3 +60,23 @@
 - Tablet layout reduces card padding to 16px and increases grid column width for readability.
 - Mobile light theme default; dark theme available in settings. Theme toggle persists using local storage + server flag.
 - Desktop web utilises max-width 1200px container with 40px gutters, ensuring comfortable reading width (~72 characters).
+
+## Form & Input Styling
+- **Authentication forms:** Light background (#FFFFFF) card with 24px radius, drop shadow `0 16px 40px rgba(15, 23, 42, 0.12)`. Inputs use floating labels and 1px border (#CBD5F5); focus state uses 2px `#7C3AED` outline and subtle glow.
+- **Assessment choices:** Radio/checkbox options styled as pill buttons with 12px padding; selected state fills with `learner.accent.secondary` and white text, incorrect answers show red border and icon.
+- **Error messaging:** Inline errors positioned 4px below field in `#EF4444` with caution icon. Form-level summary anchored at top with anchor links to invalid fields.
+
+## Gamification & Achievement Styling
+- **Badge system:** Layered gradients (#7C3AED → #F472B6) with metallic overlay for high-tier badges. Locked badges desaturated (#CBD5F5) with overlay lock icon at 60% opacity.
+- **Leaderboard:** Top-three entries highlighted with halo border, small confetti animation placeholder, and drop shadow `0 12px 32px rgba(124, 58, 237, 0.32)`.
+- **Progress calendar:** Heatmap squares use sequential scale (#EDE9FE → #7C3AED); tooltip displays completion count with 12px text.
+
+## Messaging & Social Styling
+- **Chat bubbles:** Learner messages use `#E0E7FF`, mentors `#DCFCE7`, system notifications `#F1F5F9`. Each bubble includes 8px radius and 12px padding with timestamp in #64748B.
+- **Voice/video controls:** Circular buttons with gradient fill (#7C3AED → #14B8A6) and white icon. Active state adds glowing border and subtle pulse animation.
+- **Reactions:** Chips use 999px radius, background `#F3E8FF`, and 14px text; active reaction deepens colour and increases scale by 6%.
+
+## Accessibility Styling
+- **High-contrast mode:** Background flips to #0F172A with text #F8FAFC; accent colours saturated (#A855F7, #0EA5E9) to maintain clarity.
+- **Focus outlines:** 2px `#14B8A6` outer ring plus 1px white inset stroke to ensure visibility on dark/light themes.
+- **Reduced motion:** Animations replaced with fade transitions and static state changes for toggles and carousel slides.

@@ -53,3 +53,26 @@
 2. High-contrast mode toggle persists preference via cookies; on activation, CSS variables switch to high-contrast palette.
 3. Lazy loading of hero video ensures LCP target <2.5s; fallback image served for slow connections.
 4. All modals trap focus and close on ESC, ensuring compliance with WCAG 2.1.
+
+## 10. Marketing Campaign & Tracking Logic
+1. Landing pages embed UTM-aware CTAs that propagate parameters through signup and checkout flows for attribution.
+2. Announcement banners scheduled via CMS; when active, they render in header with dismiss state stored in local storage per campaign ID.
+3. Scroll depth and interaction events pushed to analytics to evaluate content engagement; data feeds into optimisation dashboards.
+
+## 11. Self-Serve Trial & Checkout
+1. Trial form submissions trigger account pre-provisioning; system emails verification link and displays confirmation state.
+2. Checkout flow integrates payment gateway with tokenised cards; errors surfaced inline with guidance for resolution.
+3. Post-purchase tasks include inviting teammates, connecting integrations, and scheduling onboarding; completion tracked via checklist with progress indicator.
+
+## 12. Content Management & SEO Workflows
+1. CMS editors manage pillar pages with block-based editor; publishing updates static site data and invalidates CDN cache.
+2. Glossary interactions load definitions dynamically to minimise initial payload; state persists scroll position for improved UX.
+3. Sitemap and structured data updated nightly to reflect new resources, ensuring search engines capture latest content.
+
+## 13. Incident & Maintenance Communication
+1. Maintenance mode triggered via feature flag; renders full-screen message while preserving ability to access status page.
+2. Incident banner fetches from status API; acknowledgement hides banner for session but reappears if status worsens.
+
+## 14. Embedded Demo & Iframe Handling
+1. Demo modules load sandboxed iframe with persona toggles; switching persona swaps dataset via postMessage without reload.
+2. Loading skeleton displayed until iframe ready message received; if timeout occurs, fallback video tutorial shown.

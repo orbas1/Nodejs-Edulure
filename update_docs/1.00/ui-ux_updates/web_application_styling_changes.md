@@ -63,3 +63,26 @@
 - Hero video lazy loads after DOMContentLoaded with poster fallback to maintain LCP under 2.5s.
 - Background gradients implemented via CSS rather than images to reduce asset weight.
 - Use modern image formats (WebP/AVIF) with responsive `srcset` for cards and testimonials.
+- **CSS architecture:** Utilises layered approach with base tokens, component styles, and utility overrides. BEM naming maintained for marketing components; hashed classnames for React modules documented for consistency.
+- **Print styles:** Dedicated stylesheet ensuring resource articles print with simplified layout, dark background removed, and essential elements retained.
+
+## Form Styling & Validation
+- **Input fields:** Semi-transparent backgrounds with 10px radius, focus glow `0 0 0 2px rgba(37, 99, 235, 0.4)`. Disabled state reduces opacity to 0.4 and removes drop shadow.
+- **Select & dropdowns:** Use custom container with caret icon, 12px padding, and 1px border. Options list features 8px spacing and highlight bar on hover.
+- **Multi-step forms:** Progress indicator styled as segmented bar with active segment accent-coloured; step titles displayed inline with responsive stack on mobile.
+- **Validation messaging:** Inline helper text 14px `#F87171`; summary banner uses icon, bold first sentence, and anchor links.
+
+## Data & Content Modules
+- **Pricing table:** Use CSS grid with sticky recommended column, border separators, and alternating row backgrounds (#111827 / rgba(37, 99, 235, 0.08)).
+- **Blog cards:** Include gradient overlay for readability, text lockup with uppercase category label, and subtle tilt animation on hover.
+- **Timeline & stats blocks:** Vertical connectors styled with 2px accent line; stat blocks have 12px radius and gradient accent border.
+
+## Media & Illustration Treatments
+- **Video lightboxes:** Dimmed overlay (#020617 90%) with blur and drop shadow `0 40px 90px rgba(2, 6, 23, 0.65)`. Close button ghost style with accent hover.
+- **Illustrations:** Encourage duotone treatment using brand palette; 24px padding and max-width 480px on desktop to maintain balance.
+- **Icon buttons:** Circular 44px with 1px border, accent hover fill; used for carousel controls and social sharing.
+
+## Accessibility & Alternate Themes
+- **High-contrast theme:** Simplifies backgrounds to solid #000/#FFF combinations, increases font weight, and removes decorative imagery.
+- **Reduced motion mode:** Disables parallax and scroll animations; retains fade transitions only.
+- **RTL support:** Documentation specifies mirrored layout adjustments, including navigation order, arrow icons, and alignment for key components.
