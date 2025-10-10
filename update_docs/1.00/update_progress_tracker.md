@@ -12,8 +12,8 @@ All workstreams remain in planning with execution not yet started, apart from do
 | Task 5 – Explorer & Search Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 6 – Quality Assurance, Documentation & Release Readiness | 0% | 10% | 5% | 0% | 0% | 0% | 3% |
 | Task 7 – Mobile Application Completion & Store Launch | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| Task 8 – Design System Integration & UI Handoff | 50% | 28% | 45% | 40% | 35% | 20% | 36% |
-| Task 9 – Version 1.00 Design Refresh Programme | 45% | 35% | 40% | 38% | 32% | 20% | 35% |
+| Task 8 – Design System Integration & UI Handoff | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 9 – Version 1.00 Design Refresh Programme | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
 
@@ -55,15 +55,15 @@ All workstreams remain in planning with execution not yet started, apart from do
 | 7.3 Store compliance & submission assets | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 7.4 Mobile QA & device certification | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 7.5 Support playbooks & release operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 8.1 Research & experience alignment | 50% | 45% | 55% | 45% | 35% | 20% | 42% |
-| 8.2 Cross-platform design system consolidation | 45% | 30% | 50% | 35% | 30% | 15% | 34% |
-| 8.3 Application experience detailing | 40% | 25% | 45% | 35% | 30% | 15% | 32% |
-| 8.4 Web experience detailing | 42% | 20% | 40% | 30% | 28% | 12% | 29% |
-| 8.5 Design QA & engineering handoff preparation | 35% | 10% | 35% | 25% | 25% | 10% | 23% |
-| 9.1 Token & theme system completion | 55% | 40% | 45% | 42% | 35% | 25% | 40% |
-| 9.2 Navigation & layout architecture | 50% | 35% | 38% | 36% | 32% | 18% | 35% |
-| 9.3 Template & component production | 45% | 30% | 35% | 32% | 30% | 15% | 31% |
-| 9.4 Accessibility, compliance, and handoff | 48% | 35% | 42% | 38% | 30% | 18% | 35% |
+| 8.1 Research & experience alignment | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.2 Cross-platform design system consolidation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.3 Application experience detailing | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.4 Web experience detailing | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.5 Design QA & engineering handoff preparation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.1 Token & theme system completion | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.2 Navigation & layout architecture | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.3 Template & component production | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.4 Accessibility, compliance, and handoff | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
 
@@ -72,22 +72,22 @@ The design-specific health metrics below align with `Design_update_progress_trac
 
 | Metric | Score (%) | Commentary |
 | --- | --- | --- |
-| Design Quality | 68 | High-fidelity templates improving, but media viewer states need further iteration and validation. |
-| Design Organisation | 72 | IA and component inventories are documented; cross-platform linkage requires refinement. |
-| Design Position | 64 | Hero and campaign placements planned, yet seasonal takeover logic is unresolved. |
-| Design Text Grade | 70 | Copy decks largely approved; compliance wording pending legal review. |
-| Design Colour Grade | 75 | Token contrast validated; emo/seasonal overlays still undergoing regression checks. |
-| Design Render Grade | 62 | Figma render quality is strong, but cross-platform spacing mismatches persist. |
-| Compliance Grade | 66 | Privacy overlays drafted with annotation retention guidance outstanding. |
-| Security Grade | 60 | Consent and notification defaults defined, requiring engineering confirmation on enforcement. |
-| Design Functionality Grade | 63 | Core interactions mapped; advanced motion/offline behaviours incomplete. |
-| Design Images Grade | 58 | Asset manifests remain partial and need final art direction approval. |
-| Design Usability Grade | 69 | Navigation tests positive; monetisation/settings flows awaiting broader validation. |
-| Bugs-Less Grade | 65 | Dark-mode icon inconsistencies and spacing issues identified by QA remain open. |
-| Test Grade | 61 | Visual regression harness operational but limited for Flutter components. |
-| QA Grade | 67 | QA checklist in progress and needs localisation/accessibility alignment. |
-| Design Accuracy Grade | 70 | Most templates match tokens; legacy screens still reference deprecated styles. |
-| Overall Grade | 66 | Foundational improvements evident with imagery, motion, and compliance areas still below target thresholds. |
+| Design Quality | 0 | Design refresh has not started; awaiting kickoff to define baselines. |
+| Design Organisation | 0 | No IA or inventory updates completed. |
+| Design Position | 0 | Placement strategy pending. |
+| Design Text Grade | 0 | Copy deck work has not begun. |
+| Design Colour Grade | 0 | Palette and theme work outstanding. |
+| Design Render Grade | 0 | Prototyping and renders not yet produced. |
+| Compliance Grade | 0 | Compliance documentation pending engagement. |
+| Security Grade | 0 | Consent and notification safeguards awaiting definition. |
+| Design Functionality Grade | 0 | Interaction specifications not drafted. |
+| Design Images Grade | 0 | Asset manifests and imagery tasks not started. |
+| Design Usability Grade | 0 | No usability testing scheduled. |
+| Bugs-Less Grade | 0 | QA passes not run. |
+| Test Grade | 0 | Testing harness setup not begun. |
+| QA Grade | 0 | QA planning not initiated. |
+| Design Accuracy Grade | 0 | No refreshed templates exist for validation. |
+| Overall Grade | 0 | Metrics will remain at zero until the programme begins. |
 
 ## Notes & Next Steps
 - Update metrics upon completion of milestone checkpoints and after QA sign-off for each deliverable.
