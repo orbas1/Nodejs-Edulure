@@ -1,6 +1,6 @@
 # Version 1.50 Progress Tracker
 
-All workstreams are in planning with execution not yet started; therefore, completion percentages currently sit at 0%. Tracker will be updated as deliverables progress.
+All workstreams remain in planning with execution not yet started, apart from documentation groundwork under Task 6. Percentages reflect this baseline, with non-zero values only where the new testing plan advances documentation and integration readiness.
 
 ## Task-Level Progress
 | Task | Security | Completion | Integration | Functionality | Error Free | Production | Overall* |
@@ -10,7 +10,7 @@ All workstreams are in planning with execution not yet started; therefore, compl
 | Task 3 – Social Graph & Profile Component System | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 4 – Communities 2.0 & Monetisation Suite | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 5 – Explorer & Search Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| Task 6 – Quality Assurance, Documentation & Release Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 6 – Quality Assurance, Documentation & Release Readiness | 0% | 10% | 5% | 0% | 0% | 0% | 3% |
 | Task 7 – Mobile Application Completion & Store Launch | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
@@ -45,7 +45,7 @@ All workstreams are in planning with execution not yet started; therefore, compl
 | 5.5 Relevance & insight analytics | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 6.1 Comprehensive test suite execution | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 6.2 Beta programme & feedback loop | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 6.3 Documentation & enablement pack | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 6.3 Documentation & enablement pack | 0% | 20% | 10% | 0% | 0% | 0% | 5% |
 | 6.4 Release management & change control | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 6.5 Post-launch monitoring & handover | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 7.1 Mobile feature parity audit & gap closure | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -58,5 +58,5 @@ All workstreams are in planning with execution not yet started; therefore, compl
 
 ## Notes & Next Steps
 - Update metrics upon completion of milestone checkpoints and after QA sign-off for each deliverable.
-- Maintain linkage to testing reports, beta feedback, and release documentation within Task 6 artefacts.
+- Maintain linkage to testing reports, beta feedback, and release documentation within Task 6 artefacts, starting with the published Version 1.10 testing plan.
 - Coordinate Task 7 store submissions, crash monitoring configuration, and support playbooks with the release calendar.

@@ -1,13 +1,7 @@
 # Version 1.50 Update Brief
 
 ## Executive Overview
-Version 1.50 concentrates on hardening the Edulure platform and delivering the next wave of learner, instructor, and mobile capab
-ilities. The programme is structured around seven cross-functional tasks covering infrastructure governance, Cloudflare R2-backed
-content delivery, social graph foundations, Communities 2.0 monetisation, a Meilisearch-powered Explorer, comprehensive release r
-eadiness, and final mile mobile completion. All streams are currently in planning with 0% progress recorded across security, integ
-ration, functionality, error-free, production, and overall readiness metrics in the progress tracker. Delivery sequencing enforces
-foundational upgrades before feature releases and culminates with mobile store launch support to ensure parity across web, Flutter
-user, and provider experiences.
+Version 1.50 concentrates on hardening the Edulure platform and delivering the next wave of learner, instructor, and mobile capabilities. The programme is structured around seven cross-functional tasks covering infrastructure governance, Cloudflare R2-backed content delivery, social graph foundations, Communities 2.0 monetisation, a Meilisearch-powered Explorer, comprehensive release readiness, and final mile mobile completion. All streams are currently in planning, with measurable progress limited to Task 6 documentation (testing plan publication) while security, integration, functionality, error-free, production, and overall readiness metrics for other tasks remain at 0% in the progress tracker. Delivery sequencing enforces foundational upgrades before feature releases and culminates with mobile store launch support to ensure parity across web, Flutter user, and provider experiences.
 
 ## Objectives & Success Criteria
 - **Platform Integrity:** Close pre-update security and reliability gaps by completing Task 1 subtasks (1.1–1.5), yielding enforce
@@ -37,6 +31,7 @@ downstream features.
 - **Milestone 6 – Mobile Application Completion & Store Launch (Week 18):** Finalises Task 7, aligning store submissions, support, and mobile analytics with the broader release.
 
 ## Testing & Quality Strategy
+- Publish the Version 1.10 testing plan (testing_plan.md) as the QA charter guiding coverage, ownership, and exit criteria across all tasks.
 - Embed automated unit, integration, load, security, and accessibility suites per Task 6.1 to protect against regressions as new services roll out.
 - Run staged beta programmes (Task 6.2) covering web and mobile clients, collecting telemetry and user surveys to guide defect burndown.
 - Maintain documentation, training, and release artefacts (Task 6.3–6.5) to ensure stakeholders, support, and operations teams are prepared for go-live and post-launch monitoring.
@@ -49,6 +44,6 @@ downstream features.
 - Maintain contingency via feature flags, rollback scripts, and phased rollout plans, especially for monetisation and mobile store launches.
 
 ## Current Status & Next Steps
-- All tasks and subtasks are in planning with progress metrics at 0%, as tracked in the progress tracker tables.
-- Immediate next steps include finalising Task 1 security baseline implementation, validating API specifications with frontend/mobile teams, and scheduling milestone readiness reviews to confirm execution start.
+- All tasks and subtasks are in planning; only Task 6 documentation shows initial movement (testing plan publication) while remaining metrics stay at 0%, as tracked in the progress tracker tables.
+- Immediate next steps include finalising Task 1 security baseline implementation, validating API specifications with frontend/mobile teams, incorporating the new testing plan into squad backlogs, and scheduling milestone readiness reviews to confirm execution start.
 - Parallel preparation work should gather required compliance documentation, localisation inputs, and design assets to accelerate Tasks 2–7 once foundations are certified.
