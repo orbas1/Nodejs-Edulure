@@ -1,20 +1,28 @@
-# Home Page Imagery Guidelines
+# Home Page Imagery Plan – Web Application v1.00
 
-## Hero Imagery
-- Use abstract gradient background referencing brand palette.
-- Overlay with vector illustration showing collaboration (provider + learners) to highlight communities 2.0.
-- Provide alternative illustration for provider vs. learner persona (asset upload vs. collaborative study).
+## Hero Illustration
+- Asset: `hero_orbit_v1.svg`
+- Placement: Right column, 60% width, 40% height of hero section.
+- Animation: CSS parallax and subtle rotation.
 
-## Section Imagery
-- Resume strip uses course cover thumbnails (auto-generated from uploaded decks/ebooks) with subtle drop shadows.
-- Community highlights display custom avatars or uploaded banners; fallback to gradient + icon if missing.
-- Events module includes host avatars and calendar icons.
+## Value Pillars Icons
+- Icons: `icon-learning.svg`, `icon-community.svg`, `icon-mentor.svg`
+- Size: 32×32px, gradient fill from `#4C7DFF` to `#A78BFA`.
+- Source: Custom Figma icon set.
 
-## Asset Requirements
-- Format: SVG for icons, PNG/WebP for illustrative assets.
-- Dimensions: Hero 1440x480; community banners 600x240; card thumbnails 320x180.
-- Provide dark/light theme variants stored in `images_and_vectors` folder.
+## Featured Tracks Thumbnails
+- Use course-specific thumbnails 16:9 ratio.
+- Ensure each image includes overlay gradient for readability (top to transparent).
 
-## Accessibility
-- Ensure alt text describes purpose ("Illustration of provider uploading course materials").
-- Avoid text embedded in images; overlay textual info using HTML/CSS for localisation.
+## Community Snapshot Background
+- Use `community_scene_v1.svg` as faint background watermark at 12% opacity behind metrics.
+
+## Testimonials Photography
+- Avatars: 64×64px circular crops from `assets/photos/learners/`.
+- Provide alt text with name and role.
+
+## CTA Band Decoration
+- Overlay `orbital_path.svg` behind form, anchored top-left with `mix-blend-mode: screen`.
+
+## FAQ Section
+- No imagery to reduce clutter; use simple icon 24px for expand/collapse.

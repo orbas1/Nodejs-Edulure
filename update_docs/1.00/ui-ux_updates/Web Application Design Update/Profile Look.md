@@ -1,22 +1,23 @@
-# Profile Visual Design
+# Profile Experience Visual Direction – Web Application v1.00
 
-## Header
-- Full-width hero with blurred background from cover image; fallback gradient.
-- Profile avatar (96px) overlapped with 4px border using surface colour.
-- Display name, handle, verification badge, follow button.
+## Hero & Identity
+- Cover image 1440×360 with gradient overlay `linear-gradient(180deg, rgba(11,17,32,0) 0%, rgba(11,17,32,0.72) 100%)`.
+- Avatar 120×120px, border 4px `rgba(76,125,255,0.64)`, offset -60px overlapping content card.
+- Display name (Clash Display 32px), role tag (chip 14px) and location (icon + text 16px).
 
-## Stats Row
-- Show followers, following, communities, courses created/completed.
-- Provide quick actions: Message, Invite to community (if provider), Share profile link.
+## Stats & Highlights
+- Stats row with 4 metrics (Followers, Following, Completed Courses, Community Points). Each 140×120px card with accent icon.
+- Highlight badges arranged horizontally; clicking reveals modal with details.
 
-## Content Sections
-- **About:** Rich text with read more toggle.
-- **Highlights:** Carousel of featured courses or achievements.
-- **Communities:** Cards listing joined/managed communities.
-- **Assets:** Grid of published decks/ebooks.
-- **Activity:** Timeline of recent posts, follows, achievements.
+## Timeline
+- Activity timeline uses vertical line with nodes every 48px. Items include icon, title, timestamp, description, attachments preview.
+- Provide filters for activity type (Courses, Communities, Achievements, Posts).
 
-## Visual Treatments
-- Use alternating background shades between sections to create depth.
-- Provide sticky sub-navigation to jump between sections.
-- Maintain consistent spacing and typographic scale defined in fonts doc.
+## Sidebar Widgets
+- Left column features About card (bio text 16px, max 240 characters) and Skills tags (chips 16px).
+- Right column houses Achievements carousel (badges 80px), Connected accounts (list with icons), Quick actions (Edit profile, Manage notifications).
+
+## Visual Style
+- Use gradient accents behind avatar to emphasise profile identity.
+- Cards have subtle glow `0 18px 36px rgba(76,125,255,0.18)` to signal personal space.
+- Buttons adopt secondary style to avoid overpowering content.

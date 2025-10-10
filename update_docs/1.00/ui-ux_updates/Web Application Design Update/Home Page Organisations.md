@@ -1,18 +1,37 @@
-# Home Page Organisation – v1.50
+# Home Page Structure – Web Application v1.00
 
-## Layout Overview
-1. **Hero Welcome Panel:** Personalised greeting, quick stats (streak, new followers), theme toggle.
-2. **Resume Learning Strip:** Horizontal carousel of in-progress courses and ebooks with progress bars.
-3. **Community Highlights:** Grid showcasing joined communities with event badges and unread indicators.
-4. **Recommended Actions:** Cards encouraging content upload, community creation, or explore trending topics.
-5. **Events & Calendar:** Two-column section listing upcoming live sessions, webinars, and deadlines.
-6. **Resource Spotlight:** Rotating highlight of new assets, blog posts, or release notes.
-7. **Footer Utility:** Links to support, documentation, feedback, and language selection.
+## Section Order (Prospective Learners)
+1. **Hero Orbit** – 60/40 split hero with CTA and animated illustration.
+2. **Value Pillars** – 3 cards emphasising personalised learning, community, mentorship.
+3. **Featured Tracks** – Carousel of courses segmented by track, includes filter chips.
+4. **Community Snapshot** – Stats row highlighting members, events, collaborations.
+5. **Testimonials** – Rotating quotes with avatars and star ratings.
+6. **Platform Capabilities** – Grid of 6 icon-text pairs detailing features.
+7. **CTA Band** – Inline form to capture leads with privacy note.
+8. **FAQ Accordion** – 6 questions addressing onboarding and pricing.
+9. **Footer** – Navigation links, social icons, newsletter.
 
-## Responsive Adjustments
-- On tablet, hero compresses into stacked layout; resume carousel becomes horizontal scroll.
-- On mobile, sections collapse into vertical cards with quick action buttons pinned at bottom.
+## Section Order (Providers)
+1. Revenue hero.
+2. Performance metrics row (3 KPIs).
+3. Workflow stepper (Plan → Build → Launch).
+4. Case study highlight with quote.
+5. Pricing preview linking to packages.
+6. Support resources and contact.
 
-## Personalisation
-- Data-driven modules reorder based on learner vs. provider persona.
-- Use follow graph to surface relevant communities; highlight new features from change log via announcements rail.
+## Section Order (Enterprises)
+1. Compliance hero.
+2. Integration showcase grid.
+3. Security & governance cards.
+4. Success metrics slider.
+5. Demo scheduling CTA with calendar embed.
+
+## Layout Notes
+- Each section uses 80px padding (desktop) with alternating background tokens for rhythm.
+- Introduce subtle scroll-based parallax on hero illustration and stats counters.
+- Provide anchor navigation (floating right) for quick section jumps; visible after 480px scroll.
+
+## Content Ownership
+- Marketing team supplies copy via `text.md.md` matrix.
+- Product design maintains layout and component updates.
+- Analytics instrumentation ensures conversion tracking on hero CTA, form submission, and FAQ interactions.
