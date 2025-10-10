@@ -1,40 +1,52 @@
-# Settings
+# Settings — Information Architecture & Interaction Rules
 
-## Structure
-- Sections: Account, Notifications, Privacy, Monetisation, Integrations, Accessibility, Support.
-- Use segmented control on tablet and accordion on phones for deeper sections.
-- Provide persistent summary panel showing account status, plan tier, storage usage, and outstanding actions.
+## Structure Overview
+1. **Account**
+   - Profile Information (name, headline, avatar upload)
+   - Security (password, 2FA, device sessions)
+   - Connected Integrations (Google, Microsoft, Slack)
+2. **Preferences**
+   - Notifications (push, email, SMS toggles)
+   - Accessibility (font toggle, contrast mode, motion reduction)
+   - Language & Region (dropdown, locale detection)
+3. **Learning Controls**
+   - Download Quality (Low/Medium/High radio group)
+   - Autoplay & Captions
+   - Offline Storage Management
+4. **Billing & Earnings** (provider only)
+   - Payout Methods
+   - Tax Forms
+   - Invoice History
+5. **Support & Legal**
+   - Help Centre
+   - Community Guidelines
+   - Privacy Policy
+   - Terms of Service
+   - Delete Account (destructive zone)
 
-## Key Modules
-### Account
-- Profile information, security (password, MFA), device management.
-- Session history with ability to revoke individual devices.
+## Layout Specifications
+- **Header:** 104 dp avatar, display name, role chips (Learner/Provider). Primary CTA to “View Public Profile”.
+- **Section Cards:** Each category collapsed by default showing summary chips; tapping expands list items.
+- **List Row:** 64 dp height with trailing icon. Use `body/02` for title, `caption/01` for description.
+- **Destructive Zone:** Red-tinted container (background `rgba(239, 68, 68, 0.12)`) with 12 dp radius.
 
-### Notifications
-- Matrix of channels (push, email, in-app) vs event types with quick toggles.
-- Quiet hours scheduling and digest frequency controls.
+## Interaction Patterns
+- Collapsible sections maintain state per session.
+- Provide confirmation modals for sensitive toggles (e.g., disabling 2FA).
+- Inline toasts confirm preference saved, anchored above bottom nav.
+- Show skeleton placeholders when fetching remote settings; each row skeleton 48 dp height.
 
-### Privacy
-- Visibility preferences for profile, learning progress, community memberships.
-- Data export request and account deletion workflows with confirmation prompts.
+## Accessibility Considerations
+- Settings navigation supports VoiceOver rotor categories (Headers, Links, Controls).
+- Provide descriptive `accessibilityLabel` for toggles (“Enable push notifications for new lesson releases”).
+- Ensure focus returns to triggering control after closing dialogs.
 
-### Monetisation
-- Payment methods, payout schedules, tax documents.
-- Commission settings for affiliates and community tiers.
+## Content & Microcopy
+- Use supportive tone (“We’ll remind you about live cohorts 24 hours before start”).
+- Provide inline helper text for complex items (e.g., 2FA) with link to docs.
+- Display last updated timestamp for preferences using `caption/01`.
 
-### Integrations
-- Connected apps (calendar, CRM, analytics) with OAuth status and sync logs.
-- Webhook configuration for enterprise customers.
-
-### Accessibility
-- Text size presets, dyslexia-friendly font toggle, colour contrast mode, reduced motion.
-- Caption defaults and playback speed preferences.
-
-### Support
-- Access to help articles, contact support form, status page link, community guidelines.
-- "Send diagnostics" option capturing logs with consent.
-
-## Interaction Guidelines
-- Autosave changes when toggles flip; show "Saved" toast with timestamp.
-- Provide breadcrumbs/back button to return to previous screen without losing progress.
-- Ensure destructive actions (delete account) require multi-step confirmation.
+## Technical Notes
+- Document API endpoints that correspond to each section to coordinate with backend.
+- Provide variant frames for dark mode and large text.
+- Ensure destructive actions require double confirmation (modal + hold-to-confirm slider of 120 dp width).

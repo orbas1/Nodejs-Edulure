@@ -1,25 +1,55 @@
-# Screens List
+# Screens List — Mobile Application v1.00
 
-## Provider App
-1. Provider Dashboard (PD-01) — Contains 14 widget instances (W-ANA-001, W-ACT-010, W-SOC-030, etc.)
-2. Media Library (PD-02) — Card grid with selection mode, bulk actions, metadata panel
-3. Analytics Deep Dive — Drill-down charts, comparison tool, export drawer
-4. Community Hub — Channel list, events calendar, member management
-5. Event Composer — Multi-step form (details, schedule, co-hosts)
-6. Messages Inbox — Conversation list with quick reply
-7. Settings & Billing — Account overview, billing history, subscription controls
+## Learner App Screens
+1. **Onboarding Carousel (`onboarding/carousel`)**
+2. **Account Creation (`auth/signup`)**
+3. **Login (`auth/login`)**
+4. **Two-Factor Verification (`auth/2fa`)**
+5. **Home Dashboard (`home`)**
+6. **Course Detail (`learn/course/:id`)**
+7. **Lesson Player (`learn/lesson/:id`)**
+8. **Quiz / Assessment (`learn/quiz/:id`)**
+9. **Community Feed (`community/feed`)**
+10. **Community Thread (`community/thread/:id`)**
+11. **Events Calendar (`community/events`)**
+12. **Library (`library`)**
+13. **Downloads Manager (`library/downloads`)**
+14. **Profile Overview (`profile`)**
+15. **Settings (`settings`)**
+16. **Notifications Inbox (`notifications`)**
+17. **Search (`search`)**
+18. **Achievement Showcase (`profile/achievements`)**
+19. **Support Chat (`support/chat`)**
+20. **Feedback Submission (`support/feedback`)**
 
-## Learner App
-1. Learner Home Feed (LR-01) — Greeting hero, resume carousel, recommendations grid
-2. Media Viewer (LR-02) — Canvas, annotation rail, transport controls
-3. Community Space — Threads, resources, leaderboard
-4. Explorer Search & Detail — Search filters, discovery cards, detail overlay
-5. Profile & Goals — Progress overview, badges, goal editor
-6. Notifications Inbox — Tabbed feed (All, Activity, System)
-7. Settings & Accessibility — Preferences, display modes, accessibility toggles
+## Provider App Screens
+1. **Provider Home Dashboard (`provider/home`)**
+2. **Content Pipeline (`provider/content`)**
+3. **Upload Wizard Step 1–5 (`provider/upload/:step`)**
+4. **Course Builder (`provider/course-builder`)**
+5. **Lesson Editor (`provider/lesson-editor`)**
+6. **Community Moderation Queue (`provider/community/moderation`)**
+7. **Earnings Overview (`provider/earnings`)**
+8. **Payout Detail (`provider/earnings/payout/:id`)**
+9. **Affiliate Management (`provider/affiliate`)**
+10. **Events Scheduler (`provider/events`)**
+11. **Audience Insights (`provider/insights`)**
+12. **Message Centre (`provider/messages`)**
+13. **Settings (`provider/settings`)**
+14. **Support Tickets (`provider/support`)**
+15. **Team Management (`provider/team`)**
 
-## Shared Utility Screens
-1. Authentication & MFA — Login, OTP, biometric handoff
-2. Global Search Overlay — Command palette, quick actions, results list
-3. Support & Feedback Sheet — FAQ list, contact support, status updates
-4. Offline Queue Manager — Pending uploads/messages list with retry controls
+## Shared / System Screens
+- **Error States (403, 404, 500)**
+- **Maintenance Mode**
+- **Offline Mode Splash**
+- **Update Required Prompt**
+- **Push Permission Request**
+- **Biometric Unlock**
+- **Language Selector Modal**
+- **Legal Documents (Privacy, Terms)**
+
+## Prioritisation Tags
+- `P0`: Must launch with v1.00 (Home, Learn, Lesson Player, Provider Dashboard, Upload Wizard, Settings).
+- `P1`: Launch within first patch (Affiliate Management, Team Management, Support Chat).
+- `P2`: Deferred but design-ready (Maintenance Mode, Update Prompt customisations).

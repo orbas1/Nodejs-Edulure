@@ -1,32 +1,36 @@
-# Logic Flow Map
+# Logic Flow Map — High-Level Diagram
 
 ```
 [App Launch]
-    ↓
-[Authentication]
-    ├─ Existing session valid → [Home Dashboard]
-    └─ Session expired → [Sign-In → MFA → Home Dashboard]
+   ↓ (Auth token valid?)
+[Yes] → [Profile complete?]
+            ↓Yes                      ↓No
+         [Role switch?]            [Profile Setup]
+            ↓                     (collect avatar, interests)
+   ┌───────Yes───────┐
+   │                 │
+[Role Selector]   [Default Role]
+   │                 │
+[Provider Shell]  [Learner Shell]
 
-[Home Dashboard]
-    ├─ Tap "Resume" → [Media Viewer]
-    │         ├─ Online → [Live Sync]
-    │         └─ Offline → [Cached Playback → Sync Queue]
-    ├─ Tap "Upload" → [Upload Sheet → Metadata → Publish Confirmation]
-    ├─ Tap "Community Alert" → [Community Hub → Channel Detail]
-    └─ Tap "Settings" → [Settings Hub]
+Learner Shell Flow:
+[Home]
+  ├─ Resume CTA → [Lesson Player] → [Quiz] → [Completion]
+  ├─ Learn Tab → [Course Detail] → [Lesson Player]
+  ├─ Community Tab → [Feed] → [Thread]
+  ├─ Library Tab → [Downloads]
+  └─ Profile → [Settings]
 
-[Media Viewer]
-    ├─ Open discussion → [Comment Drawer]
-    ├─ Share → [Share Sheet → Deep Link]
-    └─ Complete asset → [Progress Sync → Recommendation Modal]
+Provider Shell Flow:
+[Dashboard]
+  ├─ FAB → {Upload Wizard → Publish, Schedule Event, Announcement}
+  ├─ Content → [Course Builder]
+  ├─ Community → [Moderation Queue]
+  ├─ Earnings → [Payout Detail]
+  └─ Settings → [Billing]
 
-[Community Hub]
-    ├─ Post content → [Composer → Preview → Post Success]
-    ├─ Moderate → [Action Menu → Confirmation → Audit Log]
-    └─ Schedule event → [Event Form → Publish → Calendar Sync]
-
-[Settings Hub]
-    ├─ Personalisation → [Appearance Toggle → Preview]
-    ├─ Notifications → [Preference Matrix → Save]
-    └─ Integrations → [Service Connect → OAuth → Confirmation]
+System Overlays:
+- Offline Banner overlays any screen; actions reroute to Downloads.
+- Compliance Modal overlays provider screens until resolved.
+- Push Notification → Deep link into target route with context anchor.
 ```

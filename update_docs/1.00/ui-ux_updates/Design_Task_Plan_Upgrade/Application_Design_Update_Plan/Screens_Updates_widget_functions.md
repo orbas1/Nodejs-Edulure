@@ -1,18 +1,71 @@
-# Screens Updates Widget Functions
+# Widget Functions — Behaviour Specifications
 
-| Widget (ID) | Function | Event Telemetry | Behavioural Notes | Interaction Contracts |
-| --- | --- | --- | --- | --- |
-| Hero KPI Card (W-ANA-001) | Visualises single metric with comparative delta; opens Analytics Detail on tap. | `metric_view`, `delta_threshold_crossed`, `detail_open`. | Colour ramps to semantic palette based on thresholds; numbers animate via count-up. | Emits `onOpenDetail(metricId)`; consumes `metricPayload`. |
-| Revenue Spark-line (W-ANA-002) | Chart daily revenue trends, allow timeframe switching between 7/30 days. | `sparkline_hover`, `timeframe_switch`, `export_trigger`. | Uses lazy-loaded dataset; fallback skeleton for slow networks. | Emits `onTimeframeChange(range)`; optional `onExport(type)`. |
-| Conversion Timeline (C1) | Display upload queue stages with inline retry/abort controls. | `timeline_stage_expand`, `retry_click`, `cancel_click`. | Auto-refreshes via SSE; shows optimistic state during uploads. | Emits `onOpenUpload(id)`, `onRetry(id)`, `onCancel(id)`. |
-| Quick Action Pill (W-ACT-010) | Launch shortcut flows (upload, event, announcement). | `quick_action_invoke`, `quick_action_success`. | Reorders based on frequency; displays micro-progress ring during flow. | Emits `onInvoke(actionId)` and expects promise resolution for success state. |
-| Task Checklist Item (W-ACT-012) | Track provider tasks with swipe complete/defer patterns. | `task_complete`, `task_defer`, `task_assign`. | Overdue tasks pulse subtly; completion triggers confetti microburst. | Emits `onToggle(status)`, `onAssign(userId)`. |
-| Media Card (W-MED-020) | Preview media asset, expose status, progress, actions. | `media_select`, `media_multi_select`, `media_action_menu`. | Long press enters selection mode; progress ring animates clockwise. | Emits `onSelect(id)`, `onContextMenu(id)`, `onToggleSelect(id, selected)`. |
-| Resume Carousel Card (W-MED-021) | Continue learner content with quick resume CTA. | `resume_tap`, `resume_swipe`, `resume_complete`. | Maintains offline badge; shows haptic tick when resumed offline. | Emits `onResume(itemId)`; accepts `progressUpdate` callback. |
-| Media Canvas (W-MED-022) | Render slides/ebook/audio with playback controls. | `media_play`, `media_pause`, `media_seek`, `annotation_create`. | Supports pinch zoom, scrubbing; caches next/prev slide. | Emits `onPlaybackChange(state)`, `onAnnotationCreate(payload)`. |
-| Community Pulse Chip (W-SOC-030) | Notify provider of moderation issues, open filtered view. | `pulse_open`, `pulse_dismiss`. | Badge count decrements as issues resolved; colour corresponds to severity. | Emits `onOpen(filter)`, `onDismiss(filter)`. |
-| Event Strip Card (W-SOC-031) | Highlight upcoming events with RSVP. | `event_rsvp`, `event_share`, `event_dismiss`. | Countdown badge updates live; disabled when event full. | Emits `onRSVP(eventId, status)`, `onShare(eventId)`. |
-| Discussion Drawer (W-SOC-032) | Show threaded comments, enable reply/reaction actions. | `comment_post`, `reaction_add`, `thread_scroll_depth`. | Prefetches next 20 messages; indicates typing presence. | Emits `onPost(message)`, `onReact(commentId, emoji)`. |
-| Navigation Header (W-SYS-040) | Provide screen title, breadcrumbs, contextual actions. | `breadcrumb_navigate`, `action_click`. | Collapses on scroll; displays offline banner when connectivity lost. | Emits `onNavigate(target)`, `onAction(actionId)`. |
-| Support Assistant Button (W-SYS-041) | Offer contextual help, escalate to live support. | `assistant_open`, `assistant_search`, `assistant_escalate`. | Pulses when unread tips available; respects focus order. | Emits `onOpen(context)`, `onEscalate(channel)`. |
-| Offline Queue List (W-SYS-042) | Manage pending uploads/messages with retry. | `queue_retry`, `queue_clear`. | Surfaces as modal when offline backlog >0; syncs once reconnected. | Emits `onRetry(itemId)`, `onClear(itemId)`. |
+## Hero Banner
+- Fetches personalised data (streak, recommended course) via `/api/home/summary`.
+- Collapses from 280 dp to 120 dp on scroll, keeping CTA visible.
+- Includes animated progress arc (updates on completion events).
+
+## Focus Tiles
+- Display next two actionable tasks from task engine.
+- Each tile surfaces CTA button and secondary text; pressing logs analytics event `focus_tile_tap`.
+- Supports long-press to reorder priorities (drag reorder with haptic feedback).
+
+## Carousel Cards
+- Auto-scrolls to show new content; pauses on user interaction.
+- Each card includes bookmark icon; tapping toggles saved state with immediate visual feedback.
+- Use virtualization to load max 3 cards ahead to preserve performance.
+
+## Progress Meter
+- Linear progress bar (Lesson Player) updates in real time as video/time consumed.
+- Circular progress for streak resets daily at midnight local time; animation 1 s ease-out when streak increases.
+
+## Tab Bar
+- Each tab uses accessible segmented control; arrow keys move focus.
+- Display badge count for new notifications using accent pill.
+
+## Composer Sheet
+- Rich text supports bold, italics, bullet lists, attachments (image, link).
+- Validation ensures minimum 10 characters before enabling Post button.
+- Provides emoji picker (sheet height 360 dp) with search.
+
+## Timeline Stepper
+- Each step has status (Complete, In Progress, Blocked). Status drives icon (check, spinner, alert).
+- Tapping expands details with links to relevant screens.
+- If blocked, show CTA “Resolve” linking to compliance checklist.
+
+## Analytics Card
+- Shows metric value, delta vs previous period, sparkline.
+- Supports toggling between Week/Month via segmented control within card.
+- Pressing “View details” deep links to Audience Insights with filter pre-applied.
+
+## Notification Cell
+- Swipe left reveals actions (Archive, Mark read). Swipe threshold 64 dp.
+- Tap opens deep link; highlight background `primary/50` until user navigates back.
+- Long-press enters multi-select mode.
+
+## Download Manager Card
+- Displays storage usage (progress bar) and two buttons: “Download all updates” and “Manage storage”.
+- If storage low (<10%), triggers warning banner.
+
+## Settings Accordion
+- Lazy-load contents when expanded to reduce initial load.
+- Remember expansion state in local storage.
+- Each toggle sends immediate API request; show spinner while pending.
+
+## Support CTA Card
+- Contains contact methods (chat, email, knowledge base). Buttons open corresponding modals/links.
+- Tracks `support_card_interaction` analytics event with method.
+
+## Modal Dialog
+- Focus trap ensures Tab cycling within modal.
+- Primary button disabled until required inputs validated.
+- ESC/back gesture closes modal with confirmation if unsaved changes.
+
+## Bottom Sheet
+- Draggable with 3 snap points (25%, 60%, 100%).
+- Dim background `rgba(15, 23, 42, 0.3)`; dismiss on downward swipe beyond threshold.
+
+## FAB
+- Expands into radial menu with icons labelled (Upload, Event, Announcement / Resume, Scan QR depending on role).
+- Supports long-press to reorder quick actions in settings.
+- Animates rotation 45° when expanded.

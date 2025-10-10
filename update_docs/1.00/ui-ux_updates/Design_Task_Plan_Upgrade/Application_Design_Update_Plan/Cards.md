@@ -1,37 +1,52 @@
-# Cards
+# Cards — Component Specifications
 
-## Card System Principles
-- **Touch Comfort:** Maintain 16px outer padding and 12px internal spacing to prevent accidental taps on small screens.
-- **Content Hierarchy:** Reserve top third for primary imagery or metrics, middle for titles and supporting copy, bottom for actions.
-- **State Variants:** Define resting, hover (for desktop previews), pressed, loading, and disabled states with consistent elevation tokens.
+## Card Types Overview
+| Card Type | Dimensions | Content Structure | Usage |
+| --- | --- | --- | --- |
+| Hero Metric Card | 160 × 120 dp (phone) / 200 × 140 dp (tablet) | Icon badge → Metric value → Trend chip | Revenue, enrolment, streak stats.
+| Course Resume Card | 248 × 300 dp horizontal slider | Cover image (top 160 dp), title, lesson progress, CTA button | Learner Home, Learn screen.
+| Compact List Card | Full-width 88 dp height | Thumbnail (64 dp) → Title (2 lines) → Metadata row | Library lists, community events.
+| Community Post Card | Max width 344 dp, variable height | Author row → Body text → Media area → Action bar | Community feed.
+| Task Timeline Card | 320 dp width, 96 dp height | Stage badge → Title → Subtext → Due date pill | Provider pipeline.
+| Notification Card | 312 dp width, 88 dp height | Icon circle 40 dp → Title/Message → Action chip | Inbox, alerts center.
 
-## Core Card Types
-### Course Resume Card
-- Thumbnail or slide preview with progress ring overlay showing percentage and last viewed slide/page.
-- Primary CTA "Resume" plus secondary links to discussion threads and resource attachments.
-- Context chip indicating format (Slides, Ebook, Audio) and estimated time to completion.
+## Visual Treatment
+- **Corner Radius:** 16 dp for primary cards, 12 dp for list tiles, 20 dp for hero cards.
+- **Border:** 1 dp `rgba(148, 163, 184, 0.25)` for neutral state; apply 2 dp `primary/500` for focused state.
+- **Shadow:** Level 1 default; Level 2 when card is lifted (drag, reorder).
+- **Background:** Light mode `#FFFFFF`; dark mode `rgba(13, 21, 36, 0.92)` with 1 px border `rgba(96, 165, 250, 0.12)`.
 
-### Community Card
-- Cover image with tier badge, member count, and activity indicator (green dot for live discussions).
-- Action strip with "Enter Hub", "Events", and quick share icon; long-press reveals moderation tools for admins.
-- Surface top pinned announcement and upcoming event preview within expandable footer.
+## Content Guidelines
+- Title max 48 characters; clamp to 2 lines with ellipsis.
+- Subtitle/metadata uses `body/03` with grey `neutral/400`.
+- Buttons placed bottom-right (primary) or inline chips bottom-left.
+- Include status badges (success/warning/error) at top-right with 12 dp radius.
 
-### Explorer Discovery Card
-- Entity icon and short description, tag pills for topic, and trust badges (e.g., "Verified Instructor").
-- Save/follow toggle in top-right corner with microcopy feedback.
-- Optional mini-metric row (rating, enrolments) to support decision-making.
+## Interaction States
+| State | Treatment |
+| --- | --- |
+| Default | Shadow level 1, border neutral/100.
+| Hover (tablet pointer) | Elevate to level 2, background lighten by 4%.
+| Focus (keyboard) | Outline 2 dp `info/500`, maintain accessible contrast.
+| Pressed | Reduce shadow to level 0, darken background by 6%.
+| Disabled | Remove shadow, set background to `neutral/100`, text `neutral/400`.
 
-### Analytics Snapshot Card (Provider)
-- Spark-line or radial gauge with comparison indicator vs previous period.
-- Quick filter chips for timeframe; tapping opens modal drill-down with segment filters.
-- Toast confirmation when filters applied to maintain context.
+## Media Handling
+- Cover images 16:9 ratio, auto-crop centre; ensure key subject within central 60% safe area.
+- Use `object-fit: cover` equivalent; overlay gradient bottom 80 dp to ensure text readability.
+- Lottie/animated icons limit file size ≤ 350 KB; provide fallback PNG.
 
-### Alert & Task Card
-- High-contrast border aligned with semantic colour (success, warning, error).
-- Checklist pattern with progress bar for multi-step tasks (e.g., "Complete Onboarding").
-- Swipe gestures to snooze, complete, or escalate.
+## Data Visualisation Cards
+- Sparkline area occupies bottom 24 dp with gradient fill `rgba(37, 99, 235, 0.24)` → `rgba(34, 211, 238, 0.0)`.
+- Axis labels use `caption/01`, 8 dp padding from edges.
+- Provide toggles for period selection (7d, 30d) as pills aligned top-right.
 
 ## Accessibility Considerations
-- Minimum 44px actionable targets for buttons and interactive chips.
-- Provide text alternatives for icon-only controls and ensure card backgrounds maintain 4.5:1 contrast against text.
-- Animations limited to 200ms easing with respect for reduced-motion setting.
+- Card actions accessible via rotor/VoiceOver order: Title → CTA button → Secondary actions.
+- Provide 8 dp spacing between interactive elements inside card.
+- For long press menus, display haptic feedback with ripple radius 72 dp.
+
+## Implementation Notes
+- Use component variants in design system for each card with nested auto-layout.
+- Export measurement annotations showing padding and margin tokens.
+- Document JSON schema for data binding (e.g., `courseCard { id, title, coverUrl, progressPercent, nextLessonLabel }`).

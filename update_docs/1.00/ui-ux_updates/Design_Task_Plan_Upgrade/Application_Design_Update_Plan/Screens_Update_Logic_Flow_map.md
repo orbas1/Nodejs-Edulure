@@ -1,48 +1,48 @@
-# Screens Update Logic Flow Map
+# Screens Logic Flow Map — Structured Outline
 
 ```
-[Login]
-   ↓ (JWT + device fingerprint)
-[Role Resolver]
-   ├─ Provider → [PD-01 Provider Dashboard]
-   │                ├─ Quick Action (D0) → [Upload Flow]
-   │                │                        ├─ Stage 1: [File Picker Modal]
-   │                │                        ├─ Stage 2: [Validation Banner]
-   │                │                        ├─ Stage 3: [Metadata Form]
-   │                │                        └─ Stage 4: [Publish Summary Toast]
-   │                ├─ Conversion Timeline Card (C1) → [Timeline Detail Sheet]
-   │                ├─ KPI Card (B1-B3) → [Analytics Detail w/ Filters]
-   │                └─ Community Pulse Chip (D2) → [Community Hub - Alerts Filter]
-   └─ Learner → [LR-01 Learner Home]
-                    ├─ Resume Carousel Card (B1) → [Media Viewer LR-02]
-                    │                                ├─ Annotation Rail (C0) → [Tool Palette]
-                    │                                ├─ Discussion Toggle (C1) → [Comment Drawer]
-                    │                                └─ Complete → [Progress Sync]
-                    │                                                 └─ [Recommend Next Item → Explorer Detail]
-                    ├─ Explorer Tile (C2) → [Explorer Detail]
-                    └─ Event Strip Item (D1) → [Community Event Detail]
-
-[Community Hub]
-   ├─ Channel Card → [Messages Thread]
-   │                       ├─ Message Bubble → [Reaction Tray]
-   │                       └─ Moderator Tools → [Pin/Archive Modal]
-   ├─ Events Tab → [Event Detail]
-   │                       ├─ RSVP Button → [Confirmation Banner]
-   │                       └─ Share Icon → [Share Sheet]
-   └─ Members Tab → [Member Management]
-                           ├─ Role Dropdown → [Role Update API]
-                           └─ Remove Button → [Destructive Confirm Modal]
-
-[Settings Hub]
-   ├─ Personalisation → [Theme Selector → Preview]
-   ├─ Notifications → [Channel Toggles → Save Snackbar]
-   └─ Integrations → [Connected Apps → OAuth Flow]
-
-[Global Search Overlay]
-   ├─ Quick Find → [Inline Detail Peek]
-   └─ Advanced Filter → [Result List → Deep Link Target]
-
-[Offline Queue Manager]
-   ├─ Pending Upload → [Retry | Cancel]
-   └─ Pending Message → [Send on Connect]
+START
+│
+├─► Check Authentication
+│    ├─ Authenticated → Home
+│    └─ New User → Onboarding → Signup → Profile Setup → Home
+│
+├─ Home
+│    ├─ Resume CTA → Lesson Player → (Quiz) → Completion Modal →
+│    │      ├─ Share Achievement → Social Share Sheet
+│    │      └─ Back to Home (state restored)
+│    ├─ Learn Tab → Course Detail →
+│    │      ├─ Start Course → Lesson Player
+│    │      └─ Add to Library → Library (toast confirm)
+│    ├─ Community Card → Community Feed → Thread Detail
+│    ├─ Events Widget → Events Calendar → Event Detail → Register
+│    └─ Profile Shortcut → Profile → Settings
+│
+├─ Community Feed
+│    ├─ Create Post → Compose Sheet → Submit → Feed (optimistic update)
+│    ├─ Filter Tabs → Filtered Feed
+│    └─ Notification Deep Link → Specific Thread (comment anchored)
+│
+├─ Library
+│    ├─ Downloads Manager → Manage Storage → Success Toast
+│    └─ Search Library → Course Detail
+│
+├─ Notifications
+│    ├─ Swipe Left → Archive
+│    └─ Tap Item → Deep Link (Course / Thread / Upload)
+│
+├─ Provider Dashboard (if provider role)
+│    ├─ FAB
+│    │    ├─ Upload Content → Wizard Step 1 → … → Step 5 Publish → Success → Dashboard Refresh
+│    │    ├─ Schedule Event → Event Form → Confirmation
+│    │    └─ Create Announcement → Community Feed (provider view)
+│    ├─ Metrics Card → Audience Insights → Filters → Back to Dashboard
+│    └─ Compliance Alert → Checklist Modal → Resolve → Dashboard
+│
+└─ Settings
+     ├─ Change Preference → Instant Apply → Confirmation Toast
+     ├─ Accessibility Toggle → Theme Update (global)
+     ├─ Manage Integrations → OAuth Flow → Return with Status
+     └─ Delete Account → Confirm Modal → Hold-to-confirm → Success/Failure State
+END
 ```

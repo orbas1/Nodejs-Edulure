@@ -1,25 +1,57 @@
-# Menus
+# Menus — Navigation & Hierarchy Specification
 
 ## Global Navigation
-- Primary links: Home, Explorer, Communities, Library, Profile.
-- Quick create button anchored in nav for Upload, Event, Announcement.
-- Notification badge indicators appear on relevant icons (e.g., Communities).
+### Learner App
+- **Bottom Navigation Bar (Height 72 dp):**
+  1. Home (icon: `home-variant`, label "Home").
+  2. Learn (`book-open`).
+  3. Community (`users-three`) — centre item with accent highlight.
+  4. Library (`folder-play`).
+  5. Profile (`user-circle`).
+- Active item uses pill indicator (48 dp width) with `primary/50` background and icon tinted `primary/500`.
+- On scroll down, bar hides with 120 ms slide; reappears on scroll up 12 dp.
 
-## Context Menus
-- Asset cards use three-dot menu with options (View Versions, Share, Archive, Duplicate).
-- Long-press on mobile reveals sheet with haptic feedback, ensuring options exceed 44px height.
-- Provide role-based menu items (moderators see "Pin", "Mute", "Ban").
+### Provider App
+- **Bottom Tab + Overflow (Phone):** Four main tabs: Dashboard, Content, Community, Earnings. Overflow (3-dot) opens 420 dp tall sheet listing Settings, Support, Legal.
+- **Nav Rail (Tablet ≥768 dp):** 64 dp width with icons + collapsed labels. Hover tooltip 16 dp radius bubble.
 
-## Hamburger Menu (Mobile)
-- Contains secondary destinations (Settings, Support, Billing, Legal, Feedback).
-- Display user avatar, name, plan tier at top with CTA to switch profiles if multi-account.
-- Include quick toggle for dark mode and offline downloads.
+## Secondary Menus
+- **Contextual Action Bar:** On selection of items (courses, posts), top bar expands to show bulk actions (Archive, Publish, Share). Height 56 dp with subtle shadow.
+- **Filter Menu:** Persistent chips below top bar; long-press toggles convert to dropdown for multi-select.
+- **Quick Access Drawer:** Swipes from left, width 300 dp. Contains pinned cohorts, saved searches, offline queue.
 
-## Bottom Sheet Menus
-- Use for filter sorting, quick actions, and share flows.
-- Support drag-to-expand interactions with snap points at 40%, 70%, and 100% height.
-- Provide persistent close handle for accessibility.
+## Settings Menu Structure
+1. Account
+   - Profile Info
+   - Connected Accounts
+2. Preferences
+   - Notifications
+   - Accessibility
+   - Language
+3. Learning Controls
+   - Download Quality
+   - Autoplay
+4. Support & Legal
+   - Help Centre
+   - Privacy
+   - Terms
 
-## Search Menu
-- Full-screen overlay with recent searches, trending topics, and filter chips.
-- Suggestions update in real time; keyboard focus automatically moves to first result for screen readers.
+## Menu Interaction Patterns
+- Use `ScaleFade` animation (scale from 96% → 100%, opacity 0 → 1) over 160 ms for dropdowns.
+- Ripple effect 220 ms using `rgba(37, 99, 235, 0.12)`.
+- Provide haptic feedback (light tap) when menu item selected on mobile.
+
+## Accessibility
+- All menus reachable via keyboard: Tab/Shift+Tab cycles, Enter selects, Esc closes.
+- Provide ARIA role annotations for sheet vs. listbox when exported to code.
+- Focus trap inside modal menus; first focus on header.
+
+## Content Guidelines
+- Menu labels ≤24 characters, sentence case.
+- Use supportive subtitles for complex items (e.g., “Earnings – payouts & invoices”) with `caption/01`.
+- Provide iconography referencing Edulure pictogram library; maintain 16 dp padding around icons.
+
+## Implementation Notes
+- Document nav logic in `Screens_Update_Logic_Flow.md` to align with menu states.
+- Provide Figma component with variant property for orientation (portrait/landscape) and mode (light/dark).
+- Export JSON describing nav tree for integration with app routing.
