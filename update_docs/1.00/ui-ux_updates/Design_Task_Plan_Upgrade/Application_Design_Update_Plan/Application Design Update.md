@@ -1,42 +1,56 @@
-# Application Design Update
+# Application Design Update — Mobile Apps v1.00
 
-## Vision
-Deliver a cohesive, mobile-first provider and learner experience that celebrates collaborative learning, media-rich courses, and community-driven growth while respecting the constraints of handheld sessions.
+## Experience Vision
+Deliver a premium, mobile-first Edulure experience that feels like a personalised learning cockpit. Every interaction should help providers publish and manage programmes faster while giving learners frictionless access to media-rich lessons, community touchpoints, and support resources. The design must:
+- Provide immediate clarity on "what to do next" when the app launches.
+- Blend analytics, course content, and community prompts without cognitive overload.
+- Prioritise inclusive, accessible interaction patterns that scale from 4.7" phones to 12.9" tablets.
 
-## Strategic Pillars
-1. **Task-Centric Navigation:** Every primary user goal (resume, publish, manage communities) must be reachable within two taps from the home surface.
-2. **Context Preservation:** Persist recently viewed media, active conversations, and analytics insights at the surface level to reduce task switching.
-3. **Guided Discovery:** Blend algorithmic recommendations with curated editorial moments so learners and providers can discover assets, communities, and people with confidence.
-4. **Operational Transparency:** Surface background tasks such as file conversions, sync status, and scheduled events with clear messaging, allowing users to act before issues escalate.
-5. **Accessibility & Inclusivity:** Ensure text sizing, contrast, and motion adheres to WCAG 2.2 AA while offering quick toggles for dyslexia-friendly fonts and reduced animation modes.
+## Strategic Design Pillars
+1. **Task-Centric Navigation** – No critical job-to-be-done requires more than two taps from a primary screen. Bottom navigation (learner) and docked action menus (provider) expose top tasks with clear iconography and text labels.
+2. **Context Preservation** – Recent activity, media progress, and conversation drafts persist locally. Toasts indicate background sync states, and skeleton placeholders maintain layout stability during loading.
+3. **Guided Discovery** – Algorithmic recommendations appear within structured sections backed by manual editorial curations. Each carousel communicates why it is shown through short descriptors (“Because you followed AI Cohort”).
+4. **Operational Transparency** – Upload queues, payout checkpoints, and assessment grading appear as timeline widgets with explicit status badges and timestamps.
+5. **Accessibility & Inclusivity** – WCAG 2.2 AA compliance with high-contrast mode, dyslexia-friendly font toggle, and motion reduction switch exposed in the profile flyout.
+6. **Performance-Ready Assets** – Provide redlines, Lottie specs, and density guidelines so engineering can implement without guesswork.
 
-## Release Objectives
-- Harmonise the provider and learner shells so visual language, iconography, and interactions feel related yet purpose-built.
-- Introduce modular dashboards that scale from compact phones to large tablets without compromising scannability.
-- Support asynchronous collaboration through real-time indicators, offline fallbacks, and push notification routing.
-- Align UI copy, settings language, and contextual help with the broader Version 1.50 platform updates.
+## Primary App Shells
+- **Learner Shell:** Bottom navigation with five anchors (Home, Learn, Community, Library, Profile). Supports floating action button (FAB) for quick resume or scanning QR. Adaptive top app bar collapses on scroll and exposes search + filter chips.
+- **Provider Shell:** Left-anchored collapsible rail on tablet; bottom tab bar with overflow sheet on phone. A global Create FAB opens segmented modal for upload, create cohort, schedule event.
+
+## Layout Grid & Spacing
+- Base grid: 8 dp increments with 4 dp micro-adjustments allowed for optical alignment.
+- Safe area padding: 24 dp top/bottom on phone, 32 dp on tablet.
+- Card gutters: 16 dp between cards in vertical stacks, 12 dp between carousel items.
+- Typography baseline grid: align to 4 dp to maintain crisp text on both Android and iOS.
+
+## Component & State Requirements
+- Buttons, chips, input fields, cards, banners, and list tiles conform to shared design tokens documented in component specs.
+- Each interactive element includes states: default, hover (for tablet pointer), focus, pressed, disabled, and loading.
+- Motion: Use 200 ms ease-out for entrance, 150 ms ease-in for exit. Shared curve `cubic-bezier(0.2, 0.0, 0, 1)`.
+- Shadows: Two elevation tiers for mobile (Level 1: 0 dp y/2 dp blur/rgba(15,23,42,0.08); Level 2: 6 dp y/12 dp blur/rgba(15,23,42,0.12)).
+
+## Accessibility Checklist
+- Minimum tap target: 48 × 48 dp with 8 dp spacing.
+- Provide alternate text for all imagery and transcripts for audio/video.
+- Support dynamic text scaling to 200% with responsive container reflow (cards stack vertically, chips wrap).
+- Provide focus order map documented in `Screens_Update_Logic_Flow_map.md`.
+
+## Deliverables for Engineering
+- Annotated Figma frames per screen with measurements.
+- Export kit listing raster (WebP @1x/@2x/@3x) and vector (SVG, Lottie JSON) assets.
+- Interaction prototypes demonstrating transitions (home → lesson, lesson → community post, provider upload → review).
+- Content specifications (copy decks, dummy data) for each widget.
 
 ## Success Metrics
-- **Navigation Efficiency:** Reduce average taps-to-task by 20% for upload/publish and resume-learning flows.
-- **Engagement:** Increase daily active learners viewing at least one recommended asset by 15%.
-- **Support Load:** Decrease support tickets related to "where to find" or "stuck converting" issues by 25%.
-- **Accessibility Adoption:** Achieve 30% opt-in for new accessibility controls within three months of launch.
+- Reduce median time-to-resume-course by 25% (from 12 taps to 9 taps cross-platform).
+- Increase daily active providers checking analytics by 18% via redesigned dashboard.
+- 90% of testers rate "Understanding next action" 4/5 or higher in post-test survey.
+- Crash- and jank-free navigation at 60 fps on reference devices (Pixel 6, iPhone 13 Mini, Galaxy Tab S7).
 
-## Dependencies
-- Updated analytics microservices providing real-time metrics.
-- Media conversion pipeline improvements for PowerPoint and ebook assets.
-- Push notification orchestration supporting granular event types.
-- Revised brand token library shared across mobile and web.
-
-## Stakeholders
-- **Product Design:** Owns UI systems, interaction patterns, and asset specifications.
-- **Engineering:** Implements responsive layouts, animation states, and data integrations.
-- **Content & Community:** Curates editorial modules and ensures copy alignment.
-- **Support & Training:** Updates help centre, tooltips, and in-app walkthroughs.
-
-## Delivery Roadmap
-1. **Discovery Sprint:** Validate wireframes with provider and learner panels; document usability findings.
-2. **Design System Sprint:** Finalise component tokens, iconography, and animation blueprints.
-3. **Feature Sprint:** Iterate on dashboards, media viewers, and community hubs with clickable prototypes.
-4. **Polish Sprint:** Conduct accessibility audits, refine microcopy, and prepare redlines for engineering.
-5. **Handoff:** Package Zeplin/Figma specs, annotate logic flows, and schedule design QA checkpoints.
+## Roadmap Alignment
+- **Sprint 1 (Research + Wireframes):** Validate flows with 6 learners, 4 providers. Document in `provider_app_wireframe_changes.md` and `user_app_wireframe_changes.md`.
+- **Sprint 2 (Visual Design):** Finalise tokens, typography, iconography. Update `Colours.md`, `Fonts.md`, `Cards.md`.
+- **Sprint 3 (Interaction + Motion):** Prototype transitions, update `Screens_Update_Logic_Flow.md` and widget behaviour docs.
+- **Sprint 4 (Spec & Handoff):** Produce redlines, asset kit, QA checklist.
+- **Sprint 5 (Design QA):** Validate build against specs, log deltas in `design_change_log.md`.

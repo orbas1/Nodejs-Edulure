@@ -1,17 +1,36 @@
-# Screens Update Plan
+# Screens Update Plan — Execution Timeline
 
-| Phase | Screens | Key Activities | Dependencies | Outcomes |
-| --- | --- | --- | --- | --- |
-| Sprint 1 | Navigation Shell, Provider Dashboard (PD-01) | Produce measurable grid specs, blueprint ASCII, and component bill-of-materials (BOM). Annotate states for header, KPI cards, quick action tray. | Updated design tokens, persona journeys. | Signed "coded layout" package with density tokens and motion timings. |
-| Sprint 2 | Media Library (PD-02), Upload Flow | Draft card variants, bulk action mechanics, and version drawer diagrams. Deliver widget code notes (props, state machines) and REST payload schemas. | Conversion pipeline API mocks, offline storage rules. | Redlines + JSON schema attachments accepted by engineering. |
-| Sprint 3 | Learner Home (LR-01), Media Viewer (LR-02) | Detail carousel physics, annotation rail hit zones, and discussion drawer overlays. Provide interaction matrices for gesture vs. tap behaviour. | Behavioural analytics events, haptics guidelines. | Interactive prototype validated by 10 learners with telemetry instrumentation list. |
-| Sprint 4 | Community Hub, Events, Messaging | Lay out channel lists, message bubbles, and moderator tooling with component slots for badges, reactions, and pins. Document push notification entry points to each state. | Real-time messaging SDK updates, moderation policy inputs. | Usability-tested flows with moderators and learners, ready-to-build state charts. |
-| Sprint 5 | Settings, Profile & Goals, Support Surfaces | Map settings hierarchy with component tables for toggles, sliders, chips. Provide accessibility overlay specs (focus order, reading order, voice labels). | Notification service mapping, identity API. | Complete content inventory, localisation-ready copy, focus order diagrams. |
-| Sprint 6 | Cross-Screen Polish | Align interactions, motion, and global search; deliver final asset manifest and widget-to-code traceability checklist. | QA schedule, analytics instrumentation plan. | Sign-off package with QA checklist, Zeplin links, and component tokens locked. |
+## Phase 1: Discovery & Alignment (Week 1)
+- Audit existing learner/provider screens; document pain points.
+- Conduct co-creation workshop with 6 learners, 4 providers to prioritise tasks.
+- Finalise screen inventory (`Screens_list.md`) and map success metrics.
 
-## Milestones
-1. **Blueprint Sign-Off:** ASCII layout maps, component BOM, and spacing matrix approved by product/engineering.
-2. **Design System Lock:** Tokens, typography, and components finalised with widget code references.
-3. **Prototype Validation:** Conduct remote tests with at least 10 learners/providers each using instrumented prototype builds.
-4. **Accessibility Review:** Pass WCAG 2.2 AA evaluation with documented remediations and focus order charts.
-5. **Engineering Handoff:** Annotated specs (Figma, Zeplin, JSON props) uploaded with acceptance criteria and component traceability IDs.
+## Phase 2: Wireframing (Week 2)
+- Produce low-fidelity wireframes for Home, Learn, Lesson Player, Community, Provider Dashboard.
+- Validate navigation flow with rapid usability tests (Maze or Useberry) targeting path completion <60 s.
+- Iterate based on findings, capture in `design_change_log.md`.
+
+## Phase 3: Visual Design (Weeks 3–4)
+- Apply colour, typography tokens; craft high-fidelity mockups in Figma with component variants.
+- Define imagery and illustration requirements (`Screens_update_images_and_vectors.md`).
+- Review with brand and accessibility stakeholders; log sign-off.
+
+## Phase 4: Prototyping & Interaction (Week 5)
+- Build interactive prototypes for key flows (resume lesson, upload content, moderate post).
+- Document motion specs and widget behaviour in `Screens_Updates_widget_functions.md`.
+- Conduct moderated usability sessions capturing SUS >80 target.
+
+## Phase 5: Handoff & QA (Week 6)
+- Generate redline exports with spacing, typography, asset notes.
+- Deliver JSON data schema to engineering for dummy data binding.
+- Schedule design QA checkpoints aligning with sprint reviews.
+
+## Dependencies & Risks
+- Await backend confirmation for new analytics endpoints (affects Provider Dashboard).
+- Ensure localisation team available for copy review in Week 4.
+- Mitigate risk of scope creep by freezing P0 screen requirements at end of Week 2.
+
+## Success Criteria
+- All P0 screens pass accessibility audit (WCAG 2.2 AA) by Week 6.
+- Engineering sign-off on component tokens with zero unresolved questions.
+- Usability test participants report ≥4/5 clarity rating for navigation.

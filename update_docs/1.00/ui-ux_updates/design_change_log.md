@@ -47,3 +47,10 @@ Version 1.00 modernises the Edulure ecosystem so that the marketing site, learne
 2. Confirm legal copy for affiliate disclosures before release to ensure compliance across regions.
 3. Schedule post-launch telemetry review two weeks after release to evaluate engagement with the redesigned community ladder and notification matrix.
 4. Coordinate with engineering on performance budgets for media viewers to keep interactive load under three seconds on mid-tier devices.
+
+## 2024-07-18 Mobile Application Design Pass
+- Finalised Version 1.00 learner/provider mobile specs covering colours, typography, layout, and widget behaviours.
+- Documented new screen inventories and flows for onboarding, dashboards, lesson playback, community, library, and settings.
+- Established asset sourcing plan (Unsplash, internal illustration repo, Storyset) with density exports and governance.
+- Updated logic flow to include unified app launch state machine, deep link handling, and compliance gating for providers.
+- Added accessibility commitments: high contrast mode, dyslexia-friendly fonts, focus order maps, and dynamic type support to 200%.
