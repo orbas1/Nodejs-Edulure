@@ -1,10 +1,18 @@
 # Screens Updates Widget Functions
 
-| Widget | Function | Telemetry | Notes |
-| --- | --- | --- | --- |
-| Revenue Spark-line | Visualise 7-day earnings trend; click to open detailed analytics. | Logs expand/collapse, compare selections. | Powered by analytics microservice. |
-| Conversion Progress Ring | Shows PowerPoint processing status; updates via websocket. | Emits stage transitions, failure reasons. | Must display fallback when offline. |
-| Leaderboard Card | Ranks top community members; CTA to view profile. | Tracks CTA clicks and filter use. | Uses social graph service. |
-| Announcement Tile | Highlights pinned updates/events. | Measures dismissal and reminder requests. | Should support scheduled publishing. |
-| Search Result Card | Presents summary with follow/enrol CTAs. | Logs CTA conversion, scroll depth. | Variation testing for layout. |
-| Notification Toggle Row | Controls channel preference per event. | Captures toggle state change, revert actions. | Provide inline description and audit badge. |
+| Widget (ID) | Function | Event Telemetry | Behavioural Notes | Interaction Contracts |
+| --- | --- | --- | --- | --- |
+| Hero KPI Card (W-ANA-001) | Visualises single metric with comparative delta; opens Analytics Detail on tap. | `metric_view`, `delta_threshold_crossed`, `detail_open`. | Colour ramps to semantic palette based on thresholds; numbers animate via count-up. | Emits `onOpenDetail(metricId)`; consumes `metricPayload`. |
+| Revenue Spark-line (W-ANA-002) | Chart daily revenue trends, allow timeframe switching between 7/30 days. | `sparkline_hover`, `timeframe_switch`, `export_trigger`. | Uses lazy-loaded dataset; fallback skeleton for slow networks. | Emits `onTimeframeChange(range)`; optional `onExport(type)`. |
+| Conversion Timeline (C1) | Display upload queue stages with inline retry/abort controls. | `timeline_stage_expand`, `retry_click`, `cancel_click`. | Auto-refreshes via SSE; shows optimistic state during uploads. | Emits `onOpenUpload(id)`, `onRetry(id)`, `onCancel(id)`. |
+| Quick Action Pill (W-ACT-010) | Launch shortcut flows (upload, event, announcement). | `quick_action_invoke`, `quick_action_success`. | Reorders based on frequency; displays micro-progress ring during flow. | Emits `onInvoke(actionId)` and expects promise resolution for success state. |
+| Task Checklist Item (W-ACT-012) | Track provider tasks with swipe complete/defer patterns. | `task_complete`, `task_defer`, `task_assign`. | Overdue tasks pulse subtly; completion triggers confetti microburst. | Emits `onToggle(status)`, `onAssign(userId)`. |
+| Media Card (W-MED-020) | Preview media asset, expose status, progress, actions. | `media_select`, `media_multi_select`, `media_action_menu`. | Long press enters selection mode; progress ring animates clockwise. | Emits `onSelect(id)`, `onContextMenu(id)`, `onToggleSelect(id, selected)`. |
+| Resume Carousel Card (W-MED-021) | Continue learner content with quick resume CTA. | `resume_tap`, `resume_swipe`, `resume_complete`. | Maintains offline badge; shows haptic tick when resumed offline. | Emits `onResume(itemId)`; accepts `progressUpdate` callback. |
+| Media Canvas (W-MED-022) | Render slides/ebook/audio with playback controls. | `media_play`, `media_pause`, `media_seek`, `annotation_create`. | Supports pinch zoom, scrubbing; caches next/prev slide. | Emits `onPlaybackChange(state)`, `onAnnotationCreate(payload)`. |
+| Community Pulse Chip (W-SOC-030) | Notify provider of moderation issues, open filtered view. | `pulse_open`, `pulse_dismiss`. | Badge count decrements as issues resolved; colour corresponds to severity. | Emits `onOpen(filter)`, `onDismiss(filter)`. |
+| Event Strip Card (W-SOC-031) | Highlight upcoming events with RSVP. | `event_rsvp`, `event_share`, `event_dismiss`. | Countdown badge updates live; disabled when event full. | Emits `onRSVP(eventId, status)`, `onShare(eventId)`. |
+| Discussion Drawer (W-SOC-032) | Show threaded comments, enable reply/reaction actions. | `comment_post`, `reaction_add`, `thread_scroll_depth`. | Prefetches next 20 messages; indicates typing presence. | Emits `onPost(message)`, `onReact(commentId, emoji)`. |
+| Navigation Header (W-SYS-040) | Provide screen title, breadcrumbs, contextual actions. | `breadcrumb_navigate`, `action_click`. | Collapses on scroll; displays offline banner when connectivity lost. | Emits `onNavigate(target)`, `onAction(actionId)`. |
+| Support Assistant Button (W-SYS-041) | Offer contextual help, escalate to live support. | `assistant_open`, `assistant_search`, `assistant_escalate`. | Pulses when unread tips available; respects focus order. | Emits `onOpen(context)`, `onEscalate(channel)`. |
+| Offline Queue List (W-SYS-042) | Manage pending uploads/messages with retry. | `queue_retry`, `queue_clear`. | Surfaces as modal when offline backlog >0; syncs once reconnected. | Emits `onRetry(itemId)`, `onClear(itemId)`. |
