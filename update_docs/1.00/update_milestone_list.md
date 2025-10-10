@@ -79,6 +79,16 @@
   - Handoff package (redlines, interaction videos, analytics matrix, QA checklist) distributed to implementing squads.
 - **Risk Controls:** Reserve design QA capacity, enforce token governance to prevent drift, and maintain a change-control log for scope adjustments emerging from discovery findings.
 
+## Milestone 8 – Version 1.00 Design Refresh (Task 9) – Target: Week 8 – Completion 35%
+- **Scope:** Deliver the Version 1.00 design updates described in `Design_update_milestone_list.md`, covering tokens, navigation, high-fidelity templates, and compliance-ready handoff packages.
+- **Dependencies:** Completion of Milestones 1–2 for platform readiness plus alignment with Task 8 research outputs.
+- **Exit Criteria:**
+  - Token architecture finalised with emo/seasonal theme guidance and accessibility validation reports.
+  - Navigation IA, responsive grids, and journey flows signed off across personas.
+  - High-fidelity templates and component specs delivered with asset manifests and copy decks approved.
+  - Accessibility, localisation, and compliance audits executed with results logged in `Design_Change_log.md`.
+- **Risk Controls:** Coordinate with marketing for imagery pipeline, ensure engineering resourcing for QA sessions, and monitor compliance feedback cycles closely.
+
 ### Design Milestone Phases
 1. **Discovery & Alignment Complete (Week 2 – 45%)** – user research synthesis and navigation approval delivered.
 2. **Cross-Platform Design System Frozen (Week 4 – 35%)** – shared tokens and core component kits locked with accessibility baselines and security/error states.

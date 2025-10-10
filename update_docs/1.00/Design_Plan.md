@@ -1,58 +1,40 @@
-# Version 1.50 Design Plan
+# Version 1.00 Design Plan
 
-## Purpose & Scope
-This plan consolidates the design intents extracted from the mobile Application Design Update Plan and the Web Application Design Update. It ensures that UI/UX deliverables are sequenced, governed, and handed off with parity across learner and provider surfaces. The scope covers navigation shells, media experiences, Communities 2.0, explorer, profile systems, and compliance-ready settings.
+## Vision & Experience Principles
+1. **Unified Multi-Channel Identity:** Deliver a harmonised experience across responsive web, Flutter learner app, and future provider shells. Component tokens, imagery specs, and layout primitives are defined once and consumed everywhere.
+2. **Themeable Foundations:** Establish a token-driven theming engine with support for default, high-contrast, and emo/seasonal palettes. All components must remain contrast-compliant when tokens shift.
+3. **Task-Centred Workflows:** Prioritise quick task completion by collapsing navigation depth, exposing contextual actions, and surfacing progress signals in dashboards and home screens.
+4. **Accessible-by-Design:** Bake in WCAG 2.2 AA conformance, reduced motion modes, and localisation flexibility from the component level upward.
+5. **Analytics-Ready Layouts:** Instrument every major template with component IDs, event taxonomies, and data placeholders to support growth experiments and compliance logging.
 
-## Objectives
-1. **Unify Component Language:** Deliver a shared design system (tokens, components, motion) that supports React web and Flutter mobile implementations without divergence.
-2. **Embed New Feature Workstreams:** Translate Cloudflare R2 asset handling, Communities 2.0 mechanics, social graph elements, and explorer into consistent UI patterns.
-3. **Guarantee Accessibility & Compliance:** Validate contrast, typography scaling, localisation, and regulatory touchpoints before engineering handoff.
-4. **Reduce Implementation Ambiguity:** Provide annotated flows, redlines, and logic maps so engineering squads can deliver features without repeated clarification cycles.
+## Scope of Work
+- **Theming & Tokens:** Finalise the typography scale, palette sets, spacing values, and elevation tiers captured in `Application_Design_Update_Plan/Colours.md`, `Fonts.md`, and `Screen_update_Screen_colours.md`. Extend token schema to support emo/festival overlays and partial theme swaps for landing pages.
+- **Navigation Refactor:** Adopt the cross-platform menu hierarchy defined in `Application_Design_Update_Plan/Menus.md` and `Web Application Design Update/Menus.md`. Introduce breadcrumb and stepper patterns (see `Logic_Flow_map.md`) for deep flows such as onboarding, package creation, and compliance reviews.
+- **Homepage & Dashboard Redesign:** Implement the modular hero, progress, recommendation, and campaign blocks outlined in `Screens_Update.md`, `Home page components.md`, and `Dashboard Designs.md`. Provide alternate arrangements for learners, instructors, and admin roles with dynamic content slots.
+- **Media & Resource Modules:** Rebuild content cards, forms, and resource drawers using `component_functions.md`, `Cards.md`, and `Forms.md`. Include inline states for conversion progress, offline cache, rights restrictions, and shared annotations.
+- **Profile & Settings Suite:** Align profile styling (`Profile Styling.md`, `Organisation_and_positions.md`) with monetisation and verification modules. Reshape settings dashboards (`Settings Dashboard.md`, `Settings Screen.md`) to highlight privacy, notifications, and financial controls with inline help.
+- **Responsive Behaviour:** Implement breakpoints and adaptive behaviours detailed in `Screen Size Changes.md` and `Organisation_and_positions.md`. Ensure widget stacking rules for tablets and large displays follow the updated responsive matrix.
+- **Imagery & Motion Guidelines:** Standardise hero, dashboard, and carousel imagery specs plus permissible animation curves using `images_and_vectors.md` and `Screens_update_images_and_vectors.md`. Provide fallback treatments for low-bandwidth and reduced-motion preferences.
+- **Content Governance:** Leverage `Dummy_Data_Requirements.md` and `Screen_text.md` to define placeholder copy, data fidelity expectations, and localisation strings for QA and analytics instrumentation.
 
-## Deliverable Breakdown
-### 1. Application (Flutter) Experience
-- **Navigation & Shell:** Five-tab navigation with quick actions drawer, full-screen search overlay, and contextual floating action buttons mapped in `Screens_Update.md`.
-- **Home & Dashboards:** Continue-learning carousels, community spotlight modules, provider analytics widgets, and offline-ready skeletons referencing `Screens_Update_Plan.md` and `Organisation_and_positions.md`.
-- **Media Viewers:** Unified ebook and deck experiences with annotation entry points, offline states, and conversion progress banners referencing `Screens_Update_Logic_Flow.md` and `Screens_update_images_and_vectors.md`.
-- **Content Library & Analytics:** Instructor dashboards showing upload status, DRM indicators, and analytics panels aligned to `Screens_update_images_and_vectors.md` and `Screens_Update.md` updates delivered for Task 2.
-- **Communities 2.0:** Tier ladders, event calendars, chat dock, and moderation drawer using widget functions defined in `Screens_Updates_widget_functions.md`.
-- **Settings & Notifications:** Monetisation, privacy, accessibility, and audit log tabs scoped in `Settings.md` and `Settings Screen.md` with microcopy guidelines.
+## Deliverables
+- **Design System Tokens & Documentation:** Updated Figma libraries, JSON token exports, and developer documentation covering colours, typography, spacing, elevation, and iconography.
+- **Component Specification Pack:** Redlines, interaction notes, and component anatomy diagrams for navigation bars, cards, forms, hero modules, settings clusters, and modal patterns.
+- **Flow Narratives:** Storyboards and journey maps for onboarding, content upload, community engagement, and monetisation flows referencing the logic flow artefacts.
+- **Accessibility & Compliance Checklist:** Completed evaluation forms, screen reader scripts, localisation prototypes, and security/privacy content overlays.
+- **Engineering Handoff Toolkit:** Annotated prototypes, motion references, asset package manifests, and analytics event matrices accessible via the design repository.
 
-### 2. Web Application Experience
-- **Navigation & Shell:** Explorer-centric top navigation, workspace switcher, notifications hub, and global quick actions aligning with `Organisation_and_positions.md`.
-- **Homepage:** Hero layout, continue-learning sections, and curated community tiles sourced from `Home Page Organisations.md` and `Home page images.md`.
-- **Explorer:** Faceted filters, saved search chips, inline CTAs, and empty-state education referencing `Logic_Flow_update.md` and `component_functions.md`.
-- **Content Administration:** Asset tables, analytics sidebars, and viewer overlays referencing the new Task 2 design drops (`Screens_Update.md`, `component_functions.md`) to ensure parity with the React experience.
-- **Community Hub:** Announcement rail, event calendar, affiliate marketplace, and moderation drawer per `Dashboard Organisation.md` and `Placement.md`.
-- **Profile & Settings:** Persona-aware modules from `Profile Look.md`, `Profile Styling.md`, and compliance-first settings within `Settings Dashboard.md`.
+## Key Risks & Mitigations
+| Risk | Impact | Mitigation |
+| --- | --- | --- |
+| Theming overrides break component contrast | Accessibility compliance failures during seasonal campaigns | Token-level contrast testing, automated diffing on theme updates, and design QA gating per `Screen_update_Screen_colours.md`. |
+| Navigation restructuring confuses existing users | Increased support tickets and churn | Release tooltips, in-product tours, and progressive rollout across user cohorts. |
+| Asset requirements strain marketing pipeline | Delays in seasonal hero launches | Maintain shared asset backlog, pre-render default packs, and include marketing in sprint demos referencing `images_and_vectors.md`. |
+| Motion specs exceed engineering capacity | Delivery delays or inconsistent interactions | Prioritise motion tiers, provide CSS/Flutter code snippets, and limit advanced animations to hero modules in initial release. |
+| Compliance copy not finalised | Launch blockers | Synchronise with legal/compliance weekly, track outstanding copy in Jira with due dates before engineering lock. |
 
-### 3. Shared Foundations
-- **Design Tokens:** Colour, typography, spacing, and elevation palettes codified in `Colours.md`, `Fonts.md`, and `Scss.md` for import into component libraries.
-- **Logic & Flow Maps:** Navigation logic, error handling, and offline states documented in `Logic_Flow_map.md`, `Logic_Flow_update.md`, and `Screens_Update_Logic_Flow_map.md`.
-- **Data & Analytics Hooks:** Dummy data and analytics IDs mapped in `Dummy_Data_Requirements.md` and `component_functions.md` to support instrumentation.
-- **Security & Compliance States:** Error and friction patterns for rate limiting, password guidance, and policy acknowledgements captured in `Error_states.md` and aligned with the new backend hardening.
-
-## Governance & Collaboration
-- **Design Crits:** Weekly cross-platform critique to vet component usage and ensure parity.
-- **Engineering Alignment:** Bi-weekly sync with React and Flutter leads to validate feasibility, identify performance risks, and document handoff blockers.
-- **Content & Compliance Reviews:** Copy reviews and regulatory sign-off sessions to validate moderation, monetisation, and privacy messaging.
-- **Design Ops:** Maintain version-controlled Figma libraries with release notes, publish Zeplin/ZeroHeight documentation, and track requests via the design backlog.
-
-## Timeline & Checkpoints
-1. **Discovery (Week 1–2):** Validate prototypes with representative learners/providers; capture usability notes and iterate on layout density.
-2. **System Finalisation (Week 3–4):** Lock tokens, iconography, and responsive grid rules; baseline accessibility metrics.
-3. **Feature Detailing (Week 5–6):** Finalise screens for home, explorer, communities, profiles, settings, and the Cloudflare R2 content lifecycle; produce state charts and microcopy packs.
-4. **Quality Gate (Week 7):** Run accessibility audits, localisation reviews, and responsive regression against reference breakpoints, including dark/light reader themes and offline-first messaging.
-5. **Engineering Handoff (Week 8):** Deliver redlines, interaction specs, Zeplin exports, and track outstanding questions in Jira.
-
-## Risks & Mitigations
-- **Token Drift Between Platforms:** Mitigation – lock tokens in a shared library, enforce linting in design QA, and schedule mid-sprint audits.
-- **Late Feature Scope Changes:** Mitigation – maintain change log, involve product owners in crits, and budget contingency buffer for rework.
-- **Accessibility Debt:** Mitigation – run early audits, use automated tooling, and include accessibility tasks in engineering definition of done.
-- **Telemetry Ambiguity:** Mitigation – document analytics IDs within component specs and review with Data Engineering before handoff.
-
-## Success Measures
-- Reduction of implementation questions logged by engineering squads by 40% compared with Version 1.40 release.
-- Fewer than five accessibility defects identified during QA for redesigned surfaces.
-- Positive stakeholder feedback (≥4/5 satisfaction) from learner/provider usability testing.
-- All shared components shipped with telemetry instrumentation mapped during design.
+## Approval & Governance
+- **Design Steering Committee:** Bi-weekly review of token updates, layout patterns, and accessibility outcomes.
+- **Change Control:** All modifications after freeze recorded in `Design_Change_log.md` and linked to Jira design tickets.
+- **Engineering Alignment:** Weekly design-engineering sync to validate feasibility, surface technical constraints, and plan implementation sprints.
+- **QA Readiness:** Dedicated QA design audits two sprints prior to release, leveraging templates from `update_progress_tracker.md`.

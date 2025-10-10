@@ -12,7 +12,8 @@ All workstreams remain in planning with execution not yet started, apart from do
 | Task 5 – Explorer & Search Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 6 – Quality Assurance, Documentation & Release Readiness | 0% | 10% | 5% | 0% | 0% | 0% | 3% |
 | Task 7 – Mobile Application Completion & Store Launch | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| Task 8 – Design System Integration & UI Handoff | 50% | 28% | 45% | 40% | 35% | 20% | 36% |
+| Task 8 – Design System Integration & UI Handoff | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 9 – Version 1.00 Design Refresh Programme | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
 
@@ -54,13 +55,39 @@ All workstreams remain in planning with execution not yet started, apart from do
 | 7.3 Store compliance & submission assets | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 7.4 Mobile QA & device certification | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 7.5 Support playbooks & release operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| 8.1 Research & experience alignment | 50% | 45% | 55% | 45% | 35% | 20% | 42% |
-| 8.2 Cross-platform design system consolidation | 45% | 30% | 50% | 35% | 30% | 15% | 34% |
-| 8.3 Application experience detailing | 40% | 25% | 45% | 35% | 30% | 15% | 32% |
-| 8.4 Web experience detailing | 42% | 20% | 40% | 30% | 28% | 12% | 29% |
-| 8.5 Design QA & engineering handoff preparation | 35% | 10% | 35% | 25% | 25% | 10% | 23% |
+| 8.1 Research & experience alignment | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.2 Cross-platform design system consolidation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.3 Application experience detailing | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.4 Web experience detailing | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 8.5 Design QA & engineering handoff preparation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.1 Token & theme system completion | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.2 Navigation & layout architecture | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.3 Template & component production | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 9.4 Accessibility, compliance, and handoff | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
+
+## Version 1.00 Design Metrics Snapshot
+The design-specific health metrics below align with `Design_update_progress_tracker.md` and highlight priority focus areas before final handoff.
+
+| Metric | Score (%) | Commentary |
+| --- | --- | --- |
+| Design Quality | 0 | Design refresh has not started; awaiting kickoff to define baselines. |
+| Design Organisation | 0 | No IA or inventory updates completed. |
+| Design Position | 0 | Placement strategy pending. |
+| Design Text Grade | 0 | Copy deck work has not begun. |
+| Design Colour Grade | 0 | Palette and theme work outstanding. |
+| Design Render Grade | 0 | Prototyping and renders not yet produced. |
+| Compliance Grade | 0 | Compliance documentation pending engagement. |
+| Security Grade | 0 | Consent and notification safeguards awaiting definition. |
+| Design Functionality Grade | 0 | Interaction specifications not drafted. |
+| Design Images Grade | 0 | Asset manifests and imagery tasks not started. |
+| Design Usability Grade | 0 | No usability testing scheduled. |
+| Bugs-Less Grade | 0 | QA passes not run. |
+| Test Grade | 0 | Testing harness setup not begun. |
+| QA Grade | 0 | QA planning not initiated. |
+| Design Accuracy Grade | 0 | No refreshed templates exist for validation. |
+| Overall Grade | 0 | Metrics will remain at zero until the programme begins. |
 
 ## Notes & Next Steps
 - Update metrics upon completion of milestone checkpoints and after QA sign-off for each deliverable.
