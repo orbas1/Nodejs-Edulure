@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: only light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-slate-950 antialiased;
+}
+
+a {
+  @apply text-primary transition-colors duration-200;
+}
+
+a:hover {
+  @apply text-primary-dark;
+}
