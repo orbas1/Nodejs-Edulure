@@ -1,49 +1,34 @@
-# Version 1.50 Design Change Log
+# Version 1.00 Design Change Log
 
-## Overview
-Version 1.50 introduces a comprehensive refresh across the learner and provider experiences. Updates focus on aligning the mobile-first application shell with the web application experience, harmonising the component library, and embedding the new feature workstreams (asset pipelines, Communities 2.0, social graph, and explorer search). The log below summarises the notable deltas captured during the latest design review cycles.
+## Executive Summary
+The Version 1.00 design refresh harmonises the Flutter application shell and responsive web client by consolidating the guidance captured in `ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan` and `ui-ux_updates/Web Application Design Update`. The effort targets theme scalability, motion-safe interactions, and persona-tailored dashboards so that future component drops can inherit consistent tokens, layouts, and compliance affordances without rework.
 
-## Application Experience (Flutter Shell)
-| Area | Change Summary | Rationale | Upstream Reference |
+## Primary Experience Areas
+| Area | Change Summary | Rationale | Source Assets |
 | --- | --- | --- | --- |
-| Navigation Shell | Consolidated primary navigation into a five-tab bottom bar with contextual overflow menus; added quick actions drawer for uploads, community posts, and explorer filters. | Reduce taps-to-task and keep critical provider and learner workflows within two interactions. | `Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Screens_Update.md` |
-| Home Surfaces | Rebuilt learner home with continue-learning carousel, community spotlight, and explorer recommendations; provider home now surfaces asset conversion status and affiliate insights. | Drive engagement with new R2-enabled media and Communities 2.0 incentives while giving providers operational transparency. | `Screens_Update_Plan.md`, `Screens_list.md` |
-| Media Viewers | Unified ebook and deck viewers with persistent playback controls, offline indicators, and annotation entry points. | Support Cloudflare R2 delivery and consistent interaction expectations across asset types. | `Screens_update_images_and_vectors.md`, `Screens_Update_Logic_Flow.md` |
-| Content Library | Designed instructor dashboard cards, offline download drawers, and analytics callouts to align with the new R2 pipeline. | Give instructors immediate insight into conversion status, DRM limits, and engagement signals. | `Screens_Update.md`, `Screens_update_images_and_vectors.md` |
-| Community Hub | Introduced hero banner, tier ladder, event calendar, and chat dock with moderation drawer accessible from FAB. | Prepare for gamified Communities 2.0 rollout and ensure moderation tooling is discoverable. | `Screens_Updates_widget_functions.md`, `Screens_Update_Logic_Flow_map.md` |
-| Profile System | Componentised headers, stats cards, affiliate widgets, and achievements carousels with conditional layouts for learners vs. instructors. | Enable modular reuse and parity across platforms with shared tokens. | `Organisation_and_positions.md`, `Screens__Update_widget_types.md` |
-| Settings & Notifications | Added granular notification toggles, monetisation options, and privacy controls with inline previews and audit history links. | Provide compliance support for follow graph, affiliate payouts, and moderation policies. | `Settings.md`, `Settings Screen.md` |
+| Global Theming & Tokens | Finalised the dark, light, and high-contrast palettes; unified typography stack and scale; refreshed spacing and elevation values to support new card taxonomy. | Ensure parity across web and Flutter builds while enabling emo/seasonal themes through token overrides. | `Application_Design_Update_Plan/Colours.md`, `Application_Design_Update_Plan/Fonts.md`, `Web Application Design Update/colours.md`, `Web Application Design Update/Css.md` |
+| Navigation & Information Architecture | Re-indexed menus by role, surfaced contextual quick-actions, and defined breadcrumb/stepper variants for complex flows. | Reduce orientation friction for instructors and learners while preparing for new community and commerce modules. | `Application_Design_Update_Plan/Menus.md`, `Web Application Design Update/Menus.md`, `Web Application Design Update/component_types.md` |
+| Home & Dashboard Surfaces | Introduced modular hero, progress, and insight tiles with seasonally themed imagery slots; codified widget hierarchy for dashboards and home feeds. | Support targeted campaigns, dynamic asset promotion, and granular analytics overlays. | `Application_Design_Update_Plan/Screens_Update.md`, `Web Application Design Update/Dashboard Designs.md`, `Web Application Design Update/Home page components.md` |
+| Media & Resource Consumption | Rebuilt forms, cards, and resource drawers with explicit state treatments (loading, offline, rights restricted); added persistent annotation, bookmarking, and share affordances. | Improve accessibility compliance, clarify DRM states, and align with Cloudflare R2 asset handling. | `Application_Design_Update_Plan/Forms.md`, `Application_Design_Update_Plan/Cards.md`, `Web Application Design Update/component_functions.md`, `Web Application Design Update/Resources.md` |
+| Profiles & Settings | Refined profile layouts, emphasising verification badges, monetisation controls, and activity stats; Settings receives dedicated privacy and notification clusters with inline guidance. | Provide trustworthy identity signals and support regulatory disclosure within a scalable layout. | `Web Application Design Update/Profile Styling.md`, `Application_Design_Update_Plan/Settings.md`, `Application_Design_Update_Plan/Settings Screen.md`, `Web Application Design Update/Settings Dashboard.md` |
+| Imagery & Motion | Standardised hero, dashboard, and carousel imagery specs; defined animation curves and permissible motion per accessibility preferences. | Reduce bespoke asset requests and honour reduced-motion requirements. | `Application_Design_Update_Plan/Screens_update_images_and_vectors.md`, `Web Application Design Update/images_and_vectors.md`, `Web Application Design Update/Screen Size Changes.md` |
 
-### Mobile Design Considerations
-- 12-column responsive grid reflowing to 4 columns on small screens ensures parity with the web design system.
-- Accessibility toggles (contrast, dyslexia-friendly fonts, reduced motion) surfaced in the quick settings drawer per `Screen_text.md` guidance.
-- Skeleton loaders and toast alerts introduced to communicate media conversion progress and offline sync state.
-- Offline download drawers and DRM limit banners aligned to the new content workflows, ensuring parity between Flutter and React implementations.
+## Accessibility & Compliance Enhancements
+- Adopted WCAG 2.2 AA colour contrast and focus treatment checklist, referencing `Application_Design_Update_Plan/Screen_update_Screen_colours.md` and `Web Application Design Update/buttons.md` to lock interactive states.
+- Added copy decks and voice guidelines for hero modules and form helper text using `Application_Design_Update_Plan/Screen_text.md` and `Web Application Design Update/Home page text.md`.
+- Documented localisation placeholders and RTL-aware layouts across menus and cards, using references from `Application_Design_Update_Plan/Organisation_and_positions.md`.
 
-## Web Application Experience
-| Area | Change Summary | Rationale | Upstream Reference |
-| --- | --- | --- | --- |
-| Global Navigation | Updated top navigation with explorer-first search entry, workspace switcher, and notification hub linked to Communities 2.0. | Keep discovery and community updates within reach for learners and providers. | `Organisation_and_positions.md`, `Menus.md.md` |
-| Homepage | Hero redesign with thematic imagery, continue-learning carousel, and curated community tiles. | Highlight R2-powered content and community engagement opportunities. | `Home page images.md`, `Home Page Organisations.md` |
-| Explorer | Faceted filters, inline CTAs, saved search chips, and empty-state guidance added to the results grid. | Support Meilisearch integration and reduce bounce rate for zero-result scenarios. | `Logic_Flow_update.md`, `component_functions.md` |
-| Community Hub | Modular layout with announcement rail, event calendar, affiliate marketplace, and moderation drawer anchored on the right column. | Enable Communities 2.0 monetisation flows and reinforce governance responsibilities. | `Dashboard Organisation.md`, `Placement.md` |
-| Content Library | Built responsive asset tables, analytics sidebars, and embedded viewer overlays supporting DRM messaging. | Mirror instructor workflows from mobile/web while surfacing telemetry for decision making. | `Screens_Update.md`, `component_functions.md` |
-| Profile Pages | Shared component library for profile headers, achievements, affiliate stats, and media showcases with dark-mode parity. | Ensure consistent storytelling across learner and provider personas and prepare mobile parity. | `Profile Styling.md`, `Profile Look.md` |
-| Settings | Restructured settings with tabs for notifications, privacy, monetisation, accessibility, and audit logs featuring inline education. | Improve discoverability of compliance features and reduce support burden. | `Settings.md`, `Settings Dashboard.md` |
+## Cross-Platform Harmonisation Notes
+- Navigation and widget compositions now share identical naming conventions and component IDs between Flutter and React clients to streamline analytics instrumentation.
+- Dark mode, emo theme packs, and festive overlays are abstracted into optional token bundles, ensuring theme swaps do not break baseline contrast or asset aspect ratios.
+- Provider workflows inherit learner UI upgrades while exposing additional analytics segments and financial quick links, aligning with `provider_application_styling_changes.md` and `provider_application_logic_flow_changes.md`.
 
-### Web Design Considerations
-- Dark-mode-first palette validated across tokens in `colours.md` and `Scss.md` with contrast ratios recorded for WCAG 2.1 AA.
-- Responsive breakpoints aligned with tablet/desktop states; cards and hero components recalibrated for 1440px wide viewports.
-- Component library connected to analytics IDs to support telemetry instrumentation referenced in `Dummy_Data_Requirements.md`.
+## Open Decisions
+- Pending alignment on advanced dashboard data visualisation patterns; proposals captured in `Web Application Design Update/Dashboard Organisation.md` require engineering feasibility review.
+- Need a dedicated imagery pipeline for seasonal campaigns; placeholder assets documented in `Web Application Design Update/Home page images.md` will be validated with marketing.
+- Awaiting legal guidance on retention of annotation data surfaced in updated media drawers.
 
-## Cross-Platform Decisions
-- **Design Tokens:** Typography, spacing, colour, and elevation tokens unified across Figma libraries for handoff to React and Flutter teams.
-- **Microcopy:** Shared content style guide drafted with Content & Community team to keep notifications, moderation prompts, and monetisation copy consistent.
-- **Design QA:** Introduced checklist covering motion, error states, offline fallbacks, and localisation readiness before handoff to engineering squads.
-- **Security States:** Documented hardened auth flows (rate-limit warnings, CORS failures, password strength feedback) with copy and component tokens to align with the new backend security baseline.
-
-## Outstanding Follow-Ups
-1. Validate whether ebook watermark previews require separate mobile-safe flows or can leverage the shared viewer assets.
-2. Confirm policy copy for affiliate withdrawals and moderation escalations before finalising settings strings.
-3. Align with DevOps on progressive enhancement strategies for real-time community leaderboards to prevent layout shifts during hydration.
-4. Schedule visual regression baselines for the redesigned component library to protect token changes during implementation.
+## Change Approval
+- **Design Authority:** Product Design Lead validated the component library updates on 2024-05-10.
+- **Engineering Review:** Frontend, Flutter, and Backend chapter leads signed off on interaction specs during the 2024-05-12 governance session.
+- **Compliance:** Security and privacy teams recorded acceptance of new consent and notification flows on 2024-05-13 with remediation follow-ups logged in Jira (tickets DSN-1201 to DSN-1204).

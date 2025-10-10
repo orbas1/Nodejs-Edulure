@@ -159,3 +159,20 @@ The following tasks translate the Version 1.50 strategy into actionable work pac
   8.4 Web experience detailing (20%)
   8.5 Design QA & engineering handoff preparation (10%)
 - **Testing & Evidence:** Usability study reports, accessibility audit findings, localisation reviews, design QA checklists, analytics instrumentation documentation.
+
+## Task 9 – Version 1.00 Design Refresh Execution (35%)
+- **Outcome:** Deliver the focused Version 1.00 design enhancements covering tokens, navigation, templates, and compliance-ready handoff kits.
+- **Key Deliverables:** Updated multi-theme tokens, IA documentation, annotated high-fidelity templates, accessibility/compliance audit reports, engineering handoff packages.
+- **Integrations:**
+  - **Design:** Consolidate Application and Web design artefacts, ensuring theme parity and state coverage.
+  - **Front-end:** Provide updated component specs and analytics mappings for React teams.
+  - **User Phone App:** Supply Flutter squads with revised navigation flows, theming packs, and component states.
+  - **Provider Phone App:** Deliver provider dashboards/settings templates with monetisation and analytics overlays.
+  - **Backend/Data:** Surface consent copy, analytics IDs, and feature flag requirements supporting the new experiences.
+  - **QA & Compliance:** Coordinate accessibility, localisation, and security reviews for the refreshed designs.
+- **Subtasks:**
+  9.1 Token & theme system completion (40%)
+  9.2 Navigation & layout architecture (35%)
+  9.3 Template & component production (30%)
+  9.4 Accessibility, compliance, and handoff (35%)
+- **Testing & Evidence:** Token export diffs, IA approval minutes, template QA sign-offs, accessibility/localisation reports, compliance validation logs.

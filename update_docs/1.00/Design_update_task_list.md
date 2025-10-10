@@ -1,53 +1,42 @@
-# Version 1.50 Design Task List
+# Version 1.00 Design Update Task List
 
-The following tasks translate the design strategy into tangible deliverables coordinated with engineering, product, and compliance stakeholders. Progress reflects current discovery and system definition activities.
-
-## Task 1 – Research & Experience Alignment (45%)
-- **Outcome:** Shared understanding of learner/provider goals, validated navigation flows, and prioritised design requirements for Version 1.50 surfaces.
-- **Key Deliverables:** Research readout, updated personas, journey maps, prioritised issue stack.
+## Task 1 – Token & Theme System Completion
+- **Objective:** Finalise reusable design tokens supporting default, high-contrast, and emo/seasonal themes across platforms.
 - **Subtasks:**
-  1.1 Conduct moderated usability sessions on mobile/web wireframes (60%).
-  1.2 Synthesize findings into persona updates and journey narratives (50%).
-  1.3 Validate navigation architecture with product, engineering, and support stakeholders (40%).
-  1.4 Document analytics and telemetry requirements aligned to key interactions (30%).
-  1.5 Publish decision log addressing conflicting feedback and trade-offs (40%).
+  1. Audit existing palettes and typography scales against `Colours.md` and `Fonts.md` guidance.
+  2. Produce JSON token exports with naming conventions mapped to Flutter and React variables.
+  3. Validate contrast and accessibility using automated tooling and manual spot checks on hero/button states.
+  4. Document theme override workflows, including seasonal packs and landing-page partial themes.
+  5. Coordinate with engineering to schedule token ingestion and regression monitoring.
 
-## Task 2 – Cross-Platform Design System Consolidation (55%)
-- **Outcome:** Unified tokens, components, and motion principles ready for React and Flutter consumption.
-- **Key Deliverables:** Token library, responsive component kits, accessibility baseline, design governance playbook.
+## Task 2 – Navigation & Layout Architecture
+- **Objective:** Deliver cross-platform navigation schemas, IA labels, and responsive layout rules.
 - **Subtasks:**
-  2.1 Audit existing tokens and map to shared library across platforms (70%).
-  2.2 Finalise core components (navigation, cards, forms, modals) with responsive specs (60%).
-  2.3 Define motion patterns and micro-interactions with performance guidance (50%).
-  2.4 Establish accessibility baselines (contrast, focus, text scaling) and remediation backlog (60%).
-  2.5 Implement design ops governance (naming conventions, review cadence, changelog) (60%).
+  1. Consolidate learner, instructor, and admin menu structures from `Menus.md` references.
+  2. Map journeys and decision points using `Logic_Flow_map.md` and `Logic_Flow_update.md` artefacts.
+  3. Prototype breadcrumb, stepper, and quick-action variants for complex flows.
+  4. Define breakpoint behaviours and grid adjustments per `Organisation_and_positions.md` and `Screen Size Changes.md`.
+  5. Run usability validation with representative personas and document findings.
+  6. Publish final IA documentation and component IDs to analytics/engineering teams.
 
-## Task 3 – Application Experience Detailing (60%)
-- **Outcome:** High-fidelity mobile screens and logic maps for home, media, communities, profiles, and settings.
-- **Key Deliverables:** Annotated Figma frames, logic flow diagrams, state charts, offline/edge case specs.
+## Task 3 – Template & Component Production
+- **Objective:** Produce annotated high-fidelity templates for priority experiences.
 - **Subtasks:**
-  3.1 Finalise navigation shell, quick actions drawer, and search overlays (65%).
-  3.2 Produce home/dashboard variants for learners and providers with analytics widgets (60%).
-  3.3 Detail media viewer flows (PowerPoint, ebook) with offline messaging and annotation entry points (95%).
-  3.4 Design Communities 2.0 hub including tier ladders, events, chat, and moderation drawers (55%).
-  3.5 Update settings, monetisation, and accessibility tabs with compliance copy and audit trails (60%).
+  1. Build home and dashboard compositions incorporating hero, progress, campaign, and insight modules.
+  2. Redline media viewer states covering loading, offline, rights restricted, and annotation flows.
+  3. Update profile and settings templates with monetisation, verification, and compliance sections.
+  4. Specify card, form, and modal components including empty/error states and data placeholders.
+  5. Assemble imagery specifications and asset manifests referencing `images_and_vectors.md`.
+  6. Create copy decks and microcopy guidelines for home, forms, and settings views.
+  7. Conduct peer reviews and integrate feedback prior to milestone handoff.
 
-## Task 4 – Web Experience Detailing (55%)
-- **Outcome:** Web-first responsive layouts, component usage, and interaction specs for navigation, home, explorer, communities, and settings.
-- **Key Deliverables:** Desktop/tablet breakpoints, dark-mode guidance, microcopy packs, telemetry annotations.
+## Task 4 – Accessibility, Compliance, and Handoff
+- **Objective:** Ensure the design package is implementation-ready, compliant, and QA backed.
 - **Subtasks:**
-  4.1 Reframe global navigation with explorer entry, workspace switcher, and notification hub (70%).
-  4.2 Deliver homepage hero, continue learning, and community spotlight modules (65%).
-  4.3 Specify explorer filters, saved search interactions, and empty states (55%).
-  4.4 Detail Communities 2.0 hub, affiliate marketplace, and moderation drawer (50%).
-  4.5 Refresh profile modules and compliance-first settings with persona-aware variants (50%).
-
-## Task 5 – Design QA & Engineering Handoff (25%)
-- **Outcome:** Production-ready design packages with accessibility and localisation sign-off, ready for engineering implementation.
-- **Key Deliverables:** Redlines, Zeplin exports, accessibility/localisation reports, analytics tagging matrix, design QA checklist.
-- **Subtasks:**
-  5.1 Run accessibility audits (contrast, keyboard, screen reader) and track remediation (25%).
-  5.2 Complete localisation and microcopy review including monetisation/legal copy (30%).
-  5.3 Prepare Zeplin/Figma export packages with interaction videos and component notes (20%).
-  5.4 Deliver analytics instrumentation matrix to data engineering (30%).
-  5.5 Conduct post-handoff design QA sessions with engineering squads (20%).
+  1. Execute accessibility audits (contrast, keyboard, screen reader) on final templates.
+  2. Validate localisation placeholders, RTL layouts, and translation length buffers.
+  3. Compile security/privacy overlays for settings, consent prompts, and notifications.
+  4. Produce engineering handoff kits with specs, interaction videos, and analytics matrices.
+  5. Host design QA sessions with frontend/Flutter squads to resolve open questions.
+  6. Log remaining change requests in `Design_Change_log.md` and assign Jira owners.
+  7. Capture final approvals from compliance, product, and engineering stakeholders.

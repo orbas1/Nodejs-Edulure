@@ -148,6 +148,21 @@
      8.4 **Web Experience Detailing** – publish responsive web specs for navigation, explorer, communities, profiles, and compliance settings. (20%)
      8.5 **Design QA & Engineering Handoff Preparation** – package redlines, accessibility audits, localisation packs, and analytics matrices. (10%)
 
+9. **Version 1.00 Design Refresh Programme** (35% complete)
+   - **Objective:** Execute the Version 1.00 design updates captured in `Design_Change_log.md`, `Design_Plan.md`, and underlying UI/UX artefacts so engineering teams can implement refreshed experiences without rework.
+   - **Integration Coverage:**
+     - *Design:* Finalise token architecture, navigation IA, and high-fidelity templates across Application and Web design packages.
+     - *Front-end:* Align React components with updated tokens, layout rules, and accessibility treatments.
+     - *User Phone App:* Translate navigation, theming, and component updates into Flutter implementations, including emo/seasonal theme toggles.
+     - *Provider Phone App:* Prepare provider dashboards and settings templates with monetisation and analytics treatments.
+     - *Backend/Data:* Supply analytics IDs, consent copy, and feature flags required to support new flows and compliance states.
+     - *QA & Compliance:* Coordinate accessibility, localisation, and security validation on revised templates and specs.
+   - **Subtasks:**
+     9.1 **Token & Theme System Completion** – finalise multi-theme tokens, export JSON packages, and validate accessibility regressions. (40%)
+     9.2 **Navigation & Layout Architecture** – consolidate IA, responsive grids, and journey flows across personas. (35%)
+     9.3 **Template & Component Production** – deliver annotated high-fidelity templates, component redlines, and imagery manifests. (30%)
+     9.4 **Accessibility, Compliance, and Handoff** – execute audits, produce handoff kits, and log approvals in the design change log. (35%)
+
 ## Risk & Dependency Highlights
 - Sequencing foundational hardening (Task 1) before feature delivery is mandatory to avoid compounding security and data issues.
 - Tasks 2–5 depend on shared API contracts, migrations, and telemetry from Task 1; cross-team syncs must validate readiness at each integration gate.
