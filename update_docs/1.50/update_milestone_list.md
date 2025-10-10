@@ -55,3 +55,14 @@
   - Comprehensive testing suites passed; beta feedback resolved to acceptable burndown.
   - Release assets (change log, update report, training) delivered; post-launch monitoring dashboards active.
 - **Risk Controls:** Search relevance tuning backlog maintained; launch war room staffed; rollback scripts rehearsed.
+
+## Milestone 6 – Mobile Application Completion & Store Launch (Task 7) – Target: Week 18 – Completion 0%
+- **Scope:** Finalise Flutter user app and provider app readiness by completing Task 7 subtasks for feature parity, performance, store compliance, and support operations.
+- **Dependencies:** Milestones 1–5 for stable APIs, social/community data, explorer endpoints, and release assets.
+- **Exit Criteria:**
+  - Mobile feature parity matrix signed off for learner and provider experiences.
+  - Performance, accessibility, and offline test suites passing on target device matrix.
+  - App Store / Play Store submissions prepared with compliance documentation and release notes.
+  - Mobile crash/error monitoring configured with alerting and runbooks delivered to support.
+  - Post-launch support playbooks, training, and escalation paths published.
+- **Risk Controls:** Coordinate release windows with backend rollout; maintain rollback toggles and phased rollout plan across stores.

@@ -121,3 +121,23 @@ The following tasks translate the Version 1.50 strategy into actionable work pac
   6.4 Release management & change control (0%)
   6.5 Post-launch monitoring & handover (0%)
 - **Testing & Evidence:** Test reports, beta feedback summaries, release readiness checklist, post-launch dashboards.
+
+## Task 7 – Mobile Application Completion & Store Launch (0%)
+- **Outcome:** Deliver learner and provider mobile apps with full feature parity, performance excellence, and store-compliant release assets.
+- **Key Deliverables:** Parity matrix closure, mobile optimisations, store submissions, device certification, support operations.
+- **Integrations:**
+  - **Backend:** Mobile-optimised endpoints, push notification services, real-time updates.
+  - **Front-end:** Shared component library alignment, design system tokens, cross-platform navigation cohesion.
+  - **User Phone App:** Flutter implementations for content, social, community, search, payments with offline handling.
+  - **Provider Phone App:** Instructor tooling for publishing, community moderation, payouts, analytics, and messaging.
+  - **Database:** Sync checkpoints, caching strategies, telemetry storage, and cleanup routines for mobile usage.
+  - **API:** Versioned endpoints, pagination, retries, and error handling tailored to mobile constraints.
+  - **Logic:** Feature flag fallbacks, background sync orchestration, deep-link management, and notification logic.
+  - **Design:** Mobile UI QA, accessibility verification, motion/gesture specs, and store asset kits.
+- **Subtasks:**
+  7.1 Mobile feature parity audit & gap closure (0%)
+  7.2 Performance & offline optimisation (0%)
+  7.3 Store compliance & submission assets (0%)
+  7.4 Mobile QA & device certification (0%)
+  7.5 Support playbooks & release operations (0%)
+- **Testing & Evidence:** Device farm reports, performance profiles, store readiness checklists, support playbooks, monitoring dashboards.

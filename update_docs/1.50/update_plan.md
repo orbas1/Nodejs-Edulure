@@ -114,10 +114,28 @@
      6.4 **Release Management & Change Control** – prepare release notes, change log, rollout calendar, feature flags, and war room operations. (0%)
      6.5 **Post-Launch Monitoring & Handover** – establish dashboards, on-call rotations, incident response, and final update report. (0%)
 
+7. **Mobile Application Completion & Store Launch** (0% complete)
+   - **Objective:** Achieve feature parity, performance excellence, and store-readiness for the Flutter user app and provider app so mobile experiences ship alongside web.
+   - **Integration Coverage:**
+     - *Backend:* Harden mobile-specific APIs, push notification services, and real-time endpoints for parity.
+     - *Front-end:* Align shared design system tokens and navigation paradigms for cross-platform consistency.
+     - *User Phone App:* Finalise Flutter modules for content, social, community, explorer, and payments with offline/low-bandwidth support.
+     - *Provider Phone App:* Complete instructor workflows for content authoring, community management, payouts, and analytics.
+     - *Database:* Validate mobile caching schemas, sync checkpoints, and telemetry storage for device analytics.
+     - *API:* Ensure versioned endpoints, pagination, and error handling support mobile release criteria.
+     - *Logic:* Implement feature flag fallbacks, background sync jobs, and deep-link handling across apps.
+     - *Design:* Deliver mobile-specific UI QA, accessibility, motion guidelines, and store asset packs.
+   - **Subtasks:**
+     7.1 **Mobile Feature Parity Audit & Gap Closure** – map parity matrix, close gaps for content/social/community/search, and align with release scope. (0%)
+     7.2 **Performance & Offline Optimisation** – profile startup, navigation, media handling, and implement caching/offline strategies. (0%)
+     7.3 **Store Compliance & Submission Assets** – prepare listings, privacy policies, screenshots, localisation, and compliance artefacts. (0%)
+     7.4 **Mobile QA & Device Certification** – execute device farm tests, accessibility audits, and UAT sign-offs for learner/provider apps. (0%)
+     7.5 **Support Playbooks & Release Operations** – document support workflows, incident playbooks, rollout stages, and analytics dashboards. (0%)
+
 ## Risk & Dependency Highlights
 - Sequencing foundational hardening (Task 1) before feature delivery is mandatory to avoid compounding security and data issues.
 - Tasks 2–5 depend on shared API contracts, migrations, and telemetry from Task 1; cross-team syncs must validate readiness at each integration gate.
-- Task 6 requires upstream tasks to supply testable builds, documentation inputs, and release artefacts; allocate QA resources early to parallelise validation.
+- Tasks 6–7 require upstream tasks to supply testable builds, documentation inputs, and release artefacts; allocate QA and mobile engineering resources early to parallelise validation.
 
 ## Testing & Quality Strategy
 - Embed automated pipelines (CI/CD) per task, including contract tests between backend and clients, mobile device farm runs, and design review checkpoints.

@@ -11,6 +11,7 @@ All workstreams are in planning with execution not yet started; therefore, compl
 | Task 4 – Communities 2.0 & Monetisation Suite | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 5 – Explorer & Search Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 6 – Quality Assurance, Documentation & Release Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 7 – Mobile Application Completion & Store Launch | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
 
@@ -47,9 +48,15 @@ All workstreams are in planning with execution not yet started; therefore, compl
 | 6.3 Documentation & enablement pack | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 6.4 Release management & change control | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | 6.5 Post-launch monitoring & handover | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 7.1 Mobile feature parity audit & gap closure | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 7.2 Performance & offline optimisation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 7.3 Store compliance & submission assets | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 7.4 Mobile QA & device certification | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| 7.5 Support playbooks & release operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 \*Overall equals the average of the six preceding percentage metrics for each row.
 
 ## Notes & Next Steps
 - Update metrics upon completion of milestone checkpoints and after QA sign-off for each deliverable.
 - Maintain linkage to testing reports, beta feedback, and release documentation within Task 6 artefacts.
+- Coordinate Task 7 store submissions, crash monitoring configuration, and support playbooks with the release calendar.
