@@ -1,31 +1,55 @@
-# Web Application Logic Flow Changes
+# Version 1.00 Web Application Logic Flow Changes
 
-## 1. Global Navigation & Explorer
-1. User initiates search from header; auto-complete calls Meilisearch with debounced input.
-2. Results populate with entity tabs; selecting tab filters data set without full page reload.
-3. Inline CTAs trigger context-specific modals (follow confirmation, community join paywall, course enrolment).
-4. Analytics events log search query, tab selection, filter toggles, and CTA conversions.
+## 1. Visitor to Prospect Journey
+1. Visitor lands on homepage; hero CTA options tracked (Explore vs. Talk to sales).
+2. Selecting “Explore” scrolls to product tour tabs; each tab selection loads relevant content via AJAX to maintain page speed.
+3. If visitor submits newsletter form, validation ensures consent checkbox ticked before enabling submit. Success shows confirmation message and triggers CRM automation.
+4. “Talk to sales” opens modal with multi-step form; submission posts to CRM and shows success page with scheduling link.
 
-## 2. Homepage Personalisation
-1. Homepage loads user profile context, pulling progress for courses/ebooks and community activity.
-2. Continue Learning row surfaces next steps; clicking resume routes to respective viewer module.
-3. Spotlight modules rotate based on social graph (followed instructors, communities).
-4. On scroll, lazy load additional explorer sections to maintain performance budgets.
+## 2. Authentication & Account Transition
+1. When visitor clicks Sign In, system checks session; if not authenticated, redirects to login screen.
+2. Login form uses inline validation; on success, determines role (learner/provider) and routes to appropriate dashboard.
+3. If multi-factor enabled, prompts for code before final redirect. Failure path surfaces error message and support link.
+4. Post-login banner suggests installing mobile apps and provides handoff button to open respective experiences.
 
-## 3. Profile Management
-1. On profile view, backend aggregator collects metrics (followers, completions, revenue).
-2. Widgets render conditionally: teaching analytics for instructors, learning streaks for students.
-3. Editing sections opens side panel forms with autosave and preview before publish.
-4. Changes propagate via GraphQL mutation, update caches, and log to audit trail.
+## 3. Personalised Homepage (Logged-In State)
+1. Authenticated users see personalised feed. Server composes modules: Continue Learning, Community Highlights, Recommendations, Events.
+2. Continue Learning pulls from progress service; clicking resume launches in-app viewer (same tab) with query parameters for context.
+3. Recommendations call recommendation engine with user profile features; cards include Save/Follow CTAs with optimistic UI updates.
+4. Scroll events tracked for module visibility; lazy-loaded sections fetch when entering viewport to reduce initial payload.
 
-## 4. Community Governance
-1. Moderator selects flagged content from drawer.
-2. Modal displays context, member history, and recommended actions (approve, warn, suspend).
-3. Decision writes to moderation log, updates member status, and notifies relevant parties.
-4. Community analytics recalculates health score and updates dashboards.
+## 4. Explorer Search & Filtering
+1. Search query initiated from header; client sends debounced request to Meilisearch service returning mixed entities.
+2. Tabs (Courses, Communities, People, Assets) filter dataset client-side; additional filters (price slider, duration) trigger backend request for refined results.
+3. Selecting card opens detail overlay with summary, preview media, and CTAs (Enroll, Join, Follow). Actions confirm via modal or inline toast.
+4. Save action stores item in user’s library; analytics records search term, filters, and conversions.
 
-## 5. Settings & Integrations
-1. User navigates to settings tab; data fetched from configuration service.
-2. Updating notification frequency triggers validation (rate limits) and persists to user profile.
-3. Monetisation tab integrates with payment provider for payout onboarding; success updates affiliate readiness status.
-4. Integrations tab manages API keys for SDK/CLI usage; key generation logs to audit and surfaces copy-to-clipboard.
+## 5. Community Hub & Moderation
+1. Selecting community loads hub with feed, events, resources. Data fetched via GraphQL with caching to support quick tab switching.
+2. Posting content opens composer overlay; attachments upload to storage with progress indicator before posting.
+3. Moderators access moderation drawer; decisions (approve, remove, escalate) update queue and trigger notifications to content authors.
+4. Event creation flow mirrors provider logic: modal collects details, validates tier access, schedules notifications.
+
+## 6. Monetisation & Affiliate Workflows
+1. Providers access Monetise section from console navigation. Dashboard displays revenue widgets and payout status.
+2. Initiating payout onboarding opens embedded payment provider iframe; upon completion, status updates to “Verified”.
+3. Creating affiliate offer triggers modal capturing product selection, commission, validity. Submission posts to monetisation service and displays confirmation card.
+4. Earnings reports downloadable via CSV; request shows spinner and triggers file generation service with email fallback.
+
+## 7. Settings & Integrations
+1. Settings page loads sections asynchronously to reduce bundle size. Default tab shows Account details with edit forms.
+2. Notification preferences stored per channel (email, push, in-app). Changes auto-save and show toast confirmation.
+3. Privacy tab allows exporting data; request triggers job creation and sends email when ready. Cancel action available until job starts.
+4. Integrations tab lists API keys; generating new key reveals confirmation modal, logs to audit trail, and displays masked key with copy button.
+
+## 8. Support & Help Centre
+1. Help centre search uses auto-suggest; selecting article loads detail view with breadcrumb.
+2. Users can rate article helpfulness; negative feedback opens follow-up form for additional context.
+3. Contact support form collects category, description, attachments; submission creates ticket and shows case ID.
+4. Live chat widget available for authenticated providers; offline hours convert to email form automatically.
+
+## 9. Accessibility & Performance Considerations
+1. Skip-to-content link activates on first tab press; ensures keyboard users can bypass navigation.
+2. High-contrast mode toggle persists preference via cookies; on activation, CSS variables switch to high-contrast palette.
+3. Lazy loading of hero video ensures LCP target <2.5s; fallback image served for slow connections.
+4. All modals trap focus and close on ESC, ensuring compliance with WCAG 2.1.
