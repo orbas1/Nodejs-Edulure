@@ -17,6 +17,20 @@ export async function seed(knex) {
     await trx('feature_flags').del();
     await trx('configuration_entries').del();
     await trx('community_resources').del();
+    await trx('community_message_moderation_actions').del();
+    await trx('community_message_reactions').del();
+    await trx('community_channel_members').del();
+    await trx('community_messages').del();
+    await trx('direct_message_participants').del();
+    await trx('direct_messages').del();
+    await trx('direct_message_threads').del();
+    await trx('user_presence_sessions').del();
+    await trx('social_audit_logs').del();
+    await trx('user_follow_recommendations').del();
+    await trx('user_block_list').del();
+    await trx('user_mute_list').del();
+    await trx('user_follows').del();
+    await trx('user_privacy_settings').del();
     await trx('community_posts').del();
     await trx('community_channels').del();
     await trx('community_members').del();
@@ -152,6 +166,82 @@ export async function seed(knex) {
       is_default: true,
       metadata: JSON.stringify({ cadence: 'bi-weekly' })
     });
+
+    await trx('community_channel_members').insert([
+      {
+        channel_id: opsGeneralChannelId,
+        user_id: adminId,
+        role: 'moderator',
+        notifications_enabled: true,
+        metadata: JSON.stringify({ digestWindow: 'daily' })
+      },
+      {
+        channel_id: opsGeneralChannelId,
+        user_id: learnerId,
+        role: 'member',
+        notifications_enabled: true,
+        metadata: JSON.stringify({ digestWindow: 'daily' })
+      },
+      {
+        channel_id: opsWarRoomChannelId,
+        user_id: instructorId,
+        role: 'moderator',
+        notifications_enabled: true,
+        metadata: JSON.stringify({ cadence: 'weekly' })
+      },
+      {
+        channel_id: growthAnnouncementsChannelId,
+        user_id: adminId,
+        role: 'moderator',
+        notifications_enabled: true,
+        metadata: JSON.stringify({ digestWindow: 'weekly' })
+      },
+      {
+        channel_id: growthAnnouncementsChannelId,
+        user_id: instructorId,
+        role: 'member',
+        notifications_enabled: false,
+        metadata: JSON.stringify({ digestWindow: 'weekly' })
+      }
+    ]);
+
+    const [opsStandupMessageId] = await trx('community_messages').insert({
+      community_id: opsCommunityId,
+      channel_id: opsGeneralChannelId,
+      author_id: adminId,
+      message_type: 'text',
+      body: 'Ops guild daily: confirm R2 retention job completed and flag blockers before 10:00 UTC.',
+      attachments: JSON.stringify([]),
+      metadata: JSON.stringify({ tags: ['standup'], priority: 'high' }),
+      delivered_at: trx.fn.now()
+    });
+
+    const [opsReplyMessageId] = await trx('community_messages').insert({
+      community_id: opsCommunityId,
+      channel_id: opsGeneralChannelId,
+      author_id: learnerId,
+      message_type: 'text',
+      body: 'Retention job succeeded in 4m12s. I am drafting the retro doc before today’s war room.',
+      attachments: JSON.stringify([]),
+      metadata: JSON.stringify({ reply: true }),
+      thread_root_id: opsStandupMessageId,
+      reply_to_message_id: opsStandupMessageId,
+      delivered_at: trx.fn.now()
+    });
+
+    await trx('community_message_reactions').insert({
+      message_id: opsReplyMessageId,
+      user_id: adminId,
+      emoji: '✅'
+    });
+
+    await trx('community_channel_members')
+      .where({ channel_id: opsGeneralChannelId, user_id: adminId })
+      .update({ last_read_message_id: opsReplyMessageId, last_read_at: trx.fn.now() });
+
+    await trx('community_channel_members')
+      .where({ channel_id: opsGeneralChannelId, user_id: learnerId })
+      .update({ last_read_message_id: opsReplyMessageId, last_read_at: trx.fn.now() });
 
     const [opsPlaybookAssetId] = await trx('content_assets').insert({
       public_id: crypto.randomUUID(),
@@ -589,6 +679,186 @@ export async function seed(knex) {
           subscriptionId: growthSubscriptionId
         }),
         performed_by: adminId
+      }
+    ]);
+
+    const [directThreadId] = await trx('direct_message_threads').insert({
+      subject: 'Launch Readiness Sync',
+      is_group: false,
+      metadata: JSON.stringify({ seeded: true, playbook: 'launch-readiness' }),
+      last_message_at: trx.fn.now(),
+      last_message_preview: 'Checklist signed off and synced to the ops drive.'
+    });
+
+    await trx('direct_message_participants').insert([
+      {
+        thread_id: directThreadId,
+        user_id: adminId,
+        role: 'admin',
+        notifications_enabled: true
+      },
+      {
+        thread_id: directThreadId,
+        user_id: instructorId,
+        role: 'member',
+        notifications_enabled: true
+      }
+    ]);
+
+    await trx('direct_messages').insert({
+      thread_id: directThreadId,
+      sender_id: adminId,
+      message_type: 'text',
+      body: 'Kai, can you confirm the launch checklist is ready for Friday’s dry run?',
+      attachments: JSON.stringify([]),
+      metadata: JSON.stringify({ topic: 'launch-checklist' }),
+      status: 'delivered',
+      delivered_at: trx.fn.now()
+    });
+
+    const [directMessageReplyId] = await trx('direct_messages').insert({
+      thread_id: directThreadId,
+      sender_id: instructorId,
+      message_type: 'text',
+      body: 'Checklist signed off and synced to the ops drive. I added the QA runbook link.',
+      attachments: JSON.stringify([]),
+      metadata: JSON.stringify({ checklistVersion: '2024-Q4' }),
+      status: 'read',
+      delivered_at: trx.fn.now(),
+      read_at: trx.fn.now()
+    });
+
+    await trx('direct_message_threads')
+      .where({ id: directThreadId })
+      .update({
+        last_message_at: trx.fn.now(),
+        last_message_preview: 'Checklist signed off and synced to the ops drive.'
+      });
+
+    await trx('direct_message_participants')
+      .where({ thread_id: directThreadId, user_id: adminId })
+      .update({ last_read_message_id: directMessageReplyId, last_read_at: trx.fn.now() });
+
+    await trx('direct_message_participants')
+      .where({ thread_id: directThreadId, user_id: instructorId })
+      .update({ last_read_message_id: directMessageReplyId, last_read_at: trx.fn.now() });
+
+    await trx('user_presence_sessions').insert([
+      {
+        user_id: adminId,
+        session_id: 'seed-admin-web',
+        client: 'web',
+        status: 'online',
+        connected_at: trx.fn.now(),
+        last_seen_at: trx.fn.now(),
+        metadata: JSON.stringify({ region: 'eu-west-1', appVersion: '1.0.0' })
+      },
+      {
+        user_id: instructorId,
+        session_id: 'seed-instructor-mobile',
+        client: 'mobile',
+        status: 'away',
+        connected_at: trx.fn.now(),
+        last_seen_at: trx.fn.now(),
+        expires_at: trx.raw('DATE_ADD(NOW(), INTERVAL 5 MINUTE)'),
+        metadata: JSON.stringify({ region: 'ap-southeast-1', appVersion: '1.0.0' })
+      }
+    ]);
+
+    await trx('user_privacy_settings').insert([
+      {
+        user_id: adminId,
+        profile_visibility: 'public',
+        follow_approval_required: false,
+        message_permission: 'anyone',
+        share_activity: true,
+        metadata: JSON.stringify({ spotlight: 'operations-guild' })
+      },
+      {
+        user_id: instructorId,
+        profile_visibility: 'followers',
+        follow_approval_required: true,
+        message_permission: 'followers',
+        share_activity: true,
+        metadata: JSON.stringify({ acceptsOfficeHours: true })
+      },
+      {
+        user_id: learnerId,
+        profile_visibility: 'private',
+        follow_approval_required: true,
+        message_permission: 'followers',
+        share_activity: false,
+        metadata: JSON.stringify({ reason: 'beta-tester' })
+      }
+    ]);
+
+    await trx('user_follows').insert([
+      {
+        follower_id: adminId,
+        following_id: instructorId,
+        status: 'accepted',
+        source: 'seed',
+        accepted_at: trx.fn.now(),
+        metadata: JSON.stringify({ context: 'ops-collaboration' })
+      },
+      {
+        follower_id: instructorId,
+        following_id: adminId,
+        status: 'accepted',
+        source: 'seed',
+        accepted_at: trx.fn.now(),
+        metadata: JSON.stringify({ context: 'launch-readiness' })
+      },
+      {
+        follower_id: learnerId,
+        following_id: instructorId,
+        status: 'pending',
+        source: 'seed',
+        metadata: JSON.stringify({ note: 'requested mentorship' })
+      }
+    ]);
+
+    await trx('user_mute_list').insert({
+      user_id: instructorId,
+      muted_user_id: learnerId,
+      muted_until: trx.raw('DATE_ADD(NOW(), INTERVAL 2 DAY)'),
+      reason: 'Focus mode before launch',
+      metadata: JSON.stringify({ createdBy: 'seed' })
+    });
+
+    await trx('user_follow_recommendations').insert([
+      {
+        user_id: learnerId,
+        recommended_user_id: adminId,
+        score: 87.5,
+        mutual_followers_count: 1,
+        reason_code: 'community_admin',
+        metadata: JSON.stringify({ message: 'Admins share launch retrospectives' })
+      },
+      {
+        user_id: adminId,
+        recommended_user_id: learnerId,
+        score: 65.25,
+        mutual_followers_count: 1,
+        reason_code: 'new_member',
+        metadata: JSON.stringify({ message: 'New cohort member awaiting onboarding' })
+      }
+    ]);
+
+    await trx('social_audit_logs').insert([
+      {
+        user_id: adminId,
+        target_user_id: instructorId,
+        action: 'follow.accepted',
+        source: 'seed',
+        metadata: JSON.stringify({ seed: true })
+      },
+      {
+        user_id: instructorId,
+        target_user_id: learnerId,
+        action: 'mute.applied',
+        source: 'seed',
+        metadata: JSON.stringify({ durationMinutes: 2 * 24 * 60 })
       }
     ]);
     const [adminConsoleFlagId] = await trx('feature_flags').insert({

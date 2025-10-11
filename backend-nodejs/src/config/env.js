@@ -282,7 +282,20 @@ const envSchema = z
     COMMUNITY_REMINDER_CRON: z.string().default('*/5 * * * *'),
     COMMUNITY_REMINDER_TIMEZONE: z.string().default('Etc/UTC'),
     COMMUNITY_REMINDER_LOOKAHEAD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
-    COMMUNITY_REMINDER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(100)
+    COMMUNITY_REMINDER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(100),
+    CHAT_PRESENCE_DEFAULT_TTL_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(5),
+    CHAT_PRESENCE_MAX_TTL_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
+    CHAT_MESSAGE_DEFAULT_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(50),
+    CHAT_MESSAGE_MAX_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(200),
+    DM_THREAD_DEFAULT_PAGE_SIZE: z.coerce.number().int().min(5).max(200).default(20),
+    DM_THREAD_MAX_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(100),
+    DM_MESSAGE_DEFAULT_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(50),
+    DM_MESSAGE_MAX_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(200),
+    SOCIAL_FOLLOW_DEFAULT_PAGE_SIZE: z.coerce.number().int().min(5).max(200).default(25),
+    SOCIAL_FOLLOW_MAX_PAGE_SIZE: z.coerce.number().int().min(10).max(500).default(100),
+    SOCIAL_RECOMMENDATION_MAX_RESULTS: z.coerce.number().int().min(1).max(100).default(12),
+    SOCIAL_RECOMMENDATION_REFRESH_MINUTES: z.coerce.number().int().min(5).max(24 * 60 * 7).default(360),
+    SOCIAL_MUTE_DEFAULT_DURATION_DAYS: z.coerce.number().int().min(1).max(365).default(30)
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -314,6 +327,46 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['METRICS_BEARER_TOKEN'],
         message: 'Use either METRICS_BEARER_TOKEN or METRICS_USERNAME/METRICS_PASSWORD, not both.'
+      });
+    }
+
+    if (value.CHAT_PRESENCE_DEFAULT_TTL_MINUTES > value.CHAT_PRESENCE_MAX_TTL_MINUTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CHAT_PRESENCE_DEFAULT_TTL_MINUTES'],
+        message: 'CHAT_PRESENCE_DEFAULT_TTL_MINUTES cannot exceed CHAT_PRESENCE_MAX_TTL_MINUTES.'
+      });
+    }
+
+    if (value.CHAT_MESSAGE_DEFAULT_PAGE_SIZE > value.CHAT_MESSAGE_MAX_PAGE_SIZE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['CHAT_MESSAGE_DEFAULT_PAGE_SIZE'],
+        message: 'CHAT_MESSAGE_DEFAULT_PAGE_SIZE cannot exceed CHAT_MESSAGE_MAX_PAGE_SIZE.'
+      });
+    }
+
+    if (value.DM_THREAD_DEFAULT_PAGE_SIZE > value.DM_THREAD_MAX_PAGE_SIZE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DM_THREAD_DEFAULT_PAGE_SIZE'],
+        message: 'DM_THREAD_DEFAULT_PAGE_SIZE cannot exceed DM_THREAD_MAX_PAGE_SIZE.'
+      });
+    }
+
+    if (value.DM_MESSAGE_DEFAULT_PAGE_SIZE > value.DM_MESSAGE_MAX_PAGE_SIZE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DM_MESSAGE_DEFAULT_PAGE_SIZE'],
+        message: 'DM_MESSAGE_DEFAULT_PAGE_SIZE cannot exceed DM_MESSAGE_MAX_PAGE_SIZE.'
+      });
+    }
+
+    if (value.SOCIAL_FOLLOW_DEFAULT_PAGE_SIZE > value.SOCIAL_FOLLOW_MAX_PAGE_SIZE) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['SOCIAL_FOLLOW_DEFAULT_PAGE_SIZE'],
+        message: 'SOCIAL_FOLLOW_DEFAULT_PAGE_SIZE cannot exceed SOCIAL_FOLLOW_MAX_PAGE_SIZE.'
       });
     }
   });
@@ -471,6 +524,41 @@ export const env = {
     featureFlagRefreshIntervalMs: raw.FEATURE_FLAG_REFRESH_INTERVAL_SECONDS * 1000,
     configCacheTtlMs: raw.RUNTIME_CONFIG_CACHE_TTL_SECONDS * 1000,
     configRefreshIntervalMs: raw.RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS * 1000
+  },
+  chat: {
+    presence: {
+      defaultTtlMinutes: raw.CHAT_PRESENCE_DEFAULT_TTL_MINUTES,
+      maxTtlMinutes: raw.CHAT_PRESENCE_MAX_TTL_MINUTES
+    },
+    pagination: {
+      defaultPageSize: raw.CHAT_MESSAGE_DEFAULT_PAGE_SIZE,
+      maxPageSize: raw.CHAT_MESSAGE_MAX_PAGE_SIZE
+    }
+  },
+  directMessages: {
+    threads: {
+      defaultPageSize: raw.DM_THREAD_DEFAULT_PAGE_SIZE,
+      maxPageSize: raw.DM_THREAD_MAX_PAGE_SIZE
+    },
+    messages: {
+      defaultPageSize: raw.DM_MESSAGE_DEFAULT_PAGE_SIZE,
+      maxPageSize: raw.DM_MESSAGE_MAX_PAGE_SIZE
+    }
+  },
+  social: {
+    pagination: {
+      follows: {
+        defaultPageSize: raw.SOCIAL_FOLLOW_DEFAULT_PAGE_SIZE,
+        maxPageSize: raw.SOCIAL_FOLLOW_MAX_PAGE_SIZE
+      }
+    },
+    recommendations: {
+      maxResults: raw.SOCIAL_RECOMMENDATION_MAX_RESULTS,
+      refreshMinutes: raw.SOCIAL_RECOMMENDATION_REFRESH_MINUTES
+    },
+    mute: {
+      defaultDurationDays: raw.SOCIAL_MUTE_DEFAULT_DURATION_DAYS
+    }
   },
   engagement: {
     defaultTimezone: raw.COMMUNITY_DEFAULT_TIMEZONE,

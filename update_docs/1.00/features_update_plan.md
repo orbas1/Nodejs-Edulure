@@ -50,6 +50,7 @@
 1. **Follow Graph Platform**
    - Model relationships (follow/unfollow/block/mute), privacy settings, audit logs, and moderation triggers.
    - Expose APIs and integrate with feed ranking, recommendations, notifications, explorer, and analytics.
+   - _Update:_ Database migration, repositories, `SocialGraphService`, `/api/social` routes, seeds, OpenAPI schemas, README/.env documentation, and Vitest coverage now deliver follow/unfollow, approvals, recommendations, mutes, blocks, and privacy governance ready for frontend/mobile integration.
 2. **Profile Area Rebuild**
    - Finalise component library (hero, badges, shelves, community cards, affiliate widgets, finance stats, timelines, quick actions).
    - Implement backend aggregation services with caching and search indexing; seed achievements, badges, and affiliate data.
@@ -69,6 +70,7 @@
    - Deliver affiliate marketplace: link creation, commission settings, earnings dashboards, withdrawals, instructor dashboard integration, and community owner controls.
 3. **Engagement & Communication Suite**
    - Upgrade chat/inbox with channels, DMs, read receipts, Agora live integration, notifications, online tracker, and moderation tools.
+   - _Update:_ Backend migrations, services, controllers, routes, seeds, and OpenAPI specifications for community chat, reactions, moderation, presence, and direct messaging are complete; Agora hooks now connect to production-grade messaging endpoints awaiting frontend/mobile integration.
    - Implement calendar syncing, event reminders, classroom scheduling, leaderboards, tier points, streak mechanics, and map embeds.
    - Extend admin panel oversight, support tooling, and analytics for community health.
 4. **Mobile Parity**

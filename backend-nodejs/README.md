@@ -60,7 +60,12 @@ it immediately and never commit the generated keyset file.
 
 The following additional variables configure the asset workflow:
 
-- `R2_*` credentials – Cloudflare R2 account, access keys, and bucket names for uploads, private storage, and public CDN assets.
+- `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` – Cloudflare R2 credentials provisioned for the environment.
+- `R2_REGION` – region for R2 (typically `auto`).
+- `R2_PUBLIC_BUCKET` – bucket serving public CDN content.
+- `R2_PRIVATE_BUCKET` – bucket for private, signed downloads.
+- `R2_UPLOADS_BUCKET` – bucket receiving presigned uploads before ingestion.
+- `R2_QUARANTINE_BUCKET` – bucket isolating uploads flagged by antivirus until a moderator reviews them.
 - `ASSET_PRESIGN_TTL_MINUTES` / `ASSET_DOWNLOAD_TTL_MINUTES` – expiry windows for presigned upload and download URLs.
 - `CONTENT_MAX_UPLOAD_MB` – upload size limit enforced before presigning.
 - `CLOUDCONVERT_API_KEY` – optional. Required for PowerPoint to PDF conversion and thumbnails.
@@ -86,8 +91,53 @@ enabling commerce in any environment:
 - `PAYMENTS_MAX_COUPON_PERCENTAGE` – hard cap for percentage coupons expressed in % (e.g. `80` = 80%).
 - `PAYMENTS_REPORTING_TIMEZONE` – IANA timezone string used when summarising captured revenue in finance reports.
 
+### Messaging & presence environment
+
+Community chat and direct messaging expose tunable pagination and presence windows so operations teams can right-size load and
+privacy controls per deployment:
+
+- `CHAT_PRESENCE_DEFAULT_TTL_MINUTES` / `CHAT_PRESENCE_MAX_TTL_MINUTES` – governs how long a presence beacon remains active
+  without a refresh. The API clamps individual updates to this ceiling to avoid stale presence data lingering indefinitely.
+- `CHAT_MESSAGE_DEFAULT_PAGE_SIZE` / `CHAT_MESSAGE_MAX_PAGE_SIZE` – controls default and maximum payload sizes for channel
+  history requests, ensuring pagination stays efficient even when moderators request large exports.
+- `DM_THREAD_DEFAULT_PAGE_SIZE` / `DM_THREAD_MAX_PAGE_SIZE` – sets default and upper limits when listing inbox threads. Offsets
+  greater than the configured ceiling are automatically normalised to protect the database from pathological scans.
+- `DM_MESSAGE_DEFAULT_PAGE_SIZE` / `DM_MESSAGE_MAX_PAGE_SIZE` – applies to direct-message history endpoints so clients can fetch
+  longer timelines without bypassing retention or moderation guardrails.
+
 The Vitest harness provisions safe defaults for these variables so tests run without contacting real providers. In development,
 seed data ships with dormant coupons and example orders for validating finance dashboards.
+
+### Social graph environment
+
+Follow relationships, recommendations, and privacy controls introduce their own environment levers so operators can tailor social
+experiences per tenant:
+
+- `SOCIAL_FOLLOW_DEFAULT_PAGE_SIZE` / `SOCIAL_FOLLOW_MAX_PAGE_SIZE` – clamp follower/following pagination to safe bounds for API
+  clients and moderation exports.
+- `SOCIAL_RECOMMENDATION_MAX_RESULTS` – maximum number of algorithmic suggestions returned from `/api/social/recommendations`.
+- `SOCIAL_RECOMMENDATION_REFRESH_MINUTES` – downstream workers use this cadence to refresh cached recommendations; document the
+  value alongside scheduler configuration.
+- `SOCIAL_MUTE_DEFAULT_DURATION_DAYS` – default length applied when clients mute a user without specifying a duration. Controllers
+  accept explicit overrides but never exceed the configured ceiling.
+
+Common API workflows:
+
+```bash
+# Request to follow user 91 (auto-approves when allowed)
+curl -X POST https://api.local.edulure.com/api/social/follows/91 \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"source":"profile-card"}'
+
+# Approve a pending request as the target user
+curl -X POST https://api.local.edulure.com/api/social/users/42/followers/91/approve \
+  -H "Authorization: Bearer <token>"
+
+# Retrieve personalised suggestions capped by SOCIAL_RECOMMENDATION_MAX_RESULTS
+curl https://api.local.edulure.com/api/social/recommendations?limit=8 \
+  -H "Authorization: Bearer <token>"
+```
 
 ## Project structure
 

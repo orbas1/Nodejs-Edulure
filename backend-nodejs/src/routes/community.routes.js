@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import CommunityController from '../controllers/CommunityController.js';
 import CommunityEngagementController from '../controllers/CommunityEngagementController.js';
+import CommunityChatController from '../controllers/CommunityChatController.js';
 import CommunityMonetizationController from '../controllers/CommunityMonetizationController.js';
 import auth from '../middleware/auth.js';
 
@@ -15,6 +16,40 @@ router.get('/:communityId/posts', auth(), CommunityController.listFeed);
 router.post('/:communityId/posts', auth(), CommunityController.createPost);
 router.get('/:communityId/resources', auth(), CommunityController.listResources);
 router.post('/:communityId/resources', auth(), CommunityController.createResource);
+
+router.get('/:communityId/chat/channels', auth(), CommunityChatController.listChannels);
+router.get(
+  '/:communityId/chat/channels/:channelId/messages',
+  auth(),
+  CommunityChatController.listMessages
+);
+router.post(
+  '/:communityId/chat/channels/:channelId/messages',
+  auth(),
+  CommunityChatController.postMessage
+);
+router.post(
+  '/:communityId/chat/channels/:channelId/read',
+  auth(),
+  CommunityChatController.acknowledgeRead
+);
+router.post(
+  '/:communityId/chat/channels/:channelId/messages/:messageId/reactions',
+  auth(),
+  CommunityChatController.addReaction
+);
+router.delete(
+  '/:communityId/chat/channels/:channelId/messages/:messageId/reactions',
+  auth(),
+  CommunityChatController.removeReaction
+);
+router.post(
+  '/:communityId/chat/channels/:channelId/messages/:messageId/moderate',
+  auth(),
+  CommunityChatController.moderateMessage
+);
+router.get('/:communityId/chat/presence', auth(), CommunityChatController.listPresence);
+router.post('/:communityId/chat/presence', auth(), CommunityChatController.updatePresence);
 
 router.get('/:communityId/engagement/progress', auth(), CommunityEngagementController.getMyProgress);
 router.post('/:communityId/engagement/points', auth('instructor'), CommunityEngagementController.awardPoints);

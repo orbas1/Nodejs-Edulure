@@ -14,15 +14,15 @@
 - **Dependencies:** IA research, logic flow artefacts (`Logic_Flow_map.md`, `Screens_Update_Logic_Flow_map.md`).
 - **Responsible Roles:** UX Architect, Frontend Lead, Flutter Lead.
 
-## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 75% complete)
+## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 88% complete)
 - **Objectives:** Produce annotated high-fidelity templates for home, dashboards, explorer, media viewers, profiles, and settings across web and Flutter.
 - **Entry Criteria:** Milestones 1–2 delivered; component inventory baselined.
 - **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded. _Update:_ Live classroom lobbies, tutor storefronts, booking calendars, moderator consoles, checkout, coupon, refund, finance dashboards, and the refreshed community hub/resource library are now redlined with analytics IDs, motion notes, webhook fallbacks, membership guardrails, and SCA states referencing `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, `menu_drawings.md`, and `web_application_logic_flow_changes.md`.
-- **Latest Progress:** Community paywall dashboards, subscription plan cards, entitlement badges, affiliate payout flows, and the new engagement leaderboards/streak/event reminder overlays now mirror backend APIs with interaction specs referencing `menu_drawings.md`, `dashboard_drawings.md`, `App_screens_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`.
+- **Latest Progress:** Community paywall dashboards, subscription plan cards, entitlement badges, affiliate payout flows, engagement leaderboards/streak/event reminder overlays, the end-to-end messaging suite (community chat docks, DM inbox/thread compositions, moderation trays, unread/presence states), and the new follower/following management trays with recommendation carousels now mirror backend APIs with interaction specs referencing `menu_drawings.md`, `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, `Admin_panel_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`.
 - **Dependencies:** Token library, imagery guidance (`images_and_vectors.md`), microcopy drafts (`Screen_text.md`).
 - **Responsible Roles:** Product Designers, Content Strategist, QA Design Lead.
 
-## Milestone 4 – Engineering Handoff & QA (Target: Week 8, Status: 35% complete)
+## Milestone 4 – Engineering Handoff & QA (Target: Week 8, Status: 45% complete)
 - **Objectives:** Package design specifications, motion references, analytics matrices, and QA scripts; oversee accessibility, localisation, and compliance verification.
 - **Entry Criteria:** Milestone 3 assets complete; engineering squads aligned on development sprints.
 - **Exit Criteria:** Handoff checklist signed, accessibility/localisation scripts executed, design QA sign-off recorded, open issues logged in `Design_Change_log.md`.
@@ -32,7 +32,15 @@
   - Retention audit banners and administrator prompts defined for policy compliance consoles so data hygiene automation has corresponding UI guidance; references captured in `dashboard_drawings.md` and `menu_drawings.md`.
   - Scheduler health indicators (next run, paused/backoff badges, dry-run toggles) mapped for the compliance console using `dashboard_drawings.md` and `App_screens_drawings.md` so operators have parity with the new backend job behaviour.
   - Antivirus alerts, quarantine review queues, and storage governance dashboards annotated for admin consoles with localisation and escalation guidance referencing `dashboard_drawings.md`, `App_screens_drawings.md`, and `web_app_wireframe_changes.md`.
-  - Live classroom QA packs now include join token smoke tests, moderation handoff checklists, and recording consent receipts referencing `Admin_panel_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md`.
-  - Checkout, refund, coupon, and finance dashboards now include PCI copy reviews, webhook failure contingencies, payout readiness handoffs, and support escalation scripts referencing `web_application_logic_flow_changes.md`, `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Function Design.md`, and `Application_Design_Update_Plan/Application Design Update.md`.
+  - Live classroom QA packs now include join token smoke tests, moderation handoff checklists, recording consent receipts, chat escalation flows, DM retention/export scripts, and presence refresh drills referencing `Admin_panel_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md`.
+  - Checkout, refund, coupon, finance dashboards, and messaging consoles now include PCI copy reviews, webhook failure contingencies, payout readiness handoffs, support escalation scripts, chat moderation runbooks, and DM safety audits referencing `web_application_logic_flow_changes.md`, `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Function Design.md`, `Application_Design_Update_Plan/Application Design Update.md`, `dashboard_drawings.md`, and `Admin_panel_drawings.md`.
 - **Dependencies:** Engineering schedules, QA tooling, localisation resources, compliance checklists.
 - **Responsible Roles:** Design Producer, Engineering Managers, Accessibility Specialist.
+
+### Design Milestone Addendum
+| Design Milestone | Target Week | Current Status | Key Deliverables |
+| --- | --- | --- | --- |
+| Token & Theme System Finalisation | Week 2 | 70% complete | Cross-platform token exports, emo/seasonal theme guardrails, automated contrast reports. |
+| Navigation & Layout Blueprint | Week 4 | 45% complete | Role-based IA schema, breakpoint matrices, breadcrumb/stepper interaction specs. |
+| Template & Component Delivery | Week 6 | 90% complete | Annotated templates for home/dashboards/explorer/messaging, asset manifests, copy decks. |
+| Engineering Handoff & QA | Week 8 | 45% complete | Handoff kits, accessibility/localisation scripts, messaging QA packs, design QA sign-offs. |

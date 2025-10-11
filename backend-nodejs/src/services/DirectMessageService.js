@@ -1,0 +1,266 @@
+import db from '../config/database.js';
+import DirectMessageModel from '../models/DirectMessageModel.js';
+import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
+import DirectMessageThreadModel from '../models/DirectMessageThreadModel.js';
+import DomainEventModel from '../models/DomainEventModel.js';
+import UserModel from '../models/UserModel.js';
+import logger from '../config/logger.js';
+import { env } from '../config/env.js';
+
+const log = logger.child({ module: 'direct-message-service' });
+const THREAD_DEFAULT_LIMIT = env.directMessages.threads.defaultPageSize;
+const THREAD_MAX_LIMIT = env.directMessages.threads.maxPageSize;
+const MESSAGE_DEFAULT_LIMIT = env.directMessages.messages.defaultPageSize;
+const MESSAGE_MAX_LIMIT = env.directMessages.messages.maxPageSize;
+
+function truncatePreview(body) {
+  if (!body) return null;
+  return body.length > 240 ? `${body.slice(0, 237)}...` : body;
+}
+
+async function ensureParticipant(threadId, userId) {
+  const participant = await DirectMessageParticipantModel.findParticipant(threadId, userId);
+  if (!participant) {
+    const error = new Error('Thread not found or access denied');
+    error.status = 404;
+    throw error;
+  }
+  return participant;
+}
+
+export default class DirectMessageService {
+  static async listThreads(userId, query = {}) {
+    const requestedLimit = Number(query.limit ?? THREAD_DEFAULT_LIMIT);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), THREAD_MAX_LIMIT)
+      : THREAD_DEFAULT_LIMIT;
+    const requestedOffset = Number(query.offset ?? 0);
+    const offset = Number.isFinite(requestedOffset) ? Math.max(Math.floor(requestedOffset), 0) : 0;
+    const threads = await DirectMessageThreadModel.listForUser(userId, { ...query, limit, offset });
+    if (!threads.length) {
+      return { threads: [], limit, offset };
+    }
+
+    const threadIds = threads.map((thread) => thread.id);
+    const participantsByThread = await Promise.all(
+      threadIds.map((id) => DirectMessageParticipantModel.listForThread(id))
+    );
+    const uniqueUserIds = new Set();
+    participantsByThread.forEach((participants) => {
+      participants.forEach((participant) => uniqueUserIds.add(participant.userId));
+    });
+    const users = await UserModel.findByIds([...uniqueUserIds]);
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    const latestMessages = await DirectMessageModel.latestForThreads(threadIds);
+    const latestMap = latestMessages.reduce((acc, entry) => {
+      acc.set(entry.threadId, entry.message);
+      return acc;
+    }, new Map());
+
+    const results = [];
+    for (let index = 0; index < threads.length; index += 1) {
+      const thread = threads[index];
+      const participants = participantsByThread[index].map((participant) => ({
+        ...participant,
+        user: userMap.get(participant.userId) ?? null
+      }));
+      const viewerParticipant = participants.find((participant) => participant.userId === userId);
+      if (!viewerParticipant) {
+        continue;
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const unreadCount = await DirectMessageModel.countSince(thread.id, viewerParticipant.lastReadAt);
+      results.push({
+        thread,
+        participants,
+        latestMessage: latestMap.get(thread.id) ?? null,
+        unreadCount
+      });
+    }
+
+    return { threads: results, limit, offset };
+  }
+
+  static async createThread(creatorId, payload) {
+    const participantIds = new Set((payload.participantIds ?? []).map((id) => Number(id)));
+    participantIds.add(Number(creatorId));
+    const uniqueIds = [...participantIds];
+    if (uniqueIds.length < 2) {
+      const error = new Error('A thread requires at least two participants');
+      error.status = 422;
+      throw error;
+    }
+
+    const users = await UserModel.findByIds(uniqueIds);
+    if (users.length !== uniqueIds.length) {
+      const missing = uniqueIds.filter((id) => !users.some((user) => user.id === id));
+      const error = new Error(`Participants not found: ${missing.join(', ')}`);
+      error.status = 404;
+      throw error;
+    }
+
+    let thread = null;
+    if (uniqueIds.length === 2 && !payload.forceNew) {
+      thread = await DirectMessageThreadModel.findThreadMatchingParticipants(uniqueIds);
+    }
+
+    return db.transaction(async (trx) => {
+      let createdThread = thread;
+      if (!createdThread) {
+        createdThread = await DirectMessageThreadModel.create(
+          {
+            subject: payload.subject ?? null,
+            isGroup: uniqueIds.length > 2,
+            metadata: { createdBy: creatorId }
+          },
+          trx
+        );
+
+        await Promise.all(
+          uniqueIds.map((participantId) =>
+            DirectMessageParticipantModel.create(
+              {
+                threadId: createdThread.id,
+                userId: participantId,
+                role: participantId === creatorId ? 'admin' : 'member'
+              },
+              trx
+            )
+          )
+        );
+
+        await DomainEventModel.record(
+          {
+            entityType: 'direct_message_thread',
+            entityId: createdThread.id,
+            eventType: 'dm.thread.created',
+            payload: { creatorId, participantCount: uniqueIds.length },
+            performedBy: creatorId
+          },
+          trx
+        );
+      }
+
+      let initialMessage = null;
+      if (payload.initialMessage?.body) {
+        initialMessage = await DirectMessageModel.create(
+          {
+            threadId: createdThread.id,
+            senderId: creatorId,
+            messageType: payload.initialMessage.messageType,
+            body: payload.initialMessage.body,
+            attachments: payload.initialMessage.attachments,
+            metadata: payload.initialMessage.metadata
+          },
+          trx
+        );
+
+        await DirectMessageThreadModel.updateThreadMetadata(
+          createdThread.id,
+          {
+            lastMessageAt: initialMessage.createdAt,
+            lastMessagePreview: truncatePreview(initialMessage.body)
+          },
+          trx
+        );
+
+        await DirectMessageParticipantModel.updateLastRead(
+          createdThread.id,
+          creatorId,
+          { timestamp: new Date(initialMessage.createdAt), messageId: initialMessage.id },
+          trx
+        );
+
+        await DomainEventModel.record(
+          {
+            entityType: 'direct_message',
+            entityId: initialMessage.id,
+            eventType: 'dm.message.created',
+            payload: { threadId: createdThread.id },
+            performedBy: creatorId
+          },
+          trx
+        );
+      }
+
+      log.info(
+        { threadId: createdThread.id, creatorId, reused: Boolean(thread) },
+        'direct message thread ready'
+      );
+
+      return { thread: createdThread, initialMessage };
+    });
+  }
+
+  static async listMessages(threadId, userId, filters = {}) {
+    await ensureParticipant(threadId, userId);
+    const requestedLimit = Number(filters.limit ?? MESSAGE_DEFAULT_LIMIT);
+    const limit = Number.isFinite(requestedLimit)
+      ? Math.min(Math.max(requestedLimit, 1), MESSAGE_MAX_LIMIT)
+      : MESSAGE_DEFAULT_LIMIT;
+    const messages = await DirectMessageModel.listForThread(threadId, { ...filters, limit });
+    return { messages, limit };
+  }
+
+  static async sendMessage(threadId, userId, payload) {
+    await ensureParticipant(threadId, userId);
+    return db.transaction(async (trx) => {
+      const message = await DirectMessageModel.create(
+        {
+          threadId,
+          senderId: userId,
+          messageType: payload.messageType,
+          body: payload.body,
+          attachments: payload.attachments,
+          metadata: payload.metadata
+        },
+        trx
+      );
+
+      await DirectMessageThreadModel.updateThreadMetadata(
+        threadId,
+        {
+          lastMessageAt: message.createdAt,
+          lastMessagePreview: truncatePreview(message.body)
+        },
+        trx
+      );
+
+      await DirectMessageParticipantModel.updateLastRead(
+        threadId,
+        userId,
+        { timestamp: new Date(message.createdAt), messageId: message.id },
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'direct_message',
+          entityId: message.id,
+          eventType: 'dm.message.created',
+          payload: { threadId },
+          performedBy: userId
+        },
+        trx
+      );
+
+      log.info({ threadId, messageId: message.id, senderId: userId }, 'dm message sent');
+      return message;
+    });
+  }
+
+  static async markRead(threadId, userId, payload = {}) {
+    await ensureParticipant(threadId, userId);
+    let messageRecord = null;
+    if (payload.messageId) {
+      messageRecord = await DirectMessageModel.markRead(payload.messageId);
+    }
+    const updatedParticipant = await DirectMessageParticipantModel.updateLastRead(
+      threadId,
+      userId,
+      { timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(), messageId: payload.messageId ?? null }
+    );
+    return { participant: updatedParticipant, message: messageRecord };
+  }
+}

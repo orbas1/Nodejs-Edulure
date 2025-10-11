@@ -46,6 +46,895 @@
           }
         }
       },
+      "CommunityChatChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "channelType": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "name",
+          "slug",
+          "channelType",
+          "isDefault",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityChannelMembership": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "channelId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          },
+          "muteUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadMessageId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "userId",
+          "role",
+          "notificationsEnabled",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityChatMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "channelId": {
+            "type": "integer"
+          },
+          "authorId": {
+            "type": "integer"
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "system",
+              "event",
+              "file",
+              "live"
+            ],
+            "default": "text"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "pinned": {
+            "type": "boolean"
+          },
+          "threadRootId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "replyToMessageId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string",
+                "nullable": true
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "channelId",
+          "authorId",
+          "messageType",
+          "body",
+          "attachments",
+          "metadata",
+          "status",
+          "pinned",
+          "createdAt",
+          "updatedAt",
+          "author"
+        ]
+      },
+      "CommunityChatMessageExtended": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CommunityChatMessage"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "reactions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emoji": {
+                      "type": "string"
+                    },
+                    "count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              },
+              "viewerReactions": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "CommunityChatChannelSummary": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "$ref": "#/components/schemas/CommunityChatChannel"
+          },
+          "membership": {
+            "$ref": "#/components/schemas/CommunityChannelMembership"
+          },
+          "latestMessage": {
+            "$ref": "#/components/schemas/CommunityChatMessage",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "channel",
+          "membership",
+          "unreadCount"
+        ]
+      },
+      "CommunityChatReactionSummary": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "integer"
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "emoji": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "viewerReactions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "messageId",
+          "reactions",
+          "viewerReactions"
+        ]
+      },
+      "CommunityChatModeration": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "messageId": {
+            "type": "integer"
+          },
+          "actorId": {
+            "type": "integer"
+          },
+          "actionType": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "messageId",
+          "actorId",
+          "actionType",
+          "metadata",
+          "createdAt"
+        ]
+      },
+      "CommunityChatModerationResult": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/CommunityChatMessage"
+          },
+          "moderation": {
+            "$ref": "#/components/schemas/CommunityChatModeration"
+          }
+        },
+        "required": [
+          "message",
+          "moderation"
+        ]
+      },
+      "CreateCommunityChatMessageRequest": {
+        "type": "object",
+        "properties": {
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "system",
+              "event",
+              "file",
+              "live"
+            ],
+            "default": "text"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "replyToMessageId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "threadRootId": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "CommunityChatReactionRequest": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "emoji"
+        ]
+      },
+      "CommunityChatModerationRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "delete",
+              "hide",
+              "restore"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "action"
+        ]
+      },
+      "CommunityChatReadReceiptRequest": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PresenceSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "sessionId": {
+            "type": "string"
+          },
+          "client": {
+            "type": "string",
+            "enum": [
+              "web",
+              "mobile",
+              "provider",
+              "admin"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "away",
+              "offline"
+            ]
+          },
+          "connectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "sessionId",
+          "client",
+          "status",
+          "connectedAt",
+          "lastSeenAt",
+          "metadata"
+        ]
+      },
+      "PresenceUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "online",
+              "away",
+              "offline"
+            ],
+            "default": "online"
+          },
+          "client": {
+            "type": "string",
+            "enum": [
+              "web",
+              "mobile",
+              "provider",
+              "admin"
+            ],
+            "default": "web"
+          },
+          "ttlMinutes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60,
+            "default": 5
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "connectedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DirectMessageParticipant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "threadId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          },
+          "isMuted": {
+            "type": "boolean"
+          },
+          "muteUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadMessageId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "userId",
+          "role",
+          "notificationsEnabled",
+          "isMuted",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DirectMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "threadId": {
+            "type": "integer"
+          },
+          "senderId": {
+            "type": "integer"
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "system",
+              "file"
+            ],
+            "default": "text"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sender": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string",
+                "nullable": true
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "senderId",
+          "messageType",
+          "body",
+          "attachments",
+          "metadata",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "sender"
+        ]
+      },
+      "DirectMessageThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "isGroup": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastMessagePreview": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "isGroup",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DirectMessageParticipantSummary": {
+        "type": "object",
+        "properties": {
+          "participant": {
+            "$ref": "#/components/schemas/DirectMessageParticipant"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User",
+            "nullable": true
+          }
+        },
+        "required": [
+          "participant"
+        ]
+      },
+      "DirectMessageThreadSummary": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/DirectMessageThread"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectMessageParticipantSummary"
+            }
+          },
+          "latestMessage": {
+            "$ref": "#/components/schemas/DirectMessage",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "thread",
+          "participants",
+          "unreadCount"
+        ]
+      },
+      "DirectMessageThreadCreationResult": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/DirectMessageThread"
+          },
+          "initialMessage": {
+            "$ref": "#/components/schemas/DirectMessage",
+            "nullable": true
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "DirectMessageRequest": {
+        "type": "object",
+        "properties": {
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "system",
+              "file"
+            ],
+            "default": "text"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "DirectMessageThreadRequest": {
+        "type": "object",
+        "properties": {
+          "participantIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "forceNew": {
+            "type": "boolean",
+            "default": false
+          },
+          "initialMessage": {
+            "$ref": "#/components/schemas/DirectMessageRequest"
+          }
+        },
+        "required": [
+          "participantIds"
+        ]
+      },
+      "DirectMessageReadRequest": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DirectMessageReadReceipt": {
+        "type": "object",
+        "properties": {
+          "participant": {
+            "$ref": "#/components/schemas/DirectMessageParticipant"
+          },
+          "message": {
+            "$ref": "#/components/schemas/DirectMessage",
+            "nullable": true
+          }
+        },
+        "required": [
+          "participant"
+        ]
+      },
       "AuthTokens": {
         "type": "object",
         "properties": {
@@ -1793,10 +2682,8 @@
             "type": "string"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "permissions": {
             "type": "object"
@@ -1805,10 +2692,8 @@
             "type": "boolean"
           },
           "createdBy": {
-            "type": [
-              "integer",
-              "null"
-            ]
+            "type": "integer",
+            "nullable": true
           },
           "createdAt": {
             "type": "string",
@@ -1869,10 +2754,8 @@
             "type": "string"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "priceCents": {
             "type": "integer"
@@ -1899,16 +2782,12 @@
             "type": "object"
           },
           "stripePriceId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "paypalPlanId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "createdAt": {
             "type": "string",
@@ -1957,75 +2836,55 @@
             "type": "string"
           },
           "startedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "currentPeriodStart": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "currentPeriodEnd": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "cancelAtPeriodEnd": {
             "type": "boolean"
           },
           "canceledAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "expiresAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "provider": {
             "type": "string"
           },
           "providerCustomerId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "providerSubscriptionId": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "providerStatus": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "latestPaymentIntentId": {
-            "type": [
-              "integer",
-              "null"
-            ]
+            "type": "integer",
+            "nullable": true
           },
           "affiliateId": {
-            "type": [
-              "integer",
-              "null"
-            ]
+            "type": "integer",
+            "nullable": true
           },
           "metadata": {
             "type": "object"
@@ -2084,25 +2943,19 @@
             "type": "object"
           },
           "approvedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "suspendedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "revokedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "createdAt": {
             "type": "string",
@@ -2143,30 +2996,22 @@
             "type": "string"
           },
           "payoutReference": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "scheduledAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "processedAt": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "format": "date-time"
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "failureReason": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string",
+            "nullable": true
           },
           "metadata": {
             "type": "object"
@@ -2319,6 +3164,261 @@
             "type": "string"
           }
         }
+      },
+      "SocialUserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 91
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Nova"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Rahman"
+          },
+          "role": {
+            "type": "string",
+            "example": "user"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "nova.rahman@example.com"
+          },
+          "mutualFollowers": {
+            "type": "integer",
+            "example": 3
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "role",
+          "email"
+        ]
+      },
+      "FollowRelationship": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1501
+          },
+          "followerId": {
+            "type": "integer",
+            "example": 42
+          },
+          "followingId": {
+            "type": "integer",
+            "example": 91
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "declined"
+            ],
+            "example": "accepted"
+          },
+          "source": {
+            "type": "string",
+            "example": "profile-card",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "example": "Requested mentorship",
+            "nullable": true
+          },
+          "acceptedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "followerId",
+          "followingId",
+          "status"
+        ]
+      },
+      "FollowListItem": {
+        "type": "object",
+        "properties": {
+          "relationship": {
+            "$ref": "#/components/schemas/FollowRelationship"
+          },
+          "user": {
+            "$ref": "#/components/schemas/SocialUserSummary"
+          }
+        }
+      },
+      "FollowViewerContext": {
+        "type": "object",
+        "properties": {
+          "viewerFollowsSubject": {
+            "type": "boolean",
+            "example": true
+          },
+          "subjectFollowsViewer": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "FollowRecommendationItem": {
+        "type": "object",
+        "properties": {
+          "recommendation": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number",
+                "format": "float",
+                "example": 87.5
+              },
+              "mutualFollowersCount": {
+                "type": "integer",
+                "example": 2
+              },
+              "reasonCode": {
+                "type": "string",
+                "example": "mutual_followers"
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "score",
+              "mutualFollowersCount",
+              "reasonCode"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/SocialUserSummary"
+          }
+        }
+      },
+      "FollowRequest": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 80,
+            "example": "profile-card"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 240,
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "MuteRequest": {
+        "type": "object",
+        "properties": {
+          "durationMinutes": {
+            "type": "integer",
+            "minimum": 5,
+            "example": 120
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 240,
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "BlockRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 240,
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "SocialPrivacySettings": {
+        "type": "object",
+        "properties": {
+          "profileVisibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "followers",
+              "private"
+            ],
+            "example": "followers"
+          },
+          "followApprovalRequired": {
+            "type": "boolean",
+            "example": true
+          },
+          "messagePermission": {
+            "type": "string",
+            "enum": [
+              "anyone",
+              "followers",
+              "none"
+            ],
+            "example": "followers"
+          },
+          "shareActivity": {
+            "type": "boolean",
+            "example": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "profileVisibility",
+          "followApprovalRequired",
+          "messagePermission",
+          "shareActivity"
+        ]
+      },
+      "SocialPrivacyUpdateRequest": {
+        "$ref": "#/components/schemas/SocialPrivacySettings"
       }
     }
   },
@@ -2862,11 +3962,11 @@
           "401": {
             "description": "Invalid credentials"
           },
-          "422": {
-            "description": "Validation error"
-          },
           "403": {
             "description": "Email verification required"
+          },
+          "422": {
+            "description": "Validation error"
           },
           "423": {
             "description": "Account locked"
@@ -3111,7 +4211,7 @@
             "schema": {
               "type": "integer",
               "minimum": 1,
-              "maximum": 100,
+              "maximum": 200,
               "default": 20
             }
           },
@@ -3876,6 +4976,682 @@
           },
           "422": {
             "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/chat/channels": {
+      "get": {
+        "summary": "List community chat channels",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat channels fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityChatChannelSummary"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community access denied"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/chat/channels/{channelId}/messages": {
+      "get": {
+        "summary": "List channel messages",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "threadRootId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Set to true to include moderator-hidden messages alongside visible posts."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityChatMessageExtended"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "before": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "after": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Channel not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Post channel message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommunityChatMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatMessage"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Channel not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/chat/channels/{channelId}/read": {
+      "post": {
+        "summary": "Mark channel as read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatReadReceiptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Read receipt stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChannelMembership"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Channel not found"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/reactions": {
+      "post": {
+        "summary": "Add message reaction",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatReactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reaction added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatReactionSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Message not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove message reaction",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatReactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reaction removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatReactionSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Message not found"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/moderate": {
+      "post": {
+        "summary": "Moderate a community message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatModerationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moderation applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatModerationResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Message not found"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/chat/presence": {
+      "get": {
+        "summary": "List active presence sessions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presence fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PresenceSession"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community access denied"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Update presence state",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresenceUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Presence updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PresenceSession"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
           }
         }
       }
@@ -5272,11 +7048,11 @@
               }
             }
           },
-          "429": {
-            "description": "Too many requests"
-          },
           "422": {
             "description": "Validation error"
+          },
+          "429": {
+            "description": "Too many requests"
           }
         }
       }
@@ -6123,6 +7899,1468 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/chat/threads": {
+      "get": {
+        "summary": "List direct message threads",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Threads fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DirectMessageThreadSummary"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "offset": {
+                                  "type": "integer"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create or reuse a direct message thread",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectMessageThreadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Thread ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DirectMessageThreadCreationResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Participant not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/chat/threads/{threadId}/messages": {
+      "get": {
+        "summary": "List messages in a direct message thread",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DirectMessage"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "before": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "after": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Thread access denied"
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Send a direct message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DirectMessage"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Thread access denied"
+          },
+          "404": {
+            "description": "Thread not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/chat/threads/{threadId}/read": {
+      "post": {
+        "summary": "Mark a thread as read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectMessageReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thread read receipt stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DirectMessageReadReceipt"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Thread access denied"
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      }
+    },
+    "/api/social/followers": {
+      "get": {
+        "summary": "Followers for current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Followers retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowListItem"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer",
+                                  "example": 25
+                                },
+                                "offset": {
+                                  "type": "integer",
+                                  "example": 0
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "example": 120
+                                }
+                              }
+                            },
+                            "viewerContext": {
+                              "$ref": "#/components/schemas/FollowViewerContext"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/users/{userId}/followers": {
+      "get": {
+        "summary": "Followers for specified user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Followers retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowListItem"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer",
+                                  "example": 25
+                                },
+                                "offset": {
+                                  "type": "integer",
+                                  "example": 0
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "example": 120
+                                }
+                              }
+                            },
+                            "viewerContext": {
+                              "$ref": "#/components/schemas/FollowViewerContext"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/following": {
+      "get": {
+        "summary": "Accounts the current user follows",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Following retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowListItem"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer",
+                                  "example": 25
+                                },
+                                "offset": {
+                                  "type": "integer",
+                                  "example": 0
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "example": 120
+                                }
+                              }
+                            },
+                            "viewerContext": {
+                              "$ref": "#/components/schemas/FollowViewerContext"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/users/{userId}/following": {
+      "get": {
+        "summary": "Accounts a specific user follows",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Following retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowListItem"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer",
+                                  "example": 25
+                                },
+                                "offset": {
+                                  "type": "integer",
+                                  "example": 0
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "example": 120
+                                }
+                              }
+                            },
+                            "viewerContext": {
+                              "$ref": "#/components/schemas/FollowViewerContext"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/recommendations": {
+      "get": {
+        "summary": "Recommended accounts to follow",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recommendations generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowRecommendationItem"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/follows/{userId}": {
+      "post": {
+        "summary": "Follow a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FollowRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Follow relationship processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/FollowRelationship"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Follow request pending approval",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/FollowRelationship"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unfollow a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/users/{userId}/followers/{followerId}/approve": {
+      "post": {
+        "summary": "Approve pending follow",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "followerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow request approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/FollowRelationship"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/users/{userId}/followers/{followerId}/decline": {
+      "post": {
+        "summary": "Decline pending follow",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "followerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Follow request declined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/FollowRelationship"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/mutes/{userId}": {
+      "post": {
+        "summary": "Mute notifications from a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mute applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "integer",
+                              "example": 42
+                            },
+                            "mutedUserId": {
+                              "type": "integer",
+                              "example": 91
+                            },
+                            "mutedUntil": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove mute for a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mute removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/blocks/{userId}": {
+      "post": {
+        "summary": "Block a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "integer",
+                              "example": 42
+                            },
+                            "blockedUserId": {
+                              "type": "integer",
+                              "example": 91
+                            },
+                            "blockedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Unblock a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User unblocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/privacy": {
+      "get": {
+        "summary": "Get privacy settings for current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Privacy settings retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SocialPrivacySettings"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update privacy settings for current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SocialPrivacyUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Privacy settings retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SocialPrivacySettings"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/social/users/{userId}/privacy": {
+      "get": {
+        "summary": "Get privacy settings for specific user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Privacy settings retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SocialPrivacySettings"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update privacy settings for specific user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SocialPrivacyUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Privacy settings retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SocialPrivacySettings"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
           }
         }
       }
