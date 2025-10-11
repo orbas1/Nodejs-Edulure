@@ -4,6 +4,7 @@ import logger from './config/logger.js';
 import db from './config/database.js';
 import assetIngestionService from './services/AssetIngestionService.js';
 import dataRetentionJob from './jobs/dataRetentionJob.js';
+import communityReminderJob from './jobs/communityReminderJob.js';
 import { featureFlagService, runtimeConfigService } from './services/FeatureFlagService.js';
 
 async function start() {
@@ -28,11 +29,13 @@ async function start() {
     logger.info(`Server listening on port ${port}`);
     assetIngestionService.start();
     dataRetentionJob.start();
+    communityReminderJob.start();
   });
 
   const shutdown = () => {
     assetIngestionService.stop();
     dataRetentionJob.stop();
+    communityReminderJob.stop();
     featureFlagService.stop();
     runtimeConfigService.stop();
     logger.info('Shutting down gracefully');

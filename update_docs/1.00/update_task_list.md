@@ -57,7 +57,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
    feed wiring replaces mocks with live API pagination, resource rollups, and accessibility reviewed community switcher/profile
    shells.
 2. **Roles, Paywalls & Affiliates (100%)** – Database-backed role catalogues, gated paywall tiers, subscription checkout APIs, and affiliate payout tooling are live across backend and design systems.
-3. **Engagement Mechanics (0%)** – Leaderboards, tier points, streaks, calendars, map embeds, reminders.
+3. **Engagement Mechanics (100%)** – Leaderboards, tier points, streaks, calendars, map embeds, reminders. _Progress update:_ Backend migrations/models/services/controllers/routes now power member points, streak rollovers, leaderboards, RSVP-capable event calendars, reminder scheduling, and the cron-backed reminder job with OpenAPI docs, telemetry, and Vitest coverage; design overlays for leaderboards/streaks/calendars/reminder consent align to `dashboard_drawings.md`, `website_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md`.
 4. **Chat & Messaging Suite (0%)** – Channels, DMs, presence, moderation tools, Agora live linkage.
 5. **Follow Graph & Recommendations (0%)** – Relationship model, privacy settings, feed ranking, suggestions.
 

@@ -276,7 +276,13 @@ const envSchema = z
     FEATURE_FLAG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(30),
     FEATURE_FLAG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(120),
     RUNTIME_CONFIG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(45),
-    RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(300)
+    RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(300),
+    COMMUNITY_DEFAULT_TIMEZONE: z.string().default('Etc/UTC'),
+    COMMUNITY_REMINDER_ENABLED: z.coerce.boolean().default(true),
+    COMMUNITY_REMINDER_CRON: z.string().default('*/5 * * * *'),
+    COMMUNITY_REMINDER_TIMEZONE: z.string().default('Etc/UTC'),
+    COMMUNITY_REMINDER_LOOKAHEAD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
+    COMMUNITY_REMINDER_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(100)
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -465,6 +471,16 @@ export const env = {
     featureFlagRefreshIntervalMs: raw.FEATURE_FLAG_REFRESH_INTERVAL_SECONDS * 1000,
     configCacheTtlMs: raw.RUNTIME_CONFIG_CACHE_TTL_SECONDS * 1000,
     configRefreshIntervalMs: raw.RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS * 1000
+  },
+  engagement: {
+    defaultTimezone: raw.COMMUNITY_DEFAULT_TIMEZONE,
+    reminders: {
+      enabled: raw.COMMUNITY_REMINDER_ENABLED,
+      cronExpression: raw.COMMUNITY_REMINDER_CRON,
+      timezone: raw.COMMUNITY_REMINDER_TIMEZONE,
+      lookaheadMinutes: raw.COMMUNITY_REMINDER_LOOKAHEAD_MINUTES,
+      batchSize: raw.COMMUNITY_REMINDER_BATCH_SIZE
+    }
   },
   observability: {
     tracing: {

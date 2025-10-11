@@ -2,47 +2,47 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CommunityService from '../src/services/CommunityService.js';
 
-const transactionSpy = vi.fn(async (handler) => handler({}));
+const transactionSpy = vi.hoisted(() => vi.fn(async (handler) => handler({})));
+
+const communityModelMock = vi.hoisted(() => ({
+  listByUserWithStats: vi.fn(),
+  findById: vi.fn(),
+  findBySlug: vi.fn(),
+  create: vi.fn(),
+  getStats: vi.fn()
+}));
+
+const communityMemberModelMock = vi.hoisted(() => ({
+  create: vi.fn(),
+  findMembership: vi.fn()
+}));
+
+const communityChannelModelMock = vi.hoisted(() => ({
+  create: vi.fn(),
+  findDefault: vi.fn(),
+  listByCommunity: vi.fn()
+}));
+
+const communityPostModelMock = vi.hoisted(() => ({
+  create: vi.fn(),
+  paginateForCommunity: vi.fn(),
+  paginateForUser: vi.fn()
+}));
+
+const communityResourceModelMock = vi.hoisted(() => ({
+  create: vi.fn(),
+  listForCommunity: vi.fn()
+}));
+
+const domainEventModelMock = vi.hoisted(() => ({
+  record: vi.fn()
+}));
 
 vi.mock('../src/config/database.js', () => ({
   default: {
     transaction: transactionSpy
   }
 }));
-
-const communityModelMock = {
-  listByUserWithStats: vi.fn(),
-  findById: vi.fn(),
-  findBySlug: vi.fn(),
-  create: vi.fn(),
-  getStats: vi.fn()
-};
-
-const communityMemberModelMock = {
-  create: vi.fn(),
-  findMembership: vi.fn()
-};
-
-const communityChannelModelMock = {
-  create: vi.fn(),
-  findDefault: vi.fn(),
-  listByCommunity: vi.fn()
-};
-
-const communityPostModelMock = {
-  create: vi.fn(),
-  paginateForCommunity: vi.fn(),
-  paginateForUser: vi.fn()
-};
-
-const communityResourceModelMock = {
-  create: vi.fn(),
-  listForCommunity: vi.fn()
-};
-
-const domainEventModelMock = {
-  record: vi.fn()
-};
 
 vi.mock('../src/models/CommunityModel.js', () => ({
   default: communityModelMock
@@ -78,14 +78,16 @@ const baseCommunity = {
 
 const resetMocks = () => {
   transactionSpy.mockClear();
-  Object.values({
-    ...communityModelMock,
-    ...communityMemberModelMock,
-    ...communityChannelModelMock,
-    ...communityPostModelMock,
-    ...communityResourceModelMock,
-    ...domainEventModelMock
-  }).forEach((mock) => mock.mockReset());
+  [
+    communityModelMock,
+    communityMemberModelMock,
+    communityChannelModelMock,
+    communityPostModelMock,
+    communityResourceModelMock,
+    domainEventModelMock
+  ].forEach((model) => {
+    Object.values(model).forEach((fn) => fn.mockReset());
+  });
 };
 
 describe('CommunityService', () => {

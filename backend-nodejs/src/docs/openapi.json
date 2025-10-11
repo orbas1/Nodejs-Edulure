@@ -533,6 +533,633 @@
           }
         ]
       },
+      "CommunityPointSummary": {
+        "type": "object",
+        "properties": {
+          "communityId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "points": {
+            "type": "integer"
+          },
+          "lifetimePoints": {
+            "type": "integer"
+          },
+          "tier": {
+            "type": "string"
+          },
+          "lastAwardedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastActivityAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "communityId",
+          "userId",
+          "points",
+          "lifetimePoints",
+          "tier"
+        ]
+      },
+      "CommunityPointTransaction": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "awardedBy": {
+            "type": "integer",
+            "nullable": true
+          },
+          "deltaPoints": {
+            "type": "integer"
+          },
+          "balanceAfter": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "referenceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "awardedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "userId",
+          "deltaPoints",
+          "balanceAfter",
+          "reason",
+          "source",
+          "metadata",
+          "awardedAt"
+        ]
+      },
+      "CommunityStreak": {
+        "type": "object",
+        "properties": {
+          "communityId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "currentStreakDays": {
+            "type": "integer"
+          },
+          "longestStreakDays": {
+            "type": "integer"
+          },
+          "lastActiveOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "resumedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "communityId",
+          "userId",
+          "currentStreakDays",
+          "longestStreakDays",
+          "metadata"
+        ]
+      },
+      "CommunityPointAwardResult": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/CommunityPointSummary"
+          },
+          "transaction": {
+            "$ref": "#/components/schemas/CommunityPointTransaction"
+          }
+        },
+        "required": [
+          "summary",
+          "transaction"
+        ]
+      },
+      "CommunityEngagementProgress": {
+        "type": "object",
+        "properties": {
+          "membership": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "communityId": {
+                "type": "integer"
+              },
+              "userId": {
+                "type": "integer"
+              },
+              "role": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "joinedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "leftAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "id",
+              "communityId",
+              "userId",
+              "role",
+              "status",
+              "metadata"
+            ]
+          },
+          "points": {
+            "$ref": "#/components/schemas/CommunityPointSummary"
+          },
+          "streak": {
+            "$ref": "#/components/schemas/CommunityStreak"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityPointTransaction"
+            }
+          }
+        },
+        "required": [
+          "membership",
+          "points",
+          "streak",
+          "transactions"
+        ]
+      },
+      "CommunityLeaderboardEntry": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "points": {
+            "type": "integer",
+            "nullable": true
+          },
+          "lifetimePoints": {
+            "type": "integer",
+            "nullable": true
+          },
+          "tier": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentStreakDays": {
+            "type": "integer",
+            "nullable": true
+          },
+          "longestStreakDays": {
+            "type": "integer",
+            "nullable": true
+          },
+          "lastActiveOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attendedEvents": {
+            "type": "integer",
+            "nullable": true
+          },
+          "waitlistedEvents": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "userId",
+          "name"
+        ]
+      },
+      "CommunityEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "createdBy": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "attendanceLimit": {
+            "type": "integer",
+            "nullable": true
+          },
+          "attendanceCount": {
+            "type": "integer"
+          },
+          "waitlistCount": {
+            "type": "integer"
+          },
+          "requiresRsvp": {
+            "type": "boolean"
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "meetingUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "locationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationLatitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "locationLongitude": {
+            "type": "number",
+            "nullable": true
+          },
+          "coverImageUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "recurrenceRule": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "createdBy",
+          "title",
+          "slug",
+          "startAt",
+          "endAt",
+          "timezone",
+          "visibility",
+          "status",
+          "attendanceCount",
+          "waitlistCount",
+          "requiresRsvp",
+          "isOnline",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityEventMap": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "coordinates": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              }
+            }
+          },
+          "locationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "meetingUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "shareUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "CommunityEventParticipant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "rsvpAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkInAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reminderScheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "userId",
+          "status",
+          "rsvpAt",
+          "metadata"
+        ]
+      },
+      "CommunityEventReminder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "remindAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastAttemptAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attemptCount": {
+            "type": "integer"
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "userId",
+          "status",
+          "channel",
+          "remindAt",
+          "attemptCount",
+          "metadata"
+        ]
+      },
+      "CommunityEventDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/CommunityEvent"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "map": {
+                "$ref": "#/components/schemas/CommunityEventMap"
+              },
+              "participants": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CommunityEventParticipant"
+                }
+              },
+              "attendance": {
+                "type": "object",
+                "properties": {
+                  "confirmed": {
+                    "type": "integer"
+                  },
+                  "waitlisted": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "confirmed",
+                  "waitlisted"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "CommunityCalendarEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "map": {
+            "$ref": "#/components/schemas/CommunityEventMap"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "startAt",
+          "endAt",
+          "timezone",
+          "visibility",
+          "status"
+        ]
+      },
+      "CommunityCalendar": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "integer"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "eventsByDate": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CommunityCalendarEvent"
+              }
+            }
+          }
+        },
+        "required": [
+          "month",
+          "year",
+          "eventsByDate"
+        ]
+      },
       "ContentAsset": {
         "type": "object",
         "properties": {
@@ -3249,6 +3876,848 @@
           },
           "422": {
             "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/engagement/progress": {
+      "get": {
+        "summary": "Member engagement progress",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Engagement progress retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEngagementProgress"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community is private"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/engagement/points": {
+      "post": {
+        "summary": "Award community points",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "points": {
+                    "type": "integer",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "source": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "referenceId": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "contributesToStreak": {
+                    "type": "boolean"
+                  },
+                  "activityAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "points"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Points awarded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityPointAwardResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/engagement/streaks/check-in": {
+      "post": {
+        "summary": "Record streak activity",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activityAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Streak updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityStreak"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/engagement/leaderboard": {
+      "get": {
+        "summary": "Community leaderboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "points",
+                "lifetime",
+                "streak",
+                "attendance"
+              ],
+              "default": "points"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard calculated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityLeaderboardEntry"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/events": {
+      "get": {
+        "summary": "List community events",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "scheduled",
+                "cancelled",
+                "completed"
+              ]
+            }
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "members",
+                "admins",
+                "owners"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Community events returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityEventDetail"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create community event",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "startAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "members",
+                      "admins",
+                      "owners"
+                    ],
+                    "default": "members"
+                  },
+                  "attendanceLimit": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "requiresRsvp": {
+                    "type": "boolean"
+                  },
+                  "isOnline": {
+                    "type": "boolean"
+                  },
+                  "meetingUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "locationName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "locationAddress": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "locationLatitude": {
+                    "type": "number"
+                  },
+                  "locationLongitude": {
+                    "type": "number"
+                  },
+                  "coverImageUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "recurrenceRule": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "title",
+                  "startAt",
+                  "endAt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEventDetail"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/events/{eventId}/rsvp": {
+      "post": {
+        "summary": "RSVP to community event",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "going",
+                      "interested",
+                      "waitlisted",
+                      "declined",
+                      "checked_in"
+                    ]
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RSVP stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEventParticipant"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Event not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/events/{eventId}/reminders": {
+      "post": {
+        "summary": "Schedule event reminder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "remindAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "email",
+                      "push",
+                      "sms"
+                    ]
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "remindAt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reminder scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEventReminder"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Event not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/calendar": {
+      "get": {
+        "summary": "Community calendar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 2020,
+              "maximum": 2100
+            }
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "members",
+                "admins",
+                "owners"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Calendar compiled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityCalendar"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
           }
         }
       }

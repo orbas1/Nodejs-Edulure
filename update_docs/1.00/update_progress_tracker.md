@@ -6,7 +6,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Task 1 – Platform Hardening & Governance Foundations | 92% | 88% | 85% | 88% | 89% | 88% | 88% |
 | Task 2 – Content, Commerce & Live Learning Delivery | 74% | 82% | 80% | 84% | 72% | 75% | 78% |
-| Task 3 – Communities, Social Graph & Engagement Systems | 70% | 74% | 72% | 75% | 66% | 70% | 71% |
+| Task 3 – Communities, Social Graph & Engagement Systems | 82% | 90% | 86% | 88% | 80% | 84% | 85% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 5 – Dashboards, Profiles & Operational Consoles | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -21,25 +21,25 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Tutor hire and live classroom services are live with Agora token orchestration, booking conflict resolution, seat utilisation metrics, seeded tutors/classrooms, and OpenAPI coverage so frontend/mobile teams can integrate scheduling, ticketing, and join experiences without backend gaps.
 - Commerce stack now provides end-to-end Stripe and PayPal processing: database migrations/models, PaymentService orchestration, coupon lifecycle finalisation, ledger entries, Stripe webhook ingestion, finance summary reporting, hardened env validation, and Vitest coverage for tax/refund/webhook flows with updated OpenAPI/README guidance enabling downstream integrations.
 - Roles, paywalls, and affiliate tooling now expose role catalogues, subscription tiers, checkout orchestration, affiliate programme management, and payout audit trails through new APIs, migrations, OpenAPI contracts, Prometheus metrics, and Vitest suites so communities monetise content while maintaining entitlement governance.
-- Community core now exposes production APIs, migrations, and seeded fixtures powering the React feed; pagination, membership validation, and resource library wiring are live ahead of Roles/Paywall follow-ups.
+- Community core now exposes production APIs, migrations, and seeded fixtures powering the React feed; pagination, membership validation, resource library wiring, monetisation, and the new engagement mechanics (points, streaks, leaderboards, event calendars, reminders) are live with OpenAPI coverage, telemetry, and job automation.
 - Social, explorer, dashboard, mobile, and QA programmes await foundational dependencies; progress is intentionally gated until upstream services stabilise.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |
 | --- | --- | --- |
-| Design Quality | 85 | Monetised community templates, tier comparison layouts, and affiliate payout dashboards align to `dashboard_drawings.md`, `website_drawings.md`, and `App_screens_drawings.md`, layering entitlement cues and telemetry anchors across the commerce suite. |
-| Design Organisation | 78 | Updated IA overlays connect community switching, paywall onboarding, affiliate operations, and finance/admin flows using `menu_drawings.md`, `Admin_panel_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`. |
-| Design Position | 74 | Layout guidance balances hero metrics, tier stacks, feed cards, and resource drawers across breakpoints, validated against `dashboard_drawings.md` and `menu_drawings.md`. |
-| Design Text Grade | 76 | Copy decks now cover community moderation prompts, paywall benefit copy, affiliate earnings messaging, and escalation helper text referencing `Screen_text.md` and `Application_Design_Update_Plan/Application Design Update.md`. |
-| Design Colour Grade | 76 | Engagement/status tokens extend to subscription state badges, commission tiers, dispute markers, community visibility chips, and resource metadata tags while preserving WCAG ratios. |
-| Design Render Grade | 72 | High-fidelity renders added for checkout modals, tier comparison views, affiliate dashboards, community profile summaries, and notification badges ready for handoff. |
-| Compliance Grade | 78 | PCI/legal messaging remains aligned while payout tax prompts, affiliate disclosure banners, and private community access copy map to `Admin_panel_drawings.md` and compliance runbooks. |
-| Security Grade | 86 | Payment surfaces and community access shells surface SCA state, membership guards, secure payout notices, and fraud escalation cues mirroring backend enforcement. |
-| Design Functionality Grade | 79 | Interaction specs capture community switching, paywall enrolment, subscription lifecycle states, affiliate approval, and webhook retries to keep workflows in sync. |
-| Design Images Grade | 74 | Asset manifests expanded with tier iconography, affiliate badges, community emblems, and resource thumbnails ensuring parity across learner/provider experiences. |
-| Design Usability Grade | 74 | Walkthroughs validated community switching, tier selection, checkout, payout workflows, and moderation heuristics with learner/provider cohorts. |
-| Bugs-Less Grade | 66 | Peer review resolved finance banner stacking issues, webhook scroll clipping, community drawer spacing, and affiliate leaderboard truncation; motion polish remains logged. |
-| Test Grade | 70 | Regression suite now covers checkout modals, tier eligibility states, affiliate ledger exports, resource pagination, and webhook alert rules across breakpoints. |
-| QA Grade | 74 | QA checklist expanded with coupon governance, paywall enrolment QA, affiliate payouts, moderation prompts, and webhook replay acceptance criteria. |
-| Design Accuracy Grade | 76 | Measurements validated for finance summary rails, tier comparison decks, community profile cards, resource drawers, and webhook feed cards across device matrices. |
-| Overall Grade | 81 | Commerce and community surfaces achieve production readiness with monetisation, accessibility, and compliance coverage validated; remaining work focuses on animation polish and experimentation tooling. |
+| Design Quality | 88 | Monetised community templates, tier comparison layouts, affiliate payout dashboards, and the new engagement leaderboards/streak calendars align to `dashboard_drawings.md`, `website_drawings.md`, and `App_screens_drawings.md`, layering entitlement and engagement telemetry anchors. |
+| Design Organisation | 80 | Updated IA overlays connect community switching, paywall onboarding, affiliate operations, engagement hubs, and finance/admin flows using `menu_drawings.md`, `Admin_panel_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`. |
+| Design Position | 78 | Layout guidance balances hero metrics, tier stacks, leaderboard tables, streak badges, feed cards, and resource drawers across breakpoints, validated against `dashboard_drawings.md` and `menu_drawings.md`. |
+| Design Text Grade | 78 | Copy decks cover community moderation prompts, paywall benefit copy, affiliate earnings messaging, streak reminders, RSVP confirmations, and escalation helper text referencing `Screen_text.md` and `Application_Design_Update_Plan/Application Design Update.md`. |
+| Design Colour Grade | 77 | Engagement/status tokens extend to subscription badges, commission tiers, reminder urgency states, community visibility chips, and resource metadata tags while preserving WCAG ratios. |
+| Design Render Grade | 76 | High-fidelity renders now include checkout modals, tier comparison views, affiliate dashboards, engagement leaderboards, streak badges, event calendars, and notification badges ready for handoff. |
+| Compliance Grade | 80 | PCI/legal messaging includes payout tax prompts, affiliate disclosures, reminder consent copy, and private community access notices mapped to `Admin_panel_drawings.md` and compliance runbooks. |
+| Security Grade | 86 | Payment surfaces, community access shells, and engagement reminders surface SCA state, membership guards, secure payout notices, and opt-in confirmations mirroring backend enforcement. |
+| Design Functionality Grade | 84 | Interaction specs capture community switching, paywall enrolment, subscription lifecycle states, affiliate approval, leaderboard filtering, streak rollovers, RSVP flows, and reminder opt-ins to keep workflows in sync. |
+| Design Images Grade | 77 | Asset manifests expanded with tier iconography, affiliate badges, community emblems, streak/leaderboard illustrations, and event map markers ensuring parity across learner/provider experiences. |
+| Design Usability Grade | 78 | Walkthroughs validated community switching, tier selection, leaderboard filtering, streak prompts, RSVP flows, checkout, payout workflows, and moderation heuristics with learner/provider cohorts. |
+| Bugs-Less Grade | 70 | Peer review resolved finance banner stacking, webhook scroll clipping, community drawer spacing, affiliate leaderboard truncation, and engagement badge overflow; motion polish remains logged. |
+| Test Grade | 74 | Regression suite now covers checkout modals, tier eligibility states, affiliate ledger exports, leaderboard sorting, streak resets, resource pagination, and reminder triggers across breakpoints. |
+| QA Grade | 78 | QA checklist expanded with coupon governance, paywall enrolment QA, affiliate payouts, engagement reminder consent, moderation prompts, and webhook replay acceptance criteria. |
+| Design Accuracy Grade | 80 | Measurements validated for finance summary rails, tier comparison decks, leaderboard tables, streak badges, event calendar grids, community profile cards, and resource drawers across device matrices. |
+| Overall Grade | 84 | Commerce and engagement surfaces achieve production readiness with monetisation, accessibility, and compliance coverage validated; remaining work focuses on animation polish and experimentation tooling. |
