@@ -4,11 +4,10 @@ import jwt from 'jsonwebtoken';
 
 import db from '../config/database.js';
 import { env } from '../config/env.js';
+import { getActiveJwtKey } from '../config/jwtKeyStore.js';
 import UserModel from '../models/UserModel.js';
 import UserSessionModel from '../models/UserSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
-
-export const ACCESS_TOKEN_AUDIENCE = 'api.edulure.com';
 
 function hashRefreshToken(token) {
   return crypto.createHmac('sha256', env.security.jwtRefreshSecret).update(token).digest('hex');
@@ -102,13 +101,16 @@ export default class AuthService {
       connection
     );
 
+    const { secret, algorithm, kid } = getActiveJwtKey();
     const accessToken = jwt.sign(
       { sub: user.id, email: user.email, role: user.role },
-      env.security.jwtSecret,
+      secret,
       {
         expiresIn: `${env.security.accessTokenTtlMinutes}m`,
-        audience: ACCESS_TOKEN_AUDIENCE,
-        issuer: 'edulure-platform'
+        audience: env.security.jwtAudience,
+        issuer: env.security.jwtIssuer,
+        keyid: kid,
+        algorithm
       }
     );
 

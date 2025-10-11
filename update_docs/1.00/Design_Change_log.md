@@ -37,12 +37,14 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
 - Embedded security messaging around verification, payment confirmation, and rights-managed assets across profile and commerce flows.
+- Reviewed JWT rotation backend hardening and confirmed no UI asset adjustments are required; security copy already references credential rotation guidance in profile and settings flows.
 - Added localisation placeholders, RTL mirroring, and copy length buffers to all primary templates and microcopy decks.
 
 ## Cross-Platform Alignment
 - Shared component taxonomy and asset specs across React and Flutter deliverables to ensure implementation parity.
 - Token exports now map directly to CSS variables, Flutter theme objects, and backend-driven theme payloads to support runtime theme switching.
 - Logic flow diagrams align provider workflows with learner experiences while exposing advanced analytics and financial controls.
+- Documented npm workspace runtime requirements so design token packages, storybook previews, and frontend builds rely on the same Node/npm versions enforced across engineering environments.
 
 ## Open Items & Follow-Ups
 - **Advanced Data Visualisation:** Validate charting libraries for analytics-heavy dashboards before engineering handoff.

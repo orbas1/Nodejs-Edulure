@@ -5,10 +5,12 @@
 ## Version 1.50 – Task 1 Platform Hardening & Governance
 
 - Hardened the Node.js API with rate limiting, strict CORS, Helmet/HPP guards, compression, structured request logging, and environment validation (Zod) that blocks insecure boots.
+- Added a signed JWT key store with key identifiers, runtime verification across legacy keys, and an operational rotation script to meet secret governance requirements.
 - Standardised response envelopes, added a shared HTTP response helper, and shipped an OpenAPI 3.0 specification served at `/api/docs` for downstream client contracts.
 - Introduced refresh-token backed session storage, automatic community owner enrolment, and domain event auditing via new orchestration services and repositories.
 - Migrated database management to Knex migrations with automated execution on boot, plus programmatic provisioning to replace legacy SQL installers.
 - Enabled dependency governance with Dependabot coverage, Node engine pinning, and npm audit scripts, alongside updated `.env` templates detailing new security-critical variables.
+- Promoted repository-wide npm workspaces with enforced Node/npm engine versions, runtime verification scripts, shared lint/test/audit commands, and axios-backed frontend HTTP clients so every surface consumes identical dependency trees.
 
 ## Version 1.50 – Task 2 Cloudflare R2 & Learning Content Pipelines
 

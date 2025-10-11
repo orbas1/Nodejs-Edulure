@@ -1,0 +1,28 @@
+{
+  "name": "edulure-platform",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@10.5.0",
+  "workspaces": [
+    "backend-nodejs",
+    "frontend-reactjs"
+  ],
+  "engines": {
+    "node": ">=20.12.2",
+    "npm": ">=10.5.0"
+  },
+  "scripts": {
+    "preinstall": "node ./scripts/verify-node-version.mjs",
+    "bootstrap": "npm install --workspaces",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "audit": "npm run audit:dependencies --workspaces --if-present",
+    "audit:ci": "npm run audit:dependencies --workspace backend-nodejs --if-present && npm run audit:dependencies --workspace frontend-reactjs --if-present"
+  },
+  "config": {
+    "minimumNodeVersion": "20.12.2",
+    "minimumNpmVersion": "10.5.0"
+  }
+}

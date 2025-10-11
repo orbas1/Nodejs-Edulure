@@ -8,9 +8,12 @@
 - `backend-nodejs/knexfile.cjs` – Knex CLI configuration.
 - `.github/dependabot.yml` – automated dependency monitoring for backend, frontend, mobile, and GitHub Actions.
 - `.nvmrc` – Node.js version pin for local and CI execution.
+- `scripts/verify-node-version.mjs` – workspace runtime guard ensuring Node/npm versions and package manager choice are compliant before installs.
 - `backend-nodejs/src/config/storage.js` – centralised Cloudflare R2 client configuration and endpoint export.
+- `backend-nodejs/src/config/jwtKeyStore.js` – shared JWT signing key lookup, verification, and rotation metadata access.
 - `backend-nodejs/src/services/StorageService.js`, `AssetService.js`, `AssetIngestionService.js` – storage abstraction, asset lifecycle orchestration, and conversion worker.
 - `backend-nodejs/src/controllers/ContentController.js`, `routes/content.routes.js` – content API surface for upload sessions, ingestion, analytics, and telemetry.
 - `backend-nodejs/src/models/ContentAssetModel.js`, `AssetConversionOutputModel.js`, `AssetIngestionJobModel.js`, `ContentAssetEventModel.js`, `ContentAuditLogModel.js`, `EbookProgressModel.js` – Knex repositories powering the content pipeline.
 - `backend-nodejs/migrations/20241020130000_content_assets.js` – schema for assets, ingestion jobs, conversion outputs, events, audit logs, and ebook progress.
 - `backend-nodejs/vitest.config.mjs`, `backend-nodejs/test/setupEnv.js`, `backend-nodejs/test/storageService.test.js` – Vitest harness and suites covering Cloudflare R2 storage behaviours.
+- `backend-nodejs/scripts/rotate-jwt-keys.js` – operational CLI for generating and promoting JWT signing keys.

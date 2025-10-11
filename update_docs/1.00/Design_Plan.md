@@ -49,6 +49,8 @@
 - **Design Steering:** Bi-weekly review with design leads, product, and engineering to approve token or layout adjustments.
 - **Change Control:** All deltas logged in `Design_Change_log.md` and linked to Jira design tickets.
 - **Cross-Discipline Sync:** Weekly design-engineering syncs to align implementation priorities and unblock dependencies.
+- **Security Alignment:** Included backend security rotations (JWT/key lifecycle) as a standing agenda item so design copy and user education remain accurate.
+- **Toolchain Governance:** Workspace-wide Node/npm enforcement is now mirrored in design tooling handoffs, ensuring Storybook exports, token pipelines, and asset generation run on the same runtime versions validated by engineering.
 - **QA Readiness:** Dedicated design QA sprints with accessibility, localisation, and compliance sign-off before engineering lock.
 
 ## Risk Management

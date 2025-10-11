@@ -16,7 +16,8 @@
     "migrate:latest": "knex --knexfile knexfile.cjs migrate:latest",
     "migrate:rollback": "knex --knexfile knexfile.cjs migrate:rollback",
     "seed": "knex --knexfile knexfile.cjs seed:run",
-    "audit:dependencies": "npm audit --audit-level=moderate"
+    "audit:dependencies": "npm audit --audit-level=moderate",
+    "security:rotate-jwt": "node scripts/rotate-jwt-keys.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.614.0",

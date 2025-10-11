@@ -10,7 +10,7 @@ import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import EbookProgressModel from '../models/EbookProgressModel.js';
 import storageService from './StorageService.js';
 
-const DRM_SIGNATURE_SECRET = env.security.jwtSecret;
+const DRM_SIGNATURE_SECRET = env.security.drmSignatureSecret;
 
 function buildStoragePrefix(asset) {
   return `content/${asset.type}/${asset.publicId}`;
