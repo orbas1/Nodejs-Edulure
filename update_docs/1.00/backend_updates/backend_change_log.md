@@ -5,6 +5,7 @@
 - Migrated persistence management to Knex with transactional orchestration services, refresh-token session storage, and domain event logging.
 - Replaced legacy SQL installers with programmatic provisioning scripts, `.nvmrc`/`.npmrc` runtime pinning, the preinstall verifier, and Dependabot configuration for dependency governance.
 - Added Cloudflare R2 integration, StorageService abstraction, and StorageService-based presigning helpers to manage uploads/downloads.
+- Landed a production observability stack with request correlation IDs, redaction-aware structured logging, Prometheus `/metrics`, and R2 instrumentation feeding storage latency/throughput dashboards and alerting runbooks.
 - Implemented AssetService/AssetIngestionService lifecycles with CloudConvert conversions, EPUB manifest normalisation, DRM enforcement, and analytics logging.
 - Extended controllers/routes/OpenAPI spec for `/api/content` endpoints covering uploads, ingestion, viewer tokens, analytics, telemetry, and progress.
 - Bootstrapped database schema for content assets, ingestion jobs, conversion outputs, audit logs, events, and ebook progress tracking.

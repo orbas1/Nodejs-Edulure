@@ -45,6 +45,7 @@
 - **Logic Flow Narratives:** Journey maps, service blueprints, and scenario walkthroughs aligned with `Logic_Flow_map.md` artefacts.
 - **Accessibility & Compliance Packet:** WCAG audit results, localisation scripts, security overlays, and compliance checklists.
 - **Engineering Handoff Toolkit:** Asset manifests, motion references, analytics tag map, and implementation QA checklist.
+- **Telemetry Overlay Specs:** Map Prometheus metrics, trace IDs, and client analytics events to design dashboards so product teams can correlate UI state with backend observability data.
 
 ## Governance & Collaboration
 - **Design Steering:** Bi-weekly review with design leads, product, and engineering to approve token or layout adjustments.

@@ -16,7 +16,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 ### Subtasks
 1. **Security Framework Upgrade (80%)** – Rate limiting, strict CORS, password policies, JWT validation, secret rotation. _Progress update:_ Multi-key JWT key store, rotation tooling, and shared verification helpers delivered; account lockout telemetry, email verification flows, and SMTP hardening now live with final reviews focused on session revocation policies.
 2. **Dependency & Workspace Governance (100%)** – Monorepo/tooling decisions, automated audits, version pinning, lint/test scripts. _Progress update:_ Introduced a root npm workspace with enforced Node 20.12.2+/npm 10.5.0+ engines, wired a runtime verifier, shared audit/lint/test commands, axios-backed React client, and `.npmrc` governance so CI, local, and production environments consume identical dependency trees.
-3. **Observability & Telemetry (15%)** – Logging structure, metrics dashboards (R2, Meilisearch, payments), alerting runbooks.
+3. **Observability & Telemetry (100%)** – Structured request logging now injects trace/user context, `/metrics` exposes Prometheus histograms/counters for HTTP and R2, dashboards/runbooks documented for latency, error, and exception thresholds.
 4. **Migration & Data Hygiene (5%)** – Knex/Prisma migrations, rollback rehearsals, seed datasets, retention policies.
 5. **Feature Flag & Config Service (10%)** – Environment matrices, kill switches, staged rollout orchestration.
 

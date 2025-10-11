@@ -20,6 +20,9 @@ Key environment variables are validated on boot. Ensure the following are set be
 - `JWT_REFRESH_SECRET` – 32+ character secret for refresh token HMAC hashing.
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` – database credentials. Set `DB_PROVISION_USER=true` only for local installs.
 - `TOKEN_EXPIRY_MINUTES`, `REFRESH_TOKEN_EXPIRY_DAYS` – optional overrides for token lifetimes.
+- `LOG_SERVICE_NAME`, `LOG_REDACTED_FIELDS` – customise log metadata and extend default secret/PII redaction.
+- `TRACE_HEADER_NAME`, `TRACING_SAMPLE_RATE` – tune inbound trace propagation and sampling for distributed telemetry.
+- `METRICS_ENABLED`, `METRICS_USERNAME`/`METRICS_PASSWORD` or `METRICS_BEARER_TOKEN`, `METRICS_ALLOWED_IPS` – secure Prometheus access for operations tooling.
 
 `npm run db:install` provisions the schema (via Knex migrations) and seeds the database. Use `npm run migrate:latest`/`npm run
 migrate:rollback` to manage schema changes in CI/CD. The asset ingestion worker is started alongside the HTTP server and relies on
@@ -73,6 +76,33 @@ scripts/         # operational scripts (database install, etc.)
 - Environment validation (Zod) prevents the API from booting with unsafe defaults.
 - Dependabot configuration lives at the repo root (`.github/dependabot.yml`) and `npm run audit:dependencies` surfaces CVEs.
 - Workspace tooling enforces Node.js 20.12.2+/npm 10.5.0+ via a preinstall runtime check and shared `.nvmrc`/`.npmrc` so local, CI, and production environments stay aligned.
+- Observability defaults now expose Prometheus metrics, structured request/trace logging, and per-request correlation IDs to power runbooks and dashboards.
+
+## Observability & telemetry
+
+- **Prometheus metrics** – `GET /metrics` emits application, HTTP, and Cloudflare R2 storage histograms/counters. Protect the endpoint with either Basic or Bearer auth and IP allow-lists via the environment variables outlined above. Attach the scrape job to your monitoring stack to unlock latency/error dashboards and alerting.
+- **Request correlation** – every inbound request (and downstream log line) carries a `traceId` propagated via the configurable `TRACE_HEADER_NAME`. Existing request IDs from upstream gateways are preserved when valid; otherwise a UUID is issued and echoed back in the response header.
+- **Structured logging** – Pino enriches each log with trace/span/user identifiers, service metadata, and redacts secrets and PII by default. Extend redaction lists through `LOG_REDACTED_FIELDS` to match compliance requirements.
+- **Storage instrumentation** – Cloudflare R2 interactions are wrapped with duration/throughput metrics and telemetry spans so ingestion issues surface quickly. Histogram buckets can be tuned downstream without code changes.
+
+Alerting runbooks should monitor:
+
+1. `edulure_http_request_errors_total` spikes over a rolling five-minute window (API regressions, dependency outages).
+2. `edulure_storage_operation_duration_seconds` 95th percentile exceeding 2 seconds (Cloudflare or network issues) alongside `edulure_storage_operations_in_flight` saturation.
+3. `edulure_unhandled_exceptions_total` increments correlated with low `edulure_http_request_duration_seconds` (fast failures indicative of configuration errors).
+
+Example Prometheus scrape configuration:
+
+```yaml
+- job_name: edulure-api
+  metrics_path: /metrics
+  scheme: https
+  static_configs:
+    - targets: ['api.edulure.com']
+  basic_auth:
+    username: ${EDULURE_METRICS_USER}
+    password: ${EDULURE_METRICS_PASS}
+```
 
 ## API surface
 

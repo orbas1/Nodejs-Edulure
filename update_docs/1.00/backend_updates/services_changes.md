@@ -9,3 +9,4 @@
 - `AuthService` now orchestrates account lockouts and verification gating: failed logins increment rolling counters, lockouts emit domain events, and unverified users trigger token issuance instead of session creation.
 - Introduced `EmailVerificationService` to issue hashed tokens, enforce resend cooldowns, and mark verification completion transactionally with audit logging.
 - Added `MailService` as the SMTP abstraction used by verification flows, rendering production-grade HTML/text templates and logging dispatch identifiers for observability.
+- `StorageService` now wraps Cloudflare R2 calls in telemetry spans and Prometheus counters/histograms, exposing payload size, latency, and in-flight gauges for observability dashboards.

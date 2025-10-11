@@ -13,12 +13,30 @@ import { randomUUID, createHash } from 'node:crypto';
 import { r2Client } from '../config/storage.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
+import { recordStorageOperation } from '../observability/metrics.js';
+import { withTelemetrySpan } from '../observability/requestContext.js';
 
 const VISIBILITY_BUCKET_MAP = {
   public: () => env.storage.publicBucket,
   workspace: () => env.storage.privateBucket,
   private: () => env.storage.privateBucket
 };
+
+function resolveVisibilityLabel(bucket) {
+  if (!bucket) {
+    return 'workspace';
+  }
+  if (bucket === env.storage.publicBucket) {
+    return 'public';
+  }
+  if (bucket === env.storage.uploadsBucket) {
+    return 'upload';
+  }
+  if (bucket === env.storage.privateBucket) {
+    return 'workspace';
+  }
+  return 'custom';
+}
 
 export class StorageService {
   constructor(client) {
@@ -54,96 +72,117 @@ export class StorageService {
       throw error;
     }
 
-    const command = new PutObjectCommand({
-      Bucket: targetBucket,
-      Key: key,
-      ContentType: contentType,
-      ACL: visibility === 'public' ? 'public-read' : undefined,
-      Metadata: {
-        'edulure-origin': 'platform-upload'
-      }
-    });
+    return withTelemetrySpan('storage.createUploadUrl', async () =>
+      recordStorageOperation('create_upload_url', visibility, async () => {
+        const command = new PutObjectCommand({
+          Bucket: targetBucket,
+          Key: key,
+          ContentType: contentType,
+          ACL: visibility === 'public' ? 'public-read' : undefined,
+          Metadata: {
+            'edulure-origin': 'platform-upload'
+          }
+        });
 
-    const signedUrl = await getSignedUrl(this.client, command, {
-      expiresIn: env.storage.uploadTtlMinutes * 60
-    });
+        const signedUrl = await getSignedUrl(this.client, command, {
+          expiresIn: env.storage.uploadTtlMinutes * 60
+        });
 
-    return {
-      bucket: targetBucket,
-      key,
-      url: signedUrl,
-      expiresAt: new Date(Date.now() + env.storage.uploadTtlMinutes * 60 * 1000)
-    };
+        return {
+          bucket: targetBucket,
+          key,
+          url: signedUrl,
+          expiresAt: new Date(Date.now() + env.storage.uploadTtlMinutes * 60 * 1000)
+        };
+      })
+    );
   }
 
   async createDownloadUrl({ key, bucket, visibility = 'workspace', responseContentDisposition }) {
     const targetBucket = this.resolveBucket(visibility, bucket ?? env.storage.privateBucket);
-    const command = new GetObjectCommand({
-      Bucket: targetBucket,
-      Key: key,
-      ResponseContentDisposition: responseContentDisposition
-    });
-    const signedUrl = await getSignedUrl(this.client, command, {
-      expiresIn: env.storage.downloadTtlMinutes * 60
-    });
-    return {
-      bucket: targetBucket,
-      key,
-      url: signedUrl,
-      expiresAt: new Date(Date.now() + env.storage.downloadTtlMinutes * 60 * 1000)
-    };
+    return withTelemetrySpan('storage.createDownloadUrl', async () =>
+      recordStorageOperation('create_download_url', visibility, async () => {
+        const command = new GetObjectCommand({
+          Bucket: targetBucket,
+          Key: key,
+          ResponseContentDisposition: responseContentDisposition
+        });
+        const signedUrl = await getSignedUrl(this.client, command, {
+          expiresIn: env.storage.downloadTtlMinutes * 60
+        });
+        return {
+          bucket: targetBucket,
+          key,
+          url: signedUrl,
+          expiresAt: new Date(Date.now() + env.storage.downloadTtlMinutes * 60 * 1000)
+        };
+      })
+    );
   }
 
   async uploadBuffer({ bucket, key, body, contentType, visibility = 'workspace', metadata = {} }) {
     const targetBucket = this.resolveBucket(visibility, bucket);
-    const upload = new Upload({
-      client: this.client,
-      params: {
-        Bucket: targetBucket,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-        ACL: visibility === 'public' ? 'public-read' : undefined,
-        Metadata: metadata
-      }
-    });
-    await upload.done();
-    return {
-      bucket: targetBucket,
-      key,
-      size: body.length,
-      checksum: createHash('sha256').update(body).digest('hex')
-    };
+    return withTelemetrySpan('storage.uploadBuffer', async () =>
+      recordStorageOperation('upload_buffer', visibility, async () => {
+        const upload = new Upload({
+          client: this.client,
+          params: {
+            Bucket: targetBucket,
+            Key: key,
+            Body: body,
+            ContentType: contentType,
+            ACL: visibility === 'public' ? 'public-read' : undefined,
+            Metadata: metadata
+          }
+        });
+        await upload.done();
+        return {
+          bucket: targetBucket,
+          key,
+          size: body.length,
+          checksum: createHash('sha256').update(body).digest('hex')
+        };
+      })
+    );
   }
 
   async uploadStream({ bucket, key, stream, contentType, visibility = 'workspace', metadata = {} }) {
     const targetBucket = this.resolveBucket(visibility, bucket);
-    const upload = new Upload({
-      client: this.client,
-      params: {
-        Bucket: targetBucket,
-        Key: key,
-        Body: stream,
-        ContentType: contentType,
-        ACL: visibility === 'public' ? 'public-read' : undefined,
-        Metadata: metadata
-      }
-    });
-    const result = await upload.done();
-    return {
-      bucket: targetBucket,
-      key,
-      etag: result.ETag
-    };
+    return withTelemetrySpan('storage.uploadStream', async () =>
+      recordStorageOperation('upload_stream', visibility, async () => {
+        const upload = new Upload({
+          client: this.client,
+          params: {
+            Bucket: targetBucket,
+            Key: key,
+            Body: stream,
+            ContentType: contentType,
+            ACL: visibility === 'public' ? 'public-read' : undefined,
+            Metadata: metadata
+          }
+        });
+        const result = await upload.done();
+        return {
+          bucket: targetBucket,
+          key,
+          etag: result.ETag
+        };
+      })
+    );
   }
 
   async headObject({ key, bucket }) {
     try {
-      return await this.client.send(
-        new HeadObjectCommand({
-          Bucket: bucket,
-          Key: key
-        })
+      const visibilityLabel = resolveVisibilityLabel(bucket);
+      return await withTelemetrySpan('storage.headObject', async () =>
+        recordStorageOperation('head_object', visibilityLabel, async () =>
+          this.client.send(
+            new HeadObjectCommand({
+              Bucket: bucket,
+              Key: key
+            })
+          )
+        )
       );
     } catch (error) {
       logger.error({ err: error, key, bucket }, 'Failed to fetch object metadata');
@@ -152,48 +191,62 @@ export class StorageService {
   }
 
   async deleteObject({ key, bucket }) {
-    await this.client.send(
-      new DeleteObjectCommand({
-        Bucket: bucket,
-        Key: key
-      })
+    const visibilityLabel = resolveVisibilityLabel(bucket);
+    await withTelemetrySpan('storage.deleteObject', async () =>
+      recordStorageOperation('delete_object', visibilityLabel, async () =>
+        this.client.send(
+          new DeleteObjectCommand({
+            Bucket: bucket,
+            Key: key
+          })
+        )
+      )
     );
   }
 
   async downloadToBuffer({ key, bucket }) {
     const targetBucket = bucket ?? env.storage.privateBucket;
-    const response = await this.client.send(
-      new GetObjectCommand({
-        Bucket: targetBucket,
-        Key: key
+    const visibilityLabel = resolveVisibilityLabel(targetBucket);
+    return withTelemetrySpan('storage.downloadToBuffer', async () =>
+      recordStorageOperation('download_buffer', visibilityLabel, async () => {
+        const response = await this.client.send(
+          new GetObjectCommand({
+            Bucket: targetBucket,
+            Key: key
+          })
+        );
+        const chunks = [];
+        for await (const chunk of response.Body) {
+          chunks.push(Buffer.from(chunk));
+        }
+        const buffer = Buffer.concat(chunks);
+        return {
+          bucket: targetBucket,
+          key,
+          buffer,
+          size: buffer.length,
+          contentType: response.ContentType,
+          etag: response.ETag
+        };
       })
     );
-    const chunks = [];
-    for await (const chunk of response.Body) {
-      chunks.push(Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks);
-    return {
-      bucket: targetBucket,
-      key,
-      buffer,
-      size: buffer.length,
-      contentType: response.ContentType,
-      etag: response.ETag
-    };
   }
 
   async copyObject({ sourceBucket, sourceKey, destinationBucket, destinationKey, visibility = 'workspace' }) {
     const targetBucket = destinationBucket ?? this.resolveBucket(visibility);
-    await this.client.send(
-      new CopyObjectCommand({
-        Bucket: targetBucket,
-        Key: destinationKey,
-        CopySource: `${sourceBucket}/${encodeURIComponent(sourceKey)}`,
-        ACL: visibility === 'public' ? 'public-read' : undefined
+    return withTelemetrySpan('storage.copyObject', async () =>
+      recordStorageOperation('copy_object', visibility, async () => {
+        await this.client.send(
+          new CopyObjectCommand({
+            Bucket: targetBucket,
+            Key: destinationKey,
+            CopySource: `${sourceBucket}/${encodeURIComponent(sourceKey)}`,
+            ACL: visibility === 'public' ? 'public-read' : undefined
+          })
+        );
+        return { bucket: targetBucket, key: destinationKey };
       })
     );
-    return { bucket: targetBucket, key: destinationKey };
   }
 
   buildPublicUrl({ bucket, key }) {

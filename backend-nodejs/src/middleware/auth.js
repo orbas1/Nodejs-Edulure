@@ -1,4 +1,5 @@
 import { verifyAccessToken } from '../config/jwtKeyStore.js';
+import { updateRequestContext } from '../observability/requestContext.js';
 
 const rolePriority = {
   user: 1,
@@ -21,6 +22,7 @@ export default function auth(requiredRole) {
     try {
       const payload = verifyAccessToken(token);
       req.user = { ...payload, id: payload.sub };
+      updateRequestContext({ userId: payload.sub, userRole: payload.role });
       if (requiredRole) {
         const userPriority = rolePriority[payload.role] ?? 0;
         const requiredPriority = rolePriority[requiredRole];
