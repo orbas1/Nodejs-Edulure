@@ -24,6 +24,7 @@
 - Add new page shells for explorer, communities, and monetisation scenarios using `Pages_list.md`, `Screens_list.md`, and `Organisation_and_positions.md`.
 - Deliver tutor storefront and live classroom landing templates mapped to `website_drawings.md`, `menu_drawings.md`, and `dashboard_drawings.md`, including availability calendars, countdown tiles, roster drawers, and moderator toolbars for engineering handoff.
 - Extend commerce funnels and finance dashboards using `web_application_logic_flow_changes.md`, `web_app_wireframe_changes.md`, `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`, and `Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md`, covering payment method selection, coupon validation, tax summaries, receipt emails, refunds, and payout reconciliation states.
+- Refresh community hub and resource library shells using `dashboard_drawings.md`, `website_drawings.md`, `menu_drawings.md`, `App_screens_drawings.md`, and `Admin_panel_drawings.md`, detailing role badges, moderation prompts, pagination controls, accessibility copy, and analytics instrumentation for `/api/communities` adoption.
 
 ### 4. Component Library & Interaction Specs
 - Refresh cards, forms, modals, drawers, widgets, and buttons per `Cards.md`, `Forms.md`, `component_functions.md`, `Screens__Update_widget_types.md`, and `Screen_buttons.md`.
@@ -31,6 +32,7 @@
 - Rewrite microcopy and localisation placeholders using `Screen_text.md`, `Dummy_Data_Requirements.md`, and `text.md.md`.
 - Extend interaction specs for tutor availability pills, booking conflict resolutions, live classroom countdowns, chat escalations, and Agora join/recording prompts referencing `web_application_logic_flow_changes.md`, `App_screens_drawings.md`, and `Admin_panel_drawings.md`.
 - Document payment forms, coupon chips, finance alerts, and ledger tables with idle/loading/error/success states referencing `web_application_styling_changes.md`, `user_application_styling_changes.md`, `provider_application_styling_changes.md`, and `component_functions.md`, ensuring parity across learner/provider/support consoles.
+- Add community feed cards, resource drawer pagination, and membership guardrail components referencing `dashboard_drawings.md`, `menu_drawings.md`, `App_screens_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`, including accessibility-first focus management and moderation alerts.
 
 ### 5. Imagery, Motion & Asset Governance
 - Set imagery ratios, safe areas, animation tiers, and reduced-motion treatments referencing `images_and_vectors.md`, `Screens_update_images_and _vectors.md`, and `Logic_Flow_update.md`.

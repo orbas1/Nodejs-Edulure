@@ -17,7 +17,7 @@
 ## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 65% complete)
 - **Objectives:** Produce annotated high-fidelity templates for home, dashboards, explorer, media viewers, profiles, and settings across web and Flutter.
 - **Entry Criteria:** Milestones 1–2 delivered; component inventory baselined.
-- **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded. _Update:_ Live classroom lobbies, tutor storefronts, booking calendars, moderator consoles, checkout, coupon, refund, and finance dashboards are now redlined with analytics IDs, motion notes, webhook fallbacks, and SCA states referencing `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, and `web_application_logic_flow_changes.md`.
+- **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded. _Update:_ Live classroom lobbies, tutor storefronts, booking calendars, moderator consoles, checkout, coupon, refund, finance dashboards, and the refreshed community hub/resource library are now redlined with analytics IDs, motion notes, webhook fallbacks, membership guardrails, and SCA states referencing `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, `menu_drawings.md`, and `web_application_logic_flow_changes.md`.
 - **Dependencies:** Token library, imagery guidance (`images_and_vectors.md`), microcopy drafts (`Screen_text.md`).
 - **Responsible Roles:** Product Designers, Content Strategist, QA Design Lead.
 

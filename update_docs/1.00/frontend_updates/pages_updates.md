@@ -11,6 +11,11 @@
 - New instructor content hub listing Cloudflare R2 assets with status tags, action buttons, analytics sidebar, and embedded viewers.
 - Supports uploads with checksum generation, presigned PUT submission, ingestion confirmation, and client-side caching.
 
+## `/feed`
+- React feed now consumes live `/api/communities` endpoints via `communityApi.js`, replacing mock data with authenticated pagination, aggregated feeds, and community-specific queries.
+- `Feed.jsx` orchestrates community switching, feed pagination, and resource loading states with accessible error handling, ensuring aggregated views skip redundant resource calls while member-only hubs render role badges and metadata.
+- `CommunityProfile.jsx`, `CommunitySwitcher.jsx`, and `TopBar.jsx` introduce production-ready resource drawers, load-more controls, focus-visible switcher states, and localisation-friendly metadata formatting aligned with design overlays.
+
 ## Layout & Navigation
 - `MainLayout` now renders auth-aware navigation items linking to the content library and login/register flows. Navigation visibility for the admin console honours the backend feature flag snapshot to prevent unauthorised access.
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.

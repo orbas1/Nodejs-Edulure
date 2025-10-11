@@ -3,10 +3,23 @@ import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outlin
 import CommunitySwitcher from './CommunitySwitcher.jsx';
 import SearchBar from './SearchBar.jsx';
 
-export default function TopBar({ communities, selectedCommunity, onCommunityChange }) {
+export default function TopBar({ communities, selectedCommunity, onCommunityChange, isLoading = false, error = null }) {
   return (
     <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-      <CommunitySwitcher communities={communities} selected={selectedCommunity} onSelect={onCommunityChange} />
+      <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+        <CommunitySwitcher
+          communities={communities}
+          selected={selectedCommunity}
+          onSelect={onCommunityChange}
+          disabled={isLoading || !communities?.length}
+        />
+        {isLoading && <span className="text-xs font-medium text-slate-400" aria-live="polite">Loading communities…</span>}
+        {!isLoading && error && (
+          <span className="text-xs font-medium text-red-500" role="alert" aria-live="assertive">
+            {error}
+          </span>
+        )}
+      </div>
       <div className="flex-1 min-w-[240px]">
         <SearchBar placeholder="Search the Edulure network" />
       </div>
@@ -36,15 +49,17 @@ export default function TopBar({ communities, selectedCommunity, onCommunityChan
 TopBar.propTypes = {
   communities: PropTypes.arrayOf(
     PropTypes.shape({
-      id: PropTypes.string.isRequired,
+      id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
       name: PropTypes.string.isRequired,
       description: PropTypes.string
     })
   ).isRequired,
   selectedCommunity: PropTypes.shape({
-    id: PropTypes.string,
+    id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     name: PropTypes.string,
     description: PropTypes.string
   }),
-  onCommunityChange: PropTypes.func.isRequired
+  onCommunityChange: PropTypes.func.isRequired,
+  isLoading: PropTypes.bool,
+  error: PropTypes.string
 };

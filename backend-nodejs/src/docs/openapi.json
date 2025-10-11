@@ -184,6 +184,32 @@
           "ownerId": {
             "type": "integer"
           },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "members": {
+                "type": "integer"
+              },
+              "resources": {
+                "type": "integer"
+              },
+              "posts": {
+                "type": "integer"
+              },
+              "channels": {
+                "type": "integer"
+              },
+              "lastActivityAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              }
+            }
+          },
           "membership": {
             "type": "object",
             "nullable": true,
@@ -211,8 +237,134 @@
           "slug",
           "visibility",
           "ownerId",
+          "metadata",
+          "stats",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "CommunityChannel": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "slug": { "type": "string" },
+          "type": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "isDefault": { "type": "boolean" },
+          "metadata": { "type": "object", "additionalProperties": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        },
+        "required": ["id", "name", "slug", "type", "isDefault", "metadata", "createdAt", "updatedAt"]
+      },
+      "CommunityPost": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "type": { "type": "string" },
+          "title": { "type": "string", "nullable": true },
+          "body": { "type": "string" },
+          "publishedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "scheduledAt": { "type": "string", "format": "date-time", "nullable": true },
+          "visibility": { "type": "string" },
+          "status": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "channel": { "$ref": "#/components/schemas/CommunityChannel", "nullable": true },
+          "community": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": { "type": "integer" },
+              "name": { "type": "string" },
+              "slug": { "type": "string" }
+            }
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "name": { "type": "string" },
+              "role": { "type": "string" },
+              "avatarUrl": { "type": "string", "format": "uri" }
+            },
+            "required": ["id", "name", "avatarUrl"]
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "reactions": { "type": "integer" },
+              "reactionBreakdown": { "type": "object", "additionalProperties": { "type": "integer" } },
+              "comments": { "type": "integer" }
+            }
+          },
+          "metadata": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["id", "type", "body", "visibility", "status", "tags", "author", "stats", "metadata"]
+      },
+      "CommunityResource": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "communityId": { "type": "integer" },
+          "title": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "resourceType": { "type": "string" },
+          "assetId": { "type": "integer", "nullable": true },
+          "asset": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "publicId": { "type": "string" },
+              "filename": { "type": "string" }
+            }
+          },
+          "linkUrl": { "type": "string", "format": "uri", "nullable": true },
+          "classroomReference": { "type": "string", "nullable": true },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "visibility": { "type": "string" },
+          "status": { "type": "string" },
+          "metadata": { "type": "object", "additionalProperties": true },
+          "publishedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "createdBy": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "name": { "type": "string" },
+              "role": { "type": "string", "nullable": true },
+              "avatarUrl": { "type": "string", "format": "uri" }
+            },
+            "required": ["id", "name", "avatarUrl"]
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "title",
+          "resourceType",
+          "tags",
+          "visibility",
+          "status",
+          "metadata",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
+        ]
+      },
+      "CommunityDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Community" },
+          {
+            "type": "object",
+            "properties": {
+              "channels": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/CommunityChannel" }
+              }
+            }
+          }
         ]
       },
       "ContentAsset": {
@@ -1746,6 +1898,400 @@
           "409": {
             "description": "Community slug already exists"
           }
+        }
+      }
+    },
+    "/api/communities/feed": {
+      "get": {
+        "summary": "Aggregated community feed",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+          },
+          {
+            "name": "postType",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["update", "event", "resource", "classroom", "poll"] },
+            "required": false
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["public", "members", "admins"] },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/CommunityPost" }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "page": { "type": "integer" },
+                                "perPage": { "type": "integer" },
+                                "total": { "type": "integer" },
+                                "pageCount": { "type": "integer" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid token" },
+          "422": { "description": "Validation error" }
+        }
+      }
+    },
+    "/api/communities/{communityId}": {
+      "get": {
+        "summary": "Community detail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Community detail retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/CommunityDetail" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid token" },
+          "403": { "description": "Community is private" },
+          "404": { "description": "Community not found" }
+        }
+      }
+    },
+    "/api/communities/{communityId}/posts": {
+      "get": {
+        "summary": "Community feed",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+          },
+          {
+            "name": "channelId",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1 },
+            "required": false
+          },
+          {
+            "name": "postType",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["update", "event", "resource", "classroom", "poll"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Community feed retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/CommunityPost" }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "page": { "type": "integer" },
+                                "perPage": { "type": "integer" },
+                                "total": { "type": "integer" },
+                                "pageCount": { "type": "integer" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid token" },
+          "403": { "description": "Community is private" },
+          "404": { "description": "Community not found" },
+          "422": { "description": "Validation error" }
+        }
+      },
+      "post": {
+        "summary": "Create community post",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channelId": { "type": "integer" },
+                  "postType": { "type": "string", "enum": ["update", "event", "resource", "classroom", "poll"] },
+                  "title": { "type": "string" },
+                  "body": { "type": "string" },
+                  "tags": { "type": "array", "items": { "type": "string" } },
+                  "visibility": { "type": "string", "enum": ["public", "members", "admins"] },
+                  "status": { "type": "string", "enum": ["draft", "scheduled", "published"] },
+                  "scheduledAt": { "type": "string", "format": "date-time" },
+                  "publishedAt": { "type": "string", "format": "date-time" },
+                  "metadata": { "type": "object" }
+                },
+                "required": ["body"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Post created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/CommunityPost" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid token" },
+          "403": { "description": "Insufficient permissions" },
+          "404": { "description": "Community not found" },
+          "422": { "description": "Validation error" }
+        }
+      }
+    },
+    "/api/communities/{communityId}/resources": {
+      "get": {
+        "summary": "Community resources",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+          },
+          {
+            "name": "resourceType",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["content_asset", "external_link", "document", "classroom_session"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resources retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/CommunityResource" }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": { "type": "integer" },
+                                "offset": { "type": "integer" },
+                                "total": { "type": "integer" }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid token" },
+          "403": { "description": "Community is private" },
+          "404": { "description": "Community not found" },
+          "422": { "description": "Validation error" }
+        }
+      },
+      "post": {
+        "summary": "Create community resource",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "description": { "type": "string" },
+                  "resourceType": { "type": "string", "enum": ["content_asset", "external_link", "document", "classroom_session"] },
+                  "assetId": { "type": "integer" },
+                  "linkUrl": { "type": "string", "format": "uri" },
+                  "classroomReference": { "type": "string" },
+                  "tags": { "type": "array", "items": { "type": "string" } },
+                  "visibility": { "type": "string", "enum": ["members", "admins"] },
+                  "status": { "type": "string", "enum": ["draft", "published"] },
+                  "publishedAt": { "type": "string", "format": "date-time" },
+                  "metadata": { "type": "object" }
+                },
+                "required": ["title", "resourceType"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": { "$ref": "#/components/schemas/CommunityResource" }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": { "description": "Missing or invalid token" },
+          "403": { "description": "Insufficient permissions" },
+          "404": { "description": "Community not found" },
+          "422": { "description": "Validation error" }
         }
       }
     },

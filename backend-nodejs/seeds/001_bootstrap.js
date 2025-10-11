@@ -8,6 +8,9 @@ export async function seed(knex) {
     await trx('feature_flag_audits').del();
     await trx('feature_flags').del();
     await trx('configuration_entries').del();
+    await trx('community_resources').del();
+    await trx('community_posts').del();
+    await trx('community_channels').del();
     await trx('community_members').del();
     await trx('asset_conversion_outputs').del();
     await trx('asset_ingestion_jobs').del();
@@ -113,6 +116,35 @@ export async function seed(knex) {
       }
     ]);
 
+    const [opsGeneralChannelId] = await trx('community_channels').insert({
+      community_id: opsCommunityId,
+      name: 'Operations HQ',
+      slug: 'operations-hq',
+      description: 'Daily standups, automation updates, and production escalations.',
+      channel_type: 'general',
+      is_default: true,
+      metadata: JSON.stringify({ analyticsKey: 'ops-hq' })
+    });
+
+    const [opsWarRoomChannelId] = await trx('community_channels').insert({
+      community_id: opsCommunityId,
+      name: 'Weekly War Room',
+      slug: 'weekly-war-room',
+      description: 'Live classroom launch reviews and quality scorecards.',
+      channel_type: 'classroom',
+      metadata: JSON.stringify({ defaultMeetingDay: 'Thursday' })
+    });
+
+    const [growthAnnouncementsChannelId] = await trx('community_channels').insert({
+      community_id: growthCommunityId,
+      name: 'Growth Broadcasts',
+      slug: 'growth-broadcasts',
+      description: 'Announcements, campaign retrospectives, and monetisation briefs.',
+      channel_type: 'announcements',
+      is_default: true,
+      metadata: JSON.stringify({ cadence: 'bi-weekly' })
+    });
+
     const [opsPlaybookAssetId] = await trx('content_assets').insert({
       public_id: crypto.randomUUID(),
       type: 'powerpoint',
@@ -190,6 +222,73 @@ export async function seed(knex) {
       payload: JSON.stringify({ release: 'v1', visibility: 'workspace' })
     });
 
+    const [opsRoadmapPostId] = await trx('community_posts')
+      .insert({
+        community_id: opsCommunityId,
+        channel_id: opsGeneralChannelId,
+        author_id: instructorId,
+        post_type: 'update',
+        title: 'Automation Roadmap Drop',
+        body:
+          '🎯 New automation roadmap covering classroom launch scorecards, incident playbooks, and R2 cost tracking shipped to the resource library. Reply with blockers ahead of Thursday’s launch rehearsal.',
+        tags: JSON.stringify(['Roadmap', 'Automation']),
+        visibility: 'members',
+        status: 'published',
+        published_at: trx.fn.now(),
+        comment_count: 6,
+        reaction_summary: JSON.stringify({ applause: 18, thumbsUp: 9, total: 27 }),
+        metadata: JSON.stringify({ relatedResource: 'ops-blueprint-v1', analyticsKey: 'ops-hq-roadmap-drop' })
+      });
+
+    const [growthCampaignPostId] = await trx('community_posts')
+      .insert({
+        community_id: growthCommunityId,
+        channel_id: growthAnnouncementsChannelId,
+        author_id: adminId,
+        post_type: 'event',
+        title: 'Campaign Lab AMA',
+        body:
+          '🔥 We are running a live AMA on multi-channel launch funnels this Friday. Seats are capped at 120. Secure your spot and drop campaign questions in advance.',
+        tags: JSON.stringify(['Campaigns', 'Live Session']),
+        visibility: 'members',
+        status: 'published',
+        published_at: trx.fn.now(),
+        comment_count: 12,
+        reaction_summary: JSON.stringify({ insights: 32, total: 32 }),
+        metadata: JSON.stringify({
+          classroomReference: 'LC-AMA-001',
+          registrationUrl: 'https://events.edulure.test/ama-multi-channel-funnels'
+        })
+      });
+
+    const [opsBlueprintResourceId] = await trx('community_resources').insert({
+        community_id: opsCommunityId,
+        created_by: instructorId,
+        title: 'Classroom Launch Readiness Blueprint',
+        description: 'Step-by-step readiness checklist covering Agora seat prep, tutor briefing, and QA handoff.',
+        resource_type: 'content_asset',
+        asset_id: opsPlaybookAssetId,
+        tags: JSON.stringify(['Launch', 'QA', 'Automation']),
+        visibility: 'members',
+        status: 'published',
+        published_at: trx.fn.now(),
+        metadata: JSON.stringify({ version: 1, checksum: makeHash('learning-ops-blueprint.v1') })
+    });
+
+    const [growthDashboardResourceId] = await trx('community_resources').insert({
+        community_id: growthCommunityId,
+        created_by: adminId,
+        title: 'Creator Funnel Benchmark Dashboard',
+        description: 'Realtime look at CPM, conversion rate, and LTV across the Creator Growth Lab cohort.',
+        resource_type: 'external_link',
+        link_url: 'https://analytics.edulure.test/dashboards/creator-funnel-benchmark',
+        tags: JSON.stringify(['Analytics', 'Benchmarks']),
+        visibility: 'members',
+        status: 'published',
+        published_at: trx.fn.now(),
+        metadata: JSON.stringify({ requiresSso: true })
+    });
+
     await trx('domain_events').insert([
       {
         entity_type: 'community',
@@ -204,6 +303,43 @@ export async function seed(knex) {
         event_type: 'asset.published',
         payload: JSON.stringify({ version: 1 }),
         performed_by: instructorId
+      },
+      {
+        entity_type: 'community_post',
+        entity_id: String(opsRoadmapPostId),
+        event_type: 'community.post.published',
+        payload: JSON.stringify({ channelId: opsGeneralChannelId, communityId: opsCommunityId }),
+        performed_by: instructorId
+      },
+      {
+        entity_type: 'community_post',
+        entity_id: String(growthCampaignPostId),
+        event_type: 'community.post.published',
+        payload: JSON.stringify({ channelId: growthAnnouncementsChannelId, communityId: growthCommunityId }),
+        performed_by: adminId
+      },
+      {
+        entity_type: 'community_channel',
+        entity_id: String(opsWarRoomChannelId),
+        event_type: 'community.channel.created',
+        payload: JSON.stringify({ communityId: opsCommunityId, channelType: 'classroom' }),
+        performed_by: instructorId
+      },
+      {
+        entity_type: 'community_resource',
+        entity_id: String(opsBlueprintResourceId),
+        event_type: 'community.resource.published',
+        payload: JSON.stringify({ communityId: opsCommunityId, resourceType: 'content_asset' }),
+        performed_by: instructorId
+      },
+      {
+        entity_type: 'community_resource',
+        entity_id: String(growthDashboardResourceId),
+        event_type: 'community.resource.published',
+        payload: JSON.stringify({ communityId: growthCommunityId, resourceType: 'external_link' }),
+        performed_by: adminId
+      }
+    ]);
       }
     ]);
 
