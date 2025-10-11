@@ -9,5 +9,5 @@
   - `GET /assets`, `GET /assets/{assetId}`, and `GET /assets/{assetId}/analytics` for listing, detail, and analytics views.
   - `GET /assets/{assetId}/viewer-token` and `/progress` endpoints for DRM-protected viewer access and ebook telemetry.
 - Exposed `/api/content/assets/{assetId}/events` for recording view/download/progress actions from clients.
-- Updated `/api/auth/register` and `/api/auth/login` responses to surface verification metadata alongside the user object and tokens, aligning with the new OpenAPI definitions and returning structured error details for lockout thresholds.
-- Added `/api/auth/verify-email` for token confirmation and `/api/auth/resend-verification` for throttled resend flows, both documented with validation and error semantics.
+- Updated `/api/auth/register` and `/api/auth/login` responses to surface verification metadata alongside the user object, tokens, and session envelope, aligning with the new OpenAPI definitions and returning structured error details for lockout thresholds.
+- Added `/api/auth/verify-email` for token confirmation and `/api/auth/resend-verification`, `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/logout-all` for throttled verification and session governance flows, all documented with validation, caching semantics, and error responses.

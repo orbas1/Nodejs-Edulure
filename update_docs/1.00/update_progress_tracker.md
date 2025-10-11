@@ -4,7 +4,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 
 | Task | Security Level | Completion Level | Integration Level | Functionality Level | Error-Free Level | Production Level | Overall Level |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Task 1 – Platform Hardening & Governance Foundations | 78% | 52% | 56% | 55% | 54% | 50% | 57% |
+| Task 1 – Platform Hardening & Governance Foundations | 84% | 60% | 62% | 63% | 62% | 58% | 65% |
 | Task 2 – Content, Commerce & Live Learning Delivery | 10% | 5% | 5% | 5% | 5% | 0% | 5% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -13,7 +13,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 **Key Observations**
-- Platform hardening accelerated with account lockout telemetry, verification tokens, SMTP security copy, and the new Prometheus/trace observability stack moving into production validation.
+- Platform hardening accelerated with account lockout telemetry, verification tokens, SMTP security copy, and the new Prometheus/trace observability stack moving into production validation. Session rotation/log-out tooling with cached validation now shields revoked tokens across web and mobile clients.
 - Workspace governance closed, lifting consistency metrics after enforcing Node/npm runtime parity, npm audit automation, and shared lint/test orchestration across backend and frontend.
 - Content and commerce work has initiated R2 scaffolding and live learning preparation but remains largely in design and prototyping.
 - Social, explorer, dashboard, mobile, and QA programmes await foundational dependencies; progress is intentionally gated until upstream services stabilise.

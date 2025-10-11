@@ -4,4 +4,4 @@
 - Standardised response/error envelopes simplifying API client abstractions across React and Flutter.
 - Expanded the OpenAPI document with content asset schemas, Cloudflare R2 credential requirements, and analytics telemetry definitions powering new client SDKs.
 - Documented DRM download limits, presigned URL TTLs, and ingestion workflow status codes to guide React upload flows and Flutter offline downloads.
-- Refreshed the OpenAPI specification to include verification status schemas, account lockout error codes, and the new `/api/auth/verify-email` plus `/api/auth/resend-verification` endpoints for client integration.
+- Refreshed the OpenAPI specification to include verification status schemas, account lockout error codes, the session envelope schema, and the new `/api/auth/verify-email`, `/api/auth/resend-verification`, `/api/auth/refresh`, `/api/auth/logout`, and `/api/auth/logout-all` endpoints for client integration.

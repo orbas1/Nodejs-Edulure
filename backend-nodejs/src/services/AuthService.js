@@ -9,6 +9,7 @@ import UserModel from '../models/UserModel.js';
 import UserSessionModel from '../models/UserSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import { emailVerificationService } from './EmailVerificationService.js';
+import { sessionRegistry } from './SessionRegistry.js';
 
 function hashRefreshToken(token) {
   return crypto.createHmac('sha256', env.security.jwtRefreshSecret).update(token).digest('hex');
@@ -35,6 +36,37 @@ function buildVerificationMetadata(user) {
     status: user.emailVerifiedAt ? 'verified' : 'pending',
     emailVerifiedAt: user.emailVerifiedAt ?? null
   };
+}
+
+function toIso(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function buildSessionPayload(session) {
+  return {
+    id: session.sessionId ?? session.id ?? null,
+    expiresAt: toIso(session.expiresAt),
+    lastUsedAt: toIso(session.lastUsedAt ?? null)
+  };
+}
+
+function buildRefreshTokenRequiredError() {
+  const error = new Error('Refresh token is required to obtain a new session.');
+  error.status = 400;
+  error.code = 'REFRESH_TOKEN_REQUIRED';
+  return error;
+}
+
+function buildInvalidRefreshTokenError() {
+  const error = new Error('Refresh token is invalid or has expired. Please sign in again.');
+  error.status = 401;
+  error.code = 'INVALID_REFRESH_TOKEN';
+  return error;
 }
 
 export default class AuthService {
@@ -171,6 +203,7 @@ export default class AuthService {
           entityId: user.id,
           eventType: 'user.login_succeeded',
           payload: {
+            sessionId: session.sessionId,
             sessionExpiresAt: session.expiresAt.toISOString(),
             ipAddress: context.ipAddress ?? null,
             userAgent: context.userAgent ?? null
@@ -204,12 +237,167 @@ export default class AuthService {
     };
   }
 
+  static async refreshSession(refreshToken, context = {}) {
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      throw buildRefreshTokenRequiredError();
+    }
+
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+
+    return db.transaction(async (trx) => {
+      const session = await UserSessionModel.findActiveByHash(refreshTokenHash, trx, { forUpdate: true });
+      if (!session) {
+        await DomainEventModel.record(
+          {
+            entityType: 'user_session',
+            entityId: 'unknown',
+            eventType: 'user.session_refresh_failed',
+            payload: {
+              reason: 'invalid_or_expired',
+              ipAddress: context.ipAddress ?? null,
+              userAgent: context.userAgent ?? null
+            }
+          },
+          trx
+        );
+        throw buildInvalidRefreshTokenError();
+      }
+
+      await UserSessionModel.touch(session.id, trx);
+
+      const user = await UserModel.findById(session.userId, trx);
+      if (!user) {
+        sessionRegistry.markRevoked(session.id, 'orphaned');
+        await UserSessionModel.revokeById(session.id, 'orphaned', trx);
+        throw buildInvalidRefreshTokenError();
+      }
+
+      await UserSessionModel.revokeById(session.id, 'rotated', trx);
+      await UserSessionModel.markRotated(session.id, trx);
+      sessionRegistry.markRevoked(session.id, 'rotated');
+
+      const newSession = await this.createSession(
+        { id: user.id, email: user.email, role: user.role },
+        context,
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'user',
+          entityId: user.id,
+          eventType: 'user.session_rotated',
+          payload: {
+            previousSessionId: session.id,
+            sessionId: newSession.sessionId,
+            ipAddress: context.ipAddress ?? null,
+            userAgent: context.userAgent ?? null
+          },
+          performedBy: user.id
+        },
+        trx
+      );
+
+      return this.buildAuthResponse(sanitizeUserRecord(user), newSession);
+    });
+  }
+
+  static async logout(sessionId, userId, context = {}) {
+    if (!sessionId) {
+      return { data: { revoked: false, reason: 'missing_session' } };
+    }
+
+    return db.transaction(async (trx) => {
+      const session = await UserSessionModel.findById(sessionId, trx, { forUpdate: true });
+      if (!session) {
+        sessionRegistry.markRevoked(sessionId, 'unknown');
+        return { data: { revoked: false, reason: 'not_found' } };
+      }
+
+      if (session.revokedAt) {
+        sessionRegistry.markRevoked(session.id, session.revokedReason ?? 'previously_revoked');
+        return { data: { revoked: false, reason: 'already_revoked' } };
+      }
+
+      await UserSessionModel.revokeById(session.id, 'user_logout', trx, userId ?? null);
+      sessionRegistry.markRevoked(session.id, 'user_logout');
+
+      await DomainEventModel.record(
+        {
+          entityType: 'user',
+          entityId: session.userId,
+          eventType: 'user.session_revoked',
+          payload: {
+            reason: 'user_logout',
+            sessionId: session.id,
+            ipAddress: context.ipAddress ?? null,
+            userAgent: context.userAgent ?? null
+          },
+          performedBy: userId ?? session.userId
+        },
+        trx
+      );
+
+      return { data: { revoked: true } };
+    });
+  }
+
+  static async logoutAll(userId, currentSessionId, context = {}, { includeCurrent = false } = {}) {
+    return db.transaction(async (trx) => {
+      const expiredIds = await UserSessionModel.revokeExpiredSessions(userId, trx);
+      expiredIds.forEach((id) => sessionRegistry.markRevoked(id, 'expired'));
+
+      const revokedIds = await UserSessionModel.revokeOtherSessions(
+        userId,
+        includeCurrent ? null : currentSessionId,
+        includeCurrent ? 'user_forced_logout' : 'user_logout_other_devices',
+        trx,
+        userId
+      );
+
+      revokedIds.forEach((id) =>
+        sessionRegistry.markRevoked(id, includeCurrent ? 'user_forced_logout' : 'user_logout_other_devices')
+      );
+
+      if (includeCurrent && currentSessionId && !revokedIds.includes(currentSessionId)) {
+        await UserSessionModel.revokeById(currentSessionId, 'user_forced_logout', trx, userId);
+        sessionRegistry.markRevoked(currentSessionId, 'user_forced_logout');
+        revokedIds.push(currentSessionId);
+      }
+
+      if (revokedIds.length > 0) {
+        await DomainEventModel.record(
+          {
+            entityType: 'user',
+            entityId: userId,
+            eventType: 'user.sessions_revoked',
+            payload: {
+              reason: includeCurrent ? 'user_forced_logout' : 'user_logout_other_devices',
+              sessionIds: revokedIds,
+              ipAddress: context.ipAddress ?? null,
+              userAgent: context.userAgent ?? null
+            },
+            performedBy: userId
+          },
+          trx
+        );
+      }
+
+      return {
+        data: {
+          revokedCount: revokedIds.length,
+          revokedSessionIds: revokedIds
+        }
+      };
+    });
+  }
+
   static async createSession(user, context = {}, connection = db) {
     const refreshToken = crypto.randomBytes(48).toString('base64url');
     const refreshTokenHash = hashRefreshToken(refreshToken);
     const expiresAt = new Date(Date.now() + env.security.refreshTokenTtlDays * 24 * 60 * 60 * 1000);
 
-    await UserSessionModel.create(
+    const sessionRecord = await UserSessionModel.create(
       {
         userId: user.id,
         refreshTokenHash,
@@ -220,9 +408,38 @@ export default class AuthService {
       connection
     );
 
+    const expiredIds = await UserSessionModel.revokeExpiredSessions(user.id, connection);
+    const trimmedIds = await UserSessionModel.pruneExcessSessions(
+      user.id,
+      env.security.maxActiveSessionsPerUser,
+      connection
+    );
+
+    [...expiredIds, ...trimmedIds].forEach((id) => sessionRegistry.markRevoked(id, 'session_reaped'));
+
+    if (trimmedIds.length > 0) {
+      await DomainEventModel.record(
+        {
+          entityType: 'user',
+          entityId: user.id,
+          eventType: 'user.session_revoked',
+          payload: {
+            reason: 'session_limit_exceeded',
+            sessionIds: trimmedIds,
+            ipAddress: context.ipAddress ?? null,
+            userAgent: context.userAgent ?? null
+          },
+          performedBy: user.id
+        },
+        connection
+      );
+    }
+
+    sessionRegistry.remember(sessionRecord);
+
     const { secret, algorithm, kid } = getActiveJwtKey();
     const accessToken = jwt.sign(
-      { sub: user.id, email: user.email, role: user.role },
+      { sub: user.id, email: user.email, role: user.role, sid: sessionRecord.id },
       secret,
       {
         expiresIn: `${env.security.accessTokenTtlMinutes}m`,
@@ -237,7 +454,9 @@ export default class AuthService {
       accessToken,
       refreshToken,
       expiresAt,
-      tokenType: 'Bearer'
+      tokenType: 'Bearer',
+      sessionId: sessionRecord.id,
+      lastUsedAt: sessionRecord.lastUsedAt ?? new Date()
     };
   }
 
@@ -251,7 +470,8 @@ export default class AuthService {
           refreshToken: session.refreshToken,
           tokenType: session.tokenType,
           expiresAt: session.expiresAt
-        }
+        },
+        session: buildSessionPayload(session)
       }
     };
   }

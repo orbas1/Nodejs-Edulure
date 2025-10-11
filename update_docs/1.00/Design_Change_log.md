@@ -34,6 +34,7 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Restructured settings dashboards, privacy controls, and notification clusters using `Settings Dashboard.md`, `Settings Screen.md`, and `Settings.md`.
 - Embedded legal consent, security prompts, and audit trails referencing `Function Design.md`, `component_functions.md`, and `provider_application_logic_flow_changes.md`.
 - Documented observability overlays tying Prometheus metrics and trace IDs to design QA dashboards so interface health is monitored alongside copy/accessibility sign-offs.
+- Expanded account security guidance with active-session listings, revoke-all confirmation modals, and logout microcopy referencing `Settings Dashboard.md`, `Settings.md`, `Screen_text.md`, and `menu_drawings.md` so UI mirrors the new session governance tooling.
 
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.

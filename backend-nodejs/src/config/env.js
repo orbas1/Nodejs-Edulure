@@ -132,6 +132,8 @@ const envSchema = z
     DB_POOL_MAX: z.coerce.number().int().min(2).default(10),
     RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
     RATE_LIMIT_MAX: z.coerce.number().int().min(25).max(2000).default(300),
+    SESSION_VALIDATION_CACHE_TTL_MS: z.coerce.number().int().min(1000).max(10 * 60 * 1000).default(60000),
+    MAX_ACTIVE_SESSIONS_PER_USER: z.coerce.number().int().min(1).max(50).default(10),
     METRICS_ENABLED: z.coerce.boolean().default(true),
     METRICS_USERNAME: z.string().min(3).optional(),
     METRICS_PASSWORD: z.string().min(8).optional(),
@@ -248,7 +250,9 @@ export const env = {
     drmSignatureSecret: raw.DRM_SIGNATURE_SECRET ?? activeJwtKey.secret,
     accountLockoutThreshold: raw.ACCOUNT_LOCKOUT_THRESHOLD,
     accountLockoutWindowMinutes: raw.ACCOUNT_LOCKOUT_WINDOW_MINUTES,
-    accountLockoutDurationMinutes: raw.ACCOUNT_LOCKOUT_DURATION_MINUTES
+    accountLockoutDurationMinutes: raw.ACCOUNT_LOCKOUT_DURATION_MINUTES,
+    sessionValidationCacheTtlMs: raw.SESSION_VALIDATION_CACHE_TTL_MS,
+    maxActiveSessionsPerUser: raw.MAX_ACTIVE_SESSIONS_PER_USER
   },
   database: {
     host: raw.DB_HOST,

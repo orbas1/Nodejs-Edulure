@@ -7,3 +7,4 @@
 - Added a `security:rotate-jwt` npm script and operational guidance for signing-key rotation, highlighting secret vault storage expectations.
 - Extended README guidance with workspace runtime requirements (Node.js 20.12.2+/npm 10.5.0+), pointing teams to the root verifier and shared audit scripts.
 - Documented Prometheus/Grafana integration expectations in the backend README, including alerting runbooks for HTTP errors, storage latency, and unhandled exceptions.
+- Added session governance runbook notes to the backend README covering refresh/logout endpoints, concurrency caps, and cache invalidation expectations for support teams.
