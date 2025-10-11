@@ -148,7 +148,21 @@ const envSchema = z
     R2_PUBLIC_BUCKET: z.string().min(1),
     R2_PRIVATE_BUCKET: z.string().min(1),
     R2_UPLOADS_BUCKET: z.string().min(1),
+    R2_QUARANTINE_BUCKET: z.string().min(1),
     R2_CDN_URL: z.string().url().optional(),
+    ANTIVIRUS_ENABLED: z.coerce.boolean().default(true),
+    ANTIVIRUS_HOST: z.string().min(1).default('127.0.0.1'),
+    ANTIVIRUS_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
+    ANTIVIRUS_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1000)
+      .max(600000)
+      .default(20000),
+    ANTIVIRUS_MAX_FILE_SIZE_MB: z.coerce.number().int().min(1).max(2048).default(500),
+    ANTIVIRUS_FAIL_OPEN: z.coerce.boolean().default(false),
+    ANTIVIRUS_CACHE_TTL_SECONDS: z.coerce.number().int().min(0).max(86400).default(300),
+    ANTIVIRUS_SKIP_TAG: z.string().min(1).default('edulure-skip-scan'),
     ASSET_PRESIGN_TTL_MINUTES: z.coerce.number().int().min(5).max(60).default(15),
     ASSET_DOWNLOAD_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
     CONTENT_MAX_UPLOAD_MB: z.coerce.number().int().min(10).max(2048).default(512),
@@ -282,10 +296,22 @@ export const env = {
     publicBucket: raw.R2_PUBLIC_BUCKET,
     privateBucket: raw.R2_PRIVATE_BUCKET,
     uploadsBucket: raw.R2_UPLOADS_BUCKET,
+    quarantineBucket: raw.R2_QUARANTINE_BUCKET,
     cdnUrl: raw.R2_CDN_URL,
     uploadTtlMinutes: raw.ASSET_PRESIGN_TTL_MINUTES,
     downloadTtlMinutes: raw.ASSET_DOWNLOAD_TTL_MINUTES,
     maxUploadBytes: raw.CONTENT_MAX_UPLOAD_MB * 1024 * 1024
+  },
+  antivirus: {
+    enabled: raw.ANTIVIRUS_ENABLED,
+    host: raw.ANTIVIRUS_HOST,
+    port: raw.ANTIVIRUS_PORT,
+    timeoutMs: raw.ANTIVIRUS_TIMEOUT_MS,
+    maxFileSizeBytes: raw.ANTIVIRUS_MAX_FILE_SIZE_MB * 1024 * 1024,
+    failOpen: raw.ANTIVIRUS_FAIL_OPEN,
+    cacheTtlMs: raw.ANTIVIRUS_CACHE_TTL_SECONDS * 1000,
+    skipMetadataTag: raw.ANTIVIRUS_SKIP_TAG,
+    quarantineBucket: raw.R2_QUARANTINE_BUCKET
   },
   integrations: {
     cloudConvertApiKey: raw.CLOUDCONVERT_API_KEY ?? null

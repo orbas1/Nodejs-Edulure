@@ -79,3 +79,11 @@
 ## 15. Accessibility Preferences Sync
 1. Accessibility settings updates propagate to server; other devices fetch preferences on login and apply instantly.
 2. Reduced motion preference disables auto-play of animations and carousels; ensures consistent experience across sessions.
+
+## 16. Live Classroom Participation & Tutor Booking
+1. Learner navigates to Tutor tab or receives push notification; storefront card loads availability calendar, rating, and hourly rate. Selecting slot opens confirmation sheet with countdown hold timer per `App_screens_drawings.md`.
+2. Application validates prerequisites (subscription, credits) and surfaces upsell if needed. Confirming booking triggers backend call; success displays summary with add-to-calendar, message tutor, and manage booking actions.
+3. Lobby reminder notification fires 15 minutes pre-session; tapping opens lobby with agenda, materials download, audio/video test, and chat introduction prompt referencing `App_screens_drawings.md` and `dashboard_drawings.md`.
+4. Join button requests Agora token; if failure, fallback instructions appear with retry. During session, learner can toggle chat tabs, raise hand, respond to polls, and view moderated Q&A.
+5. If connection drops, reconnection overlay appears with spinner; after 60 seconds, offer to watch recording when available. Post-session survey surfaces with rating scale, review text, and CTA to book follow-up.
+6. Booking management screen allows rescheduling, cancellation (with policy copy), and download of session recordings. Actions trigger push/email notifications for both learner and tutor.

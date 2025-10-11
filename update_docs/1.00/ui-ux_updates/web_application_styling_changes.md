@@ -86,3 +86,12 @@
 - **High-contrast theme:** Simplifies backgrounds to solid #000/#FFF combinations, increases font weight, and removes decorative imagery.
 - **Reduced motion mode:** Disables parallax and scroll animations; retains fade transitions only.
 - **RTL support:** Documentation specifies mirrored layout adjustments, including navigation order, arrow icons, and alignment for key components.
+
+## Live Classroom & Tutor Styling Extensions
+- **Video stage:** Dark slate gradient (`linear-gradient(160deg, #0B1120 0%, #111827 55%, #020617 100%)`) with 32px padding, rounded 24px corners, and inset border using `rgba(37, 99, 235, 0.2)` to differentiate host feed; active speaker ring animates with `web.accent.secondary` glow.
+- **Roster drawer:** Fixed-width 360px panel using semi-transparent surface token `rgba(15, 23, 42, 0.88)` and scroll shadows. Attendee chips use pill badges with role-based colour accents (`Instructor` – `#7C3AED`, `Moderator` – `#2563EB`, `Learner` – `#38BDF8`).
+- **Chat panel:** Message bubbles adopt 12px radius, timestamp in `web.text.secondary`, pinned system messages highlighted with `rgba(124, 58, 237, 0.12)` referencing `App_screens_drawings.md`.
+- **Availability calendar:** Tutor storefront uses glassmorphism cards with accent gradient border on selected date, stacked layout for mobile with sticky summary card referencing `website_drawings.md`.
+- **Countdown timer:** Circular progress indicator with `conic-gradient(#2563EB, #7C3AED)` border, centre uses `Inter 700` 24px typography. High-contrast mode swaps to solid outlines.
+- **Moderation toasts:** Bottom-left anchored, dark background `#1E293B`, accent border `#F59E0B`, includes iconography from `assets/moderation` set; slide-in animation 180ms ease-out.
+- **Post-session summary:** Card grid uses neutral backdrop with accent header band (#2563EB at 12% opacity). Buttons align with CTA guidelines, analytics badges display using tertiary accent for KPIs.

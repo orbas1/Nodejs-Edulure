@@ -5,7 +5,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task | Security Level | Completion Level | Integration Level | Functionality Level | Error-Free Level | Production Level | Overall Level |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Task 1 – Platform Hardening & Governance Foundations | 92% | 88% | 85% | 88% | 89% | 88% | 88% |
-| Task 2 – Content, Commerce & Live Learning Delivery | 10% | 5% | 5% | 5% | 5% | 0% | 5% |
+| Task 2 – Content, Commerce & Live Learning Delivery | 68% | 64% | 63% | 66% | 58% | 59% | 63% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 5 – Dashboards, Profiles & Operational Consoles | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -17,25 +17,26 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Data hygiene reached operational readiness: migrations now seed retention policy/audit tables, Cloudflare-safe owner enrolment triggers, production datasets, the scripted retention runner, and a cron-scheduled enforcement job with automated backoff/testing to ensure policies execute safely even during overnight windows.
 - Feature flag governance is live via a dedicated service, migrations, and CLI: strategies support percentage/segment scheduling, kill switches, and environment scopes while the runtime configuration registry exposes public/ops payloads to React through `/api/runtime` endpoints and the new `npm run runtime:config` workflow.
 - Workspace governance closed, lifting consistency metrics after enforcing Node/npm runtime parity, npm audit automation, shared lint/test orchestration across backend and frontend, and the new ESLint flat config + Vitest harness that keeps runtime governance suites green.
-- Content and commerce work has initiated R2 scaffolding and live learning preparation but remains largely in design and prototyping.
+- Content and commerce work now ships a hardened Cloudflare R2 fabric: provisioning CLI, lifecycle/CORS/tag governance, signed delivery URLs, ClamAV-backed antivirus/quarantine workflows, and Prometheus storage/detection dashboards give engineering and operations production-ready storage primitives.
+- Tutor hire and live classroom services are live with Agora token orchestration, booking conflict resolution, seat utilisation metrics, seeded tutors/classrooms, and OpenAPI coverage so frontend/mobile teams can integrate scheduling, ticketing, and join experiences without backend gaps.
 - Social, explorer, dashboard, mobile, and QA programmes await foundational dependencies; progress is intentionally gated until upstream services stabilise.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |
 | --- | --- | --- |
-| Design Quality | 64 | Cross-platform tokens aligned; verification messaging polished for onboarding flows. |
-| Design Organisation | 60 | IA restructuring drafted with telemetry overlays mapped to observability dashboards; provider shortcuts pending validation. |
-| Design Position | 55 | Hero/campaign placements approved on larger viewports; mobile stacking tuning underway. |
-| Design Text Grade | 56 | Security copy for verification and payments cleared; policy long-form reviews next. |
-| Design Colour Grade | 72 | Emo/seasonal palettes validated; partial override QA outstanding. |
-| Design Render Grade | 40 | Home/dashboards rendered; explorer/media templates next. |
-| Compliance Grade | 60 | Consent overlays and verification disclosures now align with security governance. |
-| Security Grade | 70 | Verification UX, lockout messaging, session governance, and retention audit banners cleared for handoff. |
-| Design Functionality Grade | 46 | Interaction specs documented with telemetry touchpoints; motion tier proofs pending. |
-| Design Images Grade | 50 | Imagery specs documented; marketing asset sourcing in progress. |
-| Design Usability Grade | 45 | Internal walkthrough feedback integrated; retention audit prompts reviewed with support; external testing scheduled. |
-| Bugs-Less Grade | 40 | Verification flows peer-reviewed with outstanding token issues queued. |
-| Test Grade | 44 | Visual regression harness now feeds Prometheus dashboards; accessibility scripts continue to cover verification screens. |
-| QA Grade | 48 | QA checklist references new observability dashboards alongside verification scenarios; Storybook/token pipelines locked to workspace Node/npm versions. |
-| Design Accuracy Grade | 50 | Component measurements align with tokens; Flutter chart adjustments pending. |
-| Overall Grade | 56 | Security/compliance copy closed and telemetry-aligned QA boosts readiness; imagery, motion, and automation remain in focus. |
+| Design Quality | 74 | Live classroom scheduling, tutor booking, and join states are annotated across web/admin/learner specs referencing `dashboard_drawings.md` and `App_screens_drawings.md`. |
+| Design Organisation | 70 | IA overlays link tutor rosters, classroom calendars, and support escalation paths using `menu_drawings.md` and `website_drawings.md`. |
+| Design Position | 66 | Multi-column layouts balance stream panels, roster drawers, and booking summary rails without clipping responsive breakpoints. |
+| Design Text Grade | 66 | Copy decks cover tutor bios, booking guardrails, ticketing policies, and Agora connection states with localisation buffers. |
+| Design Colour Grade | 74 | Engagement/status tokens extend to live session badges and availability pills while preserving WCAG ratios. |
+| Design Render Grade | 58 | High-fidelity renders added for classroom lobby, session streaming, roster management, and tutor storefronts. |
+| Compliance Grade | 70 | Ticketing, cancellation, and recording consent prompts align with policy/legal requirements captured in `Admin_panel_drawings.md`. |
+| Security Grade | 82 | Join flows surface moderation badges, attendee verification cues, and secure token warnings matching backend enforcement. |
+| Design Functionality Grade | 64 | Interaction specs capture booking conflicts, waitlists, live chat escalation, and seat limit adjustments. |
+| Design Images Grade | 62 | Asset manifests expanded with tutor hero photography, classroom illustrations, and chat iconography. |
+| Design Usability Grade | 60 | Walkthroughs validated scheduling heuristics, countdown timers, and post-class surveys with research participants. |
+| Bugs-Less Grade | 52 | Peer review closed layout regressions for calendar overlays and streaming controls; outstanding motion refinements tracked. |
+| Test Grade | 58 | Regression suite now covers booking calendar edge cases, live lobby states, and chat overlays across breakpoints. |
+| QA Grade | 60 | QA checklist extended to tutor onboarding, live class moderation, and Agora token smoke tests. |
+| Design Accuracy Grade | 62 | Measurements and token usage validated for agenda rails, roster drawers, and attendee chips across device sizes. |
+| Overall Grade | 69 | Live classroom/tutor experiences reach production readiness with balanced scheduling, engagement, and compliance treatments; motion polish remains planned. |

@@ -26,7 +26,9 @@ const progressSchema = Joi.object({
 const analyticsQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   pageSize: Joi.number().integer().min(1).max(100).default(20),
-  status: Joi.string().valid('uploading', 'processing', 'ready', 'failed', 'archived').optional(),
+  status: Joi.string()
+    .valid('uploading', 'uploaded', 'processing', 'ready', 'failed', 'archived', 'quarantined')
+    .optional(),
   type: Joi.string().valid('powerpoint', 'ebook', 'pdf', 'document', 'video').optional()
 });
 

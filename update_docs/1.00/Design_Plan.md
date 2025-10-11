@@ -22,11 +22,13 @@
 - Assemble modular hero, progress, recommendation, and campaign blocks using `Home page components.md`, `Screens_Update.md`, and `Dashboard Designs.md`.
 - Prepare persona-specific dashboards (learner, provider, admin) referencing `Dashboard Organisation.md`, `Settings Dashboard.md`, and `Profile Styling.md`.
 - Add new page shells for explorer, communities, and monetisation scenarios using `Pages_list.md`, `Screens_list.md`, and `Organisation_and_positions.md`.
+- Deliver tutor storefront and live classroom landing templates mapped to `website_drawings.md`, `menu_drawings.md`, and `dashboard_drawings.md`, including availability calendars, countdown tiles, roster drawers, and moderator toolbars for engineering handoff.
 
 ### 4. Component Library & Interaction Specs
 - Refresh cards, forms, modals, drawers, widgets, and buttons per `Cards.md`, `Forms.md`, `component_functions.md`, `Screens__Update_widget_types.md`, and `Screen_buttons.md`.
 - Document state diagrams (idle, hover, focused, disabled, offline, rights-restricted) with analytics instrumentation guided by `Screens_Updates_widget_functions.md` and `component_functions.md`.
 - Rewrite microcopy and localisation placeholders using `Screen_text.md`, `Dummy_Data_Requirements.md`, and `text.md.md`.
+- Extend interaction specs for tutor availability pills, booking conflict resolutions, live classroom countdowns, chat escalations, and Agora join/recording prompts referencing `web_application_logic_flow_changes.md`, `App_screens_drawings.md`, and `Admin_panel_drawings.md`.
 
 ### 5. Imagery, Motion & Asset Governance
 - Set imagery ratios, safe areas, animation tiers, and reduced-motion treatments referencing `images_and_vectors.md`, `Screens_update_images_and _vectors.md`, and `Logic_Flow_update.md`.
@@ -38,6 +40,8 @@
 - Restructure settings dashboards, privacy notifications, and consent flows referencing `Settings Dashboard.md`, `Settings Screen.md`, `Settings.md`, and `Function Design.md`.
 - Align verification prompts, lockout states, and security education with backend enforcement referencing `Screen_text.md`, `Dummy_Data_Requirements.md`, and `provider_application_logic_flow_changes.md`.
 - Add inline security messaging and audit surfaces with guidance from `provider_application_logic_flow_changes.md` and `web_application_logic_flow_changes.md`.
+- Design antivirus/quarantine alerts, review queues, and admin escalation paths for content uploads referencing `web_app_wireframe_changes.md`, `dashboard_drawings.md`, and `App_screens_drawings.md`, ensuring learners, instructors, and operators see consistent outcomes.
+- Layer tutor onboarding, compliance readiness, payout verification, recording consent, and seat limit governance prompts into provider/admin consoles referencing `provider_app_wireframe_changes.md`, `Admin_panel_drawings.md`, and `dashboard_drawings.md` so live learning operations meet policy requirements.
 - Introduce session/device management states (active session list, revoke-all confirmation, logout banners) referencing `Settings Dashboard.md`, `Settings.md`, `Screen_text.md`, `menu_drawings.md`, and `dashboard_drawings.md` so design mirrors new governance tooling.
 - Layer retention/audit disclosures into admin dashboards referencing `dashboard_drawings.md`, `menu_drawings.md`, and `Screen_text.md` so operators understand automation outcomes, cron schedule status, and recovery options tied to backend hygiene policies.
 

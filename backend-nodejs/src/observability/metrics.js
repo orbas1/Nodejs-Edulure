@@ -63,6 +63,26 @@ const storageTransferredBytes = new promClient.Histogram({
   buckets: [1024, 8192, 32768, 131072, 524288, 1048576, 5242880, 10485760, 52428800]
 });
 
+const antivirusScanDurationSeconds = new promClient.Histogram({
+  name: 'edulure_antivirus_scan_duration_seconds',
+  help: 'Duration histogram for antivirus scans',
+  labelNames: ['status'],
+  buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10, 20, 30]
+});
+
+const antivirusScanBytes = new promClient.Histogram({
+  name: 'edulure_antivirus_scan_bytes',
+  help: 'Histogram of bytes inspected by antivirus scans',
+  labelNames: ['status'],
+  buckets: [1024, 4096, 8192, 32768, 131072, 524288, 1048576, 5242880, 10485760, 52428800, 104857600]
+});
+
+const antivirusDetectionsTotal = new promClient.Counter({
+  name: 'edulure_antivirus_detections_total',
+  help: 'Count of antivirus detections grouped by signature and bucket source',
+  labelNames: ['signature', 'bucket']
+});
+
 const unhandledExceptionsTotal = new promClient.Counter({
   name: 'edulure_unhandled_exceptions_total',
   help: 'Number of unhandled errors returned to clients',
@@ -76,6 +96,9 @@ registry.registerMetric(httpRequestErrors);
 registry.registerMetric(storageOperationDurationSeconds);
 registry.registerMetric(storageOperationsInFlight);
 registry.registerMetric(storageTransferredBytes);
+registry.registerMetric(antivirusScanDurationSeconds);
+registry.registerMetric(antivirusScanBytes);
+registry.registerMetric(antivirusDetectionsTotal);
 registry.registerMetric(unhandledExceptionsTotal);
 
 function normalizeRoute(req) {
@@ -269,6 +292,20 @@ export async function recordStorageOperation(operation, visibility, handler) {
 export function recordUnhandledException(error) {
   const type = error?.name ?? 'Error';
   unhandledExceptionsTotal.inc({ type });
+}
+
+export function recordAntivirusScan({ status, bytesScanned, durationSeconds, signature, bucket }) {
+  const resolvedStatus = status ?? 'unknown';
+  const bytes = Number(bytesScanned ?? 0);
+  const duration = Number(durationSeconds ?? 0);
+  const sourceBucket = bucket ?? 'unknown';
+
+  antivirusScanDurationSeconds.observe({ status: resolvedStatus }, duration);
+  antivirusScanBytes.observe({ status: resolvedStatus }, bytes);
+
+  if (resolvedStatus === 'infected' && signature) {
+    antivirusDetectionsTotal.inc({ signature, bucket: sourceBucket });
+  }
 }
 
 export function annotateLogContextFromRequest(req) {

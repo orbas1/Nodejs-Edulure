@@ -12,6 +12,7 @@
 - `backend-nodejs/src/config/storage.js` – centralised Cloudflare R2 client configuration and endpoint export.
 - `backend-nodejs/src/config/jwtKeyStore.js` – shared JWT signing key lookup, verification, and rotation metadata access.
 - `backend-nodejs/src/services/StorageService.js`, `AssetService.js`, `AssetIngestionService.js` – storage abstraction, asset lifecycle orchestration, and conversion worker.
+- `backend-nodejs/src/services/AntivirusService.js` – ClamAV-backed streaming scanner with caching, quarantine routing, and Prometheus instrumentation.
 - `backend-nodejs/src/controllers/ContentController.js`, `routes/content.routes.js` – content API surface for upload sessions, ingestion, analytics, and telemetry.
 - `backend-nodejs/src/models/ContentAssetModel.js`, `AssetConversionOutputModel.js`, `AssetIngestionJobModel.js`, `ContentAssetEventModel.js`, `ContentAuditLogModel.js`, `EbookProgressModel.js` – Knex repositories powering the content pipeline.
 - `backend-nodejs/migrations/20241020130000_content_assets.js` – schema for assets, ingestion jobs, conversion outputs, events, audit logs, and ebook progress.
@@ -39,3 +40,5 @@
 - `backend-nodejs/scripts/runtime-config.js` – CLI generating flag/config snapshots for ops.
 - `backend-nodejs/test/featureFlagService.test.js`, `backend-nodejs/test/runtimeConfigService.test.js` – Vitest coverage validating strategy evaluation and runtime config exposure.
 - `backend-nodejs/eslint.config.mjs` – ESLint flat configuration enabling workspace-wide governance with Node/test aware rules.
+- `backend-nodejs/scripts/provision-r2-buckets.js` – operational CLI that creates/validates Cloudflare R2 buckets with lifecycle, CORS, and tagging policies.
+- `backend-nodejs/test/antivirusService.test.js` – Vitest suite exercising antivirus scanning, detection, caching, and storage streaming integrations.

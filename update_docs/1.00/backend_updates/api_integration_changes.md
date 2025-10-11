@@ -3,5 +3,6 @@
 - Published `src/docs/openapi.json` and Swagger UI to give frontend/mobile squads a contract-first integration path.
 - Standardised response/error envelopes simplifying API client abstractions across React and Flutter.
 - Expanded the OpenAPI document with content asset schemas, Cloudflare R2 credential requirements, and analytics telemetry definitions powering new client SDKs.
+- Added antivirus scan/quarantine response schemas so web/Flutter clients can surface malware warnings, retry guidance, and admin escalation workflows.
 - Documented DRM download limits, presigned URL TTLs, and ingestion workflow status codes to guide React upload flows and Flutter offline downloads.
 - Refreshed the OpenAPI specification to include verification status schemas, account lockout error codes, the session envelope schema, and the new `/api/auth/verify-email`, `/api/auth/resend-verification`, `/api/auth/refresh`, `/api/auth/logout`, and `/api/auth/logout-all` endpoints for client integration.

@@ -2,24 +2,24 @@
 
 | Metric | Current Score (%) | Status Commentary |
 | --- | --- | --- |
-| Design Quality | 64 | Token documentation aligns across platforms; verification messaging polished for onboarding flows. |
-| Design Organisation | 66 | IA restructure drafted; telemetry overlays now map UI modules, retention scheduler status panels, and feature flag control states to observability dashboards for ongoing validation. |
-| Design Position | 58 | Homepage hero and campaign placements validated on desktop/tablet; mobile stacking rules incorporate admin gating banners and runtime messaging. |
-| Design Text Grade | 56 | Core microcopy approved; verification and payment disclosures signed-off with legal. |
-| Design Colour Grade | 72 | Palette sets validated for default, emo, and seasonal themes; need final QA on partial theme overrides. |
-| Design Render Grade | 40 | High-fidelity renders produced for home/dashboards; explorer and media viewer renders in progress. |
-| Compliance Grade | 60 | Privacy prompts, consent overlays, and verification disclosures now align with security governance. |
-| Security Grade | 72 | Verification UX, lockout messaging, session governance flows, and retention scheduler status/backoff messaging approved alongside runtime notices. |
-| Design Functionality Grade | 54 | Interaction specs cover navigation/forms, telemetry touchpoints, and feature flag disable states; cron scheduler status/backoff alerts captured, motion tiers not yet prototyped. |
-| Design Images Grade | 50 | Imagery specs documented; emo/festive asset pack sourcing underway with marketing. |
-| Design Usability Grade | 48 | Two rounds of internal walkthroughs complete; session logout confirmations cleared with support and feature flag messaging peer-reviewed, external validation scheduled. |
-| Bugs-Less Grade | 40 | QA reviews cleared verification copy issues; remaining token regressions queued. |
-| Test Grade | 48 | Visual regression and accessibility scripts run alongside new observability dashboards to flag latency/error regressions; runtime config provider snapshots now part of React smoke tests. |
-| QA Grade | 48 | QA checklist now references Prometheus/trace dashboards during design sign-off, supplementing verification scenarios. |
-| Design Accuracy Grade | 50 | Component measurements align with tokens; Flutter parity adjustments outstanding for charts. |
-| Overall Grade | 60 | Security copy closed; telemetry-aligned QA boosts readiness while runtime configuration UX landed, leaving imagery, motion, and automation as the remaining focus. |
+| Design Quality | 74 | Tutor storefronts, booking flows, and live classroom consoles are specified for web, admin, and learner clients referencing `dashboard_drawings.md` and `App_screens_drawings.md`. |
+| Design Organisation | 70 | Information architecture now threads tutor rosters, classroom calendars, and escalation pathways using `menu_drawings.md` and `website_drawings.md`. |
+| Design Position | 66 | Layout guidance balances video stage, roster drawers, chat panels, and booking sidebars without breaking breakpoints. |
+| Design Text Grade | 66 | Copy decks cover tutor bios, cancellation guardrails, recording consent, and Agora connectivity states with localisation buffers. |
+| Design Colour Grade | 74 | Engagement/status tokens extended to availability pills, stream badges, and moderation alerts while preserving WCAG ratios. |
+| Design Render Grade | 58 | High-fidelity renders complete for lobby countdowns, in-session chat, tutor onboarding, and payout dashboards. |
+| Compliance Grade | 70 | Ticketing, moderation, and payout policies documented with references to `Admin_panel_drawings.md` and legal copy reviews. |
+| Security Grade | 82 | Join experiences surface verification indicators, host controls, and secure token notices aligned with backend enforcement. |
+| Design Functionality Grade | 64 | Interaction diagrams include booking conflict checks, waitlists, seat limit adjustments, and moderator escalation flows. |
+| Design Images Grade | 62 | Asset manifests expanded with tutor photography, classroom illustrations, and accessibility-compliant iconography. |
+| Design Usability Grade | 60 | Usability walkthroughs validated scheduling heuristics, countdown timers, and post-class surveys with mixed learner/provider cohorts. |
+| Bugs-Less Grade | 52 | Peer reviews resolved stacking regressions for calendar overlays and stream controls; outstanding motion polish logged. |
+| Test Grade | 58 | Regression scripts now target booking calendars, lobby states, and chat overlays across desktop/tablet/mobile breakpoints. |
+| QA Grade | 60 | QA checklist updated with tutor onboarding, live session moderation, and Agora token smoke scenarios. |
+| Design Accuracy Grade | 62 | Measurements for agenda rails, roster drawers, and attendee chips validated across device matrices. |
+| Overall Grade | 69 | Live learning/tutor flows meet production readiness while planned motion refinements continue in the next sprint. |
 
 ## Progress Notes
-- Token and theming workstreams are leading, enabling downstream template production and runtime validation.
-- Navigation, layout, and component templates are mid-flight; prioritising explorer/media surfaces and mobile stacking refinements.
-- Compliance, security, and QA disciplines are engaged; verification messaging mirrors backend enforcement, session governance overlays cover settings dashboards, retention auditing banners/specs document cron status and backoff notifications for admin consoles, and accessibility scripts progress toward closure. Admin disable states and support escalation paths for the runtime configuration console are now documented in the UI blueprints.
+- Token and theming workstreams remain stable, enabling downstream template production and runtime validation.
+- Navigation, layout, and component templates now include live classroom lobbies, tutor storefronts, and moderation consoles alongside storage governance flows.
+- Compliance, security, and QA disciplines are engaged; recording consent, ticketing, payout readiness, and moderation prompts mirror backend enforcement while accessibility and localisation checks continue.

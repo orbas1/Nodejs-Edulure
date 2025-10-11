@@ -21,6 +21,7 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 
 ### 4. Component & Interaction System
 - Reworked cards, forms, modals, and drawers per `Cards.md`, `Forms.md`, `component_functions.md`, and `Screens__Update_widget_types.md` to include explicit idle/loading/offline/error/rights-restricted states.
+- Added antivirus/quarantine banners, admin review modals, and upload status escalations informed by `web_app_wireframe_changes.md`, `dashboard_drawings.md`, and `App_screens_drawings.md`, ensuring learner/instructor/admin flows surface malware outcomes consistently.
 - Mapped widget behaviours and inline analytics IDs to `Screens_Updates_widget_functions.md`, `component_types.md`, and `component_functions.md`.
 - Hardened microcopy and interaction guidance using `Screen_text.md`, `text.md.md`, and `Dummy_Data_Requirements.md` with compliance review loops.
 
@@ -38,6 +39,14 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Documented retention and audit messaging for admin compliance consoles, mapping banners/tooltips to `dashboard_drawings.md`, `menu_drawings.md`, and `Screen_text.md` so policy automation surfaces remain transparent to operators.
 - Added scheduler status badges, dry-run toggles, and failure backoff notifications to admin compliance consoles referencing `dashboard_drawings.md` and `App_screens_drawings.md`, ensuring operations teams can see when automated hygiene is paused or deferred.
 - Introduced feature flag disable states, support escalation prompts, and runtime configuration callouts for the admin console using `dashboard_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md` so operators know when gated tooling is unavailable.
+
+### 7. Live Classroom & Tutor Hire Experience
+- Produced tutor storefront layouts with availability calendars, rate cards, and review strips aligned to `website_drawings.md` and `Home page components.md`, ensuring discovery funnels link directly into booking flows.
+- Mapped the tutor onboarding checklist, profile completeness indicators, and payout readiness badges to `provider_app_wireframe_changes.md` and `provider_application_logic_flow_changes.md` so instructors understand compliance prerequisites before accepting bookings.
+- Authored live classroom lobby, streaming stage, roster drawer, and chat sidecar compositions referencing `dashboard_drawings.md`, `App_screens_drawings.md`, and `Admin_panel_drawings.md` to guarantee parity between learner, instructor, and moderator consoles.
+- Detailed scheduling logic, waitlist prompts, ticket tiers (free, passholder, paid), and cancellation warnings using `Logic_Flow_map.md`, `Screens_Update_Logic_Flow_map.md`, and `web_application_logic_flow_changes.md` so product analytics and billing hooks align with UI states.
+- Extended component specs for availability pills, countdown timers, engagement badges, and moderation toasts using `component_types.md`, `component_functions.md`, and `Screens__Update_widget_types.md` while reusing accessibility tokens for status messaging.
+- Captured Agora connectivity, recording consent, and host handoff microcopy within `Screen_text.md`, `text.md.md`, and `web_app_wireframe_changes.md`, ensuring learners receive deterministic join guidance and moderators can escalate incidents quickly.
 
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
