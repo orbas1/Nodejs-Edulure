@@ -95,3 +95,13 @@
 - **Countdown timer:** Circular progress indicator with `conic-gradient(#2563EB, #7C3AED)` border, centre uses `Inter 700` 24px typography. High-contrast mode swaps to solid outlines.
 - **Moderation toasts:** Bottom-left anchored, dark background `#1E293B`, accent border `#F59E0B`, includes iconography from `assets/moderation` set; slide-in animation 180ms ease-out.
 - **Post-session summary:** Card grid uses neutral backdrop with accent header band (#2563EB at 12% opacity). Buttons align with CTA guidelines, analytics badges display using tertiary accent for KPIs.
+
+## Commerce Checkout Styling
+- **Layout:** Desktop uses split grid (main form 2fr, summary rail 1fr) with frosted surface tokens; tablet collapses to stacked sections with sticky summary header per `website_drawings.md`.
+- **Summary rail:** Totals card uses gradient border `linear-gradient(135deg, #2563EB 0%, #14B8A6 100%)` with inset shadow; tax and coupon rows animate in with 150ms fade when applied.
+- **Payment method selector:** Tiles 144x88px with 12px radius, icon left, copy right; selected state uses `box-shadow: 0 0 0 2px #7C3AED` and subtle scale. Focus outlines remain 2px `#38BDF8` offset.
+- **Form inputs:** Billing address fields adopt same dark input style with additional inline country flag icon; validation errors include icon + inline message referencing `Screen_text.md` copy deck.
+- **PayPal launch button:** Full-width golden gradient (#FBBF24 → #F59E0B) with drop shadow `0 12px 24px rgba(251, 191, 36, 0.35)`; reduces to brand-compliant outline variant in high-contrast mode.
+- **Success state:** Confirmation badge uses `web.accent.tertiary` ring with check icon, background gradient lighten to #0F172A; receipt CTA uses ghost button style with accent border.
+- **Failure/retry state:** Error banner uses `web.feedback.error` background with icon left, action buttons right; includes support link styled as underline using `web.accent.secondary`.
+- **Responsive behaviour:** At <=768px, payment methods collapse to accordion, summary rail moves below form with sticky order CTA bar. Accessibility ensures minimum 48px height for all tappable controls.

@@ -84,3 +84,11 @@
 4. 30 minutes before session, lobby opens; learners run audio/video checks, view agenda, and see countdown. Agora token requested on join; if environment variables missing, UI surfaces support contact and fallback instructions.
 5. During session, host controls manage mute-all, spotlight, poll launch, and chat moderation; co-hosts promoted from roster. Incident actions (remove, report) log audit events and display confirmation to moderators per `Admin_panel_drawings.md`.
 6. Session end triggers summary generation: attendance metrics, chat export, recordings, and feedback survey link. Tutor receives payout readiness prompt (mark complete, add notes), while learners see follow-up resources and review request.
+
+## 16. Commerce Checkout & Refund Flow
+1. Learner initiates checkout from cart/CTA; order builder preloads selected courses, ebooks, and live class tickets, computes subtotal, and fetches applicable coupons/taxes from `/api/commerce` while reflecting jurisdiction logic documented in `Logic_Flow_map.md` and `web_app_wireframe_changes.md`.
+2. User applies coupon; UI validates via `/api/commerce/orders` preview, surfaces success or error toast, updates totals, and toggles finance support link referencing `Screen_text.md` copy.
+3. Learner selects Stripe or PayPal; Stripe path renders Elements (card, billing details) with inline validation and 3DS fallback, while PayPal launches approval pop-up. Both log analytics checkpoints defined in `Screens_Updates_widget_functions.md`.
+4. On payment confirmation, UI polls capture endpoint for final status, transitions to success screen with receipt download, onboarding CTAs, and compliance copy referencing `dashboard_drawings.md`. Failures render recovery states guiding retry or alternate method selection.
+5. Learner initiates refund via order history; modal collects reason, posts to refund endpoint, and updates timeline with pending/refunded states while notifying finance team and surfacing SLA copy from `text.md.md`.
+6. Finance admins monitor settlement dashboard: webhook health alerts and reconciliation widgets update in real time, enabling manual capture or dispute logging flows aligned to `Admin_panel_drawings.md`.

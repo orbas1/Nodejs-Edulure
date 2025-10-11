@@ -42,3 +42,9 @@
 - `backend-nodejs/eslint.config.mjs` – ESLint flat configuration enabling workspace-wide governance with Node/test aware rules.
 - `backend-nodejs/scripts/provision-r2-buckets.js` – operational CLI that creates/validates Cloudflare R2 buckets with lifecycle, CORS, and tagging policies.
 - `backend-nodejs/test/antivirusService.test.js` – Vitest suite exercising antivirus scanning, detection, caching, and storage streaming integrations.
+- `backend-nodejs/migrations/20241112120000_payments_and_commerce.js` – Knex migration provisioning coupons, tax rates, orders, transactions, refunds, and audit tables with indexes for reconciliation performance.
+- `backend-nodejs/src/models/CommerceCouponModel.js`, `CommerceTaxRateModel.js`, `PaymentOrderModel.js`, `PaymentTransactionModel.js`, `PaymentAuditLogModel.js`, `PaymentRefundModel.js` – repositories encapsulating the commerce ledger with helper queries for finance dashboards.
+- `backend-nodejs/src/services/PaymentService.js` – production-ready payment orchestration (Stripe/PayPal intents, taxes, refunds, webhook verification, Prometheus metrics, audit logging).
+- `backend-nodejs/src/controllers/PaymentController.js`, `backend-nodejs/src/routes/commerce.routes.js` – Express surface for order create/capture/refund plus webhook endpoints.
+- `backend-nodejs/test/paymentService.test.js` – Vitest suite mocking Stripe/PayPal SDKs to validate coupon/tax calculations, refunds, and webhook handling.
+- `backend-nodejs/test/setupMocks.js` – Shared Stripe/PayPal mock harness consumed by payment-focused Vitest suites.

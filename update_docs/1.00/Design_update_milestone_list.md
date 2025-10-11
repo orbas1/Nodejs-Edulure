@@ -14,14 +14,14 @@
 - **Dependencies:** IA research, logic flow artefacts (`Logic_Flow_map.md`, `Screens_Update_Logic_Flow_map.md`).
 - **Responsible Roles:** UX Architect, Frontend Lead, Flutter Lead.
 
-## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 55% complete)
+## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 68% complete)
 - **Objectives:** Produce annotated high-fidelity templates for home, dashboards, explorer, media viewers, profiles, and settings across web and Flutter.
 - **Entry Criteria:** Milestones 1–2 delivered; component inventory baselined.
-- **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded. _Update:_ Live classroom lobbies, tutor storefronts, booking calendars, and moderator consoles are now redlined with analytics IDs, motion notes, and Agora join requirements referencing `dashboard_drawings.md`, `App_screens_drawings.md`, and `website_drawings.md`.
+- **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded. _Update:_ Live classroom lobbies, tutor storefronts, booking calendars, moderator consoles, and learner checkout/payment success+failure states are redlined with analytics IDs, motion notes, and Stripe/PayPal edge cases referencing `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, and `menu_drawings.md`.
 - **Dependencies:** Token library, imagery guidance (`images_and_vectors.md`), microcopy drafts (`Screen_text.md`).
 - **Responsible Roles:** Product Designers, Content Strategist, QA Design Lead.
 
-## Milestone 4 – Engineering Handoff & QA (Target: Week 8, Status: 28% complete)
+## Milestone 4 – Engineering Handoff & QA (Target: Week 8, Status: 34% complete)
 - **Objectives:** Package design specifications, motion references, analytics matrices, and QA scripts; oversee accessibility, localisation, and compliance verification.
 - **Entry Criteria:** Milestone 3 assets complete; engineering squads aligned on development sprints.
 - **Exit Criteria:** Handoff checklist signed, accessibility/localisation scripts executed, design QA sign-off recorded, open issues logged in `Design_Change_log.md`.
@@ -31,6 +31,6 @@
   - Retention audit banners and administrator prompts defined for policy compliance consoles so data hygiene automation has corresponding UI guidance; references captured in `dashboard_drawings.md` and `menu_drawings.md`.
   - Scheduler health indicators (next run, paused/backoff badges, dry-run toggles) mapped for the compliance console using `dashboard_drawings.md` and `App_screens_drawings.md` so operators have parity with the new backend job behaviour.
   - Antivirus alerts, quarantine review queues, and storage governance dashboards annotated for admin consoles with localisation and escalation guidance referencing `dashboard_drawings.md`, `App_screens_drawings.md`, and `web_app_wireframe_changes.md`.
-  - Live classroom QA packs now include join token smoke tests, moderation handoff checklists, and recording consent receipts referencing `Admin_panel_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md`.
+  - Live classroom QA packs now include join token smoke tests, moderation handoff checklists, recording consent receipts, and commerce checkout smoke scripts (Stripe Elements, PayPal approvals, webhook reconciliation) referencing `Admin_panel_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md`.
 - **Dependencies:** Engineering schedules, QA tooling, localisation resources, compliance checklists.
 - **Responsible Roles:** Design Producer, Engineering Managers, Accessibility Specialist.

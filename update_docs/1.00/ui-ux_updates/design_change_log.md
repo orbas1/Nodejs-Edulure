@@ -13,6 +13,7 @@ Version 1.00 formalises the unified Edulure web experience. The workstream intro
 | Settings & Support | Tabbed settings dashboard, notification matrix, security overview, support shortcuts. | Streamline account management and compliance requirements. | Web App |
 | Profile & Community | Enhanced profile hero, stats, timeline, achievements; community hub layout with events and chat dock. | Encourage engagement, provide social proof, align with brand. | Web App |
 | Live Classroom & Tutor Hire | Tutor storefronts with availability calendars, rate cards, reviews, and book-now CTAs plus live classroom lobby, streaming stage, roster drawer, and moderation rails. | Support synchronous learning, monetise expertise, and streamline scheduling/moderation per `website_drawings.md`, `dashboard_drawings.md`, and `Admin_panel_drawings.md`. | Web App |
+| Payments & Commerce | Checkout flow with coupon/tax handling, Stripe/PayPal selection, receipts, finance dashboards, and refund workflows referencing `website_drawings.md`, `menu_drawings.md`, and `Admin_panel_drawings.md`. | Monetise learning assets, ensure compliance with PCI/financial regulations, and surface settlement telemetry to operators. | Web App |
 
 ## Accessibility & Compliance Enhancements
 - **WCAG 2.1 AA coverage:** All colour pairings validated with contrast ratios logged in `accessibility_tokens.md`. Focus order rewired to follow visual hierarchy, skip links surfaced on keyboard focus, and motion preferences honoured by toggling to reduced-motion variants. Live classroom roster drawers and chat panels now include labelled regions for assistive technologies referencing `App_screens_drawings.md`.
@@ -41,6 +42,7 @@ Version 1.00 formalises the unified Edulure web experience. The workstream intro
 
 ## Detailed Changes
 - **Component Specifications:** Comprehensive updates in `component_types.md`, `component_functions.md`, `buttons.md`, `Forms.md`, and `Cards.md` detailing dimensions, states, and behaviours. Live classroom extensions include availability pills, countdown tiles, attendance badges, and moderation toasts referencing `dashboard_drawings.md` and `Admin_panel_drawings.md`.
+- **Commerce Components:** Checkout tiles, payment method selectors, order recap cards, invoice downloads, refund modals, and webhook health alerts defined with accessibility states referencing `Forms.md`, `component_types.md`, `Screens__Update_widget_types.md`, `Screen_text.md`, and `dashboard_drawings.md`.
 - **Visual Language:** Refresh of `colours.md`, `Fonts.md`, `Stylings.md`, `Css.md`, `Scss.md` establishing tokens, gradients, and implementation layering.
 - **Page Blueprints:** New content across `pages.md`, `Home Page Organisations.md`, `Dashboard Designs.md`, `Profile Look.md`, and `Settings.md` to direct layout decisions.
 - **Logic Alignment:** Updated flows in `Logic_Flow_update.md` and `Logic_Flow_map.md` to match navigation and interaction patterns. Tutor booking, waitlist escalation, and Agora join handoff scenarios now map to backend APIs and compliance checkpoints.

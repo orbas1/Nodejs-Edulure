@@ -197,7 +197,16 @@ const envSchema = z
     FEATURE_FLAG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(30),
     FEATURE_FLAG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(120),
     RUNTIME_CONFIG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(45),
-    RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(300)
+    RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(300),
+    STRIPE_SECRET_KEY: z.string().min(10).optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().min(10).optional(),
+    STRIPE_DEFAULT_STATEMENT_DESCRIPTOR: z.string().max(22).optional(),
+    PAYPAL_CLIENT_ID: z.string().min(10).optional(),
+    PAYPAL_CLIENT_SECRET: z.string().min(10).optional(),
+    PAYPAL_ENVIRONMENT: z.enum(['sandbox', 'live']).default('sandbox'),
+    PAYPAL_WEBHOOK_ID: z.string().optional(),
+    PAYMENT_ORDER_EXPIRY_MINUTES: z.coerce.number().int().min(5).max(7 * 24 * 60).default(60),
+    PAYMENT_ALLOWED_CURRENCIES: z.string().optional()
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -229,6 +238,25 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['METRICS_BEARER_TOKEN'],
         message: 'Use either METRICS_BEARER_TOKEN or METRICS_USERNAME/METRICS_PASSWORD, not both.'
+      });
+    }
+
+    const stripeConfigured = Boolean(value.STRIPE_SECRET_KEY);
+    const paypalConfigured = Boolean(value.PAYPAL_CLIENT_ID);
+
+    if (!stripeConfigured && !paypalConfigured) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['STRIPE_SECRET_KEY'],
+        message: 'Configure at least one payment provider (Stripe or PayPal) to process commerce orders.'
+      });
+    }
+
+    if (paypalConfigured && !value.PAYPAL_CLIENT_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['PAYPAL_CLIENT_SECRET'],
+        message: 'PAYPAL_CLIENT_SECRET is required when PAYPAL_CLIENT_ID is configured.'
       });
     }
   });
@@ -350,6 +378,25 @@ export const env = {
     featureFlagRefreshIntervalMs: raw.FEATURE_FLAG_REFRESH_INTERVAL_SECONDS * 1000,
     configCacheTtlMs: raw.RUNTIME_CONFIG_CACHE_TTL_SECONDS * 1000,
     configRefreshIntervalMs: raw.RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS * 1000
+  },
+  payments: {
+    allowedCurrencies: parseCsv(raw.PAYMENT_ALLOWED_CURRENCIES ?? 'USD,EUR,GBP'),
+    orderExpiryMinutes: raw.PAYMENT_ORDER_EXPIRY_MINUTES,
+    stripe: raw.STRIPE_SECRET_KEY
+      ? {
+          secretKey: raw.STRIPE_SECRET_KEY,
+          webhookSecret: raw.STRIPE_WEBHOOK_SECRET ?? null,
+          statementDescriptor: raw.STRIPE_DEFAULT_STATEMENT_DESCRIPTOR ?? 'EDULURE'
+        }
+      : null,
+    paypal: raw.PAYPAL_CLIENT_ID
+      ? {
+          clientId: raw.PAYPAL_CLIENT_ID,
+          clientSecret: raw.PAYPAL_CLIENT_SECRET,
+          environment: raw.PAYPAL_ENVIRONMENT,
+          webhookId: raw.PAYPAL_WEBHOOK_ID ?? null
+        }
+      : null
   },
   observability: {
     tracing: {

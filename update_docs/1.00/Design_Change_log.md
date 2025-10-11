@@ -48,6 +48,12 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Extended component specs for availability pills, countdown timers, engagement badges, and moderation toasts using `component_types.md`, `component_functions.md`, and `Screens__Update_widget_types.md` while reusing accessibility tokens for status messaging.
 - Captured Agora connectivity, recording consent, and host handoff microcopy within `Screen_text.md`, `text.md.md`, and `web_app_wireframe_changes.md`, ensuring learners receive deterministic join guidance and moderators can escalate incidents quickly.
 
+### 8. Payments & Commerce Experience
+- Crafted learner checkout flows referencing `website_drawings.md`, `menu_drawings.md`, and `dashboard_drawings.md`: two-column desktop layout with responsive summary rail, tax callouts, coupon field, and payment method selector mirroring backend capabilities.
+- Authored payment confirmation, failure, and refund request states with finance escalation copy using `Screen_text.md`, `text.md.md`, and `Logic_Flow_map.md` so support teams receive consistent messaging across Stripe and PayPal paths.
+- Added finance telemetry overlays and reconciliation widgets to admin dashboards referencing `Admin_panel_drawings.md` and `App_screens_drawings.md`, surfacing settlement status, webhook health, and audit log access tied to the new commerce tables.
+- Extended component library with payment method tiles, order recap cards, and inline validation treatments documented in `component_types.md`, `Forms.md`, and `Screens__Update_widget_types.md` ensuring accessibility and localisation resilience.
+
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
 - Embedded security messaging around verification, payment confirmation, and rights-managed assets across profile and commerce flows.

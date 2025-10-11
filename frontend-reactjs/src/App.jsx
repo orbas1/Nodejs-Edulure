@@ -9,6 +9,7 @@ import Profile from './pages/Profile.jsx';
 import Search from './pages/Search.jsx';
 import Admin from './pages/Admin.jsx';
 import ContentLibrary from './pages/ContentLibrary.jsx';
+import Checkout from './pages/Checkout.jsx';
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/search" element={<Search />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/content" element={<ContentLibrary />} />
+        <Route path="/checkout" element={<Checkout />} />
       </Route>
     </Routes>
   );

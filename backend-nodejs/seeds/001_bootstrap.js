@@ -5,6 +5,13 @@ const makeHash = (value) => crypto.createHash('sha256').update(value).digest('he
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
+    await trx('payment_audit_logs').del();
+    await trx('payment_refunds').del();
+    await trx('payment_transactions').del();
+    await trx('payment_order_items').del();
+    await trx('payment_orders').del();
+    await trx('commerce_tax_rates').del();
+    await trx('commerce_coupons').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flags').del();
     await trx('configuration_entries').del();
@@ -58,6 +65,137 @@ export async function seed(knex) {
       last_login_at: trx.fn.now(),
       password_changed_at: trx.fn.now()
     });
+
+    const now = new Date();
+    const nextYear = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+    const [launchCouponId] = await trx('commerce_coupons').insert({
+      code: 'LAUNCH25',
+      discount_type: 'percentage',
+      discount_value: 25,
+      currency: 'USD',
+      max_redemptions: 500,
+      redemption_count: 0,
+      valid_from: trx.fn.now(),
+      valid_until: nextYear,
+      stackable: false,
+      status: 'active',
+      metadata: JSON.stringify({
+        description: 'Launch celebration – 25% off flagship programs',
+        appliesTo: ['courses', 'ebooks', 'tutor_packages']
+      })
+    });
+
+    const [usDigitalTaxId] = await trx('commerce_tax_rates').insert({
+      country_code: 'US',
+      region_code: null,
+      rate_percentage: 0,
+      label: 'US Digital Goods (Tax Exempt)',
+      is_default: true,
+      metadata: JSON.stringify({ reason: 'Most digital goods exempt at federal level' })
+    });
+
+    const [caTaxId] = await trx('commerce_tax_rates').insert({
+      country_code: 'US',
+      region_code: 'CA',
+      rate_percentage: 8.50,
+      label: 'California – Digital Services',
+      is_default: false,
+      metadata: JSON.stringify({ nexus: 'US-CA', complianceNote: 'County average blended rate' })
+    });
+
+    const [seedOrderId] = await trx('payment_orders').insert({
+      user_id: learnerId,
+      order_number: 'ORD-2024-0001',
+      currency: 'USD',
+      subtotal_amount: 320,
+      discount_amount: 80,
+      tax_amount: 20.4,
+      total_amount: 260.4,
+      status: 'completed',
+      payment_provider: 'stripe',
+      provider_intent_id: 'pi_seed_checkout_001',
+      provider_client_secret: 'pi_seed_checkout_001_secret',
+      metadata: JSON.stringify({
+        channel: 'seed',
+        note: 'Bootstrapped order for analytics dashboards',
+        defaultTaxRateId: usDigitalTaxId
+      }),
+      billing_email: 'noemi.carvalho@edulure.test',
+      billing_country: 'US',
+      billing_region: 'CA',
+      applied_coupon_id: launchCouponId,
+      applied_tax_rate_id: caTaxId,
+      paid_at: trx.fn.now()
+    });
+
+    await trx('payment_order_items').insert([
+      {
+        order_id: seedOrderId,
+        item_type: 'course',
+        item_id: 'course-ops-blueprint',
+        name: 'Learning Ops Blueprint – Masterclass',
+        quantity: 1,
+        unit_amount: 220,
+        total_amount: 220,
+        tax_amount: 18.7,
+        discount_amount: 55,
+        metadata: JSON.stringify({ delivery: 'course', durationWeeks: 6 })
+      },
+      {
+        order_id: seedOrderId,
+        item_type: 'ebook',
+        item_id: 'ebook-systems',
+        name: 'Systems Thinking for Educators',
+        quantity: 1,
+        unit_amount: 100,
+        total_amount: 100,
+        tax_amount: 1.7,
+        discount_amount: 25,
+        metadata: JSON.stringify({ format: 'epub+audio', drm: true })
+      }
+    ]);
+
+    const [seedTransactionId] = await trx('payment_transactions').insert({
+      order_id: seedOrderId,
+      transaction_type: 'capture',
+      status: 'succeeded',
+      payment_provider: 'stripe',
+      provider_transaction_id: 'pi_seed_checkout_001',
+      amount: 260.4,
+      currency: 'USD',
+      payment_method_type: 'card',
+      response_snapshot: JSON.stringify({
+        provider: 'stripe',
+        receipt_url: 'https://stripe.local/receipts/pi_seed_checkout_001'
+      }),
+      processed_at: trx.fn.now()
+    });
+
+    await trx('payment_audit_logs').insert([
+      {
+        event_type: 'order.created',
+        order_id: seedOrderId,
+        performed_by: learnerId,
+        payload: JSON.stringify({
+          subtotal: 320,
+          currency: 'USD',
+          coupon: 'LAUNCH25',
+          taxRateId: caTaxId
+        })
+      },
+      {
+        event_type: 'payment.captured',
+        order_id: seedOrderId,
+        transaction_id: seedTransactionId,
+        performed_by: adminId,
+        payload: JSON.stringify({
+          provider: 'stripe',
+          amount: 260.4,
+          currency: 'USD'
+        })
+      }
+    ]);
 
     const [opsCommunityId] = await trx('communities').insert({
       owner_id: instructorId,

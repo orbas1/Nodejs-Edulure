@@ -17,6 +17,7 @@ export default function MainLayout() {
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
       { name: 'Search', to: '/search' },
+      { name: 'Checkout', to: '/checkout' },
       { name: 'Profile', to: '/profile' }
     ];
     if (adminConsoleEnabled) {

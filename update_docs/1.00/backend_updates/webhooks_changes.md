@@ -1,4 +1,4 @@
 # Webhook Changes
 
-- No webhook endpoints were introduced in Task 1; groundwork is limited to domain event logging for future async integration.
-- Task 2 ingestion currently polls CloudConvert jobs; webhook endpoints remain deferred until integration credentials are finalised.
+- Introduced `/api/commerce/stripe/webhook` preserving raw request bodies for signature validation before logging events and advancing order/transaction states. Replay protection leverages Stripe's signing secret and idempotency keys.
+- Added `/api/commerce/paypal/webhook` verifying transmission signatures via PayPal's API, enforcing webhook ID scoping, and writing immutable audit rows for dispute/capture updates.

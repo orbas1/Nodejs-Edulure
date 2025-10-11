@@ -67,8 +67,8 @@
 
 ## Checkout & Self-Serve Trial Flow
 - **Free trial signup:** Modal overlay with short form (name, work email, organisation size) and consent checkboxes. Confirmation page outlines next steps and link to onboarding call scheduler.
-- **Checkout summary:** Sidebar shows plan, seats, billing frequency, tax estimate, promo code field. Main content includes payment method selector, billing address, and terms acknowledgement.
-- **Post-purchase screen:** Success state with onboarding checklist, invite teammates CTA, and download apps links.
+- **Checkout summary:** Sidebar shows plan, seats, billing frequency, tax estimate, promo code field, webhook health indicator, and finance support CTA. Main content includes payment method selector (Stripe Elements cards, PayPal button), billing address, legal disclosures, and saved payment radio referencing `menu_drawings.md` and `website_drawings.md`.
+- **Post-purchase screen:** Success state with onboarding checklist, invite teammates CTA, download apps links, and receipt download card mapped to `dashboard_drawings.md` with audit trail link for finance.
 
 ## SEO & Content Infrastructure
 - **Pillar pages:** Long-form layout with sticky secondary navigation, inline CTA banners, and related resources sections between content blocks.

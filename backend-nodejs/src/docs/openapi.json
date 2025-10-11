@@ -414,6 +414,242 @@
           "status",
           "emailVerifiedAt"
         ]
+      },
+      "CommerceOrderItem": {
+        "type": "object",
+        "properties": {
+          "itemType": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "unitAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "taxAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "CommerceOrder": {
+        "type": "object",
+        "properties": {
+          "orderNumber": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "subtotalAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "discountAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "taxAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "totalAmount": {
+            "type": "number",
+            "format": "float"
+          },
+          "status": {
+            "type": "string"
+          },
+          "paymentProvider": {
+            "type": "string"
+          },
+          "billingEmail": {
+            "type": "string",
+            "nullable": true
+          },
+          "billingCountry": {
+            "type": "string",
+            "nullable": true
+          },
+          "billingRegion": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommerceOrderItem"
+            }
+          }
+        }
+      },
+      "CommercePaymentIntent": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "providerIntentId": {
+            "type": "string"
+          },
+          "clientSecret": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "CreateCommerceOrderRequest": {
+        "type": "object",
+        "required": [
+          "currency",
+          "paymentProvider",
+          "items"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "paymentProvider": {
+            "type": "string",
+            "enum": [
+              "stripe",
+              "paypal"
+            ]
+          },
+          "couponCode": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "billing": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "country": {
+                "type": "string",
+                "example": "US"
+              },
+              "region": {
+                "type": "string",
+                "example": "CA"
+              },
+              "returnUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "cancelUrl": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "itemType",
+                "name",
+                "unitAmount"
+              ],
+              "properties": {
+                "itemType": {
+                  "type": "string",
+                  "example": "course"
+                },
+                "itemId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "unitAmount": {
+                  "type": "number",
+                  "format": "float"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": true
+                },
+                "taxable": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CreateCommerceOrderResponse": {
+        "type": "object",
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/CommerceOrder"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/CommercePaymentIntent"
+          }
+        }
+      },
+      "CommerceRefundResponse": {
+        "type": "object",
+        "properties": {
+          "refundId": {
+            "type": "integer"
+          },
+          "providerResponse": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
       }
     }
   },
@@ -606,11 +842,11 @@
           "401": {
             "description": "Invalid credentials"
           },
-          "422": {
-            "description": "Validation error"
-          },
           "403": {
             "description": "Email verification required"
+          },
+          "422": {
+            "description": "Validation error"
           },
           "423": {
             "description": "Account locked"
@@ -1531,11 +1767,198 @@
               }
             }
           },
-          "429": {
-            "description": "Too many requests"
-          },
           "422": {
             "description": "Validation error"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        }
+      }
+    },
+    "/api/commerce/orders": {
+      "post": {
+        "summary": "Create a commerce order and payment intent",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommerceOrderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Order created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CreateCommerceOrderResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/orders/{orderNumber}/capture": {
+      "post": {
+        "summary": "Capture an authorized order",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Order number to capture"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Order captured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommerceOrder"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/orders/{orderNumber}/refunds": {
+      "post": {
+        "summary": "Issue a refund for an order",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "orderNumber",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Order number to refund"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "format": "float"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refund requested",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommerceRefundResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/webhooks/stripe": {
+      "post": {
+        "summary": "Stripe webhook endpoint",
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commerce/webhooks/paypal": {
+      "post": {
+        "summary": "PayPal webhook endpoint",
+        "responses": {
+          "200": {
+            "description": "Webhook processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
           }
         }
       }

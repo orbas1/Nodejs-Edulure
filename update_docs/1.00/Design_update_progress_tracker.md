@@ -2,24 +2,24 @@
 
 | Metric | Current Score (%) | Status Commentary |
 | --- | --- | --- |
-| Design Quality | 74 | Tutor storefronts, booking flows, and live classroom consoles are specified for web, admin, and learner clients referencing `dashboard_drawings.md` and `App_screens_drawings.md`. |
-| Design Organisation | 70 | Information architecture now threads tutor rosters, classroom calendars, and escalation pathways using `menu_drawings.md` and `website_drawings.md`. |
-| Design Position | 66 | Layout guidance balances video stage, roster drawers, chat panels, and booking sidebars without breaking breakpoints. |
-| Design Text Grade | 66 | Copy decks cover tutor bios, cancellation guardrails, recording consent, and Agora connectivity states with localisation buffers. |
-| Design Colour Grade | 74 | Engagement/status tokens extended to availability pills, stream badges, and moderation alerts while preserving WCAG ratios. |
-| Design Render Grade | 58 | High-fidelity renders complete for lobby countdowns, in-session chat, tutor onboarding, and payout dashboards. |
-| Compliance Grade | 70 | Ticketing, moderation, and payout policies documented with references to `Admin_panel_drawings.md` and legal copy reviews. |
-| Security Grade | 82 | Join experiences surface verification indicators, host controls, and secure token notices aligned with backend enforcement. |
-| Design Functionality Grade | 64 | Interaction diagrams include booking conflict checks, waitlists, seat limit adjustments, and moderator escalation flows. |
-| Design Images Grade | 62 | Asset manifests expanded with tutor photography, classroom illustrations, and accessibility-compliant iconography. |
-| Design Usability Grade | 60 | Usability walkthroughs validated scheduling heuristics, countdown timers, and post-class surveys with mixed learner/provider cohorts. |
-| Bugs-Less Grade | 52 | Peer reviews resolved stacking regressions for calendar overlays and stream controls; outstanding motion polish logged. |
-| Test Grade | 58 | Regression scripts now target booking calendars, lobby states, and chat overlays across desktop/tablet/mobile breakpoints. |
-| QA Grade | 60 | QA checklist updated with tutor onboarding, live session moderation, and Agora token smoke scenarios. |
-| Design Accuracy Grade | 62 | Measurements for agenda rails, roster drawers, and attendee chips validated across device matrices. |
-| Overall Grade | 69 | Live learning/tutor flows meet production readiness while planned motion refinements continue in the next sprint. |
+| Design Quality | 78 | Live classroom and commerce checkout specs are annotated across `dashboard_drawings.md`, `website_drawings.md`, and `App_screens_drawings.md`, covering payment, refund, and receipt states alongside booking flows. |
+| Design Organisation | 74 | Information architecture threads tutor rosters, classroom calendars, and the new payments IA (checkout, receipts, admin finance) using `menu_drawings.md` and `Organisation_and_positions.md`. |
+| Design Position | 70 | Layout guidance balances video stage, roster drawers, commerce summary rails, and legal disclosure panels without breaking breakpoints documented in `Screen Size Changes.md`. |
+| Design Text Grade | 70 | Copy decks now cover payment confirmation, dispute escalation, VAT invoicing, and refund timelines referencing `Screen_text.md` and `text.md.md` with localisation buffers. |
+| Design Colour Grade | 75 | Commerce badges and payment method tiles extend engagement tokens while preserving WCAG ratios noted in `Screen_update_Screen_colours.md`. |
+| Design Render Grade | 64 | High-fidelity renders complete for checkout steps, payment success/failure overlays, and finance dashboards alongside live classroom scenes. |
+| Compliance Grade | 76 | Ticketing, payout, PCI copy, and refund consent prompts validated with legal/security partners referencing `Admin_panel_drawings.md`. |
+| Security Grade | 84 | Join and checkout experiences surface verification indicators, secure payment notices, and webhook health banners aligned with backend enforcement. |
+| Design Functionality Grade | 70 | Interaction diagrams cover booking conflicts, waitlists, coupon/tax application, payment retries, and moderator escalation flows. |
+| Design Images Grade | 66 | Asset manifests expanded with payment method illustrations, finance icons, and tutor photography per `images_and_vectors.md`. |
+| Design Usability Grade | 66 | Usability walkthroughs validated scheduling heuristics, checkout form completion, and refund requests across learner/provider cohorts. |
+| Bugs-Less Grade | 56 | Peer reviews resolved layout regressions for checkout summary rails and calendar overlays; outstanding motion polish logged. |
+| Test Grade | 62 | Regression scripts now target booking calendars, checkout validation, and chat overlays across desktop/tablet/mobile breakpoints. |
+| QA Grade | 64 | QA checklist updated with tutor onboarding, live session moderation, Stripe/PayPal smoke tests, and webhook monitoring. |
+| Design Accuracy Grade | 66 | Measurements for agenda rails, roster drawers, order recap cards, and attendee chips validated across device matrices. |
+| Overall Grade | 74 | Live classroom and commerce experiences reach production readiness with cohesive scheduling, billing, and compliance treatments; motion polish remains planned. |
 
 ## Progress Notes
 - Token and theming workstreams remain stable, enabling downstream template production and runtime validation.
-- Navigation, layout, and component templates now include live classroom lobbies, tutor storefronts, and moderation consoles alongside storage governance flows.
-- Compliance, security, and QA disciplines are engaged; recording consent, ticketing, payout readiness, and moderation prompts mirror backend enforcement while accessibility and localisation checks continue.
+- Navigation, layout, and component templates now include live classroom lobbies, tutor storefronts, moderation consoles, and learner checkout/finance consoles alongside storage governance flows.
+- Compliance, security, and QA disciplines are engaged; recording consent, ticketing, payout readiness, commerce disclosures, and moderation prompts mirror backend enforcement while accessibility and localisation checks continue.

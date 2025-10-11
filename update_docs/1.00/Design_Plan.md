@@ -23,6 +23,7 @@
 - Prepare persona-specific dashboards (learner, provider, admin) referencing `Dashboard Organisation.md`, `Settings Dashboard.md`, and `Profile Styling.md`.
 - Add new page shells for explorer, communities, and monetisation scenarios using `Pages_list.md`, `Screens_list.md`, and `Organisation_and_positions.md`.
 - Deliver tutor storefront and live classroom landing templates mapped to `website_drawings.md`, `menu_drawings.md`, and `dashboard_drawings.md`, including availability calendars, countdown tiles, roster drawers, and moderator toolbars for engineering handoff.
+- Produce checkout and commerce management templates referencing `website_drawings.md`, `menu_drawings.md`, `Admin_panel_drawings.md`, and `App_screens_drawings.md` with annotated payment states (intent, capture, refund), coupon/tax surfaces, and finance telemetry overlays matching backend API contracts.
 
 ### 4. Component Library & Interaction Specs
 - Refresh cards, forms, modals, drawers, widgets, and buttons per `Cards.md`, `Forms.md`, `component_functions.md`, `Screens__Update_widget_types.md`, and `Screen_buttons.md`.
@@ -44,6 +45,7 @@
 - Layer tutor onboarding, compliance readiness, payout verification, recording consent, and seat limit governance prompts into provider/admin consoles referencing `provider_app_wireframe_changes.md`, `Admin_panel_drawings.md`, and `dashboard_drawings.md` so live learning operations meet policy requirements.
 - Introduce session/device management states (active session list, revoke-all confirmation, logout banners) referencing `Settings Dashboard.md`, `Settings.md`, `Screen_text.md`, `menu_drawings.md`, and `dashboard_drawings.md` so design mirrors new governance tooling.
 - Layer retention/audit disclosures into admin dashboards referencing `dashboard_drawings.md`, `menu_drawings.md`, and `Screen_text.md` so operators understand automation outcomes, cron schedule status, and recovery options tied to backend hygiene policies.
+- Introduce finance reconciliation consoles and learner receipts referencing `dashboard_drawings.md`, `Admin_panel_drawings.md`, and `App_screens_drawings.md`, covering settlement timelines, webhook health indicators, VAT/GST copy, and refund workflows for Stripe/PayPal parity.
 
 ## Deliverables & Outputs
 - **Design System Tokens:** JSON/CSS/Flutter exports, documentation, and regression testing scripts.
