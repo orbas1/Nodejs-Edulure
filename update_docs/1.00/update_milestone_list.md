@@ -13,10 +13,11 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   2. **Task 1.2 Dependency & Workspace Governance**
      - Select workspace tooling (PNPM/npm workspaces, Melos) and align Node/Flutter versions.
      - Configure automated dependency updates, lint/test scripts, and shared environment templates.
-     - Status update: Adopted npm workspaces with Node 20.12.2+/npm 10.5.0+ enforcement, runtime verification, shared audit/lint/test commands, and axios-backed client wrappers; Flutter alignment scheduled after backend sign-off.
+     - Status update: Adopted npm workspaces with Node 20.12.2+/npm 10.5.0+ enforcement, runtime verification, shared audit/lint/test commands, and axios-backed client wrappers; backend linting now runs via ESLint flat config with Prometheus-safe Vitest mocks, with Flutter alignment scheduled after backend sign-off.
   3. **Task 1.3 Observability, Migrations & Feature Flags**
      - Stand up logging/metrics dashboards for R2, Meilisearch, payments, communities, and mobile APIs.
      - Adopt Knex/Prisma migrations with rollback drills, seed datasets, and feature flag/configuration services.
+     - Status update: Retention policy/audit migrations, production-grade seeds, owner triggers, the scripted data retention runner, the cron scheduler, and the feature flag/runtime configuration service (with `/api/runtime` endpoints and CLI) are live.
 
 ## Milestone 2 – Content Commerce & Learning Experiences (Weeks 2–6)
 - **Tasks Included:** Task 2 – Content, Commerce & Live Learning Delivery.

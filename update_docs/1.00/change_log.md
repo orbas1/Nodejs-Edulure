@@ -8,9 +8,12 @@
 - Added a signed JWT key store with key identifiers, runtime verification across legacy keys, and an operational rotation script to meet secret governance requirements.
 - Standardised response envelopes, added a shared HTTP response helper, and shipped an OpenAPI 3.0 specification served at `/api/docs` for downstream client contracts.
 - Introduced refresh-token backed session storage, automatic community owner enrolment, and domain event auditing via new orchestration services and repositories.
+- Delivered data hygiene automation: retention policy/audit tables, owner enrolment triggers, production-grade seeds, and a CLI retention runner that purges stale sessions/telemetry with immutable audit trails.
+- Added a managed retention scheduler with cron/backoff controls, new environment toggles, and Vitest coverage so hygiene enforcement runs continuously without manual intervention.
 - Migrated database management to Knex migrations with automated execution on boot, plus programmatic provisioning to replace legacy SQL installers.
 - Enabled dependency governance with Dependabot coverage, Node engine pinning, and npm audit scripts, alongside updated `.env` templates detailing new security-critical variables.
 - Delivered full-stack observability: AsyncLocalStorage request contexts, redaction-aware structured logging, secured Prometheus `/metrics`, and R2 operation metrics feeding production alerting.
+- Modernised backend quality gates with ESLint flat configuration, workspace lint scripts, and Prometheus-aware Vitest mocks so feature flag/runtime automation can be validated without external infrastructure.
 
 ## Version 1.50 – Task 2 Cloudflare R2 & Learning Content Pipelines
 

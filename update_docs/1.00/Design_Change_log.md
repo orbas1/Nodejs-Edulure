@@ -35,6 +35,9 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Embedded legal consent, security prompts, and audit trails referencing `Function Design.md`, `component_functions.md`, and `provider_application_logic_flow_changes.md`.
 - Documented observability overlays tying Prometheus metrics and trace IDs to design QA dashboards so interface health is monitored alongside copy/accessibility sign-offs.
 - Expanded account security guidance with active-session listings, revoke-all confirmation modals, and logout microcopy referencing `Settings Dashboard.md`, `Settings.md`, `Screen_text.md`, and `menu_drawings.md` so UI mirrors the new session governance tooling.
+- Documented retention and audit messaging for admin compliance consoles, mapping banners/tooltips to `dashboard_drawings.md`, `menu_drawings.md`, and `Screen_text.md` so policy automation surfaces remain transparent to operators.
+- Added scheduler status badges, dry-run toggles, and failure backoff notifications to admin compliance consoles referencing `dashboard_drawings.md` and `App_screens_drawings.md`, ensuring operations teams can see when automated hygiene is paused or deferred.
+- Introduced feature flag disable states, support escalation prompts, and runtime configuration callouts for the admin console using `dashboard_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md` so operators know when gated tooling is unavailable.
 
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
@@ -47,6 +50,7 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Token exports now map directly to CSS variables, Flutter theme objects, and backend-driven theme payloads to support runtime theme switching.
 - Logic flow diagrams align provider workflows with learner experiences while exposing advanced analytics and financial controls.
 - Documented npm workspace runtime requirements so design token packages, storybook previews, and frontend builds rely on the same Node/npm versions enforced across engineering environments.
+- Confirmed runtime flag gating and admin disable states continue to render as designed after the backend test-to-development environment alias; no visual adjustments required.
 
 ## Open Items & Follow-Ups
 - **Advanced Data Visualisation:** Validate charting libraries for analytics-heavy dashboards before engineering handoff.

@@ -39,6 +39,7 @@
 - Align verification prompts, lockout states, and security education with backend enforcement referencing `Screen_text.md`, `Dummy_Data_Requirements.md`, and `provider_application_logic_flow_changes.md`.
 - Add inline security messaging and audit surfaces with guidance from `provider_application_logic_flow_changes.md` and `web_application_logic_flow_changes.md`.
 - Introduce session/device management states (active session list, revoke-all confirmation, logout banners) referencing `Settings Dashboard.md`, `Settings.md`, `Screen_text.md`, `menu_drawings.md`, and `dashboard_drawings.md` so design mirrors new governance tooling.
+- Layer retention/audit disclosures into admin dashboards referencing `dashboard_drawings.md`, `menu_drawings.md`, and `Screen_text.md` so operators understand automation outcomes, cron schedule status, and recovery options tied to backend hygiene policies.
 
 ## Deliverables & Outputs
 - **Design System Tokens:** JSON/CSS/Flutter exports, documentation, and regression testing scripts.

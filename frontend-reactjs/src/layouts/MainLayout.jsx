@@ -3,24 +3,30 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Disclosure, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 
 export default function MainLayout() {
   const location = useLocation();
   const { isAuthenticated, session, logout } = useAuth();
+  const { isFeatureEnabled, getConfigValue } = useRuntimeConfig();
+  const adminConsoleEnabled = isFeatureEnabled('admin.operational-console');
+  const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
   const navigation = useMemo(() => {
     const base = [
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
       { name: 'Search', to: '/search' },
-      { name: 'Profile', to: '/profile' },
-      { name: 'Admin', to: '/admin' }
+      { name: 'Profile', to: '/profile' }
     ];
+    if (adminConsoleEnabled) {
+      base.push({ name: 'Admin', to: '/admin' });
+    }
     if (isAuthenticated) {
       return [...base, { name: 'Content', to: '/content' }];
     }
     return base;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, adminConsoleEnabled]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -157,7 +163,7 @@ export default function MainLayout() {
           <div className="flex gap-4">
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
-            <a href="/support">Support</a>
+            <a href={`mailto:${supportEmail}`}>Support</a>
           </div>
         </div>
       </footer>

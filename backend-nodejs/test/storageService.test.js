@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+
+import { env } from '../src/config/env.js';
+import { StorageService } from '../src/services/StorageService.js';
 
 vi.mock('@aws-sdk/s3-request-presigner', () => ({
   getSignedUrl: vi.fn(async () => 'https://signed-url.example')
 }));
-
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { StorageService } from '../src/services/StorageService.js';
-import { env } from '../src/config/env.js';
 
 const createMockClient = () => ({
   send: vi.fn()

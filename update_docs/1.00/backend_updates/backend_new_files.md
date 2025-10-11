@@ -26,3 +26,16 @@
 - `backend-nodejs/migrations/20241101090000_enhance_user_sessions.js` – migration enriching `user_sessions` with `last_used_at`, `rotated_at`, and `revoked_by` metadata for rotation governance.
 - `backend-nodejs/src/services/SessionRegistry.js` – in-memory/session cache ensuring revoked sessions are denied without repeated database lookups.
 - `backend-nodejs/test/sessionRegistry.test.js` – Vitest suite validating session cache behaviour, TTL eviction, and revocation handling.
+- `backend-nodejs/migrations/20241105153000_data_hygiene.js` – migration adding retention policy/audit tables, owner membership triggers, and soft-delete columns for data hygiene automation.
+- `backend-nodejs/seeds/001_bootstrap.js` – production-grade seed dataset covering verified roles, communities, asset lifecycle telemetry, and stale session cases for governance validation.
+- `backend-nodejs/src/services/dataRetentionService.js` – policy-driven retention executor with audit logging used by scheduled hygiene jobs.
+- `backend-nodejs/scripts/run-data-retention.js` – CLI wrapper for enforcing retention policies with dry-run/verbose flags.
+- `backend-nodejs/src/jobs/dataRetentionJob.js` – managed cron scheduler coordinating retention enforcement with failure backoff and startup toggles.
+- `backend-nodejs/test/dataRetentionService.test.js`, `backend-nodejs/test/dataRetentionJob.test.js` – Vitest coverage for the retention executor strategies and scheduler resilience.
+- `backend-nodejs/migrations/20241107101500_feature_flags_and_runtime_config.js` – creates feature flag, audit, and runtime configuration tables with seed data.
+- `backend-nodejs/src/models/FeatureFlagModel.js`, `backend-nodejs/src/models/ConfigurationEntryModel.js` – repositories exposing JSON-parsed flag/config metadata.
+- `backend-nodejs/src/services/FeatureFlagService.js` – caching feature flag/runtime configuration orchestrator with metrics integration.
+- `backend-nodejs/src/middleware/runtimeConfig.js`, `backend-nodejs/src/controllers/RuntimeConfigController.js`, `backend-nodejs/src/routes/runtimeConfig.routes.js` – Express plumbing exposing `/api/runtime` endpoints and request helpers.
+- `backend-nodejs/scripts/runtime-config.js` – CLI generating flag/config snapshots for ops.
+- `backend-nodejs/test/featureFlagService.test.js`, `backend-nodejs/test/runtimeConfigService.test.js` – Vitest coverage validating strategy evaluation and runtime config exposure.
+- `backend-nodejs/eslint.config.mjs` – ESLint flat configuration enabling workspace-wide governance with Node/test aware rules.

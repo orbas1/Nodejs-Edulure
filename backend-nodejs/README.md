@@ -23,10 +23,26 @@ Key environment variables are validated on boot. Ensure the following are set be
 - `LOG_SERVICE_NAME`, `LOG_REDACTED_FIELDS` – customise log metadata and extend default secret/PII redaction.
 - `TRACE_HEADER_NAME`, `TRACING_SAMPLE_RATE` – tune inbound trace propagation and sampling for distributed telemetry.
 - `METRICS_ENABLED`, `METRICS_USERNAME`/`METRICS_PASSWORD` or `METRICS_BEARER_TOKEN`, `METRICS_ALLOWED_IPS` – secure Prometheus access for operations tooling.
+- `DATA_RETENTION_ENABLED`, `DATA_RETENTION_CRON`, `DATA_RETENTION_TIMEZONE`, `DATA_RETENTION_MAX_FAILURES`, `DATA_RETENTION_FAILURE_BACKOFF_MINUTES` – control the automated retention scheduler, including execution window and resilience thresholds.
+- `FEATURE_FLAG_CACHE_TTL_SECONDS`, `FEATURE_FLAG_REFRESH_INTERVAL_SECONDS`, `RUNTIME_CONFIG_CACHE_TTL_SECONDS`, `RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS` – tune feature flag/runtime configuration cache behaviour for the API and CLI.
 
 `npm run db:install` provisions the schema (via Knex migrations) and seeds the database. Use `npm run migrate:latest`/`npm run
 migrate:rollback` to manage schema changes in CI/CD. The asset ingestion worker is started alongside the HTTP server and relies on
 CloudConvert for PowerPoint renditions and local EPUB parsing for ebook manifest generation.
+
+The bootstrap seed (`npm run seed`) now provisions an operator-ready dataset: verified admin/instructor/learner accounts, two
+communities with owner auto-enrolment, a production-style PowerPoint asset and its ingestion history, ebook reading telemetry,
+and active + stale refresh sessions for governance testing. Seeds intentionally cover scenarios referenced in retention policies
+so QA can validate the automation routines.
+
+### Quality gates
+
+- `npm run lint --workspace backend-nodejs` executes the ESLint flat configuration (`eslint.config.mjs`) which lint-checks the
+  entire workspace, including Vitest suites and operational scripts, with import resolution tuned for ESM modules and Prometheus
+  instrumentation.
+- `npm run test --workspace backend-nodejs` runs the Vitest suite. Prometheus collectors and other infrastructure dependencies
+  are safely mocked in `test/setupMocks.js` so feature flag/runtime configuration logic and retention schedulers execute without
+  external services.
 
 ### Rotating JWT signing keys
 
@@ -103,6 +119,29 @@ Example Prometheus scrape configuration:
     username: ${EDULURE_METRICS_USER}
     password: ${EDULURE_METRICS_PASS}
 ```
+
+## Automated data retention
+
+- **Managed scheduler** – The HTTP process boots a `node-cron` powered `DataRetentionJob` that enforces policies according to the configured `DATA_RETENTION_CRON`. Toggle dry-runs with `DATA_RETENTION_DRY_RUN`, gate execution with `DATA_RETENTION_ENABLED`, and rely on automatic backoff after repeated failures to avoid destructive retries during outages.
+- **Policies as data** – Data hygiene is managed through the `data_retention_policies` table. Each record defines the entity,
+  action (`hard-delete` or `soft-delete`), retention horizon, and JSON criteria so governance can fine-tune behaviour without a
+  deploy cycle.
+- **Execution service** – Run `npm run data:retention` on a schedule to enforce policies. Add `--dry-run` to review the impact
+  and `--verbose` for per-policy output. Every live run writes an immutable record to `data_retention_audit_logs` capturing rows
+  touched, sample identifiers, and contextual metadata for compliance teams.
+- **Session hygiene** – Expired or inactive refresh sessions older than 90 days (30 days of inactivity) are automatically purged,
+  keeping authentication tables lean and preventing unlimited token accumulation. The session model now honours a `deleted_at`
+  flag so API queries ignore cleaned-up rows.
+- **Lifecycle coverage** – Communities dormant for two years are softly deleted rather than wiped, preserving the ability to
+  restore IDs while hiding them from member listings. Domain events and content asset telemetry follow rolling hard deletes to
+  keep analytics performant and storage predictable.
+
+## Feature flags & runtime configuration
+
+- **Database-backed definitions** – Feature flags, audits, and runtime configuration entries live in dedicated tables created by migration `20241107101500_feature_flags_and_runtime_config.js`. Flags support boolean, percentage, and segment strategies with environment scopes and schedules.
+- **Caching & metrics** – `FeatureFlagService` and `RuntimeConfigService` cache records in-memory, expose Prometheus counters (`edulure_feature_flag_evaluations_total`, `edulure_runtime_config_reads_total`), and auto-refresh based on the new TTL environment variables.
+- **Operational interfaces** – `/api/runtime/public`, `/api/runtime/user`, and `/api/runtime/snapshot` provide scoped payloads for clients and ops. `npm run runtime:config` generates JSON snapshots for change reviews or incident response.
+- **Frontend integration** – The React app consumes `/api/runtime` through `RuntimeConfigProvider`, gating navigation (e.g., admin console kill switch) and surfacing support contacts from configuration entries.
 
 ## API surface
 

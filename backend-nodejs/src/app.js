@@ -18,9 +18,11 @@ import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import communityRoutes from './routes/community.routes.js';
 import contentRoutes from './routes/content.routes.js';
+import runtimeConfigRoutes from './routes/runtimeConfig.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
 import requestContextMiddleware from './middleware/requestContext.js';
+import runtimeConfigMiddleware from './middleware/runtimeConfig.js';
 import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } from './observability/metrics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +43,7 @@ const limiter = expressRateLimit({
 const corsOrigins = new Set(env.app.corsOrigins);
 
 app.use(requestContextMiddleware);
+app.use(runtimeConfigMiddleware);
 app.use(
   pinoHttp({
     logger,
@@ -115,6 +118,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/communities', communityRoutes);
 app.use('/api/content', contentRoutes);
+app.use('/api/runtime', runtimeConfigRoutes);
 
 app.use(errorHandler);
 

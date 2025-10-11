@@ -1,3 +1,4 @@
 # Seeders Updates
 
-- No new seed data introduced; content assets are created through upload workflows and analytics captured dynamically.
+- Added `backend-nodejs/seeds/001_bootstrap.js` seeding verified admin/instructor/learner accounts, dual communities with trigger-driven owner enrolment, asset lifecycle telemetry, ebook progress, domain events, and active vs stale sessions to exercise governance flows and retention policies.
+- Seeder now provisions feature flag definitions, audit history, and runtime configuration entries (support contact, admin escalation channels, live classroom ceilings) so QA environments mirror production governance.

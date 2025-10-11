@@ -46,7 +46,7 @@ export function verifyAccessToken(token) {
   try {
     const decoded = jwt.decode(token, { complete: true });
     headerKid = decoded?.header?.kid ?? null;
-  } catch (error) {
+  } catch (_error) {
     throw new jwt.JsonWebTokenError('Unable to decode token header.');
   }
 
