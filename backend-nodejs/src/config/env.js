@@ -3,6 +3,98 @@ import { z } from 'zod';
 
 dotenv.config();
 
+function tryParseJson(value) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  try {
+    return JSON.parse(trimmed);
+  } catch (jsonError) {
+    try {
+      const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
+      return JSON.parse(decoded);
+    } catch (base64Error) {
+      return null;
+    }
+  }
+}
+
+function normalizeJwtKeyset(rawKeyset, fallbackSecret, explicitActiveKeyId) {
+  const allowedAlgorithms = new Set(['HS256', 'HS384', 'HS512']);
+  const keysetSource = tryParseJson(rawKeyset);
+
+  if (!keysetSource) {
+    if (!fallbackSecret) {
+      throw new Error(
+        'JWT configuration invalid: provide either JWT_KEYSET (JSON/base64 JSON) or a legacy JWT_SECRET value.'
+      );
+    }
+
+    const legacyKey = {
+      kid: 'legacy-env-secret',
+      secret: fallbackSecret,
+      algorithm: 'HS512',
+      status: 'active',
+      createdAt: new Date().toISOString()
+    };
+
+    return {
+      activeKeyId: legacyKey.kid,
+      keys: [legacyKey]
+    };
+  }
+
+  const keys = Array.isArray(keysetSource) ? keysetSource : keysetSource.keys ?? [];
+  const configuredActiveKeyId =
+    explicitActiveKeyId ?? keysetSource.activeKeyId ?? keysetSource.active_key_id ?? null;
+
+  if (!Array.isArray(keys) || keys.length === 0) {
+    throw new Error('JWT_KEYSET must contain at least one signing key definition.');
+  }
+
+  const normalizedKeys = keys.map((key) => {
+    if (!key.kid || typeof key.kid !== 'string') {
+      throw new Error('Every JWT key must declare a non-empty "kid" string.');
+    }
+
+    if (!key.secret || typeof key.secret !== 'string' || key.secret.length < 32) {
+      throw new Error(`Signing secret for key "${key.kid}" must be a string with >= 32 characters.`);
+    }
+
+    const algorithm = (key.algorithm ?? 'HS512').toUpperCase();
+    if (!allowedAlgorithms.has(algorithm)) {
+      throw new Error(
+        `Unsupported algorithm "${algorithm}" for key "${key.kid}". Allowed values: ${Array.from(allowedAlgorithms).join(', ')}`
+      );
+    }
+
+    const status = key.status ?? 'active';
+    return {
+      kid: key.kid,
+      secret: key.secret,
+      algorithm,
+      status,
+      createdAt: key.createdAt ?? key.created_at ?? null,
+      rotatedAt: key.rotatedAt ?? key.rotated_at ?? null
+    };
+  });
+
+  const activeKey =
+    normalizedKeys.find((key) => key.kid === configuredActiveKeyId) ??
+    normalizedKeys.find((key) => key.status === 'active');
+
+  if (!activeKey) {
+    throw new Error('JWT configuration invalid: no active signing key available.');
+  }
+
+  return {
+    activeKeyId: activeKey.kid,
+    keys: normalizedKeys
+  };
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -10,12 +102,14 @@ const envSchema = z
     APP_URL: z.string().min(1, 'APP_URL must specify at least one origin'),
     CORS_ALLOWED_ORIGINS: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-    JWT_SECRET: z
-      .string()
-      .min(32, 'JWT_SECRET must be at least 32 characters to provide adequate entropy'),
+    JWT_SECRET: z.string().min(32).optional(),
     JWT_REFRESH_SECRET: z
       .string()
       .min(32, 'JWT_REFRESH_SECRET must be at least 32 characters to provide adequate entropy'),
+    JWT_KEYSET: z.string().optional(),
+    JWT_ACTIVE_KEY_ID: z.string().optional(),
+    JWT_AUDIENCE: z.string().optional(),
+    JWT_ISSUER: z.string().optional(),
     TOKEN_EXPIRY_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(120),
     REFRESH_TOKEN_EXPIRY_DAYS: z.coerce.number().int().min(1).max(180).default(30),
     DB_HOST: z.string().min(1),
@@ -39,7 +133,8 @@ const envSchema = z
     ASSET_DOWNLOAD_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
     CONTENT_MAX_UPLOAD_MB: z.coerce.number().int().min(10).max(2048).default(512),
     CLOUDCONVERT_API_KEY: z.string().min(1).optional(),
-    DRM_DOWNLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3)
+    DRM_DOWNLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3),
+    DRM_SIGNATURE_SECRET: z.string().min(32).optional()
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -47,6 +142,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['DB_POOL_MIN'],
         message: 'DB_POOL_MIN cannot exceed DB_POOL_MAX'
+      });
+    }
+
+    if (!value.JWT_SECRET && !value.JWT_KEYSET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['JWT_SECRET'],
+        message: 'Provide either JWT_SECRET or JWT_KEYSET to sign access tokens.'
       });
     }
   });
@@ -59,6 +162,9 @@ if (!parsed.success) {
 }
 
 const raw = parsed.data;
+
+const jwtKeyset = normalizeJwtKeyset(raw.JWT_KEYSET, raw.JWT_SECRET, raw.JWT_ACTIVE_KEY_ID);
+const activeJwtKey = jwtKeyset.keys.find((key) => key.kid === jwtKeyset.activeKeyId);
 
 const corsOrigins = (raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL)
   .split(',')
@@ -74,12 +180,17 @@ export const env = {
     corsOrigins
   },
   security: {
-    jwtSecret: raw.JWT_SECRET,
     jwtRefreshSecret: raw.JWT_REFRESH_SECRET,
     accessTokenTtlMinutes: raw.TOKEN_EXPIRY_MINUTES,
     refreshTokenTtlDays: raw.REFRESH_TOKEN_EXPIRY_DAYS,
     rateLimitWindowMinutes: raw.RATE_LIMIT_WINDOW_MINUTES,
-    rateLimitMax: raw.RATE_LIMIT_MAX
+    rateLimitMax: raw.RATE_LIMIT_MAX,
+    jwtKeyset: jwtKeyset.keys,
+    jwtActiveKeyId: jwtKeyset.activeKeyId,
+    jwtActiveKey: activeJwtKey,
+    jwtAudience: raw.JWT_AUDIENCE ?? 'api.edulure.com',
+    jwtIssuer: raw.JWT_ISSUER ?? 'edulure-platform',
+    drmSignatureSecret: raw.DRM_SIGNATURE_SECRET ?? activeJwtKey.secret
   },
   database: {
     host: raw.DB_HOST,

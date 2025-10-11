@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-The development server runs on http://localhost:5173.
+The development server runs on http://localhost:5173. Use Node.js 20.12.2+ and npm 10.5.0+; the workspace runtime guard will block installs on older engines.
 
 ## Available pages
 

@@ -8,10 +8,12 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
 - **Tasks & Subtasks:**
   1. **Task 1.1 Security Framework Upgrade**
      - Implement strict CORS, rate limits, password policy, JWT validation, and secret rotation scripts.
+     - Status update: Multi-key JWT keystore, rotation CLI, and middleware verification completed; account lockout and email verification remain.
      - Add automated security scans (npm audit, Snyk) to CI and alert routing to the governance board.
   2. **Task 1.2 Dependency & Workspace Governance**
      - Select workspace tooling (PNPM/npm workspaces, Melos) and align Node/Flutter versions.
      - Configure automated dependency updates, lint/test scripts, and shared environment templates.
+     - Status update: Adopted npm workspaces with Node 20.12.2+/npm 10.5.0+ enforcement, runtime verification, shared audit/lint/test commands, and axios-backed client wrappers; Flutter alignment scheduled after backend sign-off.
   3. **Task 1.3 Observability, Migrations & Feature Flags**
      - Stand up logging/metrics dashboards for R2, Meilisearch, payments, communities, and mobile APIs.
      - Adopt Knex/Prisma migrations with rollback drills, seed datasets, and feature flag/configuration services.

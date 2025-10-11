@@ -2,7 +2,7 @@
 
 Each task below aligns with the numbered plan, includes integration coverage across required domains, and is broken into 4–6 actionable subtasks with completion percentages.
 
-## Task 1 – Platform Hardening & Governance Foundations (10% complete)
+## Task 1 – Platform Hardening & Governance Foundations (26% complete)
 ### Integration Coverage
 - **Backend:** Harden auth, feeds, payments, notifications services; add feature flags and secrets management.
 - **Front-end:** Configure shared API client, environment switching, and error boundaries in React.
@@ -14,8 +14,8 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 - **Design:** Deliver security UX guidelines, token governance, accessibility patterns, and error states.
 
 ### Subtasks
-1. **Security Framework Upgrade (20%)** – Rate limiting, strict CORS, password policies, JWT validation, secret rotation.
-2. **Dependency & Workspace Governance (0%)** – Monorepo/tooling decisions, automated audits, version pinning, lint/test scripts.
+1. **Security Framework Upgrade (20%)** – Rate limiting, strict CORS, password policies, JWT validation, secret rotation. _Progress update:_ Multi-key JWT key store, rotation tooling, and shared verification helpers delivered; pending account lockout and email verification.
+2. **Dependency & Workspace Governance (100%)** – Monorepo/tooling decisions, automated audits, version pinning, lint/test scripts. _Progress update:_ Introduced a root npm workspace with enforced Node 20.12.2+/npm 10.5.0+ engines, wired a runtime verifier, shared audit/lint/test commands, axios-backed React client, and `.npmrc` governance so CI, local, and production environments consume identical dependency trees.
 3. **Observability & Telemetry (15%)** – Logging structure, metrics dashboards (R2, Meilisearch, payments), alerting runbooks.
 4. **Migration & Data Hygiene (5%)** – Knex/Prisma migrations, rollback rehearsals, seed datasets, retention policies.
 5. **Feature Flag & Config Service (10%)** – Environment matrices, kill switches, staged rollout orchestration.

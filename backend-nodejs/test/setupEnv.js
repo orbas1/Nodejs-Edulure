@@ -6,6 +6,24 @@ process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'error';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-test-secret-test-secret-123';
 process.env.JWT_REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET ?? 'refresh-secret-refresh-secret-refresh-secret-456';
+
+if (!process.env.JWT_KEYSET) {
+  const keyset = {
+    activeKeyId: 'test-key-primary',
+    keys: [
+      {
+        kid: 'test-key-primary',
+        secret: process.env.JWT_SECRET,
+        algorithm: 'HS512',
+        status: 'active',
+        createdAt: new Date().toISOString()
+      }
+    ]
+  };
+
+  process.env.JWT_KEYSET = Buffer.from(JSON.stringify(keyset), 'utf8').toString('base64');
+  process.env.JWT_ACTIVE_KEY_ID = 'test-key-primary';
+}
 process.env.TOKEN_EXPIRY_MINUTES = process.env.TOKEN_EXPIRY_MINUTES ?? '120';
 process.env.REFRESH_TOKEN_EXPIRY_DAYS = process.env.REFRESH_TOKEN_EXPIRY_DAYS ?? '30';
 process.env.DB_HOST = process.env.DB_HOST ?? 'localhost';

@@ -16,13 +16,26 @@ npm run dev
 Key environment variables are validated on boot. Ensure the following are set before starting the server:
 
 - `APP_URL` or `CORS_ALLOWED_ORIGINS` – comma-separated list of allowed web origins.
-- `JWT_SECRET` / `JWT_REFRESH_SECRET` – 32+ character secrets used to sign access and refresh tokens.
+- `JWT_KEYSET` / `JWT_ACTIVE_KEY_ID` – base64 encoded JSON describing signing keys. Generate via `npm run security:rotate-jwt`. A legacy `JWT_SECRET` is still honoured for local environments.
+- `JWT_REFRESH_SECRET` – 32+ character secret for refresh token HMAC hashing.
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` – database credentials. Set `DB_PROVISION_USER=true` only for local installs.
 - `TOKEN_EXPIRY_MINUTES`, `REFRESH_TOKEN_EXPIRY_DAYS` – optional overrides for token lifetimes.
 
 `npm run db:install` provisions the schema (via Knex migrations) and seeds the database. Use `npm run migrate:latest`/`npm run
 migrate:rollback` to manage schema changes in CI/CD. The asset ingestion worker is started alongside the HTTP server and relies on
 CloudConvert for PowerPoint renditions and local EPUB parsing for ebook manifest generation.
+
+### Rotating JWT signing keys
+
+Run the rotation script whenever access tokens need to be re-keyed or revoked:
+
+```bash
+npm run security:rotate-jwt -- --keyset secure/jwt-keys.json
+```
+
+The script promotes a newly generated signing key, marks the previous active key as legacy, and prints a base64 encoded payload
+that should be copied to your secret manager (`JWT_KEYSET` / `JWT_ACTIVE_KEY_ID`). The plaintext secret is displayed once—store
+it immediately and never commit the generated keyset file.
 
 ### Content pipeline environment
 
@@ -59,6 +72,7 @@ scripts/         # operational scripts (database install, etc.)
 - JWTs include issuer/audience claims and role-aware access control. Refresh tokens are stored as hashed session records.
 - Environment validation (Zod) prevents the API from booting with unsafe defaults.
 - Dependabot configuration lives at the repo root (`.github/dependabot.yml`) and `npm run audit:dependencies` surfaces CVEs.
+- Workspace tooling enforces Node.js 20.12.2+/npm 10.5.0+ via a preinstall runtime check and shared `.nvmrc`/`.npmrc` so local, CI, and production environments stay aligned.
 
 ## API surface
 

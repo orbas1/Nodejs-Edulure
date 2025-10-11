@@ -1,7 +1,4 @@
-import jwt from 'jsonwebtoken';
-
-import { env } from '../config/env.js';
-import { ACCESS_TOKEN_AUDIENCE } from '../services/AuthService.js';
+import { verifyAccessToken } from '../config/jwtKeyStore.js';
 
 const rolePriority = {
   user: 1,
@@ -22,10 +19,7 @@ export default function auth(requiredRole) {
     }
 
     try {
-      const payload = jwt.verify(token, env.security.jwtSecret, {
-        audience: ACCESS_TOKEN_AUDIENCE,
-        issuer: 'edulure-platform'
-      });
+      const payload = verifyAccessToken(token);
       req.user = { ...payload, id: payload.sub };
       if (requiredRole) {
         const userPriority = rolePriority[payload.role] ?? 0;

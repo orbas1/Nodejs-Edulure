@@ -2,5 +2,5 @@
 
 - Introduced an authenticated content library route (`/content`) featuring presigned upload flows, analytics sidebars, and embedded PowerPoint/PDF/Ebook viewers backed by the new `/api/content` endpoints.
 - Replaced stub login/register screens with real authentication flows consuming the backend, including MFA placeholders, error messaging, and AuthContext session management.
-- Added `httpClient` abstraction, IDB caching (`idb-keyval`), and PropTypes coverage to stabilise API interactions and enforce component contracts.
+- Rebuilt the `httpClient` abstraction on top of axios with error normalisation, token header support, upload progress hooks, alongside IDB caching (`idb-keyval`) and PropTypes coverage to stabilise API interactions and enforce component contracts.
 - Updated build tooling via `npm install` to capture new dependencies (`epubjs`, `idb-keyval`) and ensured production builds succeed under Vite.

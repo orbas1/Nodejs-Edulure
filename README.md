@@ -2,6 +2,8 @@
 
 Base implementation for the Edulure learning community platform. The repository bundles a React front-end, Node.js/Express API, MySQL schema assets, and a companion Flutter mobile shell.
 
+The repo is now managed as an npm workspace. Node.js **20.12.2** and npm **10.5.0** (or newer) are enforced via `.nvmrc`, `.npmrc`, and a runtime verifier that blocks installs on unsupported engines or alternative package managers.
+
 ## Packages
 
 - `frontend-reactjs/` – Vite + React application with Tailwind CSS and Inter font
@@ -10,7 +12,21 @@ Base implementation for the Edulure learning community platform. The repository 
 
 ## Quick start
 
-Each package maintains its own README with installation steps. At a high level:
+Each package maintains its own README with installation steps. At a high level you can bootstrap everything from the repo root:
+
+```bash
+nvm use
+npm install
+
+# lint + test every workspace (backend + frontend)
+npm run lint
+npm run test
+
+# optional security scan
+npm run audit
+```
+
+You can still work inside individual workspaces when needed:
 
 ```bash
 # Frontend

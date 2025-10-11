@@ -1,38 +1,61 @@
+import axios from 'axios';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
 
-async function parseResponse(response) {
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('application/json')) {
-    return response.json();
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json'
   }
-  const text = await response.text();
-  return text ? { message: text } : null;
-}
+});
 
-async function request(path, { method = 'GET', headers = {}, body, token, signal } = {}) {
-  const finalHeaders = { ...headers };
-  let payload = body;
-  if (body && !(body instanceof FormData) && typeof body !== 'string') {
-    finalHeaders['Content-Type'] = 'application/json';
-    payload = JSON.stringify(body);
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response) {
+      const enriched = new Error(error.response.data?.message ?? 'Request failed');
+      enriched.status = error.response.status;
+      enriched.details = error.response.data?.data ?? error.response.data?.errors;
+      enriched.original = error;
+      return Promise.reject(enriched);
+    }
+    if (error.request) {
+      const enriched = new Error('No response received from server');
+      enriched.original = error;
+      return Promise.reject(enriched);
+    }
+    return Promise.reject(error);
   }
+);
+
+const normaliseHeaders = (headers = {}) => {
+  const result = { ...headers };
+  if (result['content-type']) {
+    result['Content-Type'] = result['content-type'];
+    delete result['content-type'];
+  }
+  return result;
+};
+
+async function request(path, { method = 'GET', headers, body, params, token, signal, onUploadProgress } = {}) {
+  const finalHeaders = normaliseHeaders(headers);
   if (token) {
     finalHeaders.Authorization = `Bearer ${token}`;
   }
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+
+  const config = {
+    url: path,
     method,
     headers: finalHeaders,
-    body: payload,
-    signal
-  });
-  const data = await parseResponse(response);
-  if (!response.ok) {
-    const error = new Error(data?.message ?? 'Request failed');
-    error.details = data?.data ?? data?.errors;
-    error.status = response.status;
-    throw error;
-  }
-  return data;
+    data: body,
+    params,
+    signal,
+    onUploadProgress
+  };
+
+  const response = await apiClient.request(config);
+  return response.data;
 }
 
 function get(path, options = {}) {
@@ -47,9 +70,13 @@ function put(path, body, options = {}) {
   return request(path, { ...options, method: 'PUT', body });
 }
 
+function patch(path, body, options = {}) {
+  return request(path, { ...options, method: 'PATCH', body });
+}
+
 function del(path, options = {}) {
   return request(path, { ...options, method: 'DELETE' });
 }
 
-export const httpClient = { get, post, put, delete: del };
-export { API_BASE_URL, request };
+export const httpClient = { get, post, put, patch, delete: del, request };
+export { API_BASE_URL, apiClient, request };
