@@ -40,3 +40,12 @@ Visitor → Audience Selection → Home Hero CTA → (Onboard | Resume) → Dash
 
 ## Visual Mapping
 - Diagram stored in Figma frame `Web v1.00 / Flow Map` with swimlanes for Learner, Provider, System.
+
+## Supporting Diagrams
+- Detailed sequence diagram stored in `docs/flows/web_v1.00_sequence.drawio` covering onboarding API calls.
+- Admin oversight flow map includes permission checks (Learner, Provider, Admin) referenced in `provider_application_logic_flow_changes.md` for parity.
+
+## Transition Rules
+- Guard transitions require resolved promises; skeleton states remain until data + feature flags ready.
+- Navigation uses `react-router` loader functions to prefetch data for `Course Detail` and `Lesson Player` ensuring zero flicker.
+- Browser back button respects preserved scroll positions via `ScrollRestoration` component.

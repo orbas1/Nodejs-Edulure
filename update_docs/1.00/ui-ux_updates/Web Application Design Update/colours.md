@@ -48,3 +48,11 @@
 - Use accent colours sparingly to highlight interactive elements; never combine more than two accents in a single component to avoid colour noise.
 - For gradients involving transparent stops, ensure background surfaces match `--surface-page` to avoid banding.
 - Document palette usage per component in Storybook to enforce consistency.
+
+## Screen Mapping
+- Map tokens per screen using `Screen_update_Screen_colours.md` ensuring CSS variables align (`--color-screen-scr00-hero-bg`, etc.).
+- Provide fallback solid colours for browsers lacking gradient support (IE mode) using `background-color` before gradient.
+
+## Testing
+- Validate colour combinations per screen via Figma plugin "Contrast" and document pass results in QA sheets.
+- Use Percy visual regression to catch gradient shifts when tokens update.

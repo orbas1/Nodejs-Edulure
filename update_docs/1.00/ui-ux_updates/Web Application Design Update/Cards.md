@@ -53,3 +53,21 @@
 - Community cards query `/api/communities/pulse`.
 - KPI cards pull from `/api/insights` with metric parameter.
 - Feed cards integrate GraphQL subscription `feedUpdates` for live comments.
+
+## Screen Usage Matrix
+- **Dashboard (SCR-02):** KPI cards (WGT-KPI), announcement banners, community pulse.
+- **Learn Library (SCR-03):** Course spotlight cards with inline actions, library playlist items styled as horizontal cards.
+- **Course Detail (SCR-04):** Module cards nested within accordion, instructor highlight card (columns 9–12).
+- **Communities (SCR-06/07):** Feed posts share card styling with reaction footer and comment preview.
+- **Profile (SCR-08):** Badge grid uses card tokens with accent overlays.
+- **Support (SCR-10):** Ticket list cards include status badge and quick links.
+- **Admin Analytics (SCR-11):** Insight cards with metric and chart combos.
+- **Admin Content (SCR-12):** Data table rows convert to card layout at <768px.
+
+## Elevation Guidelines
+- Default cards use `shadow-sm` variant; hovered interactive cards use `shadow-lg` to signal clickability.
+- Sticky cards (task rail, summary) remove bottom shadow and add border top `rgba(148,163,184,0.32)` to blend with scroll.
+
+## Micro-interactions
+- Cards animate entry with 80ms stagger (Framer Motion) from 8px upward offset.
+- On focus, apply `outline: 2px solid #38BDF8` plus `outline-offset: 4px`.
