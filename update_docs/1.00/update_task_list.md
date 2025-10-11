@@ -56,7 +56,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
    community tables, seed data, and service layer now power `/api/communities` feeds/resources with authenticated guards; React
    feed wiring replaces mocks with live API pagination, resource rollups, and accessibility reviewed community switcher/profile
    shells.
-2. **Roles, Paywalls & Affiliates (0%)** – Subscription tiers, Stripe billing, entitlements, affiliate marketplace.
+2. **Roles, Paywalls & Affiliates (100%)** – Database-backed role catalogues, gated paywall tiers, subscription checkout APIs, and affiliate payout tooling are live across backend and design systems.
 3. **Engagement Mechanics (0%)** – Leaderboards, tier points, streaks, calendars, map embeds, reminders.
 4. **Chat & Messaging Suite (0%)** – Channels, DMs, presence, moderation tools, Agora live linkage.
 5. **Follow Graph & Recommendations (0%)** – Relationship model, privacy settings, feed ranking, suggestions.

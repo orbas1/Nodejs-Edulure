@@ -18,6 +18,7 @@
 - **Objectives:** Produce annotated high-fidelity templates for home, dashboards, explorer, media viewers, profiles, and settings across web and Flutter.
 - **Entry Criteria:** Milestones 1–2 delivered; component inventory baselined.
 - **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded. _Update:_ Live classroom lobbies, tutor storefronts, booking calendars, moderator consoles, checkout, coupon, refund, finance dashboards, and the refreshed community hub/resource library are now redlined with analytics IDs, motion notes, webhook fallbacks, membership guardrails, and SCA states referencing `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, `menu_drawings.md`, and `web_application_logic_flow_changes.md`.
+- **Latest Progress:** Community paywall dashboards, subscription plan cards, entitlement badges, and affiliate payout flows now mirror backend paywall APIs with interaction specs referencing `menu_drawings.md`, `dashboard_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`.
 - **Dependencies:** Token library, imagery guidance (`images_and_vectors.md`), microcopy drafts (`Screen_text.md`).
 - **Responsible Roles:** Product Designers, Content Strategist, QA Design Lead.
 

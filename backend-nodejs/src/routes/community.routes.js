@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import CommunityController from '../controllers/CommunityController.js';
+import CommunityMonetizationController from '../controllers/CommunityMonetizationController.js';
 import auth from '../middleware/auth.js';
 
 const router = Router();
@@ -13,5 +14,45 @@ router.get('/:communityId/posts', auth(), CommunityController.listFeed);
 router.post('/:communityId/posts', auth(), CommunityController.createPost);
 router.get('/:communityId/resources', auth(), CommunityController.listResources);
 router.post('/:communityId/resources', auth(), CommunityController.createResource);
+
+router.get('/:communityId/roles', auth('instructor'), CommunityMonetizationController.listRoles);
+router.post('/:communityId/roles', auth('instructor'), CommunityMonetizationController.createRole);
+router.patch(
+  '/:communityId/members/:userId/role',
+  auth('instructor'),
+  CommunityMonetizationController.assignRole
+);
+
+router.get('/:communityId/paywall/tiers', auth(), CommunityMonetizationController.listTiers);
+router.post('/:communityId/paywall/tiers', auth('instructor'), CommunityMonetizationController.createTier);
+router.patch(
+  '/:communityId/paywall/tiers/:tierId',
+  auth('instructor'),
+  CommunityMonetizationController.updateTier
+);
+router.post('/:communityId/paywall/checkout', auth(), CommunityMonetizationController.startCheckout);
+router.get(
+  '/:communityId/subscriptions/me',
+  auth(),
+  CommunityMonetizationController.listMySubscriptions
+);
+router.post(
+  '/:communityId/subscriptions/:subscriptionId/cancel',
+  auth(),
+  CommunityMonetizationController.cancelSubscription
+);
+
+router.get('/:communityId/affiliates', auth('instructor'), CommunityMonetizationController.listAffiliates);
+router.post('/:communityId/affiliates/apply', auth(), CommunityMonetizationController.applyAffiliate);
+router.patch(
+  '/:communityId/affiliates/:affiliateId',
+  auth('instructor'),
+  CommunityMonetizationController.updateAffiliate
+);
+router.post(
+  '/:communityId/affiliates/:affiliateId/payouts',
+  auth('instructor'),
+  CommunityMonetizationController.recordPayout
+);
 
 export default router;
