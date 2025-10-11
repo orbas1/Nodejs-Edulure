@@ -1,29 +1,29 @@
 # Version 1.00 Design Update Milestones
 
-## Milestone 1 – Token Architecture Finalisation (Target: Week 2)
-- **Objectives:** Lock the cross-platform colour, typography, spacing, and elevation tokens; publish emo/seasonal theme extension guidelines.
-- **Entry Criteria:** Brand steering input signed off; baseline accessibility audit results available.
-- **Exit Criteria:** Token JSON exports delivered; contrast regression suite executed; documentation updated in `Design_Plan.md`.
-- **Dependencies:** Access to Figma libraries, existing theme assets, WCAG testing scripts.
-- **Responsible Leads:** Principal Product Designer, Design Systems Engineer.
+## Milestone 1 – Token & Theme System Finalisation (Target: Week 2, Status: 70% complete)
+- **Objectives:** Finalise cross-platform colour, typography, spacing, and motion tokens; document emo/seasonal overlays and partial page theme logic.
+- **Entry Criteria:** Brand steering approval, accessibility baseline, and engineering agreement on token ingestion format.
+- **Exit Criteria:** Token exports (CSS/JSON/Flutter) published, automated contrast checks executed, seasonal asset guardrails signed off, documentation refreshed in `Design_Plan.md`.
+- **Dependencies:** Access to design libraries, colour/typography artefacts (`Colours.md`, `Fonts.md`), QA automation scripts.
+- **Responsible Roles:** Principal Product Designer, Design Systems Engineer.
 
-## Milestone 2 – Navigation & Layout Blueprint (Target: Week 4)
+## Milestone 2 – Navigation & Layout Blueprint (Target: Week 4, Status: 45% complete)
 - **Objectives:** Approve role-based navigation schema, IA labels, and responsive layout matrices across home, dashboard, and settings templates.
-- **Entry Criteria:** Milestone 1 completed; user journey research summarised.
-- **Exit Criteria:** Interaction specs for menus, breadcrumbs, and steppers published; responsive grids validated against breakpoints; logic flow diagrams updated in `Application_Design_Update_Plan`.
-- **Dependencies:** IA research, analytics insights, logic flow artefacts (`Logic_Flow_map.md`).
-- **Responsible Leads:** UX Architect, Frontend Lead, Flutter Lead.
+- **Entry Criteria:** Milestone 1 complete, updated journey maps, analytics and research insights.
+- **Exit Criteria:** Interaction specs for menus, breadcrumbs, quick actions, and steppers published; breakpoint matrix validated; logic flow diagrams updated.
+- **Dependencies:** IA research, logic flow artefacts (`Logic_Flow_map.md`, `Screens_Update_Logic_Flow_map.md`).
+- **Responsible Roles:** UX Architect, Frontend Lead, Flutter Lead.
 
-## Milestone 3 – High-Fidelity Template Delivery (Target: Week 6)
-- **Objectives:** Ship pixel-perfect templates for home, dashboards, media viewers, profiles, and settings for both web and Flutter shells.
+## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 30% complete)
+- **Objectives:** Produce annotated high-fidelity templates for home, dashboards, explorer, media viewers, profiles, and settings across web and Flutter.
 - **Entry Criteria:** Milestones 1–2 delivered; component inventory baselined.
-- **Exit Criteria:** All templates annotated with states and variations; asset manifests produced; copy decks approved; design QA sign-off recorded.
-- **Dependencies:** Updated component tokens, imagery guidelines, copy decks.
-- **Responsible Leads:** Product Designers, Content Strategist, QA Design Lead.
+- **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded.
+- **Dependencies:** Token library, imagery guidance (`images_and_vectors.md`), microcopy drafts (`Screen_text.md`).
+- **Responsible Roles:** Product Designers, Content Strategist, QA Design Lead.
 
-## Milestone 4 – Engineering Handoff & QA (Target: Week 8)
-- **Objectives:** Provide implementation packages, motion references, and analytics matrices; oversee design QA and accessibility verification.
-- **Entry Criteria:** Milestone 3 assets complete; engineering availability confirmed.
-- **Exit Criteria:** Handoff checklist completed; accessibility and localisation scripts executed; backlog of implementation questions triaged; final approval recorded in `Design_Change_log.md`.
-- **Dependencies:** Engineering schedules, QA tooling, localisation resources.
-- **Responsible Leads:** Design Producer, Engineering Managers, Accessibility Specialist.
+## Milestone 4 – Engineering Handoff & QA (Target: Week 8, Status: 10% complete)
+- **Objectives:** Package design specifications, motion references, analytics matrices, and QA scripts; oversee accessibility, localisation, and compliance verification.
+- **Entry Criteria:** Milestone 3 assets complete; engineering squads aligned on development sprints.
+- **Exit Criteria:** Handoff checklist signed, accessibility/localisation scripts executed, design QA sign-off recorded, open issues logged in `Design_Change_log.md`.
+- **Dependencies:** Engineering schedules, QA tooling, localisation resources, compliance checklists.
+- **Responsible Roles:** Design Producer, Engineering Managers, Accessibility Specialist.

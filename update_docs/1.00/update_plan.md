@@ -124,3 +124,13 @@
      7.3 Policy & compliance rollout: privacy/terms updates, spam/bad-word detection tuning, and moderation training.
      7.4 Documentation & training: knowledge base, SOPs, release notes, update brief, and change log completion.
      7.5 Launch operations: rollout calendar, feature flags, war room staffing, monitoring dashboards, and post-launch review.
+
+## Design Workstream Addendum
+- **Scope Alignment:** The design refresh follows the artefacts in `Design_Change_log.md`, `Design_Plan.md`, and related ui-ux updates to ensure emo/seasonal themes, navigation refactors, and new template shells land in lockstep with engineering execution.
+- **Key Objectives:**
+  - Finalise token architecture and runtime theming logic (default, high-contrast, emo, seasonal) for shared React/Flutter delivery.
+  - Deliver navigation, layout, and component blueprints that accommodate new landing pages, partial theme deployments, and compliance messaging.
+  - Produce annotated templates, copy decks, and asset manifests for home, dashboards, explorer, communities, and monetisation surfaces.
+  - Harden accessibility, localisation, security, and QA guardrails before engineering handoff.
+- **Dependencies:** Design milestones rely on backend/front-end readiness for analytics IDs, theme payload ingestion, and runtime experimentation frameworks.
+- **Tracking:** Progress is monitored through `Design_update_milestone_list.md`, `Design_update_task_list.md`, and `Design_update_progress_tracker.md` with weekly governance checkpoints.

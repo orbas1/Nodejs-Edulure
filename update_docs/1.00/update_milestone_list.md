@@ -71,3 +71,11 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   3. **Task 7.1 QA, Policies & Launch Ops**
      - Run automated tests, beta programmes, security scans, accessibility checks, and moderation training.
      - Finalise knowledge base, update brief, change log, rollout calendar, war room staffing, and post-launch review.
+
+### Design Milestone Addendum
+| Design Milestone | Target Week | Current Status | Key Deliverables |
+| --- | --- | --- | --- |
+| Token & Theme System Finalisation | Week 2 | 70% complete | Cross-platform token exports, emo/seasonal theme guardrails, automated contrast reports. |
+| Navigation & Layout Blueprint | Week 4 | 45% complete | Role-based IA schema, breakpoint matrices, breadcrumb/stepper interaction specs. |
+| Template & Component Delivery | Week 6 | 30% complete | Annotated templates for home/dashboards/explorer, asset manifests, copy decks. |
+| Engineering Handoff & QA | Week 8 | 10% complete | Handoff kits, accessibility/localisation scripts, design QA sign-offs. |
