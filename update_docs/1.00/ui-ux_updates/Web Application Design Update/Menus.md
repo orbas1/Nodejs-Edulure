@@ -33,3 +33,16 @@
 - Menus support `aria-expanded`, `aria-controls`, `role="menu"`. Items `role="menuitem"` with appropriate tab order.
 - Provide visible focus state (2px outline) and maintain escape key to close.
 - Ensure screen readers announce mega-menu sections with headings.
+
+## Screen-specific Navigation Notes
+- **SCR-00 Home:** Mega-menu hero blur matches background gradient to prevent contrast issues; CTA within menu uses BTN-PRM small variant.
+- **SCR-02 Dashboard:** Sidebar indicates active sub-section using left accent bar (4px) plus background fill `rgba(76,125,255,0.12)`.
+- **SCR-03 Learn Library:** Breadcrumb displayed as `Home / Learn` with filter summary chip appended.
+- **SCR-05 Lesson Player:** Utility bar includes breadcrumbs `Course > Module > Lesson` with dropdown to switch lessons.
+- **SCR-06 Communities:** Topic tabs double as navigation; on mobile convert to horizontal scroll with snap alignment.
+- **SCR-09 Settings:** Secondary sub-tabs appear under main tab when content sections exceed 3 (e.g., Notifications -> Channels, Digests, Alerts).
+- **SCR-11 Admin Analytics:** Add global timeframe quick switcher in header (This week, This month, Custom) for faster context shifts.
+
+## Interaction Timing
+- Mega-menu open delay 80ms, close delay 120ms to support diagonal mouse movement.
+- Sidebar collapse animation 240ms; focus moved to first nav item when expanded via keyboard.

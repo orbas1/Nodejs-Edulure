@@ -53,3 +53,18 @@
 - Use `react-hook-form` with Zod schema for validation.
 - Pre-fill data from API when editing; highlight changed fields with subtle border glow.
 - Provide `onBeforeUnload` prompt if unsaved changes exist.
+
+## Screen Context Mapping
+- **Onboarding (SCR-01):** Each step uses form cards with contextual helper text and inline progress chips showing completed percentages.
+- **Course Detail (SCR-04):** Review submission modal uses star rating input (5-star, keyboard accessible) plus textarea.
+- **Lesson Player (SCR-05):** Notes form supports markdown shortcuts (`Ctrl+B` bold, `Ctrl+K` link).
+- **Communities (SCR-06/07):** Composer includes mention and hashtag suggestions; attachments preview with removable chips.
+- **Settings (SCR-09):** Billing forms integrate card element from Stripe; show card brand icons 24px.
+- **Support (SCR-10):** Ticket form includes priority dropdown (Low, Normal, Urgent) with colour-coded dots.
+- **Admin Content (SCR-12):** Bulk edit drawer uses multi-select fields with tokenised chips.
+
+## Validation States by Screen
+- Onboarding forms enforce minimum 1 goal selection; error message "Select at least one focus area" anchored under list.
+- Support ticket attachments restrict to 25MB per file; show inline error chip when exceeded.
+- Settings security forms require password strength >= 4/5; show strength meter `0–100` with colour gradient.
+- Admin content publish form verifies mandatory metadata (category, language) before enabling publish button.

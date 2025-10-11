@@ -40,3 +40,27 @@
 ## Analytics Events
 - Emit events for hero CTA, filter changes, module reorder, course enrol, lesson complete, community post, event register, settings update.
 - Attach metadata: user role, plan tier, locale.
+
+## Communities & Profile Flow Extensions
+- From Dashboard tasks referencing community events, open targeted community detail with context `?ref=taskId` to highlight relevant post.
+- Community join state triggers server call `POST /api/communities/:id/join`; on success add community to sidebar pinned list and show toast.
+- Profile edits propagate to dashboard hero and community badges via event `profile:update` to ensure UI sync without reload.
+
+## Support & Escalation Flow
+1. Settings → Support link routes to `/support` with `context` query (e.g., `billing`, `technical`).
+2. Support screen preselects FAQ tab matching context.
+3. Ticket form submission generates case ID; websockets push status updates to `Support` screen and notifications bell.
+4. Escalated tickets notify admin analytics to surface in `Support overview` widget.
+
+## Admin Oversight Flow
+1. Admin detection occurs post-auth using role claim; admin header adds `Admin` segment.
+2. `Admin Analytics` loads; filter updates propagate to `Admin Content` via shared store to align metrics and course lists.
+3. Content updates (publish/archive) emit `content:update` event consumed by Learn Library to refresh listings.
+
+## Error & Offline Enhancements
+- When API fails repeatedly (3 attempts) display service status banner linking to status page.
+- Offline queue handles notes, support tickets, playlist adjustments; show reconnection toast once synced.
+
+## Accessibility Flow Hooks
+- Each modal sets focus to first interactive element and restores on close.
+- Reduced motion toggles stored in user preferences; when enabled, skip parallax sequences and replace with fade transitions.

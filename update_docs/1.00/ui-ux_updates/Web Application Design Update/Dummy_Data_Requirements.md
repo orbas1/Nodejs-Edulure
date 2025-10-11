@@ -39,3 +39,21 @@ Provide realistic datasets for design QA, Storybook, and usability testing acros
 ## Maintenance
 - Update fixtures after major release and log version in `design_change_log.md`.
 - Run script `yarn fixtures:validate` to ensure schema compliance before merging.
+
+## Screen Coverage Matrix
+- **SCR-00 Home:** Provide hero copy variations per audience (learner/provider/enterprise) and testimonial list with `quote`, `author`, `role`, `company`, `avatar`.
+- **SCR-01 Onboarding:** Goals library (12 items) with categories, skill tags. Schedule presets (5 options) with weekly hour ranges.
+- **SCR-02 Dashboard:** Insight feed data for announcements and recommendations (courses, communities) to populate cards.
+- **SCR-03 Learn Library:** Filter metadata lists (levels, durations, formats) and saved playlist order arrays.
+- **SCR-04 Course Detail:** Syllabus data nested modules/lessons, reviews dataset (rating, body, user role, date) with pagination.
+- **SCR-05 Lesson Player:** Transcript data with timestamped paragraphs, resource downloads (file names, sizes, types).
+- **SCR-06/07 Communities:** Feed posts mixture (text-only, image, poll) and event listings (date/time, location, RSVP state).
+- **SCR-08 Profile:** Skills matrix (skill name, category, level 1–5) and timeline events (type, description, timestamp).
+- **SCR-09 Settings:** Notification matrix with event keys (course-updated, payment-due), integration list (Slack, Teams) with status.
+- **SCR-10 Support:** FAQ entries with categories, contact channels (chat, email, phone) and ticket history items (status, severity).
+- **SCR-11 Admin Analytics:** Cohort dataset arrays (name, size, completion rate), revenue breakdown by product line.
+- **SCR-12 Admin Content:** Course metadata including compliance flags, owner info, audit history entries.
+
+## Data Volume Guidelines
+- Provide enough records to render pagination/infinite scroll (min 30 courses, 40 community posts in extended fixtures used for perf testing).
+- Ensure dataset includes at least one example of each widget state (loading, empty, error) by providing toggles in fixtures metadata.
