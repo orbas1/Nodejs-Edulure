@@ -1,34 +1,55 @@
 # Version 1.00 Design Change Log
 
 ## Executive Summary
-The Version 1.00 design refresh harmonises the Flutter application shell and responsive web client by consolidating the guidance captured in `ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan` and `ui-ux_updates/Web Application Design Update`. The effort targets theme scalability, motion-safe interactions, and persona-tailored dashboards so that future component drops can inherit consistent tokens, layouts, and compliance affordances without rework.
+Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan` and `ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update` to refresh the entire Edulure experience layer. The update introduces token-driven theming (including emo and seasonal packs), restructures navigation hierarchies, hardens compliance and security messaging, and delivers new layout systems for learner, provider, and administrative surfaces. These changes ensure the responsive web application and Flutter clients share the same interaction contracts, asset specifications, and analytics instrumentation.
 
-## Primary Experience Areas
-| Area | Change Summary | Rationale | Source Assets |
-| --- | --- | --- | --- |
-| Global Theming & Tokens | Finalised the dark, light, and high-contrast palettes; unified typography stack and scale; refreshed spacing and elevation values to support new card taxonomy. | Ensure parity across web and Flutter builds while enabling emo/seasonal themes through token overrides. | `Application_Design_Update_Plan/Colours.md`, `Application_Design_Update_Plan/Fonts.md`, `Web Application Design Update/colours.md`, `Web Application Design Update/Css.md` |
-| Navigation & Information Architecture | Re-indexed menus by role, surfaced contextual quick-actions, and defined breadcrumb/stepper variants for complex flows. | Reduce orientation friction for instructors and learners while preparing for new community and commerce modules. | `Application_Design_Update_Plan/Menus.md`, `Web Application Design Update/Menus.md`, `Web Application Design Update/component_types.md` |
-| Home & Dashboard Surfaces | Introduced modular hero, progress, and insight tiles with seasonally themed imagery slots; codified widget hierarchy for dashboards and home feeds. | Support targeted campaigns, dynamic asset promotion, and granular analytics overlays. | `Application_Design_Update_Plan/Screens_Update.md`, `Web Application Design Update/Dashboard Designs.md`, `Web Application Design Update/Home page components.md` |
-| Media & Resource Consumption | Rebuilt forms, cards, and resource drawers with explicit state treatments (loading, offline, rights restricted); added persistent annotation, bookmarking, and share affordances. | Improve accessibility compliance, clarify DRM states, and align with Cloudflare R2 asset handling. | `Application_Design_Update_Plan/Forms.md`, `Application_Design_Update_Plan/Cards.md`, `Web Application Design Update/component_functions.md`, `Web Application Design Update/Resources.md` |
-| Profiles & Settings | Refined profile layouts, emphasising verification badges, monetisation controls, and activity stats; Settings receives dedicated privacy and notification clusters with inline guidance. | Provide trustworthy identity signals and support regulatory disclosure within a scalable layout. | `Web Application Design Update/Profile Styling.md`, `Application_Design_Update_Plan/Settings.md`, `Application_Design_Update_Plan/Settings Screen.md`, `Web Application Design Update/Settings Dashboard.md` |
-| Imagery & Motion | Standardised hero, dashboard, and carousel imagery specs; defined animation curves and permissible motion per accessibility preferences. | Reduce bespoke asset requests and honour reduced-motion requirements. | `Application_Design_Update_Plan/Screens_update_images_and_vectors.md`, `Web Application Design Update/images_and_vectors.md`, `Web Application Design Update/Screen Size Changes.md` |
+## Portfolio of Updates
+### 1. Global Theming & Tokens
+- Finalised palette families (default, high-contrast, emo, and seasonal overlays) with WCAG 2.2 AA contrast validation using colour matrices from `Colours.md`, `Screen_update_Screen_colours.md`, and `colours.md`.
+- Standardised typography stacks, spacing, elevation, and shadow tiers aligned to `Fonts.md`, `Organisation_and_positions.md`, and `Scss.md`.
+- Authored theme override logic for partial page takeovers (hero rows, promotional landers, community microsites) referencing `component_types.md` and `pages.md`.
 
-## Accessibility & Compliance Enhancements
-- Adopted WCAG 2.2 AA colour contrast and focus treatment checklist, referencing `Application_Design_Update_Plan/Screen_update_Screen_colours.md` and `Web Application Design Update/buttons.md` to lock interactive states.
-- Added copy decks and voice guidelines for hero modules and form helper text using `Application_Design_Update_Plan/Screen_text.md` and `Web Application Design Update/Home page text.md`.
-- Documented localisation placeholders and RTL-aware layouts across menus and cards, using references from `Application_Design_Update_Plan/Organisation_and_positions.md`.
+### 2. Navigation, IA & Layout Rationalisation
+- Re-indexed menus for learners, providers, and admins per `Menus.md`, `Organisation_and_positions.md`, and `Dashboard Organisation.md`.
+- Added breadcrumb, quick-action, and stepper variants defined in `Logic_Flow_map.md`, `Screens_Update_Logic_Flow.md`, and `Screens_Update_Logic_Flow_map.md`.
+- Introduced adaptive grid matrices and breakpoint rules guided by `Screen Size Changes.md`, `Placement.md`, and `Organisation_and_positions.md`.
 
-## Cross-Platform Harmonisation Notes
-- Navigation and widget compositions now share identical naming conventions and component IDs between Flutter and React clients to streamline analytics instrumentation.
-- Dark mode, emo theme packs, and festive overlays are abstracted into optional token bundles, ensuring theme swaps do not break baseline contrast or asset aspect ratios.
-- Provider workflows inherit learner UI upgrades while exposing additional analytics segments and financial quick links, aligning with `provider_application_styling_changes.md` and `provider_application_logic_flow_changes.md`.
+### 3. Home, Dashboard & Page Templates
+- Crafted modular hero, progress, recommendation, and campaign tiles with seasonal imagery slots referencing `Home page components.md`, `Dashboard Designs.md`, and `Screens_Update.md`.
+- Delivered persona-specific dashboard arrangements (learner, provider, admin) leveraging `Dashboard Organisation.md`, `Settings Dashboard.md`, and `Profile Styling.md`.
+- Authored new landing-page shells for explorer, communities, and monetisation flows using `Pages_list.md`, `Screens_list.md`, and `Home page components.md`.
 
-## Open Decisions
-- Pending alignment on advanced dashboard data visualisation patterns; proposals captured in `Web Application Design Update/Dashboard Organisation.md` require engineering feasibility review.
-- Need a dedicated imagery pipeline for seasonal campaigns; placeholder assets documented in `Web Application Design Update/Home page images.md` will be validated with marketing.
-- Awaiting legal guidance on retention of annotation data surfaced in updated media drawers.
+### 4. Component & Interaction System
+- Reworked cards, forms, modals, and drawers per `Cards.md`, `Forms.md`, `component_functions.md`, and `Screens__Update_widget_types.md` to include explicit idle/loading/offline/error/rights-restricted states.
+- Mapped widget behaviours and inline analytics IDs to `Screens_Updates_widget_functions.md`, `component_types.md`, and `component_functions.md`.
+- Hardened microcopy and interaction guidance using `Screen_text.md`, `text.md.md`, and `Dummy_Data_Requirements.md` with compliance review loops.
 
-## Change Approval
-- **Design Authority:** Product Design Lead validated the component library updates on 2024-05-10.
-- **Engineering Review:** Frontend, Flutter, and Backend chapter leads signed off on interaction specs during the 2024-05-12 governance session.
-- **Compliance:** Security and privacy teams recorded acceptance of new consent and notification flows on 2024-05-13 with remediation follow-ups logged in Jira (tickets DSN-1201 to DSN-1204).
+### 5. Imagery, Motion & Asset Governance
+- Standardised imagery ratios, safe areas, and animation tiers referencing `images_and_vectors.md`, `Screens_update_images_and _vectors.md`, and `Screen_buttons.md`.
+- Defined reduced-motion fallbacks and state transitions aligned with `Logic_Flow_update.md` and `Screens_Update_Plan.md`.
+- Introduced marketing asset intake workflows and seasonal asset packs referencing `Home page images.md`, `Resources.md`, and `Assets.md`.
+
+### 6. Profile, Settings & Compliance Reinforcement
+- Refreshed profile layouts with verification badges, monetisation widgets, and content shelves via `Profile Look.md`, `Profile Styling.md`, and `Organisation_and_positions.md`.
+- Restructured settings dashboards, privacy controls, and notification clusters using `Settings Dashboard.md`, `Settings Screen.md`, and `Settings.md`.
+- Embedded legal consent, security prompts, and audit trails referencing `Function Design.md`, `component_functions.md`, and `provider_application_logic_flow_changes.md`.
+
+## Accessibility, Security & Compliance Adjustments
+- Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
+- Embedded security messaging around verification, payment confirmation, and rights-managed assets across profile and commerce flows.
+- Added localisation placeholders, RTL mirroring, and copy length buffers to all primary templates and microcopy decks.
+
+## Cross-Platform Alignment
+- Shared component taxonomy and asset specs across React and Flutter deliverables to ensure implementation parity.
+- Token exports now map directly to CSS variables, Flutter theme objects, and backend-driven theme payloads to support runtime theme switching.
+- Logic flow diagrams align provider workflows with learner experiences while exposing advanced analytics and financial controls.
+
+## Open Items & Follow-Ups
+- **Advanced Data Visualisation:** Validate charting libraries for analytics-heavy dashboards before engineering handoff.
+- **Seasonal Asset Pipeline:** Coordinate marketing-provided imagery for emo and festive themes; placeholder assets captured in `Home page images.md` require art direction sign-off.
+- **Annotation Retention:** Await legal guidance on storing collaborative annotations introduced in the new media drawers.
+
+## Approval Log
+- **Design Authority:** Product Design Lead – approval granted 2024-05-10.
+- **Engineering Review:** Frontend, Flutter, and Backend chapter leads – approval granted 2024-05-12.
+- **Compliance & Security:** Privacy, legal, and security partners – approval granted 2024-05-13 with mitigation actions tracked in Jira (DSN-1201 – DSN-1204).

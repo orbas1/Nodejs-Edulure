@@ -127,3 +127,12 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 3. **Policy & Compliance Rollout (0%)** – Privacy/terms updates, spam/bad-word filters, moderation training, policy hub.
 4. **Documentation & Training (0%)** – Knowledge base, SOPs, update brief, change log, support scripts.
 5. **Launch & Post-Release Ops (0%)** – Rollout calendar, feature flags, monitoring dashboards, war room, post-mortems.
+
+### Design Task Addendum
+| Task | Status | Focus | Key Outputs |
+| --- | --- | --- | --- |
+| Token & Theme System Completion | 70% | Token architecture, emo/seasonal packs, runtime ingestion | Updated token exports, contrast reports, theme override playbooks. |
+| Navigation & Layout Architecture | 45% | IA restructure, breadcrumb/stepper patterns, breakpoint matrices | Role-based menus, responsive grid specs, usability findings. |
+| Template & Component Production | 30% | High-fidelity templates, component states, copy decks | Annotated templates, imagery manifests, localisation placeholders. |
+| Accessibility, Compliance & Handoff | 20% | Accessibility audits, security overlays, engineering readiness | QA checklists, handoff kits, compliance approvals. |
+| Theme Deployment & Runtime Validation | 15% | Theme switching validation, telemetry, rollback plans | Prototype switchers, runtime QA logs, incident response documentation. |
