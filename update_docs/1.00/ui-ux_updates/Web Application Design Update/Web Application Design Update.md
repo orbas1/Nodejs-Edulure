@@ -48,6 +48,20 @@ Spacing tokens follow an 8px scale (`4, 8, 12, 16, 24, 32, 40, 48, 64, 80, 96`).
 - **Asset Delivery:** Refer to `Assets.md` and `images_and_vectors.md` for naming conventions, compression pipelines, and repository sources.
 - **Logic Alignment:** Navigation flows, state transitions, and dashboard routing codified in `Logic_Flow_update.md` and `Logic_Flow_map.md` to guarantee design-to-dev parity.
 
+## Module Blueprint Reference
+- **Global Shell Layout:** Header (88px) + sub-header (52px) + content canvas (auto) + footer (280px). All modules align to the 12-column grid with a persistent 32px gutter and outer margin values per breakpoint. Left navigation rail retains 24px inner padding to keep icon buttons centred within 48px touch targets.
+- **Hero Orbit Stack:** Copy block width 560px, nested auto layout spacing `24px` between eyebrow, headline, body, and button row. Illustration bounding box 620×520px anchored to columns 7–12 with `translateZ(80px)` parallax depth for 3D effect. Decorative `orbital_path.svg` sits in background layer with 12px blur; hero CTA row uses `gap: 16px` and clamps to 320px max width for readability.
+- **Section Bands:** Alternating surfaces use `--surface-page` and `--surface-alt` tokens. Each band has a header cluster (eyebrow + H2 + supporting copy) occupying a 4-column span, with content modules consuming remaining columns. For example, the "Value Pillars" band arranges three cards (columns 1–4, 5–8, 9–12) with auto-fit fallback at SM breakpoints.
+- **Form Patterns:** Inline forms adopt 56px field height with 16px horizontal padding, floating labels 12px above baseline, and supporting helper text at 14px/20px. Error states highlight border in `#F87171` and inject an error icon (20px) inside the input using `padding-inline-end: 48px` to avoid text overlap.
+- **Data Visualisations:** Charts reserve 40px top padding for legend placement, 24px bottom for axis labels, and enforce minimum width 320px to avoid truncation. Tooltip containers measure 220×auto, follow pointer with 8px offset, and include timestamp, value, and delta chips.
+- **Content Cards:** Standardised card depth ensures consistent layering: base layer (card) radius 20px, accent overlay (gradient) radius 20px with `mix-blend-mode: screen`, and focus outline offset 4px to avoid clipping. Loading skeletons mimic real layout using `::before` linear gradient shimmer defined in `Css.md`.
+
+## Material & Layering Guidance
+- **Shadow Hierarchy:** Shell surfaces never exceed `0 12px 24px rgba(8,18,36,0.36)` to prevent distraction. Floating modules (drawers, modals) escalate to `0 48px 96px rgba(8,18,36,0.52)` with 24px blur radius to communicate elevation. Glow accents on hero elements use separate pseudo-element layers with reduced opacity (0.28) for performance.
+- **Texture Usage:** Pattern overlays (`gradient_mesh_01.png`, `noise_overlay_01.png`) remain below 12% opacity and anchored via CSS variables so theme toggles can swap alternatives automatically. Provide high-resolution assets to avoid banding on 4K displays.
+- **Motion Layers:** Each interactive component uses `transform` on wrapper elements while inner content remains static to avoid font rendering artifacts. Layer order defined as: base surface → texture overlay → interactive content → focus outline → tooltip/popover. Motion tokens `motionTokens.card.enter` (translateY(-8px), opacity 0→1, 180ms) and `motionTokens.modal.enter` (scale 0.96→1, 240ms) documented in `web_application_styling_changes.md`.
+- **Theme Parity:** Dark and light themes share identical spacing and geometry. Only colour tokens shift; gradients recalculate using the same stop percentages. Outline and border widths remain constant to ensure muscle memory across contexts.
+
 ## QA & Rollout Checklist
 1. Verify each page uses the correct breakpoint rules and spacing tokens.
 2. Run contrast tests for primary and secondary surfaces using Stark/Figma plugin and automated Lighthouse audits.
