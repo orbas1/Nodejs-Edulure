@@ -9,14 +9,15 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "lint": "eslint \"src/**/*.js\"",
-    "lint:fix": "eslint --fix \"src/**/*.js\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix .",
     "test": "vitest run",
     "db:install": "node scripts/install-db.js",
     "migrate:latest": "knex --knexfile knexfile.cjs migrate:latest",
     "migrate:rollback": "knex --knexfile knexfile.cjs migrate:rollback",
     "seed": "knex --knexfile knexfile.cjs seed:run",
     "data:retention": "node scripts/run-data-retention.js",
+    "runtime:config": "node scripts/runtime-config.js",
     "audit:dependencies": "npm audit --audit-level=moderate",
     "security:rotate-jwt": "node scripts/rotate-jwt-keys.js"
   },
@@ -52,9 +53,11 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "eslint": "^8.56.0",
+    "@eslint/js": "^9.14.0",
+    "eslint": "^9.14.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
+    "globals": "^15.8.0",
     "nodemon": "^3.0.3",
     "vitest": "^1.6.0"
   }

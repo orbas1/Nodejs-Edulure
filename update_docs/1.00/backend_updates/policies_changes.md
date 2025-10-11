@@ -6,3 +6,5 @@
 - Introduced account lockout governance and mandatory email verification policies, with hashed token storage and cooldown controls enforced at the API layer.
 - Added per-user session concurrency limits, forced logout endpoints, and cached revocation so compromised tokens can be invalidated instantly in line with security governance.
 - Established retention governance through policy-driven tables, audit logging, and both CLI and cron-backed enforcement so security/legal teams can prove deletion SLAs across sessions, telemetry, and dormant communities even during unattended operation.
+- Established feature flag governance with database-backed definitions, environment scopes, and runtime configuration payloads surfaced via `/api/runtime` so staged rollouts and kill switches are centrally enforced.
+- Feature flag environment scopes now treat test deployments as development aliases, ensuring QA environments respect rollout policies while keeping production gating intact.

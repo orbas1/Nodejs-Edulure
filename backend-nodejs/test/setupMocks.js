@@ -12,25 +12,63 @@ vi.mock('nodemailer', () => {
 
 vi.mock('prom-client', () => {
   class Counter {
-    inc() {}
+    constructor() {
+      this.value = 0;
+    }
+
+    inc() {
+      this.value += 1;
+    }
   }
 
   class Histogram {
-    startTimer() {
-      return () => {};
+    constructor() {
+      this.samples = [];
     }
 
-    observe() {}
+    startTimer() {
+      return (labels) => {
+        this.samples.push({ labels, duration: 0 });
+      };
+    }
+
+    observe(labels, value) {
+      this.samples.push({ labels, value });
+    }
   }
 
   class Gauge {
-    inc() {}
-    dec() {}
+    constructor() {
+      this.value = 0;
+    }
+
+    inc() {
+      this.value += 1;
+    }
+
+    dec() {
+      this.value -= 1;
+    }
   }
 
   class Registry {
+    constructor() {
+      this.metrics = new Map();
+    }
+
     setDefaultLabels() {}
-    registerMetric() {}
+
+    registerMetric(metric) {
+      this.metrics.set(metric.name, metric);
+    }
+
+    getSingleMetric(name) {
+      return this.metrics.get(name);
+    }
+
+    resetMetrics() {
+      this.metrics.clear();
+    }
   }
 
   return {

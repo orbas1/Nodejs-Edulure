@@ -1,0 +1,1 @@
+- Runtime configuration surfaces now gate the admin console, showing a disable banner with the configured escalation channel when the feature flag is off.

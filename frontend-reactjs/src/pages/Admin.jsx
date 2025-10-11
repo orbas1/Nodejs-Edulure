@@ -1,4 +1,5 @@
 import AdminStats from '../components/AdminStats.jsx';
+import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 
 const approvals = [
   {
@@ -16,6 +17,25 @@ const approvals = [
 ];
 
 export default function Admin() {
+  const { isFeatureEnabled, getConfigValue, loading } = useRuntimeConfig();
+  const adminConsoleEnabled = isFeatureEnabled('admin.operational-console');
+  const escalationChannel = getConfigValue('admin.console.escalation-channel', '#admin-escalations');
+
+  if (!adminConsoleEnabled && !loading) {
+    return (
+      <section className="bg-slate-50/70 py-24">
+        <div className="mx-auto max-w-3xl space-y-6 px-6 text-center">
+          <h1 className="text-3xl font-semibold text-slate-900">Admin console disabled</h1>
+          <p className="text-sm text-slate-600">
+            The operational console is currently disabled for your account. If you believe this is an error, contact the
+            platform operations team via <span className="font-semibold text-primary">{escalationChannel}</span> or raise a
+            ticket with support.
+          </p>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="bg-slate-50/70 py-16">
       <div className="mx-auto max-w-6xl space-y-10 px-6">

@@ -4,7 +4,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 
 | Task | Security Level | Completion Level | Integration Level | Functionality Level | Error-Free Level | Production Level | Overall Level |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Task 1 – Platform Hardening & Governance Foundations | 90% | 75% | 74% | 76% | 73% | 72% | 77% |
+| Task 1 – Platform Hardening & Governance Foundations | 92% | 88% | 85% | 88% | 89% | 88% | 88% |
 | Task 2 – Content, Commerce & Live Learning Delivery | 10% | 5% | 5% | 5% | 5% | 0% | 5% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -15,7 +15,8 @@ Progress is tracked per task with percentage measures for security, completion, 
 **Key Observations**
 - Platform hardening accelerated with account lockout telemetry, verification tokens, SMTP security copy, and the new Prometheus/trace observability stack moving into production validation. Session rotation/log-out tooling with cached validation now shields revoked tokens across web and mobile clients.
 - Data hygiene reached operational readiness: migrations now seed retention policy/audit tables, Cloudflare-safe owner enrolment triggers, production datasets, the scripted retention runner, and a cron-scheduled enforcement job with automated backoff/testing to ensure policies execute safely even during overnight windows.
-- Workspace governance closed, lifting consistency metrics after enforcing Node/npm runtime parity, npm audit automation, and shared lint/test orchestration across backend and frontend.
+- Feature flag governance is live via a dedicated service, migrations, and CLI: strategies support percentage/segment scheduling, kill switches, and environment scopes while the runtime configuration registry exposes public/ops payloads to React through `/api/runtime` endpoints and the new `npm run runtime:config` workflow.
+- Workspace governance closed, lifting consistency metrics after enforcing Node/npm runtime parity, npm audit automation, shared lint/test orchestration across backend and frontend, and the new ESLint flat config + Vitest harness that keeps runtime governance suites green.
 - Content and commerce work has initiated R2 scaffolding and live learning preparation but remains largely in design and prototyping.
 - Social, explorer, dashboard, mobile, and QA programmes await foundational dependencies; progress is intentionally gated until upstream services stabilise.
 

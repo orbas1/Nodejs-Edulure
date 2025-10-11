@@ -4,6 +4,7 @@ import logger from './config/logger.js';
 import db from './config/database.js';
 import assetIngestionService from './services/AssetIngestionService.js';
 import dataRetentionJob from './jobs/dataRetentionJob.js';
+import { featureFlagService, runtimeConfigService } from './services/FeatureFlagService.js';
 
 async function start() {
   try {
@@ -12,6 +13,13 @@ async function start() {
     logger.info('Database connected and migrations applied');
   } catch (error) {
     logger.error({ err: error }, 'Failed to initialise database');
+    process.exit(1);
+  }
+
+  try {
+    await Promise.all([featureFlagService.start(), runtimeConfigService.start()]);
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to warm runtime configuration services');
     process.exit(1);
   }
 
@@ -25,6 +33,8 @@ async function start() {
   const shutdown = () => {
     assetIngestionService.stop();
     dataRetentionJob.stop();
+    featureFlagService.stop();
+    runtimeConfigService.stop();
     logger.info('Shutting down gracefully');
     process.exit(0);
   };

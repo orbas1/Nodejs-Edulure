@@ -6,6 +6,7 @@ import { env } from '../config/env.js';
 import { getRequestContext } from './requestContext.js';
 
 const registry = new promClient.Registry();
+export const metricsRegistry = registry;
 registry.setDefaultLabels({
   service: env.logging.serviceName,
   environment: env.nodeEnv
@@ -141,7 +142,7 @@ function isIpAllowed(address, allowedEntries) {
   let client;
   try {
     client = ipaddr.parse(normalized);
-  } catch (error) {
+  } catch (_error) {
     return false;
   }
 
@@ -154,14 +155,14 @@ function isIpAllowed(address, allowedEntries) {
       try {
         const cidr = ipaddr.parseCIDR(entry);
         return client.match(cidr);
-      } catch (error) {
+      } catch (_error) {
         return false;
       }
     }
 
     try {
       return client.toNormalizedString() === ipaddr.parse(entry).toNormalizedString();
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   });

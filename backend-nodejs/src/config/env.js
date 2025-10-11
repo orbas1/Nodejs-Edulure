@@ -11,11 +11,11 @@ function tryParseJson(value) {
   const trimmed = value.trim();
   try {
     return JSON.parse(trimmed);
-  } catch (jsonError) {
+  } catch (_jsonError) {
     try {
       const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
       return JSON.parse(decoded);
-    } catch (base64Error) {
+    } catch (_base64Error) {
       return null;
     }
   }
@@ -179,7 +179,11 @@ const envSchema = z
     DATA_RETENTION_DRY_RUN: z.coerce.boolean().default(false),
     DATA_RETENTION_RUN_ON_STARTUP: z.coerce.boolean().default(false),
     DATA_RETENTION_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
-    DATA_RETENTION_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30)
+    DATA_RETENTION_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
+    FEATURE_FLAG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(30),
+    FEATURE_FLAG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(120),
+    RUNTIME_CONFIG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(45),
+    RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(300)
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -314,6 +318,12 @@ export const env = {
     runOnStartup: raw.DATA_RETENTION_RUN_ON_STARTUP,
     maxConsecutiveFailures: raw.DATA_RETENTION_MAX_FAILURES,
     failureBackoffMinutes: raw.DATA_RETENTION_FAILURE_BACKOFF_MINUTES
+  },
+  runtimeConfig: {
+    featureFlagCacheTtlMs: raw.FEATURE_FLAG_CACHE_TTL_SECONDS * 1000,
+    featureFlagRefreshIntervalMs: raw.FEATURE_FLAG_REFRESH_INTERVAL_SECONDS * 1000,
+    configCacheTtlMs: raw.RUNTIME_CONFIG_CACHE_TTL_SECONDS * 1000,
+    configRefreshIntervalMs: raw.RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS * 1000
   },
   observability: {
     tracing: {

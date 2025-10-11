@@ -10,3 +10,5 @@
 - Added session governance runbook notes to the backend README covering refresh/logout endpoints, concurrency caps, and cache invalidation expectations for support teams.
 - Documented retention automation and audit expectations in the backend README, including the `npm run data:retention` workflow, CLI flags, and policy table guidance for operations teams.
 - Updated retention documentation to cover the managed scheduler, new `DATA_RETENTION_*` environment toggles, dry-run bootstraps, and backoff behaviour so operations can monitor and pause automation responsibly.
+- Documented feature flag and runtime configuration governance in the backend README, covering new environment variables, `/api/runtime` endpoints, and the `npm run runtime:config` CLI workflow for operations.
+- Added README guidance for the new ESLint flat config and Vitest suites so engineers consistently run lint/test gates with Prometheus-safe mocks before shipping runtime governance updates.

@@ -32,3 +32,10 @@
 - `backend-nodejs/scripts/run-data-retention.js` – CLI wrapper for enforcing retention policies with dry-run/verbose flags.
 - `backend-nodejs/src/jobs/dataRetentionJob.js` – managed cron scheduler coordinating retention enforcement with failure backoff and startup toggles.
 - `backend-nodejs/test/dataRetentionService.test.js`, `backend-nodejs/test/dataRetentionJob.test.js` – Vitest coverage for the retention executor strategies and scheduler resilience.
+- `backend-nodejs/migrations/20241107101500_feature_flags_and_runtime_config.js` – creates feature flag, audit, and runtime configuration tables with seed data.
+- `backend-nodejs/src/models/FeatureFlagModel.js`, `backend-nodejs/src/models/ConfigurationEntryModel.js` – repositories exposing JSON-parsed flag/config metadata.
+- `backend-nodejs/src/services/FeatureFlagService.js` – caching feature flag/runtime configuration orchestrator with metrics integration.
+- `backend-nodejs/src/middleware/runtimeConfig.js`, `backend-nodejs/src/controllers/RuntimeConfigController.js`, `backend-nodejs/src/routes/runtimeConfig.routes.js` – Express plumbing exposing `/api/runtime` endpoints and request helpers.
+- `backend-nodejs/scripts/runtime-config.js` – CLI generating flag/config snapshots for ops.
+- `backend-nodejs/test/featureFlagService.test.js`, `backend-nodejs/test/runtimeConfigService.test.js` – Vitest coverage validating strategy evaluation and runtime config exposure.
+- `backend-nodejs/eslint.config.mjs` – ESLint flat configuration enabling workspace-wide governance with Node/test aware rules.

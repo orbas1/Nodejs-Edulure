@@ -5,6 +5,9 @@ const makeHash = (value) => crypto.createHash('sha256').update(value).digest('he
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
+    await trx('feature_flag_audits').del();
+    await trx('feature_flags').del();
+    await trx('configuration_entries').del();
     await trx('community_members').del();
     await trx('asset_conversion_outputs').del();
     await trx('asset_ingestion_jobs').del();
@@ -201,6 +204,118 @@ export async function seed(knex) {
         event_type: 'asset.published',
         payload: JSON.stringify({ version: 1 }),
         performed_by: instructorId
+      }
+    ]);
+
+    const [adminConsoleFlagId] = await trx('feature_flags').insert({
+      key: 'admin.operational-console',
+      name: 'Admin Operational Console',
+      description: 'Gates the operations console surface for vetted administrators.',
+      enabled: true,
+      kill_switch: false,
+      rollout_strategy: 'segment',
+      rollout_percentage: 100,
+      segment_rules: JSON.stringify({
+        allowedRoles: ['admin'],
+        allowedTenants: ['edulure-internal'],
+        schedule: { start: '2024-10-01T00:00:00.000Z' }
+      }),
+      variants: JSON.stringify([
+        { key: 'core', weight: 80 },
+        { key: 'beta-insights', weight: 20 }
+      ]),
+      environments: JSON.stringify(['staging', 'production']),
+      metadata: JSON.stringify({ owner: 'Platform Ops', jiraKey: 'OPS-1124' })
+    });
+
+    const [checkoutFlagId] = await trx('feature_flags').insert({
+      key: 'commerce.checkout-v2',
+      name: 'Commerce Checkout v2',
+      description: 'Rollout for the tax-aware checkout surface with split payments.',
+      enabled: true,
+      kill_switch: false,
+      rollout_strategy: 'percentage',
+      rollout_percentage: 35,
+      environments: JSON.stringify(['staging', 'production']),
+      metadata: JSON.stringify({ owner: 'Commerce', jiraKey: 'PAY-872' })
+    });
+
+    const [liveClassroomsFlagId] = await trx('feature_flags').insert({
+      key: 'learning.live-classrooms',
+      name: 'Live Classroom Availability',
+      description: 'Controls Agora-backed live classroom readiness per tenant.',
+      enabled: true,
+      kill_switch: false,
+      rollout_strategy: 'segment',
+      rollout_percentage: 70,
+      segment_rules: JSON.stringify({
+        allowedRoles: ['admin', 'instructor'],
+        allowedTenants: ['learning-ops-guild', 'creator-growth-lab'],
+        percentage: 70,
+        schedule: { start: '2024-09-15T08:00:00.000Z' }
+      }),
+      environments: JSON.stringify(['development', 'staging', 'production']),
+      metadata: JSON.stringify({ owner: 'Learning', jiraKey: 'LIVE-304' })
+    });
+
+    await trx('feature_flag_audits').insert([
+      {
+        flag_id: adminConsoleFlagId,
+        change_type: 'seed',
+        payload: JSON.stringify({ actor: 'seed', reason: 'baseline rollout' })
+      },
+      {
+        flag_id: checkoutFlagId,
+        change_type: 'rollout-percentage',
+        payload: JSON.stringify({ previous: 20, next: 35, changedBy: 'commerce.ops' })
+      },
+      {
+        flag_id: liveClassroomsFlagId,
+        change_type: 'segment-update',
+        payload: JSON.stringify({ addedTenant: 'creator-growth-lab', changedBy: 'learning.ops' })
+      }
+    ]);
+
+    await trx('configuration_entries').insert([
+      {
+        key: 'support.contact-email',
+        environment_scope: 'global',
+        value_type: 'string',
+        value: 'support@edulure.com',
+        description: 'Primary customer support email address displayed in public clients.',
+        exposure_level: 'public',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Support' })
+      },
+      {
+        key: 'admin.console.escalation-channel',
+        environment_scope: 'production',
+        value_type: 'string',
+        value: '#admin-escalations',
+        description: 'Slack channel for escalations raised by admin console operators.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ pagerDutyService: 'edulure-admin' })
+      },
+      {
+        key: 'live-classrooms.max-concurrent-rooms',
+        environment_scope: 'production',
+        value_type: 'number',
+        value: '35',
+        description: 'Operational ceiling for concurrent live classrooms per tenant.',
+        exposure_level: 'ops',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Learning Ops' })
+      },
+      {
+        key: 'commerce.checkout-v2.guardrail',
+        environment_scope: 'staging',
+        value_type: 'json',
+        value: JSON.stringify({ minVersion: '2.5.0', fallback: 'checkout-v1' }),
+        description: 'Client guardrail instructing UI to fall back when checkout v2 is unsupported.',
+        exposure_level: 'internal',
+        sensitive: false,
+        metadata: JSON.stringify({ owner: 'Commerce' })
       }
     ]);
 

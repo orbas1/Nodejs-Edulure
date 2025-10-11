@@ -12,5 +12,9 @@
 - Supports uploads with checksum generation, presigned PUT submission, ingestion confirmation, and client-side caching.
 
 ## Layout & Navigation
-- `MainLayout` now renders auth-aware navigation items linking to the content library and login/register flows.
+- `MainLayout` now renders auth-aware navigation items linking to the content library and login/register flows. Navigation visibility for the admin console honours the backend feature flag snapshot to prevent unauthorised access.
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.
+
+## `/admin`
+- Adds runtime flag gating: when the admin console feature is disabled the page renders an escalation prompt sourced from runtime configuration.
+- Existing admin dashboards retain approvals and stats panels once the flag is active, preserving production layouts.

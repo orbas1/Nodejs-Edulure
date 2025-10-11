@@ -17,3 +17,5 @@
 - Hardened configuration governance by expanding environment validation for SMTP and lockout controls, bundling operational defaults in `.env.example`, and covering the new mailer contract with Vitest.
 - Operationalised data hygiene: added retention policy/audit tables, community owner triggers, production-grade seed data, and a retention enforcement service + CLI that purges stale sessions/telemetry while emitting immutable audit records.
 - Hardened the retention programme with a managed `node-cron` scheduler, backoff-aware failure handling, environment toggles, and Vitest coverage for both the retention executor and job lifecycle.
+- Delivered a database-backed feature flag and runtime configuration service with caching, Prometheus metrics, `/api/runtime` endpoints, an operational CLI, and React integration so staged rollouts and kill switches are centrally governed.
+- Migrated backend linting to ESLint's flat config with workspace-wide scripts, expanded Prometheus test doubles, and stabilised the feature flag/runtime configuration suites so governance automation ships with green quality gates.
