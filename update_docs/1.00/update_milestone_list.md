@@ -17,6 +17,7 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   3. **Task 1.3 Observability, Migrations & Feature Flags**
      - Stand up logging/metrics dashboards for R2, Meilisearch, payments, communities, and mobile APIs.
      - Adopt Knex/Prisma migrations with rollback drills, seed datasets, and feature flag/configuration services.
+     - Status update: Retention policy/audit migrations, production-grade seeds, owner triggers, the scripted data retention runner, and a cron-scheduled enforcement job with automated backoff/tests are live; feature flag service remains in-flight.
 
 ## Milestone 2 – Content Commerce & Learning Experiences (Weeks 2–6)
 - **Tasks Included:** Task 2 – Content, Commerce & Live Learning Delivery.

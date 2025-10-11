@@ -35,7 +35,7 @@
 - **Subtasks:**
   1. Execute accessibility audits (contrast, keyboard, screen reader) on updated templates and navigation patterns.
   2. Validate localisation placeholders, RTL mirroring, and translation length buffers across high-priority screens.
-  3. Compile security/privacy overlays for settings, payments, verification, consent prompts, and reinforce key rotation messaging aligned with backend JWT lifecycle. _Update:_ Email verification, lockout copy, and session governance (active devices, revoke-all confirmation) now align with the refreshed backend flows; remaining work focuses on retention messaging.
+  3. Compile security/privacy overlays for settings, payments, verification, consent prompts, and reinforce key rotation messaging aligned with backend JWT lifecycle. _Update:_ Email verification, lockout copy, session governance (active devices, revoke-all confirmation), retention/audit banners, and scheduler status/backoff chips for admin consoles now mirror backend enforcement.
   4. Produce engineering handoff kits with specs, interaction recordings, analytics matrices, and asset manifests, verifying Storybook/token pipelines run on the workspace-enforced Node/npm versions and aligning telemetry overlays with the new backend metrics feed.
   5. Host design QA walkthroughs with frontend, Flutter, and QA squads; triage outstanding questions.
   6. Log change requests and risk notes in `Design_Change_log.md` with Jira owners and due dates.

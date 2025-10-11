@@ -35,6 +35,8 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Embedded legal consent, security prompts, and audit trails referencing `Function Design.md`, `component_functions.md`, and `provider_application_logic_flow_changes.md`.
 - Documented observability overlays tying Prometheus metrics and trace IDs to design QA dashboards so interface health is monitored alongside copy/accessibility sign-offs.
 - Expanded account security guidance with active-session listings, revoke-all confirmation modals, and logout microcopy referencing `Settings Dashboard.md`, `Settings.md`, `Screen_text.md`, and `menu_drawings.md` so UI mirrors the new session governance tooling.
+- Documented retention and audit messaging for admin compliance consoles, mapping banners/tooltips to `dashboard_drawings.md`, `menu_drawings.md`, and `Screen_text.md` so policy automation surfaces remain transparent to operators.
+- Added scheduler status badges, dry-run toggles, and failure backoff notifications to admin compliance consoles referencing `dashboard_drawings.md` and `App_screens_drawings.md`, ensuring operations teams can see when automated hygiene is paused or deferred.
 
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.

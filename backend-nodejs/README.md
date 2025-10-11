@@ -23,10 +23,16 @@ Key environment variables are validated on boot. Ensure the following are set be
 - `LOG_SERVICE_NAME`, `LOG_REDACTED_FIELDS` – customise log metadata and extend default secret/PII redaction.
 - `TRACE_HEADER_NAME`, `TRACING_SAMPLE_RATE` – tune inbound trace propagation and sampling for distributed telemetry.
 - `METRICS_ENABLED`, `METRICS_USERNAME`/`METRICS_PASSWORD` or `METRICS_BEARER_TOKEN`, `METRICS_ALLOWED_IPS` – secure Prometheus access for operations tooling.
+- `DATA_RETENTION_ENABLED`, `DATA_RETENTION_CRON`, `DATA_RETENTION_TIMEZONE`, `DATA_RETENTION_MAX_FAILURES`, `DATA_RETENTION_FAILURE_BACKOFF_MINUTES` – control the automated retention scheduler, including execution window and resilience thresholds.
 
 `npm run db:install` provisions the schema (via Knex migrations) and seeds the database. Use `npm run migrate:latest`/`npm run
 migrate:rollback` to manage schema changes in CI/CD. The asset ingestion worker is started alongside the HTTP server and relies on
 CloudConvert for PowerPoint renditions and local EPUB parsing for ebook manifest generation.
+
+The bootstrap seed (`npm run seed`) now provisions an operator-ready dataset: verified admin/instructor/learner accounts, two
+communities with owner auto-enrolment, a production-style PowerPoint asset and its ingestion history, ebook reading telemetry,
+and active + stale refresh sessions for governance testing. Seeds intentionally cover scenarios referenced in retention policies
+so QA can validate the automation routines.
 
 ### Rotating JWT signing keys
 
@@ -103,6 +109,22 @@ Example Prometheus scrape configuration:
     username: ${EDULURE_METRICS_USER}
     password: ${EDULURE_METRICS_PASS}
 ```
+
+## Automated data retention
+
+- **Managed scheduler** – The HTTP process boots a `node-cron` powered `DataRetentionJob` that enforces policies according to the configured `DATA_RETENTION_CRON`. Toggle dry-runs with `DATA_RETENTION_DRY_RUN`, gate execution with `DATA_RETENTION_ENABLED`, and rely on automatic backoff after repeated failures to avoid destructive retries during outages.
+- **Policies as data** – Data hygiene is managed through the `data_retention_policies` table. Each record defines the entity,
+  action (`hard-delete` or `soft-delete`), retention horizon, and JSON criteria so governance can fine-tune behaviour without a
+  deploy cycle.
+- **Execution service** – Run `npm run data:retention` on a schedule to enforce policies. Add `--dry-run` to review the impact
+  and `--verbose` for per-policy output. Every live run writes an immutable record to `data_retention_audit_logs` capturing rows
+  touched, sample identifiers, and contextual metadata for compliance teams.
+- **Session hygiene** – Expired or inactive refresh sessions older than 90 days (30 days of inactivity) are automatically purged,
+  keeping authentication tables lean and preventing unlimited token accumulation. The session model now honours a `deleted_at`
+  flag so API queries ignore cleaned-up rows.
+- **Lifecycle coverage** – Communities dormant for two years are softly deleted rather than wiped, preserving the ability to
+  restore IDs while hiding them from member listings. Domain events and content asset telemetry follow rolling hard deletes to
+  keep analytics performant and storage predictable.
 
 ## API surface
 

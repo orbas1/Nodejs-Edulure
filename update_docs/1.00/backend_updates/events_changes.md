@@ -4,3 +4,4 @@
 - Introduced `content_asset_events` to capture view/download/progress actions with actor metadata for analytics dashboards and DRM enforcement.
 - `content_audit_logs` now record lifecycle state changes (upload confirmed, processing completed, ingestion failures) to provide operational traceability.
 - Extended domain auditing to capture login failures, lockouts (with remaining-attempt telemetry), verification issuance, verification completion, session rotation (`user.session_rotated`), and logout events (`user.session_revoked`, `user.sessions_revoked`) for downstream security analytics.
+- Added `data_retention_audit_logs` to persist per-policy enforcement metadata (rows affected, sample IDs, dry-run flags) so governance teams can evidence deletion SLAs.

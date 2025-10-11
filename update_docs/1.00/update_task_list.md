@@ -17,7 +17,9 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 1. **Security Framework Upgrade (100%)** – Rate limiting, strict CORS, password policies, JWT validation, secret rotation. _Progress update:_ Multi-key JWT key store, rotation tooling, and shared verification helpers delivered; account lockout telemetry, email verification flows, SMTP hardening, and the new session rotation/logout suite (refresh, revoke-current, revoke-all, capped concurrent sessions, cached validation) are production ready with OpenAPI and audit coverage.
 2. **Dependency & Workspace Governance (100%)** – Monorepo/tooling decisions, automated audits, version pinning, lint/test scripts. _Progress update:_ Introduced a root npm workspace with enforced Node 20.12.2+/npm 10.5.0+ engines, wired a runtime verifier, shared audit/lint/test commands, axios-backed React client, and `.npmrc` governance so CI, local, and production environments consume identical dependency trees.
 3. **Observability & Telemetry (100%)** – Structured request logging now injects trace/user context, `/metrics` exposes Prometheus histograms/counters for HTTP and R2, dashboards/runbooks documented for latency, error, and exception thresholds.
-4. **Migration & Data Hygiene (5%)** – Knex/Prisma migrations, rollback rehearsals, seed datasets, retention policies.
+4. **Migration & Data Hygiene (100%)** – Extended Knex migrations with retention policy/audit tables, owner membership triggers,
+   production-grade seed datasets, the automated data retention CLI, and a cron-backed enforcement job with failure backoff,
+   runtime toggles, and Vitest coverage to keep hygiene hands-free.
 5. **Feature Flag & Config Service (10%)** – Environment matrices, kill switches, staged rollout orchestration.
 
 ## Task 2 – Content, Commerce & Live Learning Delivery (5% complete)

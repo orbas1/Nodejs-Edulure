@@ -3,6 +3,7 @@ import { env } from './config/env.js';
 import logger from './config/logger.js';
 import db from './config/database.js';
 import assetIngestionService from './services/AssetIngestionService.js';
+import dataRetentionJob from './jobs/dataRetentionJob.js';
 
 async function start() {
   try {
@@ -18,10 +19,12 @@ async function start() {
   app.listen(port, () => {
     logger.info(`Server listening on port ${port}`);
     assetIngestionService.start();
+    dataRetentionJob.start();
   });
 
   const shutdown = () => {
     assetIngestionService.stop();
+    dataRetentionJob.stop();
     logger.info('Shutting down gracefully');
     process.exit(0);
   };

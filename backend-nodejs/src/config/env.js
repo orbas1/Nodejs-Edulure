@@ -172,7 +172,14 @@ const envSchema = z
       .default(15),
     ACCOUNT_LOCKOUT_THRESHOLD: z.coerce.number().int().min(3).max(20).default(5),
     ACCOUNT_LOCKOUT_WINDOW_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(15),
-    ACCOUNT_LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30)
+    ACCOUNT_LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
+    DATA_RETENTION_ENABLED: z.coerce.boolean().default(true),
+    DATA_RETENTION_CRON: z.string().default('0 3 * * *'),
+    DATA_RETENTION_TIMEZONE: z.string().default('Etc/UTC'),
+    DATA_RETENTION_DRY_RUN: z.coerce.boolean().default(false),
+    DATA_RETENTION_RUN_ON_STARTUP: z.coerce.boolean().default(false),
+    DATA_RETENTION_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
+    DATA_RETENTION_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30)
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -298,6 +305,15 @@ export const env = {
     level: raw.LOG_LEVEL,
     redactedFields,
     serviceName: raw.LOG_SERVICE_NAME ?? 'edulure-api'
+  },
+  retention: {
+    enabled: raw.DATA_RETENTION_ENABLED,
+    cronExpression: raw.DATA_RETENTION_CRON,
+    timezone: raw.DATA_RETENTION_TIMEZONE,
+    dryRun: raw.DATA_RETENTION_DRY_RUN,
+    runOnStartup: raw.DATA_RETENTION_RUN_ON_STARTUP,
+    maxConsecutiveFailures: raw.DATA_RETENTION_MAX_FAILURES,
+    failureBackoffMinutes: raw.DATA_RETENTION_FAILURE_BACKOFF_MINUTES
   },
   observability: {
     tracing: {

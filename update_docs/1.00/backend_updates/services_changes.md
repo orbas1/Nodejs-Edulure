@@ -10,3 +10,5 @@
 - Introduced `EmailVerificationService` to issue hashed tokens, enforce resend cooldowns, and mark verification completion transactionally with audit logging.
 - Added `MailService` as the SMTP abstraction used by verification flows, rendering production-grade HTML/text templates and logging dispatch identifiers for observability.
 - `StorageService` now wraps Cloudflare R2 calls in telemetry spans and Prometheus counters/histograms, exposing payload size, latency, and in-flight gauges for observability dashboards.
+- Introduced `DataRetentionService` to read policy metadata, enforce hard/soft delete actions per entity, and log immutable audit rows; scriptable via the new `npm run data:retention` CLI for scheduled hygiene sweeps.
+- Added `DataRetentionJob` to coordinate cron scheduling, dry-run bootstraps, and failure backoff, wiring the retention executor directly into the API lifecycle so hygiene enforcement runs continuously without human intervention.

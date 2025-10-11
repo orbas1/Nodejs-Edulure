@@ -28,5 +28,7 @@
 - **Notes:** JWT key rotation hardening reviewed with engineering; no component updates required but documentation cross-check added to QA checklist. Workspace runtime enforcement was reviewed to guarantee Storybook exports run on the approved Node/npm versions before handoff. Verification and lockout copy now mirrors backend enforcement ahead of handoff.
   - Prometheus/trace telemetry overlays signed off with engineering to feed design QA dashboards and align runtime observability with component health reviews.
   - Session/device management overlays for the settings dashboard (active devices list, revoke-all confirmation, logout copy) reviewed with engineering using `Settings Dashboard.md`, `Settings.md`, `menu_drawings.md`, and `Screen_text.md` to match the new backend session tooling.
+  - Retention audit banners and administrator prompts defined for policy compliance consoles so data hygiene automation has corresponding UI guidance; references captured in `dashboard_drawings.md` and `menu_drawings.md`.
+  - Scheduler health indicators (next run, paused/backoff badges, dry-run toggles) mapped for the compliance console using `dashboard_drawings.md` and `App_screens_drawings.md` so operators have parity with the new backend job behaviour.
 - **Dependencies:** Engineering schedules, QA tooling, localisation resources, compliance checklists.
 - **Responsible Roles:** Design Producer, Engineering Managers, Accessibility Specialist.

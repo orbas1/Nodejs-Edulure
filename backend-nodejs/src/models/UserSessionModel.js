@@ -12,12 +12,17 @@ const BASE_COLUMNS = [
   'revoked_at as revokedAt',
   'revoked_reason as revokedReason',
   'revoked_by as revokedBy',
-  'rotated_at as rotatedAt'
+  'rotated_at as rotatedAt',
+  'deleted_at as deletedAt'
 ];
 
 export default class UserSessionModel {
-  static query(connection = db) {
-    return connection('user_sessions');
+  static query(connection = db, { includeDeleted = false } = {}) {
+    const builder = connection('user_sessions');
+    if (!includeDeleted) {
+      builder.whereNull('deleted_at');
+    }
+    return builder;
   }
 
   static async create(session, connection = db) {
@@ -29,7 +34,7 @@ export default class UserSessionModel {
       expires_at: session.expiresAt,
       last_used_at: connection.fn.now()
     };
-    const [id] = await this.query(connection).insert(payload);
+    const [id] = await this.query(connection, { includeDeleted: true }).insert(payload);
     return this.findById(id, connection);
   }
 

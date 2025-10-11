@@ -26,3 +26,9 @@
 - `backend-nodejs/migrations/20241101090000_enhance_user_sessions.js` – migration enriching `user_sessions` with `last_used_at`, `rotated_at`, and `revoked_by` metadata for rotation governance.
 - `backend-nodejs/src/services/SessionRegistry.js` – in-memory/session cache ensuring revoked sessions are denied without repeated database lookups.
 - `backend-nodejs/test/sessionRegistry.test.js` – Vitest suite validating session cache behaviour, TTL eviction, and revocation handling.
+- `backend-nodejs/migrations/20241105153000_data_hygiene.js` – migration adding retention policy/audit tables, owner membership triggers, and soft-delete columns for data hygiene automation.
+- `backend-nodejs/seeds/001_bootstrap.js` – production-grade seed dataset covering verified roles, communities, asset lifecycle telemetry, and stale session cases for governance validation.
+- `backend-nodejs/src/services/dataRetentionService.js` – policy-driven retention executor with audit logging used by scheduled hygiene jobs.
+- `backend-nodejs/scripts/run-data-retention.js` – CLI wrapper for enforcing retention policies with dry-run/verbose flags.
+- `backend-nodejs/src/jobs/dataRetentionJob.js` – managed cron scheduler coordinating retention enforcement with failure backoff and startup toggles.
+- `backend-nodejs/test/dataRetentionService.test.js`, `backend-nodejs/test/dataRetentionJob.test.js` – Vitest coverage for the retention executor strategies and scheduler resilience.

@@ -15,3 +15,5 @@
 - Shipped email verification flows with hashed token storage, SMTP delivery, OpenAPI-documented endpoints, and controller/service orchestration that blocks unverified logins while providing throttled resend support.
 - Delivered full-session governance with hashed refresh token storage, JWT `sid` claims, cached session validation, forced logout APIs (`/api/auth/refresh`, `/logout`, `/logout-all`), OpenAPI schemas, and audit/domain events so compromised credentials can be revoked instantly.
 - Hardened configuration governance by expanding environment validation for SMTP and lockout controls, bundling operational defaults in `.env.example`, and covering the new mailer contract with Vitest.
+- Operationalised data hygiene: added retention policy/audit tables, community owner triggers, production-grade seed data, and a retention enforcement service + CLI that purges stale sessions/telemetry while emitting immutable audit records.
+- Hardened the retention programme with a managed `node-cron` scheduler, backoff-aware failure handling, environment toggles, and Vitest coverage for both the retention executor and job lifecycle.
