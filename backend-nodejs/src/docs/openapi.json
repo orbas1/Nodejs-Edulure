@@ -246,97 +246,259 @@
       "CommunityChannel": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "slug": { "type": "string" },
-          "type": { "type": "string" },
-          "description": { "type": "string", "nullable": true },
-          "isDefault": { "type": "boolean" },
-          "metadata": { "type": "object", "additionalProperties": true },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
-        "required": ["id", "name", "slug", "type", "isDefault", "metadata", "createdAt", "updatedAt"]
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "type",
+          "isDefault",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
       },
       "CommunityPost": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "type": { "type": "string" },
-          "title": { "type": "string", "nullable": true },
-          "body": { "type": "string" },
-          "publishedAt": { "type": "string", "format": "date-time", "nullable": true },
-          "scheduledAt": { "type": "string", "format": "date-time", "nullable": true },
-          "visibility": { "type": "string" },
-          "status": { "type": "string" },
-          "tags": { "type": "array", "items": { "type": "string" } },
-          "channel": { "$ref": "#/components/schemas/CommunityChannel", "nullable": true },
+          "id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "channel": {
+            "$ref": "#/components/schemas/CommunityChannel",
+            "nullable": true
+          },
           "community": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "id": { "type": "integer" },
-              "name": { "type": "string" },
-              "slug": { "type": "string" }
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
             }
           },
           "author": {
             "type": "object",
             "properties": {
-              "id": { "type": "integer" },
-              "name": { "type": "string" },
-              "role": { "type": "string" },
-              "avatarUrl": { "type": "string", "format": "uri" }
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "avatarUrl": {
+                "type": "string",
+                "format": "uri"
+              }
             },
-            "required": ["id", "name", "avatarUrl"]
+            "required": [
+              "id",
+              "name",
+              "avatarUrl"
+            ]
           },
           "stats": {
             "type": "object",
             "properties": {
-              "reactions": { "type": "integer" },
-              "reactionBreakdown": { "type": "object", "additionalProperties": { "type": "integer" } },
-              "comments": { "type": "integer" }
+              "reactions": {
+                "type": "integer"
+              },
+              "reactionBreakdown": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "comments": {
+                "type": "integer"
+              }
             }
           },
-          "metadata": { "type": "object", "additionalProperties": true }
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
         },
-        "required": ["id", "type", "body", "visibility", "status", "tags", "author", "stats", "metadata"]
+        "required": [
+          "id",
+          "type",
+          "body",
+          "visibility",
+          "status",
+          "tags",
+          "author",
+          "stats",
+          "metadata"
+        ]
       },
       "CommunityResource": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "communityId": { "type": "integer" },
-          "title": { "type": "string" },
-          "description": { "type": "string", "nullable": true },
-          "resourceType": { "type": "string" },
-          "assetId": { "type": "integer", "nullable": true },
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "resourceType": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "integer",
+            "nullable": true
+          },
           "asset": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "publicId": { "type": "string" },
-              "filename": { "type": "string" }
+              "publicId": {
+                "type": "string"
+              },
+              "filename": {
+                "type": "string"
+              }
             }
           },
-          "linkUrl": { "type": "string", "format": "uri", "nullable": true },
-          "classroomReference": { "type": "string", "nullable": true },
-          "tags": { "type": "array", "items": { "type": "string" } },
-          "visibility": { "type": "string" },
-          "status": { "type": "string" },
-          "metadata": { "type": "object", "additionalProperties": true },
-          "publishedAt": { "type": "string", "format": "date-time", "nullable": true },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" },
+          "linkUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "classroomReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "createdBy": {
             "type": "object",
             "properties": {
-              "id": { "type": "integer" },
-              "name": { "type": "string" },
-              "role": { "type": "string", "nullable": true },
-              "avatarUrl": { "type": "string", "format": "uri" }
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "nullable": true
+              },
+              "avatarUrl": {
+                "type": "string",
+                "format": "uri"
+              }
             },
-            "required": ["id", "name", "avatarUrl"]
+            "required": [
+              "id",
+              "name",
+              "avatarUrl"
+            ]
           }
         },
         "required": [
@@ -355,13 +517,17 @@
       },
       "CommunityDetail": {
         "allOf": [
-          { "$ref": "#/components/schemas/Community" },
+          {
+            "$ref": "#/components/schemas/Community"
+          },
           {
             "type": "object",
             "properties": {
               "channels": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/CommunityChannel" }
+                "items": {
+                  "$ref": "#/components/schemas/CommunityChannel"
+                }
               }
             }
           }
@@ -981,6 +1147,549 @@
           "reason": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "CommunityRoleDefinition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "roleKey": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "permissions": {
+            "type": "object"
+          },
+          "isDefaultAssignable": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "roleKey",
+          "name",
+          "permissions",
+          "isDefaultAssignable",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityRoleAssignment": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "userId",
+          "role",
+          "status",
+          "metadata"
+        ]
+      },
+      "CommunityPaywallTier": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "priceCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billingInterval": {
+            "type": "string"
+          },
+          "trialPeriodDays": {
+            "type": "integer"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "benefits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "stripePriceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paypalPlanId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "slug",
+          "name",
+          "priceCents",
+          "currency",
+          "billingInterval",
+          "trialPeriodDays",
+          "isActive",
+          "benefits",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunitySubscription": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "publicId": {
+            "type": "string"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "tierId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "currentPeriodStart": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "currentPeriodEnd": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "cancelAtPeriodEnd": {
+            "type": "boolean"
+          },
+          "canceledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "providerCustomerId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerSubscriptionId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "providerStatus": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latestPaymentIntentId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "affiliateId": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "publicId",
+          "communityId",
+          "userId",
+          "tierId",
+          "status",
+          "cancelAtPeriodEnd",
+          "provider",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityAffiliate": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "referralCode": {
+            "type": "string"
+          },
+          "commissionRateBasisPoints": {
+            "type": "integer"
+          },
+          "totalEarnedCents": {
+            "type": "integer"
+          },
+          "totalPaidCents": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "approvedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "suspendedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revokedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "communityId",
+          "userId",
+          "status",
+          "referralCode",
+          "commissionRateBasisPoints",
+          "totalEarnedCents",
+          "totalPaidCents",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityAffiliatePayout": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "affiliateId": {
+            "type": "integer"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "payoutReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "scheduledAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "processedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "failureReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "affiliateId",
+          "amountCents",
+          "status",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunitySubscriptionCheckoutResponse": {
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/PaymentIntentCreateResponse"
+          },
+          "subscription": {
+            "$ref": "#/components/schemas/CommunitySubscription"
+          }
+        },
+        "required": [
+          "payment",
+          "subscription"
+        ]
+      },
+      "CommunityRoleCollection": {
+        "type": "object",
+        "properties": {
+          "definitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityRoleDefinition"
+            }
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityRoleAssignment"
+            }
+          }
+        },
+        "required": [
+          "definitions",
+          "assignments"
+        ]
+      },
+      "CommunityPaywallTierInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priceCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billingInterval": {
+            "type": "string"
+          },
+          "trialPeriodDays": {
+            "type": "integer"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "benefits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "stripePriceId": {
+            "type": "string"
+          },
+          "paypalPlanId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "priceCents",
+          "currency",
+          "billingInterval"
+        ]
+      },
+      "CommunityPaywallTierUpdateInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "priceCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "billingInterval": {
+            "type": "string"
+          },
+          "trialPeriodDays": {
+            "type": "integer"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "benefits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "stripePriceId": {
+            "type": "string"
+          },
+          "paypalPlanId": {
+            "type": "string"
           }
         }
       }
@@ -1913,23 +2622,48 @@
           {
             "name": "page",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
           },
           {
             "name": "perPage",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
           },
           {
             "name": "postType",
             "in": "query",
-            "schema": { "type": "string", "enum": ["update", "event", "resource", "classroom", "poll"] },
+            "schema": {
+              "type": "string",
+              "enum": [
+                "update",
+                "event",
+                "resource",
+                "classroom",
+                "poll"
+              ]
+            },
             "required": false
           },
           {
             "name": "visibility",
             "in": "query",
-            "schema": { "type": "string", "enum": ["public", "members", "admins"] },
+            "schema": {
+              "type": "string",
+              "enum": [
+                "public",
+                "members",
+                "admins"
+              ]
+            },
             "required": false
           }
         ],
@@ -1940,13 +2674,17 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
                     {
                       "type": "object",
                       "properties": {
                         "data": {
                           "type": "array",
-                          "items": { "$ref": "#/components/schemas/CommunityPost" }
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityPost"
+                          }
                         },
                         "meta": {
                           "type": "object",
@@ -1954,10 +2692,18 @@
                             "pagination": {
                               "type": "object",
                               "properties": {
-                                "page": { "type": "integer" },
-                                "perPage": { "type": "integer" },
-                                "total": { "type": "integer" },
-                                "pageCount": { "type": "integer" }
+                                "page": {
+                                  "type": "integer"
+                                },
+                                "perPage": {
+                                  "type": "integer"
+                                },
+                                "total": {
+                                  "type": "integer"
+                                },
+                                "pageCount": {
+                                  "type": "integer"
+                                }
                               }
                             }
                           }
@@ -1969,8 +2715,12 @@
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       }
     },
@@ -1987,7 +2737,9 @@
             "name": "communityId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1997,11 +2749,15 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
                     {
                       "type": "object",
                       "properties": {
-                        "data": { "$ref": "#/components/schemas/CommunityDetail" }
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityDetail"
+                        }
                       }
                     }
                   ]
@@ -2009,9 +2765,15 @@
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Community is private" },
-          "404": { "description": "Community not found" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community is private"
+          },
+          "404": {
+            "description": "Community not found"
+          }
         }
       }
     },
@@ -2028,28 +2790,51 @@
             "name": "communityId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "page",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
           },
           {
             "name": "perPage",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
+            }
           },
           {
             "name": "channelId",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1 },
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
             "required": false
           },
           {
             "name": "postType",
             "in": "query",
-            "schema": { "type": "string", "enum": ["update", "event", "resource", "classroom", "poll"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "update",
+                "event",
+                "resource",
+                "classroom",
+                "poll"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2059,13 +2844,17 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
                     {
                       "type": "object",
                       "properties": {
                         "data": {
                           "type": "array",
-                          "items": { "$ref": "#/components/schemas/CommunityPost" }
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityPost"
+                          }
                         },
                         "meta": {
                           "type": "object",
@@ -2073,10 +2862,18 @@
                             "pagination": {
                               "type": "object",
                               "properties": {
-                                "page": { "type": "integer" },
-                                "perPage": { "type": "integer" },
-                                "total": { "type": "integer" },
-                                "pageCount": { "type": "integer" }
+                                "page": {
+                                  "type": "integer"
+                                },
+                                "perPage": {
+                                  "type": "integer"
+                                },
+                                "total": {
+                                  "type": "integer"
+                                },
+                                "pageCount": {
+                                  "type": "integer"
+                                }
                               }
                             }
                           }
@@ -2088,10 +2885,18 @@
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Community is private" },
-          "404": { "description": "Community not found" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community is private"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       },
       "post": {
@@ -2106,7 +2911,9 @@
             "name": "communityId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2116,18 +2923,62 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "channelId": { "type": "integer" },
-                  "postType": { "type": "string", "enum": ["update", "event", "resource", "classroom", "poll"] },
-                  "title": { "type": "string" },
-                  "body": { "type": "string" },
-                  "tags": { "type": "array", "items": { "type": "string" } },
-                  "visibility": { "type": "string", "enum": ["public", "members", "admins"] },
-                  "status": { "type": "string", "enum": ["draft", "scheduled", "published"] },
-                  "scheduledAt": { "type": "string", "format": "date-time" },
-                  "publishedAt": { "type": "string", "format": "date-time" },
-                  "metadata": { "type": "object" }
+                  "channelId": {
+                    "type": "integer"
+                  },
+                  "postType": {
+                    "type": "string",
+                    "enum": [
+                      "update",
+                      "event",
+                      "resource",
+                      "classroom",
+                      "poll"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "public",
+                      "members",
+                      "admins"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "scheduled",
+                      "published"
+                    ]
+                  },
+                  "scheduledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "publishedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
                 },
-                "required": ["body"]
+                "required": [
+                  "body"
+                ]
               }
             }
           }
@@ -2139,11 +2990,15 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
                     {
                       "type": "object",
                       "properties": {
-                        "data": { "$ref": "#/components/schemas/CommunityPost" }
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityPost"
+                        }
                       }
                     }
                   ]
@@ -2151,10 +3006,18 @@
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Insufficient permissions" },
-          "404": { "description": "Community not found" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       }
     },
@@ -2171,22 +3034,41 @@
             "name": "communityId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "limit",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 50, "default": 10 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            }
           },
           {
             "name": "offset",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
           },
           {
             "name": "resourceType",
             "in": "query",
-            "schema": { "type": "string", "enum": ["content_asset", "external_link", "document", "classroom_session"] }
+            "schema": {
+              "type": "string",
+              "enum": [
+                "content_asset",
+                "external_link",
+                "document",
+                "classroom_session"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2196,13 +3078,17 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
                     {
                       "type": "object",
                       "properties": {
                         "data": {
                           "type": "array",
-                          "items": { "$ref": "#/components/schemas/CommunityResource" }
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityResource"
+                          }
                         },
                         "meta": {
                           "type": "object",
@@ -2210,9 +3096,15 @@
                             "pagination": {
                               "type": "object",
                               "properties": {
-                                "limit": { "type": "integer" },
-                                "offset": { "type": "integer" },
-                                "total": { "type": "integer" }
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "offset": {
+                                  "type": "integer"
+                                },
+                                "total": {
+                                  "type": "integer"
+                                }
                               }
                             }
                           }
@@ -2224,10 +3116,18 @@
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Community is private" },
-          "404": { "description": "Community not found" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community is private"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       },
       "post": {
@@ -2242,7 +3142,9 @@
             "name": "communityId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2252,19 +3154,63 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "title": { "type": "string" },
-                  "description": { "type": "string" },
-                  "resourceType": { "type": "string", "enum": ["content_asset", "external_link", "document", "classroom_session"] },
-                  "assetId": { "type": "integer" },
-                  "linkUrl": { "type": "string", "format": "uri" },
-                  "classroomReference": { "type": "string" },
-                  "tags": { "type": "array", "items": { "type": "string" } },
-                  "visibility": { "type": "string", "enum": ["members", "admins"] },
-                  "status": { "type": "string", "enum": ["draft", "published"] },
-                  "publishedAt": { "type": "string", "format": "date-time" },
-                  "metadata": { "type": "object" }
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "resourceType": {
+                    "type": "string",
+                    "enum": [
+                      "content_asset",
+                      "external_link",
+                      "document",
+                      "classroom_session"
+                    ]
+                  },
+                  "assetId": {
+                    "type": "integer"
+                  },
+                  "linkUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "classroomReference": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "members",
+                      "admins"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "draft",
+                      "published"
+                    ]
+                  },
+                  "publishedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
                 },
-                "required": ["title", "resourceType"]
+                "required": [
+                  "title",
+                  "resourceType"
+                ]
               }
             }
           }
@@ -2276,11 +3222,15 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
                     {
                       "type": "object",
                       "properties": {
-                        "data": { "$ref": "#/components/schemas/CommunityResource" }
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityResource"
+                        }
                       }
                     }
                   ]
@@ -2288,10 +3238,18 @@
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Insufficient permissions" },
-          "404": { "description": "Community not found" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       }
     },
@@ -2850,6 +3808,852 @@
           },
           "422": {
             "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/roles": {
+      "get": {
+        "summary": "List community roles",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Roles fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityRoleCollection"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create community role",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "roleKey": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "permissions": {
+                    "type": "object"
+                  },
+                  "isDefaultAssignable": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Role created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityRoleDefinition"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/members/{userId}/role": {
+      "patch": {
+        "summary": "Assign community member role",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roleKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "roleKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityRoleAssignment"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/paywall/tiers": {
+      "get": {
+        "summary": "List community paywall tiers",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paywall tiers fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CommunityPaywallTier"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create paywall tier",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityPaywallTierInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tier created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityPaywallTier"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/paywall/tiers/{tierId}": {
+      "patch": {
+        "summary": "Update paywall tier",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityPaywallTierUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tier updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityPaywallTier"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/paywall/checkout": {
+      "post": {
+        "summary": "Start subscription checkout",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tierId": {
+                    "type": "integer"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "couponCode": {
+                    "type": "string"
+                  },
+                  "tax": {
+                    "type": "object"
+                  },
+                  "receiptEmail": {
+                    "type": "string"
+                  },
+                  "affiliateCode": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tierId",
+                  "provider"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Checkout started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunitySubscriptionCheckoutResponse"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/subscriptions/me": {
+      "get": {
+        "summary": "List my community subscriptions",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Subscriptions fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CommunitySubscription"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/subscriptions/{subscriptionId}/cancel": {
+      "post": {
+        "summary": "Cancel community subscription",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subscriptionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cancelAtPeriodEnd": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunitySubscription"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/affiliates": {
+      "get": {
+        "summary": "List community affiliates",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Affiliates fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CommunityAffiliate"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/affiliates/apply": {
+      "post": {
+        "summary": "Apply to community affiliate program",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "referralCode": {
+                    "type": "string"
+                  },
+                  "commissionRateBasisPoints": {
+                    "type": "integer"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Affiliate application created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityAffiliate"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/affiliates/{affiliateId}": {
+      "patch": {
+        "summary": "Update community affiliate",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "commissionRateBasisPoints": {
+                    "type": "integer"
+                  },
+                  "referralCode": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Affiliate updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityAffiliate"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/communities/{communityId}/affiliates/{affiliateId}/payouts": {
+      "post": {
+        "summary": "Record affiliate payout",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountCents": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "payoutReference": {
+                    "type": "string"
+                  },
+                  "scheduledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "processedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "failureReason": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "amountCents"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payout recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityAffiliatePayout"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
           }
         }
       }

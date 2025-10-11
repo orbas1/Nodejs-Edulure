@@ -58,6 +58,7 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Refined community switcher, feed layout, and resource library specs referencing `dashboard_drawings.md`, `website_drawings.md`, `menu_drawings.md`, `App_screens_drawings.md`, and `Admin_panel_drawings.md` to capture role badges, membership guardrails, pagination controls, and accessibility-focused focus states.
 - Updated interaction narratives in `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md` and `Application_Design_Update_Plan/Application Design Update.md` with moderation prompts, resource metadata chips, and loader/error fallbacks aligned to the new backend `/api/communities` contracts.
 - Documented asset manifests for community emblems, channel avatars, and resource thumbnails across `images_and_vectors.md`, `Screens_update_images_and _vectors.md`, and `Resources.md`, ensuring parity with learner/provider dashboards.
+- Produced monetisation overlays covering subscription tier cards, checkout confirmation states, entitlement callouts, and affiliate payout dashboards referencing `menu_drawings.md`, `dashboard_drawings.md`, `Admin_panel_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md` so community managers and finance teams can govern paywalls with consistent UI cues.
 
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.

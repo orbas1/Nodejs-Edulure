@@ -16,6 +16,11 @@ import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentLedgerEntryModel from '../models/PaymentLedgerEntryModel.js';
 import PaymentRefundModel from '../models/PaymentRefundModel.js';
 import { trackPaymentCaptureMetrics, trackPaymentRefundMetrics } from '../observability/metrics.js';
+import {
+  onPaymentSucceeded as handleCommunityPaymentSucceeded,
+  onPaymentFailed as handleCommunityPaymentFailed,
+  onPaymentRefunded as handleCommunityPaymentRefunded
+} from './CommunitySubscriptionLifecycle.js';
 
 const STRIPE_API_VERSION = '2024-06-20';
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
@@ -722,6 +727,8 @@ class PaymentService {
         status: updatedIntent.status
       });
 
+      await handleCommunityPaymentSucceeded(updatedIntent, trx);
+
       return this.toApiIntent(updatedIntent);
     });
   }
@@ -858,6 +865,8 @@ class PaymentService {
         taxAmount: intent.amountTax,
         status: 'succeeded'
       });
+
+      await handleCommunityPaymentSucceeded(updated, trx);
     });
   }
 
@@ -872,12 +881,14 @@ class PaymentService {
         return;
       }
 
-      await PaymentIntentModel.updateById(intent.id, {
+      const updatedIntent = await PaymentIntentModel.updateById(intent.id, {
         status: 'failed',
         failureCode: failure?.code ?? null,
         failureMessage: failure?.message ?? paymentIntentPayload.cancellation_reason ?? null,
         canceledAt: failure?.created ? new Date(failure.created * 1000).toISOString() : new Date().toISOString()
       }, trx);
+
+      await handleCommunityPaymentFailed(updatedIntent, trx);
     });
   }
 
@@ -932,6 +943,9 @@ class PaymentService {
           currency: refund.currency?.toUpperCase() ?? intent.currency,
           amount: Number(refund.amount ?? 0)
         });
+
+        const updatedIntent = await PaymentIntentModel.findById(intent.id, trx);
+        await handleCommunityPaymentRefunded(updatedIntent, Number(refund.amount ?? 0), trx);
       }
 
       const refreshed = await PaymentIntentModel.findById(intent.id, trx);
@@ -1067,6 +1081,7 @@ class PaymentService {
       });
 
       const finalIntent = await PaymentIntentModel.findById(intent.id, trx);
+      await handleCommunityPaymentRefunded(finalIntent, refundAmount, trx);
       return this.toApiIntent(finalIntent);
     });
   }

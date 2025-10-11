@@ -5,6 +5,14 @@ const makeHash = (value) => crypto.createHash('sha256').update(value).digest('he
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
+    await trx('community_affiliate_payouts').del();
+    await trx('community_subscriptions').del();
+    await trx('community_paywall_tiers').del();
+    await trx('community_role_definitions').del();
+    await trx('community_affiliates').del();
+    await trx('payment_ledger_entries').del();
+    await trx('payment_refunds').del();
+    await trx('payment_intents').del();
     await trx('feature_flag_audits').del();
     await trx('feature_flags').del();
     await trx('configuration_entries').del();
@@ -340,9 +348,249 @@ export async function seed(knex) {
         performed_by: adminId
       }
     ]);
+
+    const [opsStrategistRoleId] = await trx('community_role_definitions').insert({
+      community_id: opsCommunityId,
+      role_key: 'ops-strategist',
+      name: 'Ops Strategist',
+      description: 'Owns automation runbooks, resource QA, and high-risk escalation workflows.',
+      permissions: JSON.stringify({
+        manageChannels: true,
+        publishContent: true,
+        viewFinanceDashboards: false,
+        orchestrateSimulations: true
+      }),
+      is_default_assignable: false,
+      created_by: instructorId
+    });
+
+    const [growthAnalystRoleId] = await trx('community_role_definitions').insert({
+      community_id: growthCommunityId,
+      role_key: 'growth-analyst',
+      name: 'Growth Analyst',
+      description: 'Responsible for attribution dashboards, paywall KPI reviews, and affiliate QA.',
+      permissions: JSON.stringify({
+        manageChannels: false,
+        publishContent: true,
+        viewFinanceDashboards: true,
+        manageAffiliates: true
+      }),
+      is_default_assignable: true,
+      created_by: adminId
+    });
+
+    const [opsPremiumTierId] = await trx('community_paywall_tiers').insert({
+      community_id: opsCommunityId,
+      slug: 'premium-ops-lab',
+      name: 'Premium Ops Lab',
+      description:
+        'Monthly access to incident simulations, automation labs, and priority escalation office hours.',
+      price_cents: 8900,
+      currency: 'USD',
+      billing_interval: 'monthly',
+      trial_period_days: 7,
+      is_active: true,
+      benefits: JSON.stringify([
+        'Weekly live incident rehearsal',
+        'Automation playbook library access',
+        'Priority escalation office hours'
+      ]),
+      metadata: JSON.stringify({ analyticsKey: 'ops-premium', featureFlag: 'ops-lab-paywall' }),
+      stripe_price_id: 'price_ops_premium_monthly'
+    });
+
+    const [growthInsiderTierId] = await trx('community_paywall_tiers').insert({
+      community_id: growthCommunityId,
+      slug: 'growth-insiders-annual',
+      name: 'Growth Insiders Annual',
+      description:
+        'Annual membership bundling campaign labs, attribution tooling, and co-marketing office hours.',
+      price_cents: 189900,
+      currency: 'USD',
+      billing_interval: 'annual',
+      trial_period_days: 14,
+      is_active: true,
+      benefits: JSON.stringify([
+        'Quarterly campaign tear-down workshops',
+        'Attribution dashboard access',
+        'Affiliate co-marketing slots'
+      ]),
+      metadata: JSON.stringify({ analyticsKey: 'growth-insider', slaHours: 12 }),
+      stripe_price_id: 'price_growth_insider_annual',
+      paypal_plan_id: 'P-GROWTH-ANNUAL'
+    });
+
+    const affiliateReferralCode = 'GROWTHLAB20';
+    const [growthAffiliateId] = await trx('community_affiliates').insert({
+      community_id: growthCommunityId,
+      user_id: learnerId,
+      status: 'approved',
+      referral_code: affiliateReferralCode,
+      commission_rate_bps: 2000,
+      total_earned_cents: 0,
+      total_paid_cents: 0,
+      metadata: JSON.stringify({ campaign: 'beta-cohort', payoutEmail: 'noemi.carvalho@edulure.test' }),
+      approved_at: trx.fn.now()
+    });
+
+    const subscriptionPublicId = crypto.randomUUID();
+    const providerIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
+    const providerChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
+
+    const [subscriptionPaymentId] = await trx('payment_intents').insert({
+      public_id: crypto.randomUUID(),
+      user_id: learnerId,
+      provider: 'stripe',
+      provider_intent_id: providerIntentId,
+      provider_latest_charge_id: providerChargeId,
+      status: 'succeeded',
+      currency: 'USD',
+      amount_subtotal: 189900,
+      amount_discount: 0,
+      amount_tax: 15192,
+      amount_total: 205092,
+      amount_refunded: 0,
+      tax_breakdown: JSON.stringify({ jurisdiction: 'US-CA', rate: 0.08 }),
+      metadata: JSON.stringify({
+        public_id: subscriptionPublicId,
+        entity_type: 'community_subscription',
+        entity_id: subscriptionPublicId,
+        items: [
+          {
+            id: 'growth-insiders-annual',
+            name: 'Growth Insiders Annual',
+            unitAmount: 189900,
+            quantity: 1,
+            discount: 0,
+            tax: 15192,
+            total: 205092
+          }
+        ],
+        taxableSubtotal: 189900,
+        taxableAfterDiscount: 189900,
+        couponCode: null,
+        couponId: null,
+        referralCode: affiliateReferralCode
+      }),
+      coupon_id: null,
+      entity_type: 'community_subscription',
+      entity_id: subscriptionPublicId,
+      receipt_email: 'noemi.carvalho@edulure.test',
+      captured_at: trx.fn.now()
+    });
+
+    await trx('payment_ledger_entries').insert({
+      payment_intent_id: subscriptionPaymentId,
+      entry_type: 'charge',
+      amount: 205092,
+      currency: 'USD',
+      details: JSON.stringify({
+        provider: 'stripe',
+        chargeId: providerChargeId,
+        paymentMethod: ['card'],
+        statementDescriptor: 'EDULURE INSIDER'
+      })
+    });
+
+    const now = new Date();
+    const nextYear = new Date(now.getTime());
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+
+    const affiliateCommission = Math.floor(205092 * 0.2);
+
+    const [growthSubscriptionId] = await trx('community_subscriptions').insert({
+      public_id: subscriptionPublicId,
+      community_id: growthCommunityId,
+      user_id: learnerId,
+      tier_id: growthInsiderTierId,
+      status: 'active',
+      started_at: now,
+      current_period_start: now,
+      current_period_end: nextYear,
+      cancel_at_period_end: false,
+      provider: 'stripe',
+      provider_customer_id: `cus_${crypto.randomBytes(6).toString('hex')}`,
+      provider_subscription_id: `sub_${crypto.randomBytes(6).toString('hex')}`,
+      provider_status: 'active',
+      latest_payment_intent_id: subscriptionPaymentId,
+      affiliate_id: growthAffiliateId,
+      metadata: JSON.stringify({ referralCode: affiliateReferralCode, source: 'seed' })
+    });
+
+    await trx('community_affiliates')
+      .where({ id: growthAffiliateId })
+      .update({ total_earned_cents: affiliateCommission, updated_at: trx.fn.now() });
+
+    await trx('community_affiliate_payouts').insert({
+      affiliate_id: growthAffiliateId,
+      amount_cents: Math.floor(affiliateCommission / 2),
+      status: 'processing',
+      payout_reference: 'PAYOUT-2024-10-001',
+      scheduled_at: trx.fn.now(),
+      metadata: JSON.stringify({ invoiceNumber: 'INV-2024-10-001', subscriptionId: growthSubscriptionId })
+    });
+
+    await trx('community_members')
+      .where({ community_id: growthCommunityId, user_id: learnerId })
+      .update({
+        status: 'active',
+        role: 'growth-analyst',
+        metadata: JSON.stringify({
+          subscriptionPublicId,
+          referralCode: affiliateReferralCode,
+          affiliateId: growthAffiliateId,
+          roleDefinitionId: growthAnalystRoleId
+        }),
+        updated_at: trx.fn.now()
+      });
+
+    await trx('community_members')
+      .where({ community_id: opsCommunityId, user_id: adminId })
+      .update({
+        role: 'ops-strategist',
+        metadata: JSON.stringify({ playbookOwner: true, roleDefinitionId: opsStrategistRoleId }),
+        updated_at: trx.fn.now()
+      });
+
+    await trx('domain_events').insert([
+      {
+        entity_type: 'community_paywall_tier',
+        entity_id: String(opsPremiumTierId),
+        event_type: 'community.paywall.tier.created',
+        payload: JSON.stringify({ communityId: opsCommunityId, slug: 'premium-ops-lab' }),
+        performed_by: instructorId
+      },
+      {
+        entity_type: 'community_paywall_tier',
+        entity_id: String(growthInsiderTierId),
+        event_type: 'community.paywall.tier.created',
+        payload: JSON.stringify({ communityId: growthCommunityId, slug: 'growth-insiders-annual' }),
+        performed_by: adminId
+      },
+      {
+        entity_type: 'community_subscription',
+        entity_id: subscriptionPublicId,
+        event_type: 'community.subscription.activated',
+        payload: JSON.stringify({
+          communityId: growthCommunityId,
+          tierId: growthInsiderTierId,
+          affiliateId: growthAffiliateId,
+          paymentIntentId: subscriptionPaymentId
+        }),
+        performed_by: learnerId
+      },
+      {
+        entity_type: 'community_affiliate',
+        entity_id: String(growthAffiliateId),
+        event_type: 'community.affiliate.payout-scheduled',
+        payload: JSON.stringify({
+          amount: Math.floor(affiliateCommission / 2),
+          payoutReference: 'PAYOUT-2024-10-001',
+          subscriptionId: growthSubscriptionId
+        }),
+        performed_by: adminId
       }
     ]);
-
     const [adminConsoleFlagId] = await trx('feature_flags').insert({
       key: 'admin.operational-console',
       name: 'Admin Operational Console',
