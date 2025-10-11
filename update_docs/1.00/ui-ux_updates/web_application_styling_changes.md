@@ -95,3 +95,12 @@
 - **Countdown timer:** Circular progress indicator with `conic-gradient(#2563EB, #7C3AED)` border, centre uses `Inter 700` 24px typography. High-contrast mode swaps to solid outlines.
 - **Moderation toasts:** Bottom-left anchored, dark background `#1E293B`, accent border `#F59E0B`, includes iconography from `assets/moderation` set; slide-in animation 180ms ease-out.
 - **Post-session summary:** Card grid uses neutral backdrop with accent header band (#2563EB at 12% opacity). Buttons align with CTA guidelines, analytics badges display using tertiary accent for KPIs.
+
+## Commerce & Finance Styling Extensions
+- **Checkout summary:** Two-column layout with frosted glass summary card using `rgba(15, 23, 42, 0.78)` background, accent dividers, and stacked line-item rows. Totals row uses `web.accent.primary` typography and badge to highlight coupon savings.
+- **Coupon input:** Rounded 12px input with inline pill for success state. Applied coupons display as chips using tertiary accent background and dismiss icon referencing `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`.
+- **Payment method selector:** Tabbed buttons for card vs PayPal. Active state uses gradient border and subtle glow; disabled state greys out with dashed border to convey unavailable providers.
+- **SCA banner:** Uses warning palette with icon, emphasised header text, and step-by-step bullets. Motion emphasises attention via 160ms slide from top with focus trap compliance.
+- **Finance dashboards:** KPI cards adopt subdued gradient (#1E293B → rgba(37,99,235,0.18)), icons tinted tertiary accent, and sparkline overlays for revenue trends. Tables include sticky headers, zebra striping, and chip indicators for status (captured/refunded/pending).
+- **Refund modals:** Dark backdrop with accent error border, amount selector slider, and policy reminder block styled with warning palette. Confirmation state swaps to success tone and displays ledger reference ID.
+- **Webhook alert banner:** Inline alert using `web.feedback.warning` with icon, CTA buttons, and subtle pulsating border to indicate required attention; high-contrast mode converts to solid outlines.

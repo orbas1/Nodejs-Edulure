@@ -58,6 +58,13 @@
 
 ## Responsive & Theme Variants
 - Tablet view reduces card padding to 20px, compresses typography scale by 1 step.
+
+## Commerce, Payout & Finance Styling
+- **Revenue dashboard:** KPI cards use accent gradient border and subtle glow when targets met; delinquent metrics display warning palette and include inline tooltip referencing `provider_application_logic_flow_changes.md`.
+- **Transaction tables:** Sticky summary row with bold typography and pill status chips (captured, pending, refunded). Hover states emphasise row with accent border.
+- **Refund workflow:** Modal styling leverages destructive colour scheme (#F43F5E) for confirmation, includes policy callout with icon, and disables confirm button until acknowledgment checkbox is selected.
+- **Coupon management:** Forms use dual columns with chips listing eligible products; success toasts adopt finance accent and provide deep link to analytics, aligning with `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`.
+- **Webhook alerts:** Notification banners anchored beneath nav with gradient warning background, CTA buttons (retry, escalate), and icon stack to flag operational tasks.
 - Mobile view uses light theme variant (`#F8FAFC` background, `#1E293B` text) for readability outdoors; accent colours remain consistent.
 - Dark/light theme toggle persists preference via local storage and server profile flag.
 

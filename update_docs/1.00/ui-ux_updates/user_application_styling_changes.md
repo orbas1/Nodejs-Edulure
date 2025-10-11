@@ -78,6 +78,12 @@
 
 ## Accessibility Styling
 - **High-contrast mode:** Background flips to #0F172A with text #F8FAFC; accent colours saturated (#A855F7, #0EA5E9) to maintain clarity.
+
+## Commerce & Payments Styling
+- **Checkout sheet:** Bottom sheet uses light surface with rounded top corners and sticky summary card. Primary action button spans full width with gradient fill; secondary PayPal button adopts blue brand colour with outlined style, referencing `user_application_logic_flow_changes.md`.
+- **Coupon entry:** Inline input with rounded edges; applied coupons display as removable chips tinted `#EDE9FE` with accent text. Error states use red helper text and shake animation for quick feedback.
+- **Receipt & history:** Payment history cards include left accent bar indicating status (captured `#22C55E`, pending `#F59E0B`, refunded `#2563EB`). Export button uses ghost style with icon from finance set documented in `Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md`.
+- **Refund modal:** Uses neutral background with warning banner at top; confirm button uses destructive palette (#EF4444) and haptic feedback on confirmation to communicate critical action.
 - **Focus outlines:** 2px `#14B8A6` outer ring plus 1px white inset stroke to ensure visibility on dark/light themes.
 - **Reduced motion:** Animations replaced with fade transitions and static state changes for toggles and carousel slides.
 

@@ -42,3 +42,5 @@
 - `backend-nodejs/eslint.config.mjs` – ESLint flat configuration enabling workspace-wide governance with Node/test aware rules.
 - `backend-nodejs/scripts/provision-r2-buckets.js` – operational CLI that creates/validates Cloudflare R2 buckets with lifecycle, CORS, and tagging policies.
 - `backend-nodejs/test/antivirusService.test.js` – Vitest suite exercising antivirus scanning, detection, caching, and storage streaming integrations.
+- `backend-nodejs/src/services/PaymentService.js`, `backend-nodejs/src/controllers/PaymentController.js`, `backend-nodejs/src/routes/payment.routes.js`, `backend-nodejs/src/models/PaymentIntentModel.js`, `PaymentCouponModel.js`, `PaymentRefundModel.js`, `PaymentLedgerEntryModel.js`, and migration `20241112120000_payments_commerce.js` – payments domain covering intents, coupons, refunds, ledgers, and HTTP entry points for Stripe/PayPal processing.
+- `backend-nodejs/test/paymentService.test.js` – Vitest coverage for tax allocation, coupon enforcement, PayPal capture, refund orchestration, and Stripe webhook signature validation.

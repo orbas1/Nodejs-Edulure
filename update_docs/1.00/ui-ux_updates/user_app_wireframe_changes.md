@@ -64,6 +64,18 @@
 - **Subscription paywall:** Modular layout with plan cards, benefits list, and FAQ accordion. CTA buttons for monthly/annual toggle. Payment sheet includes saved methods, add new card form, and coupon field.
 - **Trial reminder:** Dashboard banner showing days remaining, upgrade CTA, and link to manage billing.
 
+## Checkout & Payment Experience
+- **Cart review sheet:** Full-height modal triggered from course/ebook/tutor purchase CTA summarising selected products, subtotal, applied coupons, estimated tax, and total due. Includes expanders for tax calculation details (jurisdiction, rate, exemptions) and coupon audit trail referencing the backend ledger entry ID.
+- **Payment method hub:** Tabbed interface within checkout for Card, PayPal, and Wallet. Card tab surfaces saved cards with masked digits, ability to edit billing address, and inline CVV prompts. PayPal tab opens in-app browser overlay with progress indicator and fallback instructions if the learner cancels the approval. Wallet tab highlights institution logos and one-tap confirm buttons with biometric prompt where supported.
+- **Strong Customer Authentication (SCA) modal:** When Stripe requires additional verification, display overlay with issuer logo, status timeline (Challenge sent → Awaiting bank → Completed), and support link if the challenge fails. Provide countdown/resend options and safe cancel copy explaining consequences.
+- **Payment confirmation state:** Success screen features celebratory animation, summary card (order ID, payment reference, enrolment info), CTA buttons (“View receipt”, “Start learning”, “Share”). Embed `Add to calendar` for live sessions and show support contact for invoice requests. Error state variant highlights actionable remediation (retry card, choose PayPal, contact support) with log reference so agents can trace failures.
+
+## Receipts, History & Refund Requests
+- **Receipt centre:** Accessible from Profile > Billing. List view displays receipts with status pills (Paid, Refunded, Pending) and icons representing payment method. Tapping opens detail sheet containing itemised breakdown, tax, coupons, invoice downloads (PDF), and share/email actions. Provide quick link to finance policies and refund eligibility timer.
+- **Refund request flow:** Multi-step sheet triggered from receipt detail. Step 1 selects reason (technical issue, schedule conflict, quality concerns) and uploads attachments. Step 2 summarises prorated amounts for partial refunds (when content consumed) with clear copy on policy thresholds. Step 3 confirms submission, surfaces expected resolution time, and optional toggle to convert refund to course credit. Final state provides ticket number and ability to message support.
+- **Refund status tracker:** Timeline component embedded within receipt detail showing events (Request submitted, Under review, Approved, Reimbursed). Each event includes timestamp, responsible team, and notes referencing payment ledger updates to align with customer communications.
+- **Chargeback education banner:** When refund window has passed, display inline guidance explaining dispute path with cautionary copy about potential account suspension. Link to knowledge base article and surface contact CTA for escalations.
+
 ## Support & Safety
 - **Report & block flow:** Multi-step sheet with reason selection, optional text input, and confirmation screen referencing community guidelines.
 - **Guardian controls:** For younger learners, parental consent screen with toggle for enabling safe chat and viewing activity summary.

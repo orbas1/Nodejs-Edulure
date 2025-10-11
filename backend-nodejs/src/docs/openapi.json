@@ -414,6 +414,423 @@
           "status",
           "emailVerifiedAt"
         ]
+      },
+      "PaymentTotals": {
+        "type": "object",
+        "properties": {
+          "subtotal": {
+            "type": "integer",
+            "description": "Subtotal before discounts and taxes, expressed in cents."
+          },
+          "discount": {
+            "type": "integer",
+            "description": "Discount amount applied in cents."
+          },
+          "tax": {
+            "type": "integer",
+            "description": "Tax amount applied in cents."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total payable amount in cents."
+          }
+        },
+        "required": [
+          "subtotal",
+          "discount",
+          "tax",
+          "total"
+        ]
+      },
+      "PaymentLineItemInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "unitAmount": {
+            "type": "integer",
+            "minimum": 50,
+            "description": "Unit price in cents."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "taxExempt": {
+            "type": "boolean",
+            "default": false
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "unitAmount"
+        ]
+      },
+      "PaymentIntentCreateRequest": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "stripe",
+              "paypal"
+            ]
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentLineItemInput"
+            }
+          },
+          "couponCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "tax": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "country": {
+                "type": "string",
+                "description": "Two-letter country code."
+              },
+              "region": {
+                "type": "string",
+                "nullable": true
+              },
+              "postalCode": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "country"
+            ]
+          },
+          "entity": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "nullable": true
+              },
+              "description": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "receiptEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "paypal": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "returnUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "cancelUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "brandName": {
+                "type": "string",
+                "nullable": true
+              }
+            },
+            "required": [
+              "returnUrl",
+              "cancelUrl"
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "items"
+        ]
+      },
+      "PaymentIntentCreateResponse": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "stripe",
+              "paypal"
+            ]
+          },
+          "paymentId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "clientSecret": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PaymentTotals"
+          }
+        },
+        "required": [
+          "provider",
+          "paymentId",
+          "status",
+          "totals"
+        ]
+      },
+      "PaymentIntentRecord": {
+        "type": "object",
+        "properties": {
+          "paymentId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amountSubtotal": {
+            "type": "integer"
+          },
+          "amountDiscount": {
+            "type": "integer"
+          },
+          "amountTax": {
+            "type": "integer"
+          },
+          "amountTotal": {
+            "type": "integer"
+          },
+          "amountRefunded": {
+            "type": "integer"
+          },
+          "taxBreakdown": {
+            "type": "object"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "couponId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "entityId": {
+            "type": "string"
+          },
+          "receiptEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "canceledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "failureMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "paymentId",
+          "provider",
+          "status",
+          "currency",
+          "amountSubtotal",
+          "amountDiscount",
+          "amountTax",
+          "amountTotal",
+          "amountRefunded",
+          "metadata",
+          "entityType",
+          "entityId",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "PaymentSummaryEntry": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "gross": {
+            "type": "integer"
+          },
+          "discount": {
+            "type": "integer"
+          },
+          "net": {
+            "type": "integer"
+          },
+          "tax": {
+            "type": "integer"
+          },
+          "refunded": {
+            "type": "integer"
+          },
+          "captured": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "currency",
+          "gross",
+          "discount",
+          "net",
+          "tax",
+          "refunded",
+          "captured"
+        ]
+      },
+      "CouponPublic": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "discountType": {
+            "type": "string",
+            "enum": [
+              "percentage",
+              "fixed_amount"
+            ]
+          },
+          "discountValue": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "maxRedemptions": {
+            "type": "integer",
+            "nullable": true
+          },
+          "perUserLimit": {
+            "type": "integer",
+            "nullable": true
+          },
+          "timesRedeemed": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "discountType",
+          "discountValue",
+          "status",
+          "timesRedeemed"
+        ]
+      },
+      "PaymentRefundRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optional refund amount expressed in cents."
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
       }
     }
   },
@@ -434,6 +851,357 @@
           },
           "503": {
             "description": "Downstream dependency failure"
+          }
+        }
+      }
+    },
+    "/api/payments": {
+      "post": {
+        "summary": "Create Stripe or PayPal payment intent",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentIntentCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment intent created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaymentIntentCreateResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Coupon not found or inactive"
+          },
+          "409": {
+            "description": "Coupon redemption limit reached"
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "502": {
+            "description": "Payment provider error"
+          }
+        }
+      }
+    },
+    "/api/payments/paypal/{paymentId}/capture": {
+      "post": {
+        "summary": "Capture an approved PayPal order",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PayPal capture completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaymentIntentRecord"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Capture not allowed for current status"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Payment intent not found"
+          },
+          "502": {
+            "description": "PayPal returned an error"
+          }
+        }
+      }
+    },
+    "/api/payments/{paymentId}/refunds": {
+      "post": {
+        "summary": "Issue a Stripe or PayPal refund",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PaymentRefundRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Refund accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaymentIntentRecord"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Payment intent not found"
+          },
+          "422": {
+            "description": "Invalid refund amount"
+          },
+          "502": {
+            "description": "Payment provider error"
+          }
+        }
+      }
+    },
+    "/api/payments/reports/summary": {
+      "get": {
+        "summary": "Finance summary by currency",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Three-letter ISO currency filter"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Finance summary generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PaymentSummaryEntry"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Invalid filter parameters"
+          }
+        }
+      }
+    },
+    "/api/payments/coupons/{code}": {
+      "get": {
+        "summary": "Retrieve coupon details",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coupon fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CouponPublic"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Coupon not found"
+          },
+          "422": {
+            "description": "Invalid coupon code"
+          }
+        }
+      }
+    },
+    "/api/payments/webhooks/stripe": {
+      "post": {
+        "summary": "Stripe webhook receiver",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "description": "Stripe webhook payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Event processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "received": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Signature validation failed"
+          },
+          "500": {
+            "description": "Webhook processing error"
           }
         }
       }
