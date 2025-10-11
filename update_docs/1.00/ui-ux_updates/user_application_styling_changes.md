@@ -80,3 +80,11 @@
 - **High-contrast mode:** Background flips to #0F172A with text #F8FAFC; accent colours saturated (#A855F7, #0EA5E9) to maintain clarity.
 - **Focus outlines:** 2px `#14B8A6` outer ring plus 1px white inset stroke to ensure visibility on dark/light themes.
 - **Reduced motion:** Animations replaced with fade transitions and static state changes for toggles and carousel slides.
+
+## Live Classroom & Tutor Styling Enhancements
+- **Tutor storefront cards:** 20px radius, gradient header (#7C3AED → #14B8A6), overlay rating chip, and subtle drop shadow `0 18px 36px rgba(15, 23, 42, 0.16)`; countdown hold timer uses circular progress ring with accent gradient.
+- **Booking sheet:** Bottom sheet uses frosted backdrop (#0F172A 60%), 24px top radius, and sticky confirmation bar with dual CTAs (Confirm, Add Note). Policy copy uses `learner.text.secondary` with bullet icons for clarity.
+- **Lobby layout:** Video preview tile with 16px radius, muted background (#E2E8F0), and connection quality chip. Agenda cards use tinted backgrounds (#EEF2FF) and icon badges referencing `App_screens_drawings.md`.
+- **In-session HUD:** Floating control bar with pill buttons, active state glow (#14B8A6). Chat panel uses alternating message backgrounds (#FFFFFF / #F8FAFC) with anchored “Jump to latest” button.
+- **Feedback modal:** Fullscreen overlay with celebratory gradient (#7C3AED → #F472B6), emoji selector chips, and CTA buttons adhering to primary/secondary styling. Dark mode inverts backgrounds to maintain contrast.
+- **Recording list:** Card list uses tinted backgrounds (#F1F5F9) and download icons; hover state deepens border (#C7D2FE). Accessibility ensures 16px text minimum for metadata.

@@ -8,6 +8,7 @@ import ContentAssetEventModel from '../models/ContentAssetEventModel.js';
 import ContentAssetModel from '../models/ContentAssetModel.js';
 import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import EbookProgressModel from '../models/EbookProgressModel.js';
+import antivirusService from './AntivirusService.js';
 import storageService from './StorageService.js';
 
 const DRM_SIGNATURE_SECRET = env.security.drmSignatureSecret;
@@ -92,6 +93,116 @@ export default class AssetService {
         throw error;
       }
 
+      const objectHead = await storageService.headObject({
+        bucket: asset.storageBucket,
+        key: asset.storageKey
+      });
+
+      const scanResult = await antivirusService.scanObject({
+        bucket: asset.storageBucket,
+        key: asset.storageKey,
+        sizeBytes: Number(objectHead?.ContentLength ?? asset.sizeBytes ?? 0),
+        metadata: objectHead?.Metadata ?? {},
+        assetId: asset.id,
+        userId: actor.id,
+        mimeType: asset.mimeType ?? objectHead?.ContentType ?? undefined
+      });
+
+      const antivirusMetadata = {
+        status: scanResult.status,
+        scannedAt: scanResult.scannedAt,
+        engine: scanResult.engine,
+        signature: scanResult.signature,
+        reason: scanResult.reason,
+        bytesScanned: scanResult.bytesScanned,
+        durationSeconds: scanResult.durationSeconds,
+        cacheHit: Boolean(scanResult.cached)
+      };
+
+      await ContentAuditLogModel.record(
+        {
+          assetId: asset.id,
+          event: 'asset.antivirus.scan',
+          performedBy: actor.id,
+          payload: antivirusMetadata
+        },
+        trx
+      );
+
+      if (scanResult.status === 'infected') {
+        const quarantineBucket = env.antivirus?.quarantineBucket ?? env.storage.privateBucket;
+        const quarantineKey = `${buildStoragePrefix(asset)}/quarantine-${randomUUID()}`;
+        const { bucket: quarantinedBucket, key: quarantinedKey } = await storageService.copyObject({
+          sourceBucket: asset.storageBucket,
+          sourceKey: asset.storageKey,
+          destinationBucket: quarantineBucket,
+          destinationKey: quarantineKey
+        });
+
+        await storageService.deleteObject({ bucket: asset.storageBucket, key: asset.storageKey });
+
+        const quarantinedMetadata = {
+          ...(asset.metadata ?? {}),
+          ingestion: {
+            stage: 'quarantined',
+            quarantinedAt: new Date().toISOString()
+          },
+          antivirus: {
+            ...antivirusMetadata,
+            quarantineLocation: {
+              bucket: quarantinedBucket,
+              key: quarantinedKey
+            }
+          }
+        };
+
+        await ContentAssetModel.patchById(
+          asset.id,
+          {
+            status: 'quarantined',
+            storageBucket: quarantinedBucket,
+            storageKey: quarantinedKey,
+            checksum: checksum ?? asset.checksum,
+            metadata: quarantinedMetadata
+          },
+          trx
+        );
+
+        await ContentAssetEventModel.record(
+          {
+            assetId: asset.id,
+            userId: actor.id,
+            eventType: 'antivirus_detected',
+            metadata: {
+              signature: scanResult.signature,
+              reason: scanResult.reason,
+              bytesScanned: scanResult.bytesScanned
+            }
+          },
+          trx
+        );
+
+        await ContentAuditLogModel.record(
+          {
+            assetId: asset.id,
+            event: 'asset.antivirus.quarantined',
+            performedBy: actor.id,
+            payload: {
+              signature: scanResult.signature,
+              quarantineBucket: quarantinedBucket,
+              quarantineKey: quarantinedKey
+            }
+          },
+          trx
+        );
+
+        const violation = new Error('Upload blocked: malware detected in the uploaded file.');
+        violation.status = 422;
+        violation.code = 'ANTIVIRUS_DETECTED';
+        violation.details = [scanResult.signature ?? 'malicious content detected'];
+        throw violation;
+      }
+
       const targetKey = `${buildStoragePrefix(asset)}/source-${randomUUID()}`;
       const { bucket: destinationBucket, key: destinationKey } = await storageService.copyObject({
         sourceBucket: asset.storageBucket,
@@ -116,7 +227,22 @@ export default class AssetService {
               stage: 'queued',
               queuedAt: new Date().toISOString()
             },
+            antivirus: antivirusMetadata,
             custom: metadata ?? {}
+          }
+        },
+        trx
+      );
+
+      await ContentAssetEventModel.record(
+        {
+          assetId: asset.id,
+          userId: actor.id,
+          eventType: 'antivirus_clean',
+          metadata: {
+            status: scanResult.status,
+            bytesScanned: scanResult.bytesScanned,
+            durationSeconds: scanResult.durationSeconds
           }
         },
         trx
@@ -127,7 +253,10 @@ export default class AssetService {
           assetId: asset.id,
           event: 'asset.upload.confirmed',
           performedBy: actor.id,
-          payload: { checksum: checksum ?? asset.checksum }
+          payload: {
+            checksum: checksum ?? asset.checksum,
+            antivirus: antivirusMetadata
+          }
         },
         trx
       );

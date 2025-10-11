@@ -79,3 +79,10 @@
 
 ## Error, Empty & Edge States
 - Documented states for empty communities, no saved items, failed downloads, assessment lockouts, and maintenance downtime. Each wireframe defines illustration placement, primary/secondary copy, and relevant actions (retry, explore, contact support).
+
+## Live Classroom & Tutor Wireframes
+- **Tutor tab:** Card grid with hero featuring featured tutors, filter chips (Subject, Availability, Price), and search bar. Each card includes avatar, specialties, hourly rate, rating, and “Book” CTA referencing `App_screens_drawings.md`.
+- **Booking confirmation sheet:** Three-step indicator along top (Select, Confirm, Payment). Inline policy summary, notes field, and apply coupon CTA. Error states documented for seat conflicts and payment failures.
+- **Lobby screen:** Countdown timer centred with agenda list below, host/tutor info card, and checklist (Audio test, Camera test, Download resources). Quick action row for chat preview and support call.
+- **Live session screen:** Full-screen video with overlay controls (mute, camera, raise hand, screen share). Bottom drawer toggles chat, Q&A, polls; includes message composer with attachments. Reaction bar overlays video corner.
+- **Post-session summary:** Scorecard highlighting attendance streak, session notes, tutor review prompt, and recommended follow-up courses. Buttons for “Download recording” and “Book follow-up”.

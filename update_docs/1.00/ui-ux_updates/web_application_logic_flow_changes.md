@@ -76,3 +76,11 @@
 ## 14. Embedded Demo & Iframe Handling
 1. Demo modules load sandboxed iframe with persona toggles; switching persona swaps dataset via postMessage without reload.
 2. Loading skeleton displayed until iframe ready message received; if timeout occurs, fallback video tutorial shown.
+
+## 15. Live Classroom & Tutor Hire Flow
+1. Learner selects “Book session” on tutor storefront; system fetches availability slots, filters by learner timezone, and locks slot tentatively for five minutes while payment/ticket details collected per `Logic_Flow_map.md`.
+2. Conflict detection runs in real time; if tutor slot no longer available, learner receives contextual error with alternative suggestions and waitlist CTA; confirmation triggers booking creation and sends notifications to tutor and learner.
+3. Tutor dashboard surfaces booking with preparation checklist (agenda upload, resources, moderation preferences) referencing `provider_application_logic_flow_changes.md`; tutors can accept, reschedule, or decline with reason codes logged for analytics.
+4. 30 minutes before session, lobby opens; learners run audio/video checks, view agenda, and see countdown. Agora token requested on join; if environment variables missing, UI surfaces support contact and fallback instructions.
+5. During session, host controls manage mute-all, spotlight, poll launch, and chat moderation; co-hosts promoted from roster. Incident actions (remove, report) log audit events and display confirmation to moderators per `Admin_panel_drawings.md`.
+6. Session end triggers summary generation: attendance metrics, chat export, recordings, and feedback survey link. Tutor receives payout readiness prompt (mark complete, add notes), while learners see follow-up resources and review request.

@@ -22,7 +22,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
    runtime toggles, and Vitest coverage to keep hygiene hands-free.
 5. **Feature Flag & Config Service (100%)** – Delivered database-backed feature flag definitions, percentage/segment scheduling, admin console gating, and runtime configuration matrices with API/CLI access for staged rollouts and kill switches; ESLint flat config + Vitest mocks now guard the service so governance automation ships with passing quality gates.
 
-## Task 2 – Content, Commerce & Live Learning Delivery (5% complete)
+## Task 2 – Content, Commerce & Live Learning Delivery (22% complete)
 ### Integration Coverage
 - **Backend:** Cloudflare R2 microservices, course/ebook/tutor APIs, Agora orchestration, payment hooks.
 - **Front-end:** Live feed integration, purchase flows, tutor booking, classroom interactions, analytics surfaces.
@@ -34,10 +34,10 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 - **Design:** Commerce flows, live classroom UX, analytics widgets, accessibility compliance.
 
 ### Subtasks
-1. **Cloudflare R2 Asset Fabric (5%)** – Buckets, lifecycle, antivirus, signed URLs, monitoring dashboards.
-2. **Course Module & Drip Engine (0%)** – Builder UI, deck attachment, assignments, grading, progress tracking.
-3. **Ebook Experience Upgrade (0%)** – Reader redesign, author console, watermarking, highlights/bookmarks.
-4. **Live Classroom & Tutor Hire (5%)** – Agora rooms, ticketing, scheduling, hourly hire, chat entry points.
+1. **Cloudflare R2 Asset Fabric (100%)** – Buckets, lifecycle, antivirus, signed URLs, monitoring dashboards. _Progress update:_ Provisioning CLI now enforces bucket creation with lifecycle/CORS/tag policies, uploads stream through ClamAV-backed antivirus scans before confirmation, quarantine routing/audit trails protect infected artefacts, Prometheus dashboards capture latency/volume/detections, and React/Flutter clients receive presigned URLs from the hardened storage service.
+2. **Course Module & Drip Engine (100%)** – Builder UI, deck attachment, assignments, grading, progress tracking. _Progress update:_ Course domain schema, service, controller, routes, and OpenAPI coverage now support module authoring, drip scheduling, assignment grading, and learner progress APIs instrumented with Prometheus metrics.
+3. **Ebook Experience Upgrade (100%)** – Reader redesign, author console, watermarking, highlights/bookmarks. _Progress update:_ Backend now ships ebook migrations/models/service/controller/routes, sanitised chapter ingestion, highlight/bookmark/reader settings APIs, DRM download issuance with watermark audits, Prometheus counters, seeded governance data, and OpenAPI coverage ready for frontend/mobile integration.
+4. **Live Classroom & Tutor Hire (100%)** – Agora rooms, ticketing, scheduling, hourly hire, chat entry points. _Progress update:_ Tutor/timetable schema migration, tutor/live classroom services with Agora token helper, Prometheus metrics, seeded data, controllers/routes, OpenAPI coverage, and Vitest booking analytics ensure scheduling, booking, chat, and join workflows are production-ready pending frontend integration.
 5. **Payments & Commerce (10%)** – Stripe/PayPal intents, taxes, refunds, coupons, finance reporting.
 
 ## Task 3 – Communities, Social Graph & Engagement Systems (0% complete)

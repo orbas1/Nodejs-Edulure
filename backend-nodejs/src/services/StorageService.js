@@ -232,6 +232,32 @@ export class StorageService {
     );
   }
 
+  async getObjectStream({ key, bucket }) {
+    const targetBucket = bucket ?? env.storage.privateBucket;
+    const visibilityLabel = resolveVisibilityLabel(targetBucket);
+    return withTelemetrySpan('storage.getObjectStream', async () =>
+      recordStorageOperation('get_object_stream', visibilityLabel, async () => {
+        const response = await this.client.send(
+          new GetObjectCommand({
+            Bucket: targetBucket,
+            Key: key
+          })
+        );
+
+        return {
+          bucket: targetBucket,
+          key,
+          stream: response.Body,
+          contentLength: Number(response.ContentLength ?? 0),
+          contentType: response.ContentType,
+          metadata: response.Metadata ?? {},
+          etag: response.ETag,
+          bytes: Number(response.ContentLength ?? 0)
+        };
+      })
+    );
+  }
+
   async copyObject({ sourceBucket, sourceKey, destinationBucket, destinationKey, visibility = 'workspace' }) {
     const targetBucket = destinationBucket ?? this.resolveBucket(visibility);
     return withTelemetrySpan('storage.copyObject', async () =>

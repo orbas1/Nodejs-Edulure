@@ -87,3 +87,11 @@
 1. When provider enables experiment, system duplicates baseline entity, stores variant metadata, and starts traffic allocation job.
 2. Analytics service collects conversion metrics; UI displays significance indicator and recommendation (promote, continue, stop).
 3. Approval of QA checklist transitions content state from `in_review` to `ready_to_publish`, unlocking publish button and notifying assigned reviewers.
+
+## 15. Tutor Scheduling & Live Classroom Operations
+1. Tutor accesses **Schedule** tab; calendar loads with availability slots. Dragging to create slot opens sheet for duration, price, and modality, validating against global preferences and conflicting bookings.
+2. Publishing availability triggers backend update and surfaces confirmation toast; system queues reminder to refresh availability weekly. Slots can be bulk-edited via multi-select referencing `provider_app_wireframe_changes.md`.
+3. Incoming booking appears in **Requests** column with learner details, agenda, and notes. Tutor can Accept, Propose new time, or Decline with reason codes; responses dispatch notifications and update booking status in real time.
+4. Accepted booking moves to **Upcoming Sessions**; pre-session checklist prompts tutor to upload resources, configure moderation settings, and assign co-hosts. Compliance banner surfaces if payout/tax info incomplete.
+5. Starting live classroom from dashboard generates Agora token, opens host console with stage preview, roster, chat, and moderation tools referencing `Admin_panel_drawings.md`. Host can promote co-hosts, mute all, enable recording, and trigger polls.
+6. Post-session summary collects attendance, engagement metrics, chat transcript, and recording status. Tutor adds recap notes and marks session as completed; payout readiness step confirms rate, travel time, and optional adjustments before submitting to finance workflow.

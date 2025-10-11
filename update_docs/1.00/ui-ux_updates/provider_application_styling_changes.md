@@ -81,3 +81,11 @@
 - **Empty states:** Illustrations tinted with accent secondary at 60% opacity. Copy uses Inter 500 16px with 8px spacing before CTA.
 - **Guided walkthroughs:** Step banners use gradient background (#4B5DFF → #5AC8FA) with white text and icon avatar.
 - **Tooltips:** Dark background (#0B162B) with 12px radius, arrow indicator, and 14px text; appear with fade/slide animation.
+
+## Tutor & Live Classroom Styling Extensions
+- **Availability calendar:** Week view uses pill selectors with accent primary border for selected slots and semi-transparent fill for hover. Conflict slots render hashed overlay (#F59E0B 30%) with tooltip explaining conflict reason.
+- **Booking kanban:** Requests/Upcoming/Completed columns use surface token backgrounds (#1E293B) with 12px radius; cards include vertical accent bar mapping to booking status (New – #5AC8FA, Confirmed – #22C55E, Action Required – #F59E0B, Cancelled – #F43F5E).
+- **Host console:** Stage preview tile with glassmorphism overlay, control buttons styled as 44px circular icons with accent glow when active. Chat/roster drawers leverage thin dividers and sticky footers for composer controls referencing `Admin_panel_drawings.md`.
+- **Moderation toasts:** Right-side stacked notifications with accent-coded borders; destructive actions include red confirmation button and 2-step confirm to prevent mistakes.
+- **Payout readiness banner:** Gradient (#4B5DFF → #14B8A6) with icon, summary of outstanding compliance tasks, and CTA button. Expands on hover to list actionable items.
+- **Recording cards:** Display thumbnail placeholder with play icon, metadata chips (Duration, Attendees, Storage size) using accent secondary outlines, and quick actions (Publish, Share, Delete) aligned right.

@@ -83,5 +83,13 @@
 - **Brand kit:** Section housing logos, fonts, palettes with download controls. Wireframe includes preview area and usage guidelines accordion.
 - **Template library:** Grid view of lesson templates with preview thumbnails, metadata (length, format), and quick actions (Duplicate, Customise).
 
+## Tutor Hire & Live Classroom Wireframes
+- **Schedule planner:** Calendar view with sidebar filters (Subject, Availability type). Dragging to create slot opens inline form; conflict warnings display red banner with details referencing `provider_app_wireframe_changes.md` overlays.
+- **Booking board:** Three-column kanban (Requests, Upcoming, Completed) with cards showing learner avatar, agenda snippet, and rate. Quick actions (Accept, Reschedule, Decline) accessible via top icons.
+- **Tutor profile completeness:** Progress widget with checklist (Bio, Certifications, Pricing, Compliance). Each item links to corresponding form; banner surfaces if payout not verified.
+- **Live classroom host console:** Layout includes video stage, roster tab, chat tab, polls tab, and moderator tools sidebar. Control bar anchored bottom with buttons (Start recording, Share screen, End session) referencing `Admin_panel_drawings.md`.
+- **Post-session review:** Summary card with metrics (Attendance %, Average rating, Revenue). Buttons for “Send recap”, “Issue refund”, “Publish recording”.
+- **Compliance audit log:** Dedicated tab listing session transcripts, recording consent status, and incident reports with export options for legal review.
+
 ## Error & Empty States
 - Documented screens for empty analytics (invite learners CTA), zero revenue (connect payment provider), and no communities (create community walkthrough). Each state includes illustration placement, supportive copy, and primary CTA positioning for clarity across breakpoints.

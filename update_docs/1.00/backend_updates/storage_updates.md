@@ -4,3 +4,5 @@
 - Transactional community creation ensures owners are always enrolled and activity events recorded, preventing orphaned data.
 - New migration `20241020130000_content_assets.js` provisions `content_assets`, `asset_ingestion_jobs`, `asset_conversion_outputs`, `content_audit_logs`, `content_asset_events`, and `ebook_read_progress` tables with cascading relationships and indexes.
 - `ContentAssetModel` exposes lifecycle transitions (`markStatus`, ingestion metadata) backed by audit/event logging to maintain state integrity.
+- Added `scripts/provision-r2-buckets.js` CLI to create/verify Cloudflare R2 buckets with lifecycle, CORS, and tagging policies for public, workspace, private, and quarantine storage classes.
+- Storage governance now enforces antivirus scanning, quarantine routing, and Prometheus metrics via the new `AntivirusService` and StorageService streaming helpers.

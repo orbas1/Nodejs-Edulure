@@ -1,3 +1,5 @@
+import { PassThrough } from 'node:stream';
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
@@ -70,5 +72,29 @@ describe('StorageService', () => {
     expect(fallbackUrl).toBe(`https://public-bucket.${env.storage.accountId}.r2.cloudflarestorage.com/content/file.pdf`);
 
     env.storage.cdnUrl = originalCdn;
+  });
+
+  it('returns streaming metadata for direct object access', async () => {
+    const stream = new PassThrough();
+    const client = createMockClient();
+    client.send.mockResolvedValue({
+      Body: stream,
+      ContentLength: 4096,
+      ContentType: 'application/pdf',
+      Metadata: { 'custom-meta': 'value' },
+      ETag: 'etag-456'
+    });
+
+    service = new StorageService(client);
+    const result = await service.getObjectStream({
+      bucket: env.storage.privateBucket,
+      key: 'content/document.pdf'
+    });
+
+    expect(result.stream).toBe(stream);
+    expect(result.contentLength).toBe(4096);
+    expect(result.metadata).toEqual({ 'custom-meta': 'value' });
+    expect(result.bytes).toBe(4096);
+    expect(client.send).toHaveBeenCalledTimes(1);
   });
 });

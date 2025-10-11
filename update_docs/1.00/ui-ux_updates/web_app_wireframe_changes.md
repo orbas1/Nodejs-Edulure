@@ -80,3 +80,11 @@
 
 ## Documentation of Embedded Apps
 - **Interactive demo containers:** Wireframe includes frame dimensions, tab controls for different personas, and annotation callouts to describe functionality. Loading state documented with skeleton screen.
+
+## Live Classroom & Tutor Hire Surfaces
+- **Tutor storefront:** Grid layout with hero banner, availability calendar, hourly rate card, review carousel, and “Book session” CTA referencing `website_drawings.md`. Availability pills toggle by timezone, and secondary CTA offers “Request package”.
+- **Booking flow:** Three-step modal (select slot, confirm details, payment/ticket) with inline conflict detection messaging, waitlist fallback, and seat availability gauge aligned to `web_application_logic_flow_changes.md`.
+- **Live classroom lobby:** Countdown timer, agenda summary, host avatar stack, and network check indicator referencing `dashboard_drawings.md`. Includes CTA for testing audio/video and secondary CTA for contacting support.
+- **In-session layout:** Two-column stage with video stream on left, roster drawer/chat tabset on right; top toolbar hosts recording, mute-all, raise hand queue, and Agora connection badge as documented in `Admin_panel_drawings.md` and `App_screens_drawings.md`.
+- **Moderator console:** Admin overlay adds incident log, ban/mute controls, co-host promotion, and transcript export button with audit trail callouts.
+- **Post-session summary:** Confirmation screen summarises attendance, chat export, resource uploads, and feedback CTA linking to survey, ensuring analytics events align with backend telemetry IDs.
