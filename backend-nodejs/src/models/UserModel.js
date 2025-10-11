@@ -41,6 +41,11 @@ export default class UserModel {
     return connection('users').select(BASE_COLUMNS).where({ id }).first();
   }
 
+  static async findByIds(ids, connection = db) {
+    if (!ids?.length) return [];
+    return connection('users').select(BASE_COLUMNS).whereIn('id', ids);
+  }
+
   static async list({ limit = 20, offset = 0 } = {}) {
     return db('users')
       .select(BASE_COLUMNS)

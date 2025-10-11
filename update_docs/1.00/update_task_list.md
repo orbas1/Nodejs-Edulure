@@ -58,8 +58,11 @@ Each task below aligns with the numbered plan, includes integration coverage acr
    shells.
 2. **Roles, Paywalls & Affiliates (100%)** – Database-backed role catalogues, gated paywall tiers, subscription checkout APIs, and affiliate payout tooling are live across backend and design systems.
 3. **Engagement Mechanics (100%)** – Leaderboards, tier points, streaks, calendars, map embeds, reminders. _Progress update:_ Backend migrations/models/services/controllers/routes now power member points, streak rollovers, leaderboards, RSVP-capable event calendars, reminder scheduling, and the cron-backed reminder job with OpenAPI docs, telemetry, and Vitest coverage; design overlays for leaderboards/streaks/calendars/reminder consent align to `dashboard_drawings.md`, `website_drawings.md`, `menu_drawings.md`, and `App_screens_drawings.md`.
-4. **Chat & Messaging Suite (0%)** – Channels, DMs, presence, moderation tools, Agora live linkage.
-5. **Follow Graph & Recommendations (0%)** – Relationship model, privacy settings, feed ranking, suggestions.
+4. **Chat & Messaging Suite (100%)** – Channels, DMs, presence, moderation tools, Agora live linkage. _Progress update:_ Migration `20241123100000_community_chat.js`, repositories, `CommunityChatService`, `DirectMessageService`, Express controllers/routes, seeds, Prometheus metrics, Joi validation, and Vitest service + HTTP suites now power production-grade community chat (threaded replies, reactions, moderation, presence) and direct messaging endpoints with expanded OpenAPI coverage ready for frontend/mobile consumption.
+5. **Follow Graph & Recommendations (100%)** – Relationship model, privacy settings, feed ranking, suggestions. _Progress update:_
+   Delivered the social graph migration/models/services/controllers with transactional privacy enforcement, follow approvals,
+   mute/block automation, reciprocal recommendation generation, and pagination-tuned HTTP/OpenAPI coverage backed by Vitest
+   service + route suites and seeded fixtures for production validation.
 
 ## Task 4 – Explorer Search, Ads & Intelligence Platform (0% complete)
 ### Integration Coverage

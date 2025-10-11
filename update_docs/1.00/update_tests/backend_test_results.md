@@ -4,3 +4,6 @@
 - `npm run lint` (backend-nodejs) – re-run post content pipeline additions; no warnings/errors remain. 【98c788†L1-L5】
 - `npm run test` (backend-nodejs) – Vitest suite validates StorageService presigning flows and passes under the Zod-validated test harness. 【822c3e†L1-L15】
 - `npm test` (backend-nodejs) – verification mailer suite and storage regression both pass under Vitest. 【062da1†L1-L14】
+- `npm test --workspace backend-nodejs` – Vitest suite now covers messaging pagination clamps, presence TTL enforcement, and HTTP route integration. 【4aa469†L1-L20】
+- `npm test` (backend-nodejs) – Full Vitest suite passes after social graph resilience updates and OpenAPI normalisation. 【61cbce†L1-L33】
+- `npx swagger-cli validate src/docs/openapi.json` – Specification passes validation post-nullable normalisation for chat, DM, paywall, and social graph schemas. 【4174d7†L1-L2】

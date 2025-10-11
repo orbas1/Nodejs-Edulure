@@ -46,6 +46,8 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   3. **Task 5.1 Dashboards & Operational Consoles**
      - Rebuild profile components, finance/follower/widgets/stats surfaces, instructor dashboards, and community switcher.
      - Launch admin/customer service panels, ID verification, policy hub, and support ticket routing.
+  - **Design Sync:** Community chat docks, DM inbox/thread panes, moderation consoles, presence beacons, unread badges, and DND prompts now reference `dashboard_drawings.md`, `menu_drawings.md`, `website_drawings.md`, `Admin_panel_drawings.md`, and `App_screens_drawings.md`, ensuring documentation mirrors the new messaging pagination and TTL contracts.
+  - **Social Graph Delivery:** Follow relationships, privacy gates, mute/block cascades, and recommendation trays align to `dashboard_drawings.md`, `menu_drawings.md`, `website_drawings.md`, and `Admin_panel_drawings.md`, with updated flows documented in `ui-ux_updates/Web_Application_Design_Update` for dashboard and profile parity.
 
 ## Milestone 4 – Explorer, Ads & Intelligence (Weeks 8–12)
 - **Tasks Included:** Task 4 – Explorer Search, Ads & Intelligence Platform.
@@ -80,5 +82,5 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
 | --- | --- | --- | --- |
 | Token & Theme System Finalisation | Week 2 | 70% complete | Cross-platform token exports, emo/seasonal theme guardrails, automated contrast reports. |
 | Navigation & Layout Blueprint | Week 4 | 45% complete | Role-based IA schema, breakpoint matrices, breadcrumb/stepper interaction specs. |
-| Template & Component Delivery | Week 6 | 30% complete | Annotated templates for home/dashboards/explorer, asset manifests, copy decks. |
-| Engineering Handoff & QA | Week 8 | 10% complete | Handoff kits, accessibility/localisation scripts, design QA sign-offs. |
+| Template & Component Delivery | Week 6 | 90% complete | Annotated templates for home/dashboards/explorer/messaging, asset manifests, copy decks. |
+| Engineering Handoff & QA | Week 8 | 45% complete | Handoff kits, accessibility/localisation scripts, messaging QA packs, design QA sign-offs. |

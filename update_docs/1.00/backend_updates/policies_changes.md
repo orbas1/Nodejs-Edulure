@@ -9,3 +9,4 @@
 - Established feature flag governance with database-backed definitions, environment scopes, and runtime configuration payloads surfaced via `/api/runtime` so staged rollouts and kill switches are centrally enforced.
 - Feature flag environment scopes now treat test deployments as development aliases, ensuring QA environments respect rollout policies while keeping production gating intact.
 - Introduced malware scanning and quarantine policies: uploads must pass ClamAV inspection, infected artefacts are isolated in a dedicated bucket, and audit/event logs capture detections for compliance review.
+- Added chat moderation and presence retention policies: moderation actions (hide/delete/restore) write immutable audit rows, reactions enforce uniqueness per user/emoji, read acknowledgements cap stored history, and presence sessions expire automatically based on TTL defaults configurable via environment variables.
