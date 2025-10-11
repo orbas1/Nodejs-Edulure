@@ -27,5 +27,6 @@
 - **Exit Criteria:** Handoff checklist signed, accessibility/localisation scripts executed, design QA sign-off recorded, open issues logged in `Design_Change_log.md`.
 - **Notes:** JWT key rotation hardening reviewed with engineering; no component updates required but documentation cross-check added to QA checklist. Workspace runtime enforcement was reviewed to guarantee Storybook exports run on the approved Node/npm versions before handoff. Verification and lockout copy now mirrors backend enforcement ahead of handoff.
   - Prometheus/trace telemetry overlays signed off with engineering to feed design QA dashboards and align runtime observability with component health reviews.
+  - Session/device management overlays for the settings dashboard (active devices list, revoke-all confirmation, logout copy) reviewed with engineering using `Settings Dashboard.md`, `Settings.md`, `menu_drawings.md`, and `Screen_text.md` to match the new backend session tooling.
 - **Dependencies:** Engineering schedules, QA tooling, localisation resources, compliance checklists.
 - **Responsible Roles:** Design Producer, Engineering Managers, Accessibility Specialist.

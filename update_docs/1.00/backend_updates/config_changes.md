@@ -9,5 +9,5 @@
 - Added `src/config/storage.js` with typed Cloudflare R2 client configuration and exported endpoint for presigned URL generation.
 - Expanded `.env.example` with R2 credentials, upload/download TTLs, content size limits, CloudConvert API key, and DRM download constraints.
 - Introduced `vitest.config.mjs` with a dedicated `test/setupEnv.js` bootstrap to satisfy Zod env validation during automated test runs.
-- Enhanced `src/config/env.js` with SMTP, verification, and account lockout controls, surfacing structured configuration for the new mailer and credential governance policies.
+- Enhanced `src/config/env.js` with SMTP, verification, and account lockout controls, surfacing structured configuration for the new mailer and credential governance policies. Latest iteration adds session validation cache TTLs and per-user session caps to back the logout/rotation tooling.
 - Hardened logging/observability configuration: added configurable trace header names, sampling, metrics auth, IP allow-lists, and redactable field lists surfaced via `env.logging`/`env.observability`.

@@ -1,5 +1,6 @@
 import { verifyAccessToken } from '../config/jwtKeyStore.js';
 import { updateRequestContext } from '../observability/requestContext.js';
+import { sessionRegistry } from '../services/SessionRegistry.js';
 
 const rolePriority = {
   user: 1,
@@ -8,7 +9,7 @@ const rolePriority = {
 };
 
 export default function auth(requiredRole) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const header = req.headers.authorization;
     if (!header) {
       return res.status(401).json({ success: false, message: 'Authorization header missing' });
@@ -21,8 +22,13 @@ export default function auth(requiredRole) {
 
     try {
       const payload = verifyAccessToken(token);
-      req.user = { ...payload, id: payload.sub };
-      updateRequestContext({ userId: payload.sub, userRole: payload.role });
+      if (!payload.sid) {
+        return res.status(401).json({ success: false, message: 'Session identifier missing from token' });
+      }
+
+      const session = await sessionRegistry.ensureActive(payload.sid);
+      req.user = { ...payload, id: payload.sub, sessionId: session.id };
+      updateRequestContext({ userId: payload.sub, userRole: payload.role, sessionId: session.id });
       if (requiredRole) {
         const userPriority = rolePriority[payload.role] ?? 0;
         const requiredPriority = rolePriority[requiredRole];
@@ -32,7 +38,12 @@ export default function auth(requiredRole) {
       }
       return next();
     } catch (error) {
-      return res.status(401).json({ success: false, message: 'Invalid or expired token' });
+      const status = error.status ?? 401;
+      const message =
+        error.code === 'SESSION_REVOKED'
+          ? 'Session has been revoked. Please sign in again.'
+          : 'Invalid or expired token';
+      return res.status(status).json({ success: false, message });
     }
   };
 }

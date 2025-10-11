@@ -23,3 +23,6 @@
 - `backend-nodejs/src/services/EmailVerificationService.js` – orchestration service handling issuance, throttling, and consumption of verification tokens with domain event logging.
 - `backend-nodejs/test/mailService.test.js` – Vitest coverage validating email templates and SMTP payload construction.
 - `backend-nodejs/src/observability/requestContext.js` & `backend-nodejs/src/observability/metrics.js` – AsyncLocalStorage-backed correlation context and Prometheus metrics registry powering the new observability stack, plus `backend-nodejs/src/middleware/requestContext.js` for Express integration.
+- `backend-nodejs/migrations/20241101090000_enhance_user_sessions.js` – migration enriching `user_sessions` with `last_used_at`, `rotated_at`, and `revoked_by` metadata for rotation governance.
+- `backend-nodejs/src/services/SessionRegistry.js` – in-memory/session cache ensuring revoked sessions are denied without repeated database lookups.
+- `backend-nodejs/test/sessionRegistry.test.js` – Vitest suite validating session cache behaviour, TTL eviction, and revocation handling.

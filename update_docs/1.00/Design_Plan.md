@@ -38,6 +38,7 @@
 - Restructure settings dashboards, privacy notifications, and consent flows referencing `Settings Dashboard.md`, `Settings Screen.md`, `Settings.md`, and `Function Design.md`.
 - Align verification prompts, lockout states, and security education with backend enforcement referencing `Screen_text.md`, `Dummy_Data_Requirements.md`, and `provider_application_logic_flow_changes.md`.
 - Add inline security messaging and audit surfaces with guidance from `provider_application_logic_flow_changes.md` and `web_application_logic_flow_changes.md`.
+- Introduce session/device management states (active session list, revoke-all confirmation, logout banners) referencing `Settings Dashboard.md`, `Settings.md`, `Screen_text.md`, `menu_drawings.md`, and `dashboard_drawings.md` so design mirrors new governance tooling.
 
 ## Deliverables & Outputs
 - **Design System Tokens:** JSON/CSS/Flutter exports, documentation, and regression testing scripts.

@@ -20,3 +20,4 @@
 - Launched an instructor-focused React content library with secure uploads, cached listings, analytics sidebars, and embedded ebook/PowerPoint viewers plus authenticated login/register flows.
 - Bootstrapped Flutter content experiences with Hive-based offline caching, Dio-powered API clients, and an interactive content library supporting downloads, viewer tokens, and progress updates.
 - Implemented account lockout policies, multi-channel email verification, and SMTP-backed security communications with full OpenAPI coverage and regression tests to close Task 1.1 gaps.
+- Added refresh-token rotation with hashed session storage, JWT `sid` claims, cached session validation, and `/api/auth/refresh`, `/logout`, `/logout-all` endpoints plus OpenAPI/audit trails so compromised tokens can be revoked instantly across devices.

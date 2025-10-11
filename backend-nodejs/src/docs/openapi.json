@@ -71,6 +71,27 @@
           "expiresAt"
         ]
       },
+      "SessionEnvelope": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
       "User": {
         "type": "object",
         "properties": {
@@ -557,7 +578,8 @@
                           "required": [
                             "user",
                             "verification",
-                            "tokens"
+                            "tokens",
+                            "session"
                           ],
                           "properties": {
                             "user": {
@@ -568,6 +590,9 @@
                             },
                             "tokens": {
                               "$ref": "#/components/schemas/AuthTokens"
+                            },
+                            "session": {
+                              "$ref": "#/components/schemas/SessionEnvelope"
                             }
                           }
                         }
@@ -589,6 +614,203 @@
           },
           "423": {
             "description": "Account locked"
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "summary": "Refresh session tokens",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "refreshToken"
+                ],
+                "properties": {
+                  "refreshToken": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification",
+                            "tokens",
+                            "session"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "tokens": {
+                              "$ref": "#/components/schemas/AuthTokens"
+                            },
+                            "session": {
+                              "$ref": "#/components/schemas/SessionEnvelope"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refresh token missing"
+          },
+          "401": {
+            "description": "Refresh token invalid or expired"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Revoke current session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "revoked"
+                          ],
+                          "properties": {
+                            "revoked": {
+                              "type": "boolean"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/auth/logout-all": {
+      "post": {
+        "summary": "Revoke other active sessions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "includeCurrent": {
+                    "type": "boolean",
+                    "description": "Also revoke the session used for this request",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessions revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "revokedCount",
+                            "revokedSessionIds"
+                          ],
+                          "properties": {
+                            "revokedCount": {
+                              "type": "integer"
+                            },
+                            "revokedSessionIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Validation error"
           }
         }
       }

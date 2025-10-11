@@ -31,6 +31,14 @@ const resendVerificationSchema = Joi.object({
   email: Joi.string().email().required()
 });
 
+const refreshSchema = Joi.object({
+  refreshToken: Joi.string().min(24).required()
+});
+
+const logoutAllSchema = Joi.object({
+  includeCurrent: Joi.boolean().default(false)
+});
+
 function buildContext(req) {
   return {
     ipAddress: req.headers['x-forwarded-for']?.split(',').shift()?.trim() ?? req.ip,
@@ -110,6 +118,70 @@ export default class AuthController {
       return success(res, {
         data: result.data,
         message: 'If an account exists for this email, a verification link has been sent.'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async refresh(req, res, next) {
+    try {
+      const payload = await refreshSchema.validateAsync(req.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.refreshSession(payload.refreshToken, buildContext(req));
+      return success(res, {
+        data: result.data,
+        message: 'Session refreshed successfully'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async logout(req, res, next) {
+    try {
+      const sessionId = req.user?.sessionId ?? null;
+      const result = await AuthService.logout(sessionId, req.user?.id, buildContext(req));
+      const message = result.data.revoked
+        ? 'Signed out from current session.'
+        : 'Session already closed.';
+      return success(res, {
+        data: result.data,
+        message
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async logoutAll(req, res, next) {
+    try {
+      const payload = await logoutAllSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const result = await AuthService.logoutAll(
+        req.user.id,
+        req.user.sessionId,
+        buildContext(req),
+        { includeCurrent: payload.includeCurrent }
+      );
+      const message = payload.includeCurrent
+        ? 'All sessions have been revoked.'
+        : 'Signed out from other devices.';
+      return success(res, {
+        data: result.data,
+        message
       });
     } catch (error) {
       if (error.isJoi) {
