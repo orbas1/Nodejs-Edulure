@@ -2,23 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CommunityMonetizationService from '../src/services/CommunityMonetizationService.js';
 
-vi.mock('node:crypto', () => ({
-  randomUUID: () => 'uuid-seed'
-}));
+const transactionSpy = vi.hoisted(() => vi.fn(async (handler) => handler({})));
 
-const transactionSpy = vi.fn(async (handler) => handler({}));
-
-vi.mock('../src/config/database.js', () => ({
-  default: {
-    transaction: transactionSpy
-  }
-}));
-
-const communityModelMock = {
+const communityModelMock = vi.hoisted(() => ({
   findBySlug: vi.fn(),
   findById: vi.fn()
-};
-const communityMemberModelMock = {
+}));
+const communityMemberModelMock = vi.hoisted(() => ({
   findMembership: vi.fn(),
   create: vi.fn(),
   ensureMembership: vi.fn(),
@@ -26,47 +16,56 @@ const communityMemberModelMock = {
   updateMetadata: vi.fn(),
   updateStatus: vi.fn(),
   listByCommunity: vi.fn()
-};
-const communityRoleDefinitionModelMock = {
+}));
+const communityRoleDefinitionModelMock = vi.hoisted(() => ({
   findByCommunityAndKey: vi.fn(),
   create: vi.fn(),
   listByCommunity: vi.fn()
-};
-const communityPaywallTierModelMock = {
+}));
+const communityPaywallTierModelMock = vi.hoisted(() => ({
   findById: vi.fn(),
   findByCommunityAndSlug: vi.fn(),
   create: vi.fn(),
   updateById: vi.fn(),
   listByCommunity: vi.fn()
-};
-const communitySubscriptionModelMock = {
+}));
+const communitySubscriptionModelMock = vi.hoisted(() => ({
   create: vi.fn(),
   updateById: vi.fn(),
   findByPublicId: vi.fn(),
   listByUser: vi.fn()
-};
-const communityAffiliateModelMock = {
+}));
+const communityAffiliateModelMock = vi.hoisted(() => ({
   findById: vi.fn(),
   findByReferralCode: vi.fn(),
   listByCommunity: vi.fn(),
   create: vi.fn(),
   updateById: vi.fn(),
   incrementEarnings: vi.fn()
-};
-const communityAffiliatePayoutModelMock = {
+}));
+const communityAffiliatePayoutModelMock = vi.hoisted(() => ({
   create: vi.fn()
-};
-const domainEventMock = {
+}));
+const domainEventMock = vi.hoisted(() => ({
   record: vi.fn()
-};
-const paymentIntentModelMock = {
+}));
+const paymentIntentModelMock = vi.hoisted(() => ({
   findByPublicId: vi.fn(),
   findById: vi.fn()
-};
-const paymentServiceMock = {
+}));
+const paymentServiceMock = vi.hoisted(() => ({
   createPaymentIntent: vi.fn()
-};
+}));
 
+vi.mock('node:crypto', () => ({
+  randomUUID: () => 'uuid-seed'
+}));
+
+vi.mock('../src/config/database.js', () => ({
+  default: {
+    transaction: transactionSpy
+  }
+}));
 vi.mock('../src/models/CommunityModel.js', () => ({
   default: communityModelMock
 }));
@@ -129,16 +128,18 @@ const member = {
 
 const resetMocks = () => {
   transactionSpy.mockClear();
-  Object.values({
-    ...communityModelMock,
-    ...communityMemberModelMock,
-    ...communityRoleDefinitionModelMock,
-    ...communityPaywallTierModelMock,
-    ...communitySubscriptionModelMock,
-    ...communityAffiliateModelMock,
-    ...communityAffiliatePayoutModelMock,
-    ...paymentIntentModelMock
-  }).forEach((fn) => fn?.mockReset?.());
+  [
+    communityModelMock,
+    communityMemberModelMock,
+    communityRoleDefinitionModelMock,
+    communityPaywallTierModelMock,
+    communitySubscriptionModelMock,
+    communityAffiliateModelMock,
+    communityAffiliatePayoutModelMock,
+    paymentIntentModelMock
+  ].forEach((model) => {
+    Object.values(model).forEach((fn) => fn?.mockReset?.());
+  });
   paymentServiceMock.createPaymentIntent.mockReset();
   domainEventMock.record.mockReset();
 };
@@ -204,8 +205,7 @@ describe('CommunityMonetizationService', () => {
 
   it('starts subscription checkout and updates membership metadata', async () => {
     const membership = { ...member, userId: 55, metadata: { dashboard: true } };
-    communityMemberModelMock.findMembership.mockResolvedValueOnce(member); // actor admin check
-    communityMemberModelMock.findMembership.mockResolvedValueOnce(membership);
+    communityMemberModelMock.findMembership.mockResolvedValue(membership);
 
     const result = await CommunityMonetizationService.startSubscriptionCheckout('ops-guild', 55, {
       tierId: 99,
@@ -260,17 +260,14 @@ describe('CommunityMonetizationService', () => {
     });
 
     expect(communityAffiliatePayoutModelMock.create).toHaveBeenCalledWith(
-      expect.objectContaining({ affiliateId: 88, amountCents: 2500, status: 'processing' }),
-      expect.any(Object)
+      expect.objectContaining({ affiliateId: 88, amountCents: 2500, status: 'processing' })
     );
     expect(communityAffiliateModelMock.incrementEarnings).toHaveBeenCalledWith(
       88,
-      { amountEarnedCents: 0, amountPaidCents: 2500 },
-      expect.any(Object)
+      { amountEarnedCents: 0, amountPaidCents: 2500 }
     );
     expect(domainEventMock.record).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'community.affiliate.payout-recorded' }),
-      expect.any(Object)
+      expect.objectContaining({ eventType: 'community.affiliate.payout-recorded' })
     );
     expect(payout.amountCents).toBe(2500);
   });
@@ -291,12 +288,11 @@ describe('CommunityMonetizationService', () => {
       12,
       77,
       { role: 'ops-strategist' },
-      expect.any(Object)
+      expect.objectContaining({ transaction: expect.any(Function) })
     );
     expect(communityMemberModelMock.updateRole).toHaveBeenCalledWith(12, 77, 'ops-strategist');
     expect(domainEventMock.record).toHaveBeenCalledWith(
-      expect.objectContaining({ eventType: 'community.member.role-updated' }),
-      expect.any(Object)
+      expect.objectContaining({ eventType: 'community.member.role-updated' })
     );
     expect(assignment.role).toBe('ops-strategist');
   });
