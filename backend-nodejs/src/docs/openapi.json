@@ -32,115 +32,294 @@
       "StandardResponse": {
         "type": "object",
         "properties": {
-          "success": { "type": "boolean" },
-          "message": { "type": "string", "nullable": true },
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
           "data": {},
-          "meta": { "type": "object", "nullable": true }
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
         }
       },
       "AuthTokens": {
         "type": "object",
         "properties": {
-          "accessToken": { "type": "string" },
-          "refreshToken": { "type": "string" },
-          "tokenType": { "type": "string", "example": "Bearer" },
-          "expiresAt": { "type": "string", "format": "date-time" }
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
-        "required": ["accessToken", "refreshToken", "tokenType", "expiresAt"]
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "expiresAt"
+        ]
       },
       "User": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "firstName": { "type": "string" },
-          "lastName": { "type": "string", "nullable": true },
-          "email": { "type": "string", "format": "email" },
-          "role": { "type": "string", "enum": ["user", "instructor", "admin"] },
-          "age": { "type": "integer", "nullable": true },
-          "address": { "type": "string", "nullable": true },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "integer"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "instructor",
+              "admin"
+            ]
+          },
+          "age": {
+            "type": "integer",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
         },
-        "required": ["id", "firstName", "email", "role", "createdAt", "updatedAt"]
+        "required": [
+          "id",
+          "firstName",
+          "email",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ]
       },
       "Community": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "slug": { "type": "string" },
-          "description": { "type": "string", "nullable": true },
-          "coverImageUrl": { "type": "string", "format": "uri", "nullable": true },
-          "visibility": { "type": "string", "enum": ["public", "private"] },
-          "ownerId": { "type": "integer" },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "coverImageUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "public",
+              "private"
+            ]
+          },
+          "ownerId": {
+            "type": "integer"
+          },
           "membership": {
             "type": "object",
             "nullable": true,
             "properties": {
-              "role": { "type": "string" },
-              "status": { "type": "string" }
+              "role": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
             }
           },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" }
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
         },
-        "required": ["id", "name", "slug", "visibility", "ownerId", "createdAt", "updatedAt"]
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "visibility",
+          "ownerId",
+          "createdAt",
+          "updatedAt"
+        ]
       },
       "ContentAsset": {
         "type": "object",
         "properties": {
-          "publicId": { "type": "string" },
-          "originalFilename": { "type": "string" },
+          "publicId": {
+            "type": "string"
+          },
+          "originalFilename": {
+            "type": "string"
+          },
           "type": {
             "type": "string",
-            "enum": ["powerpoint", "ebook", "pdf", "document", "video"]
+            "enum": [
+              "powerpoint",
+              "ebook",
+              "pdf",
+              "document",
+              "video"
+            ]
           },
-          "status": { "type": "string" },
-          "visibility": { "type": "string" },
-          "updatedAt": { "type": "string", "format": "date-time", "nullable": true },
-          "metadata": { "type": "object", "nullable": true }
+          "status": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          }
         },
-        "required": ["publicId", "originalFilename", "type", "status", "visibility"]
+        "required": [
+          "publicId",
+          "originalFilename",
+          "type",
+          "status",
+          "visibility"
+        ]
       },
       "UploadSessionResponse": {
         "type": "object",
         "properties": {
-          "asset": { "$ref": "#/components/schemas/ContentAsset" },
+          "asset": {
+            "$ref": "#/components/schemas/ContentAsset"
+          },
           "upload": {
             "type": "object",
             "properties": {
-              "url": { "type": "string", "format": "uri" },
-              "bucket": { "type": "string" },
-              "key": { "type": "string" },
-              "expiresAt": { "type": "string", "format": "date-time" }
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "bucket": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
             },
-            "required": ["url", "bucket", "key", "expiresAt"]
+            "required": [
+              "url",
+              "bucket",
+              "key",
+              "expiresAt"
+            ]
           }
         },
-        "required": ["asset", "upload"]
+        "required": [
+          "asset",
+          "upload"
+        ]
       },
       "ViewerToken": {
         "type": "object",
         "properties": {
-          "url": { "type": "string", "format": "uri" },
-          "expiresAt": { "type": "string", "format": "date-time" },
-          "watermark": { "type": "string" },
-          "contentType": { "type": "string", "nullable": true },
-          "asset": { "$ref": "#/components/schemas/ContentAsset" }
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "watermark": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string",
+            "nullable": true
+          },
+          "asset": {
+            "$ref": "#/components/schemas/ContentAsset"
+          }
         },
-        "required": ["url", "expiresAt", "watermark", "asset"]
+        "required": [
+          "url",
+          "expiresAt",
+          "watermark",
+          "asset"
+        ]
       },
       "ContentAnalytics": {
         "type": "object",
         "properties": {
-          "asset": { "$ref": "#/components/schemas/ContentAsset" },
+          "asset": {
+            "$ref": "#/components/schemas/ContentAsset"
+          },
           "events": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "eventType": { "type": "string" },
-                "total": { "type": "integer" }
+                "eventType": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "integer"
+                }
               }
             }
           },
@@ -149,9 +328,15 @@
             "items": {
               "type": "object",
               "properties": {
-                "format": { "type": "string" },
-                "storageKey": { "type": "string" },
-                "storageBucket": { "type": "string" }
+                "format": {
+                  "type": "string"
+                },
+                "storageKey": {
+                  "type": "string"
+                },
+                "storageBucket": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -160,8 +345,13 @@
             "items": {
               "type": "object",
               "properties": {
-                "eventType": { "type": "string" },
-                "occurredAt": { "type": "string", "format": "date-time" }
+                "eventType": {
+                  "type": "string"
+                },
+                "occurredAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
               }
             }
           },
@@ -169,12 +359,40 @@
             "type": "object",
             "nullable": true,
             "properties": {
-              "readers": { "type": "integer" },
-              "averageProgress": { "type": "number" }
+              "readers": {
+                "type": "integer"
+              },
+              "averageProgress": {
+                "type": "number"
+              }
             }
           }
         },
-        "required": ["asset", "events"]
+        "required": [
+          "asset",
+          "events"
+        ]
+      },
+      "VerificationStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified"
+            ]
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "emailVerifiedAt"
+        ]
       }
     }
   },
@@ -187,11 +405,15 @@
             "description": "API is healthy",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "503": { "description": "Downstream dependency failure" }
+          "503": {
+            "description": "Downstream dependency failure"
+          }
         }
       }
     },
@@ -204,18 +426,44 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["firstName", "email", "password"],
+                "required": [
+                  "firstName",
+                  "email",
+                  "password"
+                ],
                 "properties": {
-                  "firstName": { "type": "string", "minLength": 2, "maxLength": 120 },
-                  "lastName": { "type": "string" },
-                  "email": { "type": "string", "format": "email" },
+                  "firstName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
                   "password": {
                     "type": "string",
                     "description": "Minimum 12 characters with upper, lower, number, and symbol"
                   },
-                  "role": { "type": "string", "enum": ["user", "instructor", "admin"] },
-                  "age": { "type": "integer", "minimum": 16, "maximum": 120 },
-                  "address": { "type": "string" }
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "instructor",
+                      "admin"
+                    ]
+                  },
+                  "age": {
+                    "type": "integer",
+                    "minimum": 16,
+                    "maximum": 120
+                  },
+                  "address": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -226,12 +474,42 @@
             "description": "Account created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
               }
             }
           },
-          "409": { "description": "Email already exists" },
-          "422": { "description": "Validation error" }
+          "409": {
+            "description": "Email already exists"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       }
     },
@@ -244,10 +522,18 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["email", "password"],
+                "required": [
+                  "email",
+                  "password"
+                ],
                 "properties": {
-                  "email": { "type": "string", "format": "email" },
-                  "password": { "type": "string" }
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -258,46 +544,107 @@
             "description": "Authenticated",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification",
+                            "tokens"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "tokens": {
+                              "$ref": "#/components/schemas/AuthTokens"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
               }
             }
           },
-          "401": { "description": "Invalid credentials" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Invalid credentials"
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "403": {
+            "description": "Email verification required"
+          },
+          "423": {
+            "description": "Account locked"
+          }
         }
       }
     },
     "/api/users/me": {
       "get": {
         "summary": "Current user profile",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Profile retrieved",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "401": { "description": "Missing or invalid token" }
+          "401": {
+            "description": "Missing or invalid token"
+          }
         }
       }
     },
     "/api/users": {
       "get": {
         "summary": "List users",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "limit",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
           },
           {
             "name": "offset",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 0, "default": 0 }
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
           }
         ],
         "responses": {
@@ -305,47 +652,85 @@
             "description": "Users returned",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Insufficient permissions" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
         }
       }
     },
     "/api/communities": {
       "get": {
         "summary": "Communities for current user",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Communities retrieved",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "401": { "description": "Missing or invalid token" }
+          "401": {
+            "description": "Missing or invalid token"
+          }
         }
       },
       "post": {
         "summary": "Create community",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name"],
+                "required": [
+                  "name"
+                ],
                 "properties": {
-                  "name": { "type": "string", "minLength": 3, "maxLength": 150 },
-                  "description": { "type": "string" },
-                  "coverImageUrl": { "type": "string", "format": "uri" },
-                  "visibility": { "type": "string", "enum": ["public", "private"], "default": "public" },
-                  "metadata": { "type": "object" }
+                  "name": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 150
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "coverImageUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "public",
+                      "private"
+                    ],
+                    "default": "public"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
                 }
               }
             }
@@ -356,61 +741,123 @@
             "description": "Community created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Insufficient permissions" },
-          "409": { "description": "Community slug already exists" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "409": {
+            "description": "Community slug already exists"
+          }
         }
       }
     },
     "/api/content/assets": {
       "get": {
         "summary": "List content assets",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
           {
             "name": "pageSize",
             "in": "query",
-            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
           },
-          { "name": "status", "in": "query", "schema": { "type": "string" } },
-          { "name": "type", "in": "query", "schema": { "type": "string" } }
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Assets returned",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "401": { "description": "Missing or invalid token" }
+          "401": {
+            "description": "Missing or invalid token"
+          }
         }
       }
     },
     "/api/content/assets/upload-session": {
       "post": {
         "summary": "Create signed upload session",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["type", "filename", "mimeType", "size"],
+                "required": [
+                  "type",
+                  "filename",
+                  "mimeType",
+                  "size"
+                ],
                 "properties": {
-                  "type": { "type": "string" },
-                  "filename": { "type": "string" },
-                  "mimeType": { "type": "string" },
-                  "size": { "type": "integer" },
-                  "checksum": { "type": "string" },
-                  "visibility": { "type": "string" }
+                  "type": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "integer"
+                  },
+                  "checksum": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "type": "string"
+                  }
                 }
               }
             }
@@ -421,25 +868,37 @@
             "description": "Upload session created",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       }
     },
     "/api/content/assets/{assetId}/ingest": {
       "post": {
         "summary": "Confirm upload and queue ingestion",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "assetId",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -449,8 +908,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "checksum": { "type": "string" },
-                  "metadata": { "type": "object" }
+                  "checksum": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
                 }
               }
             }
@@ -461,81 +924,147 @@
             "description": "Asset queued",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "401": { "description": "Missing or invalid token" },
-          "403": { "description": "Insufficient permissions" },
-          "422": { "description": "Validation error" }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       }
     },
     "/api/content/assets/{assetId}": {
       "get": {
         "summary": "Retrieve content asset",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Asset detail",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "404": { "description": "Asset not found" }
+          "404": {
+            "description": "Asset not found"
+          }
         }
       }
     },
     "/api/content/assets/{assetId}/viewer-token": {
       "get": {
         "summary": "Generate viewer token",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Viewer token issued",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "403": { "description": "Access denied" },
-          "404": { "description": "Asset not found" }
+          "403": {
+            "description": "Access denied"
+          },
+          "404": {
+            "description": "Asset not found"
+          }
         }
       }
     },
     "/api/content/assets/{assetId}/progress": {
       "get": {
         "summary": "Retrieve ebook progress",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Progress retrieved",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "404": { "description": "Asset not found" }
+          "404": {
+            "description": "Asset not found"
+          }
         }
       },
       "post": {
         "summary": "Update ebook progress",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -544,25 +1073,47 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "progressPercent": { "type": "number", "minimum": 0, "maximum": 100 },
-                  "lastLocation": { "type": "string", "nullable": true }
+                  "progressPercent": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "lastLocation": {
+                    "type": "string",
+                    "nullable": true
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Progress stored" },
-          "404": { "description": "Asset not found" }
+          "200": {
+            "description": "Progress stored"
+          },
+          "404": {
+            "description": "Asset not found"
+          }
         }
       }
     },
     "/api/content/assets/{assetId}/events": {
       "post": {
         "summary": "Record asset event",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "requestBody": {
           "required": true,
@@ -570,39 +1121,200 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["eventType"],
+                "required": [
+                  "eventType"
+                ],
                 "properties": {
-                  "eventType": { "type": "string" },
-                  "metadata": { "type": "object" }
+                  "eventType": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "description": "Event captured" },
-          "404": { "description": "Asset not found" }
+          "200": {
+            "description": "Event captured"
+          },
+          "404": {
+            "description": "Asset not found"
+          }
         }
       }
     },
     "/api/content/assets/{assetId}/analytics": {
       "get": {
         "summary": "Content analytics",
-        "security": [ { "bearerAuth": [] } ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
-          { "name": "assetId", "in": "path", "required": true, "schema": { "type": "string" } }
+          {
+            "name": "assetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
         ],
         "responses": {
           "200": {
             "description": "Analytics payload",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/StandardResponse" }
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
               }
             }
           },
-          "403": { "description": "Insufficient permissions" },
-          "404": { "description": "Asset not found" }
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Asset not found"
+          }
+        }
+      }
+    },
+    "/api/auth/verify-email": {
+      "post": {
+        "summary": "Confirm email ownership",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Verification token received via email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Token expired or already used"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/auth/resend-verification": {
+      "post": {
+        "summary": "Resend verification email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resend processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "delivered",
+                            "expiresAt"
+                          ],
+                          "properties": {
+                            "delivered": {
+                              "type": "boolean"
+                            },
+                            "expiresAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests"
+          },
+          "422": {
+            "description": "Validation error"
+          }
         }
       }
     }

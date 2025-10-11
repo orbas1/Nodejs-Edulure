@@ -48,3 +48,18 @@ process.env.ASSET_DOWNLOAD_TTL_MINUTES = process.env.ASSET_DOWNLOAD_TTL_MINUTES 
 process.env.CONTENT_MAX_UPLOAD_MB = process.env.CONTENT_MAX_UPLOAD_MB ?? '256';
 process.env.CLOUDCONVERT_API_KEY = process.env.CLOUDCONVERT_API_KEY ?? 'test-cloudconvert-key';
 process.env.DRM_DOWNLOAD_LIMIT = process.env.DRM_DOWNLOAD_LIMIT ?? '3';
+process.env.SMTP_HOST = process.env.SMTP_HOST ?? '127.0.0.1';
+process.env.SMTP_PORT = process.env.SMTP_PORT ?? '1025';
+process.env.SMTP_SECURE = process.env.SMTP_SECURE ?? 'false';
+process.env.SMTP_USER = process.env.SMTP_USER ?? 'test-user';
+process.env.SMTP_PASSWORD = process.env.SMTP_PASSWORD ?? 'test-password';
+process.env.SMTP_FROM_EMAIL = process.env.SMTP_FROM_EMAIL ?? 'security@test.local';
+process.env.SMTP_FROM_NAME = process.env.SMTP_FROM_NAME ?? 'Edulure Test Harness';
+process.env.EMAIL_VERIFICATION_URL = process.env.EMAIL_VERIFICATION_URL ?? 'https://app.local/verify-email';
+process.env.EMAIL_VERIFICATION_TOKEN_TTL_MINUTES =
+  process.env.EMAIL_VERIFICATION_TOKEN_TTL_MINUTES ?? '60';
+process.env.EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES =
+  process.env.EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES ?? '5';
+process.env.ACCOUNT_LOCKOUT_THRESHOLD = process.env.ACCOUNT_LOCKOUT_THRESHOLD ?? '5';
+process.env.ACCOUNT_LOCKOUT_WINDOW_MINUTES = process.env.ACCOUNT_LOCKOUT_WINDOW_MINUTES ?? '15';
+process.env.ACCOUNT_LOCKOUT_DURATION_MINUTES = process.env.ACCOUNT_LOCKOUT_DURATION_MINUTES ?? '30';

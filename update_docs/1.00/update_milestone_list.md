@@ -8,7 +8,7 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
 - **Tasks & Subtasks:**
   1. **Task 1.1 Security Framework Upgrade**
      - Implement strict CORS, rate limits, password policy, JWT validation, and secret rotation scripts.
-     - Status update: Multi-key JWT keystore, rotation CLI, and middleware verification completed; account lockout and email verification remain.
+     - Status update: Multi-key JWT keystore, rotation CLI, middleware verification, account lockout telemetry, and email verification messaging delivered; final focus on session revocation and observability roll-up.
      - Add automated security scans (npm audit, Snyk) to CI and alert routing to the governance board.
   2. **Task 1.2 Dependency & Workspace Governance**
      - Select workspace tooling (PNPM/npm workspaces, Melos) and align Node/Flutter versions.

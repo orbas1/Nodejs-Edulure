@@ -8,9 +8,33 @@ import { getActiveJwtKey } from '../config/jwtKeyStore.js';
 import UserModel from '../models/UserModel.js';
 import UserSessionModel from '../models/UserSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import { emailVerificationService } from './EmailVerificationService.js';
 
 function hashRefreshToken(token) {
   return crypto.createHmac('sha256', env.security.jwtRefreshSecret).update(token).digest('hex');
+}
+
+function sanitizeUserRecord(user) {
+  return {
+    id: user.id,
+    firstName: user.firstName ?? user.first_name,
+    lastName: user.lastName ?? user.last_name,
+    email: user.email,
+    role: user.role,
+    age: user.age,
+    address: user.address,
+    createdAt: user.createdAt ?? user.created_at,
+    updatedAt: user.updatedAt ?? user.updated_at,
+    emailVerifiedAt: user.emailVerifiedAt ?? user.email_verified_at ?? null,
+    lastLoginAt: user.lastLoginAt ?? user.last_login_at ?? null
+  };
+}
+
+function buildVerificationMetadata(user) {
+  return {
+    status: user.emailVerifiedAt ? 'verified' : 'pending',
+    emailVerifiedAt: user.emailVerifiedAt ?? null
+  };
 }
 
 export default class AuthService {
@@ -48,41 +72,136 @@ export default class AuthService {
         trx
       );
 
-      const session = await this.createSession(user, context, trx);
-      return this.buildAuthResponse(user, session);
+      const verification = await emailVerificationService.issueVerification(user, context, trx);
+
+      return {
+        data: {
+          user: sanitizeUserRecord(user),
+          verification: {
+            status: 'pending',
+            expiresAt: verification.expiresAt.toISOString()
+          }
+        }
+      };
     });
   }
 
   static async login(email, password, context = {}) {
-    const user = await UserModel.findByEmail(email);
-    if (!user) {
-      const error = new Error('Invalid credentials');
-      error.status = 401;
-      throw error;
-    }
+    return db.transaction(async (trx) => {
+      const user = await UserModel.forUpdateByEmail(email, trx);
+      if (!user) {
+        const error = new Error('Invalid credentials');
+        error.status = 401;
+        throw error;
+      }
 
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
-      const error = new Error('Invalid credentials');
-      error.status = 401;
-      throw error;
-    }
+      if (user.locked_until && new Date(user.locked_until) > new Date()) {
+        const error = new Error('Account temporarily locked due to repeated failed sign-in attempts.');
+        error.status = 423;
+        error.code = 'ACCOUNT_LOCKED';
+        error.details = { lockedUntil: new Date(user.locked_until).toISOString() };
+        throw error;
+      }
 
-    const session = await this.createSession({ id: user.id, email: user.email, role: user.role }, context);
-    return this.buildAuthResponse(
-      {
-        id: user.id,
-        firstName: user.first_name,
-        lastName: user.last_name,
-        email: user.email,
-        role: user.role,
-        age: user.age,
-        address: user.address,
-        createdAt: user.created_at,
-        updatedAt: user.updated_at
-      },
-      session
-    );
+      const valid = await bcrypt.compare(password, user.password_hash);
+      if (!valid) {
+        const result = await UserModel.recordLoginFailure(
+          user,
+          {
+            threshold: env.security.accountLockoutThreshold,
+            windowMinutes: env.security.accountLockoutWindowMinutes,
+            lockoutDurationMinutes: env.security.accountLockoutDurationMinutes
+          },
+          trx
+        );
+
+        const remainingAttempts = Math.max(
+          0,
+          env.security.accountLockoutThreshold - result.failureCount
+        );
+
+        await DomainEventModel.record(
+          {
+            entityType: 'user',
+            entityId: user.id,
+            eventType: 'user.login_failed',
+            payload: {
+              attempts: result.failureCount,
+              lockedUntil: result.lockedUntil ? result.lockedUntil.toISOString() : null,
+              remainingAttempts,
+              ipAddress: context.ipAddress ?? null,
+              userAgent: context.userAgent ?? null
+            }
+          },
+          trx
+        );
+
+        const error = new Error('Invalid credentials');
+        error.status = result.lockedUntil ? 423 : 401;
+        if (result.lockedUntil) {
+          error.code = 'ACCOUNT_LOCKED';
+          error.details = { lockedUntil: result.lockedUntil.toISOString() };
+        } else {
+          error.details = { remainingAttempts };
+        }
+        throw error;
+      }
+
+      if (!user.email_verified_at) {
+        await emailVerificationService.issueVerification(user, context, trx);
+        const error = new Error('Email verification required before accessing the platform.');
+        error.status = 403;
+        error.code = 'EMAIL_VERIFICATION_REQUIRED';
+        error.details = { email: user.email };
+        throw error;
+      }
+
+      await UserModel.clearLoginFailures(user.id, trx);
+      const refreshedUser = await UserModel.findById(user.id, trx);
+
+      const session = await this.createSession(
+        { id: user.id, email: user.email, role: user.role },
+        context,
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'user',
+          entityId: user.id,
+          eventType: 'user.login_succeeded',
+          payload: {
+            sessionExpiresAt: session.expiresAt.toISOString(),
+            ipAddress: context.ipAddress ?? null,
+            userAgent: context.userAgent ?? null
+          }
+        },
+        trx
+      );
+
+      return this.buildAuthResponse(sanitizeUserRecord(refreshedUser), session);
+    });
+  }
+
+  static async verifyEmail(token, context = {}) {
+    const user = await emailVerificationService.verifyToken(token, context);
+    return {
+      data: {
+        user: sanitizeUserRecord(user),
+        verification: buildVerificationMetadata(user)
+      }
+    };
+  }
+
+  static async resendVerification(email, context = {}) {
+    const result = await emailVerificationService.resend(email, context);
+    const delivered = result.reason ? true : result.delivered;
+    return {
+      data: {
+        delivered,
+        expiresAt: result.expiresAt ?? null
+      }
+    };
   }
 
   static async createSession(user, context = {}, connection = db) {
@@ -125,17 +244,8 @@ export default class AuthService {
   static buildAuthResponse(user, session) {
     return {
       data: {
-        user: {
-          id: user.id,
-          firstName: user.firstName ?? user.first_name,
-          lastName: user.lastName ?? user.last_name,
-          email: user.email,
-          role: user.role,
-          age: user.age,
-          address: user.address,
-          createdAt: user.createdAt ?? user.created_at,
-          updatedAt: user.updatedAt ?? user.updated_at
-        },
+        user,
+        verification: buildVerificationMetadata(user),
         tokens: {
           accessToken: session.accessToken,
           refreshToken: session.refreshToken,

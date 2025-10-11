@@ -17,3 +17,8 @@
 - `backend-nodejs/migrations/20241020130000_content_assets.js` – schema for assets, ingestion jobs, conversion outputs, events, audit logs, and ebook progress.
 - `backend-nodejs/vitest.config.mjs`, `backend-nodejs/test/setupEnv.js`, `backend-nodejs/test/storageService.test.js` – Vitest harness and suites covering Cloudflare R2 storage behaviours.
 - `backend-nodejs/scripts/rotate-jwt-keys.js` – operational CLI for generating and promoting JWT signing keys.
+- `backend-nodejs/migrations/20241030140000_user_security_enhancements.js` – incremental migration adding lockout telemetry columns to `users` and provisioning the `user_email_verification_tokens` table.
+- `backend-nodejs/src/models/EmailVerificationTokenModel.js` – repository layer for hashing, issuing, and consuming verification tokens with replacement semantics.
+- `backend-nodejs/src/services/MailService.js` – SMTP-backed mailer that renders production templates for security communications.
+- `backend-nodejs/src/services/EmailVerificationService.js` – orchestration service handling issuance, throttling, and consumption of verification tokens with domain event logging.
+- `backend-nodejs/test/mailService.test.js` – Vitest coverage validating email templates and SMTP payload construction.

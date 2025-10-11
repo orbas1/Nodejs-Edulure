@@ -36,6 +36,7 @@
 ### 6. Profile, Settings & Compliance Surfaces
 - Redesign profile and verification experiences via `Profile Look.md`, `Profile Styling.md`, and `Organisation_and_positions.md`.
 - Restructure settings dashboards, privacy notifications, and consent flows referencing `Settings Dashboard.md`, `Settings Screen.md`, `Settings.md`, and `Function Design.md`.
+- Align verification prompts, lockout states, and security education with backend enforcement referencing `Screen_text.md`, `Dummy_Data_Requirements.md`, and `provider_application_logic_flow_changes.md`.
 - Add inline security messaging and audit surfaces with guidance from `provider_application_logic_flow_changes.md` and `web_application_logic_flow_changes.md`.
 
 ## Deliverables & Outputs
