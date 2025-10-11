@@ -48,6 +48,12 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Extended component specs for availability pills, countdown timers, engagement badges, and moderation toasts using `component_types.md`, `component_functions.md`, and `Screens__Update_widget_types.md` while reusing accessibility tokens for status messaging.
 - Captured Agora connectivity, recording consent, and host handoff microcopy within `Screen_text.md`, `text.md.md`, and `web_app_wireframe_changes.md`, ensuring learners receive deterministic join guidance and moderators can escalate incidents quickly.
 
+### 8. Commerce, Checkout & Finance Experiences
+- Introduced full-funnel checkout flows for Stripe/PayPal intents across web and mobile referencing `web_application_logic_flow_changes.md`, `web_app_wireframe_changes.md`, and `user_application_logic_flow_changes.md`, detailing payment method selection, SCA handoffs, webhook retry states, and receipt confirmations.
+- Updated styling specs in `web_application_styling_changes.md`, `user_application_styling_changes.md`, and `provider_application_styling_changes.md` with finance tokens, statement descriptors, coupon inputs, and refund banners ensuring parity between learner, instructor, and support consoles.
+- Extended wireframes in `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Function Design.md` and `Application_Design_Update_Plan/Application Design Update.md` to cover coupon validation, tax summaries, finance dashboards, and refund workflows, including alert states for webhook discrepancies and policy escalations.
+- Logged finance telemetry overlays in `design_change_log.md` (ui-ux updates) and `web_application_logic_flow_changes.md` showing revenue summary widgets, ledger exports, and payout readiness prompts aligned with the new `/api/payments` endpoints.
+
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
 - Embedded security messaging around verification, payment confirmation, and rights-managed assets across profile and commerce flows.

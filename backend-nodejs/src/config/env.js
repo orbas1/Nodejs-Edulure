@@ -106,6 +106,70 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+function clampRate(rate) {
+  if (typeof rate !== 'number' || Number.isNaN(rate)) {
+    return 0;
+  }
+
+  const normalised = rate > 1 ? rate / 100 : rate;
+  if (normalised < 0) {
+    return 0;
+  }
+
+  if (normalised > 1) {
+    return 1;
+  }
+
+  return Number(normalised.toFixed(6));
+}
+
+function normalizeTaxTable(rawTable) {
+  if (!rawTable || typeof rawTable !== 'object') {
+    return {};
+  }
+
+  return Object.entries(rawTable).reduce((acc, [countryCode, config]) => {
+    const upperCountry = countryCode.trim().toUpperCase();
+    if (!upperCountry) {
+      return acc;
+    }
+
+    let defaultRate = 0;
+    let regions = {};
+    if (typeof config === 'number') {
+      defaultRate = clampRate(config);
+    } else if (typeof config === 'object' && config !== null) {
+      defaultRate = clampRate(config.defaultRate ?? config.default_rate ?? 0);
+      const rawRegions = config.regions ?? config.subdivisions ?? {};
+      regions = Object.entries(rawRegions).reduce((regionAcc, [regionCode, regionRate]) => {
+        const upperRegion = regionCode.trim().toUpperCase();
+        if (!upperRegion) {
+          return regionAcc;
+        }
+
+        regionAcc[upperRegion] = clampRate(regionRate);
+        return regionAcc;
+      }, {});
+    }
+
+    acc[upperCountry] = {
+      defaultRate,
+      regions
+    };
+
+    return acc;
+  }, {});
+}
+
+function normalizeStatementDescriptor(descriptor) {
+  if (!descriptor) {
+    return null;
+  }
+
+  const sanitized = descriptor.replace(/[^a-zA-Z0-9 .]/g, '').substring(0, 22).trim();
+  return sanitized ? sanitized.toUpperCase() : null;
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -169,6 +233,21 @@ const envSchema = z
     CLOUDCONVERT_API_KEY: z.string().min(1).optional(),
     DRM_DOWNLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3),
     DRM_SIGNATURE_SECRET: z.string().min(32).optional(),
+    STRIPE_SECRET_KEY: z.string().min(10),
+    STRIPE_PUBLISHABLE_KEY: z.string().min(10).optional(),
+    STRIPE_WEBHOOK_SECRET: z.string().min(10).optional(),
+    STRIPE_STATEMENT_DESCRIPTOR: z.string().min(5).max(22).optional(),
+    PAYPAL_CLIENT_ID: z.string().min(10),
+    PAYPAL_CLIENT_SECRET: z.string().min(10),
+    PAYPAL_ENVIRONMENT: z.enum(['sandbox', 'live']).default('sandbox'),
+    PAYPAL_WEBHOOK_ID: z.string().min(10).optional(),
+    PAYMENTS_DEFAULT_CURRENCY: z.string().length(3).default('USD'),
+    PAYMENTS_ALLOWED_CURRENCIES: z.string().optional(),
+    PAYMENTS_TAX_TABLE: z.string().optional(),
+    PAYMENTS_TAX_INCLUSIVE: z.coerce.boolean().default(false),
+    PAYMENTS_MINIMUM_TAX_RATE: z.coerce.number().min(0).max(1).default(0),
+    PAYMENTS_MAX_COUPON_PERCENTAGE: z.coerce.number().min(0).max(100).default(80),
+    PAYMENTS_REPORTING_TIMEZONE: z.string().default('Etc/UTC'),
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_SECURE: z.coerce.boolean().default(false),
@@ -241,6 +320,17 @@ if (!parsed.success) {
 }
 
 const raw = parsed.data;
+
+const defaultCurrency = raw.PAYMENTS_DEFAULT_CURRENCY.toUpperCase();
+const allowedCurrencies = Array.from(
+  new Set([
+    defaultCurrency,
+    ...parseCsv(raw.PAYMENTS_ALLOWED_CURRENCIES ?? '').map((currency) => currency.toUpperCase())
+  ])
+);
+const taxTable = normalizeTaxTable(tryParseJson(raw.PAYMENTS_TAX_TABLE));
+const statementDescriptor =
+  normalizeStatementDescriptor(raw.STRIPE_STATEMENT_DESCRIPTOR) ?? 'EDULURE LEARNING';
 
 const jwtKeyset = normalizeJwtKeyset(raw.JWT_KEYSET, raw.JWT_SECRET, raw.JWT_ACTIVE_KEY_ID);
 const activeJwtKey = jwtKeyset.keys.find((key) => key.kid === jwtKeyset.activeKeyId);
@@ -315,6 +405,31 @@ export const env = {
   },
   integrations: {
     cloudConvertApiKey: raw.CLOUDCONVERT_API_KEY ?? null
+  },
+  payments: {
+    defaultCurrency,
+    allowedCurrencies,
+    reportingTimezone: raw.PAYMENTS_REPORTING_TIMEZONE,
+    tax: {
+      inclusive: raw.PAYMENTS_TAX_INCLUSIVE,
+      table: taxTable,
+      minimumRate: raw.PAYMENTS_MINIMUM_TAX_RATE
+    },
+    stripe: {
+      secretKey: raw.STRIPE_SECRET_KEY,
+      publishableKey: raw.STRIPE_PUBLISHABLE_KEY ?? null,
+      webhookSecret: raw.STRIPE_WEBHOOK_SECRET ?? null,
+      statementDescriptor
+    },
+    paypal: {
+      clientId: raw.PAYPAL_CLIENT_ID,
+      clientSecret: raw.PAYPAL_CLIENT_SECRET,
+      environment: raw.PAYPAL_ENVIRONMENT,
+      webhookId: raw.PAYPAL_WEBHOOK_ID ?? null
+    },
+    coupons: {
+      maxPercentageDiscount: raw.PAYMENTS_MAX_COUPON_PERCENTAGE
+    }
   },
   drm: {
     downloadLimit: raw.DRM_DOWNLOAD_LIMIT

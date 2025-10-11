@@ -1,0 +1,462 @@
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+
+import { env } from '../src/config/env.js';
+import PaymentService from '../src/services/PaymentService.js';
+
+vi.mock('../src/config/logger.js', () => ({
+  default: {
+    child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn()
+  }
+}));
+
+const { transactionSpy } = vi.hoisted(() => ({
+  transactionSpy: vi.fn(async (handler) => handler({ isTransaction: () => true }))
+}));
+
+vi.mock('../src/config/database.js', () => ({
+  default: {
+    transaction: transactionSpy
+  }
+}));
+
+const mockedModules = vi.hoisted(() => {
+  const paymentIntentModel = {
+    create: vi.fn(),
+    findById: vi.fn(),
+    findByPublicId: vi.fn(),
+    findByProviderIntentId: vi.fn(),
+    lockByPublicId: vi.fn(),
+    updateById: vi.fn(),
+    incrementRefundAmount: vi.fn()
+  };
+
+  const paymentCouponModel = {
+    findActiveForRedemption: vi.fn(),
+    countUserRedemptions: vi.fn(),
+    findById: vi.fn(),
+    recordRedemption: vi.fn()
+  };
+
+  const paymentLedgerEntryModel = {
+    record: vi.fn()
+  };
+
+  const paymentRefundModel = {
+    create: vi.fn(),
+    findByProviderRefundId: vi.fn()
+  };
+
+  return {
+    paymentIntentModel,
+    paymentCouponModel,
+    paymentLedgerEntryModel,
+    paymentRefundModel,
+    captureMetricsSpy: vi.fn(),
+    refundMetricsSpy: vi.fn()
+  };
+});
+
+vi.mock('../src/models/PaymentIntentModel.js', () => ({
+  default: mockedModules.paymentIntentModel
+}));
+
+vi.mock('../src/models/PaymentCouponModel.js', () => ({
+  default: mockedModules.paymentCouponModel
+}));
+
+vi.mock('../src/models/PaymentLedgerEntryModel.js', () => ({
+  default: mockedModules.paymentLedgerEntryModel
+}));
+
+vi.mock('../src/models/PaymentRefundModel.js', () => ({
+  default: mockedModules.paymentRefundModel
+}));
+
+vi.mock('../src/observability/metrics.js', () => ({
+  trackPaymentCaptureMetrics: mockedModules.captureMetricsSpy,
+  trackPaymentRefundMetrics: mockedModules.refundMetricsSpy
+}));
+
+const {
+  paymentIntentModel,
+  paymentCouponModel,
+  paymentLedgerEntryModel,
+  paymentRefundModel,
+  captureMetricsSpy,
+  refundMetricsSpy
+} = mockedModules;
+
+describe('PaymentService', () => {
+  const originalTaxConfig = { ...env.payments.tax };
+  const originalAllowedCurrencies = [...env.payments.allowedCurrencies];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    transactionSpy.mockClear();
+    env.payments.allowedCurrencies.splice(0, env.payments.allowedCurrencies.length, ...originalAllowedCurrencies);
+    env.payments.tax.inclusive = originalTaxConfig.inclusive;
+    env.payments.tax.minimumRate = originalTaxConfig.minimumRate;
+    env.payments.tax.table = { ...originalTaxConfig.table };
+    PaymentService.stripeClient = null;
+    PaymentService.paypalClient = null;
+    PaymentService.paypalOrdersController = null;
+    PaymentService.paypalPaymentsController = null;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('calculates inclusive tax and discounts across line items', () => {
+    env.payments.tax.inclusive = true;
+    env.payments.tax.minimumRate = 0.05;
+    env.payments.tax.table = {
+      US: {
+        defaultRate: 0.075,
+        regions: {
+          CA: 0.0825
+        }
+      }
+    };
+
+    const totals = PaymentService.calculateTotals({
+      currency: 'USD',
+      taxRegion: { country: 'US', region: 'CA', postalCode: '94105' },
+      coupon: {
+        code: 'SAVE10',
+        discountType: 'percentage',
+        discountValue: 1000
+      },
+      items: [
+        { id: 'course', name: 'Course', unitAmount: 1000, quantity: 1 },
+        { id: 'bundle', name: 'Add-on', unitAmount: 500, quantity: 2, taxExempt: true }
+      ]
+    });
+
+    expect(totals.subtotal).toBe(2000);
+    expect(totals.discount).toBe(100);
+    expect(totals.tax).toBe(69);
+    expect(totals.total).toBe(1900);
+    expect(totals.lineItems[0]).toMatchObject({ discount: 100, tax: 69, total: 900 });
+    expect(totals.taxBreakdown).toMatchObject({
+      rate: 0.0825,
+      jurisdiction: { country: 'US', region: 'CA', postalCode: '94105' },
+      inclusive: true,
+      discountApplied: 100
+    });
+  });
+
+  it('creates Stripe payment intents with coupon validation', async () => {
+    env.payments.tax.inclusive = false;
+    env.payments.tax.minimumRate = 0.05;
+    env.payments.tax.table = {
+      US: {
+        defaultRate: 0.07
+      }
+    };
+
+    paymentCouponModel.findActiveForRedemption.mockResolvedValue({
+      id: 22,
+      code: 'SAVE20',
+      discountType: 'percentage',
+      discountValue: 2000,
+      perUserLimit: 3
+    });
+    paymentCouponModel.countUserRedemptions.mockResolvedValue(1);
+
+    paymentIntentModel.create.mockImplementation(async (payload) => ({
+      ...payload,
+      id: 10,
+      publicId: payload.publicId,
+      status: payload.status,
+      amountSubtotal: payload.amountSubtotal,
+      amountDiscount: payload.amountDiscount,
+      amountTax: payload.amountTax,
+      amountTotal: payload.amountTotal,
+      amountRefunded: payload.amountRefunded,
+      taxBreakdown: payload.taxBreakdown,
+      metadata: payload.metadata,
+      couponId: payload.couponId,
+      entityType: payload.entityType,
+      entityId: payload.entityId,
+      receiptEmail: payload.receiptEmail,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+
+    const stripeCreate = vi.fn(async () => ({
+      id: 'pi_123',
+      client_secret: 'secret_value',
+      status: 'requires_payment_method'
+    }));
+
+    vi.spyOn(PaymentService, 'getStripeClient').mockReturnValue({
+      paymentIntents: {
+        create: stripeCreate
+      }
+    });
+
+    const result = await PaymentService.createPaymentIntent({
+      userId: 'user-1',
+      provider: 'stripe',
+      currency: 'USD',
+      couponCode: 'SAVE20',
+      receiptEmail: 'learner@example.com',
+      entity: { id: 'course-101', type: 'course', name: 'Course 101' },
+      items: [
+        { id: 'course', name: 'Course Access', unitAmount: 1200, quantity: 1 },
+        { id: 'support', name: 'Support Pack', unitAmount: 300, quantity: 1, taxExempt: true }
+      ]
+    });
+
+    expect(paymentCouponModel.findActiveForRedemption).toHaveBeenCalledWith(
+      'SAVE20',
+      'USD',
+      expect.anything(),
+      expect.any(Date),
+      { lock: false }
+    );
+    expect(paymentCouponModel.countUserRedemptions).toHaveBeenCalledWith(22, 'user-1');
+    expect(stripeCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 1308, currency: 'usd', receipt_email: 'learner@example.com' }),
+      { idempotencyKey: expect.any(String) }
+    );
+    expect(paymentIntentModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'stripe',
+        amountSubtotal: 1500,
+        amountDiscount: 240,
+        amountTax: 48,
+        amountTotal: 1308,
+        couponId: 22,
+        entityType: 'course',
+        entityId: 'course-101',
+        receiptEmail: 'learner@example.com'
+      })
+    );
+    expect(result).toMatchObject({
+      provider: 'stripe',
+      paymentId: expect.any(String),
+      clientSecret: 'secret_value',
+      totals: {
+        subtotal: 1500,
+        discount: 240,
+        tax: 48,
+        total: 1308
+      }
+    });
+  });
+
+  it('captures PayPal orders and records ledger entries', async () => {
+    const lockedIntent = {
+      id: 50,
+      publicId: 'pay-123',
+      provider: 'paypal',
+      providerIntentId: 'ORDER-321',
+      status: 'processing',
+      currency: 'USD',
+      amountSubtotal: 1500,
+      amountDiscount: 0,
+      amountTax: 90,
+      amountTotal: 1590,
+      amountRefunded: 0,
+      taxBreakdown: {},
+      metadata: {},
+      couponId: 75,
+      userId: 'user-22',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    paymentIntentModel.lockByPublicId.mockResolvedValue(lockedIntent);
+    paymentIntentModel.updateById.mockImplementation(async (_id, updates) => ({
+      ...lockedIntent,
+      ...updates,
+      metadata: { ...lockedIntent.metadata, ...updates.metadata }
+    }));
+
+    paymentCouponModel.findById.mockResolvedValue({
+      id: 75,
+      code: 'WINTER25',
+      status: 'active',
+      validFrom: null,
+      validUntil: null,
+      maxRedemptions: null,
+      perUserLimit: null
+    });
+
+    const captureResponse = {
+      result: {
+        status: 'COMPLETED',
+        purchase_units: [
+          {
+            payments: {
+              captures: [
+                {
+                  id: 'CAPTURE-111',
+                  status: 'COMPLETED',
+                  amount: {
+                    value: '15.90',
+                    currency_code: 'USD'
+                  },
+                  seller_receivable_breakdown: {
+                    paypal_fee: { value: '0.59' }
+                  },
+                  create_time: '2024-11-12T10:00:00Z'
+                }
+              ]
+            }
+          }
+        ]
+      }
+    };
+
+    const captureSpy = vi.fn(async () => captureResponse);
+
+    vi.spyOn(PaymentService, 'getPayPalOrdersController').mockReturnValue({
+      captureOrder: captureSpy
+    });
+
+    const result = await PaymentService.capturePayPalOrder('pay-123');
+
+    expect(paymentIntentModel.lockByPublicId).toHaveBeenCalledWith('pay-123', expect.anything());
+    expect(captureSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'ORDER-321',
+        prefer: 'return=representation'
+      })
+    );
+    expect(paymentIntentModel.updateById).toHaveBeenCalledWith(
+      50,
+      expect.objectContaining({
+        status: 'succeeded',
+        providerCaptureId: 'CAPTURE-111',
+        amountTotal: 1590
+      }),
+      expect.anything()
+    );
+    expect(paymentLedgerEntryModel.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentIntentId: 50,
+        entryType: 'charge',
+        amount: 1590,
+        currency: 'USD',
+        details: expect.objectContaining({ captureId: 'CAPTURE-111', provider: 'paypal' })
+      }),
+      expect.anything()
+    );
+    expect(captureMetricsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'paypal', amountTotal: 1590, currency: 'USD', status: 'succeeded' })
+    );
+    expect(paymentCouponModel.recordRedemption).toHaveBeenCalledWith(
+      { couponId: 75, paymentIntentId: 50, userId: 'user-22' },
+      expect.anything()
+    );
+    expect(result).toMatchObject({ status: 'succeeded', amountTotal: 1590, provider: 'paypal' });
+  });
+
+  it('issues partial Stripe refunds with ledger updates', async () => {
+    const baseIntent = {
+      id: 60,
+      publicId: 'pay-456',
+      provider: 'stripe',
+      providerIntentId: 'pi_456',
+      status: 'succeeded',
+      currency: 'USD',
+      amountSubtotal: 1500,
+      amountDiscount: 0,
+      amountTax: 90,
+      amountTotal: 1590,
+      amountRefunded: 0,
+      userId: 'user-88',
+      couponId: null,
+      taxBreakdown: {},
+      metadata: {},
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    paymentIntentModel.lockByPublicId.mockResolvedValue(baseIntent);
+    paymentIntentModel.findById
+      .mockResolvedValueOnce({ ...baseIntent, amountRefunded: 400 })
+      .mockResolvedValueOnce({ ...baseIntent, amountRefunded: 400, status: 'partially_refunded' });
+    paymentIntentModel.updateById.mockResolvedValue({ ...baseIntent, status: 'partially_refunded' });
+
+    const stripeRefundCreate = vi.fn(async () => ({
+      id: 're_111',
+      status: 'succeeded'
+    }));
+
+    vi.spyOn(PaymentService, 'getStripeClient').mockReturnValue({
+      refunds: {
+        create: stripeRefundCreate
+      }
+    });
+
+    const result = await PaymentService.issueRefund({
+      paymentPublicId: 'pay-456',
+      amount: 400,
+      reason: 'duplicate',
+      requesterId: 'admin-42'
+    });
+
+    expect(stripeRefundCreate).toHaveBeenCalledWith(
+      { payment_intent: 'pi_456', amount: 400, reason: 'duplicate' },
+      { idempotencyKey: expect.any(String) }
+    );
+    expect(paymentRefundModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentIntentId: 60,
+        providerRefundId: 're_111',
+        amount: 400,
+        currency: 'USD',
+        requestedBy: 'admin-42'
+      }),
+      expect.anything()
+    );
+    expect(paymentIntentModel.incrementRefundAmount).toHaveBeenCalledWith(60, 400, expect.anything());
+    expect(paymentIntentModel.updateById).toHaveBeenCalledWith(60, { status: 'partially_refunded' }, expect.anything());
+    expect(paymentLedgerEntryModel.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentIntentId: 60,
+        entryType: 'refund',
+        amount: 400,
+        details: expect.objectContaining({ provider: 'stripe', reason: 'duplicate' })
+      }),
+      expect.anything()
+    );
+    expect(refundMetricsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'stripe', amount: 400, currency: 'USD' })
+    );
+    expect(result).toMatchObject({ status: 'partially_refunded', amountRefunded: 400 });
+  });
+
+  it('validates Stripe webhook signatures before delegating handlers', async () => {
+    const constructEvent = vi.fn(() => ({
+      type: 'payment_intent.succeeded',
+      data: { object: { id: 'pi_789', amount_received: 1234, currency: 'usd' } }
+    }));
+
+    vi.spyOn(PaymentService, 'getStripeClient').mockReturnValue({
+      webhooks: {
+        constructEvent
+      }
+    });
+
+    const successSpy = vi.spyOn(PaymentService, 'handleStripePaymentSucceeded').mockResolvedValue();
+    const failureSpy = vi.spyOn(PaymentService, 'handleStripePaymentFailed').mockResolvedValue();
+    const refundSpy = vi.spyOn(PaymentService, 'handleStripeChargeRefunded').mockResolvedValue();
+
+    const response = await PaymentService.handleStripeWebhook('{"id":"evt"}', 't=test');
+
+    expect(constructEvent).toHaveBeenCalledWith('{"id":"evt"}', 't=test', env.payments.stripe.webhookSecret);
+    expect(successSpy).toHaveBeenCalledWith({ id: 'pi_789', amount_received: 1234, currency: 'usd' });
+    expect(failureSpy).not.toHaveBeenCalled();
+    expect(refundSpy).not.toHaveBeenCalled();
+    expect(response).toEqual({ received: true });
+  });
+});

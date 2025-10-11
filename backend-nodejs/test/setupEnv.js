@@ -74,3 +74,22 @@ process.env.ACCOUNT_LOCKOUT_WINDOW_MINUTES = process.env.ACCOUNT_LOCKOUT_WINDOW_
 process.env.ACCOUNT_LOCKOUT_DURATION_MINUTES = process.env.ACCOUNT_LOCKOUT_DURATION_MINUTES ?? '30';
 process.env.SESSION_VALIDATION_CACHE_TTL_MS = process.env.SESSION_VALIDATION_CACHE_TTL_MS ?? '60000';
 process.env.MAX_ACTIVE_SESSIONS_PER_USER = process.env.MAX_ACTIVE_SESSIONS_PER_USER ?? '10';
+process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? 'sk_test_1234567890abcdef';
+process.env.STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY ?? 'pk_test_1234567890abcdef';
+process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? 'whsec_test_secret_key';
+process.env.STRIPE_STATEMENT_DESCRIPTOR = process.env.STRIPE_STATEMENT_DESCRIPTOR ?? 'EDULURE TEST';
+process.env.PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID ?? 'paypal-test-client-id';
+process.env.PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET ?? 'paypal-test-client-secret';
+process.env.PAYPAL_ENVIRONMENT = process.env.PAYPAL_ENVIRONMENT ?? 'sandbox';
+process.env.PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID ?? 'paypal-webhook-id';
+process.env.PAYMENTS_DEFAULT_CURRENCY = process.env.PAYMENTS_DEFAULT_CURRENCY ?? 'USD';
+process.env.PAYMENTS_ALLOWED_CURRENCIES = process.env.PAYMENTS_ALLOWED_CURRENCIES ?? 'USD,EUR,GBP';
+process.env.PAYMENTS_TAX_TABLE =
+  process.env.PAYMENTS_TAX_TABLE ?? JSON.stringify({
+    US: { defaultRate: 0.07, regions: { CA: 0.0825 } },
+    GB: { defaultRate: 0.2 }
+  });
+process.env.PAYMENTS_TAX_INCLUSIVE = process.env.PAYMENTS_TAX_INCLUSIVE ?? 'false';
+process.env.PAYMENTS_MINIMUM_TAX_RATE = process.env.PAYMENTS_MINIMUM_TAX_RATE ?? '0.05';
+process.env.PAYMENTS_MAX_COUPON_PERCENTAGE = process.env.PAYMENTS_MAX_COUPON_PERCENTAGE ?? '80';
+process.env.PAYMENTS_REPORTING_TIMEZONE = process.env.PAYMENTS_REPORTING_TIMEZONE ?? 'Etc/UTC';

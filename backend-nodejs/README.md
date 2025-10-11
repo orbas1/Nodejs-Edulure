@@ -69,6 +69,26 @@ The following additional variables configure the asset workflow:
 When running locally without CloudConvert the ingestion worker will mark PowerPoint jobs as failed. Other formats (EPUB, PDF) are
 processed entirely within the service and will continue to function.
 
+### Payments & finance environment
+
+Stripe and PayPal power the unified checkout, refunds, and finance reporting suite. Configure the following secrets before
+enabling commerce in any environment:
+
+- `STRIPE_SECRET_KEY` / `STRIPE_PUBLISHABLE_KEY` – API keys for the target Stripe account. Use restricted keys for staging.
+- `STRIPE_WEBHOOK_SECRET` – signing secret from the Stripe dashboard used to validate `/api/payments/webhooks/stripe` requests.
+- `STRIPE_STATEMENT_DESCRIPTOR` – 5–22 character descriptor presented on card statements. Defaults to `EDULURE LEARNING`.
+- `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` – REST credentials for the PayPal application (sandbox or live).
+- `PAYPAL_ENVIRONMENT` – `sandbox` or `live` to control SDK routing.
+- `PAYPAL_WEBHOOK_ID` – optional ID for webhook verification once PayPal notifications are enabled.
+- `PAYMENTS_DEFAULT_CURRENCY` & `PAYMENTS_ALLOWED_CURRENCIES` – restrict invoicing currencies. Currencies are validated on boot.
+- `PAYMENTS_TAX_TABLE` – JSON encoded tax catalogue with per-country and per-region rates. Inclusive/exclusive behaviour is
+  toggled with `PAYMENTS_TAX_INCLUSIVE`.
+- `PAYMENTS_MAX_COUPON_PERCENTAGE` – hard cap for percentage coupons expressed in % (e.g. `80` = 80%).
+- `PAYMENTS_REPORTING_TIMEZONE` – IANA timezone string used when summarising captured revenue in finance reports.
+
+The Vitest harness provisions safe defaults for these variables so tests run without contacting real providers. In development,
+seed data ships with dormant coupons and example orders for validating finance dashboards.
+
 ## Project structure
 
 ```
@@ -161,6 +181,12 @@ The OpenAPI document served at `GET /api/docs` captures contracts for the follow
 - `POST /api/content/assets/{assetId}/events` – record download/view/progress analytics.
 - `POST /api/content/assets/{assetId}/progress` & `GET /api/content/assets/{assetId}/progress` – ebook reader telemetry.
 - `GET /api/content/assets/{assetId}/analytics` – instructor analytics dashboard dataset.
+- `POST /api/payments` – create Stripe or PayPal intents with automatic tax, coupon, and metadata orchestration.
+- `POST /api/payments/paypal/{paymentId}/capture` – capture previously approved PayPal orders once learners approve payment.
+- `POST /api/payments/{paymentId}/refunds` – issue full or partial refunds with idempotent Stripe/PayPal integrations.
+- `GET /api/payments/reports/summary` – finance snapshot summarising gross/discount/tax/refund totals per currency.
+- `GET /api/payments/coupons/{code}` – fetch coupon metadata (permissions enforced by role).
+- `POST /api/payments/webhooks/stripe` – ingest Stripe events (requires raw body middleware) for intent/charge lifecycle updates.
 
 All protected routes expect a `Bearer` access token issued via the authentication endpoints. Refresh tokens are returned for
 secure storage on the client to support future token rotation flows.

@@ -9,3 +9,4 @@
 - Registered `/api/ebooks` routes covering listing/detail, create/update/publish flows, chapter CRUD + reorder, highlight/bookmark management, reader settings, and DRM download issuance with auth gating aligned to instructors/admins for authoring and authenticated learners for reading.
 - Registered `/api/tutors` routes exposing tutor profile CRUD, availability publishing, booking creation/cancellation, hourly rate updates, and booking summary reporting with instructor/admin guards.
 - Registered `/api/live-classrooms` routes for classroom scheduling, invite code generation, registration (free/paid), join context issuance (Agora token + CDN endpoints), chat session retrieval, and seat limit administration with analytics hooks.
+- Registered `/api/payments` routes for Stripe/PayPal intent creation, PayPal capture, refund issuance, finance summaries, coupon lookups, and Stripe webhook ingestion with raw-body middleware and role-aware guards.

@@ -1,4 +1,4 @@
 # Webhook Changes
 
-- No webhook endpoints were introduced in Task 1; groundwork is limited to domain event logging for future async integration.
-- Task 2 ingestion currently polls CloudConvert jobs; webhook endpoints remain deferred until integration credentials are finalised.
+- Introduced `/api/payments/webhooks/stripe` accepting raw JSON payloads with signature verification against `STRIPE_WEBHOOK_SECRET`, dispatching to PaymentService handlers for succeeded/failed/refunded events, updating payment intents, recording ledger entries, finalising coupon redemptions, and emitting Prometheus metrics.
+- Webhook controller now surfaces `received: true` responses while logging invalid signatures and configuration gaps; PayPal webhooks remain planned once provider approvals land.

@@ -89,6 +89,30 @@ const unhandledExceptionsTotal = new promClient.Counter({
   labelNames: ['type']
 });
 
+const paymentsProcessedTotal = new promClient.Counter({
+  name: 'edulure_payments_processed_total',
+  help: 'Count of payment intents processed grouped by provider, status, and currency',
+  labelNames: ['provider', 'status', 'currency']
+});
+
+const paymentsRevenueCentsTotal = new promClient.Counter({
+  name: 'edulure_payments_revenue_cents_total',
+  help: 'Total payment volume captured (in cents) grouped by provider and currency',
+  labelNames: ['provider', 'currency']
+});
+
+const paymentsTaxCentsTotal = new promClient.Counter({
+  name: 'edulure_payments_tax_cents_total',
+  help: 'Total tax collected for successful payments (in cents)',
+  labelNames: ['currency']
+});
+
+const paymentsRefundCentsTotal = new promClient.Counter({
+  name: 'edulure_payments_refund_cents_total',
+  help: 'Total refund volume issued (in cents) grouped by provider and currency',
+  labelNames: ['provider', 'currency']
+});
+
 registry.registerMetric(httpRequestsTotal);
 registry.registerMetric(httpRequestDurationSeconds);
 registry.registerMetric(httpActiveRequests);
@@ -100,6 +124,10 @@ registry.registerMetric(antivirusScanDurationSeconds);
 registry.registerMetric(antivirusScanBytes);
 registry.registerMetric(antivirusDetectionsTotal);
 registry.registerMetric(unhandledExceptionsTotal);
+registry.registerMetric(paymentsProcessedTotal);
+registry.registerMetric(paymentsRevenueCentsTotal);
+registry.registerMetric(paymentsTaxCentsTotal);
+registry.registerMetric(paymentsRefundCentsTotal);
 
 function normalizeRoute(req) {
   if (req.route?.path) {
@@ -287,6 +315,42 @@ export async function recordStorageOperation(operation, visibility, handler) {
   } finally {
     storageOperationsInFlight.dec({ operation });
   }
+}
+
+export function trackPaymentCaptureMetrics({ provider, status, currency, amountTotal, taxAmount }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const resolvedProvider = provider ?? 'unknown';
+  const resolvedCurrency = (currency ?? env.payments.defaultCurrency).toUpperCase();
+  const resolvedStatus = status ?? 'unknown';
+
+  paymentsProcessedTotal.inc({ provider: resolvedProvider, status: resolvedStatus, currency: resolvedCurrency });
+  if (Number.isFinite(amountTotal) && amountTotal > 0) {
+    paymentsRevenueCentsTotal.inc({ provider: resolvedProvider, currency: resolvedCurrency }, amountTotal);
+  }
+  if (Number.isFinite(taxAmount) && taxAmount > 0) {
+    paymentsTaxCentsTotal.inc({ currency: resolvedCurrency }, taxAmount);
+  }
+}
+
+export function trackPaymentRefundMetrics({ provider, currency, amount }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return;
+  }
+
+  paymentsRefundCentsTotal.inc(
+    {
+      provider: provider ?? 'unknown',
+      currency: (currency ?? env.payments.defaultCurrency).toUpperCase()
+    },
+    amount
+  );
 }
 
 export function recordUnhandledException(error) {

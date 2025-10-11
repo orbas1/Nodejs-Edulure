@@ -13,3 +13,4 @@
 - Documented feature flag and runtime configuration governance in the backend README, covering new environment variables, `/api/runtime` endpoints, and the `npm run runtime:config` CLI workflow for operations.
 - Added README guidance for the new ESLint flat config and Vitest suites so engineers consistently run lint/test gates with Prometheus-safe mocks before shipping runtime governance updates.
 - Added operational documentation for `npm run storage:provision`, detailing required R2 IAM scopes, lifecycle expectations, quarantine retention, and how antivirus/quarantine alerts surface in admin consoles and observability dashboards.
+- Expanded backend README and `.env.example` to document Stripe/PayPal credentials, currency/tax configuration, new `/api/payments` endpoints, Stripe raw-body requirements, and Vitest commerce coverage so engineers and operators can bootstrap checkout environments safely.

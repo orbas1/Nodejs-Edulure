@@ -87,3 +87,11 @@
 4. Join button requests Agora token; if failure, fallback instructions appear with retry. During session, learner can toggle chat tabs, raise hand, respond to polls, and view moderated Q&A.
 5. If connection drops, reconnection overlay appears with spinner; after 60 seconds, offer to watch recording when available. Post-session survey surfaces with rating scale, review text, and CTA to book follow-up.
 6. Booking management screen allows rescheduling, cancellation (with policy copy), and download of session recordings. Actions trigger push/email notifications for both learner and tutor.
+
+## 17. Commerce & Payments Flow
+1. Learner initiates checkout from storefront, cart, or booking confirmation; sheet shows order summary, tax estimate, coupon entry, and saved payment methods referencing `user_application_styling_changes.md`.
+2. Stripe card entry validates number/expiry/CVC inline; on submit, app awaits intent status and surfaces SCA challenge if required. Failure states display actionable copy and allow retry or provider switch.
+3. Selecting PayPal launches external approval; upon return, app polls payment status and displays receipt with download links. If capture pending, banner explains next steps and retry window.
+4. Receipt screen provides order details, email delivery toggle, and shortcuts to learning content. Refund CTA visible when policy allows; tapping opens guided form for amount/reason referencing `Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md`.
+5. Payment history lists past transactions with status chips, filter controls, and export option. Pending states auto-refresh every few seconds; failed transactions include support contact link and ability to retry payment method.
+6. Refund tracking updates push notifications and in-app status; if webhook indicates failure, learner sees alert with instructions and direct chat escalation.

@@ -2,24 +2,25 @@
 
 | Metric | Current Score (%) | Status Commentary |
 | --- | --- | --- |
-| Design Quality | 74 | Tutor storefronts, booking flows, and live classroom consoles are specified for web, admin, and learner clients referencing `dashboard_drawings.md` and `App_screens_drawings.md`. |
-| Design Organisation | 70 | Information architecture now threads tutor rosters, classroom calendars, and escalation pathways using `menu_drawings.md` and `website_drawings.md`. |
-| Design Position | 66 | Layout guidance balances video stage, roster drawers, chat panels, and booking sidebars without breaking breakpoints. |
-| Design Text Grade | 66 | Copy decks cover tutor bios, cancellation guardrails, recording consent, and Agora connectivity states with localisation buffers. |
-| Design Colour Grade | 74 | Engagement/status tokens extended to availability pills, stream badges, and moderation alerts while preserving WCAG ratios. |
-| Design Render Grade | 58 | High-fidelity renders complete for lobby countdowns, in-session chat, tutor onboarding, and payout dashboards. |
-| Compliance Grade | 70 | Ticketing, moderation, and payout policies documented with references to `Admin_panel_drawings.md` and legal copy reviews. |
-| Security Grade | 82 | Join experiences surface verification indicators, host controls, and secure token notices aligned with backend enforcement. |
-| Design Functionality Grade | 64 | Interaction diagrams include booking conflict checks, waitlists, seat limit adjustments, and moderator escalation flows. |
-| Design Images Grade | 62 | Asset manifests expanded with tutor photography, classroom illustrations, and accessibility-compliant iconography. |
-| Design Usability Grade | 60 | Usability walkthroughs validated scheduling heuristics, countdown timers, and post-class surveys with mixed learner/provider cohorts. |
-| Bugs-Less Grade | 52 | Peer reviews resolved stacking regressions for calendar overlays and stream controls; outstanding motion polish logged. |
-| Test Grade | 58 | Regression scripts now target booking calendars, lobby states, and chat overlays across desktop/tablet/mobile breakpoints. |
-| QA Grade | 60 | QA checklist updated with tutor onboarding, live session moderation, and Agora token smoke scenarios. |
-| Design Accuracy Grade | 62 | Measurements for agenda rails, roster drawers, and attendee chips validated across device matrices. |
-| Overall Grade | 69 | Live learning/tutor flows meet production readiness while planned motion refinements continue in the next sprint. |
+| Design Quality | 80 | Provider finance consoles now articulate coupon governance, webhook triage, dispute management, and learner receipt centres referencing `provider_app_wireframe_changes.md`, `user_app_wireframe_changes.md`, and `web_application_logic_flow_changes.md`. |
+| Design Organisation | 74 | Information architecture links finance dashboards, refund drawers, ledger exports, and dispute kanban views using `menu_drawings.md`, `website_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`. |
+| Design Position | 68 | Layout guidance balances finance summaries, coupon inspectors, webhook timelines, and dispute sidebars without breaking responsive breakpoints. |
+| Design Text Grade | 68 | Copy decks now include refund eligibility copy, dispute escalation scripts, SCA instructions, and PayPal fallback messaging with localisation buffers tied to `Screen_text.md`. |
+| Design Colour Grade | 74 | Engagement/status tokens extended to payment state badges, dispute severity markers, and webhook alerts while preserving WCAG ratios. |
+| Design Render Grade | 64 | High-fidelity renders complete for checkout modals, payment confirmation, refund trackers, finance health overview, and webhook monitors ready for engineering handoff. |
+| Compliance Grade | 74 | PCI/legal overlays annotate refund approvals, ledger exports, and dispute escalations referencing `Admin_panel_drawings.md` and compliance runbooks. |
+| Security Grade | 84 | Payment surfaces display SCA state indicators, webhook verification badges, and secure data notices mirroring backend enforcement. |
+| Design Functionality Grade | 72 | Interaction diagrams capture coupon limit enforcement, partial refunds, webhook retries, dispute lifecycle automation, and finance alert configuration. |
+| Design Images Grade | 66 | Asset manifests expanded with finance icons, dispute illustrations, and SCA imagery ensuring parity across learner/provider experiences. |
+| Design Usability Grade | 68 | Usability walkthroughs validated checkout, SCA handling, refund submissions, dispute collaboration, and webhook triage heuristics with finance stakeholders. |
+| Bugs-Less Grade | 58 | Peer reviews resolved finance banner stacking issues and webhook timeline scroll clipping; motion polish for micro-interactions remains logged. |
+| Test Grade | 64 | Regression scripts now target checkout modals, payment confirmation states, refund drawers, webhook alert rules, and dispute kanban updates across device classes. |
+| QA Grade | 68 | QA checklist expanded with coupon governance edge cases, refund SLA tracking, dispute evidence uploads, and webhook replay acceptance criteria. |
+| Design Accuracy Grade | 70 | Measurements validated for finance summary rails, coupon drawers, SCA modals, dispute kanban columns, and webhook feed cards across responsive breakpoints. |
+| Overall Grade | 75 | Commerce and finance surfaces achieve production readiness with comprehensive specifications, accessibility coverage, and compliance annotations while motion polish continues in the next sprint. |
 
 ## Progress Notes
 - Token and theming workstreams remain stable, enabling downstream template production and runtime validation.
 - Navigation, layout, and component templates now include live classroom lobbies, tutor storefronts, and moderation consoles alongside storage governance flows.
 - Compliance, security, and QA disciplines are engaged; recording consent, ticketing, payout readiness, and moderation prompts mirror backend enforcement while accessibility and localisation checks continue.
+- Checkout, refund, dispute, and finance dashboards now mirror backend `/api/payments` contracts with SCA handoffs, webhook fallbacks, coupon governance, ledger export guidance, and dispute resolution overlays captured across `web_application_logic_flow_changes.md`, `provider_app_wireframe_changes.md`, `user_app_wireframe_changes.md`, and `Application_Design_Update_Plan/Application Design Update.md`.
