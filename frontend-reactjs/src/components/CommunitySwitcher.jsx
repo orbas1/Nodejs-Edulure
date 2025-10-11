@@ -2,11 +2,21 @@ import PropTypes from 'prop-types';
 import { Menu, Transition } from '@headlessui/react';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 
-export default function CommunitySwitcher({ communities, selected, onSelect }) {
+export default function CommunitySwitcher({ communities, selected, onSelect, disabled = false }) {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
-        <Menu.Button className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-primary hover:text-primary">
+        <Menu.Button
+          type="button"
+          disabled={disabled}
+          aria-disabled={disabled}
+          data-disabled={disabled ? 'true' : 'false'}
+          className={`inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2 text-sm font-semibold shadow-sm transition ${
+            disabled
+              ? 'cursor-not-allowed text-slate-400'
+              : 'text-slate-700 hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary'
+          }`}
+        >
           {selected?.name ?? 'All Communities'}
           <ChevronDownIcon className="h-4 w-4" />
         </Menu.Button>
@@ -28,6 +38,7 @@ export default function CommunitySwitcher({ communities, selected, onSelect }) {
                   <button
                     type="button"
                     onClick={() => onSelect(community)}
+                    aria-current={selected?.id === community.id ? 'true' : 'false'}
                     className={`w-full rounded-2xl px-4 py-3 text-left text-sm font-medium transition ${
                       selected?.id === community.id
                         ? 'bg-primary/10 text-primary'
@@ -54,15 +65,16 @@ export default function CommunitySwitcher({ communities, selected, onSelect }) {
 CommunitySwitcher.propTypes = {
   communities: PropTypes.arrayOf(
     PropTypes.shape({
-      id: PropTypes.string.isRequired,
+      id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired,
       name: PropTypes.string.isRequired,
       description: PropTypes.string
     })
   ).isRequired,
   selected: PropTypes.shape({
-    id: PropTypes.string,
+    id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     name: PropTypes.string,
     description: PropTypes.string
   }),
-  onSelect: PropTypes.func.isRequired
+  onSelect: PropTypes.func.isRequired,
+  disabled: PropTypes.bool
 };

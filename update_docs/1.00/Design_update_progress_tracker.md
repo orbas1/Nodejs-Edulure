@@ -2,25 +2,25 @@
 
 | Metric | Current Score (%) | Status Commentary |
 | --- | --- | --- |
-| Design Quality | 80 | Provider finance consoles now articulate coupon governance, webhook triage, dispute management, and learner receipt centres referencing `provider_app_wireframe_changes.md`, `user_app_wireframe_changes.md`, and `web_application_logic_flow_changes.md`. |
-| Design Organisation | 74 | Information architecture links finance dashboards, refund drawers, ledger exports, and dispute kanban views using `menu_drawings.md`, `website_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`. |
-| Design Position | 68 | Layout guidance balances finance summaries, coupon inspectors, webhook timelines, and dispute sidebars without breaking responsive breakpoints. |
-| Design Text Grade | 68 | Copy decks now include refund eligibility copy, dispute escalation scripts, SCA instructions, and PayPal fallback messaging with localisation buffers tied to `Screen_text.md`. |
-| Design Colour Grade | 74 | Engagement/status tokens extended to payment state badges, dispute severity markers, and webhook alerts while preserving WCAG ratios. |
-| Design Render Grade | 64 | High-fidelity renders complete for checkout modals, payment confirmation, refund trackers, finance health overview, and webhook monitors ready for engineering handoff. |
-| Compliance Grade | 74 | PCI/legal overlays annotate refund approvals, ledger exports, and dispute escalations referencing `Admin_panel_drawings.md` and compliance runbooks. |
-| Security Grade | 84 | Payment surfaces display SCA state indicators, webhook verification badges, and secure data notices mirroring backend enforcement. |
-| Design Functionality Grade | 72 | Interaction diagrams capture coupon limit enforcement, partial refunds, webhook retries, dispute lifecycle automation, and finance alert configuration. |
-| Design Images Grade | 66 | Asset manifests expanded with finance icons, dispute illustrations, and SCA imagery ensuring parity across learner/provider experiences. |
-| Design Usability Grade | 68 | Usability walkthroughs validated checkout, SCA handling, refund submissions, dispute collaboration, and webhook triage heuristics with finance stakeholders. |
-| Bugs-Less Grade | 58 | Peer reviews resolved finance banner stacking issues and webhook timeline scroll clipping; motion polish for micro-interactions remains logged. |
-| Test Grade | 64 | Regression scripts now target checkout modals, payment confirmation states, refund drawers, webhook alert rules, and dispute kanban updates across device classes. |
-| QA Grade | 68 | QA checklist expanded with coupon governance edge cases, refund SLA tracking, dispute evidence uploads, and webhook replay acceptance criteria. |
-| Design Accuracy Grade | 70 | Measurements validated for finance summary rails, coupon drawers, SCA modals, dispute kanban columns, and webhook feed cards across responsive breakpoints. |
-| Overall Grade | 75 | Commerce and finance surfaces achieve production readiness with comprehensive specifications, accessibility coverage, and compliance annotations while motion polish continues in the next sprint. |
+| Design Quality | 82 | Community hub and resource sidebar specifications now mirror `dashboard_drawings.md`, `website_drawings.md`, and `App_screens_drawings.md`, layering role badges, pagination controls, and accessibility cues over the existing commerce suite. |
+| Design Organisation | 76 | Updated IA overlays connect community switching, feed detail, and resource curation to finance/admin flows using `menu_drawings.md`, `Admin_panel_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`. |
+| Design Position | 70 | Layout guidance balances hero metrics, feed cards, and resource drawers across breakpoints, with spacing and hierarchy validated against `dashboard_drawings.md` and `menu_drawings.md`. |
+| Design Text Grade | 70 | Copy decks now cover community moderation prompts, resource pagination helper text, and role-based guardrails referencing `Screen_text.md` and `Application_Design_Update_Plan/Application Design Update.md`. |
+| Design Colour Grade | 74 | Engagement/status tokens extended to payment state badges, dispute severity markers, community visibility chips, and resource metadata tags while preserving WCAG ratios. |
+| Design Render Grade | 68 | High-fidelity renders complete for checkout modals, community profile summaries, resource drawers, and notification badges ready for engineering handoff. |
+| Compliance Grade | 75 | PCI/legal overlays remain intact while private community access copy and escalation prompts map to `Admin_panel_drawings.md` and compliance runbooks. |
+| Security Grade | 84 | Payment surfaces and community access shells display SCA state indicators, membership guards, and secure data notices mirroring backend enforcement. |
+| Design Functionality Grade | 74 | Interaction diagrams now capture community switching, feed refresh, resource pagination, coupon enforcement, and webhook retries to keep cross-domain workflows in sync. |
+| Design Images Grade | 68 | Asset manifests expanded with community emblems, role badges, and resource thumbnails ensuring parity across learner/provider experiences. |
+| Design Usability Grade | 70 | Usability walkthroughs validated community switching, feed loading, checkout, SCA handling, and moderation heuristics with learner/provider stakeholders. |
+| Bugs-Less Grade | 62 | Peer reviews resolved finance banner stacking issues, webhook timeline scroll clipping, and community drawer spacing; motion polish for micro-interactions remains logged. |
+| Test Grade | 66 | Regression scripts now target checkout modals, resource pagination states, feed loader fallbacks, and webhook alert rules across device classes. |
+| QA Grade | 70 | QA checklist expanded with coupon governance edge cases, resource pagination QA, moderation prompts, and webhook replay acceptance criteria. |
+| Design Accuracy Grade | 72 | Measurements validated for finance summary rails, community profile cards, resource drawers, and webhook feed cards across responsive breakpoints. |
+| Overall Grade | 77 | Commerce and community surfaces achieve production readiness with comprehensive specifications, accessibility coverage, and compliance annotations while motion polish continues in the next sprint. |
 
 ## Progress Notes
 - Token and theming workstreams remain stable, enabling downstream template production and runtime validation.
-- Navigation, layout, and component templates now include live classroom lobbies, tutor storefronts, and moderation consoles alongside storage governance flows.
-- Compliance, security, and QA disciplines are engaged; recording consent, ticketing, payout readiness, and moderation prompts mirror backend enforcement while accessibility and localisation checks continue.
-- Checkout, refund, dispute, and finance dashboards now mirror backend `/api/payments` contracts with SCA handoffs, webhook fallbacks, coupon governance, ledger export guidance, and dispute resolution overlays captured across `web_application_logic_flow_changes.md`, `provider_app_wireframe_changes.md`, `user_app_wireframe_changes.md`, and `Application_Design_Update_Plan/Application Design Update.md`.
+- Navigation, layout, and component templates now include live classroom lobbies, tutor storefronts, moderation consoles, and the refreshed community hub overlays alongside storage governance flows.
+- Compliance, security, and QA disciplines are engaged; recording consent, ticketing, payout readiness, moderation prompts, and private community guardrails mirror backend enforcement while accessibility and localisation checks continue.
+- Checkout, refund, dispute, and finance dashboards now mirror backend `/api/payments` contracts with SCA handoffs, webhook fallbacks, coupon governance, ledger export guidance, and dispute resolution overlays captured in `web_application_logic_flow_changes.md`, `provider_app_wireframe_changes.md`, `user_app_wireframe_changes.md`, and `Application_Design_Update_Plan/Application Design Update.md`. Community hub overlays follow the same governance and accessibility notes outlined in `dashboard_drawings.md`, `website_drawings.md`, and `App_screens_drawings.md`.

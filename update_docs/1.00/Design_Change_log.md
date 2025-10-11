@@ -54,6 +54,11 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Extended wireframes in `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Function Design.md` and `Application_Design_Update_Plan/Application Design Update.md` to cover coupon validation, tax summaries, finance dashboards, and refund workflows, including alert states for webhook discrepancies and policy escalations.
 - Logged finance telemetry overlays in `design_change_log.md` (ui-ux updates) and `web_application_logic_flow_changes.md` showing revenue summary widgets, ledger exports, and payout readiness prompts aligned with the new `/api/payments` endpoints.
 
+### 9. Community Hub & Resource Experience
+- Refined community switcher, feed layout, and resource library specs referencing `dashboard_drawings.md`, `website_drawings.md`, `menu_drawings.md`, `App_screens_drawings.md`, and `Admin_panel_drawings.md` to capture role badges, membership guardrails, pagination controls, and accessibility-focused focus states.
+- Updated interaction narratives in `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md` and `Application_Design_Update_Plan/Application Design Update.md` with moderation prompts, resource metadata chips, and loader/error fallbacks aligned to the new backend `/api/communities` contracts.
+- Documented asset manifests for community emblems, channel avatars, and resource thumbnails across `images_and_vectors.md`, `Screens_update_images_and _vectors.md`, and `Resources.md`, ensuring parity with learner/provider dashboards.
+
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
 - Embedded security messaging around verification, payment confirmation, and rights-managed assets across profile and commerce flows.

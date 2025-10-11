@@ -11,4 +11,11 @@ export default class CommunityMemberModel {
     const [id] = await connection('community_members').insert(payload);
     return connection('community_members').where({ id }).first();
   }
+
+  static async findMembership(communityId, userId, connection = db) {
+    return connection('community_members as cm')
+      .where('cm.community_id', communityId)
+      .andWhere('cm.user_id', userId)
+      .first();
+  }
 }

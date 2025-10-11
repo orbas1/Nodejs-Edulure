@@ -1,13 +1,62 @@
 import Joi from 'joi';
 
 import CommunityService from '../services/CommunityService.js';
-import { success } from '../utils/httpResponse.js';
+import { paginated, success } from '../utils/httpResponse.js';
 
 const createSchema = Joi.object({
   name: Joi.string().trim().min(3).max(150).required(),
   description: Joi.string().max(2000).allow('', null),
   coverImageUrl: Joi.string().uri().allow('', null),
   visibility: Joi.string().valid('public', 'private').default('public'),
+  metadata: Joi.object().default({})
+});
+
+const feedQuerySchema = Joi.object({
+  page: Joi.number().integer().min(1).default(1),
+  perPage: Joi.number().integer().min(1).max(100).default(10),
+  channelId: Joi.number().integer().min(1),
+  postType: Joi.string().valid('update', 'event', 'resource', 'classroom', 'poll'),
+  visibility: Joi.string().valid('public', 'members', 'admins')
+});
+
+const createPostSchema = Joi.object({
+  channelId: Joi.number().integer().min(1),
+  postType: Joi.string().valid('update', 'event', 'resource', 'classroom', 'poll').default('update'),
+  title: Joi.string().max(200).allow(null, ''),
+  body: Joi.string().min(10).max(8000).required(),
+  tags: Joi.array().items(Joi.string().trim().max(40)).max(12).default([]),
+  visibility: Joi.string().valid('public', 'members', 'admins').default('members'),
+  status: Joi.string().valid('draft', 'scheduled', 'published').default('published'),
+  scheduledAt: Joi.date().optional(),
+  publishedAt: Joi.date().optional(),
+  metadata: Joi.object().default({})
+});
+
+const listResourcesQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(50).default(10),
+  offset: Joi.number().integer().min(0).default(0),
+  resourceType: Joi.string().valid('content_asset', 'external_link', 'document', 'classroom_session')
+});
+
+const createResourceSchema = Joi.object({
+  title: Joi.string().max(200).required(),
+  description: Joi.string().max(2000).allow('', null),
+  resourceType: Joi.string().valid('content_asset', 'external_link', 'document', 'classroom_session').default('content_asset'),
+  assetId: Joi.when('resourceType', {
+    is: 'content_asset',
+    then: Joi.number().integer().min(1).required(),
+    otherwise: Joi.number().integer().min(1).optional()
+  }),
+  linkUrl: Joi.when('resourceType', {
+    is: Joi.valid('external_link', 'document', 'classroom_session'),
+    then: Joi.string().uri().required(),
+    otherwise: Joi.string().uri().allow(null)
+  }),
+  classroomReference: Joi.string().max(120).allow(null),
+  tags: Joi.array().items(Joi.string().trim().max(40)).max(15).default([]),
+  visibility: Joi.string().valid('members', 'admins').default('members'),
+  status: Joi.string().valid('draft', 'published').default('published'),
+  publishedAt: Joi.date().optional(),
   metadata: Joi.object().default({})
 });
 
@@ -31,6 +80,108 @@ export default class CommunityController {
       return success(res, {
         data: community,
         message: 'Community created',
+        status: 201
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async getDetail(req, res, next) {
+    try {
+      const community = await CommunityService.getCommunityDetail(req.params.communityId, req.user.id);
+      return success(res, {
+        data: community,
+        message: 'Community detail fetched'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async listFeed(req, res, next) {
+    try {
+      const query = await feedQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
+      const result = await CommunityService.listFeed(req.params.communityId, req.user.id, query);
+      return paginated(res, {
+        data: result.items,
+        pagination: result.pagination,
+        message: 'Community feed fetched'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async listUserFeed(req, res, next) {
+    try {
+      const query = await feedQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
+      const result = await CommunityService.listFeedForUser(req.user.id, query);
+      return paginated(res, {
+        data: result.items,
+        pagination: result.pagination,
+        message: 'Personalised feed fetched'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async createPost(req, res, next) {
+    try {
+      const payload = await createPostSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
+      const post = await CommunityService.createPost(req.params.communityId, req.user.id, payload);
+      return success(res, {
+        data: post,
+        message: 'Post created',
+        status: 201
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async listResources(req, res, next) {
+    try {
+      const query = await listResourcesQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
+      const resources = await CommunityService.listResources(req.params.communityId, req.user.id, query);
+      return success(res, {
+        data: resources.items,
+        meta: { pagination: { total: resources.total, limit: query.limit, offset: query.offset } },
+        message: 'Community resources fetched'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async createResource(req, res, next) {
+    try {
+      const payload = await createResourceSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
+      const resource = await CommunityService.createResource(req.params.communityId, req.user.id, payload);
+      return success(res, {
+        data: resource,
+        message: 'Resource published',
         status: 201
       });
     } catch (error) {

@@ -52,7 +52,10 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 - **Design:** Role badges, community layouts, chat UX, streak visualisations, paywall onboarding.
 
 ### Subtasks
-1. **Community Core Platform (0%)** – Schemas, CRUD, feeds, resource library, classroom integration.
+1. **Community Core Platform (100%)** – Schemas, CRUD, feeds, resource library, classroom integration. _Progress update:_ Backed
+   community tables, seed data, and service layer now power `/api/communities` feeds/resources with authenticated guards; React
+   feed wiring replaces mocks with live API pagination, resource rollups, and accessibility reviewed community switcher/profile
+   shells.
 2. **Roles, Paywalls & Affiliates (0%)** – Subscription tiers, Stripe billing, entitlements, affiliate marketplace.
 3. **Engagement Mechanics (0%)** – Leaderboards, tier points, streaks, calendars, map embeds, reminders.
 4. **Chat & Messaging Suite (0%)** – Channels, DMs, presence, moderation tools, Agora live linkage.

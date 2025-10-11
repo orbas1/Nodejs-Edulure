@@ -30,3 +30,9 @@
 - Bootstrapped Flutter content experiences with Hive-based offline caching, Dio-powered API clients, and an interactive content library supporting downloads, viewer tokens, and progress updates.
 - Implemented account lockout policies, multi-channel email verification, and SMTP-backed security communications with full OpenAPI coverage and regression tests to close Task 1.1 gaps.
 - Added refresh-token rotation with hashed session storage, JWT `sid` claims, cached session validation, and `/api/auth/refresh`, `/logout`, `/logout-all` endpoints plus OpenAPI/audit trails so compromised tokens can be revoked instantly across devices.
+
+## Version 1.00 – Task 3 Communities Core Platform
+
+- Activated the community core migration set, seeded multi-community fixtures, and extended `CommunityService`/OpenAPI coverage so `/api/communities`, `/api/communities/:id/posts`, and `/api/communities/:id/resources` deliver production-ready feeds, membership enforcement, and resource metadata for downstream clients.
+- Refactored the React feed to consume the live APIs: `Feed.jsx` now orchestrates authenticated pagination, aggregate vs. community-scoped feeds, and resource drawer loading while clearing stale errors and enforcing membership-aware fallbacks.
+- Upgraded `CommunityProfile.jsx`, `CommunitySwitcher.jsx`, and `TopBar.jsx` with accessibility-first focus handling, metadata formatting, resource pagination controls, and design-aligned badges that mirror the updated community hub specifications.
