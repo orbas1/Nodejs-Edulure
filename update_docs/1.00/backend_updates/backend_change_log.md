@@ -10,3 +10,6 @@
 - Bootstrapped database schema for content assets, ingestion jobs, conversion outputs, audit logs, events, and ebook progress tracking.
 - Added a Vitest suite and environment harness to validate StorageService bucket resolution, presigning TTLs, and CDN URL generation without Cloudflare dependencies.
 - Implemented a JWT key store with active/fallback key support, added a secure rotation script, and wired middleware/services to honour issuer/audience enforcement with key identifiers.
+- Delivered credential lockout governance by extending the `users` table with failure telemetry, enforcing rolling lockout windows, and emitting audit domain events for successes, failures, and lock states.
+- Shipped email verification flows with hashed token storage, SMTP delivery, OpenAPI-documented endpoints, and controller/service orchestration that blocks unverified logins while providing throttled resend support.
+- Hardened configuration governance by expanding environment validation for SMTP and lockout controls, bundling operational defaults in `.env.example`, and covering the new mailer contract with Vitest.

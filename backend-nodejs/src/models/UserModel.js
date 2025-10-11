@@ -8,6 +8,8 @@ const BASE_COLUMNS = [
   'role',
   'age',
   'address',
+  'email_verified_at as emailVerifiedAt',
+  'last_login_at as lastLoginAt',
   'created_at as createdAt',
   'updated_at as updatedAt'
 ];
@@ -15,6 +17,10 @@ const BASE_COLUMNS = [
 export default class UserModel {
   static async findByEmail(email, connection = db) {
     return connection('users').where({ email }).first();
+  }
+
+  static async forUpdateByEmail(email, connection = db) {
+    return connection('users').where({ email }).forUpdate().first();
   }
 
   static async create(user, connection = db) {
@@ -41,5 +47,68 @@ export default class UserModel {
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
+  }
+
+  static async recordLoginFailure(user, options, connection = db) {
+    const now = new Date();
+    const windowMs = options.windowMinutes * 60 * 1000;
+    const lastFailure = user.last_failed_login_at ? new Date(user.last_failed_login_at) : null;
+    let attempts = user.failed_login_attempts ?? 0;
+
+    if (!lastFailure || now.getTime() - lastFailure.getTime() > windowMs) {
+      attempts = 0;
+    }
+
+    attempts += 1;
+    let lockedUntil = null;
+    let storedAttempts = attempts;
+    const updates = {
+      failed_login_attempts: storedAttempts,
+      last_failed_login_at: connection.fn.now()
+    };
+
+    if (attempts >= options.threshold) {
+      lockedUntil = new Date(now.getTime() + options.lockoutDurationMinutes * 60 * 1000);
+      updates.locked_until = lockedUntil;
+      storedAttempts = 0;
+      updates.failed_login_attempts = 0;
+    }
+
+    await connection('users').where({ id: user.id }).update(updates);
+
+    return {
+      attempts: storedAttempts,
+      failureCount: attempts,
+      lockedUntil
+    };
+  }
+
+  static async clearLoginFailures(userId, connection = db) {
+    await connection('users')
+      .where({ id: userId })
+      .update({
+        failed_login_attempts: 0,
+        last_failed_login_at: null,
+        locked_until: null,
+        last_login_at: connection.fn.now()
+      });
+  }
+
+  static async markEmailVerified(userId, connection = db) {
+    await connection('users')
+      .where({ id: userId })
+      .update({
+        email_verified_at: connection.fn.now(),
+        failed_login_attempts: 0,
+        last_failed_login_at: null,
+        locked_until: null
+      });
+    return this.findById(userId, connection);
+  }
+
+  static async touchVerificationSentAt(userId, connection = db) {
+    await connection('users')
+      .where({ id: userId })
+      .update({ last_verification_sent_at: connection.fn.now() });
   }
 }

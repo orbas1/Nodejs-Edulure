@@ -134,7 +134,25 @@ const envSchema = z
     CONTENT_MAX_UPLOAD_MB: z.coerce.number().int().min(10).max(2048).default(512),
     CLOUDCONVERT_API_KEY: z.string().min(1).optional(),
     DRM_DOWNLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3),
-    DRM_SIGNATURE_SECRET: z.string().min(32).optional()
+    DRM_SIGNATURE_SECRET: z.string().min(32).optional(),
+    SMTP_HOST: z.string().min(1),
+    SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
+    SMTP_SECURE: z.coerce.boolean().default(false),
+    SMTP_USER: z.string().min(1),
+    SMTP_PASSWORD: z.string().min(1),
+    SMTP_FROM_EMAIL: z.string().email(),
+    SMTP_FROM_NAME: z.string().min(1),
+    EMAIL_VERIFICATION_URL: z.string().url(),
+    EMAIL_VERIFICATION_TOKEN_TTL_MINUTES: z.coerce.number().int().min(15).max(24 * 60).default(60),
+    EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES: z
+      .coerce.number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .default(15),
+    ACCOUNT_LOCKOUT_THRESHOLD: z.coerce.number().int().min(3).max(20).default(5),
+    ACCOUNT_LOCKOUT_WINDOW_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(15),
+    ACCOUNT_LOCKOUT_DURATION_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30)
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -190,7 +208,10 @@ export const env = {
     jwtActiveKey: activeJwtKey,
     jwtAudience: raw.JWT_AUDIENCE ?? 'api.edulure.com',
     jwtIssuer: raw.JWT_ISSUER ?? 'edulure-platform',
-    drmSignatureSecret: raw.DRM_SIGNATURE_SECRET ?? activeJwtKey.secret
+    drmSignatureSecret: raw.DRM_SIGNATURE_SECRET ?? activeJwtKey.secret,
+    accountLockoutThreshold: raw.ACCOUNT_LOCKOUT_THRESHOLD,
+    accountLockoutWindowMinutes: raw.ACCOUNT_LOCKOUT_WINDOW_MINUTES,
+    accountLockoutDurationMinutes: raw.ACCOUNT_LOCKOUT_DURATION_MINUTES
   },
   database: {
     host: raw.DB_HOST,
@@ -219,6 +240,18 @@ export const env = {
   },
   drm: {
     downloadLimit: raw.DRM_DOWNLOAD_LIMIT
+  },
+  mail: {
+    smtpHost: raw.SMTP_HOST,
+    smtpPort: raw.SMTP_PORT,
+    smtpSecure: raw.SMTP_SECURE,
+    smtpUser: raw.SMTP_USER,
+    smtpPassword: raw.SMTP_PASSWORD,
+    fromEmail: raw.SMTP_FROM_EMAIL,
+    fromName: raw.SMTP_FROM_NAME,
+    verificationBaseUrl: raw.EMAIL_VERIFICATION_URL,
+    verificationTokenTtlMinutes: raw.EMAIL_VERIFICATION_TOKEN_TTL_MINUTES,
+    verificationResendCooldownMinutes: raw.EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES
   },
   logging: {
     level: raw.LOG_LEVEL

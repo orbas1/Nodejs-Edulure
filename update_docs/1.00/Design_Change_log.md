@@ -55,3 +55,4 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - **Design Authority:** Product Design Lead – approval granted 2024-05-10.
 - **Engineering Review:** Frontend, Flutter, and Backend chapter leads – approval granted 2024-05-12.
 - **Compliance & Security:** Privacy, legal, and security partners – approval granted 2024-05-13 with mitigation actions tracked in Jira (DSN-1201 – DSN-1204).
+- Finalised verification and lockout microcopy across onboarding, settings, and support flows referencing `Screen_text.md`, `text.md.md`, and `Settings Dashboard.md`, ensuring parity with the new backend governance controls.
