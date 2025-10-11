@@ -22,3 +22,4 @@
 - `backend-nodejs/src/services/MailService.js` – SMTP-backed mailer that renders production templates for security communications.
 - `backend-nodejs/src/services/EmailVerificationService.js` – orchestration service handling issuance, throttling, and consumption of verification tokens with domain event logging.
 - `backend-nodejs/test/mailService.test.js` – Vitest coverage validating email templates and SMTP payload construction.
+- `backend-nodejs/src/observability/requestContext.js` & `backend-nodejs/src/observability/metrics.js` – AsyncLocalStorage-backed correlation context and Prometheus metrics registry powering the new observability stack, plus `backend-nodejs/src/middleware/requestContext.js` for Express integration.

@@ -26,5 +26,6 @@
 - **Entry Criteria:** Milestone 3 assets complete; engineering squads aligned on development sprints.
 - **Exit Criteria:** Handoff checklist signed, accessibility/localisation scripts executed, design QA sign-off recorded, open issues logged in `Design_Change_log.md`.
 - **Notes:** JWT key rotation hardening reviewed with engineering; no component updates required but documentation cross-check added to QA checklist. Workspace runtime enforcement was reviewed to guarantee Storybook exports run on the approved Node/npm versions before handoff. Verification and lockout copy now mirrors backend enforcement ahead of handoff.
+  - Prometheus/trace telemetry overlays signed off with engineering to feed design QA dashboards and align runtime observability with component health reviews.
 - **Dependencies:** Engineering schedules, QA tooling, localisation resources, compliance checklists.
 - **Responsible Roles:** Design Producer, Engineering Managers, Accessibility Specialist.

@@ -8,6 +8,7 @@ import expressRateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import pinoHttp from 'pino-http';
+import { randomUUID } from 'crypto';
 import swaggerUi from 'swagger-ui-express';
 
 import { env } from './config/env.js';
@@ -19,6 +20,8 @@ import communityRoutes from './routes/community.routes.js';
 import contentRoutes from './routes/content.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
+import requestContextMiddleware from './middleware/requestContext.js';
+import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } from './observability/metrics.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
@@ -37,14 +40,33 @@ const limiter = expressRateLimit({
 
 const corsOrigins = new Set(env.app.corsOrigins);
 
+app.use(requestContextMiddleware);
 app.use(
   pinoHttp({
     logger,
+    genReqId: (req) => req.id ?? randomUUID(),
+    customLogLevel: (res, err) => {
+      if (err || res.statusCode >= 500) {
+        return 'error';
+      }
+      if (res.statusCode >= 400) {
+        return 'warn';
+      }
+      return 'info';
+    },
+    customProps: (req) => {
+      annotateLogContextFromRequest(req);
+      return {
+        traceId: req.traceId,
+        spanId: req.spanId
+      };
+    },
     autoLogging: {
       ignorePaths: ['/health']
     }
   })
 );
+app.use(httpMetricsMiddleware);
 app.use(limiter);
 app.use(hpp());
 app.use(
@@ -87,6 +109,7 @@ app.get('/health', async (_req, res, next) => {
   }
 });
 
+app.get('/metrics', metricsHandler);
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);

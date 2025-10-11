@@ -1,5 +1,6 @@
 import logger from '../config/logger.js';
 import { env } from '../config/env.js';
+import { recordUnhandledException } from '../observability/metrics.js';
 
 // eslint-disable-next-line no-unused-vars
 export default function errorHandler(err, _req, res, _next) {
@@ -19,5 +20,6 @@ export default function errorHandler(err, _req, res, _next) {
   }
 
   logger.error({ err, status }, 'Unhandled error');
+  recordUnhandledException(err);
   res.status(status).json(response);
 }

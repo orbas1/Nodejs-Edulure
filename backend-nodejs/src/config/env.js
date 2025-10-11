@@ -95,6 +95,17 @@ function normalizeJwtKeyset(rawKeyset, fallbackSecret, explicitActiveKeyId) {
   };
 }
 
+function parseCsv(value) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -121,6 +132,13 @@ const envSchema = z
     DB_POOL_MAX: z.coerce.number().int().min(2).default(10),
     RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(60).default(15),
     RATE_LIMIT_MAX: z.coerce.number().int().min(25).max(2000).default(300),
+    METRICS_ENABLED: z.coerce.boolean().default(true),
+    METRICS_USERNAME: z.string().min(3).optional(),
+    METRICS_PASSWORD: z.string().min(8).optional(),
+    METRICS_BEARER_TOKEN: z.string().min(16).optional(),
+    METRICS_ALLOWED_IPS: z.string().optional(),
+    TRACE_HEADER_NAME: z.string().min(3).default('x-request-id'),
+    TRACING_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.25),
     R2_ACCOUNT_ID: z.string().min(1),
     R2_ACCESS_KEY_ID: z.string().min(1),
     R2_SECRET_ACCESS_KEY: z.string().min(1),
@@ -170,6 +188,22 @@ const envSchema = z
         message: 'Provide either JWT_SECRET or JWT_KEYSET to sign access tokens.'
       });
     }
+
+    if ((value.METRICS_USERNAME && !value.METRICS_PASSWORD) || (!value.METRICS_USERNAME && value.METRICS_PASSWORD)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['METRICS_USERNAME'],
+        message: 'METRICS_USERNAME and METRICS_PASSWORD must be configured together.'
+      });
+    }
+
+    if (value.METRICS_BEARER_TOKEN && (value.METRICS_USERNAME || value.METRICS_PASSWORD)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['METRICS_BEARER_TOKEN'],
+        message: 'Use either METRICS_BEARER_TOKEN or METRICS_USERNAME/METRICS_PASSWORD, not both.'
+      });
+    }
   });
 
 const parsed = envSchema.safeParse(process.env);
@@ -188,6 +222,9 @@ const corsOrigins = (raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL)
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+
+const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
+const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');
 
 export const env = {
   nodeEnv: raw.NODE_ENV,
@@ -254,6 +291,21 @@ export const env = {
     verificationResendCooldownMinutes: raw.EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES
   },
   logging: {
-    level: raw.LOG_LEVEL
+    level: raw.LOG_LEVEL,
+    redactedFields,
+    serviceName: raw.LOG_SERVICE_NAME ?? 'edulure-api'
+  },
+  observability: {
+    tracing: {
+      headerName: raw.TRACE_HEADER_NAME.toLowerCase(),
+      sampleRate: raw.TRACING_SAMPLE_RATE
+    },
+    metrics: {
+      enabled: raw.METRICS_ENABLED,
+      username: raw.METRICS_USERNAME ?? null,
+      password: raw.METRICS_PASSWORD ?? null,
+      bearerToken: raw.METRICS_BEARER_TOKEN ?? null,
+      allowedIps: metricsAllowedIps
+    }
   }
 };

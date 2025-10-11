@@ -10,7 +10,7 @@
 - Introduced refresh-token backed session storage, automatic community owner enrolment, and domain event auditing via new orchestration services and repositories.
 - Migrated database management to Knex migrations with automated execution on boot, plus programmatic provisioning to replace legacy SQL installers.
 - Enabled dependency governance with Dependabot coverage, Node engine pinning, and npm audit scripts, alongside updated `.env` templates detailing new security-critical variables.
-- Promoted repository-wide npm workspaces with enforced Node/npm engine versions, runtime verification scripts, shared lint/test/audit commands, and axios-backed frontend HTTP clients so every surface consumes identical dependency trees.
+- Delivered full-stack observability: AsyncLocalStorage request contexts, redaction-aware structured logging, secured Prometheus `/metrics`, and R2 operation metrics feeding production alerting.
 
 ## Version 1.50 – Task 2 Cloudflare R2 & Learning Content Pipelines
 
