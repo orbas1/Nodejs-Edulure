@@ -1,0 +1,221 @@
+import { useEffect, useMemo, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowLeftOnRectangleIcon,
+  ArrowTopRightOnSquareIcon,
+  BookOpenIcon,
+  CalendarDaysIcon,
+  ChartBarIcon,
+  Cog6ToothIcon,
+  DocumentTextIcon,
+  MegaphoneIcon,
+  PlayCircleIcon,
+  Squares2X2Icon,
+  UserGroupIcon,
+  UsersIcon
+} from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { useDashboard } from '../context/DashboardContext.jsx';
+
+const navigationByRole = {
+  learner: (basePath) => [
+    { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
+    { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
+    { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
+    { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
+    { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
+    { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
+    { name: 'Become an instructor', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
+  ],
+  instructor: (basePath) => [
+    { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
+    { name: 'Create community', to: `${basePath}/communities/create`, icon: UserGroupIcon },
+    { name: 'Manage communities', to: `${basePath}/communities/manage`, icon: Cog6ToothIcon },
+    { name: 'Webinars', to: `${basePath}/communities/webinars`, icon: PlayCircleIcon },
+    { name: 'Podcasts', to: `${basePath}/communities/podcasts`, icon: MicrophoneIcon },
+    { name: 'Create course', to: `${basePath}/courses/create`, icon: DocumentTextIcon },
+    { name: 'Recorded library', to: `${basePath}/courses/library`, icon: PlayCircleIcon },
+    { name: 'Manage courses', to: `${basePath}/courses/manage`, icon: Cog6ToothIcon },
+    { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
+    { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },
+    { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
+    { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
+    { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },
+    { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
+  ]
+};
+
+function MicrophoneIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path
+        d="M12 14.25a3.75 3.75 0 0 0 3.75-3.75V6a3.75 3.75 0 1 0-7.5 0v4.5A3.75 3.75 0 0 0 12 14.25Zm6-3.75a6 6 0 0 1-12 0M9.75 19.5h4.5M12 17.25v2.25"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export default function DashboardLayout() {
+  const { role } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { activeRole, setActiveRole, roles, dashboards, searchIndex } = useDashboard();
+  const allowedRoles = useMemo(() => roles.map((r) => r.id), [roles]);
+  const resolvedRole = allowedRoles.includes(role) ? role : allowedRoles[0];
+  const basePath = `/dashboard/${resolvedRole}`;
+
+  useEffect(() => {
+    if (!allowedRoles.includes(role)) {
+      navigate(basePath, { replace: true });
+    }
+  }, [role, allowedRoles, basePath, navigate]);
+
+  useEffect(() => {
+    if (resolvedRole !== activeRole) {
+      setActiveRole(resolvedRole);
+    }
+  }, [resolvedRole, activeRole, setActiveRole]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const filteredResults = useMemo(() => {
+    if (!searchQuery) return [];
+    const query = searchQuery.toLowerCase();
+    return searchIndex
+      .filter((item) => item.role === resolvedRole)
+      .filter((item) => item.title.toLowerCase().includes(query) || item.type.toLowerCase().includes(query));
+  }, [searchQuery, searchIndex, resolvedRole]);
+
+  const navigation = useMemo(() => {
+    const builder = navigationByRole[resolvedRole];
+    return builder ? builder(basePath) : [];
+  }, [resolvedRole, basePath]);
+
+  const currentDashboard = dashboards[resolvedRole];
+
+  return (
+    <div className="flex min-h-screen bg-slate-950 text-slate-100">
+      <aside className="hidden w-72 shrink-0 border-r border-slate-900/70 bg-slate-950/80 lg:flex lg:flex-col">
+        <div className="flex h-20 items-center gap-3 border-b border-slate-900/60 px-6">
+          <img
+            src="https://i.ibb.co/twQyCm1N/Edulure-Logo.png"
+            alt="Edulure"
+            className="h-10 w-10 rounded-xl border border-slate-800 bg-slate-900/80"
+          />
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-300">Edulure</p>
+            <p className="text-xs text-slate-500">Operational Command Center</p>
+          </div>
+        </div>
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-4 py-6">
+          {navigation.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-primary/20 text-white shadow-lg shadow-primary/20'
+                    : 'text-slate-400 hover:bg-slate-900/70 hover:text-white'
+                }`
+              }
+            >
+              <item.icon className="h-5 w-5 text-slate-500 group-hover:text-white" />
+              <span>{item.name}</span>
+            </NavLink>
+          ))}
+        </nav>
+        <div className="border-t border-slate-900/60 p-4">
+          <a
+            href="/"
+            className="flex items-center justify-between rounded-xl border border-slate-800 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-primary/50 hover:text-white"
+          >
+            <span>Return to site</span>
+            <ArrowLeftOnRectangleIcon className="h-4 w-4" />
+          </a>
+        </div>
+      </aside>
+      <div className="flex min-h-screen flex-1 flex-col">
+        <header className="sticky top-0 z-40 border-b border-slate-900/60 bg-slate-950/90 backdrop-blur">
+          <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="relative flex-1">
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search across your dashboard data"
+                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 py-3 pl-12 pr-4 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    Clear
+                  </button>
+                )}
+                {filteredResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-900/80 bg-slate-950/95 p-4 shadow-2xl">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
+                    <ul className="space-y-2">
+                      {filteredResults.map((result) => (
+                        <li key={result.id}>
+                          <NavLink
+                            to={result.url}
+                            className="flex flex-col rounded-xl border border-slate-900/60 bg-slate-900/60 px-4 py-3 text-sm transition hover:border-primary/60 hover:bg-slate-900 hover:text-white"
+                            onClick={() => setSearchQuery('')}
+                          >
+                            <span className="font-semibold text-slate-100">{result.title}</span>
+                            <span className="text-xs uppercase tracking-wide text-slate-500">{result.type}</span>
+                          </NavLink>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-900/70 bg-slate-900/50 p-1 text-xs font-semibold text-slate-400">
+                {roles.map((roleOption) => {
+                  const target = `/dashboard/${roleOption.id}`;
+                  const isActive = resolvedRole === roleOption.id;
+                  return (
+                    <NavLink
+                      key={roleOption.id}
+                      to={target}
+                      className={`rounded-2xl px-4 py-2 transition ${
+                        isActive ? 'bg-primary/30 text-white shadow shadow-primary/30' : 'hover:bg-slate-900/70 hover:text-white'
+                      }`}
+                    >
+                      {roleOption.label}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-slate-500">
+              <span>
+                {roles.find((r) => r.id === resolvedRole)?.label} dashboard ·{' '}
+                {currentDashboard ? 'All systems green' : 'No data configured'}
+              </span>
+              <span>Route · {location.pathname.replace(`/dashboard/${resolvedRole}`, '') || '/overview'}</span>
+            </div>
+          </div>
+        </header>
+        <main className="flex-1 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
+          <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
+            <Outlet context={{ role: resolvedRole, dashboard: currentDashboard }} />
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,88 @@
+import { useOutletContext } from 'react-router-dom';
+
+export default function LearnerCommunities() {
+  const { dashboard } = useOutletContext();
+  const data = dashboard?.communities;
+
+  if (!data) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-8">
+      <section>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">Community management</h1>
+            <p className="mt-2 text-sm text-slate-400">
+              Track health, initiatives, and operations for every community you steward.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-full border border-primary/50 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10"
+          >
+            Create new initiative
+          </button>
+        </div>
+        <div className="mt-6 grid gap-5 lg:grid-cols-2">
+          {data.managed.map((community) => (
+            <div key={community.id} className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>{community.members} members</span>
+                <span>Moderators {community.moderators}</span>
+              </div>
+              <h2 className="mt-3 text-lg font-semibold text-white">{community.name}</h2>
+              <p className="mt-2 text-xs uppercase tracking-wide text-slate-500">Community health {community.health}</p>
+              <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                {community.initiatives.map((initiative) => (
+                  <li key={initiative} className="rounded-xl border border-slate-900/60 bg-slate-900/60 px-3 py-2">
+                    {initiative}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 flex items-center gap-3 text-xs text-slate-400">
+                <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                  View analytics
+                </button>
+                <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                  Automations
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Pipelines</h2>
+            <p className="text-sm text-slate-400">Every ongoing community operation, with the current owner and progress.</p>
+          </div>
+          <button
+            type="button"
+            className="rounded-full border border-primary/50 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10"
+          >
+            Add pipeline stage
+          </button>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {data.pipelines.map((pipeline) => (
+            <div key={pipeline.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/50 p-5">
+              <p className="text-xs uppercase tracking-wide text-slate-500">{pipeline.title}</p>
+              <p className="mt-2 text-sm text-slate-400">Owner {pipeline.owner}</p>
+              <div className="mt-4 h-2 rounded-full bg-slate-800">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
+                  style={{ width: `${pipeline.progress}%` }}
+                />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{pipeline.progress}% completion</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
