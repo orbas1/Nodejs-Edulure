@@ -22,6 +22,7 @@ import runtimeConfigRoutes from './routes/runtimeConfig.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import chatRoutes from './routes/chat.routes.js';
 import socialRoutes from './routes/social.routes.js';
+import explorerRoutes from './routes/explorer.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
 import requestContextMiddleware from './middleware/requestContext.js';
@@ -134,6 +135,7 @@ app.use('/api/runtime', runtimeConfigRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/social', socialRoutes);
+app.use('/api/explorer', explorerRoutes);
 
 app.use(errorHandler);
 

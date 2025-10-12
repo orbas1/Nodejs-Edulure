@@ -64,7 +64,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
    mute/block automation, reciprocal recommendation generation, and pagination-tuned HTTP/OpenAPI coverage backed by Vitest
    service + route suites and seeded fixtures for production validation.
 
-## Task 4 – Explorer Search, Ads & Intelligence Platform (0% complete)
+## Task 4 – Explorer Search, Ads & Intelligence Platform (60% complete)
 ### Integration Coverage
 - **Backend:** Meilisearch deployment, indexing workers, ads targeting engine, analytics collectors.
 - **Front-end:** Explorer navigation, filters, saved searches, ad slots, reporting dashboards.
@@ -82,7 +82,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
    `edulure_search_index_ready`), enforced read-only search keys at startup, operationalised the `npm run search:provision`
    bootstrap/snapshot workflow, and documented environment requirements in the backend README and `.env.example`.
 2. **Data Pipelines & Indexing (100%)** – ETL for communities, courses, ebooks, tutors, profiles, ads, events. _Progress update:_ SearchIngestionService now streams batched, incremental loads for every explorer index (communities, courses, ebooks, tutors, profiles, ads, events) with concurrency controls, Prometheus instrumentation, and snapshot-aware deletes. The new `npm run search:reindex` CLI bootstraps full or delta syncs, seeded datasets exercise course/ebook/tutor/live-classroom/ads records, and Vitest coverage validates loader pagination, incremental filters, and failure telemetry.
-3. **Explorer UX Implementation (0%)** – Entity tabs, filters, map previews, saved searches, quick actions.
+3. **Explorer UX Implementation (100%)** – Entity tabs, filters, map previews, saved searches, quick actions. _Progress update:_ `/explorer` now renders Meilisearch-backed entity tabs with live result counts, adaptive facet rails that hydrate from backend facet metadata, controlled filter persistence, keyboard-ready map previews powered by `react-simple-maps`, and saved-search CRUD (create/update/pin/apply/delete) orchestrated through optimistic React query flows, telemetry hooks, and toast-driven UX messaging aligned to design specifications.
 4. **Ads Suite Delivery (0%)** – Campaign builder, targeting rules, budgeting, creatives, compliance automation.
 5. **Analytics & Intelligence (0%)** – Dashboards, zero-result alerts, CTR tracking, predictions, experiment toggles.
 
