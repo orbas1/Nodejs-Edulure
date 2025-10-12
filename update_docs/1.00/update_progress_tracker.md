@@ -7,7 +7,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 1 – Platform Hardening & Governance Foundations | 92% | 88% | 85% | 88% | 89% | 88% | 88% |
 | Task 2 – Content, Commerce & Live Learning Delivery | 74% | 82% | 80% | 84% | 72% | 75% | 78% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 90% | 98% | 94% | 96% | 90% | 94% | 94% |
-| Task 4 – Explorer Search, Ads & Intelligence Platform | 84% | 95% | 93% | 96% | 90% | 94% | 92% |
+| Task 4 – Explorer Search, Ads & Intelligence Platform | 86% | 100% | 97% | 98% | 94% | 97% | 95% |
 | Task 5 – Dashboards, Profiles & Operational Consoles | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -43,6 +43,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Explorer infrastructure now includes ingestion: SearchIngestionService batches and parallelises ETL for communities, courses, ebooks, tutors, profiles, ads, and events with incremental `since` filters, Prometheus coverage (`edulure_search_ingestion_documents_total`, `edulure_search_ingestion_failures_total`, `edulure_search_ingestion_last_run_seconds`), and the operational `npm run search:reindex` CLI. Fresh migrations/seed data hydrate course, ebook, tutor, live classroom, and ads intelligence tables so Meilisearch indexes receive production-ready payloads after each deploy.
 - Explorer UX shipped with production fidelity: `/explorer` orchestrates cross-entity tabs, adaptive facet rails, controlled saved-search CRUD flows, keyboard-accessible geo markers, zero-result education, optimistic loading toasts, and Meilisearch-backed telemetry wiring. Navigation, auth guards, and analytics IDs align with design artefacts, while backend Prometheus metrics surface in the operator consoles.
 - Ads compliance automation is now enforced through AdsService—overspending campaigns are auto-paused with compliance metadata persisted, insights return chronologically ordered metrics, Vitest covers compliance/insight flows, and the Vite build validates the explorer/ads dashboards end-to-end following dependency reconciliation.
+- Explorer intelligence dashboards now mirror the backend analytics stack: the React `/analytics` route exposes authenticated range controls, live KPIs, entity and ads breakdowns, forecast summaries, query spotlights, and alert styling tied to the ExplorerAnalyticsService endpoints with manual refresh, empty state handling, and navigation gating so operations teams can monitor health without resorting to raw APIs.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |

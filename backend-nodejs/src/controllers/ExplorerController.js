@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import explorerSearchService from '../services/ExplorerSearchService.js';
+import explorerAnalyticsService from '../services/ExplorerAnalyticsService.js';
 import savedSearchService from '../services/SavedSearchService.js';
 import { success } from '../utils/httpResponse.js';
 
@@ -68,8 +69,51 @@ export default class ExplorerController {
         });
       }
 
+      let analyticsContext = null;
+      try {
+        const entitySummaries = Object.entries(result.results ?? {}).map(([entityType, summary]) => ({
+          entityType,
+          result: {
+            ...summary,
+            displayedHits: summary?.hits?.length ?? 0
+          }
+        }));
+        const latencyMs = entitySummaries.reduce(
+          (acc, { result: summary }) => acc + Number(summary?.processingTimeMs ?? 0),
+          0
+        );
+        analyticsContext = await explorerAnalyticsService.recordSearchExecution({
+          query: payload.query ?? '',
+          entitySummaries,
+          userId: req.user?.id,
+          sessionId: req.user?.sessionId ?? req.traceId,
+          traceId: req.traceId,
+          filters: payload.filters,
+          globalFilters: payload.globalFilters,
+          sort: payload.sort,
+          latencyMs,
+          metadata: {
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            savedSearchId: payload.savedSearchId ?? null
+          }
+        });
+      } catch (analyticsError) {
+        req.log?.warn({ err: analyticsError }, 'Failed to record explorer analytics event');
+      }
+
       return success(res, {
-        data: result,
+        data: {
+          ...result,
+          analytics: analyticsContext
+            ? {
+                searchEventId: analyticsContext.eventUuid,
+                totalResults: analyticsContext.totalResults,
+                totalDisplayed: analyticsContext.totalDisplayed,
+                zeroResult: analyticsContext.entitySummaries.every((summary) => summary.isZeroResult)
+              }
+            : null
+        },
         message: 'Explorer results fetched'
       });
     } catch (error) {

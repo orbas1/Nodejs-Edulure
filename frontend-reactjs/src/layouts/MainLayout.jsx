@@ -10,15 +10,21 @@ export default function MainLayout() {
   const { isAuthenticated, session, logout } = useAuth();
   const { isFeatureEnabled, getConfigValue } = useRuntimeConfig();
   const adminConsoleEnabled = isFeatureEnabled('admin.operational-console');
+  const analyticsDashboardEnabled = isFeatureEnabled('explorer.analytics-dashboard', true);
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
   const navigation = useMemo(() => {
     const base = [
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
-      { name: 'Explorer', to: '/explorer' },
-      { name: 'Profile', to: '/profile' }
+      { name: 'Explorer', to: '/explorer' }
     ];
+
+    if (analyticsDashboardEnabled && isAuthenticated) {
+      base.push({ name: 'Analytics', to: '/analytics' });
+    }
+
+    base.push({ name: 'Profile', to: '/profile' });
     if (adminConsoleEnabled) {
       base.push({ name: 'Admin', to: '/admin' });
     }
@@ -26,7 +32,7 @@ export default function MainLayout() {
       return [...base, { name: 'Content', to: '/content' }];
     }
     return base;
-  }, [isAuthenticated, adminConsoleEnabled]);
+  }, [isAuthenticated, adminConsoleEnabled, analyticsDashboardEnabled]);
 
   return (
     <div className="min-h-screen bg-white">

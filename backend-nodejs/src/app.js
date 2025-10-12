@@ -24,6 +24,7 @@ import chatRoutes from './routes/chat.routes.js';
 import socialRoutes from './routes/social.routes.js';
 import explorerRoutes from './routes/explorer.routes.js';
 import adsRoutes from './routes/ads.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
 import requestContextMiddleware from './middleware/requestContext.js';
@@ -138,6 +139,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/social', socialRoutes);
 app.use('/api/explorer', explorerRoutes);
 app.use('/api/ads', adsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.use(errorHandler);
 

@@ -7,6 +7,7 @@ import InstructorRegister from './pages/InstructorRegister.jsx';
 import Feed from './pages/Feed.jsx';
 import Profile from './pages/Profile.jsx';
 import Explorer from './pages/Explorer.jsx';
+import Analytics from './pages/Analytics.jsx';
 import Admin from './pages/Admin.jsx';
 import ContentLibrary from './pages/ContentLibrary.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
@@ -42,6 +43,7 @@ function App() {
         <Route path="/feed" element={<Feed />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/explorer" element={<Explorer />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/content" element={<ContentLibrary />} />
       </Route>

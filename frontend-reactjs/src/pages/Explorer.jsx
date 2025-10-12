@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import PropTypes from 'prop-types';
 import {
   AdjustmentsHorizontalIcon,
   ArrowPathIcon,
@@ -26,6 +27,7 @@ import {
   updateSavedSearch,
   deleteSavedSearch
 } from '../api/explorerApi.js';
+import { recordExplorerInteraction } from '../api/analyticsApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import worldMap from '../data/world-110m.json';
 import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
@@ -294,7 +296,35 @@ function ExplorerMap({ markers, bounds }) {
   );
 }
 
-function ResultCard({ hit }) {
+ExplorerMap.propTypes = {
+  markers: PropTypes.arrayOf(
+    PropTypes.shape({
+      longitude: PropTypes.number.isRequired,
+      latitude: PropTypes.number.isRequired,
+      label: PropTypes.string,
+      context: PropTypes.string
+    })
+  ),
+  bounds: PropTypes.shape({
+    minLng: PropTypes.number.isRequired,
+    maxLng: PropTypes.number.isRequired,
+    minLat: PropTypes.number.isRequired,
+    maxLat: PropTypes.number.isRequired
+  })
+};
+
+ExplorerMap.defaultProps = {
+  markers: [],
+  bounds: null
+};
+
+function ResultCard({ hit, onTrackInteraction }) {
+  const handleInteraction = () => {
+    if (typeof onTrackInteraction === 'function') {
+      onTrackInteraction(hit.entityType, hit.id);
+    }
+  };
+
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -345,6 +375,7 @@ function ResultCard({ hit }) {
             <a
               key={action.label}
               href={action.href}
+              onClick={handleInteraction}
               className="inline-flex items-center gap-2 rounded-full border border-primary/30 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
             >
               <SparklesIcon className="h-4 w-4" />
@@ -356,6 +387,32 @@ function ResultCard({ hit }) {
     </article>
   );
 }
+
+ResultCard.propTypes = {
+  hit: PropTypes.shape({
+    entityType: PropTypes.string.isRequired,
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    title: PropTypes.string.isRequired,
+    subtitle: PropTypes.string,
+    description: PropTypes.string,
+    tags: PropTypes.arrayOf(PropTypes.string),
+    geo: PropTypes.shape({
+      country: PropTypes.string
+    }),
+    metrics: PropTypes.objectOf(PropTypes.oneOfType([PropTypes.number, PropTypes.string])),
+    actions: PropTypes.arrayOf(
+      PropTypes.shape({
+        label: PropTypes.string.isRequired,
+        href: PropTypes.string.isRequired
+      })
+    )
+  }).isRequired,
+  onTrackInteraction: PropTypes.func
+};
+
+ResultCard.defaultProps = {
+  onTrackInteraction: undefined
+};
 
 export default function Explorer() {
   const { isAuthenticated, session } = useAuth();
@@ -371,6 +428,7 @@ export default function Explorer() {
     page: 1
   });
   const [results, setResults] = useState(null);
+  const [analyticsContext, setAnalyticsContext] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeEntity, setActiveEntity] = useState(ENTITY_KEYS[0]);
@@ -412,16 +470,39 @@ export default function Explorer() {
           throw new Error(response?.message ?? 'Search failed');
         }
         setResults(response.data);
+        setAnalyticsContext(response.data?.analytics ?? null);
       } catch (err) {
         if (err.name === 'CanceledError' || err.name === 'AbortError') {
           return;
         }
         setError(err.message ?? 'Unable to fetch explorer results');
+        setAnalyticsContext(null);
       } finally {
         setLoading(false);
       }
     },
     [authToken]
+  );
+
+  const handleResultInteraction = useCallback(
+    (entityType, resultId) => {
+      if (!analyticsContext?.searchEventId || !entityType || !resultId) {
+        return;
+      }
+
+      recordExplorerInteraction(
+        {
+          searchEventId: analyticsContext.searchEventId,
+          entityType,
+          resultId,
+          interactionType: 'click'
+        },
+        { token: authToken }
+      ).catch((interactionError) => {
+        console.warn('Failed to record explorer interaction', interactionError);
+      });
+    },
+    [analyticsContext, authToken]
   );
 
   useEffect(() => {
@@ -964,7 +1045,11 @@ export default function Explorer() {
             {activeEntityResult?.hits?.length ? (
               <div className="space-y-4">
                 {activeEntityResult.hits.map((hit) => (
-                  <ResultCard key={`${hit.entityType}-${hit.id}`} hit={hit} />
+                  <ResultCard
+                    key={`${hit.entityType}-${hit.id}`}
+                    hit={hit}
+                    onTrackInteraction={handleResultInteraction}
+                  />
                 ))}
               </div>
             ) : null}
