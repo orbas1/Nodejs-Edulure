@@ -7,3 +7,4 @@
 - `npm test --workspace backend-nodejs` – Vitest suite now covers messaging pagination clamps, presence TTL enforcement, and HTTP route integration. 【4aa469†L1-L20】
 - `npm test` (backend-nodejs) – Full Vitest suite passes after social graph resilience updates and OpenAPI normalisation. 【61cbce†L1-L33】
 - `npx swagger-cli validate src/docs/openapi.json` – Specification passes validation post-nullable normalisation for chat, DM, paywall, and social graph schemas. 【4174d7†L1-L2】
+- `npm test` (backend-nodejs) – Explorer/ads suites execute end-to-end with AdsService compliance automation and insights ordering fixes covered by Vitest. 【553d13†L1-L19】
