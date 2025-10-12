@@ -16,6 +16,13 @@
 - `Feed.jsx` orchestrates community switching, feed pagination, and resource loading states with accessible error handling, ensuring aggregated views skip redundant resource calls while member-only hubs render role badges and metadata.
 - `CommunityProfile.jsx`, `CommunitySwitcher.jsx`, and `TopBar.jsx` introduce production-ready resource drawers, load-more controls, focus-visible switcher states, and localisation-friendly metadata formatting aligned with design overlays.
 
+## `/explorer`
+- Launched the cross-entity Explorer surface that hydrates communities, courses, ebooks, tutors, and events from `/api/explorer/search`, wiring tab counts to live result totals and persisting filters in controlled React state so navigation between entities never loses context.
+- Added adaptive filter rails that materialise only when relevant facets are returned from the backend (category, price, availability, proficiency, location) and expose clear-all/reset-to-saved interactions with analytics IDs captured for each combination.
+- Integrated saved search governance with inline create, rename, pin, apply, and delete actions that call the new saved-search endpoints; modal flows harden validation, optimistic loading states, and success/error toasts for production telemetry.
+- Embedded a geospatial panel that renders backend-provided coordinates via `react-simple-maps` and the bundled `world-110m.json` topojson so learners can scan global supply quickly; markers cluster by entity type, highlight hovered cards, and support keyboard focus for accessibility.
+- Hardened empty, error, and zero-result states with prescriptive education, quick-start filters, and instrumentation hooks that align with the explorer QA scripts captured in the design documents.
+
 ## Layout & Navigation
 - `MainLayout` now renders auth-aware navigation items linking to the content library and login/register flows. Navigation visibility for the admin console honours the backend feature flag snapshot to prevent unauthorised access.
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.

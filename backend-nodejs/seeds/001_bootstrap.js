@@ -113,7 +113,11 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         focus: ['operations', 'automation'],
         timezone: 'UTC',
-        defaultChannel: 'weekly-war-room'
+        defaultChannel: 'weekly-war-room',
+        category: 'operations',
+        tagline: 'Incident-proof live classrooms and automation squads',
+        country: 'US',
+        languages: ['en']
       })
     });
 
@@ -126,7 +130,11 @@ export async function seed(knex) {
       metadata: JSON.stringify({
         focus: ['growth', 'ads'],
         ndaRequired: true,
-        defaultChannel: 'campaign-sprint'
+        defaultChannel: 'campaign-sprint',
+        category: 'growth',
+        tagline: 'Experiment-led growth and paid acquisition guild',
+        country: 'GB',
+        languages: ['en']
       })
     });
 
@@ -1400,6 +1408,22 @@ export async function seed(knex) {
     const now = new Date();
     const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    await trx('saved_searches').insert({
+      user_id: adminId,
+      name: 'Automation program discovery',
+      search_query: 'automation',
+      entity_types: JSON.stringify(['communities', 'courses', 'tutors']),
+      filters: JSON.stringify({
+        communities: { visibility: ['public'] },
+        courses: { level: ['advanced'], category: ['operations'] },
+        tutors: { languages: ['en'], isVerified: true }
+      }),
+      global_filters: JSON.stringify({ languages: ['en'] }),
+      sort_preferences: JSON.stringify({ communities: 'trending', courses: 'rating' }),
+      is_pinned: true,
+      last_used_at: trx.fn.now()
+    });
 
     await trx('user_sessions').insert([
       {

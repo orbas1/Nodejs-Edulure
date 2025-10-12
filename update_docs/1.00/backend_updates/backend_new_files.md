@@ -61,3 +61,9 @@
 - `backend-nodejs/test/searchIngestionService.test.js` – Vitest suite validating loader pagination, incremental filters, error propagation, and metric emission for the ingestion pipeline.
 - `backend-nodejs/migrations/20241119150000_ads_intelligence.js` – provisions ads campaign, creative, audience, spend, and performance tables powering explorer ads targeting and reporting.
 - `backend-nodejs/migrations/20241112123000_course_modules_and_drip_engine.js`, `20241115131500_ebook_experience_upgrade.js`, and `20241118103000_live_classroom_and_tutor_hire.js` – establish the curriculum, ebook, tutor, and live classroom schemas that now backfill search ingestion datasets with production-quality relationships and telemetry columns.
+- `backend-nodejs/migrations/20241124150000_explorer_saved_searches.js` – adds the `saved_searches` table with filters, global filters, sort preferences, pinning, and audit timestamps for explorer governance.
+- `backend-nodejs/src/models/SavedSearchModel.js` – repository serialising explorer saved searches with JSON helpers for entity/global filters and sort preferences.
+- `backend-nodejs/src/services/SavedSearchService.js` – transactional CRUD orchestrator for saved searches handling uniqueness, pin toggles, and usage telemetry updates.
+- `backend-nodejs/src/services/ExplorerSearchService.js` – federated search orchestrator normalising Meilisearch responses, facets, and geo markers for explorer delivery.
+- `backend-nodejs/src/controllers/ExplorerController.js` and `backend-nodejs/src/routes/explorer.routes.js` – Express entry points exposing `/api/explorer/search` and `/api/explorer/saved-searches` endpoints with Joi validation.
+- `backend-nodejs/src/utils/geo.js` & `backend-nodejs/src/data/countryCentroids.json` – country centroid lookup utilities powering map-ready geo markers in explorer responses.

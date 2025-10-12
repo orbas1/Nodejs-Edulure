@@ -16,7 +16,7 @@ export default function MainLayout() {
     const base = [
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
-      { name: 'Search', to: '/search' },
+      { name: 'Explorer', to: '/explorer' },
       { name: 'Profile', to: '/profile' }
     ];
     if (adminConsoleEnabled) {

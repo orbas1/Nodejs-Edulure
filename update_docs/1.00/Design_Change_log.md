@@ -81,6 +81,8 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Documented advanced filter drawers, synonym-backed quick actions, and zero-result states in `ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Function Design.md`
   and `Application_Design_Update_Plan/Application Design Update.md`, ensuring copy highlights follow-graph boosts, tutor availability,
   and ad performance metrics now surfaced by the backend index settings.
+- Calibrated the geospatial explorer panel using `website_drawings.md`, `dashboard_drawings.md`, and `App_screens_drawings.md` so the topojson map, keyboard-accessible focus rings, and hover-linked result highlights match the implemented `react-simple-maps` experience while respecting reduced-motion and high-contrast tokens.
+- Expanded saved-search modal specifications in `menu_drawings.md` and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md` to cover optimistic loading states, validation copy, toast sequencing, and analytics IDs so engineering instrumentation mirrors production UX for create, rename, pin, and delete flows.
 - Added operator dashboards for search health—node status banners, snapshot prompts, and index drift alerts—within `Admin_panel_drawings.md`
   and `dashboard_drawings.md`, mirroring the new Prometheus metrics (`edulure_search_node_health`, `edulure_search_index_ready`) so SREs
   have visual hooks for incidents.
