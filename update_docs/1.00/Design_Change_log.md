@@ -89,6 +89,7 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Updated mobile explorer flows in `App_screens_drawings.md` with carousel-first entity tabs, offline recent searches, and ad creative previews,
   referencing the same synonym/ranking cues the backend enforces, plus chip-based voice search entry points tied to the new API contracts.
 - Documented ingestion telemetry overlays in `dashboard_drawings.md` and `Admin_panel_drawings.md` showing batch progress, last-run timestamps, failure banners, and dataset freshness indicators aligned with `SearchIngestionService` metrics so operators and designers share expectations for reindex workflows across web and mobile consoles.
+- Added ads compliance overlays tying campaign auto-pause states, spend alerts, and compliance review queues to `dashboard_drawings.md`, `website_drawings.md`, and `Admin_panel_drawings.md`, ensuring instructor dashboards surface violation copy, auto-pause toasts, and historical insight charts consistent with the AdsService governance rules.
 
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
