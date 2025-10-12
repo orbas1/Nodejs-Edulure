@@ -3678,6 +3678,25 @@
             "required": [
               "items"
             ]
+          },
+          "analytics": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "searchEventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "totalResults": {
+                "type": "integer"
+              },
+              "totalDisplayed": {
+                "type": "integer"
+              },
+              "zeroResult": {
+                "type": "boolean"
+              }
+            }
           }
         },
         "required": [
@@ -3687,6 +3706,428 @@
           "results",
           "totals",
           "markers"
+        ]
+      },
+      "ExplorerAnalyticsRange": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "days"
+        ]
+      },
+      "ExplorerAnalyticsTotals": {
+        "type": "object",
+        "properties": {
+          "searches": {
+            "type": "integer"
+          },
+          "zeroResultRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "clickThroughRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageLatencyMs": {
+            "type": "integer"
+          },
+          "uniqueUsers": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "searches",
+          "zeroResultRate",
+          "clickThroughRate",
+          "averageLatencyMs"
+        ]
+      },
+      "ExplorerAnalyticsEntityBreakdown": {
+        "type": "object",
+        "properties": {
+          "entityType": {
+            "type": "string"
+          },
+          "searches": {
+            "type": "integer"
+          },
+          "zeroResultRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "clickThroughRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "displayedResults": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "averageLatencyMs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entityType",
+          "searches",
+          "zeroResultRate",
+          "clickThroughRate",
+          "displayedResults",
+          "clicks"
+        ]
+      },
+      "ExplorerAnalyticsTimeseriesPoint": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "searches": {
+            "type": "integer"
+          },
+          "zeroResultRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "clickThroughRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "averageLatencyMs": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "searches",
+          "zeroResultRate",
+          "clickThroughRate"
+        ]
+      },
+      "ExplorerAnalyticsQueryMetric": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "searches": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "query",
+          "searches"
+        ]
+      },
+      "ExplorerAnalyticsAdsSummary": {
+        "type": "object",
+        "properties": {
+          "impressions": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "conversions": {
+            "type": "integer"
+          },
+          "spendCents": {
+            "type": "integer"
+          },
+          "revenueCents": {
+            "type": "integer"
+          },
+          "clickThroughRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "conversionRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "roas": {
+            "type": "number",
+            "format": "double"
+          }
+        },
+        "required": [
+          "impressions",
+          "clicks",
+          "conversions",
+          "spendCents",
+          "revenueCents"
+        ]
+      },
+      "ExplorerAnalyticsExperiment": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "rolloutPercentage": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "enabled"
+        ]
+      },
+      "ExplorerAnalyticsForecastEntry": {
+        "type": "object",
+        "properties": {
+          "targetDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "metricValue": {
+            "type": "number",
+            "format": "double"
+          },
+          "lowerBound": {
+            "type": "number",
+            "format": "double"
+          },
+          "upperBound": {
+            "type": "number",
+            "format": "double"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "targetDate",
+          "metricValue",
+          "lowerBound",
+          "upperBound"
+        ]
+      },
+      "ExplorerAnalyticsAlert": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "alertCode": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "alertCode",
+          "severity",
+          "message",
+          "detectedAt"
+        ]
+      },
+      "ExplorerAnalyticsSummary": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "$ref": "#/components/schemas/ExplorerAnalyticsRange"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ExplorerAnalyticsTotals"
+          },
+          "entityBreakdown": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerAnalyticsEntityBreakdown"
+            }
+          },
+          "timeseries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerAnalyticsTimeseriesPoint"
+            }
+          },
+          "topQueries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerAnalyticsQueryMetric"
+            }
+          },
+          "zeroResultQueries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerAnalyticsQueryMetric"
+            }
+          },
+          "ads": {
+            "$ref": "#/components/schemas/ExplorerAnalyticsAdsSummary"
+          },
+          "experiments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerAnalyticsExperiment"
+            }
+          },
+          "forecasts": {
+            "type": "object",
+            "properties": {
+              "searchVolume": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExplorerAnalyticsForecastEntry"
+                }
+              },
+              "clickThroughRate": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExplorerAnalyticsForecastEntry"
+                }
+              }
+            }
+          },
+          "alerts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerAnalyticsAlert"
+            }
+          }
+        },
+        "required": [
+          "range",
+          "totals",
+          "entityBreakdown",
+          "timeseries",
+          "topQueries",
+          "ads",
+          "forecasts",
+          "alerts"
+        ]
+      },
+      "ExplorerInteractionRequest": {
+        "type": "object",
+        "properties": {
+          "searchEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entityType": {
+            "type": "string",
+            "example": "courses"
+          },
+          "resultId": {
+            "type": "string",
+            "example": "automation-masterclass"
+          },
+          "interactionType": {
+            "type": "string",
+            "enum": [
+              "click",
+              "detail_view",
+              "bookmark"
+            ],
+            "default": "click"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          }
+        },
+        "required": [
+          "searchEventId",
+          "entityType",
+          "resultId"
+        ]
+      },
+      "ExplorerInteractionRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "resultId": {
+            "type": "string"
+          },
+          "interactionType": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "entityType",
+          "resultId",
+          "interactionType",
+          "createdAt"
         ]
       },
       "ExplorerSearchRequest": {
@@ -10649,6 +11090,192 @@
           },
           "404": {
             "description": "Saved search not found"
+          }
+        }
+      }
+    },
+    "/api/analytics/explorer/summary": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Retrieve explorer analytics summary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "description": "Rolling time window (7d, 14d, or 30d)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "14d",
+                "30d"
+              ],
+              "default": "7d"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Explorer analytics summary returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ExplorerAnalyticsSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analytics/explorer/alerts": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "List explorer analytics alerts",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "includeResolved",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Explorer analytics alerts fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ExplorerAnalyticsAlert"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/analytics/explorer/interactions": {
+      "post": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Record an explorer interaction event",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplorerInteractionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Interaction recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ExplorerInteractionRecord"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Search event not found"
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
           }
         }
       }

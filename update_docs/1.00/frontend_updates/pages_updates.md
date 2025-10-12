@@ -23,8 +23,11 @@
 - Embedded a geospatial panel that renders backend-provided coordinates via `react-simple-maps` and the bundled `world-110m.json` topojson so learners can scan global supply quickly; markers cluster by entity type, highlight hovered cards, and support keyboard focus for accessibility.
 - Hardened empty, error, and zero-result states with prescriptive education, quick-start filters, and instrumentation hooks that align with the explorer QA scripts captured in the design documents.
 
+## `/analytics`
+- Promoted the explorer intelligence dashboard into production: authenticated providers and operations users can navigate to `/analytics` to review KPI tiles, manual refresh controls, range toggles, search and CTR charts, entity breakdown tables, ads metrics, experiment status, forecast outlooks, query spotlights, and alert feeds that hydrate from `ExplorerAnalyticsService` endpoints with WCAG-compliant dark mode styling, empty-state messaging, and 401-safe fallbacks.
+
 ## Layout & Navigation
-- `MainLayout` now renders auth-aware navigation items linking to the content library and login/register flows. Navigation visibility for the admin console honours the backend feature flag snapshot to prevent unauthorised access.
+- `MainLayout` now renders auth-aware navigation items linking to the content library, explorer analytics, and login/register flows. Navigation visibility for the admin console and analytics dashboard honours backend feature flag snapshots and authentication to prevent unauthorised access.
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.
 
 ## `/admin`

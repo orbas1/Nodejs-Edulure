@@ -5,6 +5,12 @@ const makeHash = (value) => crypto.createHash('sha256').update(value).digest('he
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
+    await trx('analytics_forecasts').del();
+    await trx('analytics_alerts').del();
+    await trx('explorer_search_daily_metrics').del();
+    await trx('explorer_search_event_interactions').del();
+    await trx('explorer_search_event_entities').del();
+    await trx('explorer_search_events').del();
     await trx('ads_campaign_metrics_daily').del();
     await trx('ads_campaigns').del();
     await trx('live_classroom_registrations').del();
@@ -1404,6 +1410,268 @@ export async function seed(knex) {
         metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
       }
     ]);
+
+    const analyticsToday = new Date();
+    analyticsToday.setUTCHours(0, 0, 0, 0);
+    const analyticsYesterday = new Date(analyticsToday.getTime() - 24 * 60 * 60 * 1000);
+    const analyticsTwoDaysAgo = new Date(analyticsToday.getTime() - 2 * 24 * 60 * 60 * 1000);
+
+    const explorerSeedUuid = crypto.randomUUID();
+    const [explorerSeedEventId] = await trx('explorer_search_events').insert({
+      event_uuid: explorerSeedUuid,
+      user_id: adminId,
+      session_id: crypto.randomUUID(),
+      trace_id: makeHash('explorer-seed-trace').slice(0, 32),
+      query: 'automation launch',
+      result_total: 42,
+      is_zero_result: false,
+      latency_ms: 210,
+      filters: JSON.stringify({ courses: { level: ['advanced'] } }),
+      global_filters: JSON.stringify({ languages: ['en'] }),
+      sort_preferences: JSON.stringify({ courses: 'rating', communities: 'trending' }),
+      metadata: JSON.stringify({ source: 'seed', cohort: 'operations' })
+    });
+
+    await trx('explorer_search_event_entities').insert([
+      {
+        event_id: explorerSeedEventId,
+        entity_type: 'communities',
+        total_hits: 18,
+        displayed_hits: 6,
+        processing_time_ms: 95,
+        is_zero_result: false,
+        click_count: 2,
+        conversion_count: 0,
+        metadata: JSON.stringify({ category: 'operations', timezone: 'UTC' })
+      },
+      {
+        event_id: explorerSeedEventId,
+        entity_type: 'courses',
+        total_hits: 14,
+        displayed_hits: 5,
+        processing_time_ms: 72,
+        is_zero_result: false,
+        click_count: 3,
+        conversion_count: 1,
+        metadata: JSON.stringify({ delivery: 'cohort', rating: 4.8 })
+      },
+      {
+        event_id: explorerSeedEventId,
+        entity_type: 'tutors',
+        total_hits: 10,
+        displayed_hits: 4,
+        processing_time_ms: 43,
+        is_zero_result: false,
+        click_count: 1,
+        conversion_count: 0,
+        metadata: JSON.stringify({ languages: ['en'], verified: true })
+      }
+    ]);
+
+    await trx('explorer_search_event_interactions').insert([
+      {
+        event_id: explorerSeedEventId,
+        entity_type: 'courses',
+        result_id: 'automation-masterclass',
+        interaction_type: 'click',
+        position: 1,
+        metadata: JSON.stringify({ action: 'primary_cta' })
+      },
+      {
+        event_id: explorerSeedEventId,
+        entity_type: 'communities',
+        result_id: 'learning-ops-guild',
+        interaction_type: 'detail_view',
+        position: 2,
+        metadata: JSON.stringify({ action: 'open_preview' })
+      }
+    ]);
+
+    await trx('explorer_search_daily_metrics').insert([
+      {
+        metric_date: analyticsTwoDaysAgo,
+        entity_type: 'all',
+        searches: 320,
+        zero_results: 42,
+        displayed_results: 1216,
+        total_results: 6420,
+        clicks: 205,
+        conversions: 58,
+        average_latency_ms: 198,
+        metadata: JSON.stringify({ cohort: 'operations' })
+      },
+      {
+        metric_date: analyticsTwoDaysAgo,
+        entity_type: 'communities',
+        searches: 110,
+        zero_results: 14,
+        displayed_results: 420,
+        total_results: 2150,
+        clicks: 68,
+        conversions: 14,
+        average_latency_ms: 182,
+        metadata: JSON.stringify({ category: 'operations' })
+      },
+      {
+        metric_date: analyticsTwoDaysAgo,
+        entity_type: 'courses',
+        searches: 128,
+        zero_results: 18,
+        displayed_results: 512,
+        total_results: 2860,
+        clicks: 92,
+        conversions: 33,
+        average_latency_ms: 166,
+        metadata: JSON.stringify({ track: 'automation' })
+      },
+      {
+        metric_date: analyticsTwoDaysAgo,
+        entity_type: 'tutors',
+        searches: 82,
+        zero_results: 10,
+        displayed_results: 284,
+        total_results: 1410,
+        clicks: 45,
+        conversions: 11,
+        average_latency_ms: 132,
+        metadata: JSON.stringify({ locale: 'global' })
+      },
+      {
+        metric_date: analyticsYesterday,
+        entity_type: 'all',
+        searches: 348,
+        zero_results: 36,
+        displayed_results: 1320,
+        total_results: 7012,
+        clicks: 248,
+        conversions: 66,
+        average_latency_ms: 187,
+        metadata: JSON.stringify({ cohort: 'growth' })
+      },
+      {
+        metric_date: analyticsYesterday,
+        entity_type: 'communities',
+        searches: 124,
+        zero_results: 11,
+        displayed_results: 470,
+        total_results: 2295,
+        clicks: 84,
+        conversions: 19,
+        average_latency_ms: 170,
+        metadata: JSON.stringify({ category: 'growth' })
+      },
+      {
+        metric_date: analyticsYesterday,
+        entity_type: 'courses',
+        searches: 141,
+        zero_results: 16,
+        displayed_results: 555,
+        total_results: 3100,
+        clicks: 118,
+        conversions: 35,
+        average_latency_ms: 158,
+        metadata: JSON.stringify({ track: 'commerce' })
+      },
+      {
+        metric_date: analyticsYesterday,
+        entity_type: 'tutors',
+        searches: 83,
+        zero_results: 9,
+        displayed_results: 295,
+        total_results: 1617,
+        clicks: 46,
+        conversions: 12,
+        average_latency_ms: 128,
+        metadata: JSON.stringify({ locale: 'emea' })
+      },
+      {
+        metric_date: analyticsToday,
+        entity_type: 'all',
+        searches: 362,
+        zero_results: 31,
+        displayed_results: 1384,
+        total_results: 7288,
+        clicks: 261,
+        conversions: 74,
+        average_latency_ms: 176,
+        metadata: JSON.stringify({ cohort: 'live-classroom' })
+      },
+      {
+        metric_date: analyticsToday,
+        entity_type: 'communities',
+        searches: 132,
+        zero_results: 9,
+        displayed_results: 492,
+        total_results: 2421,
+        clicks: 88,
+        conversions: 22,
+        average_latency_ms: 164,
+        metadata: JSON.stringify({ category: 'live' })
+      },
+      {
+        metric_date: analyticsToday,
+        entity_type: 'courses',
+        searches: 150,
+        zero_results: 12,
+        displayed_results: 575,
+        total_results: 3268,
+        clicks: 128,
+        conversions: 38,
+        average_latency_ms: 152,
+        metadata: JSON.stringify({ track: 'delivery' })
+      },
+      {
+        metric_date: analyticsToday,
+        entity_type: 'tutors',
+        searches: 80,
+        zero_results: 10,
+        displayed_results: 317,
+        total_results: 1599,
+        clicks: 45,
+        conversions: 14,
+        average_latency_ms: 121,
+        metadata: JSON.stringify({ locale: 'amer' })
+      }
+    ]);
+
+    await trx('analytics_alerts').insert([
+      {
+        alert_code: 'explorer.zero-result-rate',
+        severity: 'warning',
+        message: 'Zero-result rate for tutors exceeded 18% in the last 24h',
+        metadata: JSON.stringify({ zeroRate: 0.19, entity: 'tutors' }),
+        detected_at: new Date(analyticsToday.getTime() - 6 * 60 * 60 * 1000)
+      },
+      {
+        alert_code: 'explorer.click-through-rate',
+        severity: 'info',
+        message: 'Explorer CTR recovered above baseline after experiment rollout',
+        metadata: JSON.stringify({ ctr: 0.032, experiment: 'explorer.personalised-facets' }),
+        detected_at: new Date(analyticsYesterday.getTime() + 8 * 60 * 60 * 1000),
+        resolved_at: analyticsToday
+      }
+    ]);
+
+    const forecastBase = analyticsToday.getTime();
+    for (let i = 1; i <= 7; i += 1) {
+      const targetDate = new Date(forecastBase + i * 24 * 60 * 60 * 1000);
+      await trx('analytics_forecasts').insert({
+        forecast_code: 'explorer.search-volume',
+        target_date: targetDate,
+        metric_value: 360 + i * 8,
+        lower_bound: 320 + i * 6,
+        upper_bound: 410 + i * 9,
+        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.35 })
+      });
+      await trx('analytics_forecasts').insert({
+        forecast_code: 'explorer.click-through-rate',
+        target_date: targetDate,
+        metric_value: Number((0.031 + i * 0.0005).toFixed(4)),
+        lower_bound: Number((0.027 + i * 0.0004).toFixed(4)),
+        upper_bound: Number((0.036 + i * 0.0006).toFixed(4)),
+        metadata: JSON.stringify({ methodology: 'exponential_smoothing', alpha: 0.4 })
+      });
+    }
 
     const now = new Date();
     const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);

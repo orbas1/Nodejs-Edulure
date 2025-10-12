@@ -63,6 +63,7 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   3. **Task 4.3 Intelligence & Reporting**
      - Create dashboards for queries, zero results, CTR, conversions, ad spend, and prediction models.
      - Integrate insights into admin panels, notifications, and optimisation workflows.
+     - Status update: Explorer analytics dashboards now ship at `/analytics` with KPI tiles, range toggles, manual refresh, charts, forecasts, query spotlights, and alert feeds wired to ExplorerAnalyticsService so ops teams can monitor search health without leaving the web client.
 
 ## Milestone 5 – Mobile Parity, QA & Launch (Weeks 10–18)
 - **Tasks Included:** Task 6 – Mobile Parity & Store Readiness; Task 7 – Quality Assurance, Policies & Launch Operations.

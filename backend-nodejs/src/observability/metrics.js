@@ -163,6 +163,32 @@ const searchIngestionLastRunTimestamp = new promClient.Gauge({
   labelNames: ['index']
 });
 
+const explorerSearchEventsTotal = new promClient.Counter({
+  name: 'edulure_explorer_search_events_total',
+  help: 'Count of explorer search executions grouped by entity and result type',
+  labelNames: ['entity', 'result']
+});
+
+const explorerSearchDisplayedResults = new promClient.Histogram({
+  name: 'edulure_explorer_displayed_results',
+  help: 'Histogram of displayed results count per explorer search by entity',
+  labelNames: ['entity'],
+  buckets: [0, 1, 3, 5, 10, 20, 40, 80]
+});
+
+const explorerSearchLatencyMs = new promClient.Histogram({
+  name: 'edulure_explorer_search_latency_ms',
+  help: 'Histogram of search latency per explorer entity',
+  labelNames: ['entity'],
+  buckets: [5, 10, 25, 50, 100, 250, 500, 750, 1000, 1500, 2000]
+});
+
+const explorerSearchInteractionsTotal = new promClient.Counter({
+  name: 'edulure_explorer_interactions_total',
+  help: 'Count of explorer interactions grouped by entity and interaction type',
+  labelNames: ['entity', 'interaction_type']
+});
+
 registry.registerMetric(httpRequestsTotal);
 registry.registerMetric(httpRequestDurationSeconds);
 registry.registerMetric(httpActiveRequests);
@@ -186,6 +212,10 @@ registry.registerMetric(searchIngestionDurationSeconds);
 registry.registerMetric(searchIngestionDocumentsTotal);
 registry.registerMetric(searchIngestionErrorsTotal);
 registry.registerMetric(searchIngestionLastRunTimestamp);
+registry.registerMetric(explorerSearchEventsTotal);
+registry.registerMetric(explorerSearchDisplayedResults);
+registry.registerMetric(explorerSearchLatencyMs);
+registry.registerMetric(explorerSearchInteractionsTotal);
 
 function normalizeRoute(req) {
   if (req.route?.path) {
@@ -429,6 +459,32 @@ export function recordSearchIngestionRun({ index, documentCount, durationSeconds
 
   const reason = error?.code ?? error?.name ?? error?.message ?? 'unknown';
   searchIngestionErrorsTotal.inc({ index, reason });
+}
+
+export function recordExplorerSearchEvent({ entityType, zeroResult, displayedHits, latencyMs }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const safeEntity = entityType ?? 'unknown';
+  explorerSearchEventsTotal.inc({ entity: safeEntity, result: zeroResult ? 'zero' : 'matched' });
+  if (Number.isFinite(displayedHits) && displayedHits >= 0) {
+    explorerSearchDisplayedResults.observe({ entity: safeEntity }, displayedHits);
+  }
+  if (Number.isFinite(latencyMs) && latencyMs >= 0) {
+    explorerSearchLatencyMs.observe({ entity: safeEntity }, latencyMs);
+  }
+}
+
+export function recordExplorerInteraction({ entityType, interactionType }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  explorerSearchInteractionsTotal.inc({
+    entity: entityType ?? 'unknown',
+    interaction_type: interactionType ?? 'unknown'
+  });
 }
 
 export function trackPaymentCaptureMetrics({ provider, status, currency, amountTotal, taxAmount }) {
