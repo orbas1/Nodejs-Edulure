@@ -12,3 +12,7 @@
 - Enhanced `src/config/env.js` with SMTP, verification, and account lockout controls, surfacing structured configuration for the new mailer and credential governance policies. Latest iteration adds session validation cache TTLs and per-user session caps to back the logout/rotation tooling.
 - Hardened logging/observability configuration: added configurable trace header names, sampling, metrics auth, IP allow-lists, and redactable field lists surfaced via `env.logging`/`env.observability`.
 - Extended `src/config/env.js` with an `engagement` namespace capturing reminder enablement, cron expressions, batch sizes, lookahead windows, and timezone defaults consumed by the engagement service and reminder job.
+- Added Meilisearch configuration primitives: `src/config/env.js` now validates host lists, admin/search API keys, timeouts,
+  prefixes, and search allow-lists; new `src/config/search.js` builds typed admin/replica/read client pools with a shared
+  user-agent used by `SearchClusterService` and operational scripts.
+- Extended the search configuration namespace with ingestion controls (batch size, concurrency, delete-before-reindex toggles) consumed by `SearchIngestionService` and the new CLI so operators can throttle indexing safely per environment.

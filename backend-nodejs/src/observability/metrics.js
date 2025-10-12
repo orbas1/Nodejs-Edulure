@@ -113,6 +113,56 @@ const paymentsRefundCentsTotal = new promClient.Counter({
   labelNames: ['provider', 'currency']
 });
 
+const searchOperationDurationSeconds = new promClient.Histogram({
+  name: 'edulure_search_operation_duration_seconds',
+  help: 'Duration histogram for Meilisearch administrative operations',
+  labelNames: ['operation', 'status'],
+  buckets: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5]
+});
+
+const searchNodeHealthGauge = new promClient.Gauge({
+  name: 'edulure_search_node_health',
+  help: 'Health state of Meilisearch nodes (1 healthy, 0 unhealthy)',
+  labelNames: ['host', 'role']
+});
+
+const searchNodeLastCheckGauge = new promClient.Gauge({
+  name: 'edulure_search_node_last_check_timestamp',
+  help: 'Unix timestamp of the last successful Meilisearch healthcheck per node',
+  labelNames: ['host', 'role']
+});
+
+const searchIndexReadyGauge = new promClient.Gauge({
+  name: 'edulure_search_index_ready',
+  help: 'Indicates whether explorer indexes are provisioned (1 ready, 0 pending)',
+  labelNames: ['index']
+});
+
+const searchIngestionDurationSeconds = new promClient.Histogram({
+  name: 'edulure_search_ingestion_duration_seconds',
+  help: 'Duration histogram for search ingestion runs',
+  labelNames: ['index', 'result'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300]
+});
+
+const searchIngestionDocumentsTotal = new promClient.Counter({
+  name: 'edulure_search_ingestion_documents_total',
+  help: 'Documents processed during search ingestion grouped by index and result',
+  labelNames: ['index', 'result']
+});
+
+const searchIngestionErrorsTotal = new promClient.Counter({
+  name: 'edulure_search_ingestion_errors_total',
+  help: 'Count of search ingestion failures grouped by index and reason',
+  labelNames: ['index', 'reason']
+});
+
+const searchIngestionLastRunTimestamp = new promClient.Gauge({
+  name: 'edulure_search_ingestion_last_run_timestamp',
+  help: 'Unix timestamp of the last successful ingestion per index',
+  labelNames: ['index']
+});
+
 registry.registerMetric(httpRequestsTotal);
 registry.registerMetric(httpRequestDurationSeconds);
 registry.registerMetric(httpActiveRequests);
@@ -128,6 +178,14 @@ registry.registerMetric(paymentsProcessedTotal);
 registry.registerMetric(paymentsRevenueCentsTotal);
 registry.registerMetric(paymentsTaxCentsTotal);
 registry.registerMetric(paymentsRefundCentsTotal);
+registry.registerMetric(searchOperationDurationSeconds);
+registry.registerMetric(searchNodeHealthGauge);
+registry.registerMetric(searchNodeLastCheckGauge);
+registry.registerMetric(searchIndexReadyGauge);
+registry.registerMetric(searchIngestionDurationSeconds);
+registry.registerMetric(searchIngestionDocumentsTotal);
+registry.registerMetric(searchIngestionErrorsTotal);
+registry.registerMetric(searchIngestionLastRunTimestamp);
 
 function normalizeRoute(req) {
   if (req.route?.path) {
@@ -315,6 +373,62 @@ export async function recordStorageOperation(operation, visibility, handler) {
   } finally {
     storageOperationsInFlight.dec({ operation });
   }
+}
+
+export async function recordSearchOperation(operation, handler) {
+  if (!env.observability.metrics.enabled) {
+    return handler();
+  }
+
+  const endTimer = searchOperationDurationSeconds.startTimer({ operation, status: 'pending' });
+  try {
+    const result = await handler();
+    endTimer({ operation, status: 'success' });
+    return result;
+  } catch (error) {
+    endTimer({ operation, status: 'error' });
+    throw error;
+  }
+}
+
+export function updateSearchNodeHealth({ host, role, healthy }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  searchNodeHealthGauge.set({ host, role }, healthy ? 1 : 0);
+  if (healthy) {
+    searchNodeLastCheckGauge.set({ host, role }, Date.now() / 1000);
+  }
+}
+
+export function updateSearchIndexStatus(index, ready) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  searchIndexReadyGauge.set({ index }, ready ? 1 : 0);
+}
+
+export function recordSearchIngestionRun({ index, documentCount, durationSeconds, status, error }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const result = status === 'success' ? 'success' : 'error';
+  if (Number.isFinite(durationSeconds) && durationSeconds >= 0) {
+    searchIngestionDurationSeconds.observe({ index, result }, durationSeconds);
+  }
+  if (Number.isFinite(documentCount) && documentCount >= 0) {
+    searchIngestionDocumentsTotal.inc({ index, result }, documentCount);
+  }
+  if (result === 'success') {
+    searchIngestionLastRunTimestamp.set({ index }, Date.now() / 1000);
+    return;
+  }
+
+  const reason = error?.code ?? error?.name ?? error?.message ?? 'unknown';
+  searchIngestionErrorsTotal.inc({ index, reason });
 }
 
 export function trackPaymentCaptureMetrics({ provider, status, currency, amountTotal, taxAmount }) {

@@ -5,6 +5,25 @@ const makeHash = (value) => crypto.createHash('sha256').update(value).digest('he
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
+    await trx('ads_campaign_metrics_daily').del();
+    await trx('ads_campaigns').del();
+    await trx('live_classroom_registrations').del();
+    await trx('live_classrooms').del();
+    await trx('tutor_bookings').del();
+    await trx('tutor_availability_slots').del();
+    await trx('tutor_profiles').del();
+    await trx('ebook_watermark_events').del();
+    await trx('ebook_reader_settings').del();
+    await trx('ebook_bookmarks').del();
+    await trx('ebook_highlights').del();
+    await trx('ebook_chapters').del();
+    await trx('ebooks').del();
+    await trx('course_progress').del();
+    await trx('course_enrollments').del();
+    await trx('course_assignments').del();
+    await trx('course_lessons').del();
+    await trx('course_modules').del();
+    await trx('courses').del();
     await trx('community_affiliate_payouts').del();
     await trx('community_subscriptions').del();
     await trx('community_paywall_tiers').del();
@@ -320,6 +339,141 @@ export async function seed(knex) {
       payload: JSON.stringify({ release: 'v1', visibility: 'workspace' })
     });
 
+    const [growthPlaybookEbookAssetId] = await trx('content_assets').insert({
+      public_id: crypto.randomUUID(),
+      type: 'ebook',
+      original_filename: 'creator-growth-funnel-playbook.epub',
+      storage_key: 'growth-lab/creator-growth-funnel-playbook.epub',
+      storage_bucket: 'edulure-r2-private',
+      converted_key: 'growth-lab/creator-growth-funnel-playbook.html',
+      converted_bucket: 'edulure-r2-secure',
+      status: 'ready',
+      visibility: 'private',
+      checksum: makeHash('growth-funnel-playbook.v1'),
+      size_bytes: 4829930,
+      mime_type: 'application/epub+zip',
+      created_by: adminId,
+      published_at: trx.fn.now(),
+      metadata: JSON.stringify({
+        communityId: growthCommunityId,
+        drmProfile: 'watermark-v1',
+        ingestionPipeline: 'ebook-normaliser'
+      })
+    });
+
+    await trx('asset_ingestion_jobs').insert({
+      asset_id: growthPlaybookEbookAssetId,
+      job_type: 'ebook-normalisation',
+      status: 'completed',
+      attempts: 1,
+      result_metadata: JSON.stringify({ normalisedChapters: 8, sanitizer: 'calibre-6.0' }),
+      started_at: trx.fn.now(),
+      completed_at: trx.fn.now()
+    });
+
+    await trx('asset_conversion_outputs').insert({
+      asset_id: growthPlaybookEbookAssetId,
+      format: 'html',
+      storage_key: 'growth-lab/creator-growth-funnel-playbook.html',
+      storage_bucket: 'edulure-r2-secure',
+      checksum: makeHash('growth-funnel-playbook.v1.html'),
+      size_bytes: 1932400,
+      metadata: JSON.stringify({ chapters: 8 })
+    });
+
+    const [growthStrategiesEbookId] = await trx('ebooks').insert({
+      public_id: crypto.randomUUID(),
+      asset_id: growthPlaybookEbookAssetId,
+      title: 'Creator Funnel Intelligence Playbook',
+      slug: 'creator-funnel-intelligence-playbook',
+      subtitle: 'Forecasting CPM, conversion velocity, and retention for creator-led ads funnels.',
+      description:
+        'An operator-grade manual for diagnosing creator funnel performance with actionable benchmarks, anomaly alerts, and optimisation cadences.',
+      authors: JSON.stringify(['Amina Diallo', 'Growth Lab Analysts']),
+      tags: JSON.stringify(['Ads', 'Funnels', 'Analytics']),
+      categories: JSON.stringify(['Marketing', 'Growth']),
+      languages: JSON.stringify(['en', 'pt']),
+      isbn: '978-1-4028-9462-6',
+      reading_time_minutes: 148,
+      price_currency: 'USD',
+      price_amount: 4900,
+      rating_average: 4.6,
+      rating_count: 112,
+      watermark_id: crypto.randomUUID(),
+      status: 'published',
+      is_public: true,
+      release_at: trx.fn.now(),
+      metadata: JSON.stringify({ cohort: 'beta-ops', featureFlag: 'explorer-ads-insights' })
+    });
+
+    const [introChapterId] = await trx('ebook_chapters').insert({
+      ebook_id: growthStrategiesEbookId,
+      title: 'Diagnostic Dashboards',
+      slug: 'diagnostic-dashboards',
+      position: 1,
+      word_count: 2150,
+      summary: 'Explains telemetry sources, key ratios, and the baseline diagnostic workflow for creator funnel teams.',
+      metadata: JSON.stringify({ chartCount: 6 })
+    });
+
+    const [forecastChapterId] = await trx('ebook_chapters').insert({
+      ebook_id: growthStrategiesEbookId,
+      title: 'Forecasting Campaign Velocity',
+      slug: 'forecasting-campaign-velocity',
+      position: 2,
+      word_count: 3280,
+      summary: 'Step-by-step modelling guide covering spend pacing, conversion runway, and anomaly handling.',
+      metadata: JSON.stringify({ templateDownloadId: 'forecast-spreadsheet-v2' })
+    });
+
+    await trx('ebook_highlights').insert({
+      ebook_id: growthStrategiesEbookId,
+      chapter_id: introChapterId,
+      user_id: learnerId,
+      highlight_color: '#A855F7',
+      location: 'chapter-1-paragraph-8',
+      text: 'Weekly run-rate reviews catch 78% of CPM anomalies before spend spikes.',
+      note: 'Surface in dashboard alerts for affiliates.',
+      metadata: JSON.stringify({ priority: 'high' })
+    });
+
+    await trx('ebook_bookmarks').insert({
+      ebook_id: growthStrategiesEbookId,
+      chapter_id: forecastChapterId,
+      user_id: instructorId,
+      label: 'Campaign velocity checklist',
+      location: 'chapter-2-section-3',
+      metadata: JSON.stringify({ bookmarkedFor: 'Friday AMA' })
+    });
+
+    await trx('ebook_reader_settings')
+      .insert({
+        user_id: learnerId,
+        theme: 'dark',
+        font_size: 18,
+        line_height: 1.6,
+        font_family: 'Inter',
+        metadata: JSON.stringify({ syncSource: 'web-app' })
+      })
+      .onConflict('user_id')
+      .merge();
+
+    await trx('ebook_watermark_events').insert({
+      ebook_id: growthStrategiesEbookId,
+      user_id: learnerId,
+      download_reference: `DL-${crypto.randomBytes(4).toString('hex').toUpperCase()}`,
+      watermark_hash: makeHash('learnerId-watermark'),
+      metadata: JSON.stringify({ device: 'ios-tablet', ipAddress: '10.0.0.42' })
+    });
+
+    await trx('ebook_read_progress').insert({
+      asset_id: growthPlaybookEbookAssetId,
+      user_id: learnerId,
+      progress_percent: 58.25,
+      last_location: 'chapter-2-section-4',
+      time_spent_seconds: 2643
+    });
+
     const [opsRoadmapPostId] = await trx('community_posts')
       .insert({
         community_id: opsCommunityId,
@@ -436,6 +590,114 @@ export async function seed(knex) {
         event_type: 'community.resource.published',
         payload: JSON.stringify({ communityId: growthCommunityId, resourceType: 'external_link' }),
         performed_by: adminId
+      }
+    ]);
+
+    const [opsAutomationCourseId] = await trx('courses').insert({
+      public_id: crypto.randomUUID(),
+      instructor_id: instructorId,
+      title: 'Automation Launch Masterclass',
+      slug: 'automation-launch-masterclass',
+      summary: 'Production blueprint for running live classroom automation squads with incident rehearsal safeguards.',
+      description:
+        'This cohort-based programme equips operations leaders with the tooling, cadences, and telemetry to launch live classrooms without regression risks. Modules cover command center setup, incident simulations, telemetry dashboards, and stakeholder escalation workflows.',
+      level: 'advanced',
+      category: 'operations',
+      skills: JSON.stringify(['automation', 'incident response', 'quality assurance']),
+      tags: JSON.stringify(['Automation', 'Launch', 'Ops Guild']),
+      languages: JSON.stringify(['en']),
+      delivery_format: 'cohort',
+      thumbnail_url: 'https://cdn.edulure.test/thumbnails/automation-masterclass.png',
+      price_currency: 'USD',
+      price_amount: 129900,
+      rating_average: 4.8,
+      rating_count: 187,
+      enrolment_count: 421,
+      is_published: true,
+      release_at: trx.fn.now(),
+      status: 'published',
+      metadata: JSON.stringify({ syllabusVersion: '2024-Q4', analyticsKey: 'ops-masterclass' })
+    });
+
+    const [opsModuleKickoffId] = await trx('course_modules').insert({
+      course_id: opsAutomationCourseId,
+      title: 'Launch Command Center',
+      slug: 'launch-command-center',
+      position: 1,
+      release_offset_days: 0,
+      metadata: JSON.stringify({ recommendedDurationMinutes: 120 })
+    });
+
+    const [opsModuleIncidentId] = await trx('course_modules').insert({
+      course_id: opsAutomationCourseId,
+      title: 'Incident Simulation Drills',
+      slug: 'incident-simulation-drills',
+      position: 2,
+      release_offset_days: 7,
+      metadata: JSON.stringify({ hasSimulation: true })
+    });
+
+    const [commandCenterLessonId] = await trx('course_lessons').insert({
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleKickoffId,
+      asset_id: opsPlaybookAssetId,
+      title: 'Command Center Blueprint',
+      slug: 'command-center-blueprint',
+      position: 1,
+      duration_minutes: 45,
+      release_at: trx.fn.now(),
+      metadata: JSON.stringify({ format: 'presentation', keyTakeaway: 'Runbook readiness matrix' })
+    });
+
+    const [telemetryLessonId] = await trx('course_lessons').insert({
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleIncidentId,
+      asset_id: growthPlaybookEbookAssetId,
+      title: 'Funnel Telemetry Deep Dive',
+      slug: 'funnel-telemetry-deep-dive',
+      position: 1,
+      duration_minutes: 60,
+      release_at: trx.fn.now(),
+      metadata: JSON.stringify({ format: 'reading', worksheet: 'forecast-checklist' })
+    });
+
+    await trx('course_assignments').insert({
+      course_id: opsAutomationCourseId,
+      module_id: opsModuleIncidentId,
+      title: 'Automation Readiness Audit',
+      instructions:
+        'Upload the incident rehearsal scorecard summarising escalation roles, telemetry dashboards, and fallback runbooks for your next classroom launch.',
+      max_score: 100,
+      due_offset_days: 10,
+      rubric: JSON.stringify({ automationCoverage: 40, rehearsalRigor: 30, reportingClarity: 30 }),
+      metadata: JSON.stringify({ submissionType: 'upload', requiresReview: true })
+    });
+
+    const [opsEnrollmentId] = await trx('course_enrollments').insert({
+      public_id: crypto.randomUUID(),
+      course_id: opsAutomationCourseId,
+      user_id: learnerId,
+      status: 'active',
+      progress_percent: 46.5,
+      started_at: trx.fn.now(),
+      metadata: JSON.stringify({ cohort: '2024-Q4', enrollmentSource: 'seed' })
+    });
+
+    await trx('course_progress').insert([
+      {
+        enrollment_id: opsEnrollmentId,
+        lesson_id: commandCenterLessonId,
+        completed: true,
+        completed_at: trx.fn.now(),
+        progress_percent: 100,
+        metadata: JSON.stringify({ completionSource: 'web' })
+      },
+      {
+        enrollment_id: opsEnrollmentId,
+        lesson_id: telemetryLessonId,
+        completed: false,
+        progress_percent: 25,
+        metadata: JSON.stringify({ lastLocation: 'section-2', note: 'Review telemetry thresholds' })
       }
     ]);
 
@@ -681,6 +943,106 @@ export async function seed(knex) {
         performed_by: adminId
       }
     ]);
+
+    const tutorSlotStart = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    tutorSlotStart.setUTCHours(13, 0, 0, 0);
+    const tutorSlotEnd = new Date(tutorSlotStart.getTime() + 60 * 60 * 1000);
+    const openSlotStart = new Date(tutorSlotStart.getTime() + 3 * 24 * 60 * 60 * 1000);
+    openSlotStart.setUTCHours(15, 0, 0, 0);
+    const openSlotEnd = new Date(openSlotStart.getTime() + 60 * 60 * 1000);
+
+    const [opsTutorProfileId] = await trx('tutor_profiles').insert({
+      user_id: instructorId,
+      display_name: 'Kai Watanabe',
+      headline: 'Automation launch strategist & Agora live operations lead',
+      bio: 'Kai orchestrates hybrid live learning launches for global cohorts, specialising in incident rehearsal and telemetry roll-outs.',
+      skills: JSON.stringify(['Automation', 'Live Operations', 'Incident Response']),
+      languages: JSON.stringify(['en', 'ja']),
+      country: 'JP',
+      timezones: JSON.stringify(['Asia/Tokyo', 'Etc/UTC']),
+      availability_preferences: JSON.stringify({ weeklyHours: 12, officeHours: ['Tuesday 09:00Z', 'Thursday 14:00Z'] }),
+      hourly_rate_amount: 18000,
+      hourly_rate_currency: 'USD',
+      rating_average: 4.9,
+      rating_count: 86,
+      completed_sessions: 312,
+      response_time_minutes: 18,
+      is_verified: true,
+      metadata: JSON.stringify({ onboardingStatus: 'complete', calendlyLink: 'https://meet.edulure.test/kai' })
+    });
+
+    const [bookedAvailabilityId] = await trx('tutor_availability_slots').insert({
+      tutor_id: opsTutorProfileId,
+      start_at: tutorSlotStart,
+      end_at: tutorSlotEnd,
+      status: 'booked',
+      is_recurring: false,
+      metadata: JSON.stringify({ bookingReference: 'OPS-LAUNCH-SESSION' })
+    });
+
+    await trx('tutor_availability_slots').insert({
+      tutor_id: opsTutorProfileId,
+      start_at: openSlotStart,
+      end_at: openSlotEnd,
+      status: 'open',
+      is_recurring: true,
+      recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,WE',
+      metadata: JSON.stringify({ channel: 'ops-guild', durationMinutes: 60 })
+    });
+
+    const [opsTutorBookingId] = await trx('tutor_bookings').insert({
+      public_id: crypto.randomUUID(),
+      tutor_id: opsTutorProfileId,
+      learner_id: learnerId,
+      requested_at: trx.fn.now(),
+      confirmed_at: trx.fn.now(),
+      scheduled_start: tutorSlotStart,
+      scheduled_end: tutorSlotEnd,
+      duration_minutes: 60,
+      hourly_rate_amount: 18000,
+      hourly_rate_currency: 'USD',
+      meeting_url: 'https://meet.edulure.test/ops-masterclass-sync',
+      status: 'confirmed',
+      metadata: JSON.stringify({ availabilitySlotId: bookedAvailabilityId, communityId: opsCommunityId })
+    });
+
+    const liveClassroomStart = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    liveClassroomStart.setUTCHours(17, 0, 0, 0);
+    const liveClassroomEnd = new Date(liveClassroomStart.getTime() + 90 * 60 * 1000);
+
+    const [opsLiveClassroomId] = await trx('live_classrooms').insert({
+      public_id: crypto.randomUUID(),
+      community_id: opsCommunityId,
+      instructor_id: instructorId,
+      title: 'Automation Command Simulation',
+      slug: 'automation-command-simulation',
+      summary: 'Live simulation covering escalation workflows, telemetry dashboards, and tutor hand-offs.',
+      description:
+        'Learners practise running an automation-driven classroom rehearsal with live alerts, R2 asset sync, and tutor escalation drills anchored to the ops guild war room.',
+      type: 'workshop',
+      status: 'scheduled',
+      is_ticketed: true,
+      price_amount: 9900,
+      price_currency: 'USD',
+      capacity: 120,
+      reserved_seats: 64,
+      timezone: 'Etc/UTC',
+      start_at: liveClassroomStart,
+      end_at: liveClassroomEnd,
+      topics: JSON.stringify(['Automation', 'Live Operations']),
+      metadata: JSON.stringify({ agoraChannel: 'OPS-LAUNCH-001', featureFlag: 'live-simulations' })
+    });
+
+    await trx('live_classroom_registrations').insert({
+      classroom_id: opsLiveClassroomId,
+      user_id: learnerId,
+      status: 'registered',
+      ticket_type: 'premium',
+      amount_paid: 9900,
+      currency: 'USD',
+      registered_at: trx.fn.now(),
+      metadata: JSON.stringify({ bookingId: opsTutorBookingId, seat: 'A-14' })
+    });
 
     const [directThreadId] = await trx('direct_message_threads').insert({
       subject: 'Launch Readiness Sync',
@@ -970,6 +1332,68 @@ export async function seed(knex) {
         exposure_level: 'internal',
         sensitive: false,
         metadata: JSON.stringify({ owner: 'Commerce' })
+      }
+    ]);
+
+    const adsStart = new Date();
+    adsStart.setDate(adsStart.getDate() - 7);
+    adsStart.setUTCHours(0, 0, 0, 0);
+    const adsEnd = new Date();
+    adsEnd.setDate(adsEnd.getDate() + 21);
+    adsEnd.setUTCHours(0, 0, 0, 0);
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    twoDaysAgo.setUTCHours(0, 0, 0, 0);
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    oneDayAgo.setUTCHours(0, 0, 0, 0);
+
+    const [growthAdsCampaignId] = await trx('ads_campaigns').insert({
+      public_id: crypto.randomUUID(),
+      created_by: adminId,
+      name: 'Creator Funnel Boost Q4',
+      objective: 'conversions',
+      status: 'active',
+      budget_currency: 'USD',
+      budget_daily_cents: 500000,
+      spend_currency: 'USD',
+      spend_total_cents: 182500,
+      performance_score: 88.4,
+      ctr: 0.0425,
+      cpc_cents: 185,
+      cpa_cents: 1299,
+      targeting_keywords: JSON.stringify(['creator ads', 'funnel analytics', 'ops playbook']),
+      targeting_audiences: JSON.stringify(['Creators', 'Ops Leads']),
+      targeting_locations: JSON.stringify(['US', 'GB', 'BR']),
+      targeting_languages: JSON.stringify(['en', 'pt']),
+      creative_headline: 'Scale creator funnels with telemetry-grade insights',
+      creative_description: 'Drive conversions with automation playbooks, live simulations, and monetisation labs.',
+      creative_url: 'https://edulure.test/ads/creator-funnel-boost',
+      start_at: adsStart,
+      end_at: adsEnd,
+      metadata: JSON.stringify({ promotedCommunityId: growthCommunityId, featureFlag: 'ads-explorer-placements' })
+    });
+
+    await trx('ads_campaign_metrics_daily').insert([
+      {
+        campaign_id: growthAdsCampaignId,
+        metric_date: twoDaysAgo,
+        impressions: 42000,
+        clicks: 1785,
+        conversions: 214,
+        spend_cents: 36500,
+        revenue_cents: 98200,
+        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
+      },
+      {
+        campaign_id: growthAdsCampaignId,
+        metric_date: oneDayAgo,
+        impressions: 48750,
+        clicks: 2043,
+        conversions: 238,
+        spend_cents: 41200,
+        revenue_cents: 109500,
+        metadata: JSON.stringify({ source: 'meilisearch-reports', funnel: 'creator-growth' })
       }
     ]);
 

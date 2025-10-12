@@ -74,6 +74,59 @@ The following additional variables configure the asset workflow:
 When running locally without CloudConvert the ingestion worker will mark PowerPoint jobs as failed. Other formats (EPUB, PDF) are
 processed entirely within the service and will continue to function.
 
+### Explorer search environment
+
+The explorer, recommendation, and ads surfaces rely on a hardened Meilisearch cluster. Configure the following variables to
+provision the cluster and secure API access:
+
+- `MEILISEARCH_HOSTS` – comma-separated list of primary/admin hosts (include protocol and port).
+- `MEILISEARCH_REPLICA_HOSTS` – optional replica nodes for failover during write operations.
+- `MEILISEARCH_SEARCH_HOSTS` – read endpoints consumed by web/mobile clients. Defaults to the union of primary + replica hosts.
+- `MEILISEARCH_ADMIN_API_KEY` – admin/master API key used for index provisioning and security audits. Store in a secret manager.
+- `MEILISEARCH_SEARCH_API_KEY` – read-only key distributed to clients. The backend will refuse to start if this key has write
+  permissions.
+- `MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS` – cadence for cluster health monitoring and Prometheus reporting.
+- `MEILISEARCH_REQUEST_TIMEOUT_MS` – timeout for administrative calls (index bootstrap, health checks, snapshots).
+- `MEILISEARCH_INDEX_PREFIX` – isolates indexes per environment/tenant (`edulure`, `edulure-staging`, etc.).
+- `MEILISEARCH_ALLOWED_IPS` – IP/CIDR list exposed to operations for allow-listing reverse proxies hitting the cluster.
+
+Bootstrap or audit the cluster at any time with:
+
+```bash
+npm run search:provision
+# Append --snapshot to trigger a Meilisearch snapshot once indexes are synchronised
+npm run search:provision -- --snapshot
+```
+
+The command ensures explorer indexes exist with production settings, verifies API key privileges, runs live health checks across
+primary/replica/read nodes, and (optionally) requests a snapshot for off-site backups. Prometheus now exposes
+`edulure_search_operation_duration_seconds`, `edulure_search_node_health`, and `edulure_search_index_ready` so alerting can
+detect unhealthy nodes or drifted index definitions.
+
+Explorer ingestion is orchestrated by `SearchIngestionService`. Configure the following to tune throughput and retention:
+
+- `SEARCH_INGESTION_BATCH_SIZE` – number of records fetched per entity batch (default `500`).
+- `SEARCH_INGESTION_CONCURRENCY` – how many indexes to process in parallel during a reindex (default `2`).
+- `SEARCH_INGESTION_DELETE_BEFORE_REINDEX` – when `true` (default) a full rebuild clears existing documents before ingestion;
+  incremental runs (`--since`) always append/update in place regardless of this flag.
+
+Trigger a full or incremental rebuild with:
+
+```bash
+# Full rebuild (deletes and repopulates every explorer index)
+npm run search:reindex
+
+# Incremental sync – only reindex documents changed in the last 24 hours
+npm run search:reindex -- --since="2024-11-01T00:00:00Z"
+
+# Focus on specific indexes (e.g. courses + ads)
+npm run search:reindex -- --indexes=courses,ads
+```
+
+Successful runs emit Prometheus metrics `edulure_search_ingestion_duration_seconds`,
+`edulure_search_ingestion_documents_total`, `edulure_search_ingestion_errors_total`, and
+`edulure_search_ingestion_last_run_timestamp` so dashboards and alerts can track coverage, throughput, and failure causes.
+
 ### Payments & finance environment
 
 Stripe and PayPal power the unified checkout, refunds, and finance reporting suite. Configure the following secrets before

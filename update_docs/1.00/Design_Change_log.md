@@ -74,6 +74,20 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Updated notification drawer and activity feed narratives in `web_application_logic_flow_changes.md`, `user_application_logic_flow_changes.md`, and `menu_drawings.md` to surface follow approvals, new followers, and mute/block events consistent with the audit and domain events emitted by `SocialGraphService`.
 - Extended dummy data requirements in `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Dummy_Data_Requirements.md` and `Screen_text.md` with follower counts (250–12k), recommendation reasons (“Because you follow Operations Guild”), and privacy copy so designers and QA can mirror the seeded backend dataset.
 
+### 12. Explorer Search & Ads Intelligence
+- Finalised explorer layouts covering mixed-entity grids, saved search toasts, and pinned filters referencing `website_drawings.md`,
+  `dashboard_drawings.md`, and `menu_drawings.md` so React/Flutter implementations align with Meilisearch index groupings (communities,
+  courses, ebooks, tutors, ads, events) and the new facet definitions (tier, pricing, availability, campaign objective).
+- Documented advanced filter drawers, synonym-backed quick actions, and zero-result states in `ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Function Design.md`
+  and `Application_Design_Update_Plan/Application Design Update.md`, ensuring copy highlights follow-graph boosts, tutor availability,
+  and ad performance metrics now surfaced by the backend index settings.
+- Added operator dashboards for search health—node status banners, snapshot prompts, and index drift alerts—within `Admin_panel_drawings.md`
+  and `dashboard_drawings.md`, mirroring the new Prometheus metrics (`edulure_search_node_health`, `edulure_search_index_ready`) so SREs
+  have visual hooks for incidents.
+- Updated mobile explorer flows in `App_screens_drawings.md` with carousel-first entity tabs, offline recent searches, and ad creative previews,
+  referencing the same synonym/ranking cues the backend enforces, plus chip-based voice search entry points tied to the new API contracts.
+- Documented ingestion telemetry overlays in `dashboard_drawings.md` and `Admin_panel_drawings.md` showing batch progress, last-run timestamps, failure banners, and dataset freshness indicators aligned with `SearchIngestionService` metrics so operators and designers share expectations for reindex workflows across web and mobile consoles.
+
 ## Accessibility, Security & Compliance Adjustments
 - Enforced WCAG focus order, keyboard states, and ARIA labelling for updated forms and navigation components.
 - Embedded security messaging around verification, payment confirmation, and rights-managed assets across profile and commerce flows.

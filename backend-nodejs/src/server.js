@@ -6,6 +6,7 @@ import assetIngestionService from './services/AssetIngestionService.js';
 import dataRetentionJob from './jobs/dataRetentionJob.js';
 import communityReminderJob from './jobs/communityReminderJob.js';
 import { featureFlagService, runtimeConfigService } from './services/FeatureFlagService.js';
+import { searchClusterService } from './services/SearchClusterService.js';
 
 async function start() {
   try {
@@ -18,9 +19,13 @@ async function start() {
   }
 
   try {
-    await Promise.all([featureFlagService.start(), runtimeConfigService.start()]);
+    await Promise.all([
+      featureFlagService.start(),
+      runtimeConfigService.start(),
+      searchClusterService.start()
+    ]);
   } catch (error) {
-    logger.error({ err: error }, 'Failed to warm runtime configuration services');
+    logger.error({ err: error }, 'Failed to initialise platform services');
     process.exit(1);
   }
 
@@ -38,6 +43,7 @@ async function start() {
     communityReminderJob.stop();
     featureFlagService.stop();
     runtimeConfigService.stop();
+    searchClusterService.stop();
     logger.info('Shutting down gracefully');
     process.exit(0);
   };
