@@ -17,3 +17,7 @@
 - Documented engagement configuration, reminder scheduler operations, and cron deployment guidance in the backend README so SRE and product teams can tune batch sizes/lookahead windows and monitor reminder telemetry without source-diving.
 - Updated backend README and `.env.example` to document community chat and direct messaging prerequisites (websocket/notification hooks, presence TTL defaults, moderation workflows), reference the new `/api/communities/{id}/chat` and `/api/chat` endpoints, and outline the seed data/storyboards used by frontend and mobile teams.
 - Extended backend README and `.env.example` with social graph guidance: documented follow pagination/mute defaults, described `/api/social` follow/mute/block/privacy workflows, and noted seed data representing follower approvals/pending requests so product, support, and frontend squads can exercise the new social experiences locally.
+- Documented Meilisearch explorer operations in the backend README: captured new environment variables, Prometheus metrics, the
+  `npm run search:provision` bootstrap/snapshot workflow, and security guidance calling out the enforced read-only search key
+  requirement.
+- Extended README/search docs with ingestion coverage: outlined `npm run search:reindex`, incremental sync guidance, ingestion env toggles, expected dataset seeds (courses, ebooks, tutors, live classrooms, ads), and Prometheus metrics so ops teams can run catch-up indexing safely.

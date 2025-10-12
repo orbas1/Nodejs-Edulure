@@ -56,6 +56,7 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   1. **Task 4.1 Meilisearch Infrastructure & Data Pipelines**
      - Provision clusters, security, replication, monitoring, and backup strategies.
      - Build ETL pipelines for communities, courses, ebooks, tutors, profiles, ads, and events with incremental syncs.
+     - Status update: SearchClusterService is live with index provisioning/snapshots and the new SearchIngestionService now powers batched, incremental ETL across all explorer indexes, driven by the `npm run search:reindex` CLI and instrumented via Prometheus ingestion metrics for operational dashboards.
   2. **Task 4.2 Explorer & Ads Delivery**
      - Implement explorer navigation, filters, map previews, voice search, saved searches, and deep links (web + Flutter).
      - Launch ads campaign builder, targeting, budgeting, creatives, analytics dashboards, and compliance guards.

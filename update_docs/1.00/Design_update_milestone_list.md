@@ -14,11 +14,11 @@
 - **Dependencies:** IA research, logic flow artefacts (`Logic_Flow_map.md`, `Screens_Update_Logic_Flow_map.md`).
 - **Responsible Roles:** UX Architect, Frontend Lead, Flutter Lead.
 
-## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 88% complete)
+## Milestone 3 – Template & Component Delivery (Target: Week 6, Status: 92% complete)
 - **Objectives:** Produce annotated high-fidelity templates for home, dashboards, explorer, media viewers, profiles, and settings across web and Flutter.
 - **Entry Criteria:** Milestones 1–2 delivered; component inventory baselined.
 - **Exit Criteria:** Templates annotated with states and analytics IDs, asset manifests produced, copy decks approved, usability validation recorded. _Update:_ Live classroom lobbies, tutor storefronts, booking calendars, moderator consoles, checkout, coupon, refund, finance dashboards, and the refreshed community hub/resource library are now redlined with analytics IDs, motion notes, webhook fallbacks, membership guardrails, and SCA states referencing `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, `menu_drawings.md`, and `web_application_logic_flow_changes.md`.
-- **Latest Progress:** Community paywall dashboards, subscription plan cards, entitlement badges, affiliate payout flows, engagement leaderboards/streak/event reminder overlays, the end-to-end messaging suite (community chat docks, DM inbox/thread compositions, moderation trays, unread/presence states), and the new follower/following management trays with recommendation carousels now mirror backend APIs with interaction specs referencing `menu_drawings.md`, `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, `Admin_panel_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`.
+- **Latest Progress:** Community paywall dashboards, subscription plan cards, entitlement badges, affiliate payout flows, engagement leaderboards/streak/event reminder overlays, the end-to-end messaging suite (community chat docks, DM inbox/thread compositions, moderation trays, unread/presence states), the new follower/following management trays with recommendation carousels, and the explorer discovery stack (mixed-entity grids, facet drawers, saved search management, promoted ads rail, zero-result education, ingestion telemetry consoles) now mirror backend APIs with interaction specs referencing `menu_drawings.md`, `dashboard_drawings.md`, `App_screens_drawings.md`, `website_drawings.md`, `Admin_panel_drawings.md`, and `Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md`.
 - **Dependencies:** Token library, imagery guidance (`images_and_vectors.md`), microcopy drafts (`Screen_text.md`).
 - **Responsible Roles:** Product Designers, Content Strategist, QA Design Lead.
 
@@ -42,5 +42,5 @@
 | --- | --- | --- | --- |
 | Token & Theme System Finalisation | Week 2 | 70% complete | Cross-platform token exports, emo/seasonal theme guardrails, automated contrast reports. |
 | Navigation & Layout Blueprint | Week 4 | 45% complete | Role-based IA schema, breakpoint matrices, breadcrumb/stepper interaction specs. |
-| Template & Component Delivery | Week 6 | 90% complete | Annotated templates for home/dashboards/explorer/messaging, asset manifests, copy decks. |
+| Template & Component Delivery | Week 6 | 92% complete | Annotated templates for home/dashboards/explorer/messaging, asset manifests, copy decks. |
 | Engineering Handoff & QA | Week 8 | 45% complete | Handoff kits, accessibility/localisation scripts, messaging QA packs, design QA sign-offs. |

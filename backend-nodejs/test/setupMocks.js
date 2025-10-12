@@ -49,6 +49,18 @@ vi.mock('prom-client', () => {
     dec() {
       this.value -= 1;
     }
+
+    set(_labels, value) {
+      this.value = value;
+    }
+
+    labels() {
+      return {
+        set: (value) => {
+          this.value = value;
+        }
+      };
+    }
   }
 
   class Registry {

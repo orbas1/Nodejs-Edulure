@@ -42,3 +42,13 @@
 - Delivered the social graph stack: migration `20241125140000_social_graph.js` adds privacy, follow, mute, block, recommendation, and audit tables; repositories/service/controller/route (`SocialGraphService`/`SocialGraphController`/`/api/social`) power follower/following pagination with viewer context, follow/unfollow + approval flows, recommendation fallbacks, mute/block governance, and privacy CRUD. Seeds emulate approvals/pending requests, OpenAPI now documents the new schemas and endpoints, README + `.env.example` surface tuning knobs, and new Vitest suites cover service logic and HTTP contracts.
 - Added defensive execution helpers in `SocialGraphService` to remove silent promise `.catch` chains, routing follow recommendation and mute/unmute clean-up failures through structured warnings without interrupting customer flows.
 - Normalised nullable OpenAPI fields (chat, DM, social graph, paywalls) to leverage `nullable: true`, eliminating validation errors and confirming spec compliance via `npx swagger-cli validate src/docs/openapi.json`.
+
+## Version 1.00 – Task 4 Explorer Search & Intelligence
+
+- Hardened the Meilisearch explorer foundation: `SearchClusterService` now provisions, validates, and monitors explorer indexes (communities,
+  courses, ebooks, tutors, profiles, ads, events) with host/API key hygiene, enforced read-only search keys, Prometheus metrics
+  (`edulure_search_operation_duration_seconds`, `edulure_search_node_health`, `edulure_search_index_ready`), and a `npm run search:provision`
+  bootstrap/snapshot workflow. Backend README and `.env.example` document operational guidance, while design artefacts add explorer entity tabs,
+  facet rails, saved search UX, ad placements, and SRE health consoles referencing `website_drawings.md`, `dashboard_drawings.md`,
+  `menu_drawings.md`, `Admin_panel_drawings.md`, and `App_screens_drawings.md`.
+- Delivered production ingestion pipelines for the explorer: `SearchIngestionService` orchestrates batched/concurrent ETL for all indexes with incremental `since` support, delete-before-reindex safeguards, and Prometheus instrumentation. New CLI `npm run search:reindex` executes full/delta reloads, `.env.example` exposes ingestion tuning knobs, migrations seed courses/ebooks/tutor/live classroom/ads intelligence tables, and Vitest suites cover loader pagination plus failure telemetry so Meilisearch receives production-grade payloads on demand.

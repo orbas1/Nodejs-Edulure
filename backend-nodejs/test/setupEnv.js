@@ -100,3 +100,18 @@ process.env.COMMUNITY_REMINDER_TIMEZONE = process.env.COMMUNITY_REMINDER_TIMEZON
 process.env.COMMUNITY_REMINDER_LOOKAHEAD_MINUTES =
   process.env.COMMUNITY_REMINDER_LOOKAHEAD_MINUTES ?? '30';
 process.env.COMMUNITY_REMINDER_BATCH_SIZE = process.env.COMMUNITY_REMINDER_BATCH_SIZE ?? '100';
+process.env.MEILISEARCH_HOSTS = process.env.MEILISEARCH_HOSTS ?? 'https://meilisearch-primary.local:7700';
+process.env.MEILISEARCH_REPLICA_HOSTS =
+  process.env.MEILISEARCH_REPLICA_HOSTS ?? 'https://meilisearch-replica.local:7700';
+process.env.MEILISEARCH_SEARCH_HOSTS =
+  process.env.MEILISEARCH_SEARCH_HOSTS ?? 'https://meilisearch-primary.local:7700,https://meilisearch-replica.local:7700';
+process.env.MEILISEARCH_ADMIN_API_KEY =
+  process.env.MEILISEARCH_ADMIN_API_KEY ?? 'masterKey-masterKey-masterKey';
+process.env.MEILISEARCH_SEARCH_API_KEY =
+  process.env.MEILISEARCH_SEARCH_API_KEY ?? 'searchKey-searchKey-searchKey';
+process.env.MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS =
+  process.env.MEILISEARCH_HEALTHCHECK_INTERVAL_SECONDS ?? '30';
+process.env.MEILISEARCH_REQUEST_TIMEOUT_MS =
+  process.env.MEILISEARCH_REQUEST_TIMEOUT_MS ?? '5000';
+process.env.MEILISEARCH_INDEX_PREFIX = process.env.MEILISEARCH_INDEX_PREFIX ?? 'edulure';
+process.env.MEILISEARCH_ALLOWED_IPS = process.env.MEILISEARCH_ALLOWED_IPS ?? '127.0.0.1/32';

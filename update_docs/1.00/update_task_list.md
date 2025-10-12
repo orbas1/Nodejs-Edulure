@@ -76,8 +76,12 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 - **Design:** Explorer layouts, ad creatives, reporting visuals, accessibility for search flows.
 
 ### Subtasks
-1. **Meilisearch Infrastructure (0%)** – Provisioning, replication, security hardening, monitoring, backups.
-2. **Data Pipelines & Indexing (0%)** – ETL for communities, courses, ebooks, tutors, profiles, ads, events.
+1. **Meilisearch Infrastructure (100%)** – Provisioning, replication, security hardening, monitoring, backups. _Progress update:_
+   Added `SearchClusterService` with host/key validation, automated index provisioning (communities, courses, ebooks, tutors,
+   profiles, ads, events), Prometheus metrics (`edulure_search_operation_duration_seconds`, `edulure_search_node_health`,
+   `edulure_search_index_ready`), enforced read-only search keys at startup, operationalised the `npm run search:provision`
+   bootstrap/snapshot workflow, and documented environment requirements in the backend README and `.env.example`.
+2. **Data Pipelines & Indexing (100%)** – ETL for communities, courses, ebooks, tutors, profiles, ads, events. _Progress update:_ SearchIngestionService now streams batched, incremental loads for every explorer index (communities, courses, ebooks, tutors, profiles, ads, events) with concurrency controls, Prometheus instrumentation, and snapshot-aware deletes. The new `npm run search:reindex` CLI bootstraps full or delta syncs, seeded datasets exercise course/ebook/tutor/live-classroom/ads records, and Vitest coverage validates loader pagination, incremental filters, and failure telemetry.
 3. **Explorer UX Implementation (0%)** – Entity tabs, filters, map previews, saved searches, quick actions.
 4. **Ads Suite Delivery (0%)** – Campaign builder, targeting rules, budgeting, creatives, compliance automation.
 5. **Analytics & Intelligence (0%)** – Dashboards, zero-result alerts, CTR tracking, predictions, experiment toggles.

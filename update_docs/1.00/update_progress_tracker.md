@@ -7,7 +7,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 1 – Platform Hardening & Governance Foundations | 92% | 88% | 85% | 88% | 89% | 88% | 88% |
 | Task 2 – Content, Commerce & Live Learning Delivery | 74% | 82% | 80% | 84% | 72% | 75% | 78% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 90% | 98% | 94% | 96% | 90% | 94% | 94% |
-| Task 4 – Explorer Search, Ads & Intelligence Platform | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 4 – Explorer Search, Ads & Intelligence Platform | 48% | 58% | 55% | 60% | 52% | 56% | 55% |
 | Task 5 – Dashboards, Profiles & Operational Consoles | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -26,6 +26,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Social graph services now run with transactional privacy enforcement, reciprocal recommendation orchestration, defensive mute and block cleanup, hardened environment controls, and swagger-validated OpenAPI contracts backed by service + HTTP Vitest suites to unlock feed ranking, discovery, and moderation tooling.
 - Messaging design overlays (chat docks, DM inbox/thread panes, moderation consoles, presence beacons, unread badges, and DND prompts) now reference `dashboard_drawings.md`, `menu_drawings.md`, `website_drawings.md`, `Admin_panel_drawings.md`, and `App_screens_drawings.md`, aligning the refreshed documentation with the backend pagination and TTL contracts introduced this cycle.
 - Social, explorer, dashboard, mobile, and QA programmes await foundational dependencies; progress is intentionally gated until upstream services stabilise.
+- Explorer infrastructure now includes ingestion: SearchIngestionService batches and parallelises ETL for communities, courses, ebooks, tutors, profiles, ads, and events with incremental `since` filters, Prometheus coverage (`edulure_search_ingestion_documents_total`, `edulure_search_ingestion_failures_total`, `edulure_search_ingestion_last_run_seconds`), and the operational `npm run search:reindex` CLI. Fresh migrations/seed data hydrate course, ebook, tutor, live classroom, and ads intelligence tables so Meilisearch indexes receive production-ready payloads after each deploy.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |
