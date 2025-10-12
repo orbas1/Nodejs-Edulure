@@ -104,6 +104,20 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 4. **Admin & Customer Service Panels (0%)** – Approvals, incident response, refunds, policy hub, support tickets.
 5. **ID Verification & Compliance (0%)** – Document capture, verification workflow, audit logs, policy management.
 
+### Sprint Breakdown
+- **Sprint 5A – Component Foundations (0%)**
+  - Finalise API payloads for dashboard/profile widgets (0%).
+  - Deliver responsive layout skeletons with placeholder data (0%).
+  - Wire cache invalidation hooks for component hydration (0%).
+- **Sprint 5B – Role-Based Dashboards (0%)**
+  - Ship learner dashboard widgets and notification centre MVP (0%).
+  - Launch instructor pricing/analytics rails with audit logging (0%).
+  - Harden admin/support consoles with escalation workflows (0%).
+- **Sprint 5C – Compliance & Verification (0%)**
+  - Implement KYC document pipeline with storage encryption (0%).
+  - Automate verification status notifications across channels (0%).
+  - Publish policy hub + support SOP documentation updates (0%).
+
 ## Task 6 – Mobile Parity & Store Readiness (0% complete)
 ### Integration Coverage
 - **Backend:** Mobile-optimised endpoints, push notifications, sync APIs, download services.
@@ -122,6 +136,20 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 4. **Performance & Offline (0%)** – Caching, background sync, low-bandwidth modes, crash analytics.
 5. **Store Submission & Compliance (0%)** – Listings, privacy disclosures, review workflows, phased rollout plan.
 
+### Sprint Breakdown
+- **Sprint 6A – Core Shell & Networking (0%)**
+  - Stand up Flutter navigation shell with auth guard stubs (0%).
+  - Integrate dio client, interceptors, and secure storage bootstrap (0%).
+  - Land shared design tokens from React for typography/colour (0%).
+- **Sprint 6B – Learner Modules (0%)**
+  - Ship communities/explorer readers with cached pagination (0%).
+  - Enable course/eBook playback with offline download toggles (0%).
+  - Wire live classroom join + notifications using feature flags (0%).
+- **Sprint 6C – Instructor & Store Prep (0%)**
+  - Deliver instructor pricing/analytics dashboards with background sync (0%).
+  - Add payouts/chat inbox parity plus push notification opt-ins (0%).
+  - Complete store asset pipeline, beta channel, and crash reporting (0%).
+
 ## Task 7 – Quality Assurance, Policies & Launch Operations (0% complete)
 ### Integration Coverage
 - **Backend:** Automated tests, policy enforcement, audit logging, performance monitoring.
@@ -139,6 +167,20 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 3. **Policy & Compliance Rollout (0%)** – Privacy/terms updates, spam/bad-word filters, moderation training, policy hub.
 4. **Documentation & Training (0%)** – Knowledge base, SOPs, update brief, change log, support scripts.
 5. **Launch & Post-Release Ops (0%)** – Rollout calendar, feature flags, monitoring dashboards, war room, post-mortems.
+
+### Sprint Breakdown
+- **Sprint 7A – Automation Foundations (0%)**
+  - Stabilise Vitest coverage, contract tests, and lint gates in CI (0%).
+  - Add accessibility/visual regression pipelines with baselines (0%).
+  - Integrate load/security scans into nightly workflow (0%).
+- **Sprint 7B – UAT & Policy Readiness (0%)**
+  - Run cross-platform UAT scripts with learner/provider cohorts (0%).
+  - Finalise privacy/terms updates and legal review sign-off (0%).
+  - Train moderation/support teams on new escalation policies (0%).
+- **Sprint 7C – Launch & Support (0%)**
+  - Publish release communications and support runbooks (0%).
+  - Staff launch war-room with monitoring + rollback playbooks (0%).
+  - Schedule post-launch review and metrics dashboards (0%).
 
 ### Design Task Addendum
 | Task | Status | Focus | Key Outputs |
