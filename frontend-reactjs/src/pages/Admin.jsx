@@ -6,6 +6,31 @@ import DashboardStateMessage from '../components/dashboard/DashboardStateMessage
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+
+const numberFormatter = new Intl.NumberFormat('en-US');
+
+const EMPTY_OBJECT = Object.freeze({});
+const EMPTY_ARRAY = Object.freeze([]);
+
+function formatNumber(value) {
+  if (value === null || value === undefined) return '0';
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (Number.isNaN(numeric)) return String(value);
+  return numberFormatter.format(numeric);
+}
+
+function getSeverityStyles(severity) {
+  switch (severity) {
+    case 'critical':
+      return 'bg-rose-100 text-rose-700';
+    case 'warning':
+      return 'bg-amber-100 text-amber-700';
+    case 'info':
+      return 'bg-sky-100 text-sky-700';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
+}
 import { formatNumber } from './admin/utils.js';
 import AdminApprovalsSection from './admin/sections/AdminApprovalsSection.jsx';
 import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
@@ -27,6 +52,86 @@ export default function Admin() {
   const adminDataRaw = dashboards.admin ?? null;
   const overallLoading = runtimeLoading || loading;
 
+  const revenueCards = useMemo(() => {
+    const overview = adminData?.revenue?.overview;
+    if (!overview) {
+      return EMPTY_ARRAY;
+    }
+
+    const cards = [];
+
+    if (overview.netRevenue) {
+      cards.push({
+        label: 'Net revenue (30d)',
+        value: overview.netRevenue,
+        helper: overview.netRevenueChange
+      });
+    }
+
+    if (overview.arr) {
+      cards.push({
+        label: 'Annual recurring revenue',
+        value: overview.arr
+      });
+    }
+
+    if (overview.mrr) {
+      cards.push({
+        label: 'Monthly recurring revenue',
+        value: overview.mrr
+      });
+    }
+
+    if (overview.captureRate) {
+      cards.push({
+        label: 'Capture rate',
+        value: overview.captureRate
+      });
+    }
+
+    if (overview.failedPayments !== undefined) {
+      cards.push({
+        label: 'Failed payments (30d)',
+        value: formatNumber(overview.failedPayments)
+      });
+    }
+
+    if (overview.refundsPending !== undefined) {
+      cards.push({
+        label: 'Refunds pending',
+        value: formatNumber(overview.refundsPending)
+      });
+    }
+
+    return cards;
+  }, [adminData]);
+
+  const paymentHealthBreakdown = useMemo(() => {
+    const health = adminData?.revenue?.paymentHealth;
+    if (!health) {
+      return EMPTY_ARRAY;
+    }
+
+    const breakdown = [];
+
+    if (health.succeeded !== undefined) {
+      breakdown.push({ label: 'Succeeded', value: formatNumber(health.succeeded) });
+    }
+
+    if (health.processing !== undefined) {
+      breakdown.push({ label: 'Processing', value: formatNumber(health.processing) });
+    }
+
+    if (health.requiresAction !== undefined) {
+      breakdown.push({ label: 'Requires action', value: formatNumber(health.requiresAction) });
+    }
+
+    if (health.failed !== undefined) {
+      breakdown.push({ label: 'Failed', value: formatNumber(health.failed) });
+    }
+
+    return breakdown;
+  }, [adminData]);
   const approvalItems = adminDataRaw?.approvals?.items ?? [];
   const pendingApprovals = adminDataRaw?.approvals?.pendingCount ?? approvalItems.length;
 
@@ -214,6 +319,54 @@ export default function Admin() {
       </section>
     );
   }
+
+  const approvals = adminData.approvals ?? EMPTY_OBJECT;
+  const approvalItems = approvals.items ?? EMPTY_ARRAY;
+  const pendingApprovals = approvals.pendingCount ?? approvalItems.length;
+
+  const topCommunities = adminData.revenue?.topCommunities ?? EMPTY_ARRAY;
+
+  const support = adminData.operations?.support ?? EMPTY_OBJECT;
+  const risk = adminData.operations?.risk ?? EMPTY_OBJECT;
+  const platform = adminData.operations?.platform ?? EMPTY_OBJECT;
+  const upcomingLaunches = adminData.operations?.upcomingLaunches ?? EMPTY_ARRAY;
+
+  const alerts = adminData.activity?.alerts ?? EMPTY_ARRAY;
+  const events = adminData.activity?.events ?? EMPTY_ARRAY;
+
+  const supportStats = [
+    { label: 'Open requests', value: formatNumber(support.backlog ?? 0) },
+    { label: 'Pending memberships', value: formatNumber(support.pendingMemberships ?? 0) },
+    { label: 'Follow approvals', value: formatNumber(support.followRequests ?? 0) },
+    support.avgResponseMinutes !== undefined
+      ? { label: 'Avg. first response', value: `${formatNumber(support.avgResponseMinutes)} mins` }
+      : null,
+    support.dailyActiveMembers !== undefined
+      ? { label: 'Daily active members', value: formatNumber(support.dailyActiveMembers) }
+      : null
+  ].filter(Boolean);
+
+  const riskStats = [
+    { label: 'Payouts processing', value: formatNumber(risk.payoutsProcessing ?? 0) },
+    { label: 'Failed payments', value: formatNumber(risk.failedPayments ?? 0) },
+    { label: 'Refund queue', value: formatNumber(risk.refundsPending ?? 0) },
+    risk.alertsOpen !== undefined
+      ? { label: 'Open alerts', value: formatNumber(risk.alertsOpen) }
+      : null
+  ].filter(Boolean);
+
+  const platformStats = [
+    platform.totalUsers ? { label: 'Total users', value: platform.totalUsers } : null,
+    platform.newUsers30d ? { label: 'New users (30d)', value: platform.newUsers30d } : null,
+    platform.newUsersChange
+      ? {
+          label: 'Momentum',
+          value: platform.newUsersChange
+        }
+      : null,
+    platform.communitiesLive ? { label: 'Communities live', value: platform.communitiesLive } : null,
+    platform.instructors ? { label: 'Instructors', value: platform.instructors } : null
+  ].filter(Boolean);
 
   return (
     <div className="flex min-h-screen bg-slate-50/70">

@@ -7,6 +7,8 @@ import CourseCreationHeader from './instructor/courseCreation/CourseCreationHead
 import CourseCreationSummaryCards from './instructor/courseCreation/CourseCreationSummaryCards.jsx';
 import CourseBlueprintCard from './instructor/courseCreation/CourseBlueprintCard.jsx';
 
+const EMPTY_BLUEPRINTS = Object.freeze([]);
+
 const readinessNarrative = (score) => {
   if (score >= 80) return 'Launch-ready';
   if (score >= 50) return 'In build';
@@ -20,6 +22,8 @@ export default function InstructorCourseCreate({
   onSyncFromLms
 }) {
   const { dashboard, refresh } = useOutletContext();
+  const creationBlueprints = dashboard?.courses?.creationBlueprints;
+  const blueprints = creationBlueprints ?? EMPTY_BLUEPRINTS;
   const blueprints = useMemo(() => dashboard?.courses?.creationBlueprints ?? [], [dashboard]);
 
   const overview = useMemo(() => {
