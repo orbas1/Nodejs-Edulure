@@ -9,6 +9,7 @@ import CommunityResourceModel from '../models/CommunityResourceModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
+const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator', 'member']);
 
 function parseJsonColumn(value, fallback) {
   if (!value) return fallback;
@@ -72,7 +73,11 @@ export default class CommunityService {
       throw error;
     }
 
-    const { items, pagination } = await CommunityPostModel.paginateForCommunity(community.id, filters);
+    const searchQuery = typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
+    const { items, pagination } = await CommunityPostModel.paginateForCommunity(community.id, {
+      ...filters,
+      query: searchQuery
+    });
     return {
       items: items.map((item) => this.serializePost(item, community)),
       pagination
@@ -80,7 +85,11 @@ export default class CommunityService {
   }
 
   static async listFeedForUser(userId, filters = {}) {
-    const { items, pagination } = await CommunityPostModel.paginateForUser(userId, filters);
+    const searchQuery = typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
+    const { items, pagination } = await CommunityPostModel.paginateForUser(userId, {
+      ...filters,
+      query: searchQuery
+    });
     return {
       items: items.map((item) => this.serializePost(item)),
       pagination
@@ -189,9 +198,21 @@ export default class CommunityService {
     }
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
-    if (!membership || !MODERATOR_ROLES.has(membership.role)) {
+    if (!membership) {
+      const error = new Error('You need to join this community before posting');
+      error.status = 403;
+      throw error;
+    }
+
+    if (membership.status !== 'active') {
+      const error = new Error('Your membership is not active');
+      error.status = 403;
+      throw error;
+    }
+
+    if (!POST_AUTHOR_ROLES.has(membership.role)) {
       const error = new Error('You do not have permission to post in this community');
-      error.status = membership ? 403 : 404;
+      error.status = 403;
       throw error;
     }
 
@@ -314,6 +335,47 @@ export default class CommunityService {
     });
 
     return this.serializeResource(resource);
+  }
+
+  static async joinCommunity(communityIdentifier, userId) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    await db.transaction(async (trx) => {
+      const existing = await CommunityMemberModel.findMembership(community.id, userId, trx);
+      if (existing) {
+        if (existing.status !== 'active') {
+          await CommunityMemberModel.updateStatus(community.id, userId, 'active', trx);
+        }
+      } else {
+        await CommunityMemberModel.create(
+          {
+            communityId: community.id,
+            userId,
+            role: 'member',
+            status: 'active'
+          },
+          trx
+        );
+      }
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_member',
+          entityId: `${community.id}:${userId}`,
+          eventType: existing ? 'community.member.rejoined' : 'community.member.joined',
+          payload: { communityId: community.id },
+          performedBy: userId
+        },
+        trx
+      );
+    });
+
+    return this.getCommunityDetail(community.id, userId);
   }
 
   static async resolveDefaultChannelId(communityId) {

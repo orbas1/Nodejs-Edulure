@@ -16,7 +16,8 @@ const feedQuerySchema = Joi.object({
   perPage: Joi.number().integer().min(1).max(100).default(10),
   channelId: Joi.number().integer().min(1),
   postType: Joi.string().valid('update', 'event', 'resource', 'classroom', 'poll'),
-  visibility: Joi.string().valid('public', 'members', 'admins')
+  visibility: Joi.string().valid('public', 'members', 'admins'),
+  query: Joi.string().trim().max(200).allow(null).empty('')
 });
 
 const createPostSchema = Joi.object({
@@ -153,6 +154,18 @@ export default class CommunityController {
         error.status = 422;
         error.details = error.details.map((d) => d.message);
       }
+      return next(error);
+    }
+  }
+
+  static async join(req, res, next) {
+    try {
+      const community = await CommunityService.joinCommunity(req.params.communityId, req.user.id);
+      return success(res, {
+        data: community,
+        message: 'Joined community'
+      });
+    } catch (error) {
       return next(error);
     }
   }

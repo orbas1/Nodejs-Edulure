@@ -15,7 +15,16 @@ export async function fetchCommunityDetail(communityId, token) {
   return mapResponse(response);
 }
 
-export async function fetchCommunityFeed({ communityId, token, page = 1, perPage = 10, channelId, postType, visibility }) {
+export async function fetchCommunityFeed({
+  communityId,
+  token,
+  page = 1,
+  perPage = 10,
+  channelId,
+  postType,
+  visibility,
+  query
+}) {
   const response = await httpClient.get(`/communities/${communityId}/posts`, {
     token,
     params: {
@@ -23,20 +32,22 @@ export async function fetchCommunityFeed({ communityId, token, page = 1, perPage
       perPage,
       channelId,
       postType,
-      visibility
+      visibility,
+      query
     }
   });
   return mapResponse(response);
 }
 
-export async function fetchAggregatedFeed({ token, page = 1, perPage = 10, postType, visibility }) {
+export async function fetchAggregatedFeed({ token, page = 1, perPage = 10, postType, visibility, query }) {
   const response = await httpClient.get('/communities/feed', {
     token,
     params: {
       page,
       perPage,
       postType,
-      visibility
+      visibility,
+      query
     }
   });
   return mapResponse(response);
@@ -51,5 +62,15 @@ export async function fetchCommunityResources({ communityId, token, limit = 6, o
       resourceType
     }
   });
+  return mapResponse(response);
+}
+
+export async function createCommunityPost({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/posts`, payload, { token });
+  return mapResponse(response);
+}
+
+export async function joinCommunity({ communityId, token }) {
+  const response = await httpClient.post(`/communities/${communityId}/join`, {}, { token });
   return mapResponse(response);
 }
