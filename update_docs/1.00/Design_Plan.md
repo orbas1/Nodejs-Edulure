@@ -21,7 +21,9 @@
 ### 3. Homepage, Dashboard & Page Templates
 - Assemble modular hero, progress, recommendation, and campaign blocks using `Home page components.md`, `Screens_Update.md`, and `Dashboard Designs.md`.
 - Prepare persona-specific dashboards (learner, provider, admin) referencing `Dashboard Organisation.md`, `Settings Dashboard.md`, and `Profile Styling.md`.
+- Extend provider/instructor dashboards with production analytics rails—course progression tiles, tutor pipeline board, live classroom calendar, monetisation/pricing snapshots, ads experiment cards, and ebook performance widgets—aligned to `dashboard_drawings.md`, `menu_drawings.md`, `Admin_panel_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md` so the backend `buildInstructorDashboard` payload maps cleanly onto documented layouts and copy.
 - Add new page shells for explorer, communities, and monetisation scenarios using `Pages_list.md`, `Screens_list.md`, and `Organisation_and_positions.md`.
+- Document learner notification centre, follower approvals/recommendations, and privacy/messaging settings panels referencing `dashboard_drawings.md`, `menu_drawings.md`, `App_screens_drawings.md`, and `Settings Dashboard.md` so engineering mirrors notification filters, mark-as-read interactions, and DM alert toggles.
 - Extend explorer templates with mixed-entity tabs, facet rail, saved search management, and ads placements referencing
   `website_drawings.md`, `dashboard_drawings.md`, `menu_drawings.md`, and `ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Function Design.md`
   so UI mirrors Meilisearch index groupings, facet metadata, and the analytics overlays now emitted by the backend service. Map specs cover

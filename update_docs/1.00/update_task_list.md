@@ -86,7 +86,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 4. **Ads Suite Delivery (100%)** – Campaign builder, targeting rules, budgeting, creatives, compliance automation. _Progress update:_ AdsService now auto-halts overspending campaigns, synchronises compliance metadata, and exposes chronologically ordered insights; Vitest suites cover compliance/insight scenarios, HTTP routes hydrate instructor dashboards, and Vite builds succeed after validating the explorer map dependency chain.
 5. **Analytics & Intelligence (100%)** – Dashboards, zero-result alerts, CTR tracking, predictions, experiment toggles. _Progress update:_ Explorer analytics now ships as a production route with nav access, authenticated range controls, live summary tiles, entity/ads breakdowns, forecast panels, zero-result query spotlighting, and alert styling wired directly to the new backend services, with graceful fallbacks for empty/unauthorised states and refresh tooling to mirror operational dashboards.
 
-## Task 5 – Dashboards, Profiles & Operational Consoles (20% complete)
+## Task 5 – Dashboards, Profiles & Operational Consoles (35% complete)
 ### Integration Coverage
 - **Backend:** Profile aggregation, finance stats, verification, admin/support workflows, notification preferences.
 - **Front-end:** User dashboards (profile, followers, settings, finance, widgets, stats), admin & customer service panels.
@@ -99,8 +99,8 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 
 ### Subtasks
 1. **Profile Component Library (100%)** – Hero, badges, shelves, timelines, quick actions, caching strategy. _Progress update:_ Delivered `/api/profiles/{id}/overview` aggregation service with cached hero metrics, timeline, quick actions, community/program shelves, and insights; React profile route now renders production hero/badge/shelf/insight/timeline components aligned to design artefacts with token-aware caching hook. Backend services/controllers/routes/OpenAPI entries, frontend page/change logs, and design trackers (plan, change log, milestones, progress/task lists) were updated to document the new aggregation stack so Task 5.1 is production-ready end-to-end.
-2. **User Dashboard Delivery (0%)** – Finance, followers, settings, widgets, statistics graphs, notifications centre.
-3. **Instructor Dashboard Suite (0%)** – Community switcher, classroom courses, pricing, eBook manager, analytics.
+2. **User Dashboard Delivery (100%)** – Finance, followers, settings, widgets, statistics graphs, notifications centre. _Progress update:_ React dashboards now expose production-grade notification centre, follower governance, and privacy controls. The learner API aggregate ships notifications/follower/financial/settings payloads, new social/direct-message endpoints persist privacy + notification updates, and Vitest + HTTP suites validate the expanded surface.
+3. **Instructor Dashboard Suite (35%)** – Community switcher, classroom courses, pricing, eBook manager, analytics. _Progress update:_ `buildInstructorDashboard` now composes instructor courses, enrolments, lessons, tutor pipelines, live classrooms, asset/ebook telemetry, community monetisation, ads experiments, and subscription revenue; `DashboardService.getDashboardForUser` merges the instructor payload (roles, dashboards, profile stats/bio, search index) so `/api/dashboard/me` exposes dual-role data with Vitest coverage validating metrics/bookings/pricing delivery. Frontend surfaces remain outstanding.
 4. **Admin & Customer Service Panels (0%)** – Approvals, incident response, refunds, policy hub, support tickets.
 5. **ID Verification & Compliance (0%)** – Document capture, verification workflow, audit logs, policy management.
 
@@ -109,9 +109,9 @@ Each task below aligns with the numbered plan, includes integration coverage acr
   - Finalise API payloads for dashboard/profile widgets (0%).
   - Deliver responsive layout skeletons with placeholder data (0%).
   - Wire cache invalidation hooks for component hydration (0%).
-- **Sprint 5B – Role-Based Dashboards (0%)**
-  - Ship learner dashboard widgets and notification centre MVP (0%).
-  - Launch instructor pricing/analytics rails with audit logging (0%).
+- **Sprint 5B – Role-Based Dashboards (35%)**
+  - Ship learner dashboard widgets and notification centre MVP (100%).
+  - Launch instructor pricing/analytics rails with audit logging (35%).
   - Harden admin/support consoles with escalation workflows (0%).
 - **Sprint 5C – Compliance & Verification (0%)**
   - Implement KYC document pipeline with storage encryption (0%).

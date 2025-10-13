@@ -26,8 +26,41 @@ beforeEach(() => {
   vi.clearAllMocks();
   dashboardServiceMock.getDashboardForUser.mockResolvedValue({
     profile: { id: 42, name: 'Test User', email: 'user@test.local', avatar: '', title: '', bio: '', stats: [], feedHighlights: [] },
-    roles: [{ id: 'learner', label: 'Learner' }],
-    dashboards: { learner: { metrics: [], analytics: { learningPace: [], communityEngagement: [] }, upcoming: [], communities: { managed: [], pipelines: [] }, courses: { active: [], recommendations: [] }, calendar: [], tutorBookings: { active: [], history: [] }, ebooks: { library: [], recommendations: [] }, financial: { summary: [], invoices: [] }, notifications: { total: 0, unreadMessages: 0, items: [] }, followers: { followers: 0, following: 0, pending: [], outgoing: [], recommendations: [] }, settings: { privacy: { visibility: 'public', followApprovalRequired: false, shareActivity: true, messagePermission: 'followers' }, messaging: { unreadThreads: 0, notificationsEnabled: true }, communities: [] } } },
+    roles: [
+      { id: 'learner', label: 'Learner' },
+      { id: 'instructor', label: 'Instructor' }
+    ],
+    dashboards: {
+      learner: {
+        metrics: [],
+        analytics: { learningPace: [], communityEngagement: [] },
+        upcoming: [],
+        communities: { managed: [], pipelines: [] },
+        courses: { active: [], recommendations: [] },
+        calendar: [],
+        tutorBookings: { active: [], history: [] },
+        ebooks: { library: [], recommendations: [] },
+        financial: { summary: [], invoices: [] },
+        notifications: { total: 0, unreadMessages: 0, items: [] },
+        followers: { followers: 0, following: 0, pending: [], outgoing: [], recommendations: [] },
+        settings: {
+          privacy: { visibility: 'public', followApprovalRequired: false, shareActivity: true, messagePermission: 'followers' },
+          messaging: { unreadThreads: 0, notificationsEnabled: true },
+          communities: []
+        }
+      },
+      instructor: {
+        metrics: [
+          {
+            label: 'Active learners',
+            value: '12',
+            change: '+3 last 30d',
+            trend: 'up'
+          }
+        ],
+        analytics: { revenueStreams: [] }
+      }
+    },
     searchIndex: []
   });
 });
@@ -40,5 +73,7 @@ describe('Dashboard HTTP routes', () => {
     expect(response.body.success).toBe(true);
     expect(dashboardServiceMock.getDashboardForUser).toHaveBeenCalledWith(42);
     expect(response.body.data.profile.id).toBe(42);
+    expect(response.body.data.roles).toContainEqual({ id: 'instructor', label: 'Instructor' });
+    expect(response.body.data.dashboards.instructor.metrics[0].label).toBe('Active learners');
   });
 });
