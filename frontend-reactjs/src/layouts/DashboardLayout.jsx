@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeftOnRectangleIcon,
+  BanknotesIcon,
   ArrowTopRightOnSquareIcon,
   BookOpenIcon,
   CalendarDaysIcon,
@@ -38,6 +39,7 @@ const navigationByRole = {
     { name: 'Create course', to: `${basePath}/courses/create`, icon: DocumentTextIcon },
     { name: 'Recorded library', to: `${basePath}/courses/library`, icon: PlayCircleIcon },
     { name: 'Manage courses', to: `${basePath}/courses/manage`, icon: Cog6ToothIcon },
+    { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },

@@ -18,6 +18,7 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Crafted modular hero, progress, recommendation, and campaign tiles with seasonal imagery slots referencing `Home page components.md`, `Dashboard Designs.md`, and `Screens_Update.md`.
 - Delivered persona-specific dashboard arrangements (learner, provider, admin) leveraging `Dashboard Organisation.md`, `Settings Dashboard.md`, and `Profile Styling.md`.
 - Authored new landing-page shells for explorer, communities, and monetisation flows using `Pages_list.md`, `Screens_list.md`, and `Home page components.md`.
+- Finalised instructor monetisation dashboards in `dashboard_drawings.md`, `menu_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md`, detailing course offer funnels, subscription tier tables, revenue mix progress bars, live session pricing cards, finance export CTAs, and insight copy so the React monetisation hub mirrors production-ready spacing, typography, and analytics instrumentation.
 
 ### 4. Component & Interaction System
 - Reworked cards, forms, modals, and drawers per `Cards.md`, `Forms.md`, `component_functions.md`, and `Screens__Update_widget_types.md` to include explicit idle/loading/offline/error/rights-restricted states.

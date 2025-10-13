@@ -31,6 +31,11 @@
 - Added resilient loading, skeleton, and error states plus cache revalidation on focus and manual refresh so learners always see accurate stats even when aggregations are rebuilding.
 - Surfaced actionable CTAs (edit profile, manage availability, view statements) gated by feature flags/runtime config values, mirroring design specifications from `Profile Look.md`, `Profile Styling.md`, and `dashboard_drawings.md`.
 
+## `/dashboard/instructor/pricing`
+- Introduced a monetisation workspace that consumes the `dashboard.pricing` aggregate to render course offer funnels, subscription tier summaries, live session pricing telemetry, and revenue mix progress bars with CTA rails for exporting finance reports, configuring pricing rules, and promoting sessions.
+- Navigation now exposes a Monetisation tab for instructors, and the dashboard search overlay indexes the new route so providers can pivot directly from analytics or course management views.
+- Layout, progress visualisations, and insight copy mirror the monetisation overlays specified in `dashboard_drawings.md`, `menu_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md`.
+
 ## Layout & Navigation
 - `MainLayout` now renders auth-aware navigation items linking to the content library, explorer analytics, and login/register flows. Navigation visibility for the admin console and analytics dashboard honours backend feature flag snapshots and authentication to prevent unauthorised access.
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.
