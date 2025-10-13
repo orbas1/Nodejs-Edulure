@@ -6,10 +6,10 @@ import DashboardStateMessage from '../../components/dashboard/DashboardStateMess
 
 function MetricCard({ title, value, hint }) {
   return (
-    <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+    <div className="dashboard-panel">
       <p className="text-xs uppercase tracking-wide text-slate-500">{title}</p>
-      <p className="mt-3 text-2xl font-semibold text-white">{value}</p>
-      {hint ? <p className="mt-1 text-xs text-slate-400">{hint}</p> : null}
+      <p className="mt-3 text-2xl font-semibold text-slate-900">{value}</p>
+      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
     </div>
   );
 }
@@ -28,11 +28,11 @@ function RevenueBar({ label, value }) {
   const width = Math.min(Math.max(Number(value ?? 0), 0), 100);
   return (
     <div>
-      <div className="flex items-center justify-between text-xs text-slate-400">
+      <div className="flex items-center justify-between text-xs text-slate-500">
         <span>{label}</span>
         <span>{width}%</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-slate-800">
+      <div className="mt-2 h-2 rounded-full bg-slate-200">
         <div
           className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
           style={{ width: `${width}%` }}
@@ -148,8 +148,8 @@ export default function InstructorPricing() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Monetisation control centre</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <h1 className="text-2xl font-semibold text-slate-900">Monetisation control centre</h1>
+          <p className="mt-2 text-sm text-slate-500">
             Track cohort pricing, subscription tiers, and live session utilisation to keep revenue streams healthy.
           </p>
         </div>
@@ -162,7 +162,7 @@ export default function InstructorPricing() {
           </button>
           <button
             type="button"
-            className="rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white"
+            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary/40 hover:text-slate-900"
           >
             Configure pricing rules
           </button>
@@ -181,15 +181,15 @@ export default function InstructorPricing() {
       </section>
 
       {revenueStreams.length > 0 ? (
-        <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+        <section className="dashboard-panel">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-white">Revenue mix</h2>
-              <p className="text-sm text-slate-400">Distribution of revenue over the last 30 days.</p>
+              <h2 className="text-lg font-semibold text-slate-900">Revenue mix</h2>
+              <p className="text-sm text-slate-500">Distribution of revenue over the last 30 days.</p>
             </div>
             <button
               type="button"
-              className="rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white"
+              className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary/40 hover:text-slate-900"
             >
               Refresh snapshot
             </button>
@@ -204,19 +204,19 @@ export default function InstructorPricing() {
 
       <section className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+          <div className="dashboard-panel">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Course offers</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Course offers</h2>
               <button
                 type="button"
-                className="rounded-full border border-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white"
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary/40 hover:text-slate-900"
               >
                 Launch new offer
               </button>
             </div>
             {offers.length > 0 ? (
               <div className="mt-5 overflow-x-auto">
-                <table className="min-w-full text-left text-sm text-slate-300">
+                <table className="min-w-full text-left text-sm text-slate-600">
                   <thead className="text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="pb-3">Program</th>
@@ -227,16 +227,16 @@ export default function InstructorPricing() {
                       <th className="pb-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-900/60">
+                  <tbody className="divide-y divide-slate-100">
                     {offers.map((offer) => (
-                      <tr key={offer.id} className="hover:bg-slate-900/40">
-                        <td className="py-3 text-white">{offer.name}</td>
-                        <td className="py-3 text-slate-400">{offer.price}</td>
-                        <td className="py-3 text-slate-400">{offer.status}</td>
-                        <td className="py-3 text-slate-400">{offer.conversion}</td>
-                        <td className="py-3 text-slate-400">{offer.learners}</td>
-                        <td className="py-3 text-right text-xs text-slate-400">
-                          <button className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                      <tr key={offer.id} className="hover:bg-primary/5">
+                        <td className="py-3 text-slate-900">{offer.name}</td>
+                        <td className="py-3 text-slate-500">{offer.price}</td>
+                        <td className="py-3 text-slate-500">{offer.status}</td>
+                        <td className="py-3 text-slate-500">{offer.conversion}</td>
+                        <td className="py-3 text-slate-500">{offer.learners}</td>
+                        <td className="py-3 text-right text-xs text-slate-500">
+                          <button className="rounded-full border border-slate-300 px-3 py-1 hover:border-primary/50">
                             View funnel
                           </button>
                         </td>
@@ -246,23 +246,23 @@ export default function InstructorPricing() {
                 </table>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-slate-400">No course offers are live. Publish a cohort to populate this table.</p>
+              <p className="mt-4 text-sm text-slate-500">No course offers are live. Publish a cohort to populate this table.</p>
             )}
           </div>
 
-          <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+          <div className="dashboard-panel">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Subscription tiers</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Subscription tiers</h2>
               <button
                 type="button"
-                className="rounded-full border border-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white"
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary/40 hover:text-slate-900"
               >
                 Manage tiers
               </button>
             </div>
             {subscriptions.length > 0 ? (
               <div className="mt-5 overflow-x-auto">
-                <table className="min-w-full text-left text-sm text-slate-300">
+                <table className="min-w-full text-left text-sm text-slate-600">
                   <thead className="text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="pb-3">Tier</th>
@@ -273,16 +273,16 @@ export default function InstructorPricing() {
                       <th className="pb-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-900/60">
+                  <tbody className="divide-y divide-slate-100">
                     {subscriptions.map((subscription) => (
-                      <tr key={subscription.id} className="hover:bg-slate-900/40">
-                        <td className="py-3 text-white">{subscription.name}</td>
-                        <td className="py-3 text-slate-400">{subscription.price}</td>
-                        <td className="py-3 text-slate-400">{subscription.members}</td>
-                        <td className="py-3 text-slate-400">{subscription.churn}</td>
-                        <td className="py-3 text-slate-400">{subscription.renewal}</td>
-                        <td className="py-3 text-right text-xs text-slate-400">
-                          <button className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                      <tr key={subscription.id} className="hover:bg-primary/5">
+                        <td className="py-3 text-slate-900">{subscription.name}</td>
+                        <td className="py-3 text-slate-500">{subscription.price}</td>
+                        <td className="py-3 text-slate-500">{subscription.members}</td>
+                        <td className="py-3 text-slate-500">{subscription.churn}</td>
+                        <td className="py-3 text-slate-500">{subscription.renewal}</td>
+                        <td className="py-3 text-right text-xs text-slate-500">
+                          <button className="rounded-full border border-slate-300 px-3 py-1 hover:border-primary/50">
                             Adjust pricing
                           </button>
                         </td>
@@ -292,7 +292,7 @@ export default function InstructorPricing() {
                 </table>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-slate-400">
+              <p className="mt-4 text-sm text-slate-500">
                 No subscription tiers are active. Create a community paywall to start recurring revenue.
               </p>
             )}
@@ -300,12 +300,12 @@ export default function InstructorPricing() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+          <div className="dashboard-panel">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Live session pricing</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Live session pricing</h2>
               <button
                 type="button"
-                className="rounded-full border border-slate-800 px-3 py-1 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white"
+                className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary/40 hover:text-slate-900"
               >
                 Edit sessions
               </button>
@@ -313,21 +313,21 @@ export default function InstructorPricing() {
             {sessions.length > 0 ? (
               <ul className="mt-5 space-y-4">
                 {sessions.map((session) => (
-                  <li key={session.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-4">
+                  <li key={session.id} className="dashboard-card-muted p-4">
                     <div className="flex items-center justify-between text-xs text-slate-500">
                       <span>{session.status}</span>
                       <span>{session.date}</span>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-white">{session.name}</p>
-                    <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                    <p className="mt-2 text-sm font-semibold text-slate-900">{session.name}</p>
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                       <span>Price {session.price}</span>
                       <span>{session.seats}</span>
                     </div>
-                    <div className="mt-4 flex gap-3 text-xs text-slate-400">
-                      <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                    <div className="mt-4 flex gap-3 text-xs text-slate-500">
+                      <button type="button" className="rounded-full border border-slate-300 px-3 py-1 hover:border-primary/50">
                         Promote session
                       </button>
-                      <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                      <button type="button" className="rounded-full border border-slate-300 px-3 py-1 hover:border-primary/50">
                         View roster
                       </button>
                     </div>
@@ -335,22 +335,22 @@ export default function InstructorPricing() {
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 text-sm text-slate-400">No paid live sessions are scheduled.</p>
+              <p className="mt-4 text-sm text-slate-500">No paid live sessions are scheduled.</p>
             )}
           </div>
 
-          <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
-            <h2 className="text-lg font-semibold text-white">Signals & insights</h2>
+          <div className="dashboard-panel">
+            <h2 className="text-lg font-semibold text-slate-900">Signals & insights</h2>
             {insights.length > 0 ? (
-              <ul className="mt-4 space-y-3 text-sm text-slate-300">
+              <ul className="mt-4 space-y-3 text-sm text-slate-600">
                 {insights.map((insight, index) => (
-                  <li key={`${insight}-${index}`} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 px-4 py-3">
+                  <li key={`${insight}-${index}`} className="dashboard-card-muted px-4 py-3">
                     {insight}
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-4 text-sm text-slate-400">Insights will populate once revenue streams stabilise.</p>
+              <p className="mt-4 text-sm text-slate-500">Insights will populate once revenue streams stabilise.</p>
             )}
           </div>
         </div>

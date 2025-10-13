@@ -14,6 +14,26 @@ body {
   @apply bg-white text-slate-950 antialiased;
 }
 
+.dashboard-panel {
+  @apply rounded-3xl border border-slate-200 bg-white p-6 shadow-sm;
+}
+
+.dashboard-panel-muted {
+  @apply rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm;
+}
+
+.dashboard-card {
+  @apply rounded-2xl border border-slate-200 bg-white p-5 shadow-sm;
+}
+
+.dashboard-card-muted {
+  @apply rounded-2xl border border-slate-200 bg-slate-50 p-5;
+}
+
+.dashboard-chip {
+  @apply rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600;
+}
+
 a {
   @apply text-primary transition-colors duration-200;
 }

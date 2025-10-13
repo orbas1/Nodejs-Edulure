@@ -24,8 +24,8 @@ export default function LearnerFinancial() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">Financial overview</h1>
-          <p className="mt-2 text-sm text-slate-400">Track course investments, mentorship credits, and scholarships.</p>
+          <h1 className="text-2xl font-semibold text-slate-900">Financial overview</h1>
+          <p className="mt-2 text-sm text-slate-500">Track course investments, mentorship credits, and scholarships.</p>
         </div>
         <button
           type="button"
@@ -37,30 +37,30 @@ export default function LearnerFinancial() {
 
       <section className="grid gap-4 md:grid-cols-3">
         {summary.map((item) => (
-          <div key={item.label} className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+          <div key={item.label} className="dashboard-panel">
             <p className="text-xs uppercase tracking-wide text-slate-500">{item.label}</p>
-            <p className="mt-3 text-2xl font-semibold text-white">{item.value}</p>
-            <p className="mt-2 text-sm text-slate-400">{item.change}</p>
+            <p className="mt-3 text-2xl font-semibold text-slate-900">{item.value}</p>
+            <p className="mt-2 text-sm text-slate-500">{item.change}</p>
           </div>
         ))}
       </section>
 
-      <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+      <section className="dashboard-panel">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-white">Invoices & renewals</h2>
-            <p className="text-sm text-slate-400">Manage receipts, payment statuses, and auto-renew preferences.</p>
+            <h2 className="text-lg font-semibold text-slate-900">Invoices & renewals</h2>
+            <p className="text-sm text-slate-500">Manage receipts, payment statuses, and auto-renew preferences.</p>
           </div>
           <button
             type="button"
-            className="rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white"
+            className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary/40 hover:text-slate-900"
           >
             Update billing
           </button>
         </div>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-900/60">
-          <table className="w-full text-left text-sm text-slate-300">
-            <thead className="bg-slate-900/60 text-xs uppercase tracking-wide text-slate-500">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-3">Label</th>
                 <th className="px-4 py-3">Amount</th>
@@ -68,13 +68,13 @@ export default function LearnerFinancial() {
                 <th className="px-4 py-3">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-900/60">
+            <tbody className="divide-y divide-slate-100">
               {invoices.map((invoice) => (
-                <tr key={invoice.id} className="hover:bg-slate-900/40">
-                  <td className="px-4 py-3 text-sm font-medium text-white">{invoice.label}</td>
-                  <td className="px-4 py-3 text-slate-400">{invoice.amount}</td>
-                  <td className="px-4 py-3 text-slate-400">{invoice.status}</td>
-                  <td className="px-4 py-3 text-slate-400">{invoice.date}</td>
+                <tr key={invoice.id} className="hover:bg-primary/5">
+                  <td className="px-4 py-3 text-sm font-medium text-slate-900">{invoice.label}</td>
+                  <td className="px-4 py-3 text-slate-500">{invoice.amount}</td>
+                  <td className="px-4 py-3 text-slate-500">{invoice.status}</td>
+                  <td className="px-4 py-3 text-slate-500">{invoice.date}</td>
                 </tr>
               ))}
             </tbody>

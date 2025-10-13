@@ -861,8 +861,444 @@ export function buildInstructorDashboard({
       }
     },
     searchIndex,
-    profileStats,
-    profileBio
+  profileStats,
+  profileBio
+  };
+}
+
+function normaliseRecurringAmount(amountCents, interval) {
+  const amount = Number(amountCents ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return 0;
+  }
+  const billingInterval = String(interval ?? 'monthly').toLowerCase();
+  switch (billingInterval) {
+    case 'annual':
+    case 'yearly':
+      return Math.round(amount / 12);
+    case 'semiannual':
+    case 'semi-annual':
+    case 'biannual':
+      return Math.round(amount / 6);
+    case 'quarterly':
+      return Math.round(amount / 3);
+    case 'weekly':
+      return Math.round(amount * 4);
+    case 'daily':
+      return Math.round(amount * 30);
+    default:
+      return amount;
+  }
+}
+
+function describeDomainEvent(event) {
+  const verb = String(event.eventType ?? '')
+    .split('.')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+  const entity = String(event.entityType ?? '')
+    .split('_')
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+  if (verb && entity) {
+    return `${verb} · ${entity}`;
+  }
+  return verb || entity || 'System event';
+}
+
+async function buildAdminDashboard({ now }) {
+  const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+  const fortyEightHoursMs = 48 * 60 * 60 * 1000;
+  const thirtyDaysAgo = new Date(now.getTime() - thirtyDaysMs);
+  const sixtyDaysAgo = new Date(now.getTime() - 2 * thirtyDaysMs);
+  const thirtyDaysAhead = new Date(now.getTime() + thirtyDaysMs);
+  const fortyEightHoursAhead = new Date(now.getTime() + fortyEightHoursMs);
+
+  const [
+    communitySummaryRow,
+    subscriptionRows,
+    membershipPendingRows,
+    followPendingRows,
+    payoutRows,
+    analyticsAlertRows,
+    domainEventRows,
+    revenueCurrentRow,
+    revenuePreviousRow,
+    ledgerTrendRows,
+    sessionStatsRow
+  ] = await Promise.all([
+    db('communities')
+      .select(
+        db.raw('COUNT(*) as total'),
+        db.raw("SUM(CASE WHEN deleted_at IS NULL THEN 1 ELSE 0 END) as active"),
+        db.raw('SUM(CASE WHEN created_at >= ? THEN 1 ELSE 0 END) as createdLast30', [thirtyDaysAgo])
+      )
+      .first(),
+    db('community_subscriptions as sub')
+      .leftJoin('community_paywall_tiers as tier', 'tier.id', 'sub.tier_id')
+      .leftJoin('communities as community', 'community.id', 'sub.community_id')
+      .leftJoin('users as subscriber', 'subscriber.id', 'sub.user_id')
+      .select(
+        'sub.id',
+        'sub.community_id as communityId',
+        'sub.user_id as userId',
+        'sub.status',
+        'sub.started_at as startedAt',
+        'sub.current_period_end as currentPeriodEnd',
+        'tier.price_cents as priceCents',
+        'tier.billing_interval as billingInterval',
+        'tier.currency',
+        'tier.name as tierName',
+        'community.name as communityName',
+        'subscriber.first_name as subscriberFirstName',
+        'subscriber.last_name as subscriberLastName',
+        'subscriber.email as subscriberEmail'
+      ),
+    db('community_members as cm')
+      .leftJoin('communities as community', 'community.id', 'cm.community_id')
+      .leftJoin('users as member', 'member.id', 'cm.user_id')
+      .where('cm.status', 'pending')
+      .select(
+        'cm.id',
+        'cm.community_id as communityId',
+        'cm.role',
+        'cm.joined_at as joinedAt',
+        'cm.metadata as membershipMetadata',
+        'community.name as communityName',
+        'member.first_name as firstName',
+        'member.last_name as lastName',
+        'member.email as email'
+      ),
+    db('user_follows as follow')
+      .leftJoin('users as follower', 'follower.id', 'follow.follower_id')
+      .leftJoin('users as target', 'target.id', 'follow.following_id')
+      .where('follow.status', 'pending')
+      .select(
+        'follow.id',
+        'follow.created_at as createdAt',
+        'follow.metadata',
+        'follower.first_name as followerFirstName',
+        'follower.last_name as followerLastName',
+        'follower.email as followerEmail',
+        'target.first_name as targetFirstName',
+        'target.last_name as targetLastName'
+      ),
+    db('community_affiliate_payouts as payout')
+      .leftJoin('community_affiliates as affiliate', 'affiliate.id', 'payout.affiliate_id')
+      .leftJoin('communities as community', 'community.id', 'affiliate.community_id')
+      .leftJoin('users as affiliateUser', 'affiliateUser.id', 'affiliate.user_id')
+      .whereIn('payout.status', ['processing', 'pending'])
+      .select(
+        'payout.id',
+        'payout.affiliate_id as affiliateId',
+        'payout.amount_cents as amountCents',
+        'payout.status',
+        'payout.payout_reference as payoutReference',
+        'payout.scheduled_at as scheduledAt',
+        'payout.created_at as createdAt',
+        'payout.metadata as payoutMetadata',
+        'community.name as communityName',
+        'affiliateUser.first_name as affiliateFirstName',
+        'affiliateUser.last_name as affiliateLastName'
+      ),
+    db('analytics_alerts as alert')
+      .select(
+        'alert.id',
+        'alert.alert_code as alertCode',
+        'alert.severity',
+        'alert.message',
+        'alert.metadata',
+        'alert.detected_at as detectedAt',
+        'alert.resolved_at as resolvedAt'
+      )
+      .orderBy('alert.detected_at', 'desc')
+      .limit(15),
+    db('domain_events as event')
+      .leftJoin('users as actor', 'actor.id', 'event.performed_by')
+      .select(
+        'event.id',
+        'event.entity_type as entityType',
+        'event.entity_id as entityId',
+        'event.event_type as eventType',
+        'event.payload',
+        'event.created_at as createdAt',
+        'actor.first_name as actorFirstName',
+        'actor.last_name as actorLastName'
+      )
+      .orderBy('event.created_at', 'desc')
+      .limit(20),
+    db('payment_ledger_entries as entry')
+      .where('entry.entry_type', 'charge')
+      .andWhere('entry.recorded_at', '>=', thirtyDaysAgo)
+      .select(
+        db.raw('COALESCE(SUM(entry.amount), 0) as totalAmount'),
+        db.raw('MAX(entry.currency) as currency')
+      )
+      .first(),
+    db('payment_ledger_entries as entry')
+      .where('entry.entry_type', 'charge')
+      .andWhere('entry.recorded_at', '>=', sixtyDaysAgo)
+      .andWhere('entry.recorded_at', '<', thirtyDaysAgo)
+      .select(db.raw('COALESCE(SUM(entry.amount), 0) as totalAmount'))
+      .first(),
+    db('payment_ledger_entries as entry')
+      .where('entry.entry_type', 'charge')
+      .andWhere('entry.recorded_at', '>=', sixtyDaysAgo)
+      .select(
+        db.raw('DATE(entry.recorded_at) as day'),
+        db.raw('COALESCE(SUM(entry.amount), 0) as totalAmount'),
+        db.raw('MAX(entry.currency) as currency')
+      )
+      .groupByRaw('DATE(entry.recorded_at)')
+      .orderBy('day', 'asc'),
+    db('user_sessions')
+      .whereNull('revoked_at')
+      .select(
+        db.raw('SUM(CASE WHEN expires_at > ? THEN 1 ELSE 0 END) as activeSessions', [now]),
+        db.raw('SUM(CASE WHEN expires_at BETWEEN ? AND ? THEN 1 ELSE 0 END) as expiringSoonSessions', [now, fortyEightHoursAhead])
+      )
+      .first()
+  ]);
+
+  const totalCommunities = Number(communitySummaryRow?.active ?? communitySummaryRow?.total ?? 0);
+  const communitiesCreatedLast30 = Number(communitySummaryRow?.createdLast30 ?? 0);
+
+  const activeSubscriptions = subscriptionRows.filter((row) => row.status === 'active').length;
+  const monthlyRecurringCents = subscriptionRows.reduce((total, row) => {
+    if (row.status !== 'active') return total;
+    return total + normaliseRecurringAmount(row.priceCents, row.billingInterval);
+  }, 0);
+
+  const renewalsDue = subscriptionRows.filter((row) => {
+    if (row.status !== 'active' || !row.currentPeriodEnd) return false;
+    const renewal = typeof row.currentPeriodEnd === 'string' ? new Date(row.currentPeriodEnd) : row.currentPeriodEnd;
+    if (Number.isNaN(renewal?.getTime?.())) return false;
+    return renewal.getTime() <= thirtyDaysAhead.getTime();
+  }).length;
+
+  const revenueCurrentCents = Number(revenueCurrentRow?.totalAmount ?? 0);
+  const revenuePreviousCents = Number(revenuePreviousRow?.totalAmount ?? 0);
+  const revenueCurrency = revenueCurrentRow?.currency ?? 'USD';
+  const revenueDeltaPercent = revenuePreviousCents > 0
+    ? Math.round(((revenueCurrentCents - revenuePreviousCents) / revenuePreviousCents) * 1000) / 10
+    : null;
+
+  const approvalQueue = [];
+  membershipPendingRows.forEach((row) => {
+    approvalQueue.push({
+      id: `membership-${row.id}`,
+      type: 'Community membership',
+      name: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() || row.email || 'Member',
+      subject: row.communityName ?? 'Community',
+      summary: `Awaiting approval to join ${row.communityName ?? 'community'} as ${row.role}`,
+      status: 'Pending review',
+      submittedAt: humanizeRelativeTime(row.joinedAt, now),
+      submittedAtIso: row.joinedAt ? new Date(row.joinedAt).toISOString() : null,
+      metadata: {
+        email: row.email,
+        communityId: row.communityId,
+        requestedRole: row.role,
+        details: safeJsonParse(row.membershipMetadata, {})
+      }
+    });
+  });
+
+  followPendingRows.forEach((row) => {
+    const followerName = `${row.followerFirstName ?? ''} ${row.followerLastName ?? ''}`.trim() || row.followerEmail || 'Member';
+    const targetName = `${row.targetFirstName ?? ''} ${row.targetLastName ?? ''}`.trim() || 'account';
+    approvalQueue.push({
+      id: `follow-${row.id}`,
+      type: 'Follow request',
+      name: followerName,
+      subject: targetName,
+      summary: `${followerName} would like to follow ${targetName}`,
+      status: 'Awaiting triage',
+      submittedAt: humanizeRelativeTime(row.createdAt, now),
+      submittedAtIso: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+      metadata: {
+        email: row.followerEmail,
+        context: safeJsonParse(row.metadata, {})
+      }
+    });
+  });
+
+  payoutRows.forEach((row) => {
+    const actorName = `${row.affiliateFirstName ?? ''} ${row.affiliateLastName ?? ''}`.trim() || 'Affiliate partner';
+    approvalQueue.push({
+      id: `payout-${row.id}`,
+      type: 'Affiliate payout',
+      name: row.payoutReference ?? `Affiliate payout ${row.id}`,
+      subject: row.communityName ?? 'Community',
+      summary: `${actorName} pending ${formatCurrency(row.amountCents, revenueCurrency)}`,
+      status: row.status === 'processing' ? 'Processing' : 'Pending release',
+      submittedAt: humanizeRelativeTime(row.scheduledAt ?? row.createdAt, now),
+      submittedAtIso: (row.scheduledAt ?? row.createdAt)
+        ? new Date(row.scheduledAt ?? row.createdAt).toISOString()
+        : null,
+      metadata: {
+        affiliateId: row.affiliateId,
+        payoutReference: row.payoutReference,
+        details: safeJsonParse(row.payoutMetadata, {})
+      }
+    });
+  });
+
+  const approvalsTotals = {
+    pending: approvalQueue.length,
+    memberships: membershipPendingRows.length,
+    follows: followPendingRows.length,
+    payouts: payoutRows.length
+  };
+
+  const communityRevenueMap = new Map();
+  subscriptionRows.forEach((row) => {
+    if (!row.communityId) return;
+    const communityId = Number(row.communityId);
+    const entry = communityRevenueMap.get(communityId) ?? {
+      communityId,
+      communityName: row.communityName ?? `Community ${communityId}`,
+      activeSubscribers: 0,
+      renewalsDue: 0,
+      monthlyRecurringCents: 0,
+      currency: row.currency ?? revenueCurrency
+    };
+    if (row.status === 'active') {
+      entry.activeSubscribers += 1;
+      entry.monthlyRecurringCents += normaliseRecurringAmount(row.priceCents, row.billingInterval);
+      if (row.currentPeriodEnd) {
+        const renewal = typeof row.currentPeriodEnd === 'string'
+          ? new Date(row.currentPeriodEnd)
+          : row.currentPeriodEnd;
+        if (!Number.isNaN(renewal?.getTime?.()) && renewal.getTime() <= thirtyDaysAhead.getTime()) {
+          entry.renewalsDue += 1;
+        }
+      }
+    }
+    communityRevenueMap.set(communityId, entry);
+  });
+
+  const revenuePerCommunity = Array.from(communityRevenueMap.values()).sort(
+    (a, b) => b.monthlyRecurringCents - a.monthlyRecurringCents
+  );
+
+  const ledgerTrend = ledgerTrendRows.map((row) => {
+    const dateValue = row.day instanceof Date ? row.day : new Date(row.day);
+    const iso = !Number.isNaN(dateValue?.getTime?.()) ? dateValue.toISOString().slice(0, 10) : String(row.day ?? '');
+    return {
+      date: iso,
+      amountCents: Number(row.totalAmount ?? 0),
+      currency: row.currency ?? revenueCurrency
+    };
+  });
+
+  const alerts = analyticsAlertRows.map((row) => ({
+    id: row.id,
+    code: row.alertCode,
+    severity: row.severity,
+    message: row.message,
+    detectedAt: row.detectedAt ? new Date(row.detectedAt).toISOString() : null,
+    age: humanizeRelativeTime(row.detectedAt, now),
+    resolved: Boolean(row.resolvedAt),
+    metadata: safeJsonParse(row.metadata, {})
+  }));
+  const unresolvedAlertCount = alerts.filter((alert) => !alert.resolved).length;
+
+  const activity = domainEventRows.map((row) => ({
+    id: row.id,
+    eventType: row.eventType,
+    description: describeDomainEvent(row),
+    actor: `${row.actorFirstName ?? ''} ${row.actorLastName ?? ''}`.trim() || 'System',
+    occurredAt: row.createdAt ? new Date(row.createdAt).toISOString() : null,
+    age: humanizeRelativeTime(row.createdAt, now),
+    payload: safeJsonParse(row.payload, {})
+  }));
+
+  const activeSessions = Number(sessionStatsRow?.activeSessions ?? 0);
+  const expiringSessions = Number(sessionStatsRow?.expiringSoonSessions ?? 0);
+
+  const metrics = [
+    {
+      id: 'revenue-processed',
+      label: 'Revenue processed (30d)',
+      value: formatCurrency(revenueCurrentCents, revenueCurrency),
+      change:
+        revenueDeltaPercent === null
+          ? 'No prior period data'
+          : `${revenueDeltaPercent >= 0 ? '+' : '−'}${Math.abs(revenueDeltaPercent)}% vs prior 30d`,
+      trend: revenueDeltaPercent === null ? 'steady' : revenueDeltaPercent >= 0 ? 'up' : 'down'
+    },
+    {
+      id: 'active-subscriptions',
+      label: 'Active subscriptions',
+      value: String(activeSubscriptions),
+      change: `${renewalsDue} renewal${renewalsDue === 1 ? '' : 's'} within 30 days`,
+      trend: activeSubscriptions === 0
+        ? 'steady'
+        : renewalsDue / Math.max(activeSubscriptions, 1) > 0.25
+          ? 'down'
+          : 'up'
+    },
+    {
+      id: 'approvals-queue',
+      label: 'Approvals pending',
+      value: String(approvalQueue.length),
+      change: `${membershipPendingRows.length} membership${membershipPendingRows.length === 1 ? '' : 's'}, ${
+        followPendingRows.length
+      } follow${followPendingRows.length === 1 ? '' : 's'}`,
+      trend: approvalQueue.length > 0 ? 'down' : 'up'
+    }
+  ];
+
+  const revenueTotals = {
+    processedCents: revenueCurrentCents,
+    previousCents: revenuePreviousCents,
+    monthlyRecurringCents,
+    deltaPercent: revenueDeltaPercent,
+    currency: revenueCurrency
+  };
+
+  return {
+    dashboard: {
+      metrics,
+      approvals: {
+        totals: approvalsTotals,
+        queue: approvalQueue
+      },
+      revenue: {
+        totals: revenueTotals,
+        perCommunity: revenuePerCommunity,
+        ledgerTrend
+      },
+      operations: {
+        alerts: {
+          unresolvedCount: unresolvedAlertCount,
+          items: alerts
+        },
+        activity,
+        sessions: {
+          active: activeSessions,
+          expiringSoon: expiringSessions,
+          horizonHours: 48
+        }
+      }
+    },
+    profileStats: [
+      { label: 'Active subscriptions', value: String(activeSubscriptions) },
+      { label: 'MRR', value: formatCurrency(monthlyRecurringCents, revenueCurrency) },
+      { label: 'Open alerts', value: `${unresolvedAlertCount} open` }
+    ],
+    profileBio: `Overseeing ${totalCommunities} communities with ${activeSubscriptions} active subscription${
+      activeSubscriptions === 1 ? '' : 's'
+    } and ${approvalQueue.length} workflow${approvalQueue.length === 1 ? '' : 's'} in review.`,
+    searchIndex: [
+      { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
+      { id: 'admin-revenue', role: 'admin', type: 'Finance', title: 'Revenue performance', url: '/admin#revenue' },
+      { id: 'admin-alerts', role: 'admin', type: 'Monitoring', title: 'Operational alerts', url: '/admin#operations' }
+    ],
+    meta: {
+      communities: totalCommunities,
+      communitiesLaunched: communitiesCreatedLast30
+    }
   };
 }
 
@@ -1601,6 +2037,11 @@ export default class DashboardService {
       ebookProgressRows
     });
 
+    let adminDashboard = null;
+    if (user.role === 'admin') {
+      adminDashboard = await buildAdminDashboard({ now });
+    }
+
     const progressByEnrollment = new Map();
     progressRows.forEach((row) => {
       const list = progressByEnrollment.get(row.enrollmentId) ?? [];
@@ -2097,6 +2538,9 @@ export default class DashboardService {
     if (instructorDashboard) {
       roles.push(instructorDashboard.role);
     }
+    if (adminDashboard) {
+      roles.push({ id: 'admin', label: 'Admin', href: '/admin' });
+    }
 
     const dashboards = {
       learner: {
@@ -2166,6 +2610,9 @@ export default class DashboardService {
     if (instructorDashboard) {
       dashboards.instructor = instructorDashboard.dashboard;
     }
+    if (adminDashboard) {
+      dashboards.admin = adminDashboard.dashboard;
+    }
 
     const searchIndex = [
       ...learnerCourseSummaries.map((course) => ({
@@ -2194,6 +2641,9 @@ export default class DashboardService {
     if (instructorDashboard) {
       searchIndex.push(...instructorDashboard.searchIndex);
     }
+    if (adminDashboard) {
+      searchIndex.push(...adminDashboard.searchIndex);
+    }
 
     const communityNames = memberships.map((membership) => membership.name).filter(Boolean);
     const primaryProgram = learnerCourseSummaries[0]?.title ?? 'Edulure programs';
@@ -2204,6 +2654,9 @@ export default class DashboardService {
     if (instructorDashboard?.profileBio) {
       profileBioSegments.push(instructorDashboard.profileBio);
     }
+    if (adminDashboard?.profileBio) {
+      profileBioSegments.push(adminDashboard.profileBio);
+    }
     const profileBio = profileBioSegments.filter(Boolean).join(' ');
 
     const profileStats = [
@@ -2213,6 +2666,9 @@ export default class DashboardService {
     ];
     if (instructorDashboard) {
       profileStats.push(...instructorDashboard.profileStats);
+    }
+    if (adminDashboard) {
+      profileStats.push(...adminDashboard.profileStats);
     }
 
     const profileTitleSegments = [

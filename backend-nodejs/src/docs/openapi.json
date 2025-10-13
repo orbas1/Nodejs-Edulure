@@ -52,7 +52,7 @@
           "label": { "type": "string" },
           "value": { "type": "string" },
           "change": { "type": "string", "nullable": true },
-          "trend": { "type": "string", "enum": ["up", "down"], "nullable": true }
+          "trend": { "type": "string", "enum": ["up", "down", "steady"], "nullable": true }
         },
         "required": ["label", "value"]
       },
@@ -413,11 +413,165 @@
           "settings"
         ]
       },
+      "AdminApprovalItem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "type": { "type": "string" },
+          "name": { "type": "string" },
+          "subject": { "type": "string", "nullable": true },
+          "summary": { "type": "string" },
+          "status": { "type": "string" },
+          "submittedAt": { "type": "string" },
+          "submittedAtIso": { "type": "string", "format": "date-time", "nullable": true },
+          "metadata": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["id", "type", "name", "summary", "status", "submittedAt"]
+      },
+      "AdminApprovals": {
+        "type": "object",
+        "properties": {
+          "totals": {
+            "type": "object",
+            "properties": {
+              "pending": { "type": "integer" },
+              "memberships": { "type": "integer", "nullable": true },
+              "follows": { "type": "integer", "nullable": true },
+              "payouts": { "type": "integer", "nullable": true }
+            },
+            "required": ["pending"]
+          },
+          "queue": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminApprovalItem" }
+          }
+        },
+        "required": ["totals", "queue"]
+      },
+      "AdminRevenueTotals": {
+        "type": "object",
+        "properties": {
+          "processedCents": { "type": "integer" },
+          "previousCents": { "type": "integer" },
+          "monthlyRecurringCents": { "type": "integer" },
+          "deltaPercent": { "type": "number", "nullable": true },
+          "currency": { "type": "string" }
+        },
+        "required": ["processedCents", "previousCents", "monthlyRecurringCents", "currency"]
+      },
+      "AdminRevenueCommunity": {
+        "type": "object",
+        "properties": {
+          "communityId": { "type": "integer" },
+          "communityName": { "type": "string" },
+          "activeSubscribers": { "type": "integer" },
+          "renewalsDue": { "type": "integer" },
+          "monthlyRecurringCents": { "type": "integer" },
+          "currency": { "type": "string" }
+        },
+        "required": ["communityId", "communityName", "activeSubscribers", "renewalsDue", "monthlyRecurringCents", "currency"]
+      },
+      "AdminRevenueTrendPoint": {
+        "type": "object",
+        "properties": {
+          "date": { "type": "string" },
+          "amountCents": { "type": "integer" },
+          "currency": { "type": "string" }
+        },
+        "required": ["date", "amountCents", "currency"]
+      },
+      "AdminRevenue": {
+        "type": "object",
+        "properties": {
+          "totals": { "$ref": "#/components/schemas/AdminRevenueTotals" },
+          "perCommunity": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminRevenueCommunity" }
+          },
+          "ledgerTrend": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminRevenueTrendPoint" }
+          }
+        },
+        "required": ["totals", "perCommunity", "ledgerTrend"]
+      },
+      "AdminOperationsAlert": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "code": { "type": "string", "nullable": true },
+          "severity": { "type": "string" },
+          "message": { "type": "string" },
+          "detectedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "age": { "type": "string" },
+          "resolved": { "type": "boolean" },
+          "metadata": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["id", "severity", "message", "age", "resolved"]
+      },
+      "AdminOperationsActivity": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "eventType": { "type": "string" },
+          "description": { "type": "string" },
+          "actor": { "type": "string" },
+          "occurredAt": { "type": "string", "format": "date-time", "nullable": true },
+          "age": { "type": "string" },
+          "payload": { "type": "object", "additionalProperties": true }
+        },
+        "required": ["id", "eventType", "description", "actor", "age"]
+      },
+      "AdminOperationsSessions": {
+        "type": "object",
+        "properties": {
+          "active": { "type": "integer" },
+          "expiringSoon": { "type": "integer" },
+          "horizonHours": { "type": "integer" }
+        },
+        "required": ["active", "expiringSoon", "horizonHours"]
+      },
+      "AdminOperations": {
+        "type": "object",
+        "properties": {
+          "alerts": {
+            "type": "object",
+            "properties": {
+              "unresolvedCount": { "type": "integer" },
+              "items": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/AdminOperationsAlert" }
+              }
+            },
+            "required": ["unresolvedCount", "items"]
+          },
+          "activity": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AdminOperationsActivity" }
+          },
+          "sessions": { "$ref": "#/components/schemas/AdminOperationsSessions" }
+        },
+        "required": ["alerts", "activity", "sessions"]
+      },
+      "DashboardAdmin": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/DashboardMetric" }
+          },
+          "approvals": { "$ref": "#/components/schemas/AdminApprovals" },
+          "revenue": { "$ref": "#/components/schemas/AdminRevenue" },
+          "operations": { "$ref": "#/components/schemas/AdminOperations" }
+        },
+        "required": ["metrics", "approvals", "revenue", "operations"]
+      },
       "DashboardRole": {
         "type": "object",
         "properties": {
           "id": { "type": "string" },
-          "label": { "type": "string" }
+          "label": { "type": "string" },
+          "href": { "type": "string", "nullable": true }
         },
         "required": ["id", "label"]
       },
@@ -484,7 +638,9 @@
           "dashboards": {
             "type": "object",
             "properties": {
-              "learner": { "$ref": "#/components/schemas/DashboardLearner" }
+              "learner": { "$ref": "#/components/schemas/DashboardLearner" },
+              "instructor": { "$ref": "#/components/schemas/DashboardLearner", "nullable": true },
+              "admin": { "$ref": "#/components/schemas/DashboardAdmin", "nullable": true }
             },
             "required": ["learner"]
           },
