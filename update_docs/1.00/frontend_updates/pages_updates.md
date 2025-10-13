@@ -36,11 +36,17 @@
 - Navigation now exposes a Monetisation tab for instructors, and the dashboard search overlay indexes the new route so providers can pivot directly from analytics or course management views.
 - Layout, progress visualisations, and insight copy mirror the monetisation overlays specified in `dashboard_drawings.md`, `menu_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md`.
 
+## `/dashboard`
+- Learner and instructor dashboards now hydrate live verification status cards that list required document types, upload completion progress, checksum validation prompts, and submission gating tied to `/api/verification`. Learner copy emphasises compliance prerequisites and provides inline storage limits, while the instructor variant layers payout readiness messaging so revenue flows remain uninterrupted.
+- `DashboardHome.jsx` orchestrates shared state between learner/instructor widgets and the verification card, refreshing status post-upload or review and surfacing SLA-driven education consistent with `dashboard_drawings.md` and `App_screens_drawings.md`.
+- Submission success, resubmission required, and approved states include iconography, action CTAs, and audit-driven timestamps matching the KYC overlays captured in `Admin_panel_drawings.md` and `Application_Design_Update_Plan/Application Design Update.md`.
+
 ## Layout & Navigation
 - `MainLayout` now renders auth-aware navigation items linking to the content library, explorer analytics, and login/register flows. Navigation visibility for the admin console and analytics dashboard honours backend feature flag snapshots and authentication to prevent unauthorised access.
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.
 
 ## `/admin`
 - Implements runtime flag gating: when `admin.operational-console` is disabled the page renders a disable banner with the configured escalation channel and hides operational widgets.
-- When enabled, the page fetches `/api/admin/console` snapshots via `adminApi.js`, hydrates KPI tiles, approvals, incidents, refunds, support backlog, and policy sections, and surfaces lookback selectors, invite CTAs, and resilient loading/error states that mirror the operational console wireframes.
-- Queue cards render status/urgency/severity badges, SLA countdowns, and latest-event summaries to keep agents aligned with backend analytics, while policy cards expose owner/review metadata for compliance teams.
+- When enabled, the page consumes the admin segment of `/api/dashboard/me` via `DashboardContext`, hydrating KPI tiles, approvals, revenue/payment health, support/risk/platform stats, upcoming launches, alerts, and a policy hub CTA. Resilient loading/error states mirror the operational console wireframes and reuse shared dashboard messaging.
+- Approvals cards present pending memberships, affiliate payouts, and follow approvals with urgency/status chips; revenue cards expose net revenue, ARR/MRR, capture rate, failed payments, and refunds pending alongside a CSV export button; policy cards display status/SLA/owner/contact metadata with a CTA to the documented policy workspace.
+- The new compliance queue renders `AdminComplianceSection` fed by `/api/verification/admin/overview`, showing SLA breach counters, risk scores, outstanding document counts, and inline approve/reject/resubmission flows with reviewer note validation. Queue filters mirror the admin compliance drawings so operations can triage high-risk submissions and log audit trails without leaving the console.

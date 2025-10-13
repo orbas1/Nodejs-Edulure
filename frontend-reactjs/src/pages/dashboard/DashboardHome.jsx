@@ -32,8 +32,8 @@ export default function DashboardHome() {
   }
 
   return role === 'instructor' ? (
-    <InstructorOverview dashboard={dashboard} profile={profile} />
+    <InstructorOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />
   ) : (
-    <LearnerOverview dashboard={dashboard} profile={profile} />
+    <LearnerOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />
   );
 }
