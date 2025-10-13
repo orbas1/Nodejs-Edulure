@@ -16,6 +16,20 @@ function safeJsonParse(value, fallback = {}) {
   }
 }
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function toNumber(value) {
+  if (value === null || value === undefined) {
+    return 0;
+  }
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function formatNumber(value) {
+  return new Intl.NumberFormat('en-US').format(toNumber(value));
+}
+
 export function buildAvatarUrl(email) {
   const hash = crypto.createHash('md5').update(String(email).trim().toLowerCase()).digest('hex');
   return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=160`;
@@ -2167,6 +2181,12 @@ export default class DashboardService {
       dashboards.instructor = instructorDashboard.dashboard;
     }
 
+    let adminDashboard = null;
+    if (user.role === 'admin') {
+      adminDashboard = await DashboardService.buildAdminDashboard({ now });
+      dashboards.admin = adminDashboard.dashboard;
+    }
+
     const searchIndex = [
       ...learnerCourseSummaries.map((course) => ({
         id: `search-course-${course.id}`,
@@ -2194,6 +2214,9 @@ export default class DashboardService {
     if (instructorDashboard) {
       searchIndex.push(...instructorDashboard.searchIndex);
     }
+    if (adminDashboard?.searchIndex?.length) {
+      searchIndex.push(...adminDashboard.searchIndex);
+    }
 
     const communityNames = memberships.map((membership) => membership.name).filter(Boolean);
     const primaryProgram = learnerCourseSummaries[0]?.title ?? 'Edulure programs';
@@ -2204,6 +2227,9 @@ export default class DashboardService {
     if (instructorDashboard?.profileBio) {
       profileBioSegments.push(instructorDashboard.profileBio);
     }
+    if (adminDashboard?.profileBio) {
+      profileBioSegments.push(adminDashboard.profileBio);
+    }
     const profileBio = profileBioSegments.filter(Boolean).join(' ');
 
     const profileStats = [
@@ -2213,6 +2239,9 @@ export default class DashboardService {
     ];
     if (instructorDashboard) {
       profileStats.push(...instructorDashboard.profileStats);
+    }
+    if (adminDashboard?.profileStats?.length) {
+      profileStats.push(...adminDashboard.profileStats);
     }
 
     const profileTitleSegments = [
@@ -2230,6 +2259,9 @@ export default class DashboardService {
         profileTitleSegments.push('Instructor studio live');
       }
     }
+    if (adminDashboard?.profileTitleSegment) {
+      profileTitleSegments.push(adminDashboard.profileTitleSegment);
+    }
     const profileTitle = profileTitleSegments.join(' · ');
 
     return {
@@ -2245,6 +2277,547 @@ export default class DashboardService {
       },
       roles,
       dashboards,
+      searchIndex
+    };
+  }
+
+  static async buildAdminDashboard({ now = new Date() } = {}) {
+    const reference = now instanceof Date ? now : new Date(now);
+    const thirtyDaysAgo = new Date(reference.getTime() - 30 * DAY_IN_MS);
+    const sixtyDaysAgo = new Date(reference.getTime() - 60 * DAY_IN_MS);
+    const yesterday = new Date(reference.getTime() - DAY_IN_MS);
+    const twoDaysAgo = new Date(reference.getTime() - 2 * DAY_IN_MS);
+    const twoWeeksAhead = new Date(reference.getTime() + 14 * DAY_IN_MS);
+
+    const [
+      totalUsersRow,
+      newUsersCurrentRow,
+      newUsersPreviousRow,
+      instructorCountRow,
+      communityTotalRow,
+      communityCurrentRow,
+      communityPreviousRow,
+      activeSubscriptionDetails,
+      presenceCurrentRow,
+      presencePreviousRow,
+      revenueCurrentRows,
+      revenuePreviousRows,
+      paymentOutcomeRows,
+      pendingMembershipRows,
+      payoutRows,
+      followRequestsRows,
+      analyticsAlertsRows,
+      domainEventRows,
+      topCommunitiesRows,
+      tutorResponseRow,
+      refundsPendingRow,
+      upcomingLiveClassRows
+    ] = await Promise.all([
+      db('users').count('id as count').first(),
+      db('users').where('created_at', '>=', thirtyDaysAgo).count('id as count').first(),
+      db('users')
+        .whereBetween('created_at', [sixtyDaysAgo, thirtyDaysAgo])
+        .count('id as count')
+        .first(),
+      db('users').where('role', 'instructor').count('id as count').first(),
+      db('communities').whereNull('deleted_at').count('id as count').first(),
+      db('communities').where('created_at', '>=', thirtyDaysAgo).count('id as count').first(),
+      db('communities')
+        .whereBetween('created_at', [sixtyDaysAgo, thirtyDaysAgo])
+        .count('id as count')
+        .first(),
+      db('community_subscriptions as cs')
+        .innerJoin('community_paywall_tiers as tier', 'tier.id', 'cs.tier_id')
+        .innerJoin('communities as c', 'c.id', 'cs.community_id')
+        .select([
+          'cs.id',
+          'cs.public_id as publicId',
+          'cs.community_id as communityId',
+          'cs.started_at as startedAt',
+          'cs.current_period_end as currentPeriodEnd',
+          'tier.price_cents as priceCents',
+          'tier.currency as currency',
+          'tier.billing_interval as billingInterval',
+          'c.name as communityName'
+        ])
+        .where('cs.status', 'active'),
+      db('user_presence_sessions').where('last_seen_at', '>=', yesterday).count('id as count').first(),
+      db('user_presence_sessions')
+        .whereBetween('last_seen_at', [twoDaysAgo, yesterday])
+        .count('id as count')
+        .first(),
+      db('payment_intents')
+        .where('status', 'succeeded')
+        .andWhere('captured_at', '>=', thirtyDaysAgo)
+        .select('currency')
+        .sum({ total: 'amount_total' })
+        .groupBy('currency'),
+      db('payment_intents')
+        .where('status', 'succeeded')
+        .andWhere('captured_at', '>=', sixtyDaysAgo)
+        .andWhere('captured_at', '<', thirtyDaysAgo)
+        .select('currency')
+        .sum({ total: 'amount_total' })
+        .groupBy('currency'),
+      db('payment_intents')
+        .where('created_at', '>=', thirtyDaysAgo)
+        .select('status')
+        .count({ total: '*' })
+        .groupBy('status'),
+      db('community_members as cm')
+        .innerJoin('communities as c', 'c.id', 'cm.community_id')
+        .innerJoin('users as u', 'u.id', 'cm.user_id')
+        .where('cm.status', 'pending')
+        .select([
+          'cm.id',
+          'c.name as communityName',
+          'u.first_name as firstName',
+          'u.last_name as lastName',
+          'u.email',
+          'cm.joined_at as joinedAt'
+        ])
+        .orderBy('cm.joined_at', 'desc'),
+      db('community_affiliate_payouts as cap')
+        .innerJoin('community_affiliates as ca', 'ca.id', 'cap.affiliate_id')
+        .innerJoin('communities as c', 'c.id', 'ca.community_id')
+        .innerJoin('users as u', 'u.id', 'ca.user_id')
+        .whereIn('cap.status', ['pending', 'processing'])
+        .select([
+          'cap.id',
+          'cap.amount_cents as amountCents',
+          'cap.status',
+          'cap.scheduled_at as scheduledAt',
+          'cap.created_at as createdAt',
+          'c.name as communityName',
+          'u.first_name as firstName',
+          'u.last_name as lastName'
+        ])
+        .orderBy('cap.created_at', 'desc'),
+      db('user_follows as uf')
+        .innerJoin('users as follower', 'follower.id', 'uf.follower_id')
+        .innerJoin('users as following', 'following.id', 'uf.following_id')
+        .where('uf.status', 'pending')
+        .select([
+          'uf.id',
+          'uf.created_at as createdAt',
+          'follower.first_name as followerFirstName',
+          'follower.last_name as followerLastName',
+          'following.first_name as followingFirstName',
+          'following.last_name as followingLastName'
+        ])
+        .orderBy('uf.created_at', 'desc'),
+      db('analytics_alerts')
+        .orderBy('detected_at', 'desc')
+        .limit(6),
+      db('domain_events as de')
+        .leftJoin('users as actor', 'actor.id', 'de.performed_by')
+        .select([
+          'de.id',
+          'de.entity_type as entityType',
+          'de.entity_id as entityId',
+          'de.event_type as eventType',
+          'de.payload',
+          'de.created_at as createdAt',
+          'actor.first_name as actorFirstName',
+          'actor.last_name as actorLastName'
+        ])
+        .orderBy('de.created_at', 'desc')
+        .limit(8),
+      db('payment_intents as pi')
+        .innerJoin('community_subscriptions as cs', 'cs.public_id', 'pi.entity_id')
+        .innerJoin('communities as c', 'c.id', 'cs.community_id')
+        .where('pi.entity_type', 'community_subscription')
+        .andWhere('pi.status', 'succeeded')
+        .andWhere('pi.captured_at', '>=', thirtyDaysAgo)
+        .groupBy('c.id', 'c.name')
+        .select([
+          'c.id',
+          'c.name',
+          db.raw('SUM(pi.amount_total) as revenue'),
+          db.raw('COUNT(DISTINCT cs.id) as subscribers')
+        ])
+        .orderBy('revenue', 'desc')
+        .limit(4),
+      db('tutor_profiles').avg('response_time_minutes as avgResponse').first(),
+      db('payment_refunds').where('status', 'pending').count('id as count').first(),
+      db('live_classrooms as lc')
+        .leftJoin('communities as c', 'c.id', 'lc.community_id')
+        .where('lc.status', 'scheduled')
+        .andWhere('lc.start_at', '>=', reference)
+        .andWhere('lc.start_at', '<', twoWeeksAhead)
+        .select([
+          'lc.id',
+          'lc.title',
+          'lc.start_at as startAt',
+          'c.name as communityName'
+        ])
+        .orderBy('lc.start_at', 'asc')
+        .limit(5)
+    ]);
+
+    const totalUsers = toNumber(totalUsersRow?.count);
+    const newUsersCurrent = toNumber(newUsersCurrentRow?.count);
+    const newUsersPrevious = toNumber(newUsersPreviousRow?.count);
+    const instructorCount = toNumber(instructorCountRow?.count);
+    const communityTotal = toNumber(communityTotalRow?.count);
+    const communitiesCreatedCurrent = toNumber(communityCurrentRow?.count);
+    const communitiesCreatedPrevious = toNumber(communityPreviousRow?.count);
+    const dailyActiveCurrent = toNumber(presenceCurrentRow?.count);
+    const dailyActivePrevious = toNumber(presencePreviousRow?.count);
+
+    const activeSubscriptions = activeSubscriptionDetails.length;
+    const primaryCurrency =
+      activeSubscriptionDetails[0]?.currency ?? revenueCurrentRows[0]?.currency ?? 'USD';
+
+    const subscriptionStartsCurrent = activeSubscriptionDetails.filter((subscription) => {
+      if (!subscription.startedAt) return false;
+      const startedAt = subscription.startedAt instanceof Date
+        ? subscription.startedAt
+        : new Date(subscription.startedAt);
+      return startedAt >= thirtyDaysAgo;
+    }).length;
+    const subscriptionStartsPrevious = activeSubscriptionDetails.filter((subscription) => {
+      if (!subscription.startedAt) return false;
+      const startedAt = subscription.startedAt instanceof Date
+        ? subscription.startedAt
+        : new Date(subscription.startedAt);
+      return startedAt >= sixtyDaysAgo && startedAt < thirtyDaysAgo;
+    }).length;
+
+    const computeAnnualised = (priceCents, interval) => {
+      switch (interval) {
+        case 'monthly':
+          return priceCents * 12;
+        case 'quarterly':
+          return priceCents * 4;
+        case 'annual':
+          return priceCents;
+        case 'lifetime':
+          return 0;
+        default:
+          return priceCents * 12;
+      }
+    };
+
+    const computeMonthlyRecurring = (priceCents, interval) => {
+      switch (interval) {
+        case 'monthly':
+          return priceCents;
+        case 'quarterly':
+          return Math.round(priceCents / 3);
+        case 'annual':
+          return Math.round(priceCents / 12);
+        case 'lifetime':
+          return 0;
+        default:
+          return priceCents;
+      }
+    };
+
+    const arrCents = activeSubscriptionDetails.reduce(
+      (total, subscription) => total + computeAnnualised(toNumber(subscription.priceCents), subscription.billingInterval),
+      0
+    );
+    const mrrCents = activeSubscriptionDetails.reduce(
+      (total, subscription) => total + computeMonthlyRecurring(toNumber(subscription.priceCents), subscription.billingInterval),
+      0
+    );
+
+    const revenueCurrentTotal = revenueCurrentRows.reduce(
+      (total, row) => total + toNumber(row.total),
+      0
+    );
+    const revenuePreviousTotal = revenuePreviousRows.reduce(
+      (total, row) => total + toNumber(row.total),
+      0
+    );
+    const revenueCurrency = revenueCurrentRows[0]?.currency ?? primaryCurrency;
+
+    const paymentOutcomeMap = paymentOutcomeRows.reduce((acc, row) => {
+      acc[row.status] = toNumber(row.total ?? row.count ?? row.Total);
+      return acc;
+    }, {});
+    const paymentSucceeded = paymentOutcomeMap.succeeded ?? 0;
+    const paymentFailed = (paymentOutcomeMap.failed ?? 0) + (paymentOutcomeMap.canceled ?? 0);
+    const paymentProcessing = paymentOutcomeMap.processing ?? 0;
+    const paymentRequiresAction =
+      (paymentOutcomeMap.requires_action ?? 0) + (paymentOutcomeMap.requires_payment_method ?? 0);
+    const paymentTotalConsidered =
+      paymentSucceeded + paymentFailed + paymentProcessing + paymentRequiresAction;
+    const captureRate =
+      paymentTotalConsidered > 0
+        ? `${((paymentSucceeded / paymentTotalConsidered) * 100).toFixed(1)}%`
+        : '0%';
+
+    const refundsPending = toNumber(refundsPendingRow?.count);
+
+    const percentageChange = (current, previous, label) => {
+      if (previous === 0) {
+        if (current === 0) {
+          return { change: `No change ${label}`, trend: 'up' };
+        }
+        return { change: `+100% ${label}`, trend: 'up' };
+      }
+      const delta = ((current - previous) / previous) * 100;
+      if (Math.abs(delta) < 0.1) {
+        return { change: `No change ${label}`, trend: 'up' };
+      }
+      const rounded = Math.abs(delta).toFixed(1);
+      return {
+        change: `${delta >= 0 ? '+' : '−'}${rounded}% ${label}`,
+        trend: delta >= 0 ? 'up' : 'down'
+      };
+    };
+
+    const countChange = (current, previous, { label, unitSingular, unitPlural }) => {
+      const diff = current - previous;
+      if (diff === 0) {
+        return { change: `No change ${label}`, trend: 'up' };
+      }
+      const absolute = Math.abs(diff);
+      let unit = '';
+      if (unitSingular) {
+        const plural = unitPlural ?? `${unitSingular}s`;
+        unit = ` ${absolute === 1 ? unitSingular : plural}`;
+      }
+      return {
+        change: `${diff > 0 ? '+' : '−'}${formatNumber(absolute)}${unit} ${label}`,
+        trend: diff >= 0 ? 'up' : 'down'
+      };
+    };
+
+    const revenueChange = percentageChange(revenueCurrentTotal, revenuePreviousTotal, 'vs prior 30d');
+
+    const metrics = [
+      {
+        id: 'net-revenue',
+        label: 'Net revenue (30d)',
+        value: formatCurrency(revenueCurrentTotal, revenueCurrency),
+        change: revenueChange.change,
+        trend: revenueChange.trend
+      },
+      {
+        id: 'active-subscriptions',
+        label: 'Active subscriptions',
+        value: formatNumber(activeSubscriptions),
+        ...countChange(subscriptionStartsCurrent, subscriptionStartsPrevious, {
+          label: 'new vs prior 30d',
+          unitSingular: 'new',
+          unitPlural: 'new'
+        })
+      },
+      {
+        id: 'communities-live',
+        label: 'Communities live',
+        value: formatNumber(communityTotal),
+        ...countChange(communitiesCreatedCurrent, communitiesCreatedPrevious, {
+          label: 'launched vs prior 30d',
+          unitSingular: 'launch',
+          unitPlural: 'launches'
+        })
+      },
+      {
+        id: 'daily-active-members',
+        label: 'Daily active members',
+        value: formatNumber(dailyActiveCurrent),
+        ...countChange(dailyActiveCurrent, dailyActivePrevious, {
+          label: 'vs prior day',
+          unitSingular: 'member',
+          unitPlural: 'members'
+        })
+      }
+    ];
+
+    const approvalsItems = [];
+
+    pendingMembershipRows.forEach((row) => {
+      approvalsItems.push({
+        id: `membership-${row.id}`,
+        name: `${row.firstName} ${row.lastName}`.trim(),
+        type: 'Community access',
+        summary: `${row.communityName} • ${row.email}`,
+        submittedAt: humanizeRelativeTime(row.joinedAt, reference),
+        status: 'Pending review',
+        action: 'Review member',
+        priority: 'medium'
+      });
+    });
+
+    payoutRows.forEach((row) => {
+      approvalsItems.push({
+        id: `payout-${row.id}`,
+        name: `${row.communityName} affiliate`,
+        type: 'Affiliate payout',
+        summary: `${row.firstName} ${row.lastName}`.trim(),
+        submittedAt: humanizeRelativeTime(row.scheduledAt ?? row.createdAt, reference),
+        status: row.status === 'processing' ? 'Processing' : 'Awaiting approval',
+        action: 'Review payout',
+        priority: row.status === 'processing' ? 'low' : 'high',
+        amount: formatCurrency(row.amountCents, primaryCurrency)
+      });
+    });
+
+    followRequestsRows.forEach((row) => {
+      approvalsItems.push({
+        id: `follow-${row.id}`,
+        name: `${row.followerFirstName} ${row.followerLastName}`.trim(),
+        type: 'Follow request',
+        summary: `Waiting on ${row.followingFirstName} ${row.followingLastName}`.trim(),
+        submittedAt: humanizeRelativeTime(row.createdAt, reference),
+        status: 'Pending',
+        action: 'Review connection',
+        priority: 'low'
+      });
+    });
+
+    const approvals = {
+      pendingCount: approvalsItems.length,
+      items: approvalsItems.slice(0, 10)
+    };
+
+    const topCommunities = topCommunitiesRows.map((row) => {
+      const subscribers = toNumber(row.subscribers);
+      return {
+        id: `community-${row.id}`,
+        name: row.name,
+        revenue: formatCurrency(toNumber(row.revenue), revenueCurrency),
+        subscribers,
+        share: activeSubscriptions > 0 ? Math.round((subscribers / activeSubscriptions) * 100) : 0
+      };
+    });
+
+    const revenue = {
+      overview: {
+        netRevenue: formatCurrency(revenueCurrentTotal, revenueCurrency),
+        netRevenueChange: revenueChange.change,
+        arr: formatCurrency(arrCents, primaryCurrency),
+        mrr: formatCurrency(mrrCents, primaryCurrency),
+        captureRate,
+        failedPayments: paymentOutcomeMap.failed ?? 0,
+        refundsPending
+      },
+      topCommunities,
+      paymentHealth: {
+        succeeded: paymentSucceeded,
+        processing: paymentProcessing,
+        requiresAction: paymentRequiresAction,
+        failed: paymentOutcomeMap.failed ?? 0,
+        total: paymentTotalConsidered
+      }
+    };
+
+    const alerts = analyticsAlertsRows.map((row) => {
+      const metadata = safeJsonParse(row.metadata, {});
+      return {
+        id: `alert-${row.alert_code ?? row.id}`,
+        severity: row.severity,
+        message: row.message,
+        detectedAt: row.detected_at,
+        detectedLabel: humanizeRelativeTime(row.detected_at, reference),
+        resolvedAt: row.resolved_at,
+        resolvedLabel: row.resolved_at ? humanizeRelativeTime(row.resolved_at, reference) : null,
+        metadata
+      };
+    });
+
+    const events = domainEventRows.map((row) => {
+      const payload = safeJsonParse(row.payload, {});
+      const actorName = `${row.actorFirstName ?? ''} ${row.actorLastName ?? ''}`.trim();
+      const summaryParts = [row.eventType.replace(/[._]/g, ' ')];
+      if (actorName) {
+        summaryParts.push(`by ${actorName}`);
+      }
+      return {
+        id: `event-${row.id}`,
+        type: row.eventType,
+        entity: row.entityType,
+        summary: summaryParts.join(' '),
+        occurredAt: row.createdAt,
+        occurredLabel: humanizeRelativeTime(row.createdAt, reference),
+        metadata: payload
+      };
+    });
+
+    const averageResponseMinutes = Math.round(
+      toNumber(tutorResponseRow?.avgResponse ?? tutorResponseRow?.avg_response)
+    );
+
+    const openAlerts = alerts.filter((alert) => !alert.resolvedAt).length;
+
+    const upcomingLaunches = upcomingLiveClassRows.map((row) => {
+      const startAt = row.startAt instanceof Date ? row.startAt : new Date(row.startAt);
+      const diffMs = startAt.getTime() - reference.getTime();
+      const diffDays = Math.max(0, Math.round(diffMs / DAY_IN_MS));
+      const startIn = diffMs <= 0
+        ? 'In progress'
+        : diffDays === 0
+          ? 'Starting today'
+          : `In ${diffDays} day${diffDays === 1 ? '' : 's'}`;
+      return {
+        id: `launch-${row.id}`,
+        title: row.title,
+        community: row.communityName ?? 'Community',
+        startAt: formatDateTime(startAt, { dateStyle: 'medium', timeStyle: 'short' }),
+        startIn
+      };
+    });
+
+    const operations = {
+      support: {
+        backlog: pendingMembershipRows.length + followRequestsRows.length,
+        pendingMemberships: pendingMembershipRows.length,
+        followRequests: followRequestsRows.length,
+        avgResponseMinutes: averageResponseMinutes,
+        dailyActiveMembers: dailyActiveCurrent
+      },
+      risk: {
+        payoutsProcessing: payoutRows.length,
+        failedPayments: paymentOutcomeMap.failed ?? 0,
+        refundsPending,
+        alertsOpen: openAlerts
+      },
+      platform: {
+        totalUsers: formatNumber(totalUsers),
+        newUsers30d: formatNumber(newUsersCurrent),
+        newUsersChange: countChange(newUsersCurrent, newUsersPrevious, {
+          label: 'vs prior 30d',
+          unitSingular: 'signup',
+          unitPlural: 'signups'
+        }).change,
+        communitiesLive: formatNumber(communityTotal),
+        instructors: formatNumber(instructorCount)
+      },
+      upcomingLaunches
+    };
+
+    const profileStats = [
+      { label: 'Active subscriptions', value: `${formatNumber(activeSubscriptions)} accounts` },
+      { label: 'Communities live', value: `${formatNumber(communityTotal)} spaces` },
+      { label: 'ARR', value: formatCurrency(arrCents, primaryCurrency) }
+    ];
+
+    const profileBio = `Overseeing ${formatNumber(communityTotal)} communities, ${formatNumber(
+      activeSubscriptions
+    )} active subscriptions, and ${formatCurrency(revenueCurrentTotal, revenueCurrency)} captured in the last 30 days.`;
+
+    const searchIndex = [
+      { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
+      { id: 'admin-revenue', role: 'admin', type: 'Revenue', title: 'Revenue performance', url: '/admin#revenue' },
+      { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' }
+    ];
+
+    return {
+      role: { id: 'admin', label: 'Admin' },
+      dashboard: {
+        metrics,
+        approvals,
+        revenue,
+        operations,
+        activity: { alerts, events }
+      },
+      profileStats,
+      profileBio,
+      profileTitleSegment: 'Platform operations oversight',
       searchIndex
     };
   }
