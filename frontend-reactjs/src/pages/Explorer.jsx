@@ -3,14 +3,18 @@ import PropTypes from 'prop-types';
 import {
   AdjustmentsHorizontalIcon,
   ArrowPathIcon,
+  ArrowTrendingUpIcon,
   BookmarkIcon,
   BookmarkSlashIcon,
   CalendarDaysIcon,
+  ChartBarIcon,
+  ClockIcon,
   GlobeAltIcon,
   MegaphoneIcon,
   UsersIcon,
   AcademicCapIcon,
   BookOpenIcon,
+  CurrencyDollarIcon,
   UserGroupIcon,
   UserCircleIcon,
   MapPinIcon,
@@ -250,6 +254,55 @@ function formatNumber(value) {
   return new Intl.NumberFormat('en-US').format(value);
 }
 
+function formatCurrency(value) {
+  if (!value) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: value >= 100 ? 0 : 2
+    }).format(value >= 100 ? value / 100 : value);
+  }
+  if (typeof value === 'object') {
+    const amount = Number.isFinite(value.amount) ? value.amount : null;
+    if (amount === null) return null;
+    const currency = value.currency ?? 'USD';
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: amount >= 100 ? 0 : 2
+    }).format(amount >= 100 ? amount / 100 : amount);
+  }
+  return null;
+}
+
+function formatDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  }).format(date);
+}
+
+function formatDuration(minutes) {
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes)) {
+    return null;
+  }
+  if (minutes < 60) {
+    return `${Math.round(minutes)} min`;
+  }
+  const hours = minutes / 60;
+  if (hours < 10) {
+    return `${hours.toFixed(1)} hr`;
+  }
+  return `${Math.round(hours)} hr`;
+}
+
 function ExplorerMap({ markers, bounds }) {
   if (!markers?.length) {
     return (
@@ -355,13 +408,49 @@ SponsoredAdCard.propTypes = {
   }).isRequired
 };
 
-function ResultCard({ hit, onTrackInteraction }) {
+function ActionButtons({ hit, onTrackInteraction }) {
   const handleInteraction = () => {
     if (typeof onTrackInteraction === 'function') {
       onTrackInteraction(hit.entityType, hit.id);
     }
   };
 
+  return (
+    <div className="mt-5 flex flex-wrap gap-3">
+      {hit.actions?.map((action) => (
+        <a
+          key={action.label}
+          href={action.href}
+          onClick={handleInteraction}
+          className="inline-flex items-center gap-2 rounded-full border border-primary/30 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
+        >
+          <SparklesIcon className="h-4 w-4" />
+          {action.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+ActionButtons.propTypes = {
+  hit: PropTypes.shape({
+    entityType: PropTypes.string.isRequired,
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    actions: PropTypes.arrayOf(
+      PropTypes.shape({
+        label: PropTypes.string.isRequired,
+        href: PropTypes.string.isRequired
+      })
+    )
+  }).isRequired,
+  onTrackInteraction: PropTypes.func
+};
+
+ActionButtons.defaultProps = {
+  onTrackInteraction: undefined
+};
+
+function StandardResultCard({ hit, onTrackInteraction }) {
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -406,50 +495,330 @@ function ResultCard({ hit, onTrackInteraction }) {
           </dl>
         )}
       </div>
-      {hit.actions?.length ? (
-        <div className="mt-4 flex flex-wrap gap-3">
-          {hit.actions.map((action) => (
-            <a
-              key={action.label}
-              href={action.href}
-              onClick={handleInteraction}
-              className="inline-flex items-center gap-2 rounded-full border border-primary/30 px-4 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
-            >
-              <SparklesIcon className="h-4 w-4" />
-              {action.label}
-            </a>
-          ))}
-        </div>
-      ) : null}
+      {hit.actions?.length ? <ActionButtons hit={hit} onTrackInteraction={onTrackInteraction} /> : null}
     </article>
   );
 }
 
-ResultCard.propTypes = {
-  hit: PropTypes.shape({
-    entityType: PropTypes.string.isRequired,
-    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-    title: PropTypes.string.isRequired,
-    subtitle: PropTypes.string,
-    description: PropTypes.string,
-    tags: PropTypes.arrayOf(PropTypes.string),
-    geo: PropTypes.shape({
-      country: PropTypes.string
-    }),
-    metrics: PropTypes.objectOf(PropTypes.oneOfType([PropTypes.number, PropTypes.string])),
-    actions: PropTypes.arrayOf(
-      PropTypes.shape({
-        label: PropTypes.string.isRequired,
-        href: PropTypes.string.isRequired
-      })
-    )
-  }).isRequired,
-  onTrackInteraction: PropTypes.func
+StandardResultCard.propTypes = {
+  hit: ActionButtons.propTypes.hit,
+  onTrackInteraction: ActionButtons.propTypes.onTrackInteraction
 };
 
-ResultCard.defaultProps = {
-  onTrackInteraction: undefined
+StandardResultCard.defaultProps = ActionButtons.defaultProps;
+
+function CommunityResultCard({ hit, onTrackInteraction }) {
+  const languages = Array.isArray(hit.raw?.languages) ? hit.raw.languages.slice(0, 2).join(', ') : null;
+  const timezone = hit.raw?.timezone ?? hit.raw?.primaryTimezone ?? null;
+  const onlineCount = hit.raw?.online ?? hit.raw?.onlineCount ?? hit.raw?.onlineMembers ?? null;
+  const members = hit.metrics?.members ?? formatNumber(hit.raw?.memberCount);
+  const trendScore = hit.metrics?.trendScore ?? hit.raw?.trendScore ?? null;
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            <UsersIcon className="h-4 w-4" /> Community
+          </div>
+          <h3 className="mt-3 text-2xl font-semibold text-slate-900">{hit.title}</h3>
+          {hit.subtitle && <p className="text-sm font-medium text-slate-500">{hit.subtitle}</p>}
+          {hit.description && <p className="mt-3 text-sm text-slate-600">{hit.description}</p>}
+          {hit.tags?.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {hit.tags.slice(0, 6).map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 sm:grid-cols-3">
+          {members && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Members</p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">{members}</p>
+            </div>
+          )}
+          {trendScore && (
+            <div className="rounded-2xl bg-indigo-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-indigo-500">
+                <ArrowTrendingUpIcon className="h-4 w-4" /> Trend score
+              </p>
+              <p className="mt-2 text-xl font-semibold text-indigo-600">{trendScore}</p>
+            </div>
+          )}
+          {onlineCount && (
+            <div className="rounded-2xl bg-emerald-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Online now</p>
+              <p className="mt-2 text-xl font-semibold text-emerald-600">{formatNumber(onlineCount)}</p>
+            </div>
+          )}
+          {languages && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Languages</p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{languages}</p>
+            </div>
+          )}
+          {timezone && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Timezone</p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{timezone}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      {hit.actions?.length ? <ActionButtons hit={hit} onTrackInteraction={onTrackInteraction} /> : null}
+    </article>
+  );
+}
+
+CommunityResultCard.propTypes = StandardResultCard.propTypes;
+
+CommunityResultCard.defaultProps = StandardResultCard.defaultProps;
+
+function CourseResultCard({ hit, onTrackInteraction }) {
+  const price = formatCurrency(hit.raw?.price) ?? (hit.subtitle?.match(/\$[\d,.]+/)?.[0] ?? null);
+  const rating = hit.raw?.rating?.average ? `${hit.raw.rating.average.toFixed(1)}★` : null;
+  const enrolments = hit.metrics?.enrolments ?? (hit.raw?.enrolmentCount ? formatNumber(hit.raw.enrolmentCount) : null);
+  const releaseAt = hit.metrics?.releaseAt ? formatDate(hit.metrics.releaseAt) : formatDate(hit.raw?.releaseAt);
+  const duration = hit.raw?.durationHours ? `${hit.raw.durationHours} hr` : formatDuration(hit.raw?.durationMinutes);
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            <AcademicCapIcon className="h-4 w-4" /> Course
+          </div>
+          <h3 className="mt-3 text-2xl font-semibold text-slate-900">{hit.title}</h3>
+          {hit.subtitle && <p className="text-sm font-medium text-slate-500">{hit.subtitle}</p>}
+          {hit.description && <p className="mt-3 text-sm text-slate-600">{hit.description}</p>}
+          {hit.tags?.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {hit.tags.slice(0, 6).map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 sm:grid-cols-3">
+          {price && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <CurrencyDollarIcon className="h-4 w-4" /> Tuition
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">{price}</p>
+            </div>
+          )}
+          {rating && (
+            <div className="rounded-2xl bg-indigo-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500">Rating</p>
+              <p className="mt-2 text-xl font-semibold text-indigo-600">{rating}</p>
+            </div>
+          )}
+          {enrolments && (
+            <div className="rounded-2xl bg-emerald-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Enrolled</p>
+              <p className="mt-2 text-xl font-semibold text-emerald-600">{enrolments}</p>
+            </div>
+          )}
+          {duration && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <ClockIcon className="h-4 w-4" /> Duration
+              </p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{duration}</p>
+            </div>
+          )}
+          {releaseAt && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Updated</p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{releaseAt}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      {hit.actions?.length ? <ActionButtons hit={hit} onTrackInteraction={onTrackInteraction} /> : null}
+    </article>
+  );
+}
+
+CourseResultCard.propTypes = StandardResultCard.propTypes;
+
+CourseResultCard.defaultProps = StandardResultCard.defaultProps;
+
+function EbookResultCard({ hit, onTrackInteraction }) {
+  const price = formatCurrency(hit.raw?.price) ?? (hit.subtitle?.match(/\$[\d,.]+/)?.[0] ?? null);
+  const rating = hit.raw?.rating?.average ? `${hit.raw.rating.average.toFixed(1)}★` : null;
+  const readingTime = hit.metrics?.readingTimeMinutes
+    ? formatDuration(hit.metrics.readingTimeMinutes)
+    : formatDuration(hit.raw?.readingTimeMinutes);
+  const formats = Array.isArray(hit.raw?.formats) ? hit.raw.formats.join(', ') : null;
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            <BookOpenIcon className="h-4 w-4" /> Ebook
+          </div>
+          <h3 className="mt-3 text-2xl font-semibold text-slate-900">{hit.title}</h3>
+          {hit.subtitle && <p className="text-sm font-medium text-slate-500">{hit.subtitle}</p>}
+          {hit.description && <p className="mt-3 text-sm text-slate-600">{hit.description}</p>}
+          {hit.tags?.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {hit.tags.slice(0, 6).map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 sm:grid-cols-3">
+          {price && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <CurrencyDollarIcon className="h-4 w-4" /> Price
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">{price}</p>
+            </div>
+          )}
+          {rating && (
+            <div className="rounded-2xl bg-indigo-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500">Rating</p>
+              <p className="mt-2 text-xl font-semibold text-indigo-600">{rating}</p>
+            </div>
+          )}
+          {readingTime && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <ClockIcon className="h-4 w-4" /> Reading time
+              </p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{readingTime}</p>
+            </div>
+          )}
+          {formats && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Formats</p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{formats}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      {hit.actions?.length ? <ActionButtons hit={hit} onTrackInteraction={onTrackInteraction} /> : null}
+    </article>
+  );
+}
+
+EbookResultCard.propTypes = StandardResultCard.propTypes;
+
+EbookResultCard.defaultProps = StandardResultCard.defaultProps;
+
+function TutorResultCard({ hit, onTrackInteraction }) {
+  const rate = formatCurrency(hit.raw?.hourlyRate) ?? (hit.subtitle?.match(/\$[\d,.]+/)?.[0] ?? null);
+  const rating = hit.raw?.rating?.average ? `${hit.raw.rating.average.toFixed(1)}★` : null;
+  const responseTime = hit.metrics?.responseTimeMinutes
+    ? formatDuration(hit.metrics.responseTimeMinutes)
+    : formatDuration(hit.raw?.responseTimeMinutes);
+  const completedSessions = hit.metrics?.completedSessions
+    ? hit.metrics.completedSessions
+    : hit.raw?.completedSessions
+    ? formatNumber(hit.raw.completedSessions)
+    : null;
+  const countries = hit.geo?.country ?? hit.raw?.country ?? null;
+
+  return (
+    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            <UserGroupIcon className="h-4 w-4" /> Tutor
+          </div>
+          <h3 className="mt-3 text-2xl font-semibold text-slate-900">{hit.title}</h3>
+          {hit.subtitle && <p className="text-sm font-medium text-slate-500">{hit.subtitle}</p>}
+          {hit.description && <p className="mt-3 text-sm text-slate-600">{hit.description}</p>}
+          {hit.tags?.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {hit.tags.slice(0, 8).map((tag) => (
+                <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+        <div className="grid grid-cols-2 gap-4 text-sm text-slate-600 sm:grid-cols-3">
+          {rate && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <CurrencyDollarIcon className="h-4 w-4" /> Hourly rate
+              </p>
+              <p className="mt-2 text-xl font-semibold text-slate-900">{rate}</p>
+            </div>
+          )}
+          {rating && (
+            <div className="rounded-2xl bg-indigo-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500">Rating</p>
+              <p className="mt-2 text-xl font-semibold text-indigo-600">{rating}</p>
+            </div>
+          )}
+          {completedSessions && (
+            <div className="rounded-2xl bg-emerald-50 p-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-500">Sessions</p>
+              <p className="mt-2 text-xl font-semibold text-emerald-600">{completedSessions}</p>
+            </div>
+          )}
+          {responseTime && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <ClockIcon className="h-4 w-4" /> Response time
+              </p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{responseTime}</p>
+            </div>
+          )}
+          {countries && (
+            <div className="rounded-2xl bg-slate-50 p-4 text-center">
+              <p className="inline-flex items-center justify-center gap-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <GlobeAltIcon className="h-4 w-4" /> Location
+              </p>
+              <p className="mt-2 text-sm font-semibold text-slate-700">{countries}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      {hit.actions?.length ? <ActionButtons hit={hit} onTrackInteraction={onTrackInteraction} /> : null}
+    </article>
+  );
+}
+
+TutorResultCard.propTypes = StandardResultCard.propTypes;
+
+TutorResultCard.defaultProps = StandardResultCard.defaultProps;
+
+const ENTITY_CARD_COMPONENTS = {
+  communities: CommunityResultCard,
+  courses: CourseResultCard,
+  ebooks: EbookResultCard,
+  tutors: TutorResultCard
 };
+
+function ExplorerResultCard({ hit, mode, onTrackInteraction }) {
+  const Renderer = mode === 'entity' ? ENTITY_CARD_COMPONENTS[hit.entityType] ?? StandardResultCard : StandardResultCard;
+  return <Renderer hit={hit} onTrackInteraction={onTrackInteraction} />;
+}
+
+ExplorerResultCard.propTypes = {
+  hit: StandardResultCard.propTypes.hit,
+  mode: PropTypes.oneOf(['standard', 'entity']).isRequired,
+  onTrackInteraction: StandardResultCard.propTypes.onTrackInteraction
+};
+
+ExplorerResultCard.defaultProps = StandardResultCard.defaultProps;
 
 export default function Explorer() {
   const { isAuthenticated, session } = useAuth();
@@ -684,6 +1053,11 @@ export default function Explorer() {
   const sponsoredPlacements = results?.adsPlacements ?? [];
 
   const canSaveSearch = isAuthenticated && Boolean(authToken);
+  const isGlobalSearch = searchParams.entityTypes.length > 1;
+  const resultViewMode = isGlobalSearch ? 'standard' : 'entity';
+  const activeDescription = isGlobalSearch
+    ? 'Standard explorer view across all enabled entities.'
+    : currentEntityMeta?.description;
 
   const handleSaveSearch = async () => {
     if (!newSavedSearchName.trim()) {
@@ -1025,13 +1399,20 @@ export default function Explorer() {
                   );
                 })}
               </nav>
-              {currentEntityMeta && (
-                <p className="mt-4 text-sm text-slate-500">{currentEntityMeta.description}</p>
-              )}
+              {activeDescription && <p className="mt-4 text-sm text-slate-500">{activeDescription}</p>}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                   {loading ? 'Refreshing results…' : `${formatNumber(totalForEntity)} results`}
                 </p>
+                {isGlobalSearch ? (
+                  <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <Squares2X2Icon className="h-3.5 w-3.5" /> Standard view
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+                    <ChartBarIcon className="h-3.5 w-3.5" /> {currentEntityMeta?.label ?? 'Entity'} view
+                  </span>
+                )}
                 {currentEntityMeta?.sortOptions?.length ? (
                   <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
                     Sort by
@@ -1104,9 +1485,10 @@ export default function Explorer() {
             {activeEntityResult?.hits?.length ? (
               <div className="space-y-4">
                 {activeEntityResult.hits.map((hit) => (
-                  <ResultCard
+                  <ExplorerResultCard
                     key={`${hit.entityType}-${hit.id}`}
                     hit={hit}
+                    mode={resultViewMode}
                     onTrackInteraction={handleResultInteraction}
                   />
                 ))}

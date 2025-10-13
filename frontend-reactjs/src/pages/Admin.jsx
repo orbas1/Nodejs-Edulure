@@ -7,6 +7,9 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
 
+const EMPTY_OBJECT = Object.freeze({});
+const EMPTY_ARRAY = Object.freeze([]);
+
 function formatNumber(value) {
   if (value === null || value === undefined) return '0';
   const numeric = typeof value === 'number' ? value : Number(value);
@@ -38,6 +41,87 @@ export default function Admin() {
 
   const adminData = dashboards.admin ?? null;
   const overallLoading = runtimeLoading || loading;
+
+  const revenueCards = useMemo(() => {
+    const overview = adminData?.revenue?.overview;
+    if (!overview) {
+      return EMPTY_ARRAY;
+    }
+
+    const cards = [];
+
+    if (overview.netRevenue) {
+      cards.push({
+        label: 'Net revenue (30d)',
+        value: overview.netRevenue,
+        helper: overview.netRevenueChange
+      });
+    }
+
+    if (overview.arr) {
+      cards.push({
+        label: 'Annual recurring revenue',
+        value: overview.arr
+      });
+    }
+
+    if (overview.mrr) {
+      cards.push({
+        label: 'Monthly recurring revenue',
+        value: overview.mrr
+      });
+    }
+
+    if (overview.captureRate) {
+      cards.push({
+        label: 'Capture rate',
+        value: overview.captureRate
+      });
+    }
+
+    if (overview.failedPayments !== undefined) {
+      cards.push({
+        label: 'Failed payments (30d)',
+        value: formatNumber(overview.failedPayments)
+      });
+    }
+
+    if (overview.refundsPending !== undefined) {
+      cards.push({
+        label: 'Refunds pending',
+        value: formatNumber(overview.refundsPending)
+      });
+    }
+
+    return cards;
+  }, [adminData]);
+
+  const paymentHealthBreakdown = useMemo(() => {
+    const health = adminData?.revenue?.paymentHealth;
+    if (!health) {
+      return EMPTY_ARRAY;
+    }
+
+    const breakdown = [];
+
+    if (health.succeeded !== undefined) {
+      breakdown.push({ label: 'Succeeded', value: formatNumber(health.succeeded) });
+    }
+
+    if (health.processing !== undefined) {
+      breakdown.push({ label: 'Processing', value: formatNumber(health.processing) });
+    }
+
+    if (health.requiresAction !== undefined) {
+      breakdown.push({ label: 'Requires action', value: formatNumber(health.requiresAction) });
+    }
+
+    if (health.failed !== undefined) {
+      breakdown.push({ label: 'Failed', value: formatNumber(health.failed) });
+    }
+
+    return breakdown;
+  }, [adminData]);
 
   if (!adminConsoleEnabled && !overallLoading) {
     return (
@@ -98,84 +182,19 @@ export default function Admin() {
     );
   }
 
-  const approvals = adminData.approvals ?? {};
-  const approvalItems = approvals.items ?? [];
+  const approvals = adminData.approvals ?? EMPTY_OBJECT;
+  const approvalItems = approvals.items ?? EMPTY_ARRAY;
   const pendingApprovals = approvals.pendingCount ?? approvalItems.length;
 
-  const revenueOverview = adminData.revenue?.overview ?? {};
-  const paymentHealth = adminData.revenue?.paymentHealth ?? {};
-  const topCommunities = adminData.revenue?.topCommunities ?? [];
+  const topCommunities = adminData.revenue?.topCommunities ?? EMPTY_ARRAY;
 
-  const support = adminData.operations?.support ?? {};
-  const risk = adminData.operations?.risk ?? {};
-  const platform = adminData.operations?.platform ?? {};
-  const upcomingLaunches = adminData.operations?.upcomingLaunches ?? [];
+  const support = adminData.operations?.support ?? EMPTY_OBJECT;
+  const risk = adminData.operations?.risk ?? EMPTY_OBJECT;
+  const platform = adminData.operations?.platform ?? EMPTY_OBJECT;
+  const upcomingLaunches = adminData.operations?.upcomingLaunches ?? EMPTY_ARRAY;
 
-  const alerts = adminData.activity?.alerts ?? [];
-  const events = adminData.activity?.events ?? [];
-
-  const revenueCards = useMemo(
-    () =>
-      [
-        revenueOverview.netRevenue
-          ? {
-              label: 'Net revenue (30d)',
-              value: revenueOverview.netRevenue,
-              helper: revenueOverview.netRevenueChange
-            }
-          : null,
-        revenueOverview.arr
-          ? {
-              label: 'Annual recurring revenue',
-              value: revenueOverview.arr
-            }
-          : null,
-        revenueOverview.mrr
-          ? {
-              label: 'Monthly recurring revenue',
-              value: revenueOverview.mrr
-            }
-          : null,
-        revenueOverview.captureRate
-          ? {
-              label: 'Capture rate',
-              value: revenueOverview.captureRate
-            }
-          : null,
-        revenueOverview.failedPayments !== undefined
-          ? {
-              label: 'Failed payments (30d)',
-              value: formatNumber(revenueOverview.failedPayments)
-            }
-          : null,
-        revenueOverview.refundsPending !== undefined
-          ? {
-              label: 'Refunds pending',
-              value: formatNumber(revenueOverview.refundsPending)
-            }
-          : null
-      ].filter(Boolean),
-    [revenueOverview]
-  );
-
-  const paymentHealthBreakdown = useMemo(
-    () =>
-      [
-        paymentHealth.succeeded !== undefined
-          ? { label: 'Succeeded', value: formatNumber(paymentHealth.succeeded) }
-          : null,
-        paymentHealth.processing !== undefined
-          ? { label: 'Processing', value: formatNumber(paymentHealth.processing) }
-          : null,
-        paymentHealth.requiresAction !== undefined
-          ? { label: 'Requires action', value: formatNumber(paymentHealth.requiresAction) }
-          : null,
-        paymentHealth.failed !== undefined
-          ? { label: 'Failed', value: formatNumber(paymentHealth.failed) }
-          : null
-      ].filter(Boolean),
-    [paymentHealth]
-  );
+  const alerts = adminData.activity?.alerts ?? EMPTY_ARRAY;
+  const events = adminData.activity?.events ?? EMPTY_ARRAY;
 
   const supportStats = [
     { label: 'Open requests', value: formatNumber(support.backlog ?? 0) },

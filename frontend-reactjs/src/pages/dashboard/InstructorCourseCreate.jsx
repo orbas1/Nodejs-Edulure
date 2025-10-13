@@ -3,6 +3,8 @@ import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 
+const EMPTY_BLUEPRINTS = Object.freeze([]);
+
 const readinessNarrative = (score) => {
   if (score >= 80) return 'Launch-ready';
   if (score >= 50) return 'In build';
@@ -12,7 +14,8 @@ const readinessNarrative = (score) => {
 
 export default function InstructorCourseCreate() {
   const { dashboard, refresh } = useOutletContext();
-  const blueprints = dashboard?.courses?.creationBlueprints ?? [];
+  const creationBlueprints = dashboard?.courses?.creationBlueprints;
+  const blueprints = creationBlueprints ?? EMPTY_BLUEPRINTS;
 
   const overview = useMemo(() => {
     if (blueprints.length === 0) {
