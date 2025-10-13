@@ -41,5 +41,6 @@
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.
 
 ## `/admin`
-- Adds runtime flag gating: when the admin console feature is disabled the page renders an escalation prompt sourced from runtime configuration.
-- Existing admin dashboards retain approvals and stats panels once the flag is active, preserving production layouts.
+- Implements runtime flag gating: when `admin.operational-console` is disabled the page renders a disable banner with the configured escalation channel and hides operational widgets.
+- When enabled, the page fetches `/api/admin/console` snapshots via `adminApi.js`, hydrates KPI tiles, approvals, incidents, refunds, support backlog, and policy sections, and surfaces lookback selectors, invite CTAs, and resilient loading/error states that mirror the operational console wireframes.
+- Queue cards render status/urgency/severity badges, SLA countdowns, and latest-event summaries to keep agents aligned with backend analytics, while policy cards expose owner/review metadata for compliance teams.
