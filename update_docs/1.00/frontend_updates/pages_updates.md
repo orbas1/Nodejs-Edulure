@@ -42,5 +42,5 @@
 
 ## `/admin`
 - Implements runtime flag gating: when `admin.operational-console` is disabled the page renders a disable banner with the configured escalation channel and hides operational widgets.
-- When enabled, the page fetches `/api/admin/console` snapshots via `adminApi.js`, hydrates KPI tiles, approvals, incidents, refunds, support backlog, and policy sections, and surfaces lookback selectors, invite CTAs, and resilient loading/error states that mirror the operational console wireframes.
-- Queue cards render status/urgency/severity badges, SLA countdowns, and latest-event summaries to keep agents aligned with backend analytics, while policy cards expose owner/review metadata for compliance teams.
+- When enabled, the page consumes the admin segment of `/api/dashboard/me` via `DashboardContext`, hydrating KPI tiles, approvals, revenue/payment health, support/risk/platform stats, upcoming launches, alerts, and a policy hub CTA. Resilient loading/error states mirror the operational console wireframes and reuse shared dashboard messaging.
+- Approvals cards present pending memberships, affiliate payouts, and follow approvals with urgency/status chips; revenue cards expose net revenue, ARR/MRR, capture rate, failed payments, and refunds pending alongside a CSV export button; policy cards display status/SLA/owner/contact metadata with a CTA to the documented policy workspace.
