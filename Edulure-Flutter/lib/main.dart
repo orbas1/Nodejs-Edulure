@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'screens/communities_screen.dart';
 import 'screens/content_library_screen.dart';
 import 'screens/feed_screen.dart';
 import 'screens/home_screen.dart';
@@ -36,6 +37,7 @@ class EdulureApp extends StatelessWidget {
         '/': (_) => const HomeScreen(),
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
+        '/communities': (_) => const CommunitiesScreen(),
         '/feed': (_) => const FeedScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),
