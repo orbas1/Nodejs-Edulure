@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 class SessionManager {
@@ -5,6 +6,7 @@ class SessionManager {
   static const _assetsBox = 'content_assets';
   static const _downloadsBox = 'content_downloads';
   static const _sessionKey = 'current';
+  static const _activeRoleKey = 'active_role';
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -19,6 +21,10 @@ class SessionManager {
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     await _session.put(_sessionKey, session);
+    final userRole = session['user'] is Map ? session['user']['role'] : null;
+    if (userRole is String && userRole.isNotEmpty) {
+      await _session.put(_activeRoleKey, userRole);
+    }
   }
 
   static Map<String, dynamic>? getSession() {
@@ -27,6 +33,24 @@ class SessionManager {
       return Map<String, dynamic>.from(data);
     }
     return null;
+  }
+
+  static ValueListenable<Box<dynamic>> sessionListenable() {
+    return _session.listenable();
+  }
+
+  static String? getActiveRole() {
+    final stored = _session.get(_activeRoleKey);
+    if (stored is String && stored.isNotEmpty) {
+      return stored;
+    }
+    final session = getSession();
+    final role = session?['user'] is Map ? session?['user']['role'] : null;
+    return role is String && role.isNotEmpty ? role : null;
+  }
+
+  static Future<void> setActiveRole(String role) async {
+    await _session.put(_activeRoleKey, role);
   }
 
   static String? getAccessToken() {
@@ -40,5 +64,6 @@ class SessionManager {
 
   static Future<void> clear() async {
     await _session.delete(_sessionKey);
+    await _session.delete(_activeRoleKey);
   }
 }
