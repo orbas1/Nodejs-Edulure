@@ -17,7 +17,8 @@ export default function MainLayout() {
     const base = [
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
-      { name: 'Explorer', to: '/explorer' }
+      { name: 'Explorer', to: '/explorer' },
+      { name: 'About', to: '/about' }
     ];
 
     if (analyticsDashboardEnabled && isAuthenticated) {
@@ -167,6 +168,7 @@ export default function MainLayout() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-10 text-sm text-slate-500 md:flex-row md:items-center md:justify-between">
           <p>© {new Date().getFullYear()} Edulure. All rights reserved.</p>
           <div className="flex gap-4">
+            <a href="/about">About</a>
             <a href="/privacy">Privacy</a>
             <a href="/terms">Terms</a>
             <a href={`mailto:${supportEmail}`}>Support</a>

@@ -26,6 +26,52 @@ const ALL_COMMUNITIES_NODE = {
 
 const DEFAULT_RESOURCES_META = { limit: 6, offset: 0, total: 0 };
 
+const CURATED_HIGHLIGHTS = [
+  {
+    title: 'Trust-building sprint',
+    description: 'Daily prompts to strengthen peer accountability in your cohort.',
+    stats: ['+312% engagement lift', '14-day guided cadence']
+  },
+  {
+    title: 'Spotlight: Instructor playbooks',
+    description: 'See how verified instructors launch revenue pods and advisory retainers.',
+    stats: ['6 new playbooks', 'Updated weekly']
+  },
+  {
+    title: 'Investor AMA replay',
+    description: 'Questions from last night’s live AMA with operators from Sequoia Arc.',
+    stats: ['48-minute replay', 'Key deals annotated']
+  }
+];
+
+const CURATED_STORIES = [
+  {
+    badge: 'Editor’s pick',
+    time: '3 minutes ago',
+    title: 'How to operationalise trust scores across your ecosystem',
+    summary: 'Break down the trust framework Alex Morgan uses to keep both learner and instructor reputations high.',
+    metrics: ['6 frameworks', 'Downloadable checklist']
+  },
+  {
+    badge: 'Community spotlight',
+    time: '20 minutes ago',
+    title: 'RevOps Guild hosted its first async hackathon',
+    summary: 'Members shipped 12 playbooks and raised $42k in shared revenue within a weekend.',
+    metrics: ['328 contributors', '42 shared templates']
+  }
+];
+
+const TRENDING_TOPICS = [
+  { tag: '#RevenueRituals', delta: '+312%', description: 'Teams swapping cadence scripts and retention rituals.' },
+  { tag: '#TrustSignals', delta: '+187%', description: 'Instructors publishing transparent trust dashboards.' },
+  { tag: '#LearnerOps', delta: '+142%', description: 'Automation recipes for high-touch cohorts.' }
+];
+
+const FEATURED_CREATORS = [
+  { name: 'Mira Shah', handle: '@mirarevops', highlight: 'Built a 9-week B2B retention lab', trust: 95 },
+  { name: 'Leo Okafor', handle: '@buildwithleo', highlight: 'Scaled async micro-courses to $80k ARR', trust: 92 }
+];
+
 export default function Feed() {
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken;
@@ -353,6 +399,37 @@ export default function Feed() {
           isSearching={isLoadingFeed && !isLoadingMore}
         />
         <SkewedMenu activeState={menuState} activeItem={activeMenuItem} onSelect={setActiveMenuItem} />
+        <div className="overflow-hidden rounded-4xl border border-slate-200 bg-gradient-to-br from-primary/10 via-white to-slate-50 p-8 shadow-card">
+          <div className="grid gap-8 md:grid-cols-[minmax(0,_1.3fr)_minmax(0,_1fr)]">
+            <div className="space-y-4">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+                Live operating feed
+              </span>
+              <h1 className="text-2xl font-semibold text-slate-900">Bring your ecosystem to life with trusted updates, cohort stories, and verified wins.</h1>
+              <p className="text-sm text-slate-600">
+                Follow top communities, spotlight your wins, and unlock curated playbooks across Edulure. Verified instructors surface here when their learners rave.
+              </p>
+              {!isAuthenticated && (
+                <div className="inline-flex flex-wrap items-center gap-3 rounded-full bg-white px-4 py-2 text-xs font-semibold text-primary shadow-sm">
+                  Sign in with SSO or Google Authenticator to personalise this feed.
+                </div>
+              )}
+            </div>
+            <div className="grid gap-3">
+              {CURATED_HIGHLIGHTS.map((highlight) => (
+                <div key={highlight.title} className="rounded-3xl border border-white/60 bg-white/80 p-4 shadow-sm">
+                  <p className="text-sm font-semibold text-slate-900">{highlight.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{highlight.description}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-primary">
+                    {highlight.stats.map((stat) => (
+                      <span key={stat} className="rounded-full bg-primary/10 px-3 py-1">{stat}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
         {!isAuthenticated && (
           <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm text-slate-600">
             Sign in to follow your communities, share updates, and access the resource library.
@@ -404,8 +481,27 @@ export default function Feed() {
                     return <FeedCard key={`post-${post.id}`} post={post} />;
                   })}
                   {feedItems.length === 0 && (
-                    <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-                      No activity yet. Be the first to share an update.
+                    <div className="space-y-4">
+                      {CURATED_STORIES.map((story) => (
+                        <div key={story.title} className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                            <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 font-semibold text-primary">
+                              {story.badge}
+                            </span>
+                            <span>{story.time}</span>
+                          </div>
+                          <h3 className="mt-3 text-lg font-semibold text-slate-900">{story.title}</h3>
+                          <p className="mt-2 text-sm text-slate-600">{story.summary}</p>
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                            {story.metrics.map((metric) => (
+                              <span key={metric} className="rounded-full bg-slate-100 px-3 py-1">{metric}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+                        No activity yet. Be the first to share an update.
+                      </div>
                     </div>
                   )}
                   {canLoadMore && (
@@ -422,17 +518,53 @@ export default function Feed() {
               )}
             </div>
           </div>
-          <CommunityProfile
-            community={selectedCommunity?.id === 'all' ? null : communityDetail}
-            isAggregate={selectedCommunity?.id === 'all'}
-            resources={resources}
-            resourcesMeta={resourcesMeta}
-            isLoadingDetail={selectedCommunity?.id !== 'all' && (isLoadingCommunityDetail || isLoadingCommunities)}
-            isLoadingResources={isLoadingResources}
-            error={communityDetailError}
-            resourcesError={resourcesError}
-            onLoadMoreResources={hasMoreResources ? loadMoreResources : null}
-          />
+          <div className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Trending now</h2>
+              <div className="mt-4 space-y-4">
+                {TRENDING_TOPICS.map((topic) => (
+                  <div key={topic.tag} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-900">{topic.tag}</span>
+                      <span className="text-xs font-semibold text-primary">{topic.delta}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">{topic.description}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-xs text-primary">
+                Verified instructors get featured when their trust scores stay above 90 and they publish weekly updates.
+              </div>
+            </div>
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-semibold text-slate-900">Featured creators</h2>
+              <div className="mt-4 space-y-3 text-sm text-slate-600">
+                {FEATURED_CREATORS.map((creator) => (
+                  <div key={creator.handle} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-slate-900">{creator.name}</p>
+                        <p className="text-xs text-slate-500">{creator.handle}</p>
+                      </div>
+                      <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Trust {creator.trust}%</span>
+                    </div>
+                    <p className="mt-2 text-xs text-slate-500">{creator.highlight}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <CommunityProfile
+              community={selectedCommunity?.id === 'all' ? null : communityDetail}
+              isAggregate={selectedCommunity?.id === 'all'}
+              resources={resources}
+              resourcesMeta={resourcesMeta}
+              isLoadingDetail={selectedCommunity?.id !== 'all' && (isLoadingCommunityDetail || isLoadingCommunities)}
+              isLoadingResources={isLoadingResources}
+              error={communityDetailError}
+              resourcesError={resourcesError}
+              onLoadMoreResources={hasMoreResources ? loadMoreResources : null}
+            />
+          </div>
         </div>
       </div>
     </div>
