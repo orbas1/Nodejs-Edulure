@@ -5,6 +5,7 @@ import UserModel from '../models/UserModel.js';
 import UserPrivacySettingModel from '../models/UserPrivacySettingModel.js';
 import UserFollowModel from '../models/UserFollowModel.js';
 import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
+import PlatformSettingsService from './PlatformSettingsService.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -3029,6 +3030,8 @@ export default class DashboardService {
       };
     });
 
+    const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
+
     const operations = {
       support: {
         backlog: pendingMembershipRows.length + followRequestsRows.length,
@@ -3080,7 +3083,10 @@ export default class DashboardService {
         approvals,
         revenue,
         operations,
-        activity: { alerts, events }
+        activity: { alerts, events },
+        settings: {
+          monetization: monetizationSettings
+        }
       },
       profileStats,
       profileBio,

@@ -21,6 +21,8 @@ import {
   onPaymentFailed as handleCommunityPaymentFailed,
   onPaymentRefunded as handleCommunityPaymentRefunded
 } from './CommunitySubscriptionLifecycle.js';
+import PlatformSettingsService from './PlatformSettingsService.js';
+import EscrowService from './EscrowService.js';
 
 const STRIPE_API_VERSION = '2024-06-20';
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
@@ -409,11 +411,12 @@ class PaymentService {
     entity,
     metadata,
     receiptEmail,
-    paypal
+    paypal,
+    escrow
   }) {
     const normalizedProvider = provider?.toLowerCase();
-    if (!['stripe', 'paypal'].includes(normalizedProvider)) {
-      const error = new Error('Provider must be either stripe or paypal.');
+    if (!['stripe', 'paypal', 'escrow'].includes(normalizedProvider)) {
+      const error = new Error('Provider must be either stripe, paypal, or escrow.');
       error.status = 422;
       throw error;
     }
@@ -445,6 +448,11 @@ class PaymentService {
     }
 
     const totals = this.calculateTotals({ items, coupon, taxRegion: tax, currency: normalizedCurrency });
+    const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
+    const platformCommissionCents = PlatformSettingsService.calculateCommission(
+      totals.total,
+      monetizationSettings.commissions
+    );
 
     const publicId = randomUUID();
     const baseMetadata = {
@@ -462,8 +470,95 @@ class PaymentService {
       taxableSubtotal: totals.taxableSubtotal,
       taxableAfterDiscount: totals.taxableAfterDiscount,
       couponCode: coupon?.code ?? null,
-      couponId: coupon?.id ?? null
+      couponId: coupon?.id ?? null,
+      monetization: {
+        commission: {
+          enabled: monetizationSettings.commissions.enabled,
+          rateBps: monetizationSettings.commissions.rateBps,
+          minimumFeeCents: monetizationSettings.commissions.minimumFeeCents,
+          amountCents: platformCommissionCents
+        },
+        subscriptions: {
+          enabled: monetizationSettings.subscriptions.enabled,
+          restrictedFeatures: monetizationSettings.subscriptions.restrictedFeatures,
+          gracePeriodDays: monetizationSettings.subscriptions.gracePeriodDays,
+          restrictOnFailure: monetizationSettings.subscriptions.restrictOnFailure
+        },
+        payments: monetizationSettings.payments
+      }
     };
+
+    if (normalizedProvider === 'escrow') {
+      if (!EscrowService.isConfigured()) {
+        const error = new Error('Escrow.com integration is not configured.');
+        error.status = 503;
+        throw error;
+      }
+
+      if (!escrow?.buyer || !escrow?.seller) {
+        const error = new Error('Escrow payments require buyer and seller information.');
+        error.status = 422;
+        throw error;
+      }
+
+      let escrowTransaction;
+      try {
+        escrowTransaction = await EscrowService.createTransaction({
+          publicId,
+          amountCents: totals.total,
+          currency: normalizedCurrency,
+          description: escrow.description ?? entity?.description ?? entity?.name ?? 'Marketplace transaction',
+          buyer: escrow.buyer,
+          seller: escrow.seller,
+          inspectionPeriod: escrow.inspectionPeriod ?? monetizationSettings.subscriptions.gracePeriodDays ?? 3,
+          metadata: baseMetadata
+        });
+      } catch (error) {
+        logger.error({ err: error, publicId }, 'Failed to create Escrow.com transaction');
+        if (!error.status) {
+          error.status = 502;
+        }
+        throw error;
+      }
+
+      const intentRecord = await PaymentIntentModel.create({
+        publicId,
+        userId,
+        provider: 'escrow',
+        providerIntentId: escrowTransaction.id ?? escrowTransaction.reference ?? publicId,
+        status: 'requires_action',
+        currency: normalizedCurrency,
+        amountSubtotal: totals.subtotal,
+        amountDiscount: totals.discount,
+        amountTax: totals.tax,
+        amountTotal: totals.total,
+        amountRefunded: 0,
+        taxBreakdown: totals.taxBreakdown,
+        metadata: { ...baseMetadata, escrow: escrowTransaction },
+        couponId: coupon?.id ?? null,
+        entityType: entity?.type ?? 'commerce-item',
+        entityId: entity?.id ?? publicId,
+        receiptEmail
+      });
+
+      return {
+        provider: 'escrow',
+        paymentId: intentRecord.publicId,
+        escrow: {
+          transactionId: escrowTransaction.id ?? escrowTransaction.reference ?? publicId,
+          status: escrowTransaction.status ?? 'pending',
+          redirectUrl:
+            escrowTransaction.checkoutUrl ?? escrowTransaction.checkout_url ?? escrowTransaction.payment_url ?? null
+        },
+        status: intentRecord.status,
+        totals: {
+          subtotal: totals.subtotal,
+          discount: totals.discount,
+          tax: totals.tax,
+          total: totals.total
+        }
+      };
+    }
 
     if (normalizedProvider === 'stripe') {
       const stripe = this.getStripeClient();
