@@ -14,6 +14,7 @@ router.post('/', auth('instructor'), CommunityController.create);
 router.get('/:communityId', auth(), CommunityController.getDetail);
 router.get('/:communityId/posts', auth(), CommunityController.listFeed);
 router.post('/:communityId/posts', auth(), CommunityController.createPost);
+router.post('/:communityId/join', auth(), CommunityController.join);
 router.get('/:communityId/resources', auth(), CommunityController.listResources);
 router.post('/:communityId/resources', auth(), CommunityController.createResource);
 

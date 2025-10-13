@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   fetchAggregatedFeed,
   fetchCommunities,
   fetchCommunityDetail,
   fetchCommunityFeed,
-  fetchCommunityResources
+  fetchCommunityResources,
+  joinCommunity
 } from '../api/communityApi.js';
 import TopBar from '../components/TopBar.jsx';
 import SkewedMenu from '../components/SkewedMenu.jsx';
 import FeedComposer from '../components/FeedComposer.jsx';
 import FeedCard from '../components/FeedCard.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
+import CommunityHero from '../components/CommunityHero.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const ALL_COMMUNITIES_NODE = {
@@ -44,6 +46,11 @@ export default function Feed() {
   const [isLoadingCommunityDetail, setIsLoadingCommunityDetail] = useState(false);
   const [isLoadingResources, setIsLoadingResources] = useState(false);
   const [resourcesError, setResourcesError] = useState(null);
+  const [searchValue, setSearchValue] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchQueryRef = useRef('');
+  const [isJoiningCommunity, setIsJoiningCommunity] = useState(false);
+  const [joinError, setJoinError] = useState(null);
 
   const menuState = useMemo(() => (selectedCommunity?.id === 'all' ? 'all' : 'community'), [selectedCommunity]);
 
@@ -61,6 +68,9 @@ export default function Feed() {
       setResourcesError(null);
       setIsLoadingCommunityDetail(false);
       setIsLoadingResources(false);
+      setSearchValue('');
+      setSearchQuery('');
+      setJoinError(null);
       return;
     }
 
@@ -101,10 +111,11 @@ export default function Feed() {
   }, [token]);
 
   const loadFeed = useCallback(
-    async ({ page = 1, append = false } = {}) => {
+    async ({ page = 1, append = false, queryOverride } = {}) => {
       if (!token) return;
       const isAggregate = selectedCommunity?.id === 'all';
       const setLoading = append ? setIsLoadingMore : setIsLoadingFeed;
+      const queryTerm = queryOverride !== undefined ? queryOverride : searchQueryRef.current;
 
       setLoading(true);
       if (!append) {
@@ -113,8 +124,14 @@ export default function Feed() {
 
       try {
         const request = isAggregate
-          ? fetchAggregatedFeed({ token, page, perPage: 6 })
-          : fetchCommunityFeed({ communityId: selectedCommunity.id, token, page, perPage: 6 });
+          ? fetchAggregatedFeed({ token, page, perPage: 6, query: queryTerm || undefined })
+          : fetchCommunityFeed({
+              communityId: selectedCommunity.id,
+              token,
+              page,
+              perPage: 6,
+              query: queryTerm || undefined
+            });
 
         const response = await request;
         const items = response.data ?? [];
@@ -217,6 +234,75 @@ export default function Feed() {
   };
 
   const hasCommunitiesLoaded = communities.length > 0 && !isLoadingCommunities;
+  const composerCommunities = useMemo(
+    () => communities.filter((community) => community.id !== 'all'),
+    [communities]
+  );
+  const composerDefaultCommunityId = useMemo(() => {
+    if (selectedCommunity?.id === 'all') {
+      return composerCommunities[0]?.id;
+    }
+    return selectedCommunity?.id;
+  }, [selectedCommunity, composerCommunities]);
+
+  useEffect(() => {
+    setJoinError(null);
+    setIsJoiningCommunity(false);
+  }, [selectedCommunity?.id]);
+
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+    setSearchValue(searchQuery);
+  }, [searchQuery]);
+
+  const handleSearchSubmit = (value) => {
+    const trimmed = value.trim();
+    setSearchValue(value);
+    setSearchQuery(trimmed);
+    loadFeed({ page: 1, append: false, queryOverride: trimmed });
+  };
+
+  const handleJoinCommunity = async () => {
+    if (!token || !communityDetail?.id) return;
+    setJoinError(null);
+    setIsJoiningCommunity(true);
+
+    try {
+      const response = await joinCommunity({ communityId: communityDetail.id, token });
+      const updatedCommunity = response?.data;
+      if (updatedCommunity) {
+        setCommunityDetail(updatedCommunity);
+        setCommunities((prev) =>
+          prev.map((community) =>
+            String(community.id) === String(updatedCommunity.id)
+              ? {
+                  ...community,
+                  name: updatedCommunity.name,
+                  description: updatedCommunity.description,
+                  coverImageUrl: updatedCommunity.coverImageUrl,
+                  stats: updatedCommunity.stats,
+                  membership: updatedCommunity.membership
+                }
+              : community
+          )
+        );
+      } else {
+        await loadCommunityDetail(communityDetail.id);
+      }
+    } catch (error) {
+      setJoinError(error?.message ?? 'Unable to join this community right now.');
+    } finally {
+      setIsJoiningCommunity(false);
+    }
+  };
+
+  const handlePostCreated = async () => {
+    await loadFeed({ page: 1, append: false, queryOverride: searchQuery });
+    if (selectedCommunity?.id && selectedCommunity.id !== 'all') {
+      await loadCommunityDetail(selectedCommunity.id);
+    }
+  };
+
   const loadMoreResources = useCallback(async () => {
     if (!token) return;
     const communityId = selectedCommunity?.id;
@@ -257,6 +343,10 @@ export default function Feed() {
           onCommunityChange={(community) => setSelectedCommunity(community)}
           isLoading={!hasCommunitiesLoaded}
           error={communitiesError}
+          searchValue={searchValue}
+          onSearchChange={(value) => setSearchValue(value)}
+          onSearchSubmit={handleSearchSubmit}
+          isSearching={isLoadingFeed && !isLoadingMore}
         />
         <SkewedMenu activeState={menuState} activeItem={activeMenuItem} onSelect={setActiveMenuItem} />
         {!isAuthenticated && (
@@ -264,9 +354,26 @@ export default function Feed() {
             Sign in to follow your communities, share updates, and access the resource library.
           </div>
         )}
+        {selectedCommunity?.id !== 'all' && (
+          <CommunityHero
+            community={communityDetail}
+            isLoading={isLoadingCommunityDetail || isLoadingCommunities}
+            error={communityDetailError}
+            onJoin={communityDetail?.membership?.status === 'active' ? null : handleJoinCommunity}
+            isJoining={isJoiningCommunity}
+            joinError={joinError}
+          />
+        )}
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
           <div className="space-y-6">
-            {isAuthenticated && <FeedComposer />}
+            {isAuthenticated && (
+              <FeedComposer
+                communities={composerCommunities}
+                defaultCommunityId={composerDefaultCommunityId}
+                disabled={isLoadingCommunities}
+                onPostCreated={handlePostCreated}
+              />
+            )}
             <div className="space-y-4">
               {isLoadingFeed && !isLoadingMore ? (
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">

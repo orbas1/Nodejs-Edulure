@@ -73,7 +73,7 @@ export default class CommunityPostModel {
   }
 
   static async paginateForCommunity(communityId, filters = {}, connection = db) {
-    const { page = 1, perPage = 10, channelId, postType, visibility } = filters;
+    const { page = 1, perPage = 10, channelId, postType, visibility, query } = filters;
 
     const baseQuery = connection('community_posts as cp')
       .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
@@ -93,6 +93,15 @@ export default class CommunityPostModel {
 
     if (visibility) {
       baseQuery.andWhere('cp.visibility', visibility);
+    }
+
+    if (query) {
+      const searchTerm = `%${query.toLowerCase()}%`;
+      baseQuery.andWhere(function applySearch() {
+        this.whereRaw('LOWER(cp.title) LIKE ?', [searchTerm])
+          .orWhereRaw('LOWER(cp.body) LIKE ?', [searchTerm])
+          .orWhereRaw('LOWER(cp.tags) LIKE ?', [searchTerm]);
+      });
     }
 
     const totalRow = await baseQuery
@@ -122,7 +131,7 @@ export default class CommunityPostModel {
   }
 
   static async paginateForUser(userId, filters = {}, connection = db) {
-    const { page = 1, perPage = 10, postType } = filters;
+    const { page = 1, perPage = 10, postType, query } = filters;
 
     const baseQuery = connection('community_posts as cp')
       .innerJoin('community_members as cm', function joinMembers() {
@@ -145,6 +154,15 @@ export default class CommunityPostModel {
 
     if (postType) {
       baseQuery.andWhere('cp.post_type', postType);
+    }
+
+    if (query) {
+      const searchTerm = `%${query.toLowerCase()}%`;
+      baseQuery.andWhere(function applySearch() {
+        this.whereRaw('LOWER(cp.title) LIKE ?', [searchTerm])
+          .orWhereRaw('LOWER(cp.body) LIKE ?', [searchTerm])
+          .orWhereRaw('LOWER(cp.tags) LIKE ?', [searchTerm]);
+      });
     }
 
     const totalRow = await baseQuery
