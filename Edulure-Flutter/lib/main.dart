@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'screens/communities_screen.dart';
 import 'screens/content_library_screen.dart';
+import 'screens/course_management_screen.dart';
+import 'screens/course_purchase_screen.dart';
 import 'screens/feed_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/tutor_booking_screen.dart';
+import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
 
 Future<void> main() async {
@@ -37,10 +41,14 @@ class EdulureApp extends StatelessWidget {
         '/': (_) => const HomeScreen(),
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
+        '/communities': (_) => const CommunitiesScreen(),
         '/feed': (_) => const FeedScreen(),
+        '/inbox': (_) => const InboxScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),
         '/tutor-bookings': (_) => const TutorBookingScreen(),
+        '/courses/manage': (_) => const CourseManagementScreen(),
+        '/courses/purchase': (_) => const CoursePurchaseScreen(),
       },
     );
   }

@@ -1,12 +1,13 @@
 import PropTypes from 'prop-types';
 
+import VerificationStatusCard from '../../../components/dashboard/VerificationStatusCard.jsx';
 import LearnerFeedHighlightsSection from './sections/LearnerFeedHighlightsSection.jsx';
 import LearnerMetricsSection from './sections/LearnerMetricsSection.jsx';
 import LearnerPaceSection from './sections/LearnerPaceSection.jsx';
 import LearnerProfileSection from './sections/LearnerProfileSection.jsx';
 import LearnerUpcomingSection from './sections/LearnerUpcomingSection.jsx';
 
-export default function LearnerOverview({ dashboard, profile }) {
+export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const metrics = dashboard.metrics ?? [];
   const learningPace = (dashboard.analytics?.learningPace ?? []).map((entry) => ({
     label: entry.day,
@@ -25,6 +26,8 @@ export default function LearnerOverview({ dashboard, profile }) {
         <LearnerPaceSection pace={learningPace} />
       </section>
 
+      <VerificationStatusCard verification={profile?.verification ?? null} onRefresh={onRefresh} />
+
       <section className="grid gap-6 lg:grid-cols-2">
         <LearnerUpcomingSection upcoming={upcoming} />
         <LearnerFeedHighlightsSection highlights={feedHighlights} />
@@ -35,5 +38,10 @@ export default function LearnerOverview({ dashboard, profile }) {
 
 LearnerOverview.propTypes = {
   dashboard: PropTypes.object.isRequired,
-  profile: PropTypes.object.isRequired
+  profile: PropTypes.object.isRequired,
+  onRefresh: PropTypes.func
+};
+
+LearnerOverview.defaultProps = {
+  onRefresh: null
 };

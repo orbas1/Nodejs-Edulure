@@ -199,6 +199,7 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+    APP_NAME: z.string().min(1).default('Edulure'),
     APP_URL: z.string().min(1, 'APP_URL must specify at least one origin'),
     CORS_ALLOWED_ORIGINS: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
@@ -262,6 +263,10 @@ const envSchema = z
     STRIPE_PUBLISHABLE_KEY: z.string().min(10).optional(),
     STRIPE_WEBHOOK_SECRET: z.string().min(10).optional(),
     STRIPE_STATEMENT_DESCRIPTOR: z.string().min(5).max(22).optional(),
+    ESCROW_API_KEY: z.string().min(1).optional(),
+    ESCROW_API_SECRET: z.string().min(1).optional(),
+    ESCROW_BASE_URL: z.string().url().optional(),
+    ESCROW_WEBHOOK_SECRET: z.string().min(1).optional(),
     PAYPAL_CLIENT_ID: z.string().min(10),
     PAYPAL_CLIENT_SECRET: z.string().min(10),
     PAYPAL_ENVIRONMENT: z.enum(['sandbox', 'live']).default('sandbox'),
@@ -375,6 +380,14 @@ const envSchema = z
       });
     }
 
+    if ((value.ESCROW_API_KEY && !value.ESCROW_API_SECRET) || (!value.ESCROW_API_KEY && value.ESCROW_API_SECRET)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ESCROW_API_KEY'],
+        message: 'ESCROW_API_KEY and ESCROW_API_SECRET must be configured together.'
+      });
+    }
+
     if (value.CHAT_PRESENCE_DEFAULT_TTL_MINUTES > value.CHAT_PRESENCE_MAX_TTL_MINUTES) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -477,6 +490,7 @@ export const env = {
   isProduction: raw.NODE_ENV === 'production',
   isDevelopment: raw.NODE_ENV === 'development',
   app: {
+    name: raw.APP_NAME,
     port: raw.PORT,
     corsOrigins
   },
@@ -560,6 +574,12 @@ export const env = {
       clientSecret: raw.PAYPAL_CLIENT_SECRET,
       environment: raw.PAYPAL_ENVIRONMENT,
       webhookId: raw.PAYPAL_WEBHOOK_ID ?? null
+    },
+    escrow: {
+      apiKey: raw.ESCROW_API_KEY ?? null,
+      apiSecret: raw.ESCROW_API_SECRET ?? null,
+      baseUrl: raw.ESCROW_BASE_URL ?? 'https://api.escrow.com/2017-09-01',
+      webhookSecret: raw.ESCROW_WEBHOOK_SECRET ?? null
     },
     coupons: {
       maxPercentageDiscount: raw.PAYMENTS_MAX_COUPON_PERCENTAGE

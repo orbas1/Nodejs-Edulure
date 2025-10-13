@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
+const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
@@ -66,6 +67,9 @@ export async function seed(knex) {
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
     await trx('domain_events').del();
+    await trx('kyc_audit_logs').del();
+    await trx('kyc_documents').del();
+    await trx('kyc_verifications').del();
     await trx('user_sessions').del();
     await trx('user_email_verification_tokens').del();
     await trx('communities').del();
@@ -108,6 +112,176 @@ export async function seed(knex) {
       last_login_at: trx.fn.now(),
       password_changed_at: trx.fn.now()
     });
+
+    const adminVerificationRef = makeVerificationRef();
+    const instructorVerificationRef = makeVerificationRef();
+    const learnerVerificationRef = makeVerificationRef();
+
+    const [adminVerificationId] = await trx('kyc_verifications').insert({
+      user_id: adminId,
+      reference: adminVerificationRef,
+      status: 'approved',
+      documents_required: 3,
+      documents_submitted: 3,
+      risk_score: 1.75,
+      needs_manual_review: false,
+      escalation_level: 'none',
+      last_submitted_at: trx.fn.now(),
+      last_reviewed_at: trx.fn.now(),
+      reviewed_by: adminId,
+      policy_references: JSON.stringify(['AML-2024', 'KYC-GLOBAL'])
+    });
+
+    const [instructorVerificationId] = await trx('kyc_verifications').insert({
+      user_id: instructorId,
+      reference: instructorVerificationRef,
+      status: 'pending_review',
+      documents_required: 3,
+      documents_submitted: 3,
+      risk_score: 12.5,
+      needs_manual_review: true,
+      escalation_level: 't1',
+      last_submitted_at: trx.fn.now(),
+      rejection_reason: null
+    });
+
+    const [learnerVerificationId] = await trx('kyc_verifications').insert({
+      user_id: learnerId,
+      reference: learnerVerificationRef,
+      status: 'collecting',
+      documents_required: 3,
+      documents_submitted: 1,
+      risk_score: 0,
+      needs_manual_review: false,
+      escalation_level: 'none'
+    });
+
+    await trx('kyc_documents').insert([
+      {
+        verification_id: adminVerificationId,
+        document_type: 'government-id-front',
+        status: 'accepted',
+        storage_bucket: 'edulure-uploads',
+        storage_key: `kyc/${adminVerificationRef}/passport-front.png`,
+        file_name: 'passport-front.png',
+        mime_type: 'image/png',
+        size_bytes: 324567,
+        checksum_sha256: makeHash('admin-passport-front'),
+        submitted_at: trx.fn.now(),
+        reviewed_at: trx.fn.now()
+      },
+      {
+        verification_id: adminVerificationId,
+        document_type: 'government-id-back',
+        status: 'accepted',
+        storage_bucket: 'edulure-uploads',
+        storage_key: `kyc/${adminVerificationRef}/passport-back.png`,
+        file_name: 'passport-back.png',
+        mime_type: 'image/png',
+        size_bytes: 287654,
+        checksum_sha256: makeHash('admin-passport-back'),
+        submitted_at: trx.fn.now(),
+        reviewed_at: trx.fn.now()
+      },
+      {
+        verification_id: adminVerificationId,
+        document_type: 'identity-selfie',
+        status: 'accepted',
+        storage_bucket: 'edulure-uploads',
+        storage_key: `kyc/${adminVerificationRef}/selfie.png`,
+        file_name: 'selfie.png',
+        mime_type: 'image/png',
+        size_bytes: 198765,
+        checksum_sha256: makeHash('admin-selfie'),
+        submitted_at: trx.fn.now(),
+        reviewed_at: trx.fn.now()
+      },
+      {
+        verification_id: instructorVerificationId,
+        document_type: 'government-id-front',
+        status: 'pending',
+        storage_bucket: 'edulure-uploads',
+        storage_key: `kyc/${instructorVerificationRef}/id-front.png`,
+        file_name: 'id-front.png',
+        mime_type: 'image/png',
+        size_bytes: 256784,
+        checksum_sha256: makeHash('instructor-front'),
+        submitted_at: trx.fn.now(),
+        reviewed_at: null
+      },
+      {
+        verification_id: instructorVerificationId,
+        document_type: 'government-id-back',
+        status: 'pending',
+        storage_bucket: 'edulure-uploads',
+        storage_key: `kyc/${instructorVerificationRef}/id-back.png`,
+        file_name: 'id-back.png',
+        mime_type: 'image/png',
+        size_bytes: 244112,
+        checksum_sha256: makeHash('instructor-back'),
+        submitted_at: trx.fn.now(),
+        reviewed_at: null
+      },
+      {
+        verification_id: instructorVerificationId,
+        document_type: 'identity-selfie',
+        status: 'pending',
+        storage_bucket: 'edulure-uploads',
+        storage_key: `kyc/${instructorVerificationRef}/selfie.png`,
+        file_name: 'selfie.png',
+        mime_type: 'image/png',
+        size_bytes: 201223,
+        checksum_sha256: makeHash('instructor-selfie'),
+        submitted_at: trx.fn.now(),
+        reviewed_at: null
+      },
+      {
+        verification_id: learnerVerificationId,
+        document_type: 'government-id-front',
+        status: 'pending',
+        storage_bucket: 'edulure-uploads',
+        storage_key: `kyc/${learnerVerificationRef}/id-front.png`,
+        file_name: 'id-front.png',
+        mime_type: 'image/png',
+        size_bytes: 243888,
+        checksum_sha256: makeHash('learner-front'),
+        submitted_at: trx.fn.now(),
+        reviewed_at: null
+      }
+    ]);
+
+    await trx('kyc_audit_logs').insert([
+      {
+        verification_id: adminVerificationId,
+        actor_id: adminId,
+        action: 'review_approved',
+        notes: 'Identity verified for platform operator account.',
+        metadata: JSON.stringify({ riskScore: 1.75 }),
+        created_at: trx.fn.now()
+      },
+      {
+        verification_id: instructorVerificationId,
+        actor_id: instructorId,
+        action: 'submitted_for_review',
+        metadata: JSON.stringify({ documentsSubmitted: 3 }),
+        created_at: trx.fn.now()
+      },
+      {
+        verification_id: instructorVerificationId,
+        actor_id: adminId,
+        action: 'review_pending',
+        notes: 'Queued for manual verification due to glare detected on ID back image.',
+        metadata: JSON.stringify({ escalationLevel: 't1' }),
+        created_at: trx.fn.now()
+      },
+      {
+        verification_id: learnerVerificationId,
+        actor_id: learnerId,
+        action: 'document_attached',
+        metadata: JSON.stringify({ documentType: 'government-id-front' }),
+        created_at: trx.fn.now()
+      }
+    ]);
 
     const [opsCommunityId] = await trx('communities').insert({
       owner_id: instructorId,

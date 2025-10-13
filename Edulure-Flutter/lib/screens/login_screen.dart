@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 
 import '../services/auth_service.dart';
 import '../services/session_manager.dart';
@@ -16,6 +17,19 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
   bool _loading = false;
   String? _error;
+
+  String _resolveErrorMessage(Object error) {
+    if (error is DioException) {
+      final response = error.response?.data;
+      if (response is Map && response['message'] is String) {
+        return response['message'] as String;
+      }
+      if (response is Map && response['errors'] is List && response['errors'].isNotEmpty) {
+        return response['errors'].first.toString();
+      }
+    }
+    return 'Unable to authenticate. Please check your credentials.';
+  }
 
   @override
   void dispose() {
@@ -38,10 +52,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Welcome back ${session['user']['firstName'] ?? ''}!')),
       );
-      Navigator.pushReplacementNamed(context, '/content');
+      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
     } catch (error) {
       setState(() {
-        _error = 'Unable to authenticate. Please check your credentials.';
+        _error = _resolveErrorMessage(error);
       });
     } finally {
       if (mounted) {

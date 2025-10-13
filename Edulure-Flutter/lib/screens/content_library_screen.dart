@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/content_service.dart';
 import '../services/session_manager.dart';
+import 'ebook_reader_screen.dart';
 
 class ContentLibraryScreen extends StatefulWidget {
   const ContentLibraryScreen({super.key});
@@ -14,6 +15,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
   final ContentService _service = ContentService();
   List<ContentAsset> _assets = [];
   Map<String, String> _downloads = {};
+  Map<String, EbookProgress> _ebookProgress = {};
   bool _loading = true;
 
   @override
@@ -28,6 +30,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
     setState(() {
       _assets = cachedAssets;
       _downloads = cachedDownloads;
+      _ebookProgress = _service.loadCachedEbookProgress();
       _loading = false;
     });
     await _refresh();
@@ -40,6 +43,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
       setState(() {
         _assets = assets;
         _downloads = _service.loadCachedDownloads();
+        _ebookProgress = _service.loadCachedEbookProgress();
       });
     } catch (error) {
       if (!mounted) return;
@@ -76,17 +80,35 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
   Future<void> _open(ContentAsset asset) async {
     try {
       final existingPath = _downloads[asset.publicId];
-      if (existingPath != null) {
-        await _service.openAsset(existingPath);
-        return;
+      String? path = existingPath;
+      if (path == null) {
+        final token = await _service.viewerToken(asset.publicId);
+        path = await _service.downloadAsset(asset, token);
+        await _service.recordDownload(asset.publicId);
+        setState(() {
+          _downloads[asset.publicId] = path!;
+        });
       }
-      final token = await _service.viewerToken(asset.publicId);
-      final path = await _service.downloadAsset(asset, token);
-      await _service.recordDownload(asset.publicId);
-      setState(() {
-        _downloads[asset.publicId] = path;
-      });
-      await _service.openAsset(path);
+      if (!mounted) return;
+      if (asset.type == 'ebook') {
+        final result = await Navigator.of(context).push<EbookProgress>(
+          MaterialPageRoute(
+            builder: (_) => EbookReaderScreen(
+              asset: asset,
+              filePath: path!,
+              service: _service,
+              initialProgress: _ebookProgress[asset.publicId],
+            ),
+          ),
+        );
+        if (result != null && mounted) {
+          setState(() {
+            _ebookProgress[asset.publicId] = result;
+          });
+        }
+      } else {
+        await _service.openAsset(path!);
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -137,6 +159,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                       itemBuilder: (context, index) {
                         final asset = _assets[index];
                         final downloadedPath = _downloads[asset.publicId];
+                        final ebookProgress = _ebookProgress[asset.publicId];
                         return Card(
                           margin: const EdgeInsets.only(bottom: 16),
                           elevation: 1,
@@ -208,6 +231,23 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                     ],
                                   ],
                                 ),
+                                if (asset.type == 'ebook') ...[
+                                  const SizedBox(height: 12),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: LinearProgressIndicator(
+                                      value: (ebookProgress?.progressPercent ?? 0) / 100,
+                                      minHeight: 6,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    ebookProgress != null
+                                        ? 'Progress ${ebookProgress.progressPercent.toStringAsFixed(0)}%'
+                                        : 'No reading progress yet',
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ],
                                 if (downloadedPath != null)
                                   Padding(
                                     padding: const EdgeInsets.only(top: 8),

@@ -5,6 +5,8 @@ import UserModel from '../models/UserModel.js';
 import UserPrivacySettingModel from '../models/UserPrivacySettingModel.js';
 import UserFollowModel from '../models/UserFollowModel.js';
 import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
+import PlatformSettingsService from './PlatformSettingsService.js';
+import IdentityVerificationService from './IdentityVerificationService.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -2531,6 +2533,32 @@ export default class DashboardService {
     }
     const profileTitle = profileTitleSegments.join(' · ');
 
+    const verificationSummary = await IdentityVerificationService.getVerificationSummaryForUser(user.id);
+    const safeVerification = {
+      status: verificationSummary.status,
+      reference: verificationSummary.reference,
+      documentsRequired: verificationSummary.documentsRequired,
+      documentsSubmitted: verificationSummary.documentsSubmitted,
+      requiredDocuments: verificationSummary.requiredDocuments,
+      outstandingDocuments: verificationSummary.outstandingDocuments,
+      riskScore: verificationSummary.riskScore,
+      needsManualReview: verificationSummary.needsManualReview,
+      escalationLevel: verificationSummary.escalationLevel,
+      lastSubmittedAt: verificationSummary.lastSubmittedAt,
+      lastReviewedAt: verificationSummary.lastReviewedAt,
+      rejectionReason: verificationSummary.rejectionReason,
+      documents: verificationSummary.documents.map((doc) => ({
+        id: doc.id,
+        type: doc.type,
+        status: doc.status,
+        fileName: doc.fileName,
+        mimeType: doc.mimeType,
+        sizeBytes: doc.sizeBytes,
+        submittedAt: doc.submittedAt,
+        reviewedAt: doc.reviewedAt
+      }))
+    };
+
     return {
       profile: {
         id: user.id,
@@ -2540,7 +2568,8 @@ export default class DashboardService {
         title: profileTitle,
         bio: profileBio,
         stats: profileStats,
-        feedHighlights
+        feedHighlights,
+        verification: safeVerification
       },
       roles,
       dashboards,
@@ -3029,6 +3058,9 @@ export default class DashboardService {
       };
     });
 
+    const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
+    const compliance = await IdentityVerificationService.getAdminOverview({ now: reference });
+
     const operations = {
       support: {
         backlog: pendingMembershipRows.length + followRequestsRows.length,
@@ -3063,6 +3095,11 @@ export default class DashboardService {
       { label: 'ARR', value: formatCurrency(arrCents, primaryCurrency) }
     ];
 
+    const pendingKycMetric = compliance.metrics?.find((metric) => metric.id === 'kyc-pending-review');
+    if (pendingKycMetric) {
+      profileStats.push({ label: 'KYC reviews pending', value: `${pendingKycMetric.value} cases` });
+    }
+
     const profileBio = `Overseeing ${formatNumber(communityTotal)} communities, ${formatNumber(
       activeSubscriptions
     )} active subscriptions, and ${formatCurrency(revenueCurrentTotal, revenueCurrency)} captured in the last 30 days.`;
@@ -3070,7 +3107,8 @@ export default class DashboardService {
     const searchIndex = [
       { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
       { id: 'admin-revenue', role: 'admin', type: 'Revenue', title: 'Revenue performance', url: '/admin#revenue' },
-      { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' }
+      { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' },
+      { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' }
     ];
 
     return {
@@ -3080,6 +3118,11 @@ export default class DashboardService {
         approvals,
         revenue,
         operations,
+        activity: { alerts, events },
+        settings: {
+          monetization: monetizationSettings
+        }
+        compliance,
         activity: { alerts, events }
       },
       profileStats,
