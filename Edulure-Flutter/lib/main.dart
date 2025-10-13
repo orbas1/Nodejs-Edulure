@@ -9,6 +9,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
+import 'services/push_notification_service.dart';
 import 'screens/tutor_booking_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
@@ -16,6 +17,7 @@ import 'services/session_manager.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SessionManager.init();
+  await PushNotificationService.instance.initialize();
   runApp(const EdulureApp());
 }
 

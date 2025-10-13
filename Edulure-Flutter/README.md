@@ -18,3 +18,11 @@ Routes available:
 - `/profile` member profile overview
 
 The app uses the Inter font via `google_fonts` and Material 3 design system.
+
+## Push notifications
+
+The mobile client now configures Firebase Cloud Messaging and surfaces incoming
+push alerts with `flutter_local_notifications`. Provide your Firebase project
+configuration files (`google-services.json` / `GoogleService-Info.plist`) before
+running the app to ensure tokens register correctly and background handlers fire
+as expected.
