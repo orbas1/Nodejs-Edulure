@@ -3,7 +3,30 @@ import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outlin
 import CommunitySwitcher from './CommunitySwitcher.jsx';
 import SearchBar from './SearchBar.jsx';
 
-export default function TopBar({ communities, selectedCommunity, onCommunityChange, isLoading = false, error = null }) {
+export default function TopBar({
+  communities,
+  selectedCommunity,
+  onCommunityChange,
+  isLoading = false,
+  error = null,
+  searchValue,
+  onSearchChange,
+  onSearchSubmit,
+  isSearching = false
+}) {
+  const handleSearchChange = (value, event) => {
+    if (typeof onSearchChange === 'function') {
+      onSearchChange(value, event);
+    }
+  };
+
+  const handleSearchSubmit = (event) => {
+    if (typeof onSearchSubmit === 'function') {
+      const inputValue = event?.target?.search?.value ?? '';
+      onSearchSubmit(inputValue);
+    }
+  };
+
   return (
     <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
       <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
@@ -21,7 +44,13 @@ export default function TopBar({ communities, selectedCommunity, onCommunityChan
         )}
       </div>
       <div className="flex-1 min-w-[240px]">
-        <SearchBar placeholder="Search the Edulure network" />
+        <SearchBar
+          value={searchValue}
+          onChange={handleSearchChange}
+          onSubmit={handleSearchSubmit}
+          loading={isSearching}
+          placeholder="Search the Edulure network"
+        />
       </div>
       <div className="flex items-center gap-3 text-slate-500">
         <button className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary">
@@ -61,5 +90,9 @@ TopBar.propTypes = {
   }),
   onCommunityChange: PropTypes.func.isRequired,
   isLoading: PropTypes.bool,
-  error: PropTypes.string
+  error: PropTypes.string,
+  searchValue: PropTypes.string,
+  onSearchChange: PropTypes.func,
+  onSearchSubmit: PropTypes.func,
+  isSearching: PropTypes.bool
 };
