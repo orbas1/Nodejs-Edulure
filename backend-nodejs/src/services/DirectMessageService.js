@@ -6,6 +6,7 @@ import DomainEventModel from '../models/DomainEventModel.js';
 import UserModel from '../models/UserModel.js';
 import logger from '../config/logger.js';
 import { env } from '../config/env.js';
+import realtimeService from './RealtimeService.js';
 
 const log = logger.child({ module: 'direct-message-service' });
 const THREAD_DEFAULT_LIMIT = env.directMessages.threads.defaultPageSize;
@@ -191,6 +192,11 @@ export default class DirectMessageService {
 
       return { thread: createdThread, initialMessage };
     });
+
+    const participants = await DirectMessageParticipantModel.listForThread(createdThread.id);
+    realtimeService.broadcastThreadUpsert(createdThread, participants, { initialMessage });
+
+    return { thread: createdThread, initialMessage };
   }
 
   static async listMessages(threadId, userId, filters = {}) {
@@ -205,7 +211,7 @@ export default class DirectMessageService {
 
   static async sendMessage(threadId, userId, payload) {
     await ensureParticipant(threadId, userId);
-    return db.transaction(async (trx) => {
+    const message = await db.transaction(async (trx) => {
       const message = await DirectMessageModel.create(
         {
           threadId,
@@ -248,6 +254,11 @@ export default class DirectMessageService {
       log.info({ threadId, messageId: message.id, senderId: userId }, 'dm message sent');
       return message;
     });
+
+    const participants = await DirectMessageParticipantModel.listForThread(threadId);
+    realtimeService.broadcastMessage(threadId, message, participants);
+
+    return message;
   }
 
   static async markRead(threadId, userId, payload = {}) {
@@ -261,6 +272,7 @@ export default class DirectMessageService {
       userId,
       { timestamp: payload.timestamp ? new Date(payload.timestamp) : new Date(), messageId: payload.messageId ?? null }
     );
+    realtimeService.broadcastReadReceipt(threadId, updatedParticipant);
     return { participant: updatedParticipant, message: messageRecord };
   }
 }

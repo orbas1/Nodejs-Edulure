@@ -7,11 +7,12 @@ export function success(res, { data, message, meta, status = 200 }) {
   });
 }
 
-export function paginated(res, { data, pagination, message, status = 200 }) {
+export function paginated(res, { data, pagination, message, status = 200, meta = {} }) {
   return success(res, {
     data,
     message,
     meta: {
+      ...meta,
       pagination
     },
     status

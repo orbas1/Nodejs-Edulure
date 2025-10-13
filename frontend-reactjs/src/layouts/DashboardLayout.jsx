@@ -9,6 +9,7 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
+  InboxStackIcon,
   MegaphoneIcon,
   PlayCircleIcon,
   Squares2X2Icon,
@@ -23,6 +24,7 @@ const navigationByRole = {
   learner: (basePath) => [
     { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
     { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
+    { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
@@ -39,6 +41,7 @@ const navigationByRole = {
     { name: 'Create course', to: `${basePath}/courses/create`, icon: DocumentTextIcon },
     { name: 'Recorded library', to: `${basePath}/courses/library`, icon: PlayCircleIcon },
     { name: 'Manage courses', to: `${basePath}/courses/manage`, icon: Cog6ToothIcon },
+    { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },

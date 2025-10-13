@@ -110,7 +110,8 @@ export default class CommunityController {
       return paginated(res, {
         data: result.items,
         pagination: result.pagination,
-        message: 'Community feed fetched'
+        message: 'Community feed fetched',
+        meta: { ads: result.ads }
       });
     } catch (error) {
       if (error.isJoi) {
@@ -128,7 +129,8 @@ export default class CommunityController {
       return paginated(res, {
         data: result.items,
         pagination: result.pagination,
-        message: 'Personalised feed fetched'
+        message: 'Personalised feed fetched',
+        meta: { ads: result.ads }
       });
     } catch (error) {
       if (error.isJoi) {
