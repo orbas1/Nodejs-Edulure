@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
 
 Future<void> main() async {
@@ -37,6 +38,7 @@ class EdulureApp extends StatelessWidget {
         '/login': (_) => const LoginScreen(),
         '/register': (_) => const RegisterScreen(),
         '/feed': (_) => const FeedScreen(),
+        '/inbox': (_) => const InboxScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),
       },

@@ -71,6 +71,13 @@ class HomeScreen extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.inbox_outlined),
+                    title: const Text('Messages'),
+                    subtitle: const Text('Coordinate with faculty and members in threaded conversations.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/inbox'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.person_outline),
                     title: const Text('Profile'),
                     subtitle: const Text('Personalise your instructor and member presence.'),
