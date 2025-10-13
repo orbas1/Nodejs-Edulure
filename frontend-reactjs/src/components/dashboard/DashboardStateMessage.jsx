@@ -30,21 +30,21 @@ export default function DashboardStateMessage({
 
   return (
     <div
-      className={`flex flex-col items-center justify-center gap-4 rounded-3xl border border-slate-900/60 bg-slate-900/40 px-8 py-12 text-center ${className}`.trim()}
+      className={`dashboard-card flex flex-col items-center justify-center gap-4 px-8 py-12 text-center ${className}`.trim()}
     >
       <Icon
         className={`h-10 w-10 ${iconClass} ${variant === 'loading' ? 'animate-spin [animation-duration:1.1s]' : ''}`}
         aria-hidden="true"
       />
       <div className="space-y-2">
-        {title ? <h2 className="text-lg font-semibold text-white">{title}</h2> : null}
-        {description ? <p className="text-sm text-slate-400">{description}</p> : null}
+        {title ? <h2 className="text-lg font-semibold text-slate-900">{title}</h2> : null}
+        {description ? <p className="text-sm text-slate-600">{description}</p> : null}
       </div>
       {actionLabel && onAction ? (
         <button
           type="button"
           onClick={onAction}
-          className="rounded-full border border-primary/50 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10"
+          className="dashboard-primary-pill"
         >
           {actionLabel}
         </button>

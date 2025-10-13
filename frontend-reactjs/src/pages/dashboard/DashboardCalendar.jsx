@@ -10,36 +10,30 @@ export default function DashboardCalendar() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">{role === 'instructor' ? 'Program calendar' : 'Learning calendar'}</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <h1 className="dashboard-title">{role === 'instructor' ? 'Program calendar' : 'Learning calendar'}</h1>
+          <p className="dashboard-subtitle">
             Seamlessly coordinate live sessions, deep work blocks, and content releases.
           </p>
         </div>
         <div className="flex gap-3">
-          <button
-            type="button"
-            className="rounded-full border border-primary/50 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10"
-          >
+          <button type="button" className="dashboard-primary-pill">
             Create event
           </button>
-          <button
-            type="button"
-            className="rounded-full border border-slate-800 px-4 py-2 text-xs font-semibold text-slate-300 transition hover:border-primary/40 hover:text-white"
-          >
+          <button type="button" className="dashboard-pill">
             Share agenda
           </button>
         </div>
       </div>
 
-      <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+      <section className="dashboard-section">
         {items.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-5">
             {items.map((day) => (
-              <div key={day.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/50 p-4">
-                <p className="text-xs uppercase tracking-wide text-slate-500">{day.day}</p>
-                <ul className="mt-3 space-y-2 text-sm text-slate-300">
+              <div key={day.id} className="dashboard-card-muted p-4">
+                <p className="dashboard-kicker">{day.day}</p>
+                <ul className="mt-3 space-y-2 text-sm text-slate-600">
                   {day.items.map((item) => (
-                    <li key={item} className="rounded-xl border border-slate-900/60 bg-slate-900/60 px-3 py-2">
+                    <li key={item} className="dashboard-card-muted px-3 py-2">
                       {item}
                     </li>
                   ))}

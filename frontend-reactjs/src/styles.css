@@ -21,3 +21,45 @@ a {
 a:hover {
   @apply text-primary-dark;
 }
+
+@layer components {
+  .dashboard-shell {
+    @apply min-h-screen bg-slate-50 text-slate-900;
+  }
+
+  .dashboard-aside {
+    @apply hidden w-72 shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur lg:flex lg:flex-col lg:shadow-sm;
+  }
+
+  .dashboard-card {
+    @apply rounded-3xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .dashboard-card-muted {
+    @apply rounded-2xl border border-slate-200 bg-slate-50;
+  }
+
+  .dashboard-section {
+    @apply dashboard-card p-6;
+  }
+
+  .dashboard-kicker {
+    @apply text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+
+  .dashboard-title {
+    @apply text-2xl font-semibold text-slate-900;
+  }
+
+  .dashboard-subtitle {
+    @apply mt-2 text-sm text-slate-600;
+  }
+
+  .dashboard-pill {
+    @apply rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary;
+  }
+
+  .dashboard-primary-pill {
+    @apply rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark;
+  }
+}
