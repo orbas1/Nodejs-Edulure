@@ -87,6 +87,13 @@ class _PublicHomeView extends StatelessWidget {
               return Column(
                 children: [
                   ListTile(
+                    leading: const Icon(Icons.groups_3_outlined),
+                    title: const Text('Communities'),
+                    subtitle: const Text('Curate your hubs and monitor health in real time.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/communities'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.dashboard_customize_outlined),
                     title: const Text('Live feed'),
                     subtitle: const Text('Stay up to date with every community in a unified stream.'),
