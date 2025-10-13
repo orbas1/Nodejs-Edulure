@@ -1,9 +1,22 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorCourseManage() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const pipeline = dashboard?.courses?.pipeline ?? [];
   const production = dashboard?.courses?.production ?? [];
+
+  if (pipeline.length === 0 && production.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="Course operations pending"
+        description="No cohorts or production tasks are currently tracked. Refresh once you've synced course data."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

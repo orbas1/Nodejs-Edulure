@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorCommunityManage() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const manageDeck = dashboard?.communities?.manageDeck ?? [];
+
+  if (manageDeck.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="Community metrics unavailable"
+        description="We haven't received operations data for any active communities yet. Refresh after syncing."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

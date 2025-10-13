@@ -1,10 +1,24 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorTutorBookings() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const bookings = dashboard?.bookings;
 
-  if (!bookings) return null;
+  if (!bookings) {
+    return (
+      <DashboardStateMessage
+        title="No tutor booking data"
+        description="There are no inbound mentor requests or confirmed sessions yet. Refresh to fetch the latest pipeline."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
+
+  const pipeline = bookings.pipeline ?? [];
+  const confirmed = bookings.confirmed ?? [];
 
   return (
     <div className="space-y-8">
@@ -24,7 +38,7 @@ export default function InstructorTutorBookings() {
       <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
         <h2 className="text-lg font-semibold text-white">Pending requests</h2>
         <ul className="mt-4 space-y-4">
-          {bookings.pipeline.map((item) => (
+          {pipeline.map((item) => (
             <li key={item.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
@@ -47,7 +61,7 @@ export default function InstructorTutorBookings() {
       <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
         <h2 className="text-lg font-semibold text-white">Confirmed sessions</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {bookings.confirmed.map((item) => (
+          {confirmed.map((item) => (
             <div key={item.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-5">
               <p className="text-xs uppercase tracking-wide text-slate-500">{item.date}</p>
               <p className="mt-2 text-sm font-semibold text-white">{item.topic}</p>

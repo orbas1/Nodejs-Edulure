@@ -16,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useDashboard } from '../context/DashboardContext.jsx';
+import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
 
 const navigationByRole = {
   learner: (basePath) => [
@@ -65,19 +66,19 @@ export default function DashboardLayout() {
   const { role } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { activeRole, setActiveRole, roles, dashboards, searchIndex } = useDashboard();
+  const { activeRole, setActiveRole, roles, dashboards, searchIndex, loading, error, refresh } = useDashboard();
   const allowedRoles = useMemo(() => roles.map((r) => r.id), [roles]);
-  const resolvedRole = allowedRoles.includes(role) ? role : allowedRoles[0];
-  const basePath = `/dashboard/${resolvedRole}`;
+  const resolvedRole = allowedRoles.length > 0 ? (allowedRoles.includes(role) ? role : allowedRoles[0]) : null;
+  const basePath = resolvedRole ? `/dashboard/${resolvedRole}` : '/dashboard';
 
   useEffect(() => {
-    if (!allowedRoles.includes(role)) {
+    if (resolvedRole && role && !allowedRoles.includes(role)) {
       navigate(basePath, { replace: true });
     }
-  }, [role, allowedRoles, basePath, navigate]);
+  }, [role, allowedRoles, basePath, navigate, resolvedRole]);
 
   useEffect(() => {
-    if (resolvedRole !== activeRole) {
+    if (resolvedRole && resolvedRole !== activeRole) {
       setActiveRole(resolvedRole);
     }
   }, [resolvedRole, activeRole, setActiveRole]);
@@ -96,7 +97,47 @@ export default function DashboardLayout() {
     return builder ? builder(basePath) : [];
   }, [resolvedRole, basePath]);
 
-  const currentDashboard = dashboards[resolvedRole];
+  const currentDashboard = resolvedRole ? dashboards[resolvedRole] ?? null : null;
+  const resolvedRoleMeta = resolvedRole ? roles.find((r) => r.id === resolvedRole) : null;
+
+  let mainContent;
+  if (loading && !currentDashboard) {
+    mainContent = (
+      <DashboardStateMessage
+        variant="loading"
+        title="Loading your dashboard"
+        description="We are fetching the latest metrics, sessions, and community data."
+      />
+    );
+  } else if (error) {
+    mainContent = (
+      <DashboardStateMessage
+        variant="error"
+        title="We couldn't load your dashboard"
+        description={error.message ?? 'An unexpected error occurred while retrieving your data.'}
+        actionLabel="Retry"
+        onAction={() => refresh()}
+      />
+    );
+  } else if (!resolvedRole) {
+    mainContent = (
+      <DashboardStateMessage
+        title="No dashboards available"
+        description="Your account is not associated with an active learner or instructor workspace yet."
+      />
+    );
+  } else if (!currentDashboard) {
+    mainContent = (
+      <DashboardStateMessage
+        title="Dashboard data unavailable"
+        description="We couldn't find any configured data for this role yet. Configure sources and try again."
+        actionLabel="Refresh"
+        onAction={() => refresh()}
+      />
+    );
+  } else {
+    mainContent = <Outlet context={{ role: resolvedRole, dashboard: currentDashboard, refresh }} />;
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100">
@@ -203,16 +244,21 @@ export default function DashboardLayout() {
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-slate-500">
               <span>
-                {roles.find((r) => r.id === resolvedRole)?.label} dashboard ·{' '}
-                {currentDashboard ? 'All systems green' : 'No data configured'}
+                {resolvedRoleMeta?.label ?? 'Dashboard'} dashboard ·{' '}
+                {currentDashboard ? 'All systems green' : loading ? 'Syncing data' : 'Awaiting configuration'}
               </span>
-              <span>Route · {location.pathname.replace(`/dashboard/${resolvedRole}`, '') || '/overview'}</span>
+              <span>
+                Route ·
+                {resolvedRole
+                  ? location.pathname.replace(`/dashboard/${resolvedRole}`, '') || '/overview'
+                  : ' /'}
+              </span>
             </div>
           </div>
         </header>
         <main className="flex-1 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
           <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
-            <Outlet context={{ role: resolvedRole, dashboard: currentDashboard }} />
+            {mainContent}
           </div>
         </main>
       </div>

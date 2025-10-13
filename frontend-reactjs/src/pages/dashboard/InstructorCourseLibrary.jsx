@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorCourseLibrary() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const library = dashboard?.courses?.library ?? [];
+
+  if (library.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="No recorded assets"
+        description="Upload or migrate recorded sessions to build your evergreen course library."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

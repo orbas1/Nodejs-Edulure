@@ -26,6 +26,11 @@
 ## `/analytics`
 - Promoted the explorer intelligence dashboard into production: authenticated providers and operations users can navigate to `/analytics` to review KPI tiles, manual refresh controls, range toggles, search and CTR charts, entity breakdown tables, ads metrics, experiment status, forecast outlooks, query spotlights, and alert feeds that hydrate from `ExplorerAnalyticsService` endpoints with WCAG-compliant dark mode styling, empty-state messaging, and 401-safe fallbacks.
 
+## `/profile`
+- Replaced the legacy stub with a production profile dashboard that hydrates `/api/profiles/{id}/overview` via `useProfileOverview` (React Query + cache TTL) and renders hero metrics, verification badges, follower/engagement insights, programme shelves (courses, communities, ebooks), quick actions, and an activity timeline.
+- Added resilient loading, skeleton, and error states plus cache revalidation on focus and manual refresh so learners always see accurate stats even when aggregations are rebuilding.
+- Surfaced actionable CTAs (edit profile, manage availability, view statements) gated by feature flags/runtime config values, mirroring design specifications from `Profile Look.md`, `Profile Styling.md`, and `dashboard_drawings.md`.
+
 ## Layout & Navigation
 - `MainLayout` now renders auth-aware navigation items linking to the content library, explorer analytics, and login/register flows. Navigation visibility for the admin console and analytics dashboard honours backend feature flag snapshots and authentication to prevent unauthorised access.
 - `AuthContext` provider wraps the app in `main.jsx` to propagate session state across routes and components.

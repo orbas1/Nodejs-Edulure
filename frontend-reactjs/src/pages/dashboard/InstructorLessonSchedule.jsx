@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorLessonSchedule() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const lessons = dashboard?.schedules?.lessons ?? [];
+
+  if (lessons.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="No lessons scheduled"
+        description="There are no upcoming cohorts or lessons in the production calendar. Refresh after scheduling sessions."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

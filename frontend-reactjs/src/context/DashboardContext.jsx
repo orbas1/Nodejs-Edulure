@@ -1,32 +1,98 @@
 import PropTypes from 'prop-types';
-import { createContext, useContext, useMemo, useState } from 'react';
-import {
-  availableDashboardRoles,
-  dashboardSearchIndex,
-  dashboardUserProfile,
-  instructorDashboardData,
-  learnerDashboardData
-} from '../data/dashboardData.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+
+import { fetchDashboard } from '../api/dashboardApi.js';
+import { useAuth } from './AuthContext.jsx';
 
 const DashboardContext = createContext(null);
 
-export function DashboardProvider({ children }) {
-  const [activeRole, setActiveRole] = useState(availableDashboardRoles[0]?.id ?? 'learner');
+const initialState = {
+  profile: null,
+  roles: [],
+  dashboards: {},
+  searchIndex: [],
+  loading: false,
+  error: null
+};
 
-  const value = useMemo(
-    () => ({
-      activeRole,
-      setActiveRole,
-      profile: dashboardUserProfile,
-      roles: availableDashboardRoles,
-      dashboards: {
-        learner: learnerDashboardData,
-        instructor: instructorDashboardData
-      },
-      searchIndex: dashboardSearchIndex
-    }),
-    [activeRole]
+export function DashboardProvider({ children }) {
+  const { session, isAuthenticated } = useAuth();
+  const [state, setState] = useState(initialState);
+  const [activeRole, setActiveRole] = useState(null);
+  const activeRequest = useRef(null);
+
+  const loadDashboard = useCallback(
+    async (signal) => {
+      if (!isAuthenticated || !session?.tokens?.accessToken) {
+        setState(initialState);
+        setActiveRole(null);
+        return;
+      }
+
+      setState((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        const payload = await fetchDashboard({ token: session.tokens.accessToken, signal });
+        setState({
+          profile: payload.profile,
+          roles: payload.roles,
+          dashboards: payload.dashboards,
+          searchIndex: payload.searchIndex,
+          loading: false,
+          error: null
+        });
+        setActiveRole((current) => {
+          if (current && payload.roles.some((role) => role.id === current)) {
+            return current;
+          }
+          return payload.roles[0]?.id ?? null;
+        });
+      } catch (error) {
+        if (signal?.aborted || error?.name === 'CanceledError') return;
+        const normalisedError = error instanceof Error ? error : new Error('Failed to load dashboard data');
+        setState((prev) => ({ ...prev, loading: false, error: normalisedError }));
+      }
+    },
+    [isAuthenticated, session?.tokens?.accessToken]
   );
+
+  const triggerLoad = useCallback(() => {
+    if (activeRequest.current) {
+      activeRequest.current.abort();
+    }
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    loadDashboard(controller.signal).finally(() => {
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+      }
+    });
+    return controller;
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const controller = triggerLoad();
+    return () => {
+      controller.abort();
+      activeRequest.current = null;
+    };
+  }, [triggerLoad]);
+
+  const refresh = useCallback(() => triggerLoad(), [triggerLoad]);
+
+  const value = useMemo(() => {
+    const resolvedRole = activeRole ?? state.roles[0]?.id ?? null;
+    return {
+      activeRole: resolvedRole,
+      setActiveRole,
+      profile: state.profile,
+      roles: state.roles,
+      dashboards: state.dashboards,
+      searchIndex: state.searchIndex,
+      loading: state.loading,
+      error: state.error,
+      refresh
+    };
+  }, [activeRole, state, refresh]);
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
 }

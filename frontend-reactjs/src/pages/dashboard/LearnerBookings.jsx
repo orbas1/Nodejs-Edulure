@@ -1,10 +1,24 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function LearnerBookings() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const data = dashboard?.tutorBookings;
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <DashboardStateMessage
+        title="No learner bookings"
+        description="We couldn't locate any upcoming or historical tutor bookings. Refresh to retrieve the latest mentor agenda."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
+
+  const active = data.active ?? [];
+  const history = data.history ?? [];
 
   return (
     <div className="space-y-8">
@@ -35,7 +49,7 @@ export default function LearnerBookings() {
           </button>
         </div>
         <div className="mt-5 space-y-4">
-          {data.active.map((item) => (
+          {active.map((item) => (
             <div key={item.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-300">
                 <div>
@@ -67,7 +81,7 @@ export default function LearnerBookings() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-900/60">
-            {data.history.map((item) => (
+            {history.map((item) => (
               <tr key={item.id} className="hover:bg-slate-900/40">
                 <td className="py-3">{item.mentor}</td>
                 <td className="py-3 text-slate-400">{item.topic}</td>

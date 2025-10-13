@@ -1,0 +1,1149 @@
+import crypto from 'node:crypto';
+
+import db from '../config/database.js';
+import UserModel from '../models/UserModel.js';
+import UserPrivacySettingModel from '../models/UserPrivacySettingModel.js';
+import UserFollowModel from '../models/UserFollowModel.js';
+import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
+
+function safeJsonParse(value, fallback = {}) {
+  if (!value) return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+export function buildAvatarUrl(email) {
+  const hash = crypto.createHash('md5').update(String(email).trim().toLowerCase()).digest('hex');
+  return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=160`;
+}
+
+export function formatCurrency(amountCents, currency = 'USD') {
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2
+  });
+  const amount = Number(amountCents ?? 0) / 100;
+  return formatter.format(amount);
+}
+
+export function humanizeRelativeTime(date, referenceDate = new Date()) {
+  if (!date) return 'Unknown';
+  const target = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
+  const diffMs = referenceDate.getTime() - target.getTime();
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes < 1) return 'Just now';
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  const diffWeeks = Math.round(diffDays / 7);
+  if (diffWeeks < 5) return `${diffWeeks}w ago`;
+  const diffMonths = Math.round(diffDays / 30);
+  if (diffMonths < 12) return `${diffMonths}mo ago`;
+  const diffYears = Math.round(diffDays / 365);
+  return `${diffYears}y ago`;
+}
+
+export function calculateLearningStreak(completionDates, referenceDate = new Date()) {
+  if (!completionDates?.length) {
+    return { current: 0, longest: 0 };
+  }
+
+  const daySet = new Set();
+  completionDates.forEach((date) => {
+    if (!date) return;
+    const resolved = typeof date === 'string' ? new Date(date) : date;
+    const key = resolved.toISOString().slice(0, 10);
+    daySet.add(key);
+  });
+
+  const sortedDays = Array.from(daySet)
+    .sort()
+    .map((iso) => new Date(`${iso}T00:00:00Z`));
+
+  let longest = 0;
+  let streak = 1;
+  for (let i = 1; i < sortedDays.length; i += 1) {
+    const diffDays = (sortedDays[i].getTime() - sortedDays[i - 1].getTime()) / (24 * 60 * 60 * 1000);
+    if (diffDays === 1) {
+      streak += 1;
+    } else {
+      longest = Math.max(longest, streak);
+      streak = 1;
+    }
+  }
+  longest = Math.max(longest, streak);
+
+  const todayKey = referenceDate.toISOString().slice(0, 10);
+  let cursor = new Date(`${todayKey}T00:00:00Z`);
+  let current = 0;
+  while (daySet.has(cursor.toISOString().slice(0, 10))) {
+    current += 1;
+    cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000);
+  }
+
+  return { current, longest };
+}
+
+export function buildLearningPace(completions, referenceDate = new Date()) {
+  const days = [];
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const day = new Date(referenceDate.getTime() - offset * 24 * 60 * 60 * 1000);
+    const key = day.toLocaleDateString('en-US', { weekday: 'short' });
+    days.push({ key, minutes: 0 });
+  }
+
+  completions.forEach((completion) => {
+    if (!completion.completedAt) return;
+    const completedAt = typeof completion.completedAt === 'string'
+      ? new Date(completion.completedAt)
+      : completion.completedAt;
+    const diffDays = Math.floor(
+      (referenceDate.setHours(0, 0, 0, 0) - completedAt.setHours(0, 0, 0, 0)) /
+        (24 * 60 * 60 * 1000)
+    );
+    if (diffDays >= 0 && diffDays < 7) {
+      const index = 6 - diffDays;
+      if (days[index]) {
+        days[index].minutes += Number(completion.durationMinutes ?? 0);
+      }
+    }
+  });
+
+  return days.map((entry) => ({ day: entry.key, minutes: entry.minutes }));
+}
+
+function sum(array, selector = (value) => value) {
+  return array.reduce((total, item) => total + Number(selector(item) ?? 0), 0);
+}
+
+function buildCalendarEntries(entries) {
+  const days = new Map();
+  entries.forEach((entry) => {
+    if (!days.has(entry.day)) {
+      days.set(entry.day, []);
+    }
+    days.get(entry.day).push(entry.description);
+  });
+  return Array.from(days.entries()).map(([day, items], index) => ({
+    id: `day-${index}`,
+    day,
+    items
+  }));
+}
+
+function formatDateTime(date, options = {}) {
+  if (!date) return 'TBD';
+  const resolved = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('en-US', {
+    dateStyle: options.dateStyle ?? 'medium',
+    timeStyle: options.timeStyle ?? 'short',
+    timeZone: options.timeZone ?? 'UTC'
+  }).format(resolved);
+}
+
+function differenceInDays(end, start) {
+  const endDate = typeof end === 'string' ? new Date(end) : new Date(end.getTime());
+  const startDate = typeof start === 'string' ? new Date(start) : new Date(start.getTime());
+  const diffMs = endDate.getTime() - startDate.getTime();
+  return Math.round(diffMs / (24 * 60 * 60 * 1000));
+}
+
+function minutesToReadable(minutes) {
+  if (minutes < 60) {
+    return `${Math.round(minutes)} mins`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const remaining = Math.round(minutes % 60);
+  if (remaining === 0) {
+    return `${hours} hrs`;
+  }
+  return `${hours}h ${remaining}m`;
+}
+
+export default class DashboardService {
+  static async getDashboardForUser(userId, { referenceDate = new Date() } = {}) {
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      const error = new Error('User not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const now = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+
+    const [
+      privacySettings,
+      courseStats,
+      enrollmentRows,
+      progressRows,
+      membershipRows,
+      communityStatRows,
+      subscriptionRows,
+      affiliateRows,
+      affiliatePayoutRows,
+      liveClassRows,
+      tutorBookingRows,
+      directMessageRows,
+      followersCount,
+      followingCount,
+      pendingIncomingRows,
+      pendingOutgoingRows,
+      followRecommendations,
+      paymentIntentRows,
+      ebookProgressRows,
+      ebookRows,
+      ebookHighlightRows,
+      ebookBookmarkRows,
+      communityMessageRows,
+      communityMessageContributionRows,
+      communityAssignments
+    ] = await Promise.all([
+      UserPrivacySettingModel.getForUser(userId),
+      db('course_enrollments as ce')
+        .where('ce.user_id', userId)
+        .select(
+          db.raw("SUM(CASE WHEN ce.status = 'active' THEN 1 ELSE 0 END) as active_count"),
+          db.raw("SUM(CASE WHEN ce.status = 'completed' THEN 1 ELSE 0 END) as completed_count"),
+          db.raw('AVG(ce.progress_percent) as avg_progress'),
+          db.raw('COUNT(*) as total_enrollments')
+        )
+        .first(),
+      db('course_enrollments as ce')
+        .innerJoin('courses as c', 'c.id', 'ce.course_id')
+        .innerJoin('users as instructor', 'instructor.id', 'c.instructor_id')
+        .where('ce.user_id', userId)
+        .select(
+          'ce.id as enrollmentId',
+          'ce.public_id as enrollmentPublicId',
+          'ce.course_id as courseId',
+          'ce.status as status',
+          'ce.progress_percent as progressPercent',
+          'ce.started_at as startedAt',
+          'ce.completed_at as completedAt',
+          'ce.last_accessed_at as lastAccessedAt',
+          'c.title as courseTitle',
+          'c.slug as courseSlug',
+          'c.summary as courseSummary',
+          'c.level as courseLevel',
+          'c.delivery_format as deliveryFormat',
+          'c.rating_average as courseRating',
+          'c.rating_count as courseRatingCount',
+          'c.enrolment_count as enrolmentCount',
+          'c.release_at as releaseAt',
+          'c.metadata as courseMetadata',
+          'instructor.first_name as instructorFirstName',
+          'instructor.last_name as instructorLastName'
+        )
+        .orderBy('ce.started_at', 'desc'),
+      db('course_progress as cp')
+        .innerJoin('course_enrollments as ce', 'ce.id', 'cp.enrollment_id')
+        .innerJoin('course_lessons as cl', 'cl.id', 'cp.lesson_id')
+        .where('ce.user_id', userId)
+        .select(
+          'cp.enrollment_id as enrollmentId',
+          'ce.course_id as courseId',
+          'cp.completed as completed',
+          'cp.completed_at as completedAt',
+          'cp.progress_percent as progressPercent',
+          'cl.title as lessonTitle',
+          'cl.slug as lessonSlug',
+          'cl.position as lessonPosition',
+          'cl.duration_minutes as durationMinutes',
+          'cl.release_at as lessonReleaseAt'
+        ),
+      db('community_members as cm')
+        .innerJoin('communities as c', 'c.id', 'cm.community_id')
+        .where('cm.user_id', userId)
+        .select(
+          'cm.id as membershipId',
+          'cm.community_id as communityId',
+          'cm.role',
+          'cm.status',
+          'cm.joined_at as joinedAt',
+          'cm.metadata as membershipMetadata',
+          'c.name as communityName',
+          'c.slug as communitySlug',
+          'c.description as communityDescription',
+          'c.visibility as visibility',
+          'c.metadata as communityMetadata',
+          'c.owner_id as ownerId'
+        ),
+      db('community_members')
+        .whereIn(
+          'community_id',
+          db('community_members').select('community_id').where('user_id', userId)
+        )
+        .groupBy('community_id')
+        .select(
+          'community_id',
+          db.raw("SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_members"),
+          db.raw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_members"),
+          db.raw("SUM(CASE WHEN role != 'member' AND status = 'active' THEN 1 ELSE 0 END) as moderators")
+        ),
+      db('community_subscriptions as cs')
+        .leftJoin('community_paywall_tiers as tier', 'tier.id', 'cs.tier_id')
+        .where('cs.user_id', userId)
+        .select(
+          'cs.community_id as communityId',
+          'cs.public_id as subscriptionId',
+          'cs.status',
+          'cs.started_at as startedAt',
+          'cs.current_period_start as currentPeriodStart',
+          'cs.current_period_end as currentPeriodEnd',
+          'cs.cancel_at_period_end as cancelAtPeriodEnd',
+          'cs.provider',
+          'cs.metadata as subscriptionMetadata',
+          'tier.name as tierName',
+          'tier.price_cents as tierPriceCents',
+          'tier.currency as tierCurrency',
+          'tier.billing_interval as tierInterval',
+          'tier.benefits as tierBenefits'
+        ),
+      db('community_affiliates')
+        .where('user_id', userId)
+        .select(
+          'id',
+          'community_id as communityId',
+          'status',
+          'referral_code as referralCode',
+          'commission_rate_bps as commissionRateBps',
+          'total_earned_cents as totalEarnedCents',
+          'total_paid_cents as totalPaidCents',
+          'metadata',
+          'approved_at as approvedAt'
+        ),
+      db('community_affiliate_payouts')
+        .whereIn(
+          'affiliate_id',
+          db('community_affiliates').select('id').where('user_id', userId)
+        )
+        .select(
+          'id',
+          'affiliate_id as affiliateId',
+          'amount_cents as amountCents',
+          'status',
+          'payout_reference as payoutReference',
+          'scheduled_at as scheduledAt',
+          'processed_at as processedAt',
+          'metadata'
+        ),
+      db('live_classroom_registrations as reg')
+        .innerJoin('live_classrooms as lc', 'lc.id', 'reg.classroom_id')
+        .leftJoin('communities as c', 'c.id', 'lc.community_id')
+        .where('reg.user_id', userId)
+        .select(
+          'lc.id as classroomId',
+          'lc.public_id as classroomPublicId',
+          'lc.community_id as communityId',
+          'lc.title',
+          'lc.slug',
+          'lc.summary',
+          'lc.start_at as startAt',
+          'lc.end_at as endAt',
+          'lc.type',
+          'lc.price_amount as priceAmount',
+          'lc.price_currency as priceCurrency',
+          'lc.capacity',
+          'lc.reserved_seats as reservedSeats',
+          'lc.timezone',
+          'lc.metadata as classroomMetadata',
+          'reg.status as registrationStatus',
+          'reg.ticket_type as ticketType',
+          'reg.amount_paid as amountPaid',
+          'reg.currency as registrationCurrency',
+          'reg.registered_at as registeredAt',
+          'c.name as communityName'
+        ),
+      db('tutor_bookings as tb')
+        .innerJoin('tutor_profiles as tp', 'tp.id', 'tb.tutor_id')
+        .where('tb.learner_id', userId)
+        .select(
+          'tb.id',
+          'tb.public_id as publicId',
+          'tb.status',
+          'tb.scheduled_start as scheduledStart',
+          'tb.scheduled_end as scheduledEnd',
+          'tb.duration_minutes as durationMinutes',
+          'tb.hourly_rate_amount as hourlyRateAmount',
+          'tb.hourly_rate_currency as hourlyRateCurrency',
+          'tb.meeting_url as meetingUrl',
+          'tb.metadata',
+          'tp.display_name as tutorName',
+          'tp.headline as tutorHeadline',
+          'tp.rating_average as tutorRating',
+          'tp.rating_count as tutorRatingCount'
+        ),
+      db('direct_message_participants as dmp')
+        .innerJoin('direct_message_threads as thread', 'thread.id', 'dmp.thread_id')
+        .where('dmp.user_id', userId)
+        .select(
+          'dmp.thread_id as threadId',
+          'dmp.role',
+          'dmp.notifications_enabled as notificationsEnabled',
+          'dmp.last_read_message_id as lastReadMessageId',
+          'dmp.last_read_at as lastReadAt',
+          'thread.last_message_at as lastMessageAt',
+          'thread.last_message_preview as lastMessagePreview',
+          'thread.is_group as isGroup',
+          'thread.metadata as threadMetadata'
+        ),
+      UserFollowModel.countFollowers(userId),
+      UserFollowModel.countFollowing(userId),
+      db('user_follows as uf')
+        .innerJoin('users as u', 'u.id', 'uf.follower_id')
+        .where('uf.following_id', userId)
+        .andWhere('uf.status', 'pending')
+        .select(
+          'uf.id',
+          'u.id as userId',
+          'u.first_name as firstName',
+          'u.last_name as lastName',
+          'u.email',
+          'uf.created_at as requestedAt',
+          'uf.metadata'
+        ),
+      db('user_follows as uf')
+        .innerJoin('users as u', 'u.id', 'uf.following_id')
+        .where('uf.follower_id', userId)
+        .andWhere('uf.status', 'pending')
+        .select(
+          'uf.id',
+          'u.id as userId',
+          'u.first_name as firstName',
+          'u.last_name as lastName',
+          'u.email',
+          'uf.created_at as requestedAt',
+          'uf.metadata'
+        ),
+      FollowRecommendationModel.listForUser(userId, { limit: 6 }),
+      db('payment_intents')
+        .where('user_id', userId)
+        .orderBy('created_at', 'desc')
+        .select(
+          'public_id as publicId',
+          'status',
+          'currency',
+          'amount_subtotal as amountSubtotal',
+          'amount_discount as amountDiscount',
+          'amount_tax as amountTax',
+          'amount_total as amountTotal',
+          'amount_refunded as amountRefunded',
+          'metadata',
+          'entity_type as entityType',
+          'entity_id as entityId',
+          'captured_at as capturedAt',
+          'created_at as createdAt'
+        ),
+      db('ebook_read_progress as erp')
+        .innerJoin('content_assets as asset', 'asset.id', 'erp.asset_id')
+        .innerJoin('ebooks as ebook', 'ebook.asset_id', 'asset.id')
+        .where('erp.user_id', userId)
+        .select(
+          'ebook.id as ebookId',
+          'ebook.public_id as ebookPublicId',
+          'ebook.title',
+          'ebook.slug',
+          'ebook.subtitle',
+          'ebook.description',
+          'ebook.price_currency as currency',
+          'ebook.price_amount as priceAmount',
+          'ebook.rating_average as ratingAverage',
+          'ebook.rating_count as ratingCount',
+          'ebook.metadata as ebookMetadata',
+          'erp.progress_percent as progressPercent',
+          'erp.last_location as lastLocation',
+          'erp.time_spent_seconds as timeSpentSeconds'
+        ),
+      db('ebooks').select(
+        'id',
+        'public_id as publicId',
+        'title',
+        'slug',
+        'subtitle',
+        'description',
+        'price_currency as currency',
+        'price_amount as priceAmount',
+        'rating_average as ratingAverage',
+        'rating_count as ratingCount',
+        'metadata',
+        'release_at as releaseAt'
+      ),
+      db('ebook_highlights').where('user_id', userId).select('ebook_id as ebookId', 'id'),
+      db('ebook_bookmarks').where('user_id', userId).select('ebook_id as ebookId', 'id'),
+      db('community_messages as msg')
+        .leftJoin('communities as c', 'c.id', 'msg.community_id')
+        .where('msg.author_id', userId)
+        .orderBy('msg.delivered_at', 'desc')
+        .limit(5)
+        .select(
+          'msg.id',
+          'msg.body',
+          'msg.metadata',
+          'msg.delivered_at as deliveredAt',
+          'msg.thread_root_id as threadRootId',
+          'c.name as communityName'
+        ),
+      db('community_messages as msg')
+        .leftJoin('communities as c', 'c.id', 'msg.community_id')
+        .where('msg.author_id', userId)
+        .groupBy('msg.community_id', 'c.name')
+        .select('msg.community_id as communityId', 'c.name as communityName', db.raw('COUNT(*) as contribution_count')),
+      db('course_assignments as ca')
+        .innerJoin('course_enrollments as ce', 'ce.course_id', 'ca.course_id')
+        .innerJoin('courses as c', 'c.id', 'ca.course_id')
+        .where('ce.user_id', userId)
+        .select(
+          'ca.id',
+          'ca.course_id as courseId',
+          'ca.title',
+          'ca.due_offset_days as dueOffsetDays',
+          'ca.metadata',
+          'ce.started_at as enrollmentStartedAt',
+          'c.title as courseTitle'
+        )
+    ]);
+    const communityStatsMap = new Map();
+    communityStatRows.forEach((row) => {
+      communityStatsMap.set(Number(row.community_id), {
+        activeMembers: Number(row.active_members ?? 0),
+        pendingMembers: Number(row.pending_members ?? 0),
+        moderators: Number(row.moderators ?? 0)
+      });
+    });
+
+    const subscriptionByCommunity = new Map();
+    subscriptionRows.forEach((row) => {
+      subscriptionByCommunity.set(Number(row.communityId), {
+        ...row,
+        metadata: safeJsonParse(row.subscriptionMetadata, {})
+      });
+    });
+
+    const affiliateByCommunity = new Map();
+    affiliateRows.forEach((row) => {
+      affiliateByCommunity.set(Number(row.communityId), {
+        ...row,
+        metadata: safeJsonParse(row.metadata, {})
+      });
+    });
+
+    const affiliatePayoutByAffiliate = new Map();
+    affiliatePayoutRows.forEach((row) => {
+      const entry = affiliatePayoutByAffiliate.get(row.affiliateId) ?? [];
+      entry.push({ ...row, metadata: safeJsonParse(row.metadata, {}) });
+      affiliatePayoutByAffiliate.set(row.affiliateId, entry);
+    });
+
+    const progressByEnrollment = new Map();
+    progressRows.forEach((row) => {
+      const list = progressByEnrollment.get(row.enrollmentId) ?? [];
+      list.push(row);
+      progressByEnrollment.set(row.enrollmentId, list);
+    });
+
+    const learningCompletions = progressRows
+      .filter((row) => row.completed && row.completedAt)
+      .map((row) => ({
+        completedAt: row.completedAt,
+        durationMinutes: Number(row.durationMinutes ?? 0)
+      }));
+
+    const streak = calculateLearningStreak(
+      learningCompletions.map((entry) => entry.completedAt),
+      now
+    );
+
+    const lastSevenWindow = now.getTime() - 7 * 24 * 60 * 60 * 1000;
+    const previousSevenWindow = now.getTime() - 14 * 24 * 60 * 60 * 1000;
+
+    const lastSevenCompletions = learningCompletions.filter((entry) => {
+      const completed = typeof entry.completedAt === 'string' ? new Date(entry.completedAt) : entry.completedAt;
+      return completed.getTime() >= lastSevenWindow;
+    });
+
+    const previousSevenCompletions = learningCompletions.filter((entry) => {
+      const completed = typeof entry.completedAt === 'string' ? new Date(entry.completedAt) : entry.completedAt;
+      return completed.getTime() >= previousSevenWindow && completed.getTime() < lastSevenWindow;
+    });
+
+    const timeInvestedCurrent = sum(lastSevenCompletions, (entry) => entry.durationMinutes);
+    const timeInvestedPrevious = sum(previousSevenCompletions, (entry) => entry.durationMinutes);
+    const modulesCompletedCurrent = lastSevenCompletions.length;
+    const modulesCompletedPrevious = previousSevenCompletions.length;
+
+    const communityContributionMap = new Map();
+    communityMessageContributionRows.forEach((row) => {
+      communityContributionMap.set(Number(row.communityId), {
+        name: row.communityName,
+        count: Number(row.contribution_count ?? 0)
+      });
+    });
+
+    const memberships = membershipRows.map((row) => {
+      const stats = communityStatsMap.get(Number(row.communityId)) ?? {
+        activeMembers: 0,
+        pendingMembers: 0,
+        moderators: 0
+      };
+      const subscription = subscriptionByCommunity.get(Number(row.communityId));
+      const affiliate = affiliateByCommunity.get(Number(row.communityId));
+      const affiliatePayouts = affiliate ? affiliatePayoutByAffiliate.get(affiliate.id) ?? [] : [];
+      const upcomingSessions = liveClassRows.filter(
+        (session) => Number(session.communityId ?? 0) === Number(row.communityId)
+      );
+
+      const initiatives = [];
+      if (subscription) {
+        initiatives.push(
+          `Subscribed to ${subscription.tierName} (${formatCurrency(subscription.tierPriceCents, subscription.tierCurrency)}/${subscription.tierInterval})`
+        );
+      }
+      if (affiliate) {
+        const outstanding = Number(affiliate.totalEarnedCents ?? 0) - Number(affiliate.totalPaidCents ?? 0);
+        initiatives.push(`Affiliate referrals ${affiliate.referralCode} · ${formatCurrency(outstanding, 'USD')} pending`);
+      }
+      if (stats.pendingMembers > 0) {
+        initiatives.push(`${stats.pendingMembers} member invite${stats.pendingMembers === 1 ? '' : 's'} awaiting approval`);
+      }
+      if (upcomingSessions.length > 0) {
+        initiatives.push(`${upcomingSessions.length} live session${upcomingSessions.length === 1 ? '' : 's'} scheduled`);
+      }
+      if (initiatives.length === 0) {
+        initiatives.push('Monitoring engagement and retention baselines');
+      }
+
+      const totalMembers = stats.activeMembers + stats.pendingMembers;
+      const healthRatio = totalMembers > 0 ? Math.round((stats.activeMembers / totalMembers) * 100) : 0;
+
+      return {
+        id: `community-${row.communityId}`,
+        name: row.communityName,
+        members: `${stats.activeMembers} active`,
+        moderators: stats.moderators,
+        health: `${healthRatio}%`,
+        initiatives,
+        metadata: {
+          role: row.role,
+          status: row.status
+        }
+      };
+    });
+
+    const pipelineEntries = [];
+    subscriptionRows.forEach((subscription) => {
+      if (!subscription.currentPeriodEnd || !subscription.currentPeriodStart) return;
+      const totalDays = Math.max(differenceInDays(subscription.currentPeriodEnd, subscription.currentPeriodStart), 1);
+      const elapsedDays = Math.min(
+        Math.max(differenceInDays(now, subscription.currentPeriodStart), 0),
+        totalDays
+      );
+      const progressPercent = Math.round((elapsedDays / totalDays) * 100);
+      pipelineEntries.push({
+        id: `subscription-${subscription.subscriptionId}`,
+        title: `${subscription.tierName} renewal`,
+        owner: 'You',
+        progress: progressPercent
+      });
+    });
+
+    affiliateRows.forEach((affiliate) => {
+      const payouts = affiliatePayoutByAffiliate.get(affiliate.id) ?? [];
+      payouts.forEach((payout) => {
+        let progress = 25;
+        if (payout.status === 'processing') progress = 60;
+        if (payout.status === 'completed') progress = 100;
+        pipelineEntries.push({
+          id: `payout-${payout.id}`,
+          title: `Affiliate payout ${payout.payoutReference}`,
+          owner: affiliate.referralCode,
+          progress
+        });
+      });
+    });
+
+    liveClassRows.forEach((session) => {
+      if (!session.capacity) return;
+      const occupancy = Math.min(
+        Math.round((Number(session.reservedSeats ?? 0) / Number(session.capacity ?? 1)) * 100),
+        100
+      );
+      pipelineEntries.push({
+        id: `classroom-${session.classroomId}`,
+        title: `${session.title} occupancy`,
+        owner: session.communityName ?? 'Live classroom',
+        progress: occupancy
+      });
+    });
+
+    const uniquePipelines = [];
+    const pipelineIds = new Set();
+    pipelineEntries
+      .sort((a, b) => b.progress - a.progress)
+      .forEach((entry) => {
+        if (pipelineIds.has(entry.id) || uniquePipelines.length >= 4) return;
+        pipelineIds.add(entry.id);
+        uniquePipelines.push(entry);
+      });
+
+    const activeEnrollments = enrollmentRows.filter((row) => row.status === 'active');
+    const courseSummaries = activeEnrollments.map((enrollment) => {
+      const lessons = (progressByEnrollment.get(enrollment.enrollmentId) ?? []).sort(
+        (a, b) => a.lessonPosition - b.lessonPosition
+      );
+      const nextLesson = lessons.find((lesson) => !lesson.completed);
+      return {
+        id: enrollment.courseSlug,
+        title: enrollment.courseTitle,
+        status: 'In progress',
+        progress: Math.round(Number(enrollment.progressPercent ?? 0)),
+        instructor: `${enrollment.instructorFirstName} ${enrollment.instructorLastName}`.trim(),
+        nextLesson: nextLesson ? nextLesson.lessonTitle : 'Review completed lessons'
+      };
+    });
+
+    const ebookHighlightMap = ebookHighlightRows.reduce((acc, row) => {
+      const key = Number(row.ebookId);
+      acc.set(key, (acc.get(key) ?? 0) + 1);
+      return acc;
+    }, new Map());
+
+    const ebookBookmarkMap = ebookBookmarkRows.reduce((acc, row) => {
+      const key = Number(row.ebookId);
+      acc.set(key, (acc.get(key) ?? 0) + 1);
+      return acc;
+    }, new Map());
+
+    const ebookLibrary = ebookProgressRows.map((row) => {
+      const highlights = ebookHighlightMap.get(row.ebookId) ?? 0;
+      const bookmarks = ebookBookmarkMap.get(row.ebookId) ?? 0;
+      const progressPercent = Number(row.progressPercent ?? 0);
+      let statusLabel = 'Not started';
+      if (progressPercent >= 100) statusLabel = 'Completed';
+      else if (progressPercent > 0) statusLabel = 'In progress';
+      return {
+        id: `ebook-${row.ebookId}`,
+        title: row.title,
+        status: statusLabel,
+        progress: progressPercent,
+        price: formatCurrency(row.priceAmount, row.currency),
+        highlights,
+        bookmarks,
+        timeSpent: minutesToReadable(Number(row.timeSpentSeconds ?? 0) / 60)
+      };
+    });
+
+    const recommendationCandidates = ebookRows.filter((ebook) =>
+      !ebookProgressRows.some((progress) => progress.ebookId === ebook.id)
+    );
+    const courseRecommendations = recommendationCandidates.slice(0, 3).map((ebook) => ({
+      id: `ebook-rec-${ebook.id}`,
+      title: `${ebook.title} (Ebook)`,
+      summary: (ebook.subtitle ?? ebook.description ?? '').slice(0, 120) || 'Explore complementary research and playbooks.',
+      rating: Number(ebook.ratingAverage ?? 0).toFixed(1)
+    }));
+
+    const assignmentAlerts = communityAssignments
+      .map((assignment) => {
+        if (!assignment.enrollmentStartedAt) return null;
+        const dueDate = new Date(assignment.enrollmentStartedAt);
+        dueDate.setDate(dueDate.getDate() + Number(assignment.dueOffsetDays ?? 0));
+        return {
+          id: assignment.id,
+          courseTitle: assignment.courseTitle,
+          title: assignment.title,
+          dueDate
+        };
+      })
+      .filter((assignment) => assignment && assignment.dueDate >= now);
+
+    const upcomingEvents = [];
+    liveClassRows.forEach((session) => {
+      if (!session.startAt) return;
+      const start = new Date(session.startAt);
+      if (start < now) return;
+      upcomingEvents.push({
+        id: `live-${session.classroomId}`,
+        title: session.title,
+        type: 'Live classroom',
+        date: start,
+        host: session.communityName ?? 'Edulure Live',
+        action: session.registrationStatus === 'registered' ? 'Join room' : 'Manage ticket'
+      });
+    });
+
+    tutorBookingRows.forEach((booking) => {
+      if (!booking.scheduledStart) return;
+      const start = new Date(booking.scheduledStart);
+      if (start < now) return;
+      upcomingEvents.push({
+        id: `booking-${booking.id}`,
+        title: booking.metadata?.topic ?? booking.tutorHeadline ?? 'Mentor session',
+        type: 'Mentor session',
+        date: start,
+        host: booking.tutorName,
+        action: 'Review brief'
+      });
+    });
+
+    assignmentAlerts
+      .filter((assignment) => assignment.dueDate.getTime() - now.getTime() <= 7 * 24 * 60 * 60 * 1000)
+      .forEach((assignment) => {
+        upcomingEvents.push({
+          id: `assignment-${assignment.id}`,
+          title: assignment.title,
+          type: 'Assignment due',
+          date: assignment.dueDate,
+          host: assignment.courseTitle,
+          action: 'Submit work'
+        });
+      });
+
+    upcomingEvents.sort((a, b) => a.date - b.date);
+
+    const upcomingDisplay = upcomingEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      type: event.type,
+      date: formatDateTime(event.date, { timeStyle: 'short' }),
+      host: event.host,
+      action: event.action,
+      dateLabel: event.date.toLocaleDateString('en-US', { weekday: 'short' })
+    }));
+
+    const calendarEntries = buildCalendarEntries(
+      upcomingDisplay.map((event) => ({
+        day: event.dateLabel,
+        description: `${event.type} · ${event.title}`
+      }))
+    );
+
+    const tutorSessions = tutorBookingRows.map((booking) => ({
+      ...booking,
+      metadata: safeJsonParse(booking.metadata, {})
+    }));
+
+    const tutorBookings = {
+      active: tutorSessions
+        .filter((booking) => booking.scheduledStart && new Date(booking.scheduledStart) >= now)
+        .map((booking) => ({
+          id: booking.id,
+          topic: booking.metadata?.topic ?? booking.tutorHeadline ?? 'Mentor session',
+          mentor: booking.tutorName,
+          date: formatDateTime(booking.scheduledStart, { timeStyle: 'short' }),
+          status: booking.status
+        })),
+      history: tutorSessions
+        .filter((booking) => booking.scheduledEnd && new Date(booking.scheduledEnd) < now)
+        .map((booking) => ({
+          id: booking.id,
+          mentor: booking.tutorName,
+          topic: booking.metadata?.topic ?? booking.tutorHeadline ?? 'Mentor session',
+          date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium' }),
+          rating: Number(booking.tutorRating ?? 0).toFixed(1)
+        }))
+    };
+
+    const totalSpent = paymentIntentRows
+      .filter((intent) => intent.status === 'succeeded')
+      .reduce((total, intent) => total + Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0), 0);
+
+    const lastThirtyWindow = now.getTime() - 30 * 24 * 60 * 60 * 1000;
+    const previousThirtyWindow = now.getTime() - 60 * 24 * 60 * 60 * 1000;
+
+    const totalSpentCurrent = paymentIntentRows
+      .filter((intent) => intent.status === 'succeeded' && intent.capturedAt && new Date(intent.capturedAt).getTime() >= lastThirtyWindow)
+      .reduce((total, intent) => total + Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0), 0);
+
+    const totalSpentPrevious = paymentIntentRows
+      .filter((intent) =>
+        intent.status === 'succeeded' &&
+        intent.capturedAt &&
+        new Date(intent.capturedAt).getTime() >= previousThirtyWindow &&
+        new Date(intent.capturedAt).getTime() < lastThirtyWindow
+      )
+      .reduce((total, intent) => total + Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0), 0);
+
+    const activeSubscriptions = subscriptionRows.filter((subscription) => subscription.status === 'active');
+    const outstandingAffiliate = affiliateRows.reduce(
+      (total, affiliate) => total + (Number(affiliate.totalEarnedCents ?? 0) - Number(affiliate.totalPaidCents ?? 0)),
+      0
+    );
+
+    const financialSummary = [
+      {
+        label: 'Total invested',
+        value: formatCurrency(totalSpent, 'USD'),
+        change: `${totalSpentCurrent >= totalSpentPrevious ? '+' : '−'}${formatCurrency(
+          Math.abs(totalSpentCurrent - totalSpentPrevious),
+          'USD'
+        )} last 30d`,
+        trend: totalSpentCurrent >= totalSpentPrevious ? 'up' : 'down'
+      },
+      {
+        label: 'Active subscriptions',
+        value: `${activeSubscriptions.length} active`,
+        change: activeSubscriptions
+          .map((subscription) =>
+            `Renews ${formatDateTime(subscription.currentPeriodEnd, { dateStyle: 'medium', timeStyle: undefined })}`
+          )
+          .join(' • ') || 'No renewals scheduled',
+        trend: 'up'
+      },
+      {
+        label: 'Affiliate credits',
+        value: formatCurrency(outstandingAffiliate, 'USD'),
+        change: outstandingAffiliate > 0 ? 'Release pending payout' : 'All payouts cleared',
+        trend: outstandingAffiliate > 0 ? 'up' : 'down'
+      }
+    ];
+
+    const invoices = paymentIntentRows.slice(0, 6).map((intent) => {
+      const metadata = safeJsonParse(intent.metadata, {});
+      const items = Array.isArray(metadata.items) ? metadata.items : [];
+      const label = items.length
+        ? items.map((item) => item.name ?? item.id).join(', ')
+        : intent.entityType ?? 'Payment';
+      return {
+        id: intent.publicId,
+        label,
+        amount: formatCurrency(Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0), intent.currency ?? 'USD'),
+        status: intent.status,
+        date: formatDateTime(intent.capturedAt ?? intent.createdAt, { dateStyle: 'medium', timeStyle: undefined })
+      };
+    });
+
+    const directMessageInsights = directMessageRows.map((row) => {
+      const lastMessageAt = row.lastMessageAt ? new Date(row.lastMessageAt) : null;
+      const lastReadAt = row.lastReadAt ? new Date(row.lastReadAt) : null;
+      const hasUnread = !lastReadAt || (lastMessageAt && lastMessageAt > lastReadAt);
+      return {
+        threadId: row.threadId,
+        unread: hasUnread,
+        notificationsEnabled: Boolean(row.notificationsEnabled),
+        preview: row.lastMessagePreview
+      };
+    });
+
+    const unreadThreads = directMessageInsights.filter((entry) => entry.unread).length;
+
+    const pendingFollowRequests = pendingIncomingRows.map((row) => ({
+      id: row.id,
+      name: `${row.firstName} ${row.lastName}`.trim(),
+      email: row.email,
+      requestedAt: humanizeRelativeTime(row.requestedAt, now)
+    }));
+
+    const followSuggestions = followRecommendations.map((entry) => ({
+      id: entry.recommendation.id,
+      name: `${entry.user.firstName} ${entry.user.lastName}`.trim(),
+      score: entry.recommendation.score,
+      reason: entry.recommendation.reasonCode.replace(/_/g, ' ')
+    }));
+
+    const feedHighlights = communityMessageRows.map((row) => {
+      const metadata = safeJsonParse(row.metadata, {});
+      const tags = Array.isArray(metadata.tags) ? metadata.tags : [];
+      return {
+        id: row.id,
+        headline: row.body.slice(0, 120),
+        time: humanizeRelativeTime(row.deliveredAt, now),
+        tags: tags.length ? tags : [row.communityName ?? 'Community'],
+        reactions: metadata.reactions ?? 0,
+        comments: metadata.replies ?? 0
+      };
+    });
+
+    const completedLessons = progressRows.filter((row) => row.completed).length;
+    const activeCommunityCount = memberships.filter((membership) => membership.metadata.status === 'active').length;
+    const totalCommunityPosts = communityMessageContributionRows.reduce(
+      (total, row) => total + Number(row.contribution_count ?? 0),
+      0
+    );
+
+    const metrics = [
+      {
+        label: 'Learning streak',
+        value: `${streak.current} day${streak.current === 1 ? '' : 's'}`,
+        change: `Longest ${streak.longest} day${streak.longest === 1 ? '' : 's'}`,
+        trend: streak.current >= streak.longest ? 'up' : 'down'
+      },
+      {
+        label: 'Lessons completed',
+        value: `${completedLessons} lessons`,
+        change: `${modulesCompletedCurrent >= modulesCompletedPrevious ? '+' : '−'}${Math.abs(
+          modulesCompletedCurrent - modulesCompletedPrevious
+        )} last 7d`,
+        trend: modulesCompletedCurrent >= modulesCompletedPrevious ? 'up' : 'down'
+      },
+      {
+        label: 'Time invested',
+        value: minutesToReadable(timeInvestedCurrent),
+        change: `${timeInvestedCurrent >= timeInvestedPrevious ? '+' : '−'}${minutesToReadable(
+          Math.abs(timeInvestedCurrent - timeInvestedPrevious)
+        )} vs prior week`,
+        trend: timeInvestedCurrent >= timeInvestedPrevious ? 'up' : 'down'
+      },
+      {
+        label: 'Communities active',
+        value: String(activeCommunityCount),
+        change: `${totalCommunityPosts} posts logged`,
+        trend: totalCommunityPosts > 0 ? 'up' : 'down'
+      }
+    ];
+
+    const learningPace = buildLearningPace(learningCompletions, now);
+    const communityEngagement = Array.from(communityContributionMap.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4)
+      .map((entry) => ({ name: entry.name, participation: entry.count }));
+
+    const notifications = [];
+    pendingFollowRequests.forEach((request) => {
+      notifications.push({
+        id: `follow-${request.id}`,
+        title: `${request.name} requested to follow you`,
+        timestamp: request.requestedAt,
+        type: 'social'
+      });
+    });
+    assignmentAlerts.forEach((assignment) => {
+      notifications.push({
+        id: `assignment-${assignment.id}`,
+        title: `${assignment.title} due ${formatDateTime(assignment.dueDate, { dateStyle: 'medium', timeStyle: undefined })}`,
+        timestamp: humanizeRelativeTime(assignment.dueDate, now),
+        type: 'learning'
+      });
+    });
+    if (unreadThreads > 0) {
+      notifications.push({
+        id: 'dm-unread',
+        title: `${unreadThreads} conversation${unreadThreads === 1 ? '' : 's'} awaiting review`,
+        timestamp: 'Messages',
+        type: 'messaging'
+      });
+    }
+
+    const roles = [{ id: 'learner', label: 'Learner' }];
+
+    const dashboards = {
+      learner: {
+        metrics,
+        analytics: {
+          learningPace,
+          communityEngagement
+        },
+        upcoming: upcomingDisplay.slice(0, 5),
+        communities: {
+          managed: memberships,
+          pipelines: uniquePipelines
+        },
+        courses: {
+          active: courseSummaries,
+          recommendations: courseRecommendations
+        },
+        calendar: calendarEntries,
+        tutorBookings,
+        ebooks: {
+          library: ebookLibrary,
+          recommendations: courseRecommendations
+        },
+        financial: {
+          summary: financialSummary,
+          invoices
+        },
+        notifications: {
+          total: notifications.length,
+          unreadMessages: unreadThreads,
+          items: notifications
+        },
+        followers: {
+          followers: followersCount,
+          following: followingCount,
+          pending: pendingFollowRequests,
+          outgoing: pendingOutgoingRows.map((row) => ({
+            id: row.id,
+            name: `${row.firstName} ${row.lastName}`.trim(),
+            email: row.email,
+            requestedAt: humanizeRelativeTime(row.requestedAt, now)
+          })),
+          recommendations: followSuggestions
+        },
+        settings: {
+          privacy: {
+            visibility: privacySettings.profileVisibility,
+            followApprovalRequired: privacySettings.followApprovalRequired,
+            shareActivity: privacySettings.shareActivity,
+            messagePermission: privacySettings.messagePermission
+          },
+          messaging: {
+            unreadThreads,
+            notificationsEnabled: directMessageInsights.every((entry) => entry.notificationsEnabled)
+          },
+          communities: memberships.map((membership) => ({
+            id: membership.id,
+            name: membership.name,
+            role: membership.metadata.role,
+            status: membership.metadata.status
+          }))
+        }
+      }
+    };
+
+    const searchIndex = [
+      ...courseSummaries.map((course) => ({
+        id: `search-course-${course.id}`,
+        role: 'learner',
+        type: 'Course',
+        title: course.title,
+        url: `/dashboard/learner/courses/${course.id}`
+      })),
+      ...memberships.map((community) => ({
+        id: `search-community-${community.id}`,
+        role: 'learner',
+        type: 'Community',
+        title: community.name,
+        url: '/dashboard/learner/communities'
+      })),
+      ...upcomingDisplay.map((event) => ({
+        id: `search-event-${event.id}`,
+        role: 'learner',
+        type: event.type,
+        title: event.title,
+        url: '/dashboard/learner/calendar'
+      }))
+    ];
+
+    const communityNames = memberships.map((membership) => membership.name).filter(Boolean);
+    const primaryProgram = courseSummaries[0]?.title ?? 'Edulure programs';
+    const profileBio = communityNames.length
+      ? `Currently collaborating across ${communityNames.join(', ')} while progressing through ${primaryProgram}.`
+      : `Progressing through ${primaryProgram}.`;
+
+    return {
+      profile: {
+        id: user.id,
+        name: `${user.firstName} ${user.lastName}`.trim(),
+        email: user.email,
+        avatar: buildAvatarUrl(user.email),
+        title: `${memberships.length} communities · ${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`,
+        bio: profileBio,
+        stats: [
+          { label: 'Communities', value: `${memberships.length} joined` },
+          { label: 'Courses', value: `${activeEnrollments.length} active` },
+          { label: 'Badges', value: `${learningCompletions.length} milestones` }
+        ],
+        feedHighlights
+      },
+      roles,
+      dashboards,
+      searchIndex
+    };
+  }
+}

@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorTutorSchedule() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const schedule = dashboard?.schedules?.tutor ?? [];
+
+  if (schedule.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="Tutor availability not synced"
+        description="Sync your mentors' calendars to populate availability windows across pods."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
