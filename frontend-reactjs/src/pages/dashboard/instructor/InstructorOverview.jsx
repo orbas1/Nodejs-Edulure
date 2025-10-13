@@ -1,13 +1,14 @@
 import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 
+import VerificationStatusCard from '../../../components/dashboard/VerificationStatusCard.jsx';
 import InstructorMetricsSection from './sections/InstructorMetricsSection.jsx';
 import InstructorPipelineSection from './sections/InstructorPipelineSection.jsx';
 import InstructorProductionSection from './sections/InstructorProductionSection.jsx';
 import InstructorProfileSection from './sections/InstructorProfileSection.jsx';
 import InstructorRevenueSection from './sections/InstructorRevenueSection.jsx';
 
-export default function InstructorOverview({ dashboard, profile }) {
+export default function InstructorOverview({ dashboard, profile, onRefresh }) {
   const metrics = dashboard.metrics ?? [];
   const enrollmentMetrics = useMemo(
     () =>
@@ -33,6 +34,8 @@ export default function InstructorOverview({ dashboard, profile }) {
         <InstructorRevenueSection revenueSlices={revenueSlices} />
       </section>
 
+      <VerificationStatusCard verification={profile?.verification ?? null} onRefresh={onRefresh} />
+
       <section className="grid gap-6 lg:grid-cols-2">
         <InstructorPipelineSection pipeline={pipeline} />
         <InstructorProductionSection production={production} />
@@ -43,5 +46,10 @@ export default function InstructorOverview({ dashboard, profile }) {
 
 InstructorOverview.propTypes = {
   dashboard: PropTypes.object.isRequired,
-  profile: PropTypes.object.isRequired
+  profile: PropTypes.object.isRequired,
+  onRefresh: PropTypes.func
+};
+
+InstructorOverview.defaultProps = {
+  onRefresh: null
 };

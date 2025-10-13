@@ -8,7 +8,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 2 – Content, Commerce & Live Learning Delivery | 74% | 82% | 80% | 84% | 72% | 75% | 78% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 90% | 98% | 94% | 96% | 90% | 94% | 94% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 86% | 100% | 97% | 98% | 94% | 97% | 95% |
-| Task 5 – Dashboards, Profiles & Operational Consoles | 76% | 92% | 93% | 95% | 86% | 91% | 89% |
+| Task 5 – Dashboards, Profiles & Operational Consoles | 90% | 100% | 98% | 99% | 94% | 98% | 97% |
 | Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
@@ -16,8 +16,8 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Sprint | Scope | Status | Key Deliverables |
 | --- | --- | --- | --- |
 | Task 5 – Sprint 5A | Component foundations | 60% | API payload definitions, responsive skeletons, cache hooks |
-| Task 5 – Sprint 5B | Role dashboards | 85% | Learner widgets, instructor analytics, admin escalation console |
-| Task 5 – Sprint 5C | Compliance & verification | 0% | KYC pipeline, verification notifications, policy hub updates |
+| Task 5 – Sprint 5B | Role dashboards | 92% | Learner widgets, instructor analytics, admin operational console (approvals, policy hub, export tooling) |
+| Task 5 – Sprint 5C | Compliance & verification | 100% | KYC pipeline live with document ingestion, learner/instructor upload flows, admin review queue, audit trails, and design/documentation sign-off |
 | Task 6 – Sprint 6A | Core shell & networking | 0% | Flutter shell, dio client + secure storage, shared tokens |
 | Task 6 – Sprint 6B | Learner modules | 0% | Community/explorer readers, course/eBook playback, live class joins |
 | Task 6 – Sprint 6C | Instructor & store prep | 0% | Instructor dashboards, payouts/inbox parity, store submission ops |
@@ -49,6 +49,8 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Instructor dashboard aggregation is live: `buildInstructorDashboard` composes course progress, tutor pipelines, live classroom schedules, asset/ebook performance, community monetisation, ads experiments, and subscription revenue while `DashboardService.getDashboardForUser` merges the instructor payload, expands profile stats/bio, and appends search index entries. Vitest service + HTTP suites now validate instructor metrics and contract delivery, unlocking Task 5.3 frontend integration.
 - Instructor monetisation hub is operational in React: `/dashboard/instructor/pricing` renders course offer funnels, subscription tiers, live-session pricing, revenue mix progress bars, and insight callouts by consuming the new `dashboard.pricing` payload with normalised metrics, linted data parsing, and navigation/search integration aligned to `dashboard_drawings.md`, `menu_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md`.
 - Admin control center now ships the operational console: the React `/admin` route consumes the new `/api/admin/console` snapshot to present approvals, incident bridges, refund audits, support backlog, and policy updates with live metrics, severity badges, SLA cues, and feature-flag governance aligned to `Admin_panel_drawings.md`, `dashboard_drawings.md`, and runtime configuration contracts. Documentation, database change logs, design trackers, and QA notes have been updated to mirror the production payloads, migration, seeds, OpenAPI schemas, and Vitest suites backing the console so downstream teams have a single source of truth.
+- Admin operational console iteration now adds runtime-driven policy governance, CSV export, and admin invite tooling: React `/admin` consumes `/api/dashboard/me` admin aggregates to present KPI tiles, approvals queues, payment health breakdowns, support/risk/platform stats, policy hub CTAs, operational alerts, and analytics shortcuts with feature-flag gating. The UI mirrors `Admin_panel_drawings.md`, `dashboard_drawings.md`, `menu_drawings.md`, and runtime configuration docs so operations teams can triage incidents and policy reviews without leaving the console.
+- Identity verification is now production ready across backend and frontend: the new KYC tables, seeds, and service layer power presigned uploads, checksum validation, audit logging, and admin review flows. Learner and instructor dashboards surface live verification progress with self-service uploads, while the admin compliance queue exposes risk controls, SLA tracking, and review actions tied to audit trails and OpenAPI documentation.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |

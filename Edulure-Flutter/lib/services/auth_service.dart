@@ -20,4 +20,30 @@ class AuthService {
     await SessionManager.saveSession(session);
     return session;
   }
+
+  Future<Map<String, dynamic>> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    required String role,
+    int? age,
+    String? address,
+  }) async {
+    final payload = {
+      'firstName': firstName,
+      'lastName': lastName,
+      'email': email,
+      'password': password,
+      'role': role,
+      if (age != null) 'age': age,
+      if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+    };
+    final response = await _dio.post('/auth/register', data: payload);
+    final data = response.data['data'];
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    return {};
+  }
 }
