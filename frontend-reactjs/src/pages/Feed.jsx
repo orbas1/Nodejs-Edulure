@@ -12,6 +12,7 @@ import TopBar from '../components/TopBar.jsx';
 import SkewedMenu from '../components/SkewedMenu.jsx';
 import FeedComposer from '../components/FeedComposer.jsx';
 import FeedCard from '../components/FeedCard.jsx';
+import FeedSponsoredCard from '../components/FeedSponsoredCard.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import CommunityHero from '../components/CommunityHero.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -36,6 +37,7 @@ export default function Feed() {
   const [activeMenuItem, setActiveMenuItem] = useState('Communities');
   const [feedItems, setFeedItems] = useState([]);
   const [feedMeta, setFeedMeta] = useState({ page: 1, perPage: 10, total: 0, pageCount: 0 });
+  const [feedAdsMeta, setFeedAdsMeta] = useState(null);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [feedError, setFeedError] = useState(null);
@@ -60,6 +62,7 @@ export default function Feed() {
       setSelectedCommunity(ALL_COMMUNITIES_NODE);
       setFeedItems([]);
       setFeedMeta({ page: 1, perPage: 10, total: 0, pageCount: 0 });
+      setFeedAdsMeta(null);
       setFeedError(null);
       setCommunityDetail(null);
       setCommunityDetailError(null);
@@ -139,6 +142,7 @@ export default function Feed() {
 
         setFeedItems((prev) => (append ? [...prev, ...items] : items));
         setFeedMeta(pagination);
+        setFeedAdsMeta(response.meta?.ads ?? null);
       } catch (error) {
         if (!append) {
           setFeedItems([]);
@@ -383,9 +387,22 @@ export default function Feed() {
                 <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">{feedError}</div>
               ) : (
                 <>
-                  {feedItems.map((post) => (
-                    <FeedCard key={post.id} post={post} />
-                  ))}
+                  {feedAdsMeta?.count > 0 && (
+                    <div className="rounded-3xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-800">
+                      Sponsored placements active · {feedAdsMeta.count}{' '}
+                      {feedAdsMeta.count === 1 ? 'campaign' : 'campaigns'} matched for your feed.
+                    </div>
+                  )}
+                  {feedItems.map((item) => {
+                    if (item?.kind === 'ad' && item.ad) {
+                      return <FeedSponsoredCard key={`ad-${item.ad.placementId}`} ad={item.ad} />;
+                    }
+                    const post = item?.kind === 'post' ? item.post : item;
+                    if (!post) {
+                      return null;
+                    }
+                    return <FeedCard key={`post-${post.id}`} post={post} />;
+                  })}
                   {feedItems.length === 0 && (
                     <div className="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
                       No activity yet. Be the first to share an update.

@@ -1,3 +1,5 @@
+import http from 'node:http';
+
 import app from './app.js';
 import { env } from './config/env.js';
 import logger from './config/logger.js';
@@ -7,6 +9,7 @@ import dataRetentionJob from './jobs/dataRetentionJob.js';
 import communityReminderJob from './jobs/communityReminderJob.js';
 import { featureFlagService, runtimeConfigService } from './services/FeatureFlagService.js';
 import { searchClusterService } from './services/SearchClusterService.js';
+import realtimeService from './services/RealtimeService.js';
 
 async function start() {
   try {
@@ -30,7 +33,11 @@ async function start() {
   }
 
   const port = env.app.port;
-  app.listen(port, () => {
+  const httpServer = http.createServer(app);
+
+  await realtimeService.start(httpServer);
+
+  httpServer.listen(port, () => {
     logger.info(`Server listening on port ${port}`);
     assetIngestionService.start();
     dataRetentionJob.start();
@@ -41,6 +48,7 @@ async function start() {
     assetIngestionService.stop();
     dataRetentionJob.stop();
     communityReminderJob.stop();
+    realtimeService.stop();
     featureFlagService.stop();
     runtimeConfigService.stop();
     searchClusterService.stop();

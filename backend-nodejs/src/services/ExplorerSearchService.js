@@ -2,6 +2,7 @@ import logger from '../config/logger.js';
 import { recordSearchOperation } from '../observability/metrics.js';
 import { INDEX_DEFINITIONS, searchClusterService } from './SearchClusterService.js';
 import { buildBounds, resolveCountryCoordinates } from '../utils/geo.js';
+import AdsPlacementService from './AdsPlacementService.js';
 
 const ENTITY_CONFIG = {
   communities: {
@@ -489,6 +490,11 @@ export class ExplorerSearchService {
     const allMarkers = results.flatMap((result) => result.markers);
     const bounds = buildBounds(allMarkers);
 
+    const adsPlacements = await AdsPlacementService.placementsForSearch({
+      query,
+      entities: resolvedEntities
+    });
+
     return {
       query,
       page,
@@ -502,7 +508,8 @@ export class ExplorerSearchService {
       markers: {
         items: allMarkers,
         bounds
-      }
+      },
+      adsPlacements
     };
   }
 }

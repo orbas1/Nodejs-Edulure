@@ -480,6 +480,11 @@ export const env = {
     port: raw.PORT,
     corsOrigins
   },
+  video: {
+    basePlaybackUrl: raw.VIDEO_BASE_URL ?? 'https://video.edulure.local/streams',
+    tokenTtlMinutes: Number(raw.VIDEO_TOKEN_TTL_MINUTES ?? 90),
+    liveEdgeLatencySeconds: Number(raw.VIDEO_LIVE_EDGE_LATENCY_SECONDS ?? 3)
+  },
   security: {
     jwtRefreshSecret: raw.JWT_REFRESH_SECRET,
     accessTokenTtlMinutes: raw.TOKEN_EXPIRY_MINUTES,

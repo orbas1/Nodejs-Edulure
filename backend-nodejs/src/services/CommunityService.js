@@ -7,6 +7,7 @@ import CommunityModel from '../models/CommunityModel.js';
 import CommunityPostModel from '../models/CommunityPostModel.js';
 import CommunityResourceModel from '../models/CommunityResourceModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import AdsPlacementService from './AdsPlacementService.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator', 'member']);
@@ -73,26 +74,44 @@ export default class CommunityService {
       throw error;
     }
 
+    const { items, pagination } = await CommunityPostModel.paginateForCommunity(community.id, filters);
+    const serialised = items.map((item) => this.serializePost(item, community));
+    const decorated = await AdsPlacementService.decorateFeed({
+      posts: serialised,
+      context: 'community_feed',
+      page: filters.page,
+      perPage: filters.perPage,
+      metadata: { communityId: community.id }
     const searchQuery = typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
     const { items, pagination } = await CommunityPostModel.paginateForCommunity(community.id, {
       ...filters,
       query: searchQuery
     });
     return {
-      items: items.map((item) => this.serializePost(item, community)),
-      pagination
+      items: decorated.items,
+      pagination,
+      ads: decorated.ads
     };
   }
 
   static async listFeedForUser(userId, filters = {}) {
+    const { items, pagination } = await CommunityPostModel.paginateForUser(userId, filters);
+    const serialised = items.map((item) => this.serializePost(item));
+    const decorated = await AdsPlacementService.decorateFeed({
+      posts: serialised,
+      context: 'global_feed',
+      page: filters.page,
+      perPage: filters.perPage,
+      metadata: { userId }
     const searchQuery = typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
     const { items, pagination } = await CommunityPostModel.paginateForUser(userId, {
       ...filters,
       query: searchQuery
     });
     return {
-      items: items.map((item) => this.serializePost(item)),
-      pagination
+      items: decorated.items,
+      pagination,
+      ads: decorated.ads
     };
   }
 
