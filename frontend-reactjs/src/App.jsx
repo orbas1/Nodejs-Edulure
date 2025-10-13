@@ -31,6 +31,7 @@ import InstructorLessonSchedule from './pages/dashboard/InstructorLessonSchedule
 import InstructorTutorSchedule from './pages/dashboard/InstructorTutorSchedule.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
 import InstructorAds from './pages/dashboard/InstructorAds.jsx';
+import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
         <Route path="courses/create" element={<InstructorCourseCreate />} />
         <Route path="courses/library" element={<InstructorCourseLibrary />} />
         <Route path="courses/manage" element={<InstructorCourseManage />} />
+        <Route path="pricing" element={<InstructorPricing />} />
         <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
         <Route path="ebooks/create" element={<InstructorEbookCreate />} />

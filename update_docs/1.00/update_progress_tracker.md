@@ -8,7 +8,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 2 – Content, Commerce & Live Learning Delivery | 74% | 82% | 80% | 84% | 72% | 75% | 78% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 90% | 98% | 94% | 96% | 90% | 94% | 94% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 86% | 100% | 97% | 98% | 94% | 97% | 95% |
-| Task 5 – Dashboards, Profiles & Operational Consoles | 60% | 72% | 72% | 74% | 64% | 70% | 69% |
+| Task 5 – Dashboards, Profiles & Operational Consoles | 64% | 84% | 86% | 88% | 78% | 84% | 81% |
 | Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
@@ -16,7 +16,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Sprint | Scope | Status | Key Deliverables |
 | --- | --- | --- | --- |
 | Task 5 – Sprint 5A | Component foundations | 60% | API payload definitions, responsive skeletons, cache hooks |
-| Task 5 – Sprint 5B | Role dashboards | 35% | Learner widgets, instructor analytics, admin escalation console |
+| Task 5 – Sprint 5B | Role dashboards | 70% | Learner widgets, instructor analytics, admin escalation console |
 | Task 5 – Sprint 5C | Compliance & verification | 0% | KYC pipeline, verification notifications, policy hub updates |
 | Task 6 – Sprint 6A | Core shell & networking | 0% | Flutter shell, dio client + secure storage, shared tokens |
 | Task 6 – Sprint 6B | Learner modules | 0% | Community/explorer readers, course/eBook playback, live class joins |
@@ -47,6 +47,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Profile overview orchestration landed with `/api/profiles/{id}/overview`: the aggregation service hydrates hero metrics, engagement insights, programme shelves, quick actions, and timeline events with TTL caching, while the React profile route consumes the live payload via a new caching hook and production-grade components aligned to `Profile Look.md`, `Profile Styling.md`, and `dashboard_drawings.md`. Backend API/service/controller/route documentation, frontend change logs, and design plans/trackers were refreshed to capture the new profile experience so Task 5.1 is fully documented for downstream squads.
 - Learner dashboard delivery now includes a production notification centre, follower governance workspace, and privacy/messaging controls. `DashboardService` enriches the learner aggregate with notifications/follower/settings payloads, `DirectMessageService` exposes global notification toggles, `/api/social` privacy APIs are wired to the dashboard, React routes render the new surfaces, and Vitest + HTTP suites guard the new endpoints.
 - Instructor dashboard aggregation is live: `buildInstructorDashboard` composes course progress, tutor pipelines, live classroom schedules, asset/ebook performance, community monetisation, ads experiments, and subscription revenue while `DashboardService.getDashboardForUser` merges the instructor payload, expands profile stats/bio, and appends search index entries. Vitest service + HTTP suites now validate instructor metrics and contract delivery, unlocking Task 5.3 frontend integration.
+- Instructor monetisation hub is operational in React: `/dashboard/instructor/pricing` renders course offer funnels, subscription tiers, live-session pricing, revenue mix progress bars, and insight callouts by consuming the new `dashboard.pricing` payload with normalised metrics, linted data parsing, and navigation/search integration aligned to `dashboard_drawings.md`, `menu_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md`.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |
