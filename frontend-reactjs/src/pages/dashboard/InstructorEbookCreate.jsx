@@ -29,25 +29,50 @@ export default function InstructorEbookCreate() {
         </button>
       </div>
 
-      <section className="dashboard-section">
-        <ul className="space-y-4">
-          {pipelines.map((pipeline) => (
-            <li key={pipeline.id} className="dashboard-card-muted p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="dashboard-kicker">{pipeline.stage}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{pipeline.title}</p>
-                </div>
-                <div className="text-right text-xs text-slate-600">
-                  <p>Owner {pipeline.owner}</p>
-                  <button type="button" className="mt-2 dashboard-pill px-3 py-1">
-                    Open workspace
-                  </button>
-                </div>
+      <section className="grid gap-4 lg:grid-cols-2">
+        {pipelines.map((pipeline) => (
+          <div key={pipeline.id} className="dashboard-section space-y-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="dashboard-kicker">{pipeline.stage}</p>
+                <p className="mt-1 text-base font-semibold text-slate-900">{pipeline.title}</p>
+                <p className="mt-2 text-xs text-slate-500">Last updated {pipeline.lastUpdated}</p>
+                {pipeline.reference ? (
+                  <p className="mt-1 text-xs text-slate-500">Reference {pipeline.reference}</p>
+                ) : null}
               </div>
-            </li>
-          ))}
-        </ul>
+              <div className="text-right text-xs text-slate-600">
+                <p className="text-2xl font-semibold text-slate-900">{pipeline.progress}%</p>
+                <p className="mt-1">Progress</p>
+                <p className="mt-2">Owner {pipeline.owner}</p>
+              </div>
+            </div>
+            <div className="h-2 w-full rounded-full bg-slate-200">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
+                style={{ width: `${Math.min(Math.max(Number(pipeline.progress ?? 0), 0), 100)}%` }}
+              />
+            </div>
+            {pipeline.latestActivity ? (
+              <p className="text-xs text-slate-500">Latest activity · {pipeline.latestActivity}</p>
+            ) : null}
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              {pipeline.nextActions?.map((action) => (
+                <span key={action} className="dashboard-pill px-3 py-1">
+                  {action}
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+              <button type="button" className="dashboard-primary-pill">
+                Open workspace
+              </button>
+              <button type="button" className="dashboard-pill">
+                Share with editors
+              </button>
+            </div>
+          </div>
+        ))}
       </section>
     </div>
   );

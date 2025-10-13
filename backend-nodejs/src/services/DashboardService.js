@@ -138,6 +138,7 @@ export function buildInstructorDashboard({
   now,
   courses,
   courseEnrollments,
+  modules,
   lessons,
   assignments,
   tutorProfiles,
@@ -266,6 +267,7 @@ export function buildInstructorDashboard({
       releaseAt: course.releaseAt ? new Date(course.releaseAt) : null,
       priceAmount,
       priceCurrency: course.priceCurrency ?? 'USD',
+      deliveryFormat: course.deliveryFormat,
       active,
       completed,
       invited,
@@ -292,6 +294,22 @@ export function buildInstructorDashboard({
     { active: 0, completed: 0, invited: 0, total: 0, startedRecent: 0, revenue: 0, revenueRecent: 0 }
   );
 
+  const modulesNormalised = modules.map((module) => ({
+    id: Number(module.id),
+    courseId: Number(module.courseId),
+    title: module.title,
+    position: Number(module.position ?? 0),
+    releaseOffsetDays: Number(module.releaseOffsetDays ?? 0),
+    metadata: safeJsonParse(module.metadata, {})
+  }));
+
+  const modulesByCourse = new Map();
+  modulesNormalised.forEach((module) => {
+    const list = modulesByCourse.get(module.courseId) ?? [];
+    list.push(module);
+    modulesByCourse.set(module.courseId, list);
+  });
+
   const lessonsNormalised = lessons.map((lesson) => {
     const moduleOffset = Number(lesson.moduleReleaseOffsetDays ?? 0);
     let releaseDate = lesson.releaseAt ? new Date(lesson.releaseAt) : null;
@@ -302,11 +320,21 @@ export function buildInstructorDashboard({
     return {
       id: Number(lesson.id),
       courseId: Number(lesson.courseId),
+      moduleId: Number(lesson.moduleId),
       courseTitle: lesson.courseTitle,
       title: lesson.title,
       releaseAt: releaseDate,
+      durationMinutes: Number(lesson.durationMinutes ?? 0),
       metadata: safeJsonParse(lesson.metadata, {})
     };
+  });
+
+  const lessonsByModule = new Map();
+  lessonsNormalised.forEach((lesson) => {
+    if (!lesson.moduleId) return;
+    const list = lessonsByModule.get(lesson.moduleId) ?? [];
+    list.push(lesson);
+    lessonsByModule.set(lesson.moduleId, list);
   });
 
   const upcomingLessons = lessonsNormalised
@@ -322,12 +350,21 @@ export function buildInstructorDashboard({
     return {
       id: Number(assignment.id),
       courseId: Number(assignment.courseId),
+      moduleId: assignment.moduleId ? Number(assignment.moduleId) : null,
       courseTitle: assignment.courseTitle,
       title: assignment.title,
       dueDate,
       owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
       metadata
     };
+  });
+
+  const assignmentsByModule = new Map();
+  assignmentsNormalised.forEach((assignment) => {
+    if (!assignment.moduleId) return;
+    const list = assignmentsByModule.get(assignment.moduleId) ?? [];
+    list.push(assignment);
+    assignmentsByModule.set(assignment.moduleId, list);
   });
 
   const upcomingAssignments = assignmentsNormalised
@@ -423,12 +460,17 @@ export function buildInstructorDashboard({
     notes: Array.from(entry.notes).join(' • ') || 'Capacity in sync'
   }));
 
-  const assetIds = new Set(assets.map((asset) => Number(asset.id)));
+  const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
   const assetEventGroups = new Map();
   assetEvents.forEach((event) => {
     const assetId = Number(event.assetId);
     const list = assetEventGroups.get(assetId) ?? [];
-    list.push({ ...event, metadata: safeJsonParse(event.metadata, {}) });
+    const occurredAt = event.occurredAt
+      ? event.occurredAt instanceof Date
+        ? event.occurredAt
+        : new Date(event.occurredAt)
+      : null;
+    list.push({ ...event, occurredAt, metadata: safeJsonParse(event.metadata, {}) });
     assetEventGroups.set(assetId, list);
   });
 
@@ -465,8 +507,85 @@ export function buildInstructorDashboard({
   const ebookRevenue = ebookCatalogue.reduce((total, ebook) => {
     const match = ebookRows.find((row) => `ebook-${row.id}` == ebook.id);
     if (!match) return total;
-    return total + Number(match.priceAmount ?? 0) * Number(ebook.downloads ?? 0);
-  }, 0);
+      return total + Number(match.priceAmount ?? 0) * Number(ebook.downloads ?? 0);
+    }, 0);
+
+  const resolveManuscriptStage = (asset, latestEvent) => {
+    if (asset.type === 'ebook' && asset.status === 'ready') {
+      return 'Ready for distribution';
+    }
+    if (asset.status === 'ready') {
+      return 'Packaged';
+    }
+    if (asset.status === 'processing') {
+      return 'Conversion running';
+    }
+    if (latestEvent?.eventType === 'annotation-created') {
+      return 'In editing';
+    }
+    if (latestEvent?.eventType === 'viewed') {
+      return 'Peer review';
+    }
+    return 'Outlining';
+  };
+
+  const stageProgressMap = new Map([
+    ['Outlining', 20],
+    ['Peer review', 45],
+    ['In editing', 60],
+    ['Conversion running', 75],
+    ['Packaged', 90],
+    ['Ready for distribution', 100]
+  ]);
+
+  const actionsByStage = new Map([
+    ['Outlining', ['Define chapter structure', 'Assign writing crew']],
+    ['Peer review', ['Collect reviewer feedback', 'Track edits']],
+    ['In editing', ['Resolve annotations', 'Prepare layout brief']],
+    ['Conversion running', ['Validate export quality', 'QA accessibility']],
+    ['Packaged', ['Upload to catalogue', 'Schedule launch']],
+    ['Ready for distribution', ['Promote to learners', 'Bundle with cohorts']]
+  ]);
+
+  const creationPipelines = assetsNormalised
+    .filter((asset) =>
+      ['ebook', 'document', 'powerpoint', 'markdown', 'notion', 'google-doc'].includes(
+        String(asset.type ?? '').toLowerCase()
+      )
+    )
+    .map((asset) => {
+      const events = (assetEventGroups.get(Number(asset.id)) ?? []).sort(
+        (a, b) => {
+          const aTime = a.occurredAt instanceof Date ? a.occurredAt.getTime() : 0;
+          const bTime = b.occurredAt instanceof Date ? b.occurredAt.getTime() : 0;
+          return aTime - bTime;
+        }
+      );
+      const latestEvent = events[events.length - 1] ?? null;
+      const stage = resolveManuscriptStage(asset, latestEvent);
+      const progress = stageProgressMap.get(stage) ?? Math.min(90, 30 + events.length * 10);
+      const nextActions = actionsByStage.get(stage) ?? ['Assign reviewer', 'Prepare launch checklist'];
+      let latestActivity = null;
+      if (latestEvent?.eventType === 'annotation-created' && latestEvent.metadata?.note) {
+        latestActivity = latestEvent.metadata.note;
+      } else if (latestEvent?.eventType) {
+        latestActivity = latestEvent.eventType.replace(/[-_]/g, ' ');
+      }
+      const reference = asset.metadata?.deckVersion
+        ? `Deck v${asset.metadata.deckVersion}`
+        : asset.metadata?.ingestionPipeline ?? null;
+      return {
+        id: `manuscript-${asset.id}`,
+        title: normaliseFilename(asset.originalFilename),
+        stage,
+        progress,
+        lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
+        owner: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor',
+        nextActions,
+        reference,
+        latestActivity
+      };
+    });
 
   const metricsByCampaign = new Map();
   adsMetrics.forEach((metric) => {
@@ -606,7 +725,14 @@ export function buildInstructorDashboard({
     return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
   };
 
-  const library = assets
+  const assetsNormalised = assets.map((asset) => ({
+    ...asset,
+    metadata: safeJsonParse(asset.metadata, {}),
+    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+  }));
+
+  const library = assetsNormalised
     .filter((asset) => asset.status === 'ready')
     .map((asset) => ({
       id: `asset-${asset.id}`,
@@ -614,6 +740,129 @@ export function buildInstructorDashboard({
       format: asset.type,
       updated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: undefined })
     }));
+
+  const formatReleaseOffsetLabel = (offsetDays) => {
+    const offset = Number.isFinite(Number(offsetDays)) ? Number(offsetDays) : null;
+    if (offset === null || Number.isNaN(offset) || offset <= 0) {
+      return 'Launch week';
+    }
+    if (offset % 7 === 0) {
+      const week = offset / 7 + 1;
+      return `Week ${week}`;
+    }
+    return `Day ${offset}`;
+  };
+
+  const readinessLabelForScore = (score) => {
+    if (score >= 80) return 'Launch-ready';
+    if (score >= 50) return 'In build';
+    if (score > 0) return 'Needs production';
+    return 'Kick-off required';
+  };
+
+  const creationBlueprints = courseSummaries.map((course) => {
+    const courseModules = [...(modulesByCourse.get(course.id) ?? [])].sort((a, b) => a.position - b.position);
+    const moduleSummaries = courseModules.map((module) => {
+      const moduleLessons = lessonsByModule.get(module.id) ?? [];
+      const moduleAssignments = assignmentsByModule.get(module.id) ?? [];
+      const lessonDuration = moduleLessons.reduce((total, lesson) => total + Number(lesson.durationMinutes ?? 0), 0);
+      const recommendedMinutes = Number(
+        module.metadata?.recommendedDurationMinutes ?? module.metadata?.estimatedMinutes ?? 0
+      );
+      const durationMinutes = lessonDuration > 0 ? lessonDuration : recommendedMinutes;
+      const outstanding = [];
+      if (moduleLessons.length === 0) {
+        outstanding.push('Add lesson plan');
+      }
+      if (course.deliveryFormat === 'cohort' && moduleAssignments.length === 0) {
+        outstanding.push('Attach assignment');
+      }
+      if (!module.metadata?.ritual && !module.metadata?.hasSimulation) {
+        outstanding.push('Document ritual');
+      }
+      if (durationMinutes === 0) {
+        outstanding.push('Estimate duration');
+      }
+      return {
+        id: module.id,
+        title: module.title,
+        lessons: moduleLessons.length,
+        assignments: moduleAssignments.length,
+        durationMinutes,
+        releaseLabel: formatReleaseOffsetLabel(module.releaseOffsetDays),
+        outstanding
+      };
+    });
+
+    const modulesReady = moduleSummaries.filter((module) => module.outstanding.length === 0).length;
+    const readinessScore = moduleSummaries.length
+      ? Math.round((modulesReady / moduleSummaries.length) * 100)
+      : 0;
+    const totalDurationMinutes = moduleSummaries.reduce((total, module) => total + module.durationMinutes, 0);
+    const outstanding = moduleSummaries
+      .flatMap((module) => module.outstanding.map((task) => `${module.title}: ${task}`))
+      .slice(0, 8);
+    const upcomingMilestones = [
+      ...upcomingLessons
+        .filter((lesson) => lesson.courseId === course.id)
+        .map((lesson) => ({
+          id: `lesson-${lesson.id}`,
+          title: lesson.title,
+          type: 'Lesson release',
+          date: lesson.releaseAt
+        })),
+      ...upcomingAssignments
+        .filter((assignment) => assignment.courseId === course.id)
+        .map((assignment) => ({
+          id: `assignment-${assignment.id}`,
+          title: assignment.title,
+          type: 'Assignment due',
+          date: assignment.dueDate
+        }))
+    ]
+      .sort((a, b) => {
+        const aTime = a.date instanceof Date ? a.date.getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.date instanceof Date ? b.date.getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      })
+      .slice(0, 4)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        type: item.type,
+        due: item.date
+          ? formatDateTime(item.date, {
+              dateStyle: 'medium',
+              timeStyle: item.type === 'Lesson release' ? 'short' : undefined
+            })
+          : 'TBD'
+      }));
+
+    return {
+      id: `blueprint-${course.id}`,
+      name: course.title,
+      stage: statusLabels[course.status] ?? course.status,
+      summary: course.summary,
+      readiness: readinessScore,
+      readinessLabel: readinessLabelForScore(readinessScore),
+      totalDurationMinutes,
+      totalDurationLabel: totalDurationMinutes > 0 ? minutesToReadable(totalDurationMinutes) : 'Estimate pending',
+      moduleCount: moduleSummaries.length,
+      modules: moduleSummaries.map((module) => ({
+        id: `module-${module.id}`,
+        title: module.title,
+        release: module.releaseLabel,
+        lessons: module.lessons,
+        assignments: module.assignments,
+        duration: module.durationMinutes > 0 ? minutesToReadable(module.durationMinutes) : 'Estimate pending',
+        outstanding: module.outstanding
+      })),
+      outstanding,
+      upcoming: upcomingMilestones,
+      learners: course.total,
+      price: formatCurrency(course.priceAmount, course.priceCurrency ?? 'USD')
+    };
+  });
 
   const managedCommunitiesSummaries = managedCommunities.map((community) => {
     const communityId = Number(community.communityId);
@@ -843,7 +1092,8 @@ export function buildInstructorDashboard({
       courses: {
         pipeline,
         production,
-        library
+        library,
+        creationBlueprints
       },
       communities: {
         manageDeck: managedCommunitiesSummaries,
@@ -860,7 +1110,8 @@ export function buildInstructorDashboard({
         confirmed: confirmedBookings
       },
       ebooks: {
-        catalogue: ebookCatalogue
+        catalogue: ebookCatalogue,
+        creationPipelines
       },
       ads: {
         active: activeCampaigns,
@@ -975,6 +1226,7 @@ export default class DashboardService {
       communityAssignments,
       instructorCourseRows,
       instructorCourseEnrollmentRows,
+      instructorCourseModuleRows,
       instructorLessonRows,
       instructorAssignmentRows,
       tutorProfileRows,
@@ -1331,6 +1583,18 @@ export default class DashboardService {
           'ic.price_amount as priceAmount',
           'ic.price_currency as priceCurrency'
         ),
+      db('course_modules as module')
+        .innerJoin('courses as course', 'course.id', 'module.course_id')
+        .where('course.instructor_id', userId)
+        .select(
+          'module.id',
+          'module.course_id as courseId',
+          'module.title',
+          'module.slug',
+          'module.position',
+          'module.release_offset_days as releaseOffsetDays',
+          'module.metadata'
+        ),
       db('course_lessons as lesson')
         .innerJoin('courses as course', 'course.id', 'lesson.course_id')
         .innerJoin('course_modules as module', 'module.id', 'lesson.module_id')
@@ -1338,6 +1602,7 @@ export default class DashboardService {
         .select(
           'lesson.id',
           'lesson.course_id as courseId',
+          'lesson.module_id as moduleId',
           'lesson.title',
           'lesson.slug',
           'lesson.position',
@@ -1356,6 +1621,7 @@ export default class DashboardService {
         .select(
           'assignment.id',
           'assignment.course_id as courseId',
+          'assignment.module_id as moduleId',
           'assignment.title',
           'assignment.instructions',
           'assignment.max_score as maxScore',
@@ -1595,6 +1861,7 @@ export default class DashboardService {
       now,
       courses: instructorCourseRows,
       courseEnrollments: instructorCourseEnrollmentRows,
+      modules: instructorCourseModuleRows,
       lessons: instructorLessonRows,
       assignments: instructorAssignmentRows,
       tutorProfiles: tutorProfileRows,
