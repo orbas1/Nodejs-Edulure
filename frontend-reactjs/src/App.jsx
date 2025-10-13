@@ -10,6 +10,9 @@ import Explorer from './pages/Explorer.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Admin from './pages/Admin.jsx';
 import ContentLibrary from './pages/ContentLibrary.jsx';
+import About from './pages/About.jsx';
+import Privacy from './pages/Privacy.jsx';
+import Terms from './pages/Terms.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
 import DashboardHome from './pages/dashboard/DashboardHome.jsx';
 import LearnerCommunities from './pages/dashboard/LearnerCommunities.jsx';
@@ -47,6 +50,9 @@ function App() {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="/content" element={<ContentLibrary />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
       </Route>
       <Route path="/dashboard" element={<Navigate to="/dashboard/learner" replace />} />
       <Route path="/dashboard/:role" element={<DashboardLayout />}>
