@@ -49,354 +49,715 @@
       "DashboardMetric": {
         "type": "object",
         "properties": {
-          "label": { "type": "string" },
-          "value": { "type": "string" },
-          "change": { "type": "string", "nullable": true },
-          "trend": { "type": "string", "enum": ["up", "down"], "nullable": true }
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "nullable": true
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "nullable": true
+          }
         },
-        "required": ["label", "value"]
+        "required": [
+          "label",
+          "value"
+        ]
       },
       "DashboardLearningPaceEntry": {
         "type": "object",
         "properties": {
-          "day": { "type": "string" },
-          "minutes": { "type": "number" }
+          "day": {
+            "type": "string"
+          },
+          "minutes": {
+            "type": "number"
+          }
         },
-        "required": ["day", "minutes"]
+        "required": [
+          "day",
+          "minutes"
+        ]
       },
       "DashboardCommunityEngagementEntry": {
         "type": "object",
         "properties": {
-          "name": { "type": "string" },
-          "participation": { "type": "number" }
+          "name": {
+            "type": "string"
+          },
+          "participation": {
+            "type": "number"
+          }
         },
-        "required": ["name", "participation"]
+        "required": [
+          "name",
+          "participation"
+        ]
       },
       "DashboardUpcomingItem": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "type": { "type": "string" },
-          "date": { "type": "string" },
-          "host": { "type": "string", "nullable": true },
-          "action": { "type": "string", "nullable": true },
-          "dateLabel": { "type": "string", "nullable": true }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "dateLabel": {
+            "type": "string",
+            "nullable": true
+          }
         },
-        "required": ["id", "title", "type", "date"]
+        "required": [
+          "id",
+          "title",
+          "type",
+          "date"
+        ]
       },
       "DashboardCommunitySummary": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "members": { "type": "string" },
-          "moderators": { "type": "integer" },
-          "health": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "members": {
+            "type": "string"
+          },
+          "moderators": {
+            "type": "integer"
+          },
+          "health": {
+            "type": "string"
+          },
           "initiatives": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "metadata": {
             "type": "object",
             "additionalProperties": true
           }
         },
-        "required": ["id", "name", "members", "moderators", "health", "initiatives"]
+        "required": [
+          "id",
+          "name",
+          "members",
+          "moderators",
+          "health",
+          "initiatives"
+        ]
       },
       "DashboardPipelineItem": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "owner": { "type": "string" },
-          "progress": { "type": "number" }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number"
+          }
         },
-        "required": ["id", "title", "owner", "progress"]
+        "required": [
+          "id",
+          "title",
+          "owner",
+          "progress"
+        ]
       },
       "DashboardCourseSummary": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "status": { "type": "string" },
-          "progress": { "type": "number" },
-          "instructor": { "type": "string" },
-          "nextLesson": { "type": "string", "nullable": true }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number"
+          },
+          "instructor": {
+            "type": "string"
+          },
+          "nextLesson": {
+            "type": "string",
+            "nullable": true
+          }
         },
-        "required": ["id", "title", "status", "progress", "instructor"]
+        "required": [
+          "id",
+          "title",
+          "status",
+          "progress",
+          "instructor"
+        ]
       },
       "DashboardCalendarDay": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "day": { "type": "string" },
+          "id": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string"
+          },
           "items": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           }
         },
-        "required": ["id", "day", "items"]
+        "required": [
+          "id",
+          "day",
+          "items"
+        ]
       },
       "DashboardTutorBooking": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "topic": { "type": "string" },
-          "mentor": { "type": "string" },
-          "date": { "type": "string" },
-          "status": { "type": "string", "nullable": true },
-          "rating": { "type": "string", "nullable": true }
+          "id": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "mentor": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "rating": {
+            "type": "string",
+            "nullable": true
+          }
         },
-        "required": ["id", "topic", "mentor", "date"]
+        "required": [
+          "id",
+          "topic",
+          "mentor",
+          "date"
+        ]
       },
       "DashboardEbookEntry": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "status": { "type": "string" },
-          "progress": { "type": "number" },
-          "price": { "type": "string" },
-          "highlights": { "type": "integer" },
-          "bookmarks": { "type": "integer" },
-          "timeSpent": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number"
+          },
+          "price": {
+            "type": "string"
+          },
+          "highlights": {
+            "type": "integer"
+          },
+          "bookmarks": {
+            "type": "integer"
+          },
+          "timeSpent": {
+            "type": "string"
+          }
         },
-        "required": ["id", "title", "status", "progress", "price"]
+        "required": [
+          "id",
+          "title",
+          "status",
+          "progress",
+          "price"
+        ]
       },
       "DashboardFinancialSummaryItem": {
         "type": "object",
         "properties": {
-          "label": { "type": "string" },
-          "value": { "type": "string" },
-          "change": { "type": "string", "nullable": true },
-          "trend": { "type": "string", "enum": ["up", "down"], "nullable": true }
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "nullable": true
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "nullable": true
+          }
         },
-        "required": ["label", "value"]
+        "required": [
+          "label",
+          "value"
+        ]
       },
       "DashboardInvoice": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "label": { "type": "string" },
-          "amount": { "type": "string" },
-          "status": { "type": "string" },
-          "date": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
         },
-        "required": ["id", "label", "amount", "status", "date"]
+        "required": [
+          "id",
+          "label",
+          "amount",
+          "status",
+          "date"
+        ]
       },
       "DashboardNotification": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "title": { "type": "string" },
-          "timestamp": { "type": "string" },
-          "type": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
         },
-        "required": ["id", "title", "timestamp", "type"]
+        "required": [
+          "id",
+          "title",
+          "timestamp",
+          "type"
+        ]
       },
       "DashboardFollowerRecord": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "email": { "type": "string", "nullable": true },
-          "requestedAt": { "type": "string", "nullable": true },
-          "score": { "type": "number", "nullable": true },
-          "reason": { "type": "string", "nullable": true }
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "number",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
         },
-        "required": ["id", "name"]
+        "required": [
+          "id",
+          "name"
+        ]
       },
       "DashboardPrivacySettings": {
         "type": "object",
         "properties": {
-          "visibility": { "type": "string" },
-          "followApprovalRequired": { "type": "boolean" },
-          "shareActivity": { "type": "boolean" },
-          "messagePermission": { "type": "string" }
+          "visibility": {
+            "type": "string"
+          },
+          "followApprovalRequired": {
+            "type": "boolean"
+          },
+          "shareActivity": {
+            "type": "boolean"
+          },
+          "messagePermission": {
+            "type": "string"
+          }
         },
-        "required": ["visibility", "followApprovalRequired", "shareActivity", "messagePermission"]
+        "required": [
+          "visibility",
+          "followApprovalRequired",
+          "shareActivity",
+          "messagePermission"
+        ]
       },
       "DashboardMessagingSettings": {
         "type": "object",
         "properties": {
-          "unreadThreads": { "type": "integer" },
-          "notificationsEnabled": { "type": "boolean" }
+          "unreadThreads": {
+            "type": "integer"
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          }
         },
-        "required": ["unreadThreads", "notificationsEnabled"]
+        "required": [
+          "unreadThreads",
+          "notificationsEnabled"
+        ]
       },
       "DashboardCommunitySetting": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "role": { "type": "string" },
-          "status": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
         },
-        "required": ["id", "name", "role", "status"]
+        "required": [
+          "id",
+          "name",
+          "role",
+          "status"
+        ]
       },
       "DashboardSettings": {
         "type": "object",
         "properties": {
-          "privacy": { "$ref": "#/components/schemas/DashboardPrivacySettings" },
-          "messaging": { "$ref": "#/components/schemas/DashboardMessagingSettings" },
+          "privacy": {
+            "$ref": "#/components/schemas/DashboardPrivacySettings"
+          },
+          "messaging": {
+            "$ref": "#/components/schemas/DashboardMessagingSettings"
+          },
           "communities": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DashboardCommunitySetting" }
+            "items": {
+              "$ref": "#/components/schemas/DashboardCommunitySetting"
+            }
           }
         },
-        "required": ["privacy", "messaging", "communities"]
+        "required": [
+          "privacy",
+          "messaging",
+          "communities"
+        ]
       },
       "DashboardLearner": {
         "type": "object",
         "properties": {
           "metrics": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DashboardMetric" }
+            "items": {
+              "$ref": "#/components/schemas/DashboardMetric"
+            }
           },
           "analytics": {
             "type": "object",
             "properties": {
               "learningPace": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardLearningPaceEntry" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardLearningPaceEntry"
+                }
               },
               "communityEngagement": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardCommunityEngagementEntry" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardCommunityEngagementEntry"
+                }
               }
             },
-            "required": ["learningPace", "communityEngagement"]
+            "required": [
+              "learningPace",
+              "communityEngagement"
+            ]
           },
           "upcoming": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DashboardUpcomingItem" }
+            "items": {
+              "$ref": "#/components/schemas/DashboardUpcomingItem"
+            }
           },
           "communities": {
             "type": "object",
             "properties": {
               "managed": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardCommunitySummary" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardCommunitySummary"
+                }
               },
               "pipelines": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardPipelineItem" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardPipelineItem"
+                }
               }
             },
-            "required": ["managed", "pipelines"]
+            "required": [
+              "managed",
+              "pipelines"
+            ]
           },
           "courses": {
             "type": "object",
             "properties": {
               "active": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardCourseSummary" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardCourseSummary"
+                }
               },
               "recommendations": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "title": { "type": "string" },
-                    "summary": { "type": "string", "nullable": true },
-                    "rating": { "type": "string", "nullable": true }
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "rating": {
+                      "type": "string",
+                      "nullable": true
+                    }
                   },
-                  "required": ["id", "title"]
+                  "required": [
+                    "id",
+                    "title"
+                  ]
                 }
               }
             },
-            "required": ["active", "recommendations"]
+            "required": [
+              "active",
+              "recommendations"
+            ]
           },
           "calendar": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DashboardCalendarDay" }
+            "items": {
+              "$ref": "#/components/schemas/DashboardCalendarDay"
+            }
           },
           "tutorBookings": {
             "type": "object",
             "properties": {
               "active": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardTutorBooking" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardTutorBooking"
+                }
               },
               "history": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardTutorBooking" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardTutorBooking"
+                }
               }
             },
-            "required": ["active", "history"]
+            "required": [
+              "active",
+              "history"
+            ]
           },
           "ebooks": {
             "type": "object",
             "properties": {
               "library": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardEbookEntry" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardEbookEntry"
+                }
               },
               "recommendations": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "title": { "type": "string" },
-                    "summary": { "type": "string", "nullable": true },
-                    "rating": { "type": "string", "nullable": true }
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "rating": {
+                      "type": "string",
+                      "nullable": true
+                    }
                   },
-                  "required": ["id", "title"]
+                  "required": [
+                    "id",
+                    "title"
+                  ]
                 }
               }
             },
-            "required": ["library", "recommendations"]
+            "required": [
+              "library",
+              "recommendations"
+            ]
           },
           "financial": {
             "type": "object",
             "properties": {
               "summary": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardFinancialSummaryItem" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFinancialSummaryItem"
+                }
               },
               "invoices": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardInvoice" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardInvoice"
+                }
               }
             },
-            "required": ["summary", "invoices"]
+            "required": [
+              "summary",
+              "invoices"
+            ]
           },
           "notifications": {
             "type": "object",
             "properties": {
-              "total": { "type": "integer" },
-              "unreadMessages": { "type": "integer" },
+              "total": {
+                "type": "integer"
+              },
+              "unreadMessages": {
+                "type": "integer"
+              },
               "items": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardNotification" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardNotification"
+                }
               }
             },
-            "required": ["total", "unreadMessages", "items"]
+            "required": [
+              "total",
+              "unreadMessages",
+              "items"
+            ]
           },
           "followers": {
             "type": "object",
             "properties": {
-              "followers": { "type": "integer" },
-              "following": { "type": "integer" },
+              "followers": {
+                "type": "integer"
+              },
+              "following": {
+                "type": "integer"
+              },
               "pending": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardFollowerRecord" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFollowerRecord"
+                }
               },
               "outgoing": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardFollowerRecord" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFollowerRecord"
+                }
               },
               "recommendations": {
                 "type": "array",
-                "items": { "$ref": "#/components/schemas/DashboardFollowerRecord" }
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFollowerRecord"
+                }
               }
             },
-            "required": ["followers", "following", "pending", "outgoing", "recommendations"]
+            "required": [
+              "followers",
+              "following",
+              "pending",
+              "outgoing",
+              "recommendations"
+            ]
           },
-          "settings": { "$ref": "#/components/schemas/DashboardSettings" }
+          "settings": {
+            "$ref": "#/components/schemas/DashboardSettings"
+          }
         },
         "required": [
           "metrics",
@@ -416,40 +777,82 @@
       "DashboardRole": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "label": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
         },
-        "required": ["id", "label"]
+        "required": [
+          "id",
+          "label"
+        ]
       },
       "DashboardSearchIndexItem": {
         "type": "object",
         "properties": {
-          "id": { "type": "string" },
-          "role": { "type": "string" },
-          "type": { "type": "string" },
-          "title": { "type": "string" },
-          "url": { "type": "string" }
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
         },
-        "required": ["id", "role", "type", "title", "url"]
+        "required": [
+          "id",
+          "role",
+          "type",
+          "title",
+          "url"
+        ]
       },
       "DashboardProfile": {
         "type": "object",
         "properties": {
-          "id": { "type": "integer" },
-          "name": { "type": "string" },
-          "email": { "type": "string" },
-          "avatar": { "type": "string" },
-          "title": { "type": "string" },
-          "bio": { "type": "string" },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
           "stats": {
             "type": "array",
             "items": {
               "type": "object",
               "properties": {
-                "label": { "type": "string" },
-                "value": { "type": "string" }
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
               },
-              "required": ["label", "value"]
+              "required": [
+                "label",
+                "value"
+              ]
             }
           },
           "feedHighlights": {
@@ -457,43 +860,86 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "integer" },
-                "headline": { "type": "string" },
-                "time": { "type": "string" },
+                "id": {
+                  "type": "integer"
+                },
+                "headline": {
+                  "type": "string"
+                },
+                "time": {
+                  "type": "string"
+                },
                 "tags": {
                   "type": "array",
-                  "items": { "type": "string" }
+                  "items": {
+                    "type": "string"
+                  }
                 },
-                "reactions": { "type": "integer" },
-                "comments": { "type": "integer" }
+                "reactions": {
+                  "type": "integer"
+                },
+                "comments": {
+                  "type": "integer"
+                }
               },
-              "required": ["id", "headline", "time", "tags", "reactions", "comments"]
+              "required": [
+                "id",
+                "headline",
+                "time",
+                "tags",
+                "reactions",
+                "comments"
+              ]
             }
           }
         },
-        "required": ["id", "name", "email", "avatar", "title", "bio", "stats", "feedHighlights"]
+        "required": [
+          "id",
+          "name",
+          "email",
+          "avatar",
+          "title",
+          "bio",
+          "stats",
+          "feedHighlights"
+        ]
       },
       "DashboardResponse": {
         "type": "object",
         "properties": {
-          "profile": { "$ref": "#/components/schemas/DashboardProfile" },
+          "profile": {
+            "$ref": "#/components/schemas/DashboardProfile"
+          },
           "roles": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DashboardRole" }
+            "items": {
+              "$ref": "#/components/schemas/DashboardRole"
+            }
           },
           "dashboards": {
             "type": "object",
             "properties": {
-              "learner": { "$ref": "#/components/schemas/DashboardLearner" }
+              "learner": {
+                "$ref": "#/components/schemas/DashboardLearner"
+              }
             },
-            "required": ["learner"]
+            "required": [
+              "learner"
+            ]
           },
           "searchIndex": {
             "type": "array",
-            "items": { "$ref": "#/components/schemas/DashboardSearchIndexItem" }
+            "items": {
+              "$ref": "#/components/schemas/DashboardSearchIndexItem"
+            }
           }
         },
-        "required": ["profile", "roles", "dashboards", "searchIndex"]
+        "required": [
+          "profile",
+          "roles",
+          "dashboards",
+          "searchIndex"
+        ]
       },
       "CommunityChatChannel": {
         "type": "object",
@@ -5310,6 +5756,357 @@
             }
           }
         }
+      },
+      "VerificationRequirement": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Verification document type identifier"
+          },
+          "label": {
+            "type": "string",
+            "description": "Human readable label presented to users"
+          },
+          "description": {
+            "type": "string",
+            "description": "Guidance for preparing the document"
+          }
+        },
+        "required": [
+          "type",
+          "label"
+        ]
+      },
+      "VerificationDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string",
+            "description": "Document type uploaded by the user"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "VerificationSummary": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Current verification status for the user"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Unique verification reference"
+          },
+          "documentsRequired": {
+            "type": "integer"
+          },
+          "documentsSubmitted": {
+            "type": "integer"
+          },
+          "requiredDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationRequirement"
+            }
+          },
+          "outstandingDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationRequirement"
+            }
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "needsManualReview": {
+            "type": "boolean"
+          },
+          "escalationLevel": {
+            "type": "string"
+          },
+          "lastSubmittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rejectionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationDocument"
+            }
+          }
+        }
+      },
+      "VerificationUploadResponse": {
+        "type": "object",
+        "properties": {
+          "verificationReference": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string"
+          },
+          "upload": {
+            "type": "object",
+            "properties": {
+              "bucket": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "bucket",
+              "key",
+              "url",
+              "expiresAt"
+            ]
+          }
+        },
+        "required": [
+          "verificationReference",
+          "documentType",
+          "upload"
+        ]
+      },
+      "VerificationMetric": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "nullable": true
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "VerificationQueueItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "email"
+            ]
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "escalationLevel": {
+            "type": "string"
+          },
+          "documentsSubmitted": {
+            "type": "integer"
+          },
+          "documentsRequired": {
+            "type": "integer"
+          },
+          "lastSubmittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "waitingHours": {
+            "type": "number"
+          },
+          "hasBreachedSla": {
+            "type": "boolean"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/VerificationSummary"
+          }
+        }
+      },
+      "VerificationAdminOverview": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationMetric"
+            }
+          },
+          "queue": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationQueueItem"
+            }
+          },
+          "slaBreaches": {
+            "type": "integer"
+          },
+          "manualReviewQueue": {
+            "type": "integer"
+          },
+          "lastGeneratedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VerificationAuditEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VerificationReviewRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "resubmission_required"
+            ]
+          },
+          "riskScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "rejectionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "escalationLevel": {
+            "type": "string",
+            "enum": [
+              "none",
+              "t1",
+              "t2",
+              "t3"
+            ]
+          },
+          "policyReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status"
+        ]
       }
     }
   },
@@ -12217,6 +13014,399 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/verification/me": {
+      "get": {
+        "summary": "Identity verification summary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/verification/me/upload-requests": {
+      "post": {
+        "summary": "Request presigned upload for verification documents",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "documentType": {
+                    "type": "string"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "sizeBytes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "documentType",
+                  "fileName",
+                  "mimeType",
+                  "sizeBytes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationUploadResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload request"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/verification/me/documents": {
+      "post": {
+        "summary": "Attach uploaded verification document metadata",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "documentType": {
+                    "type": "string"
+                  },
+                  "storageBucket": {
+                    "type": "string"
+                  },
+                  "storageKey": {
+                    "type": "string"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "sizeBytes": {
+                    "type": "integer"
+                  },
+                  "checksumSha256": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "documentType",
+                  "storageBucket",
+                  "storageKey",
+                  "fileName",
+                  "mimeType",
+                  "sizeBytes",
+                  "checksumSha256"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid document payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/verification/me/submit": {
+      "post": {
+        "summary": "Submit verification for manual review",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Verification is not ready for review"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/api/verification/admin/overview": {
+      "get": {
+        "summary": "Administrative verification overview",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationAdminOverview"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
+        }
+      }
+    },
+    "/api/verification/{verificationId}/review": {
+      "post": {
+        "summary": "Review verification submission",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "verificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Verification record identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid review payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Verification record not found"
+          }
+        }
+      }
+    },
+    "/api/verification/{verificationId}/audit": {
+      "get": {
+        "summary": "Verification audit trail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "verificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Verification record identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/VerificationAuditEntry"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Verification record not found"
           }
         }
       }

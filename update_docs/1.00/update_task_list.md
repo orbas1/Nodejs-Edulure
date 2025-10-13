@@ -86,7 +86,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 4. **Ads Suite Delivery (100%)** – Campaign builder, targeting rules, budgeting, creatives, compliance automation. _Progress update:_ AdsService now auto-halts overspending campaigns, synchronises compliance metadata, and exposes chronologically ordered insights; Vitest suites cover compliance/insight scenarios, HTTP routes hydrate instructor dashboards, and Vite builds succeed after validating the explorer map dependency chain.
 5. **Analytics & Intelligence (100%)** – Dashboards, zero-result alerts, CTR tracking, predictions, experiment toggles. _Progress update:_ Explorer analytics now ships as a production route with nav access, authenticated range controls, live summary tiles, entity/ads breakdowns, forecast panels, zero-result query spotlighting, and alert styling wired directly to the new backend services, with graceful fallbacks for empty/unauthorised states and refresh tooling to mirror operational dashboards.
 
-## Task 5 – Dashboards, Profiles & Operational Consoles (55% complete)
+## Task 5 – Dashboards, Profiles & Operational Consoles (62% complete)
 ### Integration Coverage
 - **Backend:** Profile aggregation, finance stats, verification, admin/support workflows, notification preferences.
 - **Front-end:** User dashboards (profile, followers, settings, finance, widgets, stats), admin & customer service panels.
@@ -102,21 +102,21 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 2. **User Dashboard Delivery (100%)** – Finance, followers, settings, widgets, statistics graphs, notifications centre. _Progress update:_ React dashboards now expose production-grade notification centre, follower governance, and privacy controls. The learner API aggregate ships notifications/follower/financial/settings payloads, new social/direct-message endpoints persist privacy + notification updates, and Vitest + HTTP suites validate the expanded surface.
 3. **Instructor Dashboard Suite (100%)** – Community switcher, classroom courses, pricing, eBook manager, analytics. _Progress update:_ React now renders the complete instructor workspace: the new `/dashboard/instructor/pricing` route consumes `dashboard.pricing` aggregates for course offers, subscription tiers, live-session pricing, revenue mix, and insight callouts with production-grade tables, progress bars, and CTA rails aligned to `dashboard_drawings.md`, `menu_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md`. Navigation exposes the monetisation hub, `InstructorPricing.jsx` normalises metrics for cohort conversion, subscriber counts, and seat utilisation, and the dashboard search overlay indexes the new route so providers can govern revenue without leaving the control centre.
 4. **Admin & Customer Service Panels (100%)** – Approvals, incident response, refunds, policy hub, support tickets. _Progress update:_ React `/admin` now consumes the live `/api/dashboard/me` admin payload to render KPI tiles, approvals queues, revenue cards, payment health breakdowns, support/risk/platform stats, upcoming launches, operational alerts, and a dedicated policy hub CTA. CSV export tooling, runtime feature flag gating, invite workflows, and analytics shortcuts align to `Admin_panel_drawings.md`, `dashboard_drawings.md`, `menu_drawings.md`, and runtime configuration guides so administrators triage incidents, refunds, and policy reviews without falling back to raw data dumps.
-5. **ID Verification & Compliance (0%)** – Document capture, verification workflow, audit logs, policy management.
+5. **ID Verification & Compliance (100%)** – Document capture, verification workflow, audit logs, policy management. _Progress update:_ Added database-backed KYC verification, document, and audit tables with seeds; delivered REST endpoints, admin dashboard queue, learner/instructor upload workflows, presigned storage integration, and policy-aware review tooling with audit coverage and design documentation. React now includes learner/instructor verification cards, an admin compliance queue with inline review actions, and shared API clients; DashboardService aggregates verification summaries for all roles; Vitest suites and HTTP tests guard the service/route contracts while OpenAPI specs document every payload so compliance teams can rely on consistent UI + API behaviour.
 
 ### Sprint Breakdown
 - **Sprint 5A – Component Foundations (0%)**
   - Finalise API payloads for dashboard/profile widgets (0%).
   - Deliver responsive layout skeletons with placeholder data (0%).
   - Wire cache invalidation hooks for component hydration (0%).
-- **Sprint 5B – Role-Based Dashboards (70%)**
+- **Sprint 5B – Role-Based Dashboards (100%)**
   - Ship learner dashboard widgets and notification centre MVP (100%).
   - Launch instructor pricing/analytics rails with audit logging (100%).
-  - Harden admin/support consoles with escalation workflows (0%).
-- **Sprint 5C – Compliance & Verification (0%)**
-  - Implement KYC document pipeline with storage encryption (0%).
-  - Automate verification status notifications across channels (0%).
-  - Publish policy hub + support SOP documentation updates (0%).
+  - Harden admin/support consoles with escalation workflows (100%).
+- **Sprint 5C – Compliance & Verification (100%)**
+  - Implement KYC document pipeline with storage encryption (100%).
+  - Automate verification status notifications across channels (100%).
+  - Publish policy hub + support SOP documentation updates (100%).
 
 ## Task 6 – Mobile Parity & Store Readiness (0% complete)
 ### Integration Coverage

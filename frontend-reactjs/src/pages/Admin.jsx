@@ -1,12 +1,14 @@
 import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { reviewVerificationCase } from '../api/verificationApi.js';
 import AdminStats from '../components/AdminStats.jsx';
 import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import AdminApprovalsSection from './admin/sections/AdminApprovalsSection.jsx';
+import AdminComplianceSection from './admin/sections/AdminComplianceSection.jsx';
 import AdminOperationsSection from './admin/sections/AdminOperationsSection.jsx';
 import AdminPolicyHubSection from './admin/sections/AdminPolicyHubSection.jsx';
 import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
@@ -23,6 +25,7 @@ const sectionNavigation = [
   { id: 'revenue', label: 'Revenue' },
   { id: 'communities', label: 'Communities' },
   { id: 'operations', label: 'Operations' },
+  { id: 'compliance', label: 'Compliance' },
   { id: 'policies', label: 'Policies' },
   { id: 'launches', label: 'Launches' },
   { id: 'activity', label: 'Activity' }
@@ -80,6 +83,12 @@ export default function Admin() {
   const risk = operations.risk ?? EMPTY_OBJECT;
   const platform = operations.platform ?? EMPTY_OBJECT;
   const upcomingLaunches = operations.upcomingLaunches ?? EMPTY_ARRAY;
+
+  const compliance = adminData.compliance ?? EMPTY_OBJECT;
+  const complianceMetrics = compliance.metrics ?? EMPTY_ARRAY;
+  const complianceQueue = compliance.queue ?? EMPTY_ARRAY;
+  const complianceSlaBreaches = compliance.slaBreaches ?? 0;
+  const complianceManualReview = compliance.manualReviewQueue ?? 0;
 
   const alerts = adminData.activity?.alerts ?? EMPTY_ARRAY;
   const events = adminData.activity?.events ?? EMPTY_ARRAY;
@@ -201,6 +210,23 @@ export default function Admin() {
           : null
       ].filter(Boolean),
     [risk]
+  );
+
+  const handleVerificationReview = useCallback(
+    async (item, payload) => {
+      if (!session?.tokens?.accessToken) {
+        throw new Error('Authentication token missing');
+      }
+      await reviewVerificationCase({
+        token: session.tokens.accessToken,
+        verificationId: item.id,
+        body: payload
+      });
+      if (refresh) {
+        await refresh();
+      }
+    },
+    [session?.tokens?.accessToken, refresh]
   );
 
   const platformStats = useMemo(
@@ -457,6 +483,15 @@ export default function Admin() {
               supportStats={supportStats}
               riskStats={riskStats}
               platformStats={platformStats}
+            />
+
+            <AdminComplianceSection
+              sectionId="compliance"
+              metrics={complianceMetrics}
+              queue={complianceQueue}
+              slaBreaches={complianceSlaBreaches}
+              manualReviewQueue={complianceManualReview}
+              onReview={handleVerificationReview}
             />
 
             <AdminPolicyHubSection

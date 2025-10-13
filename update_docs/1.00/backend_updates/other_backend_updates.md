@@ -21,3 +21,5 @@
   `npm run search:provision` bootstrap/snapshot workflow, and security guidance calling out the enforced read-only search key
   requirement.
 - Extended README/search docs with ingestion coverage: outlined `npm run search:reindex`, incremental sync guidance, ingestion env toggles, expected dataset seeds (courses, ebooks, tutors, live classrooms, ads), and Prometheus metrics so ops teams can run catch-up indexing safely.
+
+- Added backend README and `.env.example` guidance for the KYC verification pipeline: documented storage configuration requirements (`R2_UPLOADS_BUCKET`, max upload bytes), checksum expectations, presigned URL TTLs, reviewer role mapping, audit log retention, and `/api/verification` usage so engineering, compliance, and support teams can manage document capture and review workflows without reverse-engineering code.
