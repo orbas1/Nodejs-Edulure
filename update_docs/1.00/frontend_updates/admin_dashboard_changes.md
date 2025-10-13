@@ -1,1 +1,8 @@
-- Runtime configuration surfaces now gate the admin console, showing a disable banner with the configured escalation channel when the feature flag is off.
+# Admin Dashboard & Operational Console Updates
+
+- Runtime configuration gating: when `admin.operational-console` is disabled the page renders a production escalation banner sourced from `admin.console.escalation-channel`, mirroring the disable overlays specified in `Admin_panel_drawings.md` and `Design_Plan.md`.
+- Snapshot-driven analytics: `AdminStats.jsx` now renders subscription growth, community launches, and support responsiveness KPIs with percentage deltas and CSAT callouts so operators can triage performance at a glance.
+- Queue workspaces: the approvals rail lists instructor applications, payout overrides, and policy acknowledgements with urgency/status pills and review CTA buttons; the incident bridge surfaces severity badges, owner assignments, Slack war-room channels, and customer impact notes; the refund queue exposes amount/status chips, requester metadata, and age calculations for finance follow-up.
+- Support backlog insights: backlog pills summarise open/urgent/awaiting-customer/breached-SLA counts while the backlog list highlights SLA countdowns, priority badges, and last public responses sourced from `SupportTicketEventModel` to keep agents aligned with the backend metrics.
+- Policy governance grid: policy cards display category, status, owner, next review date, and summary copy so compliance teams mirror the `policy_documents` table without leaving the console.
+- Operator tooling enhancements: lookback selectors drive back-end recomputation windows, invite buttons surface admin onboarding flows, loading/error states provide resilient messaging, and all sections reuse accessible rounded card treatments aligned to `Admin_panel_drawings.md`, `dashboard_drawings.md`, and `ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan` guidance.

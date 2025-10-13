@@ -9,3 +9,4 @@
 - `npx swagger-cli validate src/docs/openapi.json` – Specification passes validation post-nullable normalisation for chat, DM, paywall, and social graph schemas. 【4174d7†L1-L2】
 - `npm test` (backend-nodejs) – Explorer/ads suites execute end-to-end with AdsService compliance automation and insights ordering fixes covered by Vitest. 【553d13†L1-L19】
 - `npm test` (backend-nodejs) – Explorer analytics, chat, social graph, and ads HTTP/service suites all pass after installing workspace dependencies, confirming telemetry and alert flows remain stable. 【2cc86b†L1-L34】
+- `npm test --workspace backend-nodejs` – Fails with Rollup parsing error "Nullish coalescing operator(??) requires parens when mixing with logical operators" while executing Vitest HTTP suites (admin, ads, chat, dashboard, social graph). Requires linting pass to insert parentheses or upgrade parser. 【722075†L1-L39】
