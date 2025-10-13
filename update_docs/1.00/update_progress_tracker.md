@@ -8,15 +8,15 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 2 – Content, Commerce & Live Learning Delivery | 74% | 82% | 80% | 84% | 72% | 75% | 78% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 90% | 98% | 94% | 96% | 90% | 94% | 94% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 86% | 100% | 97% | 98% | 94% | 97% | 95% |
-| Task 5 – Dashboards, Profiles & Operational Consoles | 40% | 38% | 36% | 38% | 35% | 36% | 37% |
+| Task 5 – Dashboards, Profiles & Operational Consoles | 60% | 72% | 72% | 74% | 64% | 70% | 69% |
 | Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 ### Sprint Breakdowns for Tasks 5–7
 | Sprint | Scope | Status | Key Deliverables |
 | --- | --- | --- | --- |
-| Task 5 – Sprint 5A | Component foundations | 0% | API payload definitions, responsive skeletons, cache hooks |
-| Task 5 – Sprint 5B | Role dashboards | 0% | Learner widgets, instructor analytics, admin escalation console |
+| Task 5 – Sprint 5A | Component foundations | 60% | API payload definitions, responsive skeletons, cache hooks |
+| Task 5 – Sprint 5B | Role dashboards | 35% | Learner widgets, instructor analytics, admin escalation console |
 | Task 5 – Sprint 5C | Compliance & verification | 0% | KYC pipeline, verification notifications, policy hub updates |
 | Task 6 – Sprint 6A | Core shell & networking | 0% | Flutter shell, dio client + secure storage, shared tokens |
 | Task 6 – Sprint 6B | Learner modules | 0% | Community/explorer readers, course/eBook playback, live class joins |
@@ -45,6 +45,8 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Ads compliance automation is now enforced through AdsService—overspending campaigns are auto-paused with compliance metadata persisted, insights return chronologically ordered metrics, Vitest covers compliance/insight flows, and the Vite build validates the explorer/ads dashboards end-to-end following dependency reconciliation.
 - Explorer intelligence dashboards now mirror the backend analytics stack: the React `/analytics` route exposes authenticated range controls, live KPIs, entity and ads breakdowns, forecast summaries, query spotlights, and alert styling tied to the ExplorerAnalyticsService endpoints with manual refresh, empty state handling, and navigation gating so operations teams can monitor health without resorting to raw APIs.
 - Profile overview orchestration landed with `/api/profiles/{id}/overview`: the aggregation service hydrates hero metrics, engagement insights, programme shelves, quick actions, and timeline events with TTL caching, while the React profile route consumes the live payload via a new caching hook and production-grade components aligned to `Profile Look.md`, `Profile Styling.md`, and `dashboard_drawings.md`. Backend API/service/controller/route documentation, frontend change logs, and design plans/trackers were refreshed to capture the new profile experience so Task 5.1 is fully documented for downstream squads.
+- Learner dashboard delivery now includes a production notification centre, follower governance workspace, and privacy/messaging controls. `DashboardService` enriches the learner aggregate with notifications/follower/settings payloads, `DirectMessageService` exposes global notification toggles, `/api/social` privacy APIs are wired to the dashboard, React routes render the new surfaces, and Vitest + HTTP suites guard the new endpoints.
+- Instructor dashboard aggregation is live: `buildInstructorDashboard` composes course progress, tutor pipelines, live classroom schedules, asset/ebook performance, community monetisation, ads experiments, and subscription revenue while `DashboardService.getDashboardForUser` merges the instructor payload, expands profile stats/bio, and appends search index entries. Vitest service + HTTP suites now validate instructor metrics and contract delivery, unlocking Task 5.3 frontend integration.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |
