@@ -355,7 +355,7 @@ describe('buildInstructorDashboard', () => {
           authors: JSON.stringify(['Ivy Instructor']),
           priceAmount: 1500,
           currency: 'USD',
-          metadata: JSON.stringify({ status: 'Published', cohort: 'DesignOps Collective' })
+          metadata: JSON.stringify({ status: 'Published', cohort: 'DesignOps Collective', productionStage: 'editing' })
         }
       ],
       ebookProgressRows: [
@@ -385,6 +385,11 @@ describe('buildInstructorDashboard', () => {
     expect(snapshot.dashboard.pricing.subscriptions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: expect.stringContaining('Pro Circle'), members: '1 active' })
+      ])
+    );
+    expect(snapshot.dashboard.ebooks.creationPipelines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'ebook-pipeline-88', stage: 'Editing' })
       ])
     );
     expect(snapshot.searchIndex).toEqual(

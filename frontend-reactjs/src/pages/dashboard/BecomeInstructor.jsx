@@ -1,7 +1,7 @@
 export default function BecomeInstructor() {
   return (
     <div className="space-y-10">
-      <header className="rounded-3xl border border-primary/20 bg-primary/10 p-8 text-white">
+      <header className="rounded-3xl border border-primary/20 bg-primary/10 p-8 text-slate-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-primary-light">Instructor accelerator</p>
@@ -35,15 +35,15 @@ export default function BecomeInstructor() {
             description: 'Access dedicated marketing, platform tooling, and tutor pods to run your cohort at scale.'
           }
         ].map((phase) => (
-          <div key={phase.title} className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+          <div key={phase.title} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <p className="text-xs uppercase tracking-wide text-slate-500">{phase.title}</p>
-            <p className="mt-3 text-sm text-slate-300">{phase.description}</p>
+            <p className="mt-3 text-sm text-slate-500">{phase.description}</p>
           </div>
         ))}
       </section>
 
-      <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
-        <h2 className="text-lg font-semibold text-white">What you unlock</h2>
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">What you unlock</h2>
         <ul className="mt-4 grid gap-3 md:grid-cols-2">
           {[
             'Production team with editors, designers, and success ops',
@@ -53,7 +53,7 @@ export default function BecomeInstructor() {
             'Marketing placement across the Edulure network',
             'Access to Edulure Ads experimentation budget'
           ].map((benefit) => (
-            <li key={benefit} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 px-4 py-3 text-sm text-slate-300">
+            <li key={benefit} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
               {benefit}
             </li>
           ))}

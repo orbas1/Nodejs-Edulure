@@ -434,13 +434,16 @@ export default class CommunityEngagementService {
         .limit(limit)
         .offset(offset);
 
-      return rows.map((row) => ({
-        userId: row.userId,
-        name: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() || 'Community Member',
-        currentStreakDays: Number(row.currentStreakDays ?? 0),
-        longestStreakDays: Number(row.longestStreakDays ?? 0),
-        lastActiveOn: row.lastActiveOn
-      }));
+      return rows.map((row) => {
+        const displayName = `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim();
+        return {
+          userId: row.userId,
+          name: displayName || 'Community Member',
+          currentStreakDays: Number(row.currentStreakDays ?? 0),
+          longestStreakDays: Number(row.longestStreakDays ?? 0),
+          lastActiveOn: row.lastActiveOn
+        };
+      });
     }
 
     if (type === 'attendance') {
@@ -464,12 +467,15 @@ export default class CommunityEngagementService {
         .limit(limit)
         .offset(offset);
 
-      return rows.map((row) => ({
-        userId: row.userId,
-        name: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() || 'Community Member',
-        attendedEvents: Number(row.attendedCount ?? 0),
-        waitlistedEvents: Number(row.waitlistedCount ?? 0)
-      }));
+      return rows.map((row) => {
+        const displayName = `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim();
+        return {
+          userId: row.userId,
+          name: displayName || 'Community Member',
+          attendedEvents: Number(row.attendedCount ?? 0),
+          waitlistedEvents: Number(row.waitlistedCount ?? 0)
+        };
+      });
     }
 
     const rows = await connection('community_member_points as cmp')
@@ -488,13 +494,16 @@ export default class CommunityEngagementService {
       .limit(limit)
       .offset(offset);
 
-    return rows.map((row) => ({
-      userId: row.userId,
-      name: `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim() || 'Community Member',
-      points: Number(row.points ?? 0),
-      lifetimePoints: Number(row.lifetimePoints ?? 0),
-      tier: row.tier
-    }));
+    return rows.map((row) => {
+      const displayName = `${row.firstName ?? ''} ${row.lastName ?? ''}`.trim();
+      return {
+        userId: row.userId,
+        name: displayName || 'Community Member',
+        points: Number(row.points ?? 0),
+        lifetimePoints: Number(row.lifetimePoints ?? 0),
+        tier: row.tier
+      };
+    });
   }
 
   static async listEvents(communityIdentifier, userId, query = {}) {

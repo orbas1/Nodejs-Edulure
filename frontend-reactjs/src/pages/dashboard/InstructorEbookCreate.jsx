@@ -21,29 +21,29 @@ export default function InstructorEbookCreate() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-white">E-book production</h1>
-          <p className="mt-2 text-sm text-slate-400">Coordinate drafts, editing, and release planning for upcoming titles.</p>
+          <h1 className="text-2xl font-semibold text-slate-900">E-book production</h1>
+          <p className="mt-2 text-sm text-slate-600">Coordinate drafts, editing, and release planning for upcoming titles.</p>
         </div>
         <button
           type="button"
-          className="rounded-full border border-primary/50 px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary/10"
+          className="dashboard-action"
         >
           Create new manuscript
         </button>
       </div>
 
-      <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+      <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <ul className="space-y-4">
           {pipelines.map((pipeline) => (
-            <li key={pipeline.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-5">
+            <li key={pipeline.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">{pipeline.stage}</p>
-                  <p className="mt-1 text-sm font-semibold text-white">{pipeline.title}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{pipeline.title}</p>
                 </div>
-                <div className="text-right text-xs text-slate-400">
+                <div className="text-right text-xs text-slate-600">
                   <p>Owner {pipeline.owner}</p>
-                  <button type="button" className="mt-2 rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                  <button type="button" className="mt-2 dashboard-chip">
                     Open workspace
                   </button>
                 </div>

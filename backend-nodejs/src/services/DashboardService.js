@@ -145,6 +145,10 @@ export function buildInstructorDashboard({
 }) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+  const instructorName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+  const instructorIdentity = instructorName || user.email || 'Instructor';
+  const facilitatorIdentity = instructorName || user.email || 'Facilitator';
+
   const communityStatsMap = new Map();
   communityStats.forEach((stat) => {
     const communityId = Number(stat.community_id ?? stat.communityId);
@@ -164,6 +168,8 @@ export function buildInstructorDashboard({
   const upsertManagedCommunity = (communityId, payload) => {
     if (!communityLookup.has(communityId)) {
       communityLookup.set(communityId, payload);
+    }
+    if (!managedCommunityIds.has(communityId)) {
       managedCommunities.push(payload);
     }
     managedCommunityIds.add(communityId);
@@ -215,7 +221,6 @@ export function buildInstructorDashboard({
   });
 
   const hasInstructorSignals =
-    user.role === 'instructor' ||
     courses.length > 0 ||
     tutorProfiles.length > 0 ||
     managedCommunityIds.size > 0 ||
@@ -305,13 +310,14 @@ export function buildInstructorDashboard({
     const base = assignment.courseReleaseAt ? new Date(assignment.courseReleaseAt) : new Date(now.getTime());
     const offset = Number(assignment.dueOffsetDays ?? 0);
     const dueDate = new Date(base.getTime() + offset * 24 * 60 * 60 * 1000);
+    const assignmentOwner = metadata.owner ?? instructorIdentity;
     return {
       id: Number(assignment.id),
       courseId: Number(assignment.courseId),
       courseTitle: assignment.courseTitle,
       title: assignment.title,
       dueDate,
-      owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
+      owner: assignmentOwner,
       metadata
     };
   });
@@ -350,22 +356,28 @@ export function buildInstructorDashboard({
 
   const pipelineBookings = tutorBookingsNormalised
     .filter((booking) => booking.status === 'requested')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      status: 'Requested',
-      learner: `${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner',
-      requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
-      topic: booking.metadata.topic ?? 'Mentorship session'
-    }));
+    .map((booking) => {
+      const learnerName = `${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim();
+      return {
+        id: `booking-${booking.id}`,
+        status: 'Requested',
+        learner: learnerName || 'Learner',
+        requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
+        topic: booking.metadata.topic ?? 'Mentorship session'
+      };
+    });
 
   const confirmedBookings = tutorBookingsNormalised
     .filter((booking) => booking.status === 'confirmed')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      topic: booking.metadata.topic ?? 'Mentorship session',
-      learner: `${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner',
-      date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
-    }));
+    .map((booking) => {
+      const learnerName = `${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim();
+      return {
+        id: `booking-${booking.id}`,
+        topic: booking.metadata.topic ?? 'Mentorship session',
+        learner: learnerName || 'Learner',
+        date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+      };
+    });
 
   const tutorProfileMap = new Map();
   tutorProfiles.forEach((profile) => {
@@ -447,6 +459,25 @@ export function buildInstructorDashboard({
       };
     })
     .filter(Boolean);
+
+  const ebookProductionPipelines = ebookRows
+    .map((ebook) => {
+      const metadata = safeJsonParse(ebook.metadata, {});
+      const stageKey = metadata.productionStage ?? metadata.stage ?? metadata.status ?? 'Planning';
+      const stage = typeof stageKey === 'string' ? stageKey.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase()) : 'Planning';
+      const owner = metadata.owner ?? metadata.lead ?? instructorIdentity;
+      const launchAt = metadata.launchAt ?? metadata.publishAt ?? metadata.releaseAt ?? null;
+      const release = launchAt ? formatDateTime(launchAt, { dateStyle: 'medium', timeStyle: undefined }) : 'Timeline pending';
+
+      return {
+        id: `ebook-pipeline-${ebook.id}`,
+        title: ebook.title,
+        stage,
+        owner,
+        release
+      };
+    })
+    .filter((entry) => entry.title);
 
   const ebookRevenue = ebookCatalogue.reduce((total, ebook) => {
     const match = ebookRows.find((row) => `ebook-${row.id}` == ebook.id);
@@ -570,17 +601,22 @@ export function buildInstructorDashboard({
     }));
 
   const production = [
-    ...upcomingAssignments.map((assignment) => ({
-      id: `assignment-${assignment.id}`,
-      asset: `${assignment.courseTitle} · ${assignment.title}`,
-      owner: assignment.owner,
-      status: assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate, { dateStyle: 'medium', timeStyle: undefined })}` : 'Scheduling',
-      type: 'Assignment'
-    })),
+    ...upcomingAssignments.map((assignment) => {
+      const statusLabel = assignment.dueDate
+        ? `Due ${formatDateTime(assignment.dueDate, { dateStyle: 'medium', timeStyle: undefined })}`
+        : 'Scheduling';
+      return {
+        id: `assignment-${assignment.id}`,
+        asset: `${assignment.courseTitle} · ${assignment.title}`,
+        owner: assignment.owner,
+        status: statusLabel,
+        type: 'Assignment'
+      };
+    }),
     ...upcomingLessons.map((lesson) => ({
       id: `lesson-${lesson.id}`,
       asset: `${lesson.courseTitle} · ${lesson.title}`,
-      owner: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator',
+      owner: facilitatorIdentity,
       status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
       type: 'Lesson'
     }))
@@ -658,7 +694,7 @@ export function buildInstructorDashboard({
     topic: lesson.title,
     course: lesson.courseTitle,
     date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
-    facilitator: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'
+    facilitator: facilitatorIdentity
   }));
 
   const calendarEntries = [];
@@ -846,7 +882,8 @@ export function buildInstructorDashboard({
         confirmed: confirmedBookings
       },
       ebooks: {
-        catalogue: ebookCatalogue
+        catalogue: ebookCatalogue,
+        creationPipelines: ebookProductionPipelines
       },
       ads: {
         active: activeCampaigns,
@@ -1802,12 +1839,15 @@ export default class DashboardService {
     const recommendationCandidates = ebookRows.filter((ebook) =>
       !ebookProgressRows.some((progress) => progress.ebookId === ebook.id)
     );
-    const courseRecommendations = recommendationCandidates.slice(0, 3).map((ebook) => ({
-      id: `ebook-rec-${ebook.id}`,
-      title: `${ebook.title} (Ebook)`,
-      summary: (ebook.subtitle ?? ebook.description ?? '').slice(0, 120) || 'Explore complementary research and playbooks.',
-      rating: Number(ebook.ratingAverage ?? 0).toFixed(1)
-    }));
+    const courseRecommendations = recommendationCandidates.slice(0, 3).map((ebook) => {
+      const excerpt = (ebook.subtitle ?? ebook.description ?? '').slice(0, 120);
+      return {
+        id: `ebook-rec-${ebook.id}`,
+        title: `${ebook.title} (Ebook)`,
+        summary: excerpt || 'Explore complementary research and playbooks.',
+        rating: Number(ebook.ratingAverage ?? 0).toFixed(1)
+      };
+    });
 
     const assignmentAlerts = communityAssignments
       .map((assignment) => {

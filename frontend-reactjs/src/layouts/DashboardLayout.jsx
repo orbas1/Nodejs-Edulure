@@ -142,16 +142,16 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-950 text-slate-100">
-      <aside className="hidden w-72 shrink-0 border-r border-slate-900/70 bg-slate-950/80 lg:flex lg:flex-col">
-        <div className="flex h-20 items-center gap-3 border-b border-slate-900/60 px-6">
+    <div className="flex min-h-screen bg-slate-50 text-slate-900">
+      <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white lg:flex lg:flex-col">
+        <div className="flex h-20 items-center gap-3 border-b border-slate-200 px-6">
           <img
             src="https://i.ibb.co/twQyCm1N/Edulure-Logo.png"
             alt="Edulure"
-            className="h-10 w-10 rounded-xl border border-slate-800 bg-slate-900/80"
+            className="h-10 w-10 rounded-xl border border-slate-200 bg-slate-100"
           />
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-slate-300">Edulure</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-700">Edulure</p>
             <p className="text-xs text-slate-500">Operational Command Center</p>
           </div>
         </div>
@@ -164,20 +164,20 @@ export default function DashboardLayout() {
               className={({ isActive }) =>
                 `group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-primary/20 text-white shadow-lg shadow-primary/20'
-                    : 'text-slate-400 hover:bg-slate-900/70 hover:text-white'
+                    ? 'bg-primary/10 text-primary-dark shadow-sm shadow-primary/20'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`
               }
             >
-              <item.icon className="h-5 w-5 text-slate-500 group-hover:text-white" />
+              <item.icon className="h-5 w-5 text-slate-400 group-hover:text-primary" />
               <span>{item.name}</span>
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-slate-900/60 p-4">
+        <div className="border-t border-slate-200 p-4">
           <a
             href="/"
-            className="flex items-center justify-between rounded-xl border border-slate-800 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:border-primary/50 hover:text-white"
+            className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
           >
             <span>Return to site</span>
             <ArrowLeftOnRectangleIcon className="h-4 w-4" />
@@ -185,39 +185,39 @@ export default function DashboardLayout() {
         </div>
       </aside>
       <div className="flex min-h-screen flex-1 flex-col">
-        <header className="sticky top-0 z-40 border-b border-slate-900/60 bg-slate-950/90 backdrop-blur">
+        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
           <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="relative flex-1">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="search"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Search across your dashboard data"
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-900/80 py-3 pl-12 pr-4 text-sm text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
                 {searchQuery && (
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-white"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-primary"
                     onClick={() => setSearchQuery('')}
                   >
                     Clear
                   </button>
                 )}
                 {filteredResults.length > 0 && (
-                  <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-900/80 bg-slate-950/95 p-4 shadow-2xl">
+                  <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
                     <ul className="space-y-2">
                       {filteredResults.map((result) => (
                         <li key={result.id}>
                           <NavLink
                             to={result.url}
-                            className="flex flex-col rounded-xl border border-slate-900/60 bg-slate-900/60 px-4 py-3 text-sm transition hover:border-primary/60 hover:bg-slate-900 hover:text-white"
+                            className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm transition hover:border-primary/60 hover:bg-primary/5 hover:text-primary-dark"
                             onClick={() => setSearchQuery('')}
                           >
-                            <span className="font-semibold text-slate-100">{result.title}</span>
+                            <span className="font-semibold text-slate-900">{result.title}</span>
                             <span className="text-xs uppercase tracking-wide text-slate-500">{result.type}</span>
                           </NavLink>
                         </li>
@@ -226,7 +226,7 @@ export default function DashboardLayout() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-900/70 bg-slate-900/50 p-1 text-xs font-semibold text-slate-400">
+              <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-slate-100 p-1 text-xs font-semibold text-slate-600">
                 {roles.map((roleOption) => {
                   const target = `/dashboard/${roleOption.id}`;
                   const isActive = resolvedRole === roleOption.id;
@@ -235,7 +235,7 @@ export default function DashboardLayout() {
                       key={roleOption.id}
                       to={target}
                       className={`rounded-2xl px-4 py-2 transition ${
-                        isActive ? 'bg-primary/30 text-white shadow shadow-primary/30' : 'hover:bg-slate-900/70 hover:text-white'
+                        isActive ? 'bg-primary/10 text-primary-dark shadow-sm shadow-primary/20' : 'hover:bg-white hover:text-primary-dark'
                       }`}
                     >
                       {roleOption.label}
@@ -258,7 +258,7 @@ export default function DashboardLayout() {
             </div>
           </div>
         </header>
-        <main className="flex-1 bg-gradient-to-b from-slate-950 via-slate-950 to-slate-900">
+        <main className="flex-1 bg-gradient-to-b from-slate-50 via-slate-50 to-white">
           <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
             {mainContent}
           </div>

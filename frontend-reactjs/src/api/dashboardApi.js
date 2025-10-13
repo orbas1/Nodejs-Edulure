@@ -1,10 +1,14 @@
 import { httpClient } from './httpClient.js';
+import { dashboardDemo } from './dashboardDemoData.js';
 
 function normaliseDashboardResponse(payload = {}) {
-  const profile = payload.profile ?? null;
-  const roles = Array.isArray(payload.roles) ? payload.roles : [];
-  const dashboards = typeof payload.dashboards === 'object' && payload.dashboards !== null ? payload.dashboards : {};
-  const searchIndex = Array.isArray(payload.searchIndex) ? payload.searchIndex : [];
+  const container = typeof payload.data === 'object' && payload.data !== null ? payload.data : payload;
+
+  const profile = container.profile ?? null;
+  const roles = Array.isArray(container.roles) ? container.roles : [];
+  const dashboards =
+    typeof container.dashboards === 'object' && container.dashboards !== null ? container.dashboards : {};
+  const searchIndex = Array.isArray(container.searchIndex) ? container.searchIndex : [];
 
   return { profile, roles, dashboards, searchIndex };
 }
@@ -14,8 +18,24 @@ export async function fetchDashboard({ token, signal } = {}) {
     throw new Error('Authentication token is required to fetch dashboard data');
   }
 
-  const response = await httpClient.get('/dashboard/me', { token, signal });
-  return normaliseDashboardResponse(response);
+  try {
+    const response = await httpClient.get('/dashboard/me', { token, signal });
+    const normalised = normaliseDashboardResponse(response);
+    if (import.meta.env?.DEV && !normalised.profile) {
+      console.warn('Dashboard API returned no profile data, using demo payload instead.');
+      return dashboardDemo;
+    }
+    return normalised;
+  } catch (error) {
+    if (signal?.aborted || error?.name === 'CanceledError') {
+      throw error;
+    }
+    if (import.meta.env?.DEV) {
+      console.warn('Falling back to demo dashboard data due to fetch failure.', error);
+      return dashboardDemo;
+    }
+    throw error;
+  }
 }
 
 export const dashboardApi = { fetchDashboard };

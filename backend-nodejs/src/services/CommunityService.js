@@ -397,7 +397,8 @@ export default class CommunityService {
       ? reactionSummary.total
       : Object.values(reactionSummary).reduce((sum, value) => (typeof value === 'number' ? sum + value : sum), 0);
 
-    const authorName = (post.authorName ?? '').trim() || 'Community Member';
+    const rawAuthorName = (post.authorName ?? '').trim();
+    const authorName = rawAuthorName || 'Community Member';
 
     const community = communityOverride
       ? { id: communityOverride.id, name: communityOverride.name, slug: communityOverride.slug }
@@ -443,6 +444,9 @@ export default class CommunityService {
     const tags = toArray(resource.tags);
     const metadata = parseJsonColumn(resource.metadata, {});
 
+    const creatorName = (resource.createdByName ?? '').trim();
+    const resolvedCreatorName = creatorName || 'Community Member';
+
     return {
       id: resource.id,
       communityId: resource.communityId,
@@ -467,7 +471,7 @@ export default class CommunityService {
       updatedAt: resource.updatedAt,
       createdBy: {
         id: resource.createdBy,
-        name: (resource.createdByName ?? '').trim() || 'Community Member',
+        name: resolvedCreatorName,
         role: resource.createdByRole,
         avatarUrl: buildAvatarUrl(resource.createdByName)
       }
