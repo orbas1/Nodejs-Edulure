@@ -13,11 +13,21 @@ export default function MainLayout() {
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
   const navigation = useMemo(() => {
-    const base = [
+    const role = session?.user?.role ?? null;
+    const publicNavigation = [
+      { name: 'Home', to: '/' },
+      { name: 'About', to: '/about' }
+    ];
+
+    if (!isAuthenticated) {
+      return publicNavigation;
+    }
+
+    const authedNavigation = [
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
       { name: 'Explorer', to: '/explorer' },
-      { name: 'About', to: '/about' }
+      { name: 'Profile', to: '/profile' }
     ];
     if (isAuthenticated) {
       return [...base, { name: 'Content', to: '/content' }];
@@ -42,6 +52,23 @@ export default function MainLayout() {
   const handleProfileNavigation = () => {
     navigate('/profile');
   };
+
+    if (role === 'instructor' || role === 'admin') {
+      authedNavigation.push({ name: 'Content', to: '/content' });
+    }
+
+    if (analyticsDashboardEnabled && (role === 'instructor' || role === 'admin')) {
+      authedNavigation.push({ name: 'Analytics', to: '/analytics' });
+    }
+
+    if (role === 'admin' && adminConsoleEnabled) {
+      authedNavigation.push({ name: 'Admin', to: '/admin' });
+    }
+
+    authedNavigation.push({ name: 'About', to: '/about' });
+
+    return authedNavigation;
+  }, [isAuthenticated, session, adminConsoleEnabled, analyticsDashboardEnabled]);
 
   return (
     <div className="min-h-screen bg-white">
