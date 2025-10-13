@@ -9,6 +9,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/tutor_booking_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
 
@@ -45,6 +46,7 @@ class EdulureApp extends StatelessWidget {
         '/inbox': (_) => const InboxScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),
+        '/tutor-bookings': (_) => const TutorBookingScreen(),
         '/courses/manage': (_) => const CourseManagementScreen(),
         '/courses/purchase': (_) => const CoursePurchaseScreen(),
       },

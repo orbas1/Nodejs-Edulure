@@ -115,6 +115,13 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/profile'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.calendar_month_outlined),
+                    title: const Text('Tutor bookings'),
+                    subtitle: const Text('Manage mentor requests, schedules, and session history.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/tutor-bookings'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.library_books_outlined),
                     title: const Text('Content library'),
                     subtitle: const Text('Download decks and ebooks with offline support.'),
