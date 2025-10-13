@@ -53,6 +53,43 @@ class ContentService {
     return entries;
   }
 
+  Map<String, EbookProgress> loadCachedEbookProgress() {
+    final entries = <String, EbookProgress>{};
+    final box = SessionManager.ebookProgressCache;
+    for (final key in box.keys) {
+      final value = box.get(key);
+      if (value is Map) {
+        entries[key.toString()] =
+            EbookProgress.fromJson(Map<String, dynamic>.from(value as Map));
+      }
+    }
+    return entries;
+  }
+
+  ReaderPreferences loadReaderPreferences() {
+    final data = SessionManager.readerSettingsCache.get('preferences');
+    if (data is Map) {
+      return ReaderPreferences.fromJson(
+        Map<String, dynamic>.from(data as Map),
+      );
+    }
+    return const ReaderPreferences();
+  }
+
+  Future<void> saveReaderPreferences(ReaderPreferences preferences) async {
+    await SessionManager.readerSettingsCache.put(
+      'preferences',
+      preferences.toJson(),
+    );
+  }
+
+  Future<void> cacheEbookProgress(String assetId, EbookProgress progress) async {
+    await SessionManager.ebookProgressCache.put(
+      assetId,
+      progress.toJson(),
+    );
+  }
+
   Future<ViewerToken> viewerToken(String assetId) async {
     final token = SessionManager.getAccessToken();
     if (token == null) {
@@ -167,6 +204,87 @@ class ViewerToken {
       expiresAt: json['expiresAt'] as String,
       watermark: json['watermark'] as String,
       contentType: json['contentType'] as String?,
+    );
+  }
+}
+
+enum ReaderThemePreference { light, dark }
+
+class ReaderPreferences {
+  const ReaderPreferences({
+    this.theme = ReaderThemePreference.light,
+    this.fontScale = 1.0,
+  });
+
+  final ReaderThemePreference theme;
+  final double fontScale;
+
+  ReaderPreferences copyWith({
+    ReaderThemePreference? theme,
+    double? fontScale,
+  }) {
+    return ReaderPreferences(
+      theme: theme ?? this.theme,
+      fontScale: fontScale ?? this.fontScale,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'theme': theme.name,
+      'fontScale': fontScale,
+    };
+  }
+
+  factory ReaderPreferences.fromJson(Map<String, dynamic> json) {
+    final themeValue = json['theme'] as String?;
+    final fontScaleValue = (json['fontScale'] as num?)?.toDouble();
+    return ReaderPreferences(
+      theme: ReaderThemePreference.values.firstWhere(
+        (mode) => mode.name == themeValue,
+        orElse: () => ReaderThemePreference.light,
+      ),
+      fontScale: fontScaleValue != null && fontScaleValue > 0
+          ? fontScaleValue.clamp(0.8, 1.6).toDouble()
+          : 1.0,
+    );
+  }
+}
+
+class EbookProgress {
+  EbookProgress({
+    required this.progressPercent,
+    this.cfi,
+    DateTime? updatedAt,
+  }) : updatedAt = updatedAt ?? DateTime.now();
+
+  final double progressPercent;
+  final String? cfi;
+  final DateTime updatedAt;
+
+  Map<String, dynamic> toJson() {
+    return {
+      'progressPercent': progressPercent,
+      'cfi': cfi,
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
+
+  factory EbookProgress.fromJson(Map<String, dynamic> json) {
+    return EbookProgress(
+      progressPercent: (json['progressPercent'] as num?)?.toDouble() ?? 0,
+      cfi: json['cfi'] as String?,
+      updatedAt: json['updatedAt'] is String
+          ? DateTime.tryParse(json['updatedAt'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  EbookProgress copyWith({double? progressPercent, String? cfi}) {
+    return EbookProgress(
+      progressPercent: progressPercent ?? this.progressPercent,
+      cfi: cfi ?? this.cfi,
+      updatedAt: DateTime.now(),
     );
   }
 }
