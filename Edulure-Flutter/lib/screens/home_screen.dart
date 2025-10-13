@@ -84,6 +84,20 @@ class HomeScreen extends StatelessWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/content'),
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.dashboard_outlined),
+                    title: const Text('Course management'),
+                    subtitle: const Text('Track cohorts, assign production tasks, and monitor operations.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/courses/manage'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.shopping_bag_outlined),
+                    title: const Text('Purchase courses'),
+                    subtitle: const Text('Review offers, apply coupons, and confirm learner enrolments.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/courses/purchase'),
+                  ),
                 ],
               );
             },

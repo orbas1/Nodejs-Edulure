@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/content_library_screen.dart';
+import 'screens/course_management_screen.dart';
+import 'screens/course_purchase_screen.dart';
 import 'screens/feed_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
@@ -39,6 +41,8 @@ class EdulureApp extends StatelessWidget {
         '/feed': (_) => const FeedScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),
+        '/courses/manage': (_) => const CourseManagementScreen(),
+        '/courses/purchase': (_) => const CoursePurchaseScreen(),
       },
     );
   }
