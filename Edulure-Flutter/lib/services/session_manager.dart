@@ -4,6 +4,8 @@ class SessionManager {
   static const _sessionBox = 'session';
   static const _assetsBox = 'content_assets';
   static const _downloadsBox = 'content_downloads';
+  static const _ebookProgressBox = 'ebook_progress';
+  static const _readerSettingsBox = 'ebook_reader_settings';
   static const _sessionKey = 'current';
 
   static Future<void> init() async {
@@ -11,11 +13,15 @@ class SessionManager {
     await Hive.openBox(_sessionBox);
     await Hive.openBox(_assetsBox);
     await Hive.openBox(_downloadsBox);
+    await Hive.openBox(_ebookProgressBox);
+    await Hive.openBox(_readerSettingsBox);
   }
 
   static Box get _session => Hive.box(_sessionBox);
   static Box get assetsCache => Hive.box(_assetsBox);
   static Box get downloadsCache => Hive.box(_downloadsBox);
+  static Box get ebookProgressCache => Hive.box(_ebookProgressBox);
+  static Box get readerSettingsCache => Hive.box(_readerSettingsBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     await _session.put(_sessionKey, session);
