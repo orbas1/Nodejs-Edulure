@@ -6,6 +6,7 @@ import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/tutor_booking_screen.dart';
 import 'services/session_manager.dart';
 
 Future<void> main() async {
@@ -39,6 +40,7 @@ class EdulureApp extends StatelessWidget {
         '/feed': (_) => const FeedScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),
+        '/tutor-bookings': (_) => const TutorBookingScreen(),
       },
     );
   }
