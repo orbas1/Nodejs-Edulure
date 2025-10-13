@@ -5,6 +5,7 @@ import UserModel from '../models/UserModel.js';
 import UserPrivacySettingModel from '../models/UserPrivacySettingModel.js';
 import UserFollowModel from '../models/UserFollowModel.js';
 import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
+import PlatformSettingsService from './PlatformSettingsService.js';
 import IdentityVerificationService from './IdentityVerificationService.js';
 
 function safeJsonParse(value, fallback = {}) {
@@ -3057,6 +3058,7 @@ export default class DashboardService {
       };
     });
 
+    const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
     const compliance = await IdentityVerificationService.getAdminOverview({ now: reference });
 
     const operations = {
@@ -3116,6 +3118,10 @@ export default class DashboardService {
         approvals,
         revenue,
         operations,
+        activity: { alerts, events },
+        settings: {
+          monetization: monetizationSettings
+        }
         compliance,
         activity: { alerts, events }
       },

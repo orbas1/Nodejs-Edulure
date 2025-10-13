@@ -27,6 +27,20 @@ const paypalSchema = Joi.object({
   brandName: Joi.string().max(127).optional()
 });
 
+const escrowPartySchema = Joi.object({
+  email: Joi.string().email().required(),
+  firstName: Joi.string().max(120).optional(),
+  lastName: Joi.string().max(120).optional(),
+  language: Joi.string().length(2).lowercase().optional()
+});
+
+const escrowSchema = Joi.object({
+  buyer: escrowPartySchema.required(),
+  seller: escrowPartySchema.required(),
+  description: Joi.string().max(255).optional(),
+  inspectionPeriod: Joi.number().integer().min(1).max(30).optional()
+});
+
 const taxSchema = Joi.object({
   country: Joi.string().length(2).uppercase().required(),
   region: Joi.string().max(3).uppercase().allow(null, '').optional(),
@@ -34,7 +48,7 @@ const taxSchema = Joi.object({
 });
 
 const paymentIntentSchema = Joi.object({
-  provider: Joi.string().valid('stripe', 'paypal').required(),
+  provider: Joi.string().valid('stripe', 'paypal', 'escrow').required(),
   currency: Joi.string().length(3).uppercase().optional(),
   items: Joi.array().items(lineItemSchema).min(1).required(),
   couponCode: Joi.string().trim().uppercase().optional(),
@@ -42,7 +56,8 @@ const paymentIntentSchema = Joi.object({
   entity: entitySchema.optional(),
   metadata: Joi.object().optional(),
   receiptEmail: Joi.string().email().optional(),
-  paypal: paypalSchema.optional()
+  paypal: paypalSchema.optional(),
+  escrow: escrowSchema.optional()
 });
 
 const refundSchema = Joi.object({
