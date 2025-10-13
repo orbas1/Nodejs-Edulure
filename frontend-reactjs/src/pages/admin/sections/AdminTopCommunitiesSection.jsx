@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types';
 
-export default function AdminTopCommunitiesSection({ communities, formatNumber }) {
+export default function AdminTopCommunitiesSection({ sectionId, communities, formatNumber }) {
   return (
-    <section className="dashboard-section">
+    <section id={sectionId} className="dashboard-section">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-900">Top performing communities</h2>
         <span className="text-xs uppercase tracking-wide text-slate-500">Last 30 days</span>
@@ -42,6 +42,11 @@ export default function AdminTopCommunitiesSection({ communities, formatNumber }
 }
 
 AdminTopCommunitiesSection.propTypes = {
+  sectionId: PropTypes.string,
   communities: PropTypes.arrayOf(PropTypes.object).isRequired,
   formatNumber: PropTypes.func.isRequired
+};
+
+AdminTopCommunitiesSection.defaultProps = {
+  sectionId: undefined
 };

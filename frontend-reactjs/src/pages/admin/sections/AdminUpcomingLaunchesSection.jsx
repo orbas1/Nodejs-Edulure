@@ -1,8 +1,8 @@
 import PropTypes from 'prop-types';
 
-export default function AdminUpcomingLaunchesSection({ launches }) {
+export default function AdminUpcomingLaunchesSection({ sectionId, launches }) {
   return (
-    <section className="dashboard-section">
+    <section id={sectionId} className="dashboard-section">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-slate-900">Upcoming launches</h3>
         <span className="text-xs uppercase tracking-wide text-slate-500">Next 14 days</span>
@@ -35,5 +35,10 @@ export default function AdminUpcomingLaunchesSection({ launches }) {
 }
 
 AdminUpcomingLaunchesSection.propTypes = {
+  sectionId: PropTypes.string,
   launches: PropTypes.arrayOf(PropTypes.object).isRequired
+};
+
+AdminUpcomingLaunchesSection.defaultProps = {
+  sectionId: undefined
 };

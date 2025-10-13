@@ -1,5 +1,5 @@
 import { Fragment, useMemo } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Disclosure, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -7,10 +7,9 @@ import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 
 export default function MainLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isAuthenticated, session, logout } = useAuth();
-  const { isFeatureEnabled, getConfigValue } = useRuntimeConfig();
-  const adminConsoleEnabled = isFeatureEnabled('admin.operational-console');
-  const analyticsDashboardEnabled = isFeatureEnabled('explorer.analytics-dashboard', true);
+  const { getConfigValue } = useRuntimeConfig();
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
 
   const navigation = useMemo(() => {
@@ -20,20 +19,29 @@ export default function MainLayout() {
       { name: 'Explorer', to: '/explorer' },
       { name: 'About', to: '/about' }
     ];
-
-    if (analyticsDashboardEnabled && isAuthenticated) {
-      base.push({ name: 'Analytics', to: '/analytics' });
-    }
-
-    base.push({ name: 'Profile', to: '/profile' });
-    if (adminConsoleEnabled) {
-      base.push({ name: 'Admin', to: '/admin' });
-    }
     if (isAuthenticated) {
       return [...base, { name: 'Content', to: '/content' }];
     }
     return base;
-  }, [isAuthenticated, adminConsoleEnabled, analyticsDashboardEnabled]);
+  }, [isAuthenticated]);
+
+  const avatarUrl = session?.user?.avatarUrl;
+  const displayName = session?.user?.firstName
+    ? `${session.user.firstName}${session.user.lastName ? ` ${session.user.lastName}` : ''}`
+    : session?.user?.email ?? 'Your profile';
+  const emailLabel = session?.user?.email;
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase())
+    .slice(0, 2)
+    .join('') || 'ED';
+
+  const avatarClass = 'flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary';
+
+  const handleProfileNavigation = () => {
+    navigate('/profile');
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -63,18 +71,33 @@ export default function MainLayout() {
           </nav>
           <div className="hidden items-center gap-3 md:flex">
             {isAuthenticated ? (
-              <>
-                <div className="rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary">
-                  {session?.user?.firstName ?? session?.user?.email}
-                </div>
+              <div className="flex min-w-[240px] flex-col rounded-3xl border border-slate-200 bg-white/80 p-3 shadow-sm">
                 <button
                   type="button"
-                  onClick={logout}
-                  className="rounded-full border border-primary/30 px-5 py-2 text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
+                  onClick={handleProfileNavigation}
+                  className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
                 >
-                  Log out
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt={displayName} className="h-11 w-11 rounded-full object-cover" />
+                  ) : (
+                    <span className={avatarClass}>{initials}</span>
+                  )}
+                  <span className="flex flex-col">
+                    <span className="text-sm font-semibold text-slate-900">{displayName}</span>
+                    {emailLabel ? <span className="text-xs text-slate-500">{emailLabel}</span> : null}
+                    <span className="mt-1 text-xs font-semibold uppercase tracking-wide text-primary">View profile</span>
+                  </span>
                 </button>
-              </>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="w-full rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                  >
+                    Log out
+                  </button>
+                </div>
+              </div>
             ) : (
               <>
                 <NavLink
@@ -129,13 +152,34 @@ export default function MainLayout() {
                       ))}
                       <div className="mt-4 flex flex-col gap-3">
                         {isAuthenticated ? (
-                          <button
-                            type="button"
-                            onClick={logout}
-                            className="rounded-full border border-primary/30 px-5 py-2 text-center text-sm font-semibold text-primary hover:border-primary hover:text-primary-dark"
-                          >
-                            Log out
-                          </button>
+                          <div className="space-y-4 rounded-3xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate('/profile');
+                                document.activeElement?.blur();
+                              }}
+                              className="flex items-center gap-3 rounded-2xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                            >
+                              {avatarUrl ? (
+                                <img src={avatarUrl} alt={displayName} className="h-11 w-11 rounded-full object-cover" />
+                              ) : (
+                                <span className={avatarClass}>{initials}</span>
+                              )}
+                              <span className="flex flex-col">
+                                <span className="text-sm font-semibold text-slate-900">{displayName}</span>
+                                {emailLabel ? <span className="text-xs text-slate-500">{emailLabel}</span> : null}
+                                <span className="mt-1 text-xs font-semibold uppercase tracking-wide text-primary">View profile</span>
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={logout}
+                              className="w-full rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                            >
+                              Log out
+                            </button>
+                          </div>
                         ) : (
                           <>
                             <NavLink

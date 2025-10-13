@@ -33,9 +33,9 @@ StatList.propTypes = {
   ).isRequired
 };
 
-export default function AdminOperationsSection({ supportStats, riskStats, platformStats }) {
+export default function AdminOperationsSection({ sectionId, supportStats, riskStats, platformStats }) {
   return (
-    <section className="grid gap-6 lg:grid-cols-3">
+    <section id={sectionId} className="grid gap-6 lg:grid-cols-3">
       <StatList title="Support load" emptyLabel="No pending support indicators." entries={supportStats} />
       <StatList title="Risk &amp; trust" emptyLabel="No risk signals detected." entries={riskStats} />
       <StatList title="Platform snapshot" emptyLabel="No aggregate platform metrics available." entries={platformStats} />
@@ -44,7 +44,12 @@ export default function AdminOperationsSection({ supportStats, riskStats, platfo
 }
 
 AdminOperationsSection.propTypes = {
+  sectionId: PropTypes.string,
   supportStats: PropTypes.arrayOf(PropTypes.object).isRequired,
   riskStats: PropTypes.arrayOf(PropTypes.object).isRequired,
   platformStats: PropTypes.arrayOf(PropTypes.object).isRequired
+};
+
+AdminOperationsSection.defaultProps = {
+  sectionId: undefined
 };
