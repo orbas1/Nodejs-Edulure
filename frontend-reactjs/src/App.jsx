@@ -13,6 +13,7 @@ import ContentLibrary from './pages/ContentLibrary.jsx';
 import About from './pages/About.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
+import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
 import DashboardHome from './pages/dashboard/DashboardHome.jsx';
 import LearnerCommunities from './pages/dashboard/LearnerCommunities.jsx';
@@ -45,18 +46,67 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/instructor" element={<InstructorRegister />} />
-        <Route path="/feed" element={<Feed />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/explorer" element={<Explorer />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="/content" element={<ContentLibrary />} />
+        <Route
+          path="/feed"
+          element={(
+            <ProtectedRoute>
+              <Feed />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/profile"
+          element={(
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/explorer"
+          element={(
+            <ProtectedRoute>
+              <Explorer />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/analytics"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor', 'admin']}>
+              <Analytics />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/admin"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <Admin />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/content"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor', 'admin']}>
+              <ContentLibrary />
+            </ProtectedRoute>
+          )}
+        />
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
       </Route>
       <Route path="/dashboard" element={<Navigate to="/dashboard/learner" replace />} />
-      <Route path="/dashboard/:role" element={<DashboardLayout />}>
+      <Route
+        path="/dashboard/:role"
+        element={(
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        )}
+      >
         <Route index element={<DashboardHome />} />
         <Route path="communities" element={<LearnerCommunities />} />
         <Route path="courses" element={<LearnerCourses />} />
