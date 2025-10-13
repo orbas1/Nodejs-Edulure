@@ -55,6 +55,7 @@
 
 ### 6. Profile, Settings & Compliance Surfaces
 - Redesign profile and verification experiences via `Profile Look.md`, `Profile Styling.md`, and `Organisation_and_positions.md`.
+- Codify the learner profile overview module system—hero metrics, verification badges, insight tiles, programme shelves, quick actions, and audit timeline—ensuring responsive spacing, analytics IDs, cache refresh cues, and localisation copy are documented in `Profile Look.md`, `Profile Styling.md`, `dashboard_drawings.md`, `App_screens_drawings.md`, and `Admin_panel_drawings.md` for engineering parity.
 - Restructure settings dashboards, privacy notifications, and consent flows referencing `Settings Dashboard.md`, `Settings Screen.md`, `Settings.md`, and `Function Design.md`.
 - Align verification prompts, lockout states, and security education with backend enforcement referencing `Screen_text.md`, `Dummy_Data_Requirements.md`, and `provider_application_logic_flow_changes.md`.
 - Add inline security messaging and audit surfaces with guidance from `provider_application_logic_flow_changes.md` and `web_application_logic_flow_changes.md`.

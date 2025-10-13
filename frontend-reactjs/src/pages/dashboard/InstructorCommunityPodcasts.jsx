@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorCommunityPodcasts() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const podcasts = dashboard?.communities?.podcasts ?? [];
+
+  if (podcasts.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="No podcast episodes in production"
+        description="Spin up a new series or import from your studio integrations to monitor production progress here."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

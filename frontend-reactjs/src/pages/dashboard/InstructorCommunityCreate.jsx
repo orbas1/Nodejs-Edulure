@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorCommunityCreate() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const templates = dashboard?.communities?.createTemplates ?? [];
+
+  if (templates.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="No launch templates"
+        description="Upload community launch frameworks to power quick start experiences for instructors."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorCommunityWebinars() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const webinars = dashboard?.communities?.webinars ?? [];
+
+  if (webinars.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="No community webinars scheduled"
+        description="Add upcoming webinars or sync from your events platform to track registrants and conversion."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

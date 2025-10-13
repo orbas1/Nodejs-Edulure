@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorEbookCreate() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const pipelines = dashboard?.ebooks?.creationPipelines ?? [];
+
+  if (pipelines.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="No e-book projects in flight"
+        description="Kick off a new manuscript or import an existing project plan to track production tasks."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

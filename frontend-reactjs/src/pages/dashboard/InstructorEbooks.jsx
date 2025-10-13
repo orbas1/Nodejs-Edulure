@@ -1,8 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorEbooks() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const catalogue = dashboard?.ebooks?.catalogue ?? [];
+
+  if (catalogue.length === 0) {
+    return (
+      <DashboardStateMessage
+        title="No published titles"
+        description="Publish a guide or sync from your distribution channels to monitor catalogue performance."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

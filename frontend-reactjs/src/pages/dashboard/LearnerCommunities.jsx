@@ -1,12 +1,24 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function LearnerCommunities() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const data = dashboard?.communities;
 
   if (!data) {
-    return null;
+    return (
+      <DashboardStateMessage
+        title="No communities configured"
+        description="We could not load any community operations for this dashboard role. Try refreshing to pull the latest assignments."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
   }
+
+  const managed = data.managed ?? [];
+  const pipelines = data.pipelines ?? [];
 
   return (
     <div className="space-y-8">
@@ -26,7 +38,7 @@ export default function LearnerCommunities() {
           </button>
         </div>
         <div className="mt-6 grid gap-5 lg:grid-cols-2">
-          {data.managed.map((community) => (
+          {managed.map((community) => (
             <div key={community.id} className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
               <div className="flex items-center justify-between text-xs text-slate-500">
                 <span>{community.members} members</span>
@@ -68,7 +80,7 @@ export default function LearnerCommunities() {
           </button>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
-          {data.pipelines.map((pipeline) => (
+          {pipelines.map((pipeline) => (
             <div key={pipeline.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/50 p-5">
               <p className="text-xs uppercase tracking-wide text-slate-500">{pipeline.title}</p>
               <p className="mt-2 text-sm text-slate-400">Owner {pipeline.owner}</p>

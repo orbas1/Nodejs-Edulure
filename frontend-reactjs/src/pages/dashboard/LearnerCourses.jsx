@@ -1,13 +1,25 @@
 import { useNavigate, useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function LearnerCourses() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const navigate = useNavigate();
   const data = dashboard?.courses;
 
   if (!data) {
-    return null;
+    return (
+      <DashboardStateMessage
+        title="Learner courses not available"
+        description="We couldn't find any active or recommended courses for your learner dashboard. Refresh to pull the latest schedule."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
   }
+
+  const active = data.active ?? [];
+  const recommendations = data.recommendations ?? [];
 
   return (
     <div className="space-y-8">
@@ -37,7 +49,7 @@ export default function LearnerCourses() {
       <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
         <h2 className="text-lg font-semibold text-white">Active programs</h2>
         <div className="mt-5 space-y-4">
-          {data.active.map((course) => (
+          {active.map((course) => (
             <button
               key={course.id}
               type="button"
@@ -80,7 +92,7 @@ export default function LearnerCourses() {
           </button>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {data.recommendations.map((rec) => (
+          {recommendations.map((rec) => (
             <div key={rec.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/50 p-5">
               <p className="text-xs uppercase tracking-wide text-slate-500">Rating {rec.rating}</p>
               <p className="mt-2 text-lg font-semibold text-white">{rec.title}</p>

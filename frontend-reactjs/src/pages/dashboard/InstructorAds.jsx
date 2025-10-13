@@ -1,10 +1,21 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function InstructorAds() {
-  const { dashboard } = useOutletContext();
+  const { dashboard, refresh } = useOutletContext();
   const ads = dashboard?.ads;
 
-  if (!ads) return null;
+  if (!ads) {
+    return (
+      <DashboardStateMessage
+        title="Ads workspace offline"
+        description="Performance data hasn't synced from your ad accounts yet. Refresh after connecting channels."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">

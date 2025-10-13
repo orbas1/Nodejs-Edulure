@@ -86,7 +86,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 4. **Ads Suite Delivery (100%)** – Campaign builder, targeting rules, budgeting, creatives, compliance automation. _Progress update:_ AdsService now auto-halts overspending campaigns, synchronises compliance metadata, and exposes chronologically ordered insights; Vitest suites cover compliance/insight scenarios, HTTP routes hydrate instructor dashboards, and Vite builds succeed after validating the explorer map dependency chain.
 5. **Analytics & Intelligence (100%)** – Dashboards, zero-result alerts, CTR tracking, predictions, experiment toggles. _Progress update:_ Explorer analytics now ships as a production route with nav access, authenticated range controls, live summary tiles, entity/ads breakdowns, forecast panels, zero-result query spotlighting, and alert styling wired directly to the new backend services, with graceful fallbacks for empty/unauthorised states and refresh tooling to mirror operational dashboards.
 
-## Task 5 – Dashboards, Profiles & Operational Consoles (0% complete)
+## Task 5 – Dashboards, Profiles & Operational Consoles (20% complete)
 ### Integration Coverage
 - **Backend:** Profile aggregation, finance stats, verification, admin/support workflows, notification preferences.
 - **Front-end:** User dashboards (profile, followers, settings, finance, widgets, stats), admin & customer service panels.
@@ -98,7 +98,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 - **Design:** Component library, KPI widgets, admin workflows, accessibility/compliance states.
 
 ### Subtasks
-1. **Profile Component Library (0%)** – Hero, badges, shelves, timelines, quick actions, caching strategy.
+1. **Profile Component Library (100%)** – Hero, badges, shelves, timelines, quick actions, caching strategy. _Progress update:_ Delivered `/api/profiles/{id}/overview` aggregation service with cached hero metrics, timeline, quick actions, community/program shelves, and insights; React profile route now renders production hero/badge/shelf/insight/timeline components aligned to design artefacts with token-aware caching hook. Backend services/controllers/routes/OpenAPI entries, frontend page/change logs, and design trackers (plan, change log, milestones, progress/task lists) were updated to document the new aggregation stack so Task 5.1 is production-ready end-to-end.
 2. **User Dashboard Delivery (0%)** – Finance, followers, settings, widgets, statistics graphs, notifications centre.
 3. **Instructor Dashboard Suite (0%)** – Community switcher, classroom courses, pricing, eBook manager, analytics.
 4. **Admin & Customer Service Panels (0%)** – Approvals, incident response, refunds, policy hub, support tickets.
@@ -187,6 +187,6 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 | --- | --- | --- | --- |
 | Token & Theme System Completion | 70% | Token architecture, emo/seasonal packs, runtime ingestion | Updated token exports, contrast reports, theme override playbooks. |
 | Navigation & Layout Architecture | 45% | IA restructure, breadcrumb/stepper patterns, breakpoint matrices | Role-based menus, responsive grid specs, usability findings. |
-| Template & Component Production | 30% | High-fidelity templates, component states, copy decks | Annotated templates, imagery manifests, localisation placeholders. |
+| Template & Component Production | 100% | High-fidelity templates, component states, copy decks | Annotated templates (home/dashboards/explorer/messaging/profile overview), imagery manifests, localisation placeholders. |
 | Accessibility, Compliance & Handoff | 20% | Accessibility audits, security overlays, engineering readiness | QA checklists, handoff kits, compliance approvals. |
 | Theme Deployment & Runtime Validation | 15% | Theme switching validation, telemetry, rollback plans | Prototype switchers, runtime QA logs, incident response documentation. |

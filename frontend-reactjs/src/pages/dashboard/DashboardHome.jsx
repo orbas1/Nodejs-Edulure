@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useOutletContext } from 'react-router-dom';
+
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useDashboard } from '../../context/DashboardContext.jsx';
 
 function MetricCard({ metric }) {
@@ -44,15 +46,19 @@ BarTrack.propTypes = {
 };
 
 function HomeLearner({ dashboard, profile }) {
-  const learningPace = dashboard.analytics.learningPace.map((entry) => ({
+  const metrics = dashboard.metrics ?? [];
+  const learningPace = (dashboard.analytics?.learningPace ?? []).map((entry) => ({
     label: entry.day,
     value: `${entry.minutes}m`
   }));
+  const upcoming = dashboard.upcoming ?? [];
+  const profileStats = profile?.stats ?? [];
+  const feedHighlights = profile?.feedHighlights ?? [];
 
   return (
     <div className="space-y-10">
       <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        {dashboard.metrics.map((metric) => (
+        {metrics.map((metric) => (
           <MetricCard key={metric.label} metric={metric} />
         ))}
       </section>
@@ -60,16 +66,16 @@ function HomeLearner({ dashboard, profile }) {
       <section className="grid gap-6 lg:grid-cols-5">
         <div className="rounded-3xl border border-slate-900/70 bg-slate-900/40 p-6 lg:col-span-3">
           <div className="flex items-center gap-4">
-            <img src={profile.avatar} alt={profile.name} className="h-16 w-16 rounded-2xl border border-slate-800" />
+            <img src={profile?.avatar} alt={profile?.name ?? 'Learner profile'} className="h-16 w-16 rounded-2xl border border-slate-800" />
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">Learner Profile</p>
-              <h2 className="text-2xl font-semibold text-white">{profile.name}</h2>
-              <p className="text-sm text-slate-400">{profile.title}</p>
+              <h2 className="text-2xl font-semibold text-white">{profile?.name ?? 'Learner'}</h2>
+              <p className="text-sm text-slate-400">{profile?.title ?? 'Active learner'}</p>
             </div>
           </div>
-          <p className="mt-4 text-sm text-slate-300">{profile.bio}</p>
+          <p className="mt-4 text-sm text-slate-300">{profile?.bio ?? 'Welcome to your learning control center.'}</p>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {profile.stats.map((stat) => (
+            {profileStats.map((stat) => (
               <div key={stat.label} className="rounded-2xl border border-slate-900/60 bg-slate-900/40 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">{stat.label}</p>
                 <p className="mt-2 text-xl font-semibold text-white">{stat.value}</p>
@@ -91,7 +97,7 @@ function HomeLearner({ dashboard, profile }) {
         <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
           <p className="text-xs uppercase tracking-wide text-slate-500">Upcoming commitments</p>
           <ul className="mt-4 space-y-4">
-            {dashboard.upcoming.map((event) => (
+            {upcoming.map((event) => (
               <li key={event.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-4">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>{event.type}</span>
@@ -112,7 +118,7 @@ function HomeLearner({ dashboard, profile }) {
         <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
           <p className="text-xs uppercase tracking-wide text-slate-500">Feed highlights</p>
           <ul className="mt-4 space-y-4">
-            {profile.feedHighlights.map((item) => (
+            {feedHighlights.map((item) => (
               <li key={item.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-4">
                 <div className="flex items-center justify-between text-xs text-slate-500">
                   <span>{item.time}</span>
@@ -138,23 +144,28 @@ HomeLearner.propTypes = {
 };
 
 function HomeInstructor({ dashboard, profile }) {
+  const metrics = dashboard.metrics ?? [];
   const enrollmentMetrics = useMemo(
     () =>
-      dashboard.analytics.enrollment.map((metric) => ({
+      (dashboard.analytics?.enrollment ?? []).map((metric) => ({
         label: metric.label,
         value: `${metric.current}`,
         change: `${metric.current >= metric.previous ? '+' : '−'}${Math.abs(metric.current - metric.previous)}`,
         trend: metric.current >= metric.previous ? 'up' : 'down'
       })),
-    [dashboard.analytics.enrollment]
+    [dashboard.analytics?.enrollment]
   );
 
-  const revenueSlices = dashboard.analytics.revenueStreams;
+  const revenueSlices = dashboard.analytics?.revenueStreams ?? [];
+  const pipeline = dashboard.courses?.pipeline ?? [];
+  const production = dashboard.courses?.production ?? [];
+
+  const profileStats = enrollmentMetrics;
 
   return (
     <div className="space-y-10">
       <section className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        {dashboard.metrics.map((metric) => (
+        {metrics.map((metric) => (
           <MetricCard key={metric.label} metric={metric} />
         ))}
       </section>
@@ -162,10 +173,10 @@ function HomeInstructor({ dashboard, profile }) {
       <section className="grid gap-6 lg:grid-cols-5">
         <div className="rounded-3xl border border-slate-900/70 bg-slate-900/40 p-6 lg:col-span-3">
           <div className="flex items-center gap-4">
-            <img src={profile.avatar} alt={profile.name} className="h-16 w-16 rounded-2xl border border-slate-800" />
+            <img src={profile?.avatar} alt={profile?.name ?? 'Instructor profile'} className="h-16 w-16 rounded-2xl border border-slate-800" />
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-400">Instructor-in-residence</p>
-              <h2 className="text-2xl font-semibold text-white">{profile.name}</h2>
+              <h2 className="text-2xl font-semibold text-white">{profile?.name ?? 'Instructor'}</h2>
               <p className="text-sm text-slate-400">Cohort architect & facilitator</p>
             </div>
           </div>
@@ -174,7 +185,7 @@ function HomeInstructor({ dashboard, profile }) {
             recent signals.
           </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {enrollmentMetrics.map((stat) => (
+            {profileStats.map((stat) => (
               <div key={stat.label} className="rounded-2xl border border-slate-900/60 bg-slate-900/40 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">{stat.label}</p>
                 <p className="mt-2 text-xl font-semibold text-white">{stat.value}</p>
@@ -201,7 +212,7 @@ function HomeInstructor({ dashboard, profile }) {
         <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
           <p className="text-xs uppercase tracking-wide text-slate-500">Launch radar</p>
           <ul className="mt-4 space-y-4">
-            {dashboard.courses.pipeline.map((cohort) => (
+            {pipeline.map((cohort) => (
               <li key={cohort.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-4">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>{cohort.stage}</span>
@@ -216,7 +227,7 @@ function HomeInstructor({ dashboard, profile }) {
         <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
           <p className="text-xs uppercase tracking-wide text-slate-500">Production board</p>
           <ul className="mt-4 space-y-4">
-            {dashboard.courses.production.map((asset) => (
+            {production.map((asset) => (
               <li key={asset.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/60 p-4">
                 <div className="flex items-center justify-between text-xs text-slate-400">
                   <span>{asset.owner}</span>
@@ -238,14 +249,28 @@ HomeInstructor.propTypes = {
 };
 
 export default function DashboardHome() {
-  const { role, dashboard } = useOutletContext();
+  const { role, dashboard, refresh } = useOutletContext();
   const { profile } = useDashboard();
 
   if (!dashboard) {
     return (
-      <div className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-10 text-center text-sm text-slate-400">
-        No dashboard data configured for this role.
-      </div>
+      <DashboardStateMessage
+        title="Dashboard data unavailable"
+        description="We don't have any overview data for this workspace yet. Refresh once data sources are connected."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
+
+  if (!profile) {
+    return (
+      <DashboardStateMessage
+        title="Profile data missing"
+        description="We couldn't load your learner profile. Refresh to retry the sync."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
     );
   }
 

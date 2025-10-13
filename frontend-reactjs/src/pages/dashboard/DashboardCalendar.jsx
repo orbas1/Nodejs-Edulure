@@ -1,7 +1,9 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function DashboardCalendar() {
-  const { role, dashboard } = useOutletContext();
+  const { role, dashboard, refresh } = useOutletContext();
   const items = dashboard?.calendar ?? [];
 
   return (
@@ -30,20 +32,29 @@ export default function DashboardCalendar() {
       </div>
 
       <section className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
-        <div className="grid gap-4 md:grid-cols-5">
-          {items.map((day) => (
-            <div key={day.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/50 p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-500">{day.day}</p>
-              <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                {day.items.map((item) => (
-                  <li key={item} className="rounded-xl border border-slate-900/60 bg-slate-900/60 px-3 py-2">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+        {items.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-5">
+            {items.map((day) => (
+              <div key={day.id} className="rounded-2xl border border-slate-900/60 bg-slate-900/50 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">{day.day}</p>
+                <ul className="mt-3 space-y-2 text-sm text-slate-300">
+                  {day.items.map((item) => (
+                    <li key={item} className="rounded-xl border border-slate-900/60 bg-slate-900/60 px-3 py-2">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <DashboardStateMessage
+            title="Calendar is clear"
+            description="No commitments found for this role. Refresh after scheduling sessions or syncing calendars."
+            actionLabel="Refresh"
+            onAction={() => refresh?.()}
+          />
+        )}
       </section>
     </div>
   );

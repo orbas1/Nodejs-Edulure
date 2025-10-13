@@ -67,3 +67,7 @@
 - `backend-nodejs/src/services/ExplorerSearchService.js` – federated search orchestrator normalising Meilisearch responses, facets, and geo markers for explorer delivery.
 - `backend-nodejs/src/controllers/ExplorerController.js` and `backend-nodejs/src/routes/explorer.routes.js` – Express entry points exposing `/api/explorer/search` and `/api/explorer/saved-searches` endpoints with Joi validation.
 - `backend-nodejs/src/utils/geo.js` & `backend-nodejs/src/data/countryCentroids.json` – country centroid lookup utilities powering map-ready geo markers in explorer responses.
+- `backend-nodejs/src/repositories/ProfileRepository.js` – aggregation repository composing user profile, social, community, engagement, and commerce data with privacy/role guards for profile dashboards.
+- `backend-nodejs/src/services/ProfileAggregationService.js` – service orchestrating cached hero metrics, badges, shelves, insights, quick actions, and timeline events for `/api/profiles/:id/overview`.
+- `backend-nodejs/src/controllers/ProfileController.js` & `backend-nodejs/src/routes/profile.routes.js` – Express controller/router exposing the profile overview endpoint with Joi validation and cache headers.
+- `backend-nodejs/test/profileAggregationService.test.js`, `backend-nodejs/test/profileHttpRoutes.test.js` – Vitest coverage validating aggregation stitching, cache behaviour, and HTTP responses for the new profile surface.

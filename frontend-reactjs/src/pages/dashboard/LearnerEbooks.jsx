@@ -1,8 +1,23 @@
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
 export default function LearnerEbooks() {
-  const { dashboard } = useOutletContext();
-  const library = dashboard?.ebooks?.library ?? [];
+  const { dashboard, refresh } = useOutletContext();
+  const ebooks = dashboard?.ebooks;
+
+  if (!ebooks) {
+    return (
+      <DashboardStateMessage
+        title="E-book workspace unavailable"
+        description="We could not load your library insights. Refresh to try pulling the latest progress and highlights."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
+
+  const library = ebooks.library ?? [];
 
   return (
     <div className="space-y-8">
@@ -22,28 +37,38 @@ export default function LearnerEbooks() {
       </div>
 
       <section className="grid gap-4 md:grid-cols-3">
-        {library.map((ebook) => (
-          <div key={ebook.id} className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
-            <p className="text-xs uppercase tracking-wide text-slate-500">{ebook.format}</p>
-            <h2 className="mt-2 text-lg font-semibold text-white">{ebook.title}</h2>
-            <p className="mt-2 text-sm text-slate-400">Last opened {ebook.lastOpened}</p>
-            <div className="mt-4 h-2 rounded-full bg-slate-800">
-              <div
-                className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
-                style={{ width: `${ebook.progress}%` }}
-              />
+        {library.length > 0 ? (
+          library.map((ebook) => (
+            <div key={ebook.id} className="rounded-3xl border border-slate-900/60 bg-slate-900/40 p-6">
+              <p className="text-xs uppercase tracking-wide text-slate-500">{ebook.format}</p>
+              <h2 className="mt-2 text-lg font-semibold text-white">{ebook.title}</h2>
+              <p className="mt-2 text-sm text-slate-400">Last opened {ebook.lastOpened}</p>
+              <div className="mt-4 h-2 rounded-full bg-slate-800">
+                <div
+                  className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
+                  style={{ width: `${ebook.progress}%` }}
+                />
+              </div>
+              <p className="mt-3 text-xs text-slate-500">{ebook.progress}% complete</p>
+              <div className="mt-4 flex items-center gap-3 text-xs text-slate-400">
+                <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                  Continue reading
+                </button>
+                <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
+                  Share highlight
+                </button>
+              </div>
             </div>
-            <p className="mt-3 text-xs text-slate-500">{ebook.progress}% complete</p>
-            <div className="mt-4 flex items-center gap-3 text-xs text-slate-400">
-              <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
-                Continue reading
-              </button>
-              <button type="button" className="rounded-full border border-slate-700 px-3 py-1 hover:border-primary/50">
-                Share highlight
-              </button>
-            </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <DashboardStateMessage
+            className="md:col-span-3"
+            title="No saved e-books yet"
+            description="Import resources or sync from your reader integrations to populate this space."
+            actionLabel="Refresh"
+            onAction={() => refresh?.()}
+          />
+        )}
       </section>
     </div>
   );

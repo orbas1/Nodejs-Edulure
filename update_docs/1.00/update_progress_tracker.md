@@ -8,7 +8,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 2 – Content, Commerce & Live Learning Delivery | 74% | 82% | 80% | 84% | 72% | 75% | 78% |
 | Task 3 – Communities, Social Graph & Engagement Systems | 90% | 98% | 94% | 96% | 90% | 94% | 94% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 86% | 100% | 97% | 98% | 94% | 97% | 95% |
-| Task 5 – Dashboards, Profiles & Operational Consoles | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 5 – Dashboards, Profiles & Operational Consoles | 40% | 38% | 36% | 38% | 35% | 36% | 37% |
 | Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
@@ -44,6 +44,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Explorer UX shipped with production fidelity: `/explorer` orchestrates cross-entity tabs, adaptive facet rails, controlled saved-search CRUD flows, keyboard-accessible geo markers, zero-result education, optimistic loading toasts, and Meilisearch-backed telemetry wiring. Navigation, auth guards, and analytics IDs align with design artefacts, while backend Prometheus metrics surface in the operator consoles.
 - Ads compliance automation is now enforced through AdsService—overspending campaigns are auto-paused with compliance metadata persisted, insights return chronologically ordered metrics, Vitest covers compliance/insight flows, and the Vite build validates the explorer/ads dashboards end-to-end following dependency reconciliation.
 - Explorer intelligence dashboards now mirror the backend analytics stack: the React `/analytics` route exposes authenticated range controls, live KPIs, entity and ads breakdowns, forecast summaries, query spotlights, and alert styling tied to the ExplorerAnalyticsService endpoints with manual refresh, empty state handling, and navigation gating so operations teams can monitor health without resorting to raw APIs.
+- Profile overview orchestration landed with `/api/profiles/{id}/overview`: the aggregation service hydrates hero metrics, engagement insights, programme shelves, quick actions, and timeline events with TTL caching, while the React profile route consumes the live payload via a new caching hook and production-grade components aligned to `Profile Look.md`, `Profile Styling.md`, and `dashboard_drawings.md`. Backend API/service/controller/route documentation, frontend change logs, and design plans/trackers were refreshed to capture the new profile experience so Task 5.1 is fully documented for downstream squads.
 
 ### Design Progress Addendum
 | Metric | Current Score (%) | Commentary |
