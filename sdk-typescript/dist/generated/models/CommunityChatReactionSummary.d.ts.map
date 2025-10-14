@@ -1,0 +1,1 @@
+{"version":3,"file":"CommunityChatReactionSummary.d.ts","sourceRoot":"","sources":["../../../src/generated/models/CommunityChatReactionSummary.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,4BAA4B,GAAG;IACvC,SAAS,EAAE,MAAM,CAAC;IAClB,SAAS,EAAE,KAAK,CAAC;QACb,KAAK,CAAC,EAAE,MAAM,CAAC;QACf,KAAK,CAAC,EAAE,MAAM,CAAC;KAClB,CAAC,CAAC;IACH,eAAe,EAAE,KAAK,CAAC,MAAM,CAAC,CAAC;CAClC,CAAC"}

@@ -13,7 +13,10 @@
     "preview": "vite preview",
     "lint": "eslint \"src\"",
     "lint:fix": "eslint \"src\" --fix",
-    "audit:dependencies": "npm audit --audit-level=moderate"
+    "audit:dependencies": "npm audit --audit-level=moderate",
+    "sdk:build": "npm run --prefix ../sdk-typescript build",
+    "predev": "npm run sdk:build",
+    "prebuild": "npm run sdk:build"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
@@ -29,7 +32,8 @@
     "react-router-dom": "^6.22.3",
     "react-simple-maps": "^3.0.0",
     "recharts": "^3.2.1",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "@edulure/api-sdk": "file:../sdk-typescript"
   },
   "devDependencies": {
     "@types/react": "^18.2.21",

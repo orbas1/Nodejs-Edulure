@@ -75,6 +75,10 @@
 - Audit log table uses monospace columns for timestamps/action codes, row hover accent #334155, and severity icons.
 - Governance shortcuts styled as pill buttons with icon, uppercase label, focus outline #22D3EE.
 
+### Service Availability Messaging
+- Global service health banner adopts pill-shaped warning cards using tone-specific palettes (critical: #FEE2E2/#B91C1C, warning: #FEF3C7/#B45309, info: #E0F2FE/#0369A1) with uppercase chips and iconography mirroring incident status.【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L9-L73】
+- Desktop header shows compact status badge (matching tone palette) adjacent to navigation, while mobile drawers mirror the badge and descriptive copy to keep outage context across breakpoints.【F:frontend-reactjs/src/layouts/MainLayout.jsx†L24-L260】
+
 ### Learner Panel Styling
 - Hero banner gradient (#312E81→#6366F1) with streak path illustration; progress ring uses 6px stroke and drop shadow.
 - Feed cards 12px radius, left accent bar color-coded by item type, inline CTAs tertiary style.

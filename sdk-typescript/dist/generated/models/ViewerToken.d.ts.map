@@ -1,0 +1,1 @@
+{"version":3,"file":"ViewerToken.d.ts","sourceRoot":"","sources":["../../../src/generated/models/ViewerToken.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,gBAAgB,CAAC;AACnD,MAAM,MAAM,WAAW,GAAG;IACtB,GAAG,EAAE,MAAM,CAAC;IACZ,SAAS,EAAE,MAAM,CAAC;IAClB,SAAS,EAAE,MAAM,CAAC;IAClB,WAAW,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IAC5B,KAAK,EAAE,YAAY,CAAC;CACvB,CAAC"}

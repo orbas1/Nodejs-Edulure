@@ -22,6 +22,7 @@ All design milestones start at **0%** completion and must produce artefacts refe
   - Responsive mockups for marketing funnels (home, catalog, cohort, pricing, resources) at 1280–768 breakpoints approved.【F:update_docs/1.50/Design_Plan.md†L82-L94】
   - Dashboard templates (overview, cohort management, analytics, resources, settings) annotated for command palette, breadcrumbs, and contextual sidebars.【F:update_docs/1.50/Design_Plan.md†L95-L105】
   - Component spec dossiers (cards, tables, charts, forms, modals) and interaction prototypes published to Storybook backlog.【F:update_docs/1.50/Design_Plan.md†L99-L105】
+  - Operator dashboard mockups reference live service readiness telemetry delivered by the backend squad to ensure health banners and incident shortcuts reflect real-time status; the shell implementation now consumes the manifest feed to visualise outages consistently.【F:backend-nodejs/src/servers/webServer.js†L19-L94】【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L1-L96】
 
 ## Milestone D4 – Asset, Copy, and Compliance Delivery (Weeks 3–5, 0%)
 - **Goal:** Finalise copy decks, imagery requirements, dummy data, and accessibility testing protocols to enable engineering readiness and performance governance.【F:update_docs/1.50/Design_Plan.md†L107-L126】

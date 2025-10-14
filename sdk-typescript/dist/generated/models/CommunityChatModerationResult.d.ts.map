@@ -1,0 +1,1 @@
+{"version":3,"file":"CommunityChatModerationResult.d.ts","sourceRoot":"","sources":["../../../src/generated/models/CommunityChatModerationResult.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,oBAAoB,EAAE,MAAM,wBAAwB,CAAC;AACnE,OAAO,KAAK,EAAE,uBAAuB,EAAE,MAAM,2BAA2B,CAAC;AACzE,MAAM,MAAM,6BAA6B,GAAG;IACxC,OAAO,EAAE,oBAAoB,CAAC;IAC9B,UAAU,EAAE,uBAAuB,CAAC;CACvC,CAAC"}

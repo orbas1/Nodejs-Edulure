@@ -1,0 +1,1 @@
+{"version":3,"file":"CapabilityManifestSummary.d.ts","sourceRoot":"","sources":["../../../src/generated/models/CapabilityManifestSummary.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,kCAAkC,EAAE,MAAM,sCAAsC,CAAC;AAC/F;;GAEG;AACH,MAAM,MAAM,yBAAyB,GAAG;IACpC,QAAQ,EAAE,kCAAkC,CAAC;IAC7C,YAAY,EAAE,kCAAkC,CAAC;CACpD,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"PaymentSummaryEntry.d.ts","sourceRoot":"","sources":["../../../src/generated/models/PaymentSummaryEntry.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,mBAAmB,GAAG;IAC9B,QAAQ,EAAE,MAAM,CAAC;IACjB,KAAK,EAAE,MAAM,CAAC;IACd,QAAQ,EAAE,MAAM,CAAC;IACjB,GAAG,EAAE,MAAM,CAAC;IACZ,GAAG,EAAE,MAAM,CAAC;IACZ,QAAQ,EAAE,MAAM,CAAC;IACjB,QAAQ,EAAE,MAAM,CAAC;CACpB,CAAC"}

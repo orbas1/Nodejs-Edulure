@@ -32,6 +32,8 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
 import UserMenu from '../components/navigation/UserMenu.jsx';
+import ServiceHealthBanner from '../components/status/ServiceHealthBanner.jsx';
+import { useServiceHealth } from '../context/ServiceHealthContext.jsx';
 
 const navigationByRole = {
   learner: (basePath) => [
@@ -119,6 +121,7 @@ export default function DashboardLayout() {
   const location = useLocation();
   const { session, logout } = useAuth();
   const { activeRole, setActiveRole, roles, dashboards, searchIndex, loading, error, refresh } = useDashboard();
+  const { alerts, manifest } = useServiceHealth();
 
   const allowedRoles = useMemo(() => roles.map((r) => r.id), [roles]);
   const resolvedRole = useMemo(() => {
@@ -159,6 +162,37 @@ export default function DashboardLayout() {
       .filter((item) => item.role === resolvedRole)
       .filter((item) => item.title.toLowerCase().includes(query) || item.type.toLowerCase().includes(query));
   }, [searchQuery, searchIndex, resolvedRole]);
+
+  const healthHeadline = useMemo(() => {
+    if (!manifest) {
+      return { label: 'Checking platform health', tone: 'neutral' };
+    }
+    if (alerts.some((alert) => alert.level === 'critical')) {
+      return { label: 'Service interruption in progress', tone: 'critical' };
+    }
+    if (alerts.some((alert) => alert.level === 'warning')) {
+      return { label: 'Some services degraded', tone: 'warning' };
+    }
+    if (alerts.some((alert) => alert.level === 'info')) {
+      return { label: 'Capability updates active', tone: 'info' };
+    }
+    return { label: 'All systems operational', tone: 'success' };
+  }, [alerts, manifest]);
+
+  const healthToneClass = useMemo(() => {
+    switch (healthHeadline.tone) {
+      case 'critical':
+        return 'text-rose-600';
+      case 'warning':
+        return 'text-amber-600';
+      case 'info':
+        return 'text-sky-600';
+      case 'success':
+        return 'text-emerald-600';
+      default:
+        return 'text-slate-500';
+    }
+  }, [healthHeadline.tone]);
 
   const navigation = useMemo(() => {
     const builder = resolvedRole ? navigationByRole[resolvedRole] : null;
@@ -326,7 +360,7 @@ export default function DashboardLayout() {
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-slate-500">
               <span>
                 {resolvedRoleMeta?.label ?? 'Dashboard'} dashboard ·{' '}
-                {currentDashboard ? 'All systems green' : loading ? 'Syncing data' : 'Awaiting configuration'}
+                <span className={`font-semibold ${healthToneClass}`}>{healthHeadline.label}</span>
               </span>
               <span>
                 Route ·
@@ -337,6 +371,7 @@ export default function DashboardLayout() {
             </div>
           </div>
         </header>
+        <ServiceHealthBanner maxAlerts={4} />
         <main className="flex-1 bg-gradient-to-b from-slate-50 via-white to-slate-100">
           <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">{mainContent}</div>
         </main>

@@ -8,6 +8,8 @@ import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import UserMenu from '../components/navigation/UserMenu.jsx';
+import { useServiceHealth } from '../context/ServiceHealthContext.jsx';
+import ServiceHealthBanner from '../components/status/ServiceHealthBanner.jsx';
 
 const DASHBOARD_PATH_BY_ROLE = {
   admin: '/dashboard/admin',
@@ -23,6 +25,7 @@ export default function MainLayout() {
   const { isAuthenticated, session, logout } = useAuth();
   const { getConfigValue, isFeatureEnabled } = useRuntimeConfig();
   const { t } = useLanguage();
+  const { alerts, manifest } = useServiceHealth();
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
   const analyticsDashboardEnabled = isFeatureEnabled('analytics.explorer-dashboard', true);
   const adminConsoleEnabled = isFeatureEnabled('admin.operational-console', false);
@@ -99,6 +102,64 @@ export default function MainLayout() {
   const dashboardPath =
     DASHBOARD_PATH_BY_ROLE[(session?.user?.role ?? 'learner').toLowerCase()] ?? '/dashboard/learner';
 
+  const healthSummary = useMemo(() => {
+    if (!manifest) {
+      return {
+        label: 'Monitoring services',
+        tone: 'neutral',
+        message: 'Fetching latest readiness telemetry.'
+      };
+    }
+
+    const criticalAlert = alerts.find((alert) => alert.level === 'critical');
+    if (criticalAlert) {
+      return {
+        label: 'Service interruption',
+        tone: 'critical',
+        message: criticalAlert.message
+      };
+    }
+
+    const warningAlert = alerts.find((alert) => alert.level === 'warning');
+    if (warningAlert) {
+      return {
+        label: 'Performance degraded',
+        tone: 'warning',
+        message: warningAlert.message
+      };
+    }
+
+    const infoAlert = alerts.find((alert) => alert.level === 'info');
+    if (infoAlert) {
+      return {
+        label: 'Capability updates active',
+        tone: 'info',
+        message: infoAlert.message
+      };
+    }
+
+    return {
+      label: 'All systems operational',
+      tone: 'success',
+      message: 'All monitored services are available.'
+    };
+  }, [alerts, manifest]);
+
+  const statusBadgeClasses = useMemo(() => {
+    switch (healthSummary.tone) {
+      case 'critical':
+        return 'border border-rose-200 bg-rose-100 text-rose-700';
+      case 'warning':
+        return 'border border-amber-200 bg-amber-100 text-amber-700';
+      case 'info':
+        return 'border border-sky-200 bg-sky-100 text-sky-700';
+      case 'success':
+        return 'border border-emerald-200 bg-emerald-100 text-emerald-700';
+      default:
+        return 'border border-slate-200 bg-slate-100 text-slate-600';
+    }
+  }, [healthSummary.tone]);
+
   return (
     <div className="min-h-screen bg-white">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -110,23 +171,30 @@ export default function MainLayout() {
               className="h-10 w-auto"
             />
           </a>
-          {isAuthenticated ? (
-            <nav className="hidden items-center gap-6 lg:flex">
-              {navigation.map((item) => (
-                <NavLink
-                  key={item.name}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    `text-sm font-semibold transition-colors duration-200 hover:text-primary-dark ${
-                      isActive ? 'text-primary' : 'text-slate-600'
-                    }`
-                  }
-                >
-                  {item.name}
-                </NavLink>
-              ))}
-            </nav>
-          ) : null}
+          <div className="hidden items-center gap-4 lg:flex">
+            {isAuthenticated ? (
+              <nav className="flex items-center gap-6">
+                {navigation.map((item) => (
+                  <NavLink
+                    key={item.name}
+                    to={item.to}
+                    className={({ isActive }) =>
+                      `text-sm font-semibold transition-colors duration-200 hover:text-primary-dark ${
+                        isActive ? 'text-primary' : 'text-slate-600'
+                      }`
+                    }
+                  >
+                    {item.name}
+                  </NavLink>
+                ))}
+              </nav>
+            ) : null}
+            <span
+              className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusBadgeClasses}`}
+            >
+              {healthSummary.label}
+            </span>
+          </div>
           <div className="hidden items-center gap-3 lg:flex">
             <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
             {isAuthenticated ? (
@@ -172,6 +240,14 @@ export default function MainLayout() {
                   >
                     <Disclosure.Panel className="absolute inset-x-4 top-20 z-50 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl backdrop-blur">
                       <div className="flex flex-col gap-5">
+                        <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+                          <p
+                            className={`inline-flex w-full items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide ${statusBadgeClasses}`}
+                          >
+                            {healthSummary.label}
+                          </p>
+                          <p className="mt-2 text-xs text-slate-600">{healthSummary.message}</p>
+                        </div>
                         <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
                           <LanguageSelector size="compact" variant="light" align="start" fullWidth />
                         </div>
@@ -266,6 +342,7 @@ export default function MainLayout() {
           </div>
         </div>
       </header>
+      <ServiceHealthBanner />
       <main className="bg-white">
         <Outlet key={location.pathname} />
       </main>

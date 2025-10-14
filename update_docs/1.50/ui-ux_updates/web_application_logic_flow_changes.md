@@ -4,6 +4,7 @@
 - Implemented unified state management using Redux Toolkit with normalized entities for cohorts, lessons, learners, and analytics insights.
 - Introduced server-driven UI pattern for marketing modules allowing CMS-managed layouts without redeploys.
 - Added WebSocket layer for real-time updates (chat, notifications, live sessions) integrated with fallback polling.
+- Global shell polls the capability manifest `/api/v1/runtime/manifest`, broadcasting service availability banners and status badges to all layouts so outage messaging and refresh controls remain consistent across contexts.【F:frontend-reactjs/src/context/ServiceHealthContext.jsx†L1-L165】【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L1-L96】
 
 ## Authentication & Session Management
 - Login flow now supports email/password, Google, Microsoft, and SAML SSO. After authentication, the header populates with **Feed, Communities, Explore, Create, Dashboard, Profile avatar dropdown** while user redirected based on role (Learner, Provider, Admin).

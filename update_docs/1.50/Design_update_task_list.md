@@ -34,6 +34,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
 
 ## 3. Web Application Navigation & Funnel Redesign (0%)
 - **Objective:** Restructure marketing funnels and authenticated dashboards with modular components and performance guardrails.【F:update_docs/1.50/Design_Plan.md†L78-L117】
+- _Progress note:_ Backend readiness probes are now available for integration, enabling the operator dashboard and banner tasks below to consume live service health data without additional design-blocking API work.【F:backend-nodejs/src/servers/webServer.js†L19-L94】
 - **Subtasks (11 total):**
   1. Create sitemap and navigation blueprint covering marketing pages, dashboards, and contextual menus.【F:update_docs/1.50/Design_Plan.md†L80-L94】
   2. Develop hero, testimonial, curriculum, and CTA partials for themed marketing campaigns.【F:update_docs/1.50/Design_Plan.md†L82-L94】
@@ -46,6 +47,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   9. Run performance design review with engineering to validate partial loading strategies and asset budgets.【F:update_docs/1.50/Design_Plan.md†L107-L123】
   10. Publish Storybook backlog entries and asset manifests for front-end squads.【F:update_docs/1.50/Design_Plan.md†L99-L123】
   11. Capture conversion and usability success metrics with baseline analytics queries for post-launch comparisons.【F:update_docs/1.50/Design_Plan.md†L140-L153】
+  - _Progress note:_ Service availability banner specifications implemented in the shell, ensuring navigation badges mirror readiness telemetry for operator awareness.【F:frontend-reactjs/src/layouts/MainLayout.jsx†L24-L260】【F:update_docs/1.50/ui-ux_updates/web_application_styling_changes.md†L65-L78】
 
 ## 4. Asset, Copy, and Compliance Enablement (0%)
 - **Objective:** Deliver documentation, assets, and compliance artefacts that unblock development, QA, and marketing teams.【F:update_docs/1.50/Design_Plan.md†L107-L136】

@@ -8,5 +8,6 @@ const router = Router();
 router.get('/public', RuntimeConfigController.publicSnapshot);
 router.get('/user', auth(), RuntimeConfigController.userSnapshot);
 router.get('/snapshot', auth('admin'), RuntimeConfigController.snapshot);
+router.get('/manifest', RuntimeConfigController.capabilityManifest);
 
 export default router;

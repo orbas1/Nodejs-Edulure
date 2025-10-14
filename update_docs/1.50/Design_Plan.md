@@ -10,6 +10,7 @@
 - Maintain a rolling design change log and milestone review board to capture scope shifts, risk mitigations, and decision outcomes before engineering handoff.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L41-L53】
 - Operate cross-functional ceremonies (design <> engineering <> marketing <> analytics) with pre-read artefacts to accelerate feedback and alignment on theme or page additions.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L81-L92】
 - Preserve modular documentation (wireframes, component specs, logic flows, asset manifests) to enable partial-based builds, themable deployments, and quick creation of campaign-specific pages.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L27-L40】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L29-L40】
+- Partner with platform engineering to incorporate the new readiness telemetry feeds into operator dashboard modules, ensuring health banners and incident workflows reflect live service status without redundant API design work.【F:backend-nodejs/src/servers/webServer.js†L19-L94】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Logic_Flow_map.md†L1-L37】
 
 ## 2. Mobile Application Design Scope
 ### 2.1 Foundations & Tokens

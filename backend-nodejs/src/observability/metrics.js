@@ -43,6 +43,12 @@ const httpRequestErrors = new promClient.Counter({
   labelNames: ['method', 'route', 'status_code']
 });
 
+const featureGateDecisionsTotal = new promClient.Counter({
+  name: 'edulure_feature_flag_gate_decisions_total',
+  help: 'Feature flag gate outcomes for API routes',
+  labelNames: ['flag_key', 'result', 'route', 'audience', 'reason']
+});
+
 const storageOperationDurationSeconds = new promClient.Histogram({
   name: 'edulure_storage_operation_duration_seconds',
   help: 'Duration histogram for R2 storage operations',
@@ -193,6 +199,7 @@ registry.registerMetric(httpRequestsTotal);
 registry.registerMetric(httpRequestDurationSeconds);
 registry.registerMetric(httpActiveRequests);
 registry.registerMetric(httpRequestErrors);
+registry.registerMetric(featureGateDecisionsTotal);
 registry.registerMetric(storageOperationDurationSeconds);
 registry.registerMetric(storageOperationsInFlight);
 registry.registerMetric(storageTransferredBytes);
@@ -526,6 +533,22 @@ export function trackPaymentRefundMetrics({ provider, currency, amount }) {
 export function recordUnhandledException(error) {
   const type = error?.name ?? 'Error';
   unhandledExceptionsTotal.inc({ type });
+}
+
+export function recordFeatureGateDecision({ flagKey, result, route, audience, reason }) {
+  const resolvedFlag = flagKey ?? 'unknown';
+  const resolvedResult = result ?? 'unknown';
+  const resolvedRoute = route ?? 'unknown';
+  const resolvedAudience = audience ?? 'public';
+  const resolvedReason = reason ?? 'unspecified';
+
+  featureGateDecisionsTotal.inc({
+    flag_key: resolvedFlag,
+    result: resolvedResult,
+    route: resolvedRoute,
+    audience: resolvedAudience,
+    reason: resolvedReason
+  });
 }
 
 export function recordAntivirusScan({ status, bytesScanned, durationSeconds, signature, bucket }) {

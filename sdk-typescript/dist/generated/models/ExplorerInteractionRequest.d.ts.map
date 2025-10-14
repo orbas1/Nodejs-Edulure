@@ -1,0 +1,1 @@
+{"version":3,"file":"ExplorerInteractionRequest.d.ts","sourceRoot":"","sources":["../../../src/generated/models/ExplorerInteractionRequest.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,0BAA0B,GAAG;IACrC,aAAa,EAAE,MAAM,CAAC;IACtB,UAAU,EAAE,MAAM,CAAC;IACnB,QAAQ,EAAE,MAAM,CAAC;IACjB,eAAe,CAAC,EAAE,OAAO,GAAG,aAAa,GAAG,UAAU,CAAC;IACvD,QAAQ,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;CAC5B,CAAC"}
