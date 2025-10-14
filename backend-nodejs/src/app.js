@@ -40,6 +40,20 @@ import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
 
+let readinessReporter = () => ({
+  service: 'web-service',
+  ready: false,
+  status: 'not_ready',
+  timestamp: new Date().toISOString(),
+  message: 'Readiness probe not initialised'
+});
+
+export function registerReadinessProbe(getStatus) {
+  if (typeof getStatus === 'function') {
+    readinessReporter = getStatus;
+  }
+}
+
 const app = express();
 
 app.disable('x-powered-by');
@@ -116,6 +130,28 @@ app.use(
   })
 );
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+app.get('/live', (_req, res) => {
+  const payload = {
+    service: 'web-service',
+    alive: true,
+    status: 'alive',
+    checkedAt: new Date().toISOString()
+  };
+  return res.status(200).json(payload);
+});
+
+app.get('/ready', (_req, res) => {
+  const report = readinessReporter();
+  const ready = Boolean(report?.ready);
+  const payload = {
+    service: 'web-service',
+    status: ready ? 'ready' : 'not_ready',
+    checkedAt: new Date().toISOString(),
+    ...(report && typeof report === 'object' ? report : {})
+  };
+  return res.status(ready ? 200 : 503).json(payload);
+});
 
 app.get('/health', async (_req, res, next) => {
   try {

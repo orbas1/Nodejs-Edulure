@@ -7,8 +7,13 @@
     "node": ">=20.12.2"
   },
   "scripts": {
-    "dev": "nodemon src/server.js",
-    "start": "node src/server.js",
+    "dev": "nodemon src/bin/web.js",
+    "dev:worker": "nodemon src/bin/worker.js",
+    "dev:realtime": "nodemon src/bin/realtime.js",
+    "start": "node src/bin/web.js",
+    "start:web": "node src/bin/web.js",
+    "start:worker": "node src/bin/worker.js",
+    "start:realtime": "node src/bin/realtime.js",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "test": "vitest run",

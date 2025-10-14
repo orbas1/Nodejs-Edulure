@@ -2,11 +2,11 @@
 
 All tasks start at **0%** completion. Percentages will be updated during execution.
 
-## 1. Platform Hardening & Modularisation (0%)
+## 1. Platform Hardening & Modularisation (20%)
 - **Objective:** Decouple backend services, externalise shared state, and enforce secure configuration to resolve Issues 1–4 & 8–10 while enabling enterprise hardening commitments.【F:update_docs/1.50/pre-update_evaluations/issue_list.md†L4-L37】【F:update_docs/1.50/features_to_add.md†L6-L30】
 - **Integration Subtasks (8 total):**
   - **Backend:**
-    1. Split server bootstrap into web, worker, and realtime services with readiness probes and crash isolation.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L4-L19】
+    1. Split server bootstrap into web, worker, and realtime services with readiness probes and crash isolation.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L4-L19】 ✅ Completed – modular entrypoints deployed with readiness telemetry, signal-aware shutdown, and per-service health surfaces.
     2. Implement feature-flagged router loader with `/v1` prefixes and error-boundary middleware.
   - **Front-end:**
     3. Consume new health-check and capability endpoints to display service availability banners.

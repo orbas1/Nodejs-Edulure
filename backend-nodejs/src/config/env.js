@@ -200,6 +200,11 @@ const envSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+    WEB_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    WEB_PROBE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    WORKER_PROBE_PORT: z.coerce.number().int().min(1).max(65535).default(9091),
+    REALTIME_PORT: z.coerce.number().int().min(1).max(65535).default(4100),
+    REALTIME_PROBE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
     APP_NAME: z.string().min(1).default('Edulure'),
     APP_URL: z.string().min(1, 'APP_URL must specify at least one origin'),
     CORS_ALLOWED_ORIGINS: z.string().optional(),
@@ -352,7 +357,9 @@ const envSchema = z
     MEILISEARCH_ALLOWED_IPS: z.string().optional(),
     SEARCH_INGESTION_BATCH_SIZE: z.coerce.number().int().min(25).max(2000).default(500),
     SEARCH_INGESTION_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
-    SEARCH_INGESTION_DELETE_BEFORE_REINDEX: z.coerce.boolean().default(true)
+    SEARCH_INGESTION_DELETE_BEFORE_REINDEX: z.coerce.boolean().default(true),
+    BOOTSTRAP_MAX_RETRIES: z.coerce.number().int().min(1).max(10).default(5),
+    BOOTSTRAP_RETRY_DELAY_MS: z.coerce.number().int().min(100).max(60000).default(2000)
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -500,14 +507,34 @@ const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRE
 const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
 const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
 
+const webPort = raw.WEB_PORT ?? raw.PORT;
+const webProbePort = raw.WEB_PROBE_PORT ?? webPort;
+const workerProbePort = raw.WORKER_PROBE_PORT;
+const realtimePort = raw.REALTIME_PORT;
+const realtimeProbePort = raw.REALTIME_PROBE_PORT ?? realtimePort;
+
 export const env = {
   nodeEnv: raw.NODE_ENV,
   isProduction: raw.NODE_ENV === 'production',
   isDevelopment: raw.NODE_ENV === 'development',
   app: {
     name: raw.APP_NAME,
-    port: raw.PORT,
+    port: webPort,
+    probePort: webProbePort,
     corsOrigins
+  },
+  services: {
+    web: {
+      port: webPort,
+      probePort: webProbePort
+    },
+    worker: {
+      probePort: workerProbePort
+    },
+    realtime: {
+      port: realtimePort,
+      probePort: realtimeProbePort
+    }
   },
   video: {
     basePlaybackUrl: raw.VIDEO_BASE_URL ?? 'https://video.edulure.local/streams',
@@ -627,6 +654,10 @@ export const env = {
     level: raw.LOG_LEVEL,
     redactedFields,
     serviceName: raw.LOG_SERVICE_NAME ?? 'edulure-api'
+  },
+  bootstrap: {
+    maxAttempts: raw.BOOTSTRAP_MAX_RETRIES,
+    retryDelayMs: raw.BOOTSTRAP_RETRY_DELAY_MS
   },
   retention: {
     enabled: raw.DATA_RETENTION_ENABLED,

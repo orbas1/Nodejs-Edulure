@@ -34,6 +34,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
 
 ## 3. Web Application Navigation & Funnel Redesign (0%)
 - **Objective:** Restructure marketing funnels and authenticated dashboards with modular components and performance guardrails.【F:update_docs/1.50/Design_Plan.md†L78-L117】
+- _Progress note:_ Backend readiness probes are now available for integration, enabling the operator dashboard and banner tasks below to consume live service health data without additional design-blocking API work.【F:backend-nodejs/src/servers/webServer.js†L19-L94】
 - **Subtasks (11 total):**
   1. Create sitemap and navigation blueprint covering marketing pages, dashboards, and contextual menus.【F:update_docs/1.50/Design_Plan.md†L80-L94】
   2. Develop hero, testimonial, curriculum, and CTA partials for themed marketing campaigns.【F:update_docs/1.50/Design_Plan.md†L82-L94】
