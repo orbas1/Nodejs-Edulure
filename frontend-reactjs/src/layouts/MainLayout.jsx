@@ -9,31 +9,50 @@ export default function MainLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, session, logout } = useAuth();
-  const { getConfigValue } = useRuntimeConfig();
+  const { getConfigValue, isFeatureEnabled } = useRuntimeConfig();
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
+  const analyticsDashboardEnabled = isFeatureEnabled('analytics.explorer-dashboard', true);
+  const adminConsoleEnabled = isFeatureEnabled('admin.operational-console', false);
+  const contentLibraryEnabled = isFeatureEnabled('content.library', true);
 
   const navigation = useMemo(() => {
-    const role = session?.user?.role ?? null;
-    const publicNavigation = [
-      { name: 'Home', to: '/' },
-      { name: 'About', to: '/about' }
-    ];
-
     if (!isAuthenticated) {
-      return publicNavigation;
+      return [
+        { name: 'Home', to: '/' },
+        { name: 'About', to: '/about' }
+      ];
     }
 
-    const authedNavigation = [
+    const role = session?.user?.role ?? 'user';
+    const items = [
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
       { name: 'Explorer', to: '/explorer' },
       { name: 'Profile', to: '/profile' }
     ];
-    if (isAuthenticated) {
-      return [...base, { name: 'Content', to: '/content' }];
+
+    if (contentLibraryEnabled && (role === 'instructor' || role === 'admin')) {
+      items.push({ name: 'Content', to: '/content' });
     }
-    return base;
-  }, [isAuthenticated]);
+
+    if (analyticsDashboardEnabled && (role === 'instructor' || role === 'admin')) {
+      items.push({ name: 'Analytics', to: '/analytics' });
+    }
+
+    if (adminConsoleEnabled && role === 'admin') {
+      items.push({ name: 'Admin', to: '/admin' });
+    }
+
+    items.push({ name: 'About', to: '/about' });
+
+    return items;
+  }, [
+    isAuthenticated,
+    session,
+    contentLibraryEnabled,
+    analyticsDashboardEnabled,
+    adminConsoleEnabled
+  ]);
 
   const avatarUrl = session?.user?.avatarUrl;
   const displayName = session?.user?.firstName
@@ -52,23 +71,6 @@ export default function MainLayout() {
   const handleProfileNavigation = () => {
     navigate('/profile');
   };
-
-    if (role === 'instructor' || role === 'admin') {
-      authedNavigation.push({ name: 'Content', to: '/content' });
-    }
-
-    if (analyticsDashboardEnabled && (role === 'instructor' || role === 'admin')) {
-      authedNavigation.push({ name: 'Analytics', to: '/analytics' });
-    }
-
-    if (role === 'admin' && adminConsoleEnabled) {
-      authedNavigation.push({ name: 'Admin', to: '/admin' });
-    }
-
-    authedNavigation.push({ name: 'About', to: '/about' });
-
-    return authedNavigation;
-  }, [isAuthenticated, session, adminConsoleEnabled, analyticsDashboardEnabled]);
 
   return (
     <div className="min-h-screen bg-white">
