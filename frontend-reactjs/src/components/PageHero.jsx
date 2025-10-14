@@ -1,6 +1,8 @@
 import PropTypes from 'prop-types';
 
-export default function PageHero({ title, description, cta }) {
+export default function PageHero({ title, description, subtitle, cta }) {
+  const heroDescription = description ?? subtitle;
+
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
       <div className="pointer-events-none absolute inset-0">
@@ -16,6 +18,8 @@ export default function PageHero({ title, description, cta }) {
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
             {title}
           </h1>
+          {heroDescription && <p className="mt-6 text-lg leading-8 text-slate-600">{heroDescription}</p>}
+          {cta ? <div className="mt-10 flex flex-wrap items-center gap-4">{cta}</div> : null}
           <p className="mt-6 text-lg leading-8 text-slate-200">{description}</p>
           <div className="mt-8 flex items-center gap-4 text-sm text-white/80">
             {["Strategists", "Designers", "Founders", "Mentors"].map((label) => (
@@ -53,6 +57,13 @@ export default function PageHero({ title, description, cta }) {
 
 PageHero.propTypes = {
   title: PropTypes.string.isRequired,
-  description: PropTypes.string.isRequired,
-  cta: PropTypes.node.isRequired
+  description: PropTypes.string,
+  subtitle: PropTypes.string,
+  cta: PropTypes.node
+};
+
+PageHero.defaultProps = {
+  description: undefined,
+  subtitle: undefined,
+  cta: null
 };
