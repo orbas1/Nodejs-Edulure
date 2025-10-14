@@ -22,9 +22,10 @@ export default function InstructorCourseCreate({
   onSyncFromLms
 }) {
   const { dashboard, refresh } = useOutletContext();
-  const creationBlueprints = dashboard?.courses?.creationBlueprints;
-  const blueprints = creationBlueprints ?? EMPTY_BLUEPRINTS;
-  const blueprints = useMemo(() => dashboard?.courses?.creationBlueprints ?? [], [dashboard]);
+  const blueprints = useMemo(
+    () => dashboard?.courses?.creationBlueprints ?? EMPTY_BLUEPRINTS,
+    [dashboard]
+  );
 
   const overview = useMemo(() => {
     if (blueprints.length === 0) {

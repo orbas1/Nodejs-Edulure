@@ -5,17 +5,50 @@ import { reviewVerificationCase } from '../api/verificationApi.js';
 import AdminStats from '../components/AdminStats.jsx';
 import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { formatNumber } from './admin/utils.js';
+import { useDashboard } from '../context/DashboardContext.jsx';
+import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import AdminApprovalsSection from './admin/sections/AdminApprovalsSection.jsx';
+import AdminComplianceSection from './admin/sections/AdminComplianceSection.jsx';
+import AdminMonetizationSettingsSection from './admin/sections/AdminMonetizationSettingsSection.jsx';
+import AdminOperationsSection from './admin/sections/AdminOperationsSection.jsx';
+import AdminPolicyHubSection from './admin/sections/AdminPolicyHubSection.jsx';
 import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
 import AdminTopCommunitiesSection from './admin/sections/AdminTopCommunitiesSection.jsx';
-import AdminOperationsSection from './admin/sections/AdminOperationsSection.jsx';
 import AdminUpcomingLaunchesSection from './admin/sections/AdminUpcomingLaunchesSection.jsx';
 import AdminActivitySection from './admin/sections/AdminActivitySection.jsx';
-import AdminMonetizationSettingsSection from './admin/sections/AdminMonetizationSettingsSection.jsx';
+import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
 const EMPTY_OBJECT = Object.freeze({});
 const EMPTY_ARRAY = Object.freeze([]);
+
+const SECTION_NAVIGATION = Object.freeze([
+  { id: 'overview', label: 'Overview' },
+  { id: 'approvals', label: 'Approvals' },
+  { id: 'revenue', label: 'Revenue' },
+  { id: 'monetization', label: 'Monetization' },
+  { id: 'communities', label: 'Communities' },
+  { id: 'operations', label: 'Operations' },
+  { id: 'compliance', label: 'Compliance' },
+  { id: 'policies', label: 'Policies' },
+  { id: 'launches', label: 'Launches' },
+  { id: 'activity', label: 'Activity' }
+]);
+
+function normaliseSlaHours(value) {
+  const numeric = Number.parseInt(value, 10);
+  if (Number.isNaN(numeric) || numeric <= 0) {
+    return 24;
+  }
+  return numeric;
+}
+
+function createCsvCell(value) {
+  if (value === null || value === undefined) {
+    return '""';
+  }
+  const text = String(value).replace(/"/g, '""');
+  return `"${text}"`;
+}
 
 function buildSupportStats(support) {
   const entries = [
@@ -75,52 +108,14 @@ function buildPlatformStats(platform) {
       ? { label: 'Instructors', value: formatNumber(platform.instructors) }
       : null
   ];
-import { useDashboard } from '../context/DashboardContext.jsx';
-import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
-import AdminApprovalsSection from './admin/sections/AdminApprovalsSection.jsx';
-import AdminComplianceSection from './admin/sections/AdminComplianceSection.jsx';
-import AdminOperationsSection from './admin/sections/AdminOperationsSection.jsx';
-import AdminPolicyHubSection from './admin/sections/AdminPolicyHubSection.jsx';
-import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
-import AdminTopCommunitiesSection from './admin/sections/AdminTopCommunitiesSection.jsx';
-import AdminUpcomingLaunchesSection from './admin/sections/AdminUpcomingLaunchesSection.jsx';
-import AdminActivitySection from './admin/sections/AdminActivitySection.jsx';
-import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
-const EMPTY_OBJECT = Object.freeze({});
-const EMPTY_ARRAY = Object.freeze([]);
-const sectionNavigation = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'approvals', label: 'Approvals' },
-  { id: 'revenue', label: 'Revenue' },
-  { id: 'communities', label: 'Communities' },
-  { id: 'operations', label: 'Operations' },
-  { id: 'compliance', label: 'Compliance' },
-  { id: 'policies', label: 'Policies' },
-  { id: 'launches', label: 'Launches' },
-  { id: 'activity', label: 'Activity' }
-];
-
-function normaliseSlaHours(value) {
-  const numeric = Number.parseInt(value, 10);
-  if (Number.isNaN(numeric) || numeric <= 0) {
-    return 24;
-  }
-  return numeric;
-}
-
-function createCsvCell(value) {
-  if (value === null || value === undefined) {
-    return '""';
-  }
-  const text = String(value).replace(/"/g, '""');
-  return `"${text}"`;
+  return entries.filter(Boolean);
 }
 
 export default function Admin() {
   const navigate = useNavigate();
   const { session } = useAuth();
-  const { dashboards, loading, error, refresh, roles, setActiveRole } = useDashboard();
+  const { dashboards, loading, error, refresh, roles = EMPTY_ARRAY, setActiveRole } = useDashboard();
   const { isFeatureEnabled, getConfigValue, loading: runtimeLoading } = useRuntimeConfig();
 
   const adminConsoleEnabled = isFeatureEnabled('admin.operational-console');
@@ -137,6 +132,7 @@ export default function Admin() {
   const adminData = useMemo(() => adminDataRaw ?? EMPTY_OBJECT, [adminDataRaw]);
   const overallLoading = runtimeLoading || loading;
   const isAdminUser = session?.user?.role === 'admin';
+  const token = session?.tokens?.accessToken ?? null;
 
   const adminMetrics = adminData.metrics ?? EMPTY_ARRAY;
 
@@ -144,9 +140,11 @@ export default function Admin() {
   const approvalItems = approvals.items ?? EMPTY_ARRAY;
   const pendingApprovals = approvals.pendingCount ?? approvalItems.length;
 
-  const revenueOverview = adminData.revenue?.overview ?? EMPTY_OBJECT;
-  const paymentHealth = adminData.revenue?.paymentHealth ?? EMPTY_OBJECT;
+  const revenueOverview = adminData.revenue?.overview ?? null;
+  const paymentHealth = adminData.revenue?.paymentHealth ?? null;
   const topCommunities = adminData.revenue?.topCommunities ?? EMPTY_ARRAY;
+
+  const monetizationSettings = adminData.settings?.monetization ?? null;
 
   const operations = adminData.operations ?? EMPTY_OBJECT;
   const support = operations.support ?? EMPTY_OBJECT;
@@ -160,8 +158,9 @@ export default function Admin() {
   const complianceSlaBreaches = compliance.slaBreaches ?? 0;
   const complianceManualReview = compliance.manualReviewQueue ?? 0;
 
-  const alerts = adminData.activity?.alerts ?? EMPTY_ARRAY;
-  const events = adminData.activity?.events ?? EMPTY_ARRAY;
+  const activity = adminData.activity ?? EMPTY_OBJECT;
+  const alerts = activity.alerts ?? EMPTY_ARRAY;
+  const events = activity.events ?? EMPTY_ARRAY;
 
   const policyLastReviewed = useMemo(() => {
     if (!policyLastReviewedRaw) {
@@ -240,55 +239,17 @@ export default function Admin() {
     ].filter(Boolean);
   }, [paymentHealth]);
 
-  const supportStats = useMemo(
-    () =>
-      [
-        support.backlog !== undefined ? { label: 'Open requests', value: formatNumber(support.backlog) } : null,
-        support.pendingMemberships !== undefined
-          ? { label: 'Pending memberships', value: formatNumber(support.pendingMemberships) }
-          : null,
-        support.followRequests !== undefined
-          ? { label: 'Follow approvals', value: formatNumber(support.followRequests) }
-          : null,
-        support.avgResponseMinutes !== undefined
-          ? {
-              label: 'Avg. first response',
-              value: `${formatNumber(support.avgResponseMinutes)} mins`
-            }
-          : null,
-        support.dailyActiveMembers !== undefined
-          ? { label: 'Daily active members', value: formatNumber(support.dailyActiveMembers) }
-          : null
-      ].filter(Boolean),
-    [support]
-  );
-
-  const riskStats = useMemo(
-    () =>
-      [
-        risk.payoutsProcessing !== undefined
-          ? { label: 'Payouts processing', value: formatNumber(risk.payoutsProcessing) }
-          : null,
-        risk.failedPayments !== undefined
-          ? { label: 'Failed payments', value: formatNumber(risk.failedPayments) }
-          : null,
-        risk.refundsPending !== undefined
-          ? { label: 'Refund queue', value: formatNumber(risk.refundsPending) }
-          : null,
-        risk.alertsOpen !== undefined
-          ? { label: 'Open alerts', value: formatNumber(risk.alertsOpen) }
-          : null
-      ].filter(Boolean),
-    [risk]
-  );
+  const supportStats = useMemo(() => buildSupportStats(support), [support]);
+  const riskStats = useMemo(() => buildRiskStats(risk), [risk]);
+  const platformStats = useMemo(() => buildPlatformStats(platform), [platform]);
 
   const handleVerificationReview = useCallback(
     async (item, payload) => {
-      if (!session?.tokens?.accessToken) {
+      if (!token) {
         throw new Error('Authentication token missing');
       }
       await reviewVerificationCase({
-        token: session.tokens.accessToken,
+        token,
         verificationId: item.id,
         body: payload
       });
@@ -296,24 +257,7 @@ export default function Admin() {
         await refresh();
       }
     },
-    [session?.tokens?.accessToken, refresh]
-  );
-
-  const platformStats = useMemo(
-    () =>
-      [
-        platform.totalUsers ? { label: 'Total users', value: platform.totalUsers } : null,
-        platform.newUsers30d ? { label: 'New users (30d)', value: platform.newUsers30d } : null,
-        platform.newUsersChange
-          ? {
-              label: 'Momentum',
-              value: platform.newUsersChange
-            }
-          : null,
-        platform.communitiesLive ? { label: 'Communities live', value: platform.communitiesLive } : null,
-        platform.instructors ? { label: 'Instructors', value: platform.instructors } : null
-      ].filter(Boolean),
-    [platform]
+    [token, refresh]
   );
 
   const handleRevenueExport = useCallback(() => {
@@ -385,107 +329,7 @@ export default function Admin() {
 
   const handleOpenAnalytics = useCallback(() => navigate('/analytics'), [navigate]);
 
-  return entries.filter(Boolean);
-}
-
-export default function Admin() {
-  const { session } = useAuth();
-  const { isFeatureEnabled, getConfigValue, loading: runtimeLoading } = useRuntimeConfig();
-  const { dashboards, loading, error, refresh } = useDashboard();
-  const navigate = useNavigate();
-
-  const adminConsoleEnabled = isFeatureEnabled('admin.operational-console');
-  const escalationChannel = getConfigValue('admin.console.escalation-channel', '#admin-escalations');
-  const isAdminUser = session?.user?.role === 'admin';
-  const token = session?.tokens?.accessToken ?? null;
-
-  const adminData = dashboards.admin ?? EMPTY_OBJECT;
-  const overallLoading = runtimeLoading || loading;
-
-  const revenueOverview = adminData.revenue?.overview ?? null;
-  const paymentHealth = adminData.revenue?.paymentHealth ?? null;
-  const revenueCards = useMemo(() => {
-    if (!revenueOverview) {
-      return EMPTY_ARRAY;
-    }
-
-    return [
-      revenueOverview.netRevenue
-        ? {
-            label: 'Net revenue (30d)',
-            value: revenueOverview.netRevenue,
-            helper: revenueOverview.netRevenueChange
-          }
-        : null,
-      revenueOverview.arr ? { label: 'Annual recurring revenue', value: revenueOverview.arr } : null,
-      revenueOverview.mrr ? { label: 'Monthly recurring revenue', value: revenueOverview.mrr } : null,
-      revenueOverview.captureRate ? { label: 'Capture rate', value: revenueOverview.captureRate } : null,
-      revenueOverview.failedPayments !== undefined
-        ? { label: 'Failed payments (30d)', value: formatNumber(revenueOverview.failedPayments) }
-        : null,
-      revenueOverview.refundsPending !== undefined
-        ? { label: 'Refunds pending', value: formatNumber(revenueOverview.refundsPending) }
-        : null
-    ].filter(Boolean);
-  }, [revenueOverview]);
-
-  const paymentHealthBreakdown = useMemo(() => {
-    if (!paymentHealth) {
-      return EMPTY_ARRAY;
-    }
-
-    return [
-      paymentHealth.succeeded !== undefined
-        ? { label: 'Succeeded', value: formatNumber(paymentHealth.succeeded) }
-        : null,
-      paymentHealth.processing !== undefined
-        ? { label: 'Processing', value: formatNumber(paymentHealth.processing) }
-        : null,
-      paymentHealth.requiresAction !== undefined
-        ? { label: 'Requires action', value: formatNumber(paymentHealth.requiresAction) }
-        : null,
-      paymentHealth.failed !== undefined
-        ? { label: 'Failed', value: formatNumber(paymentHealth.failed) }
-        : null
-    ].filter(Boolean);
-  }, [paymentHealth]);
-
-  const approvals = adminData.approvals ?? EMPTY_OBJECT;
-  const approvalItems = approvals.items ?? EMPTY_ARRAY;
-  const pendingApprovals = approvals.pendingCount ?? approvalItems.length;
-
-  const topCommunities = adminData.revenue?.topCommunities ?? EMPTY_ARRAY;
-
-  const operations = adminData.operations ?? EMPTY_OBJECT;
-  const support = operations.support ?? EMPTY_OBJECT;
-  const risk = operations.risk ?? EMPTY_OBJECT;
-  const platform = operations.platform ?? EMPTY_OBJECT;
-  const upcomingLaunches = operations.upcomingLaunches ?? EMPTY_ARRAY;
-
-  const supportStats = useMemo(() => buildSupportStats(support), [support]);
-  const riskStats = useMemo(() => buildRiskStats(risk), [risk]);
-  const platformStats = useMemo(() => buildPlatformStats(platform), [platform]);
-
-  const activity = adminData.activity ?? EMPTY_OBJECT;
-  const alerts = activity.alerts ?? EMPTY_ARRAY;
-  const events = activity.events ?? EMPTY_ARRAY;
-
-  const adminMetrics = adminData.metrics ?? EMPTY_ARRAY;
-  const monetizationSettings = adminData.settings?.monetization ?? null;
-
-  const sectionNavigation = useMemo(
-    () => [
-      { id: 'overview', label: 'Overview' },
-      { id: 'approvals', label: 'Approvals' },
-      { id: 'revenue', label: 'Revenue' },
-      { id: 'monetization', label: 'Monetization' },
-      { id: 'communities', label: 'Communities' },
-      { id: 'operations', label: 'Operations' },
-      { id: 'launches', label: 'Launches' },
-      { id: 'activity', label: 'Activity' }
-    ],
-    []
-  );
+  const sectionNavigation = useMemo(() => SECTION_NAVIGATION, []);
 
   if (!adminConsoleEnabled && !overallLoading) {
     return (
@@ -493,8 +337,8 @@ export default function Admin() {
         <div className="mx-auto max-w-3xl space-y-6 px-6 text-center">
           <h1 className="text-3xl font-semibold text-slate-900">Admin console disabled</h1>
           <p className="text-sm text-slate-600">
-            The operational console is currently disabled for your account. If you believe this is an
-            error, contact the platform operations team via
+            The operational console is currently disabled for your account. If you believe this is an error,
+            contact the platform operations team via
             <span className="font-semibold text-primary"> {escalationChannel}</span>.
           </p>
         </div>
@@ -508,8 +352,8 @@ export default function Admin() {
         <div className="mx-auto max-w-3xl space-y-6 px-6 text-center">
           <h1 className="text-3xl font-semibold text-slate-900">Access restricted</h1>
           <p className="text-sm text-slate-600">
-            Your account does not have administrator permissions. Please contact platform operations if you
-            require elevated access.
+            Your account does not have administrator permissions. Please contact platform operations if you require
+            elevated access.
           </p>
         </div>
       </section>
@@ -569,7 +413,7 @@ export default function Admin() {
             </a>
           ))}
         </nav>
-        <div className="border-t border-slate-200 px-6 py-6 space-y-3">
+        <div className="space-y-3 border-t border-slate-200 px-6 py-6">
           <button
             type="button"
             onClick={handleSwitchToInstructor}
@@ -606,10 +450,9 @@ export default function Admin() {
                   <div className="space-y-2">
                     <h1 className="text-3xl font-semibold text-slate-900">Admin control center</h1>
                     <p className="text-sm text-slate-600">
-                      Monitor revenue, approvals, and platform health in one workspace. Escalate incidents via
+                      Monitor revenue, approvals, policy cadences, and platform health in one workspace. Escalate
+                      incidents via
                       <span className="font-semibold text-primary"> {escalationChannel}</span>.
-                      Monitor revenue, approvals, policy cadences, and platform health in one workspace. Escalate incidents via{' '}
-                      <span className="font-semibold text-primary">{escalationChannel}</span>.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
@@ -643,7 +486,7 @@ export default function Admin() {
             <AdminRevenueSection
               revenueCards={revenueCards}
               paymentHealthBreakdown={paymentHealthBreakdown}
-              onExport={() => {}}
+              onExport={handleRevenueExport}
             />
 
             <AdminMonetizationSettingsSection
@@ -651,7 +494,6 @@ export default function Admin() {
               settings={monetizationSettings}
               token={token}
               onSettingsUpdated={refresh}
-              onExport={handleRevenueExport}
             />
 
             <AdminTopCommunitiesSection
