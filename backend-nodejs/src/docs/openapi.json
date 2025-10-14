@@ -9834,6 +9834,7 @@
     "/api/content/assets": {
       "get": {
         "summary": "List content assets",
+        "description": "Requires instructor or admin workspace access.",
         "security": [
           {
             "bearerAuth": []
@@ -9887,6 +9888,9 @@
           },
           "401": {
             "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Instructor or admin permissions required"
           }
         }
       }

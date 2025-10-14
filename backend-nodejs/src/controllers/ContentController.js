@@ -32,6 +32,48 @@ const analyticsQuerySchema = Joi.object({
   type: Joi.string().valid('powerpoint', 'ebook', 'pdf', 'document', 'video').optional()
 });
 
+const metadataUpdateSchema = Joi.object({
+  title: Joi.string().trim().max(140).allow(null, '').optional(),
+  description: Joi.string().trim().max(1500).allow(null, '').optional(),
+  categories: Joi.array()
+    .items(Joi.string().trim().max(40))
+    .max(12)
+    .default([]),
+  tags: Joi.array()
+    .items(Joi.string().trim().max(32))
+    .max(24)
+    .default([]),
+  coverImage: Joi.object({
+    url: Joi.string().uri({ scheme: ['https'] }).allow(null, '').default(null),
+    alt: Joi.string().trim().max(120).allow(null, '').default(null)
+  })
+    .default({})
+    .optional(),
+  gallery: Joi.array()
+    .items(
+      Joi.object({
+        url: Joi.string().uri({ scheme: ['https'] }).required(),
+        caption: Joi.string().trim().max(160).allow(null, '').default(null),
+        kind: Joi.string().valid('image', 'video').default('image')
+      })
+    )
+    .max(8)
+    .default([]),
+  showcase: Joi.object({
+    headline: Joi.string().trim().max(120).allow(null, '').default(null),
+    subheadline: Joi.string().trim().max(200).allow(null, '').default(null),
+    videoUrl: Joi.string().uri({ scheme: ['https'] }).allow(null, '').default(null),
+    videoPosterUrl: Joi.string().uri({ scheme: ['https'] }).allow(null, '').default(null),
+    callToActionLabel: Joi.string().trim().max(40).allow(null, '').default(null),
+    callToActionUrl: Joi.string().uri({ scheme: ['https'] }).allow(null, '').default(null),
+    badge: Joi.string().trim().max(32).allow(null, '').default(null)
+  })
+    .default({})
+    .optional(),
+  visibility: Joi.string().valid('workspace', 'private', 'public').optional(),
+  featureFlags: Joi.object({ showcasePinned: Joi.boolean().default(false) }).default({})
+});
+
 export default class ContentController {
   static async createUploadSession(req, res, next) {
     try {
@@ -159,6 +201,20 @@ export default class ContentController {
       const analytics = await AssetService.analytics(req.params.assetId);
       return success(res, { data: analytics });
     } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateMetadata(req, res, next) {
+    try {
+      const payload = await metadataUpdateSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
+      const asset = await AssetService.updateMetadata(req.params.assetId, payload, req.user);
+      return success(res, { data: asset, message: 'Material profile updated' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
       return next(error);
     }
   }

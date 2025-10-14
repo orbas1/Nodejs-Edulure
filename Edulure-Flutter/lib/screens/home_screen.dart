@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../services/session_manager.dart';
+import '../services/language_service.dart';
+import '../widgets/language_selector.dart';
 
 enum _MenuAction { dashboard, profile, settings, signOut }
 
@@ -28,41 +30,49 @@ class _PublicHomeView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0.4,
-        toolbarHeight: 72,
-        titleSpacing: 20,
-        title: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: Image.network(
-                'https://i.ibb.co/twQyCm1N/Edulure-Logo.png',
-                height: 40,
-              ),
+    return ValueListenableBuilder<String>(
+      valueListenable: LanguageService.listenable(),
+      builder: (context, code, _) {
+        final t = LanguageService.translate;
+        return Scaffold(
+          appBar: AppBar(
+            automaticallyImplyLeading: false,
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 0.4,
+            toolbarHeight: 72,
+            titleSpacing: 20,
+            title: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.network(
+                    'https://i.ibb.co/twQyCm1N/Edulure-Logo.png',
+                    height: 40,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pushNamed(context, '/login'),
-            child: const Text('Login'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: LanguageSelector(compact: true),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/login'),
+                child: Text(t('navigation.login')),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () => Navigator.pushNamed(context, '/register'),
+                child: Text(t('navigation.register')),
+              ),
+              const SizedBox(width: 16),
+            ],
           ),
-          const SizedBox(width: 8),
-          FilledButton(
-            onPressed: () => Navigator.pushNamed(context, '/register'),
-            child: const Text('Join Edulure'),
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
+          body: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
           Container(
             padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
@@ -75,7 +85,8 @@ class _PublicHomeView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Learning communities engineered for scale',
+                  t('home.hero.title'),
+                  'Learning communities built for scale',
                   style: Theme.of(context)
                       .textTheme
                       .headlineSmall
@@ -83,7 +94,8 @@ class _PublicHomeView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Blend courses, community, and live sessions into one seamless mobile experience.',
+                  t('home.hero.description'),
+                  'Run courses, community, and live sessions from one secure app.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 24),
@@ -102,84 +114,85 @@ class _PublicHomeView extends StatelessWidget {
           ValueListenableBuilder(
             valueListenable: SessionManager.assetsCache.listenable(),
             builder: (context, box, _) {
+              final role = SessionManager.getActiveRole();
+              final classroomTarget = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
+
               return Column(
                 children: [
                   ListTile(
                     leading: const Icon(Icons.groups_3_outlined),
                     title: const Text('Communities'),
-                    subtitle: const Text('Curate your hubs and monitor health in real time.'),
+                    subtitle: const Text('Track health across every hub.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/communities'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.dashboard_customize_outlined),
                     title: const Text('Live feed'),
-                    subtitle: const Text('Stay up to date with every community in a unified stream.'),
+                    subtitle: const Text('Monitor updates across workspaces.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.library_books_outlined),
-                    title: const Text('Edulure blog'),
-                    subtitle: const Text('Read enterprise updates and best practices.'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.pushNamed(context, '/blog'),
                     leading: const Icon(Icons.videocam_outlined),
                     title: const Text('Live classrooms'),
-                    subtitle: const Text('Preview upcoming rooms, whiteboards, and facilitator readiness.'),
+                    subtitle: const Text('Prep upcoming rooms and materials in seconds.'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      final role = SessionManager.getActiveRole();
-                      final target = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
-                      Navigator.pushNamed(context, target);
-                    },
+                    onTap: () => Navigator.pushNamed(context, classroomTarget),
                   ),
                   ListTile(
                     leading: const Icon(Icons.travel_explore_outlined),
                     title: const Text('Explorer intelligence'),
-                    subtitle: const Text('Search cohorts, talent, and campaigns across the network.'),
+                    subtitle: const Text('Search cohorts, talent, and campaigns.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/explorer'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.library_books_outlined),
+                    title: const Text('Edulure blog'),
+                    subtitle: const Text('Platform updates and playbooks.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/blog'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.inbox_outlined),
                     title: const Text('Messages'),
-                    subtitle: const Text('Coordinate with faculty and members in threaded conversations.'),
+                    subtitle: const Text('Coordinate with members in threads.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/inbox'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.person_outline),
                     title: const Text('Profile'),
-                    subtitle: const Text('Personalise your instructor and member presence.'),
+                    subtitle: const Text('Tailor your instructor or learner presence.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/profile'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.calendar_month_outlined),
                     title: const Text('Tutor bookings'),
-                    subtitle: const Text('Manage mentor requests, schedules, and session history.'),
+                    subtitle: const Text('Manage mentor requests and schedules.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/tutor-bookings'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.library_books_outlined),
                     title: const Text('Content library'),
-                    subtitle: const Text('Download decks and ebooks with offline support.'),
+                    subtitle: const Text('Access decks and ebooks with offline support.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/content'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.dashboard_outlined),
                     title: const Text('Course management'),
-                    subtitle: const Text('Track cohorts, assign production tasks, and monitor operations.'),
+                    subtitle: const Text('Track cohorts and production tasks.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/courses/manage'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.shopping_bag_outlined),
                     title: const Text('Purchase courses'),
-                    subtitle: const Text('Review offers, apply coupons, and confirm learner enrolments.'),
+                    subtitle: const Text('Review offers and confirm enrollments.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/courses/purchase'),
                   ),
@@ -188,7 +201,9 @@ class _PublicHomeView extends StatelessWidget {
             },
           ),
         ],
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -293,254 +308,263 @@ class _AuthenticatedHomeViewState extends State<_AuthenticatedHomeView> {
     final verificationStatus = _verification?['status']?.toString() ?? 'pending';
     final email = _user?['email']?.toString();
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0.4,
-        toolbarHeight: 84,
-        titleSpacing: 0,
-        leadingWidth: 72,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16),
-          child: CircleAvatar(
-            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-            child: Text(_initials, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Welcome back, $_userDisplayName',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+    return ValueListenableBuilder<String>(
+      valueListenable: LanguageService.listenable(),
+      builder: (context, code, _) {
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.white,
+            elevation: 0.4,
+            toolbarHeight: 84,
+            titleSpacing: 0,
+            leadingWidth: 72,
+            leading: Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: CircleAvatar(
+                backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                child: Text(_initials, style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
             ),
-            if (email != null)
-              Text(
-                email!,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.blueGrey),
-              ),
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Chip(
-              avatar: const Icon(Icons.badge_outlined, size: 16),
-              label: Text(_roleLabel(_activeRole)),
-              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Welcome back, $_userDisplayName',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                if (email != null)
+                  Text(
+                    email!,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.blueGrey),
+                  ),
+              ],
             ),
-          ),
-          PopupMenuButton<_MenuAction>(
-            tooltip: 'Workspace menu',
-            onSelected: _handleMenuAction,
-            itemBuilder: (context) => [
-              PopupMenuItem<_MenuAction>(
-                value: _MenuAction.dashboard,
-                child: const ListTile(
-                  leading: Icon(Icons.dashboard_customize_outlined),
-                  title: Text('Open dashboard'),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: LanguageSelector(compact: true),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Chip(
+                  avatar: const Icon(Icons.badge_outlined, size: 16),
+                  label: Text(_roleLabel(_activeRole)),
+                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
                 ),
               ),
-              PopupMenuItem<_MenuAction>(
-                value: _MenuAction.profile,
-                child: const ListTile(
-                  leading: Icon(Icons.person_outline),
-                  title: Text('View profile'),
-                ),
-              ),
-              PopupMenuItem<_MenuAction>(
-                value: _MenuAction.settings,
-                child: const ListTile(
-                  leading: Icon(Icons.settings_outlined),
-                  title: Text('Settings'),
-                ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem<_MenuAction>(
-                value: _MenuAction.signOut,
-                child: const ListTile(
-                  leading: Icon(Icons.logout_outlined, color: Colors.redAccent),
-                  title: Text('Sign out'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Card(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    child: Text(
-                      _initials,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+              PopupMenuButton<_MenuAction>(
+                tooltip: 'Workspace menu',
+                onSelected: _handleMenuAction,
+                itemBuilder: (context) => [
+                  PopupMenuItem<_MenuAction>(
+                    value: _MenuAction.dashboard,
+                    child: const ListTile(
+                      leading: Icon(Icons.dashboard_customize_outlined),
+                      title: Text('Open dashboard'),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _userDisplayName,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 4),
-                        if (email != null)
-                          Text(
-                            email,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
-                          ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            Chip(
-                              label: Text('Viewing as ${_roleLabel(_activeRole)}'),
-                              avatar: const Icon(Icons.badge_outlined, size: 18),
-                            ),
-                            Chip(
-                              label: Text(verificationStatus == 'verified' ? 'Email verified' : 'Verification pending'),
-                              avatar: Icon(
-                                verificationStatus == 'verified'
-                                    ? Icons.verified_outlined
-                                    : Icons.mark_email_unread_outlined,
-                                size: 18,
-                                color: verificationStatus == 'verified' ? Colors.green : Colors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  PopupMenuItem<_MenuAction>(
+                    value: _MenuAction.profile,
+                    child: const ListTile(
+                      leading: Icon(Icons.person_outline),
+                      title: Text('View profile'),
+                    ),
+                  ),
+                  PopupMenuItem<_MenuAction>(
+                    value: _MenuAction.settings,
+                    child: const ListTile(
+                      leading: Icon(Icons.settings_outlined),
+                      title: Text('Settings'),
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  PopupMenuItem<_MenuAction>(
+                    value: _MenuAction.signOut,
+                    child: const ListTile(
+                      leading: Icon(Icons.logout_outlined, color: Colors.redAccent),
+                      title: Text('Sign out'),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(width: 8),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text(
-            'Switch workspace role',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: _availableRoles
-                .map(
-                  (role) => ChoiceChip(
-                    label: Text(_roleLabel(role)),
-                    selected: _activeRole == role,
-                    onSelected: (selected) {
-                      if (selected) {
-                        _setActiveRole(role);
-                      }
-                    },
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 24),
-          Container(
+          body: ListView(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: roleDetails.heroGradient,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  roleDetails.heroTitle,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  roleDetails.heroSubtitle,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Focus areas',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: roleDetails.features
-                .map(
-                  (feature) => SizedBox(
-                    width: 320,
-                    child: Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
+            children: [
+              Card(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        child: Text(
+                          _initials,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(feature.icon, size: 28, color: Theme.of(context).colorScheme.primary),
-                            const SizedBox(height: 16),
                             Text(
-                              feature.title,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w600),
+                              _userDisplayName,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                             ),
+                            const SizedBox(height: 4),
+                            if (email != null)
+                              Text(
+                                email,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+                              ),
                             const SizedBox(height: 8),
-                            Text(
-                              feature.description,
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                Chip(
+                                  label: Text('Viewing as ${_roleLabel(_activeRole)}'),
+                                  avatar: const Icon(Icons.badge_outlined, size: 18),
+                                ),
+                                Chip(
+                                  label: Text(verificationStatus == 'verified' ? 'Email verified' : 'Verification pending'),
+                                  avatar: Icon(
+                                    verificationStatus == 'verified'
+                                        ? Icons.verified_outlined
+                                        : Icons.mark_email_unread_outlined,
+                                    size: 18,
+                                    color: verificationStatus == 'verified' ? Colors.green : Colors.orange,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Switch workspace role',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: _availableRoles
+                    .map(
+                      (role) => ChoiceChip(
+                        label: Text(_roleLabel(role)),
+                        selected: _activeRole == role,
+                        onSelected: (selected) {
+                          if (selected) {
+                            _setActiveRole(role);
+                          }
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: roleDetails.heroGradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      roleDetails.heroTitle,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600, color: Colors.white),
                     ),
-                  ),
-                )
-                .toList(),
+                    const SizedBox(height: 12),
+                    Text(
+                      roleDetails.heroSubtitle,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Focus areas',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                children: roleDetails.features
+                    .map(
+                      (feature) => SizedBox(
+                        width: 320,
+                        child: Card(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(feature.icon, size: 28, color: Theme.of(context).colorScheme.primary),
+                                const SizedBox(height: 16),
+                                Text(
+                                  feature.title,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  feature.description,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Quick actions',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: roleDetails.actions
+                    .map(
+                      (action) => FilledButton.tonalIcon(
+                        onPressed: () => Navigator.pushNamed(context, action.route),
+                        icon: Icon(action.icon),
+                        label: Text(action.label),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          Text(
-            'Quick actions',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: roleDetails.actions
-                .map(
-                  (action) => FilledButton.tonalIcon(
-                    onPressed: () => Navigator.pushNamed(context, action.route),
-                    icon: Icon(action.icon),
-                    label: Text(action.label),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

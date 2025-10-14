@@ -2,6 +2,8 @@ import PropTypes from 'prop-types';
 
 export default function PageHero({ title, description, subtitle, cta }) {
   const heroDescription = description ?? subtitle;
+  const bodyCopy = heroDescription;
+  const roleBadges = ['Operators', 'Instructors', 'Creators'];
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
@@ -13,24 +15,32 @@ export default function PageHero({ title, description, subtitle, cta }) {
       <div className="relative mx-auto flex max-w-6xl flex-col gap-16 px-6 py-24 lg:flex-row lg:items-center">
         <div className="w-full lg:w-1/2">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white/80">
-            Collective learning for builders
+            Enterprise learning OS
           </span>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
             {title}
           </h1>
-          {heroDescription && <p className="mt-6 text-lg leading-8 text-slate-600">{heroDescription}</p>}
+          {bodyCopy ? <p className="mt-6 text-lg leading-8 text-slate-200">{bodyCopy}</p> : null}
           {cta ? <div className="mt-10 flex flex-wrap items-center gap-4">{cta}</div> : null}
-          <p className="mt-6 text-lg leading-8 text-slate-200">{description}</p>
           <div className="mt-8 flex items-center gap-4 text-sm text-white/80">
             {["Strategists", "Designers", "Founders", "Mentors"].map((label) => (
               <span key={label} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+          {heroDescription && (
+            <p className="mt-6 max-w-xl text-base leading-7 text-white/80 md:text-lg md:leading-8">
+              {heroDescription}
+            </p>
+          )}
+          {cta ? <div className="mt-8 flex flex-wrap items-center gap-4">{cta}</div> : null}
+          <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-white/80">
+            {roleBadges.map((label) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1"
+              >
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 {label}
               </span>
             ))}
-          </div>
-          <div className="mt-10 flex flex-wrap items-center gap-4">
-            {cta}
           </div>
         </div>
         <div className="w-full lg:w-1/2">

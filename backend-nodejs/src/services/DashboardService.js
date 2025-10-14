@@ -154,6 +154,73 @@ function buildPlacementTags(campaign, keywords, audiences) {
   return Array.from(tags);
 }
 
+function computeToolCategoryFromSlug(slug) {
+  if (!slug) return 'Enablement';
+  const value = String(slug).toLowerCase();
+  if (value.includes('ops') || value.includes('operations')) {
+    return 'Operations';
+  }
+  if (value.includes('lab') || value.includes('studio') || value.includes('workshop')) {
+    return 'Studio';
+  }
+  if (value.includes('growth') || value.includes('sales') || value.includes('revenue')) {
+    return 'Revenue';
+  }
+  if (value.includes('community') || value.includes('collab')) {
+    return 'Collaboration';
+  }
+  if (value.includes('analytics') || value.includes('insight')) {
+    return 'Intelligence';
+  }
+  return 'Enablement';
+}
+
+function computeToolLifecycleStage(createdAt, referenceDate = new Date()) {
+  if (!createdAt) return 'Onboarding';
+  const created = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  const diffMs = referenceDate.getTime() - created.getTime();
+  const diffDays = Math.max(0, Math.round(diffMs / DAY_IN_MS));
+  if (diffDays < 90) return 'Onboarding';
+  if (diffDays < 240) return 'Growth';
+  if (diffDays < 480) return 'Scale';
+  return 'Mature';
+}
+
+function computeToolStatus(utilisationRate, adoptionVelocity) {
+  const utilisation = Number.isFinite(utilisationRate) ? utilisationRate : 0;
+  const velocity = Number.isFinite(adoptionVelocity) ? adoptionVelocity : 0;
+  if (utilisation >= 0.92) {
+    return velocity >= 0 ? 'At capacity' : 'Stabilising';
+  }
+  if (utilisation >= 0.75) {
+    return velocity >= 0 ? 'Scaling' : 'Monitoring';
+  }
+  if (utilisation >= 0.45) {
+    return velocity >= 0 ? 'Healthy' : 'Re-energise';
+  }
+  return velocity >= 0 ? 'Pilot' : 'Reboot';
+}
+
+function formatSignedNumber(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || Number.isNaN(numeric) || numeric === 0) {
+    return '0';
+  }
+  const absolute = Math.abs(numeric);
+  const formatted = new Intl.NumberFormat('en-US').format(absolute);
+  return `${numeric > 0 ? '+' : '−'}${formatted}`;
+}
+
+function describeDelta(current, previous) {
+  const currentValue = Number(current ?? 0);
+  const previousValue = Number(previous ?? 0);
+  const diff = currentValue - previousValue;
+  if (diff === 0) {
+    return 'No change vs prior 30d';
+  }
+  return `${formatSignedNumber(diff)} vs prior 30d`;
+}
+
 export function buildAvatarUrl(email) {
   const hash = crypto.createHash('md5').update(String(email).trim().toLowerCase()).digest('hex');
   return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=160`;
@@ -454,6 +521,498 @@ export function buildCommunityDashboard({
     const communityId = Number(message.communityId ?? 0);
     return managedCommunityIds.has(communityId);
   });
+
+  const formatCurrencySummary = (currencyMap) => {
+    const entries = Array.from(currencyMap.entries()).filter(([, cents]) => Number(cents ?? 0) !== 0);
+    if (entries.length === 0) {
+      return '—';
+    }
+    if (entries.length === 1) {
+      const [currency, cents] = entries[0];
+      return formatCurrency(cents, currency);
+    }
+    return entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' · ');
+  };
+
+  const courseById = new Map(courseSummaries.map((course) => [Number(course.id), course]));
+  const stageLabelByStatus = {
+    draft: 'Qualification',
+    discovery: 'Qualification',
+    qualification: 'Qualification',
+    pilot: 'Pilot',
+    beta: 'Pilot',
+    negotiation: 'Negotiation',
+    enterprise: 'Negotiation',
+    contract: 'Contract',
+    published: 'Contract',
+    renewal: 'Renewal'
+  };
+  const stageProbability = {
+    Qualification: 0.35,
+    Pilot: 0.55,
+    Negotiation: 0.68,
+    Contract: 0.82,
+    Renewal: 0.9
+  };
+
+  const bidPipeline = [];
+  const stageBreakdown = new Map();
+  const clientPipeline = new Map();
+  const pipelineValueByCurrency = new Map();
+  const weightedValueByCurrency = new Map();
+  const probabilityValues = [];
+  const conversionValues = [];
+
+  courseSummaries.forEach((course) => {
+    const metadata = course.metadata ?? {};
+    const listings = Array.isArray(metadata.catalogueListings) ? metadata.catalogueListings : [];
+    listings.forEach((listing, index) => {
+      const channel = listing.channel ?? listing.workspace ?? listing.id ?? 'Marketplace';
+      const rawStatus = (listing.status ?? 'Draft').toString().toLowerCase();
+      const stage = stageLabelByStatus[rawStatus] ?? 'Qualification';
+      const priceCents = Number.isFinite(Number(listing.price))
+        ? Number(listing.price)
+        : Number(course.priceAmount ?? 0);
+      const conversions = Number(listing.conversions ?? 0);
+      const impressions = Number(listing.impressions ?? 0);
+      let conversionRate = Number(listing.conversionRate ?? 0);
+      if (conversionRate > 1) {
+        conversionRate = conversionRate / 100;
+      }
+      if (!Number.isFinite(conversionRate) || conversionRate <= 0) {
+        conversionRate = impressions > 0 ? conversions / impressions : 0.12;
+      }
+      const expectedDeals = conversions > 0 ? conversions : Math.max(1, Math.round(conversionRate * 100));
+      const pipelineValueCents = Math.max(0, priceCents) * expectedDeals;
+      const probability = stageProbability[stage] ?? 0.45;
+      const updatedAt = listing.lastSyncedAt ? new Date(listing.lastSyncedAt) : course.releaseAt ?? now;
+      const currency = listing.currency ?? course.priceCurrency ?? 'USD';
+      const conversionLabel = conversions > 0 ? `${conversions} wins` : formatPercentage(conversionRate, 1);
+
+      bidPipeline.push({
+        id: `bid-${course.id}-${listing.id ?? index}`,
+        name: course.title,
+        channel,
+        status: capitalise(listing.status ?? 'Draft'),
+        stage,
+        valueCents: pipelineValueCents,
+        value: formatCurrency(pipelineValueCents, currency),
+        currency,
+        probability,
+        probabilityLabel: `${Math.round(probability * 100)}%`,
+        conversionRate,
+        conversionLabel,
+        updatedAt: updatedAt instanceof Date ? updatedAt : new Date(updatedAt),
+        updatedLabel: updatedAt
+          ? formatDateTime(updatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Not yet synced',
+        nextAction:
+          rawStatus === 'pilot'
+            ? 'Graduate pilot to enterprise tier'
+            : rawStatus === 'draft'
+              ? 'Finalise commercial terms'
+              : 'Monitor performance telemetry',
+        owner: resolveName(user.firstName, user.lastName, user.email)
+      });
+
+      const stageEntry = stageBreakdown.get(stage) ?? {
+        id: `stage-${stage.toLowerCase().replace(/\s+/g, '-')}`,
+        name: stage,
+        count: 0,
+        valueByCurrency: new Map(),
+        probabilityTotal: 0
+      };
+      stageEntry.count += 1;
+      stageEntry.probabilityTotal += probability;
+      accumulateCurrency(stageEntry.valueByCurrency, currency, pipelineValueCents);
+      stageBreakdown.set(stage, stageEntry);
+
+      const clientKey = channel.toLowerCase();
+      const clientEntry = clientPipeline.get(clientKey) ?? {
+        id: `client-${clientKey || 'channel'}`,
+        name: channel,
+        pipelineValueByCurrency: new Map(),
+        stageCounts: new Map(),
+        probabilityTotal: 0,
+        conversionTotal: 0,
+        records: 0,
+        owner: resolveName(user.firstName, user.lastName, user.email),
+        latestUpdate: null
+      };
+      clientEntry.records += 1;
+      accumulateCurrency(clientEntry.pipelineValueByCurrency, currency, pipelineValueCents);
+      clientEntry.stageCounts.set(stage, (clientEntry.stageCounts.get(stage) ?? 0) + 1);
+      clientEntry.probabilityTotal += probability;
+      clientEntry.conversionTotal += conversionRate;
+      if (!clientEntry.latestUpdate || (updatedAt && updatedAt > clientEntry.latestUpdate)) {
+        clientEntry.latestUpdate = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+      }
+      clientPipeline.set(clientKey, clientEntry);
+
+      accumulateCurrency(pipelineValueByCurrency, currency, pipelineValueCents);
+      accumulateCurrency(weightedValueByCurrency, currency, Math.round(pipelineValueCents * probability));
+      probabilityValues.push(probability);
+      conversionValues.push(conversionRate);
+    });
+  });
+
+  bidPipeline.sort((a, b) => {
+    if ((b.probability ?? 0) !== (a.probability ?? 0)) {
+      return (b.probability ?? 0) - (a.probability ?? 0);
+    }
+    return (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0);
+  });
+
+  const bidStages = Array.from(stageBreakdown.values()).map((entry) => {
+    const valueLabel = formatCurrencySummary(entry.valueByCurrency);
+    const averageProbability =
+      entry.count > 0 ? `${Math.round((entry.probabilityTotal / entry.count) * 100)}%` : '—';
+    return {
+      id: entry.id,
+      name: entry.name,
+      count: entry.count,
+      value: valueLabel,
+      averageProbability
+    };
+  });
+
+  const responseTimes = tutorBookingsNormalised
+    .filter((booking) => booking.requestedAt && booking.confirmedAt)
+    .map((booking) =>
+      Math.max(
+        0,
+        Math.round((booking.confirmedAt.getTime() - booking.requestedAt.getTime()) / (60 * 1000))
+      )
+    );
+  const averageResponseMinutes = responseTimes.length
+    ? Math.round(responseTimes.reduce((total, value) => total + value, 0) / responseTimes.length)
+    : null;
+  const responseLabel = averageResponseMinutes !== null ? minutesToReadable(averageResponseMinutes) : 'No confirmed bids';
+
+  const projectSummary = [
+    {
+      id: 'projects-active-bids',
+      label: 'Active bids',
+      value: `${bidPipeline.length}`,
+      detail: bidPipeline.length > 0 ? 'Across marketplace & enterprise channels' : 'Publish a bid to get started',
+      tone: bidPipeline.length > 0 ? 'primary' : 'neutral',
+      trend: bidPipeline.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'projects-weighted-pipeline',
+      label: 'Weighted pipeline',
+      value: formatCurrencySummary(weightedValueByCurrency),
+      detail: 'Probability-adjusted forecast for next 60 days',
+      tone: 'success',
+      trend: 'up'
+    },
+    {
+      id: 'projects-conversion',
+      label: 'Avg. conversion',
+      value: conversionValues.length
+        ? formatPercentage(
+            conversionValues.reduce((total, value) => total + value, 0) / conversionValues.length,
+            1
+          )
+        : '0.0%',
+      detail: 'Rolling 30d performance across bids',
+      tone: 'info',
+      trend: conversionValues.length ? 'up' : 'neutral'
+    },
+    {
+      id: 'projects-response-sla',
+      label: 'Bid response SLA',
+      value: responseLabel,
+      detail: `${pipelineBookings.length} inbound brief${pipelineBookings.length === 1 ? '' : 's'} awaiting triage`,
+      tone: averageResponseMinutes !== null && averageResponseMinutes <= 120 ? 'success' : 'warning',
+      trend: averageResponseMinutes !== null && averageResponseMinutes <= 180 ? 'up' : 'down'
+    }
+  ];
+
+  const isProjectAssignment = (assignment) => {
+    const metadata = assignment.metadata ?? {};
+    const tags = normaliseStringArray(metadata.tags ?? metadata.labels ?? metadata.categories);
+    const keywords = `${assignment.title ?? ''} ${assignment.instructions ?? ''}`.toLowerCase();
+    const projectKeywords = ['project', 'proposal', 'audit', 'launch', 'bid', 'playbook'];
+    const hasKeyword = projectKeywords.some((keyword) => keywords.includes(keyword));
+    const requiresReview = Boolean(
+      metadata.requiresReview || metadata.reviewRequired || metadata.requiresApproval
+    );
+    const taggedProject = tags.some((tag) => projectKeywords.includes(tag.toLowerCase()));
+    return requiresReview || hasKeyword || taggedProject;
+  };
+
+  const projectProposals = assignmentsNormalised
+    .filter(isProjectAssignment)
+    .map((assignment) => {
+      const metadata = assignment.metadata ?? {};
+      const course = courseById.get(Number(assignment.courseId));
+      const dueDate = assignment.dueDate instanceof Date ? assignment.dueDate : null;
+      const dueLabel = dueDate
+        ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined })
+        : 'Schedule pending';
+      const dueIn = dueDate ? humanizeFutureTime(dueDate, now) : 'TBD';
+      const courseValue = Number(course?.priceAmount ?? 0);
+      const weightingPercent = Number(
+        metadata.weight ??
+          metadata.weightPercent ??
+          metadata.weighting ??
+          metadata.weightingPercent ??
+          metadata.contractWeight ??
+          25
+      );
+      const weighting = Number.isFinite(weightingPercent) && weightingPercent > 0 ? weightingPercent / 100 : 0.25;
+      const estimatedValueCents = Math.round(Math.max(courseValue * Math.max(weighting, 0.15), 0));
+      const stage = !dueDate
+        ? 'Scoping'
+        : dueDate.getTime() < now.getTime()
+          ? 'Delivery'
+          : dueDate.getTime() - now.getTime() <= 7 * DAY_IN_MS
+            ? 'Negotiation'
+            : 'Discovery';
+      const confidence = metadata.requiresReview ? 0.64 : 0.82;
+      const reviewers = normaliseStringArray(
+        metadata.reviewers ?? metadata.approvers ?? metadata.stakeholders ?? metadata.signatories
+      );
+      const riskLevelRaw = (metadata.risk ?? metadata.riskLevel ?? metadata.riskScore ?? '').toString().toLowerCase();
+      const riskLevel = ['low', 'medium', 'high'].includes(riskLevelRaw)
+        ? riskLevelRaw
+        : metadata.requiresReview
+          ? 'high'
+          : 'medium';
+      const riskScore = riskLevel === 'high' ? 3 : riskLevel === 'medium' ? 2 : 1;
+      const summaryNote = metadata.summary ?? (assignment.instructions ? assignment.instructions.slice(0, 140) : null);
+      const anchors = normaliseStringArray(metadata.dependencies ?? metadata.inputs ?? metadata.attachments);
+      const timezone = metadata.timezone ?? course?.metadata?.dripCampaign?.timezone ?? 'UTC';
+      const client =
+        metadata.client ??
+        course?.metadata?.catalogueListings?.[0]?.channel ??
+        course?.metadata?.workspace ??
+        course?.title ??
+        assignment.courseTitle;
+      return {
+        id: `proposal-${assignment.id}`,
+        title: assignment.title,
+        client,
+        course: assignment.courseTitle,
+        stage,
+        dueDate,
+        dueLabel,
+        dueIn,
+        owner: assignment.owner,
+        valueCents: estimatedValueCents,
+        value: formatCurrency(estimatedValueCents, course?.priceCurrency ?? 'USD'),
+        confidence,
+        confidenceLabel: `${Math.round(confidence * 100)}%`,
+        reviewers: reviewers.length ? reviewers : [assignment.owner],
+        summary: summaryNote,
+        highlights: [
+          summaryNote ?? 'Structured deliverable awaiting submission',
+          metadata.requiresReview ? 'Manual QA required' : 'Auto-approval eligible'
+        ].filter(Boolean),
+        timezone,
+        riskLevel,
+        riskScore,
+        anchors,
+        reviewWindow: metadata.reviewWindow ?? 'Deal desk review within 48h'
+      };
+    })
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) {
+        return a.dueDate - b.dueDate;
+      }
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return a.id.localeCompare(b.id);
+    });
+
+  const proposalTimeline = projectProposals
+    .filter((proposal) => proposal.dueDate)
+    .slice(0, 8)
+    .map((proposal) => ({
+      id: `timeline-${proposal.id}`,
+      title: proposal.title,
+      stage: proposal.stage,
+      dueLabel: proposal.dueLabel,
+      dueIn: proposal.dueIn,
+      owner: proposal.owner
+    }));
+
+  const reviewStakeholders = new Set();
+  projectProposals.forEach((proposal) => {
+    proposal.reviewers.forEach((reviewer) => reviewStakeholders.add(reviewer));
+  });
+  const approvalsRequired = Math.max(reviewStakeholders.size, 2);
+  const nextReview = proposalTimeline[0]?.dueLabel ?? formatDateTime(now, { dateStyle: 'long' });
+  const nextReviewWindow = proposalTimeline[0]?.dueIn ?? 'Rolling review';
+  const averageRiskScore = projectProposals.length
+    ? projectProposals.reduce((total, proposal) => total + (proposal.riskScore ?? 1), 0) / projectProposals.length
+    : 1;
+  const riskAppetite =
+    averageRiskScore >= 2.5 ? 'High risk portfolio' : averageRiskScore >= 1.75 ? 'Balanced risk posture' : 'Low risk';
+
+  const reviewBoard = {
+    owner: resolveName(user.firstName, user.lastName, user.email),
+    approvalsRequired,
+    nextReview,
+    nextReviewWindow,
+    riskAppetite,
+    escalationContact: user.email,
+    cadence: 'Deal desk meets weekly on Tuesdays 09:00 UTC',
+    automation: 'Bid scoring automation triages new proposals in under 2 minutes.',
+    security:
+      'Proposals stored in AES-256 encrypted vault with per-approver MFA, full audit trails, and dynamic watermarks.'
+  };
+
+  const projectDeliverables = communityResources
+    .filter((resource) => resource.createdBy === user.id)
+    .map((resource) => {
+      const metadata = safeJsonParse(resource.metadata, {});
+      return {
+        id: `deliverable-${resource.id}`,
+        title: resource.title,
+        community: resource.communityName,
+        status: resource.status ?? 'Published',
+        type: resource.resourceType,
+        updatedLabel: resource.publishedAt
+          ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
+          : 'Draft',
+        tags: normaliseStringArray(resource.tags).slice(0, 5),
+        version: metadata.version ?? metadata.deckVersion ?? null
+      };
+    });
+
+  const projectArtifacts = assetsNormalised.slice(0, 8).map((asset) => ({
+    id: `artifact-${asset.id}`,
+    name: normaliseFilename(asset.originalFilename),
+    stage: asset.metadata?.stage ?? 'Asset',
+    lastUpdated: asset.updatedAt
+      ? formatDateTime(asset.updatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Not updated',
+    owner: resolveName(user.firstName, user.lastName, 'Instructor'),
+    notes: asset.metadata?.notes ?? asset.metadata?.summary ?? null
+  }));
+
+  const projectSignals = campaignsDetailed.slice(0, 6).map((entry) => {
+    const conversionsDelta = entry.previousMetric
+      ? entry.latestMetric.conversions - entry.previousMetric.conversions
+      : entry.latestMetric?.conversions ?? 0;
+    const momentum = conversionsDelta > 0 ? 'up' : conversionsDelta < 0 ? 'down' : 'neutral';
+    return {
+      id: `signal-${entry.campaign.id}`,
+      title: entry.campaign.name,
+      channel: entry.placementSurface,
+      status: capitalise(entry.campaign.status ?? 'pending'),
+      spend: formatCurrency(entry.spendCents, entry.spendCurrency),
+      roas:
+        formatRoasFromCents(entry.lifetime.revenueCents, entry.lifetime.spendCents) ?? 'Awaiting spend data',
+      delta:
+        conversionsDelta === 0
+          ? 'Stable conversions'
+          : `${conversionsDelta > 0 ? '+' : ''}${conversionsDelta} conversions vs last sync`,
+      momentum,
+      objective: entry.campaign.objective ? capitalise(entry.campaign.objective) : 'Awareness',
+      lastObserved: entry.latestMetric?.date
+        ? formatDateTime(entry.latestMetric.date, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'No telemetry',
+      tags: entry.placementTags.slice(0, 4)
+    };
+  });
+
+  const projectClients = Array.from(clientPipeline.values()).map((client) => {
+    const entries = Array.from(client.pipelineValueByCurrency.entries());
+    const valueLabel = entries.length
+      ? entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' · ')
+      : '—';
+    const averageProbability = client.records > 0 ? client.probabilityTotal / client.records : 0;
+    const averageConversion = client.records > 0 ? client.conversionTotal / client.records : 0;
+    const topStage = Array.from(client.stageCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Qualification';
+    return {
+      id: client.id,
+      name: client.name,
+      pipelineValue: valueLabel,
+      averageProbability: `${Math.round(averageProbability * 100)}%`,
+      averageConversion: formatPercentage(averageConversion || 0, 1),
+      activeProjects: client.records,
+      topStage,
+      owner: client.owner,
+      updatedLabel: client.latestUpdate
+        ? formatDateTime(client.latestUpdate, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'Not yet synced'
+    };
+  });
+
+  const projectControls = {
+    owner: resolveName(user.firstName, user.lastName, user.email),
+    approvalsRequired,
+    reviewCadence: 'Weekly deal desk with rolling 48h async approvals',
+    lastAudit: formatDateTime(now, { dateStyle: 'long' }),
+    security:
+      'RBAC enforced with MFA, TLS 1.3 in transit, AES-256 at rest, and immutable audit trails across proposals.',
+    dataResidency: 'US & EU data centres with geo-fenced storage and regional failover.',
+    retention:
+      'Executed contracts retained for 7 years with auto-expiring watermarked downloads after 48 hours.',
+    automation:
+      'Machine scoring evaluates every bid against historical win patterns and flags anomalies instantly.',
+    compliance: [
+      'Multi-party approval required above $50k contract value.',
+      'Identity verification enforced for all external stakeholders before access.',
+      'Real-time anomaly detection guards against pricing regressions and duplicated bids.'
+    ]
+  };
+
+  const projectsWorkspace = {
+    summary: projectSummary,
+    bids: {
+      pipeline: bidPipeline,
+      stages: bidStages,
+      backlog: pipelineBookings,
+      metrics: {
+        totalPipeline: formatCurrencySummary(pipelineValueByCurrency),
+        weightedPipeline: formatCurrencySummary(weightedValueByCurrency),
+        averageProbability: probabilityValues.length
+          ? `${Math.round((probabilityValues.reduce((total, value) => total + value, 0) / probabilityValues.length) * 100)}%`
+          : '—',
+        averageConversion: conversionValues.length
+          ? formatPercentage(
+              conversionValues.reduce((total, value) => total + value, 0) / conversionValues.length,
+              1
+            )
+          : '0.0%',
+        responseSla: responseLabel,
+        inboundRequests: pipelineBookings.length
+      }
+    },
+    proposals: {
+      active: projectProposals,
+      reviewBoard,
+      timeline: proposalTimeline
+    },
+    portfolio: {
+      deliverables: projectDeliverables,
+      artifacts: projectArtifacts
+    },
+    clients: projectClients,
+    signals: projectSignals,
+    controls: projectControls
+  };
+
+  const projectSearchEntries = [
+    ...projectsWorkspace.bids.pipeline.map((bid) => ({
+      id: `search-instructor-project-bid-${bid.id}`,
+      role: 'instructor',
+      type: 'Project bid',
+      title: `${bid.name} · ${bid.channel}`,
+      url: '/dashboard/instructor/projects'
+    })),
+    ...projectsWorkspace.proposals.active.map((proposal) => ({
+      id: `search-instructor-project-proposal-${proposal.id}`,
+      role: 'instructor',
+      type: 'Project proposal',
+      title: proposal.title,
+      url: '/dashboard/instructor/projects'
+    }))
+  ];
 
   const metrics = [
     {
@@ -1214,6 +1773,7 @@ export function buildInstructorDashboard({
     ...booking,
     metadata: safeJsonParse(booking.metadata, {}),
     requestedAt: booking.requestedAt ? new Date(booking.requestedAt) : null,
+    confirmedAt: booking.confirmedAt ? new Date(booking.confirmedAt) : null,
     scheduledStart: booking.scheduledStart ? new Date(booking.scheduledStart) : null,
     scheduledEnd: booking.scheduledEnd ? new Date(booking.scheduledEnd) : null
   }));
@@ -1470,6 +2030,317 @@ export function buildInstructorDashboard({
       const leaf = name.split('/').pop();
       return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
     };
+  const serviceCapacityByMonth = new Map();
+  upcomingTutorSlots.forEach((slot) => {
+    if (!slot.startAt) return;
+    const key = toUtcMonthKey(slot.startAt);
+    if (!key) return;
+    serviceCapacityByMonth.set(key, (serviceCapacityByMonth.get(key) ?? 0) + 1);
+  });
+
+  const rosterLookup = new Map();
+  tutorRoster.forEach((entry) => {
+    const tutorId = Number(String(entry.id ?? '').replace('tutor-', ''));
+    if (Number.isNaN(tutorId)) return;
+    rosterLookup.set(tutorId, entry);
+  });
+
+  const serviceOfferings = tutorProfiles
+    .map((profile) => {
+      const metadata = safeJsonParse(profile.metadata, {});
+      const serviceMetadata =
+        (metadata.service && typeof metadata.service === 'object')
+          ? metadata.service
+          : (metadata.services && typeof metadata.services === 'object')
+            ? metadata.services.primary ?? metadata.services.default ?? metadata.services
+            : {};
+      const rosterEntry = rosterLookup.get(Number(profile.id));
+      const baseName =
+        serviceMetadata.name ??
+        profile.displayName ??
+        rosterEntry?.name ??
+        resolveName(user.firstName, user.lastName, 'Service');
+      const category = serviceMetadata.category ?? metadata.specialty ?? 'Mentorship service';
+      const priceLabel =
+        serviceMetadata.priceLabel ??
+        (serviceMetadata.priceCents
+          ? formatCurrency(serviceMetadata.priceCents, serviceMetadata.priceCurrency ?? 'USD')
+          : rosterEntry?.rate ?? 'Custom pricing');
+      const durationMinutes = Number(
+        serviceMetadata.durationMinutes ??
+          serviceMetadata.duration ??
+          metadata.defaultDuration ??
+          metadata.durationMinutes ??
+          0
+      );
+      const durationLabel =
+        serviceMetadata.durationLabel ??
+        (durationMinutes > 0 ? minutesToReadable(durationMinutes) : rosterEntry?.weeklyHours ?? '45 mins standard');
+      const tags = new Set([
+        ...(Array.isArray(rosterEntry?.focusAreas) ? rosterEntry.focusAreas : []),
+        ...normaliseStringArray(serviceMetadata.tags),
+        ...normaliseStringArray(metadata.expertise)
+      ]);
+      const csatScore = Number(profile.ratingAverage ?? serviceMetadata.csat ?? 0);
+      const clientsServed = Number(
+        profile.completedSessions ??
+          serviceMetadata.clientsServed ??
+          serviceMetadata.clients ??
+          0
+      );
+      const automationRate = Number(serviceMetadata.automationRate ?? 0);
+      const slaMinutes = Number(
+        serviceMetadata.slaMinutes ??
+          metadata.responseTimeMinutes ??
+          profile.responseTimeMinutes ??
+          0
+      );
+      const statusTone = serviceMetadata.statusTone ?? rosterEntry?.statusTone ?? 'success';
+      const statusLabel = serviceMetadata.statusLabel ?? rosterEntry?.status ?? 'Active';
+
+      const description =
+        serviceMetadata.description ??
+        metadata.bio ??
+        'High-touch advisory service with enterprise-grade playbooks and reporting.';
+
+      return {
+        id: `service-${profile.id}`,
+        name: baseName,
+        category,
+        status: serviceMetadata.status ?? statusLabel.toLowerCase(),
+        statusLabel,
+        statusTone,
+        description,
+        priceLabel,
+        durationLabel,
+        deliveryLabel: serviceMetadata.delivery ?? 'Virtual session',
+        tags: Array.from(tags).slice(0, 6),
+        csatLabel:
+          csatScore > 0 ? `${csatScore.toFixed(1)} / 5 (${Number(profile.ratingCount ?? 0)} reviews)` : 'Awaiting feedback',
+        clientsServedLabel:
+          clientsServed > 0 ? `${clientsServed} client${clientsServed === 1 ? '' : 's'} served` : 'First client onboarding',
+        automationLabel:
+          automationRate > 0 ? `${Math.round(automationRate)}% automated flow` : 'Manual qualification',
+        slaLabel: slaMinutes > 0 ? `${minutesToReadable(slaMinutes)} response SLA` : 'SLA pending',
+        utilisationLabel: rosterEntry?.workload ?? 'Capacity aligned'
+      };
+    })
+    .filter(Boolean);
+
+  const serviceEvents = tutorBookingsNormalised
+    .filter((booking) => booking.status === 'confirmed' || booking.status === 'requested' || booking.status === 'in_review')
+    .map((booking) => {
+      const scheduledStart = booking.scheduledStart ?? booking.requestedAt ?? null;
+      if (!scheduledStart) {
+        return null;
+      }
+      const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
+      const statusLabelMap = {
+        confirmed: 'Confirmed',
+        requested: 'Awaiting confirmation',
+        in_review: 'Under review'
+      };
+      const stageMap = {
+        confirmed: 'Delivery',
+        requested: 'Intake',
+        in_review: 'QA'
+      };
+      return {
+        id: `service-booking-${booking.id}`,
+        topic: booking.metadata.topic ?? 'Strategy session',
+        status: booking.status,
+        statusLabel: statusLabelMap[booking.status] ?? capitalise(booking.status ?? 'Pipeline'),
+        learner: learnerName,
+        stage: stageMap[booking.status] ?? 'Pipeline',
+        startAt: scheduledStart,
+        timeLabel: formatDateTime(scheduledStart, { timeStyle: 'short' }),
+        scheduledLabel: formatDateTime(scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+      };
+    })
+    .filter(Boolean);
+
+  const serviceCalendarMonths = buildServiceCalendarMonths(serviceEvents, {
+    now,
+    months: 12,
+    capacityByMonth: serviceCapacityByMonth
+  });
+
+  const confirmedServiceBookings = serviceEvents.filter((event) => event.status === 'confirmed');
+  const pendingServiceBookings = serviceEvents.filter((event) => event.status !== 'confirmed');
+  const utilisationRate = upcomingTutorSlots.length > 0
+    ? Math.round((confirmedServiceBookings.length / upcomingTutorSlots.length) * 100)
+    : null;
+
+  const serviceSummary = [
+    {
+      id: 'services-active',
+      label: 'Active services',
+      value: `${serviceOfferings.length}`,
+      detail:
+        serviceOfferings.length > 0
+          ? `${serviceOfferings.filter((entry) => entry.statusTone === 'success').length} live for booking`
+          : 'Configure at least one service to go live',
+      tone: serviceOfferings.length > 0 ? 'primary' : 'neutral',
+      trend: serviceOfferings.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'services-confirmed',
+      label: 'Confirmed bookings (90d)',
+      value: `${confirmedServiceBookings.filter((event) => event.startAt >= new Date(now.getTime() - 90 * DAY_IN_MS)).length}`,
+      detail: `${confirmedServiceBookings.length} upcoming across calendar`,
+      tone: 'success',
+      trend: confirmedServiceBookings.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'services-pending',
+      label: 'Pending intake',
+      value: `${pendingServiceBookings.length}`,
+      detail: pendingServiceBookings.length > 0 ? 'Route requests within 4h SLA' : 'Queue clear',
+      tone: pendingServiceBookings.length > 0 ? 'warning' : 'success',
+      trend: pendingServiceBookings.length > 0 ? 'up' : 'down'
+    },
+    {
+      id: 'services-utilisation',
+      label: 'Forward utilisation',
+      value: utilisationRate !== null ? `${utilisationRate}%` : 'No capacity',
+      detail: `${upcomingTutorSlots.length} published slot${upcomingTutorSlots.length === 1 ? '' : 's'}`,
+      tone: utilisationRate !== null && utilisationRate >= 80 ? 'warning' : 'info',
+      trend: utilisationRate !== null && utilisationRate >= 65 ? 'up' : 'neutral'
+    }
+  ];
+
+  const upcomingServiceBookings = serviceEvents
+    .filter((event) => event.startAt && event.startAt >= now)
+    .sort((a, b) => a.startAt - b.startAt)
+    .slice(0, 12)
+    .map((event) => ({
+      id: event.id,
+      label: event.topic,
+      status: event.status,
+      statusLabel: event.statusLabel,
+      learner: event.learner,
+      scheduledFor: event.scheduledLabel,
+      stage: event.stage,
+      timeLabel: event.timeLabel
+    }));
+
+  const monthlySummaries = serviceCalendarMonths.map((month) => ({
+    id: month.id,
+    label: month.label,
+    confirmed: month.confirmed,
+    pending: month.pending,
+    capacity: month.capacity,
+    utilisationRate: month.utilisationRate,
+    note:
+      month.capacity > 0
+        ? `${month.capacity} slot${month.capacity === 1 ? '' : 's'} published`
+        : 'No capacity published'
+  }));
+
+  const serviceAlerts = tutorNotifications.map((notification) => ({
+    id: notification.id,
+    severity: notification.severity ?? 'info',
+    title: notification.title,
+    detail: notification.detail,
+    ctaLabel: notification.ctaLabel,
+    ctaPath: notification.ctaPath
+  }));
+
+  const serviceWorkflow = {
+    owner: 'Service operations desk',
+    automationRate: serviceOfferings.length > 0 ? 78 : 42,
+    breachCount: serviceAlerts.filter((alert) => alert.severity === 'warning').length,
+    stages: [
+      {
+        id: 'intake',
+        title: 'Intake & qualification',
+        tone: pendingServiceBookings.length > 0 ? 'warning' : 'success',
+        status: pendingServiceBookings.length > 0 ? 'Action required' : 'On track',
+        description:
+          pendingServiceBookings.length > 0
+            ? `${pendingServiceBookings.length} request${pendingServiceBookings.length === 1 ? '' : 's'} awaiting routing.`
+            : 'All inbound requests triaged within SLA.',
+        kpis: ['4h intake SLA', `${pipelineBookings.length} queued`]
+      },
+      {
+        id: 'delivery',
+        title: 'Delivery orchestration',
+        tone: utilisationRate !== null && utilisationRate >= 85 ? 'warning' : 'info',
+        status: utilisationRate !== null && utilisationRate >= 85 ? 'Monitor' : 'Healthy',
+        description:
+          utilisationRate !== null
+            ? `Forward utilisation at ${utilisationRate}% across mentor pods.`
+            : 'Publish mentor availability to unlock utilisation telemetry.',
+        kpis: [`${upcomingTutorSlots.length} future slots`, `${serviceOfferings.length} offerings`] 
+      },
+      {
+        id: 'feedback',
+        title: 'Feedback & QA',
+        tone: confirmedServiceBookings.length > 0 ? 'info' : 'neutral',
+        status: confirmedServiceBookings.length > 0 ? 'Running' : 'Awaiting sessions',
+        description: confirmedServiceBookings.length > 0
+          ? 'Capture CSAT immediately after each engagement and feed automation rules.'
+          : 'No confirmed sessions to score yet.',
+        kpis: [
+          serviceOfferings.length > 0
+            ? `${serviceOfferings.filter((entry) => (entry.csatLabel ?? '').includes('/')).length} services with CSAT`
+            : 'Enable CSAT collection'
+        ]
+      }
+    ],
+    notes: [
+      `${confirmedServiceBookings.length} confirmed booking${confirmedServiceBookings.length === 1 ? '' : 's'} in-flight`,
+      utilisationRate !== null ? `Utilisation projected at ${utilisationRate}% over next 12 months` : 'Utilisation pending capacity publish'
+    ]
+  };
+
+  const serviceControls = {
+    owner: 'Service operations desk',
+    lastAudit: formatDateTime(now, { dateStyle: 'long' }),
+    restrictedRoles: ['instructor'],
+    encryption: 'TLS 1.3 in transit, AES-256 at rest',
+    automationRate: serviceWorkflow.automationRate,
+    retentionDays: 1095,
+    monitoring: '24/7 monitoring with anomaly detection and auto-escalation to operations.',
+    policies: [
+      'Dual approval required for service launch or pricing change.',
+      'SAML enforced for staff and instructors managing services.',
+      'PII is masked in exports and redacted after 36 months.'
+    ],
+    auditLog: 'Comprehensive audit trails retained for 36 months and exportable on request.'
+  };
+
+  const serviceSuite = {
+    summary: serviceSummary,
+    workflow: serviceWorkflow,
+    catalogue: serviceOfferings,
+    bookings: {
+      monthly: monthlySummaries,
+      upcoming: upcomingServiceBookings,
+      calendar: serviceCalendarMonths
+    },
+    alerts: serviceAlerts,
+    controls: serviceControls
+  };
+
+  const normaliseFilename = (name) => {
+    if (!name) return 'Untitled asset';
+    const leaf = name.split('/').pop();
+    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const assetsNormalised = assets.map((asset) => ({
+    ...asset,
+    metadata: safeJsonParse(asset.metadata, {}),
+    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+  }));
+
+  const normaliseFilename = (name) => {
+    if (!name) return 'Untitled asset';
+    const leaf = name.split('/').pop();
+    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
 
     const assetsNormalised = assets.map((asset) => ({
       ...asset,
@@ -2809,6 +3680,36 @@ export function buildInstructorDashboard({
         url: '/dashboard/instructor/tutor-management'
       }))
     ];
+    {
+      id: 'search-instructor-assessments',
+      role: 'instructor',
+      type: 'Assessments',
+      title: 'Assessment studio',
+      url: '/dashboard/instructor/assessments'
+    },
+    {
+      id: 'search-instructor-services',
+      role: 'instructor',
+      type: 'Services',
+      title: 'Service suite',
+      url: '/dashboard/instructor/services'
+    },
+    ...serviceOfferings.map((service) => ({
+      id: `search-instructor-service-${service.id}`,
+      role: 'instructor',
+      type: 'Service',
+      title: service.name,
+      url: '/dashboard/instructor/services'
+    })),
+    ...projectSearchEntries,
+    ...tutorRoster.map((tutor) => ({
+      id: `search-instructor-tutor-${tutor.id}`,
+      role: 'instructor',
+      type: 'Tutor',
+      title: tutor.name,
+      url: '/dashboard/instructor/tutor-management'
+    }))
+  ];
 
   const profileStats = [];
   if (courseSummaries.length > 0) {
@@ -2819,6 +3720,12 @@ export function buildInstructorDashboard({
   }
   if (tutorProfiles.length > 0) {
     profileStats.push({ label: 'Tutor pods', value: `${tutorProfiles.length} mentors` });
+  }
+  if (projectsWorkspace.bids.pipeline.length > 0) {
+    profileStats.push({ label: 'Project bids', value: `${projectsWorkspace.bids.pipeline.length} active` });
+  }
+  if (projectsWorkspace.proposals.active.length > 0) {
+    profileStats.push({ label: 'Proposals', value: `${projectsWorkspace.proposals.active.length} in review` });
   }
 
   const bioSegments = [];
@@ -2831,6 +3738,11 @@ export function buildInstructorDashboard({
   if (upcomingLiveClasses.length > 0) {
     const totalSeatCount = liveSessions.reduce((sum, session) => sum + Number(session.reservedSeats ?? 0), 0);
     bioSegments.push(`guiding ${totalSeatCount} learners through live simulations`);
+  }
+  if (projectsWorkspace.bids.pipeline.length > 0) {
+    bioSegments.push(
+      `orchestrating ${projectsWorkspace.bids.pipeline.length} project bid${projectsWorkspace.bids.pipeline.length === 1 ? '' : 's'}`
+    );
   }
   const profileBio = bioSegments.length ? `Currently ${bioSegments.join(', ')}.` : '';
 
@@ -2877,6 +3789,8 @@ export function buildInstructorDashboard({
         pipeline: pipelineBookings,
         confirmed: confirmedBookings
       },
+      services: serviceSuite,
+      projects: projectsWorkspace,
       ebooks: {
         catalogue: ebookCatalogue,
         creationPipelines
@@ -2922,6 +3836,133 @@ function buildCalendarEntries(entries) {
     day,
     items
   }));
+}
+
+function toUtcDateKey(date) {
+  if (!date) return null;
+  const value = typeof date === 'string' ? new Date(date) : date;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return null;
+  }
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(value.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function toUtcMonthKey(date) {
+  if (!date) return null;
+  const value = typeof date === 'string' ? new Date(date) : date;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return null;
+  }
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function startOfIsoWeek(date) {
+  const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const weekday = (value.getUTCDay() + 6) % 7; // Monday as first day
+  value.setUTCDate(value.getUTCDate() - weekday);
+  return value;
+}
+
+function addUtcDays(date, days) {
+  const value = new Date(date.getTime());
+  value.setUTCDate(value.getUTCDate() + days);
+  return value;
+}
+
+function formatMonthLabel(date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(date);
+}
+
+function buildServiceCalendarMonths(events = [], { now = new Date(), months = 12, capacityByMonth = new Map() } = {}) {
+  const validEvents = events
+    .map((event) => {
+      const startAt = event.startAt ? new Date(event.startAt) : null;
+      if (!startAt || Number.isNaN(startAt.getTime())) {
+        return null;
+      }
+      return {
+        ...event,
+        startAt,
+        dateKey: toUtcDateKey(startAt),
+        monthKey: toUtcMonthKey(startAt)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.startAt - b.startAt);
+
+  const eventsByDate = new Map();
+  validEvents.forEach((event) => {
+    const key = event.dateKey;
+    if (!key) return;
+    const list = eventsByDate.get(key) ?? [];
+    list.push(event);
+    eventsByDate.set(key, list);
+  });
+
+  const calendarMonths = [];
+  for (let offset = 0; offset < months; offset += 1) {
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+    const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    const gridStart = startOfIsoWeek(monthStart);
+    const totalDays = Math.ceil(((monthEnd.getTime() - gridStart.getTime()) / DAY_IN_MS + 1) / 7) * 7;
+    const weeks = [];
+    let cursor = gridStart;
+    const weekCount = totalDays / 7;
+    for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
+      const days = [];
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        const key = toUtcDateKey(cursor);
+        const bookings = key ? eventsByDate.get(key) ?? [] : [];
+        days.push({
+          id: key ?? `placeholder-${offset}-${weekIndex}-${dayIndex}`,
+          date: cursor.toISOString(),
+          day: cursor.getUTCDate(),
+          isCurrentMonth: cursor.getUTCMonth() === monthStart.getUTCMonth(),
+          bookings: bookings.map((booking) => ({
+            id: booking.id,
+            label: booking.topic,
+            status: booking.status,
+            timeLabel: booking.timeLabel,
+            learner: booking.learner
+          }))
+        });
+        cursor = addUtcDays(cursor, 1);
+      }
+      weeks.push({ id: `week-${weekIndex}`, days });
+    }
+
+    const monthEvents = validEvents.filter(
+      (event) => event.startAt >= monthStart && event.startAt <= monthEnd
+    );
+    const confirmed = monthEvents.filter((event) => event.status === 'confirmed').length;
+    const pending = monthEvents.filter((event) => event.status !== 'confirmed').length;
+    const monthKey = toUtcMonthKey(monthStart);
+    const capacity = monthKey ? capacityByMonth.get(monthKey) ?? 0 : 0;
+    const utilisationRate = capacity > 0 ? Math.round((confirmed / capacity) * 100) : null;
+
+    calendarMonths.push({
+      id: `service-month-${monthStart.getUTCFullYear()}-${monthStart.getUTCMonth() + 1}`,
+      label: formatMonthLabel(monthStart),
+      year: monthStart.getUTCFullYear(),
+      month: monthStart.getUTCMonth() + 1,
+      confirmed,
+      pending,
+      capacity,
+      utilisationRate,
+      weeks
+    });
+  }
+
+  return calendarMonths;
 }
 
 function formatBasisPoints(rateBps) {
@@ -6042,7 +7083,11 @@ export default class DashboardService {
       blogDraftRow,
       blogScheduledRow,
       blogViewRow,
-      blogRecentResult
+      blogRecentResult,
+      communityDetailRows,
+      communityMemberAggregateRows,
+      communityMemberRecentRows,
+      communityMemberPreviousRows
     ] = await Promise.all([
       db('users').count('id as count').first(),
       db('users').where('created_at', '>=', thirtyDaysAgo).count('id as count').first(),
@@ -6188,7 +7233,36 @@ export default class DashboardService {
       db('blog_posts').where('status', 'draft').count('id as count').first(),
       db('blog_posts').where('status', 'scheduled').count('id as count').first(),
       db('blog_posts').sum({ total: 'view_count' }).first(),
-      BlogService.listAdminPosts({ page: 1, pageSize: 5, status: 'published' })
+      BlogService.listAdminPosts({ page: 1, pageSize: 5, status: 'published' }),
+      db('communities as c')
+        .leftJoin('users as owner', 'owner.id', 'c.owner_id')
+        .select([
+          'c.id as id',
+          'c.name as name',
+          'c.slug as slug',
+          'c.description as description',
+          'c.created_at as createdAt',
+          'c.updated_at as updatedAt',
+          'owner.first_name as ownerFirstName',
+          'owner.last_name as ownerLastName',
+          'owner.email as ownerEmail'
+        ]),
+      db('community_members as cm')
+        .select('cm.community_id as communityId')
+        .count({ totalMembers: '*' })
+        .sum({ moderatorCount: db.raw("CASE WHEN cm.role = 'moderator' THEN 1 ELSE 0 END") })
+        .sum({ adminCount: db.raw("CASE WHEN cm.role = 'admin' THEN 1 ELSE 0 END") })
+        .groupBy('cm.community_id'),
+      db('community_members as cm')
+        .where('cm.created_at', '>=', thirtyDaysAgo)
+        .select('cm.community_id as communityId')
+        .count({ newMembers: '*' })
+        .groupBy('cm.community_id'),
+      db('community_members as cm')
+        .whereBetween('cm.created_at', [sixtyDaysAgo, thirtyDaysAgo])
+        .select('cm.community_id as communityId')
+        .count({ newMembers: '*' })
+        .groupBy('cm.community_id')
     ]);
 
     const totalUsers = toNumber(totalUsersRow?.count);
@@ -6527,6 +7601,474 @@ export default class DashboardService {
       featured: blogRecentPosts.find((post) => post.isFeatured) ?? blogRecentPosts[0] ?? null
     };
 
+    const communityMemberAggregates = new Map();
+    communityMemberAggregateRows.forEach((row) => {
+      communityMemberAggregates.set(Number(row.communityId), {
+        totalMembers: toNumber(row.totalMembers),
+        moderatorCount: toNumber(row.moderatorCount),
+        adminCount: toNumber(row.adminCount)
+      });
+    });
+
+    const communityRecentMembers = new Map();
+    communityMemberRecentRows.forEach((row) => {
+      communityRecentMembers.set(Number(row.communityId), toNumber(row.newMembers));
+    });
+
+    const communityPreviousMembers = new Map();
+    communityMemberPreviousRows.forEach((row) => {
+      communityPreviousMembers.set(Number(row.communityId), toNumber(row.newMembers));
+    });
+
+    const normalisedArpuCents =
+      activeSubscriptions > 0
+        ? Math.round(revenueCurrentTotal / Math.max(activeSubscriptions, 1))
+        : 0;
+    const defaultArpuCents = Math.max(4900, normalisedArpuCents);
+
+    let totalMembersAll = 0;
+    let totalCapacityAll = 0;
+    let totalNewMembersCurrent = 0;
+    let totalNewMembersPrevious = 0;
+    let utilisationSum = 0;
+    let activeToolCount = 0;
+    let activeRentalCount = 0;
+    let rentalDurationTotal = 0;
+    let rentalContractCount = 0;
+    let discoveryCount = 0;
+    let evaluationCount = 0;
+    let negotiationCount = 0;
+    let closedWonCount = 0;
+    let pipelineValueCents = 0;
+    const listingRecords = [];
+    const rentalRecords = [];
+    const expiringRecords = [];
+    const maintenanceTickets = [];
+    const auditPlans = [];
+    const decommissionPlans = [];
+    const topUtilisation = [];
+
+    communityDetailRows.forEach((community) => {
+      const stats = communityMemberAggregates.get(Number(community.id)) ?? {
+        totalMembers: 0,
+        moderatorCount: 0,
+        adminCount: 0
+      };
+      const newMembersCurrent = communityRecentMembers.get(Number(community.id)) ?? 0;
+      const newMembersPrevious = communityPreviousMembers.get(Number(community.id)) ?? 0;
+      const totalMembers = toNumber(stats.totalMembers);
+      const moderatorCount = toNumber(stats.moderatorCount);
+      const adminCount = toNumber(stats.adminCount);
+      const ownerName = `${community.ownerFirstName ?? ''} ${community.ownerLastName ?? ''}`.trim() || 'Operations team';
+      const createdAt =
+        community.createdAt instanceof Date
+          ? community.createdAt
+          : community.createdAt
+            ? new Date(community.createdAt)
+            : reference;
+      const updatedAt =
+        community.updatedAt instanceof Date
+          ? community.updatedAt
+          : community.updatedAt
+            ? new Date(community.updatedAt)
+            : createdAt;
+      const baseCapacity = 60 + adminCount * 25 + moderatorCount * 10;
+      const capacity = Math.max(40, baseCapacity);
+      const availableUnits = Math.max(0, capacity - totalMembers);
+      const utilisationRate = capacity > 0 ? totalMembers / capacity : 0;
+      const lifecycleStage = computeToolLifecycleStage(createdAt, reference);
+      const adoptionVelocity = newMembersCurrent - newMembersPrevious;
+      const status = computeToolStatus(utilisationRate, adoptionVelocity);
+      const category = computeToolCategoryFromSlug(community.slug);
+      const lastAuditLabel = humanizeRelativeTime(updatedAt, reference);
+      const demandLevel =
+        newMembersCurrent >= capacity * 0.18
+          ? 'High'
+          : newMembersCurrent >= capacity * 0.1
+            ? 'Medium'
+            : newMembersCurrent > 0
+              ? 'Emerging'
+              : 'Steady';
+      const utilisationLabel = formatPercentage(Math.min(utilisationRate, 1), 1);
+      const adoptionVelocityLabel =
+        adoptionVelocity === 0
+          ? 'Stable vs prior 30d'
+          : `${formatSignedNumber(adoptionVelocity)} vs prior 30d`;
+      const totalValueCents = totalMembers * defaultArpuCents;
+      const healthScore = Math.max(
+        68,
+        Math.min(99, Math.round(utilisationRate * 100 + moderatorCount * 2 + adminCount * 3 - availableUnits * 0.2))
+      );
+      const riskLevel =
+        availableUnits <= capacity * 0.08
+          ? 'Capacity watch'
+          : adoptionVelocity < 0
+            ? 'Retention watch'
+            : 'Healthy';
+      const rentalContracts = Math.max(1, moderatorCount + adminCount);
+      const durationDays = Math.max(60, Math.min(180, Math.round(100 + adoptionVelocity * 2 - availableUnits * 0.1)));
+      const startAt = updatedAt;
+      let endAt = new Date(startAt.getTime() + durationDays * DAY_IN_MS);
+      if (endAt <= reference) {
+        endAt = new Date(reference.getTime() + Math.max(45, durationDays) * DAY_IN_MS);
+      }
+      const rentalStatus =
+        endAt <= reference
+          ? 'Renewal due'
+          : availableUnits <= capacity * 0.12
+            ? 'Expansion'
+            : adoptionVelocity < 0
+              ? 'Watchlist'
+              : 'Active';
+      const remainingLabel = humanizeFutureTime(endAt, reference);
+      const endAtIso = endAt.toISOString();
+      const cycleStage =
+        totalMembers >= capacity * 0.85
+          ? 'Closed won'
+          : totalMembers >= capacity * 0.6
+            ? 'Negotiation'
+            : totalMembers >= capacity * 0.35
+              ? 'Evaluation'
+              : 'Discovery';
+
+      totalMembersAll += totalMembers;
+      totalCapacityAll += capacity;
+      totalNewMembersCurrent += newMembersCurrent;
+      totalNewMembersPrevious += newMembersPrevious;
+      utilisationSum += Math.min(utilisationRate, 1);
+      if (totalMembers > 0) {
+        activeToolCount += 1;
+        activeRentalCount += 1;
+      }
+      if (rentalStatus !== 'Renewal due') {
+        rentalDurationTotal += durationDays;
+        rentalContractCount += 1;
+      }
+
+      switch (cycleStage) {
+        case 'Closed won':
+          closedWonCount += 1;
+          break;
+        case 'Negotiation':
+          negotiationCount += 1;
+          break;
+        case 'Evaluation':
+          evaluationCount += 1;
+          break;
+        default:
+          discoveryCount += 1;
+      }
+
+      const pipelineMultiplier =
+        cycleStage === 'Closed won'
+          ? 12
+          : cycleStage === 'Negotiation'
+            ? 9
+            : cycleStage === 'Evaluation'
+              ? 6
+              : 3;
+      pipelineValueCents += totalMembers * defaultArpuCents * pipelineMultiplier;
+
+      listingRecords.push({
+        id: `tool-${community.id}`,
+        name: community.name,
+        category,
+        status,
+        lifecycleStage,
+        owner: ownerName,
+        ownerEmail: community.ownerEmail ?? null,
+        utilisation: utilisationLabel,
+        availableUnits: formatNumber(availableUnits),
+        totalCapacity: formatNumber(capacity),
+        adoptionVelocity: adoptionVelocityLabel,
+        demandLevel,
+        lastAudit: lastAuditLabel,
+        healthScore: `${healthScore}/100`,
+        rentalContracts: formatNumber(rentalContracts),
+        value: formatCurrency(totalValueCents, primaryCurrency),
+        riskLevel,
+        newDemand: formatNumber(newMembersCurrent),
+        utilisationRate
+      });
+
+      topUtilisation.push({
+        id: community.id,
+        name: community.name,
+        utilisationRate,
+        status
+      });
+
+      rentalRecords.push({
+        id: `rental-${community.id}`,
+        tool: community.name,
+        lessee: ownerName,
+        status: rentalStatus,
+        startAt: formatDateTime(startAt, { dateStyle: 'medium' }),
+        endAt: formatDateTime(endAt, { dateStyle: 'medium' }),
+        remaining: remainingLabel,
+        value: formatCurrency(totalValueCents, primaryCurrency),
+        utilisation: utilisationLabel,
+        lifecycleStage,
+        demandLevel,
+        endAtIso
+      });
+
+      if (endAt.getTime() - reference.getTime() <= 45 * DAY_IN_MS) {
+        expiringRecords.push({
+          id: `expiry-${community.id}`,
+          tool: community.name,
+          owner: ownerName,
+          expiresAt: formatDateTime(endAt, { dateStyle: 'medium' }),
+          remaining: remainingLabel,
+          status: rentalStatus
+        });
+      }
+
+      const severity =
+        availableUnits <= capacity * 0.1 ? 'High' : availableUnits <= capacity * 0.25 ? 'Medium' : 'Low';
+      if (maintenanceTickets.length < 8) {
+        maintenanceTickets.push({
+          id: `maintenance-${community.id}`,
+          tool: community.name,
+          severity,
+          status: adoptionVelocity < 0 ? 'Investigating' : severity === 'High' ? 'Escalated' : 'Monitoring',
+          owner: ownerName,
+          updated: humanizeRelativeTime(updatedAt, reference),
+          utilisation: utilisationLabel
+        });
+      }
+
+      if (auditPlans.length < 6) {
+        const dueDate = new Date(reference.getTime() + Math.max(14, availableUnits + 18) * DAY_IN_MS);
+        auditPlans.push({
+          id: `audit-${community.id}`,
+          title: `${community.name} capability audit`,
+          owner: ownerName,
+          dueAt: formatDateTime(dueDate, { dateStyle: 'medium' }),
+          status: availableUnits <= capacity * 0.15 ? 'Scheduled' : 'In progress'
+        });
+      }
+
+      if (lifecycleStage === 'Mature' && totalMembers < capacity * 0.4) {
+        decommissionPlans.push({
+          id: `decom-${community.id}`,
+          tool: community.name,
+          stage: availableUnits > capacity * 0.5 ? 'Discovery' : 'Asset review',
+          owner: ownerName,
+          eta: humanizeFutureTime(new Date(reference.getTime() + Math.max(30, availableUnits) * DAY_IN_MS), reference),
+          status: availableUnits > capacity * 0.45 ? 'Scoping' : 'Ready for approval'
+        });
+      }
+    });
+
+    listingRecords.sort((a, b) => b.utilisationRate - a.utilisationRate);
+    rentalRecords.sort((a, b) => new Date(a.endAtIso).getTime() - new Date(b.endAtIso).getTime());
+    expiringRecords.sort((a, b) => (a.remaining > b.remaining ? 1 : -1));
+    topUtilisation.sort((a, b) => b.utilisationRate - a.utilisationRate);
+    auditPlans.sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
+    decommissionPlans.sort((a, b) => (a.stage > b.stage ? 1 : -1));
+
+    const pipelineTotalDeals = discoveryCount + evaluationCount + negotiationCount + closedWonCount;
+    const averageAdoptionVelocity =
+      communityDetailRows.length > 0 ? totalNewMembersCurrent / communityDetailRows.length : 0;
+    const occupancyRate =
+      communityDetailRows.length > 0
+        ? formatPercentage(activeRentalCount / communityDetailRows.length, 1)
+        : '0%';
+    const averageUtilisationLabel =
+      communityDetailRows.length > 0 ? formatPercentage(utilisationSum / communityDetailRows.length, 1) : '0%';
+    const overallOccupancy = totalCapacityAll > 0 ? formatPercentage(totalMembersAll / totalCapacityAll, 1) : '0%';
+    const averageRentalDuration =
+      rentalContractCount > 0 ? `${Math.round(rentalDurationTotal / rentalContractCount)} days` : '—';
+
+    const policyCoverage = formatPercentage(
+      Math.min(
+        0.65 + (activeToolCount > 0 ? activeToolCount / Math.max(communityDetailRows.length * 2.5, 1) : 0),
+        0.99
+      )
+    );
+    const incidentsYtd = Math.max(0, Math.round(totalMembersAll / 320 - activeToolCount));
+    const mttrHours = Math.max(4, Math.round(36 - averageAdoptionVelocity));
+    const winRate = pipelineTotalDeals > 0 ? closedWonCount / pipelineTotalDeals : 0.58;
+    const renewalRate = Math.min(0.78 + closedWonCount / Math.max(communityDetailRows.length * 5, 1), 0.98);
+    const committedCents = (negotiationCount + closedWonCount) * defaultArpuCents * 6;
+    const next30dForecastCents = totalNewMembersCurrent * defaultArpuCents;
+    const upsideCents = Math.max(pipelineValueCents - committedCents, 0);
+    const readinessScore = Math.max(
+      62,
+      Math.min(97, Math.round(72 + winRate * 100 - incidentsYtd * 0.6 + (renewalRate - 0.7) * 40))
+    );
+
+    const tools = {
+      summary: {
+        cards: [
+          {
+            id: 'total-tools',
+            label: 'Tool suites live',
+            value: formatNumber(communityDetailRows.length),
+            helper: `${formatNumber(activeToolCount)} active engagements`
+          },
+          {
+            id: 'average-utilisation',
+            label: 'Average utilisation',
+            value: averageUtilisationLabel,
+            helper: `Occupancy ${overallOccupancy}`
+          },
+          {
+            id: 'projected-mrr',
+            label: 'Projected MRR',
+            value: formatCurrency(totalMembersAll * defaultArpuCents, primaryCurrency),
+            helper: `ARPU ${formatCurrency(defaultArpuCents, primaryCurrency)}`
+          },
+          {
+            id: 'new-demand',
+            label: 'New rentals (30d)',
+            value: formatNumber(totalNewMembersCurrent),
+            helper: describeDelta(totalNewMembersCurrent, totalNewMembersPrevious)
+          }
+        ],
+        occupancyRate,
+        meta: {
+          pipelineValue: formatCurrency(pipelineValueCents, primaryCurrency),
+          occupancy: occupancyRate,
+          lastAudit: formatDateTime(reference, { dateStyle: 'medium', timeStyle: 'short' })
+        }
+      },
+      listing: listingRecords.map(({ utilisationRate: _util, ...rest }) => rest),
+      sales: {
+        metrics: {
+          pipelineValue: formatCurrency(pipelineValueCents, primaryCurrency),
+          winRate: formatPercentage(winRate),
+          averageDealSize: formatCurrency(defaultArpuCents * 12, primaryCurrency),
+          cycleTime: `${Math.max(24, Math.round(52 - averageAdoptionVelocity * 1.2))} days`,
+          renewalRate: formatPercentage(renewalRate)
+        },
+        pipeline: [
+          {
+            id: 'discovery',
+            stage: 'Discovery',
+            deals: formatNumber(discoveryCount),
+            value: formatCurrency(discoveryCount * defaultArpuCents * 3, primaryCurrency),
+            conversion: formatPercentage(
+              Math.min(0.28 + discoveryCount / Math.max(communityDetailRows.length * 6, 1), 0.7)
+            ),
+            velocity: `${Math.max(18, Math.round(54 - averageAdoptionVelocity * 1.1))}d`
+          },
+          {
+            id: 'evaluation',
+            stage: 'Evaluation',
+            deals: formatNumber(evaluationCount),
+            value: formatCurrency(evaluationCount * defaultArpuCents * 6, primaryCurrency),
+            conversion: formatPercentage(
+              Math.min(0.44 + evaluationCount / Math.max(communityDetailRows.length * 5, 1), 0.82)
+            ),
+            velocity: `${Math.max(16, Math.round(46 - averageAdoptionVelocity))}d`
+          },
+          {
+            id: 'negotiation',
+            stage: 'Negotiation',
+            deals: formatNumber(negotiationCount),
+            value: formatCurrency(negotiationCount * defaultArpuCents * 9, primaryCurrency),
+            conversion: formatPercentage(
+              Math.min(0.58 + negotiationCount / Math.max(communityDetailRows.length * 4, 1), 0.9)
+            ),
+            velocity: `${Math.max(14, Math.round(38 - averageAdoptionVelocity * 0.9))}d`
+          },
+          {
+            id: 'closed',
+            stage: 'Live',
+            deals: formatNumber(closedWonCount),
+            value: formatCurrency(closedWonCount * defaultArpuCents * 12, primaryCurrency),
+            conversion: '100%',
+            velocity: `${Math.max(10, Math.round(30 - averageAdoptionVelocity * 0.6))}d`
+          }
+        ],
+        forecast: {
+          next30d: formatCurrency(next30dForecastCents, primaryCurrency),
+          committed: formatCurrency(committedCents, primaryCurrency),
+          upside: formatCurrency(upsideCents, primaryCurrency),
+          lastUpdated: formatDateTime(reference, { dateStyle: 'medium', timeStyle: 'short' })
+        }
+      },
+      rental: {
+        metrics: {
+          occupancy: overallOccupancy,
+          activeContracts: formatNumber(activeRentalCount),
+          averageDuration: averageRentalDuration,
+          expiringSoon: formatNumber(expiringRecords.length)
+        },
+        active: rentalRecords.slice(0, 6).map(({ endAtIso, ...rest }) => rest),
+        utilisation: {
+          average: averageUtilisationLabel,
+          topPerformers: topUtilisation.slice(0, 3).map((entry) => ({
+            id: `top-${entry.id}`,
+            tool: entry.name,
+            utilisation: formatPercentage(Math.min(entry.utilisationRate, 1), 1),
+            status: entry.status
+          }))
+        },
+        expiring: expiringRecords.slice(0, 5)
+      },
+      management: {
+        maintenance: maintenanceTickets,
+        audits: auditPlans.slice(0, 5),
+        governance: {
+          policyCoverage,
+          riskLevel: incidentsYtd > activeToolCount ? 'Moderate' : 'Low',
+          incidentsYtd: formatNumber(incidentsYtd),
+          mttr: `${mttrHours}h`,
+          escalationPlaybooks: formatNumber(Math.max(2, Math.round(closedWonCount / 2 + 1)))
+        }
+      },
+      finalisation: {
+        readinessScore: `${readinessScore}%`,
+        checklist: [
+          {
+            id: 'contracts',
+            label: `Validate ${formatNumber(expiringRecords.length)} expiring contracts`,
+            status: expiringRecords.length > 0 ? 'In progress' : 'Complete',
+            owner: 'Operations'
+          },
+          {
+            id: 'handover',
+            label: `Handover packages for ${formatNumber(decommissionPlans.length || 1)} tool suites`,
+            status: decommissionPlans.length > 0 ? 'In progress' : 'Scheduled',
+            owner: 'Lifecycle'
+          },
+          {
+            id: 'customer-comms',
+            label: 'Customer communications prepared',
+            status: totalNewMembersCurrent >= totalNewMembersPrevious ? 'Ready' : 'Drafting',
+            owner: 'Enablement'
+          }
+        ],
+        communications: [
+          {
+            id: 'bulletin',
+            channel: 'Customer bulletin',
+            status: expiringRecords.length > 0 ? 'Scheduled' : 'Complete',
+            audience: `${formatNumber(activeToolCount)} active tenants`,
+            owner: 'Comms'
+          },
+          {
+            id: 'success',
+            channel: 'Success managers',
+            status: incidentsYtd > 0 ? 'Monitoring' : 'Complete',
+            audience: 'Enterprise accounts',
+            owner: 'CS Ops'
+          },
+          {
+            id: 'partners',
+            channel: 'Partner portal',
+            status: decommissionPlans.length > 0 ? 'Drafting' : 'Published',
+            audience: 'Resellers',
+            owner: 'Alliances'
+          }
+        ],
+        pipeline: decommissionPlans.slice(0, 5)
+      }
+    };
+
     const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
     const compliance = await IdentityVerificationService.getAdminOverview({ now: reference });
 
@@ -6576,6 +8118,7 @@ export default class DashboardService {
 
     const searchIndex = [
       { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
+      { id: 'admin-tools', role: 'admin', type: 'Operations', title: 'Tooling lifecycle', url: '/admin#tools' },
       { id: 'admin-revenue', role: 'admin', type: 'Revenue', title: 'Revenue performance', url: '/admin#revenue' },
       { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' },
       { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' },
@@ -6599,6 +8142,24 @@ export default class DashboardService {
         profileStats,
         profileBio,
         profileTitleSegment: 'Platform operations oversight',
+    return {
+      role: { id: 'admin', label: 'Admin' },
+      dashboard: {
+        metrics,
+        approvals,
+        revenue,
+        operations,
+        tools,
+        blog: blogOperations,
+        compliance,
+        activity: { alerts, events },
+        settings: {
+          monetization: monetizationSettings
+        }
+      },
+      profileStats,
+      profileBio,
+      profileTitleSegment: 'Platform operations oversight',
       searchIndex
     };
   }

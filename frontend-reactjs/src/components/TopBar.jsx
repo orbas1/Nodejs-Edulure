@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
 import CommunitySwitcher from './CommunitySwitcher.jsx';
 import SearchBar from './SearchBar.jsx';
+import LanguageSelector from './navigation/LanguageSelector.jsx';
 
 export default function TopBar({
   communities,
@@ -53,6 +54,7 @@ export default function TopBar({
         />
       </div>
       <div className="flex items-center justify-end gap-3 text-slate-500">
+        <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
         <button
           type="button"
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary"

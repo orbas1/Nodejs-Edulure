@@ -5,12 +5,14 @@ import {
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
   BanknotesIcon,
+  Bars3Icon,
   BookOpenIcon,
   CalendarDaysIcon,
   ChartBarIcon,
   Cog6ToothIcon,
-  IdentificationIcon,
   DocumentTextIcon,
+  ClipboardDocumentListIcon,
+  IdentificationIcon,
   InboxStackIcon,
   HandshakeIcon,
   MegaphoneIcon,
@@ -19,10 +21,13 @@ import {
   Squares2X2Icon,
   UserGroupIcon,
   UsersIcon,
+  VideoCameraIcon,
+  XMarkIcon
   Bars3Icon,
   XMarkIcon,
   VideoCameraIcon,
   MapIcon
+  BriefcaseIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -63,6 +68,8 @@ const navigationByRole = {
     { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'Service suite', to: `${basePath}/services`, icon: BriefcaseIcon },
+    { name: 'Project bids', to: `${basePath}/projects`, icon: ClipboardDocumentListIcon },
     { name: 'Tutor management', to: `${basePath}/tutor-management`, icon: IdentificationIcon },
     { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },
     { name: 'Field services', to: `${basePath}/field-services`, icon: MapIcon },
@@ -83,6 +90,7 @@ const navigationByRole = {
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
     { name: 'Platform ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
     { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon },
+    { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
     { name: 'Fixnado Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
   ],
   community: (basePath) => [
@@ -299,6 +307,10 @@ export default function DashboardLayout() {
                     );
                   })}
                 </div>
+                      {roleOption.label}
+                    </NavLink>
+                  );
+                })}
               </div>
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
@@ -327,7 +339,8 @@ export default function DashboardLayout() {
               </span>
             </div>
           </div>
-        </header>
+        </div>
+      </header>
         <main className="flex-1 bg-gradient-to-b from-slate-50 via-white to-slate-100">
           <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
             {mainContent}

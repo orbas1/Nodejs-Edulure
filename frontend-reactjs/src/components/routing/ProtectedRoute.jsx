@@ -55,6 +55,18 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       const primaryRole = session?.user?.role;
       if (primaryRole) {
         normalizedRoleSet.add(String(primaryRole).toLowerCase());
+    const normalizedAllowed = allowedRoles.map((role) => String(role).toLowerCase());
+    const derivedRoles = deriveRoleSet(session?.user);
+
+    const aggregatedRoles = new Set(derivedRoles);
+    dashboardRoles.forEach((role) => {
+      if (!role) {
+        return;
+      }
+
+      const identifier = role?.id ?? role?.code ?? role;
+      if (identifier) {
+        aggregatedRoles.add(String(identifier).toLowerCase());
       }
       dashboardRoles.forEach((role) => {
         if (role?.id) {
@@ -66,6 +78,9 @@ export default function ProtectedRoute({ children, allowedRoles }) {
       if (!hasAccess) {
         return <Navigate to="/" replace />;
       }
+    const hasAccess = normalizedAllowed.some((role) => aggregatedRoles.has(role));
+    if (!hasAccess) {
+      return <Navigate to="/" replace />;
     }
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/content_service.dart';
 import '../services/session_manager.dart';
+import '../widgets/material_metadata_sheet.dart';
 import 'ebook_reader_screen.dart';
 
 const Color _brandPrimary = Color(0xFF2D62FF);
@@ -26,6 +27,8 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
   String? _marketplaceError;
   String? _purchaseStatus;
   String? _pendingPurchaseId;
+  bool _accessDenied = false;
+  String? _accessDeniedMessage;
 
   @override
   void initState() {
@@ -36,27 +39,71 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
   Future<void> _initialise() async {
     final cachedAssets = _service.loadCachedAssets();
     final cachedDownloads = _service.loadCachedDownloads();
+    final cachedProgress = _service.loadCachedEbookProgress();
+    final token = SessionManager.getAccessToken();
+    final role = SessionManager.getActiveRole();
+    final canManage = role == 'instructor' || role == 'admin';
     setState(() {
-      _assets = cachedAssets;
-      _downloads = cachedDownloads;
-      _ebookProgress = _service.loadCachedEbookProgress();
+      _assets = canManage ? cachedAssets : <ContentAsset>[];
+      _downloads = canManage ? cachedDownloads : <String, String>{};
+      _ebookProgress = canManage ? cachedProgress : <String, EbookProgress>{};
       _loading = false;
+      _accessDenied = token != null && !canManage;
+      _accessDeniedMessage = _accessDenied
+          ? 'Switch to an instructor or admin workspace to manage the content library.'
+          : null;
     });
     await _refresh();
   }
 
   Future<void> _refresh() async {
-    setState(() {
-      _loading = true;
-      _purchaseStatus = null;
-      _pendingPurchaseId = null;
-    });
+    final role = SessionManager.getActiveRole();
+    final canManage = role == 'instructor' || role == 'admin';
+    final token = SessionManager.getAccessToken();
+
+    if (!canManage) {
+      if (mounted) {
+        setState(() {
+          _accessDenied = token != null;
+          _accessDeniedMessage = _accessDenied
+              ? 'Switch to an instructor or admin workspace to manage the content library.'
+              : null;
+          _assets = <ContentAsset>[];
+          _downloads = <String, String>{};
+          _ebookProgress = <String, EbookProgress>{};
+          _loading = false;
+        });
+      }
+      await _loadMarketplace();
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _purchaseStatus = null;
+        _pendingPurchaseId = null;
+        _accessDenied = false;
+        _accessDeniedMessage = null;
+      });
+    }
+
     try {
       final assets = await _service.fetchAssets();
+      if (!mounted) return;
       setState(() {
         _assets = assets;
         _downloads = _service.loadCachedDownloads();
         _ebookProgress = _service.loadCachedEbookProgress();
+      });
+    } on ContentAccessDeniedException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _accessDenied = true;
+        _accessDeniedMessage = error.message;
+        _assets = <ContentAsset>[];
+        _downloads = <String, String>{};
+        _ebookProgress = <String, EbookProgress>{};
       });
     } catch (error) {
       if (!mounted) return;
@@ -357,9 +404,29 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
     }
   }
 
+  Future<void> _openMetadataSheet(ContentAsset asset) async {
+    final updated = await showModalBottomSheet<ContentAsset>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => MaterialMetadataSheet(asset: asset, service: _service),
+    );
+    if (updated != null && mounted) {
+      setState(() {
+        _assets = _assets
+            .map((item) => item.publicId == updated.publicId ? updated : item)
+            .toList();
+      });
+      await SessionManager.assetsCache
+          .put('items', _assets.map((asset) => asset.toJson()).toList());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final token = SessionManager.getAccessToken();
+    final role = SessionManager.getActiveRole();
+    final canManage = role == 'instructor' || role == 'admin';
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -399,18 +466,59 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                     color: _brandPrimary,
                     backgroundColor: Colors.white,
                     onRefresh: _refresh,
-                    child: _loading && _assets.isEmpty
-                        ? const Center(child: CircularProgressIndicator(color: _brandPrimary))
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
+                    child: _accessDenied
+                        ? ListView(
+                            padding: const EdgeInsets.all(24),
                             physics: const AlwaysScrollableScrollPhysics(
                               parent: BouncingScrollPhysics(),
                             ),
-                            itemCount: _assets.length,
-                            itemBuilder: (context, index) {
-                              final asset = _assets[index];
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                decoration: BoxDecoration(
+                                  color: _brandSurface,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(color: _brandPrimary.withOpacity(0.1)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Instructor workspace required',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w700, color: _brandPrimaryDark),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _accessDeniedMessage ??
+                                          'Switch to an instructor or admin workspace to manage metadata, galleries, and showcase settings.',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(color: Colors.blueGrey.shade600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          )
+                        : _loading && _assets.isEmpty
+                            ? const Center(child: CircularProgressIndicator(color: _brandPrimary))
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                physics: const AlwaysScrollableScrollPhysics(
+                                  parent: BouncingScrollPhysics(),
+                                ),
+                                itemCount: _assets.length,
+                                itemBuilder: (context, index) {
+                                  final asset = _assets[index];
                               final downloadedPath = _downloads[asset.publicId];
                               final ebookProgress = _ebookProgress[asset.publicId];
+                              final description = asset.customMetadata['description'] as String?;
+                              final showcase = asset.customMetadata['showcase'];
+                              final badge = showcase is Map<String, dynamic> ? showcase['badge'] as String? : null;
                               return Card(
                                 margin: const EdgeInsets.only(bottom: 16),
                                 elevation: 2,
@@ -467,7 +575,96 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                         style: Theme.of(context).textTheme.bodySmall,
                                       ),
                                       const SizedBox(height: 16),
-                                      Row(
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          Chip(
+                                            label: Text((asset.visibility ?? 'workspace').toUpperCase()),
+                                            backgroundColor: _brandPrimary.withOpacity(0.12),
+                                            labelStyle: const TextStyle(
+                                              color: _brandPrimaryDark,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          ...asset.categories.map(
+                                            (category) => Chip(
+                                              label: Text(category),
+                                              backgroundColor: Colors.blueGrey.shade50,
+                                              labelStyle: TextStyle(
+                                                color: Colors.blueGrey.shade700,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (asset.coverImageUrl != null && asset.coverImageUrl!.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: Image.network(
+                                            asset.coverImageUrl!,
+                                            height: 140,
+                                            width: double.infinity,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Container(
+                                              height: 140,
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: Colors.blueGrey.shade50,
+                                                borderRadius: BorderRadius.circular(16),
+                                              ),
+                                              child: const Center(
+                                                child: Icon(Icons.image_not_supported_outlined, color: Colors.blueGrey),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                      if (badge != null && badge.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        Chip(
+                                          label: Text(badge.toUpperCase()),
+                                          backgroundColor: Colors.orange.shade50,
+                                          labelStyle: const TextStyle(color: Colors.orange, fontWeight: FontWeight.w700),
+                                        ),
+                                      ],
+                                      if (description != null && description.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          description,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(color: Colors.blueGrey.shade600),
+                                        ),
+                                      ],
+                                      if (asset.tags.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 6,
+                                          runSpacing: 6,
+                                          children: asset.tags
+                                              .map(
+                                                (tag) => Chip(
+                                                  label: Text('#$tag'),
+                                                  backgroundColor: _brandPrimary.withOpacity(0.08),
+                                                  labelStyle: const TextStyle(
+                                                    color: _brandPrimaryDark,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              )
+                                              .toList(),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 16),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
                                         children: [
                                           FilledButton.tonal(
                                             onPressed: () => _open(asset),
@@ -481,7 +678,6 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                             ),
                                             child: const Text('Open'),
                                           ),
-                                          const SizedBox(width: 8),
                                           OutlinedButton.icon(
                                             onPressed: () => _download(asset),
                                             icon: const Icon(Icons.download),
@@ -495,8 +691,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                             ),
                                             label: Text(downloadedPath != null ? 'Redownload' : 'Download'),
                                           ),
-                                          if (asset.type == 'ebook') ...[
-                                            const SizedBox(width: 8),
+                                          if (asset.type == 'ebook')
                                             TextButton(
                                               onPressed: () => _markComplete(asset),
                                               style: TextButton.styleFrom(
@@ -504,7 +699,19 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                               ),
                                               child: const Text('Mark complete'),
                                             ),
-                                          ],
+                                          if (canManage)
+                                            FilledButton(
+                                              onPressed: () => _openMetadataSheet(asset),
+                                              style: FilledButton.styleFrom(
+                                                backgroundColor: _brandPrimary,
+                                                foregroundColor: Colors.white,
+                                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(999),
+                                                ),
+                                              ),
+                                              child: const Text('Manage'),
+                                            ),
                                         ],
                                       ),
                                       if (asset.type == 'ebook') ...[
