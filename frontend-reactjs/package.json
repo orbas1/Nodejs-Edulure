@@ -27,7 +27,7 @@
     "epubjs": "^0.3.93",
     "idb-keyval": "^6.2.1",
     "prop-types": "^15.8.1",
-    "react": "^18.2.0",
+    "react": "^19.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3",
     "react-simple-maps": "^3.0.0",
@@ -36,7 +36,7 @@
     "@edulure/api-sdk": "file:../sdk-typescript"
   },
   "devDependencies": {
-    "@types/react": "^18.2.21",
+    "@types/react": "^19.2.2",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.17",
