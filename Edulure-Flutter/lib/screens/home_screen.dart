@@ -499,6 +499,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       ),
     ],
     actions: [
+      _RoleAction(icon: Icons.dashboard_customize_outlined, label: 'Open instructor dashboard', route: '/instructor-dashboard'),
       _RoleAction(icon: Icons.add_circle_outline, label: 'Create course', route: '/content'),
       _RoleAction(icon: Icons.message_outlined, label: 'Open inbox', route: '/feed'),
       _RoleAction(icon: Icons.schedule_outlined, label: 'Plan lesson', route: '/profile'),
