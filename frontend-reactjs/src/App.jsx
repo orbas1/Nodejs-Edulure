@@ -13,6 +13,7 @@ import ContentLibrary from './pages/ContentLibrary.jsx';
 import About from './pages/About.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
+import Communities from './pages/Communities.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
 import DashboardHome from './pages/dashboard/DashboardHome.jsx';
@@ -54,6 +55,14 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/instructor" element={<InstructorRegister />} />
+        <Route
+          path="/communities"
+          element={(
+            <ProtectedRoute allowedRoles={['admin', 'moderator', 'owner', 'member', 'non-member']}>
+              <Communities />
+            </ProtectedRoute>
+          )}
+        />
         <Route
           path="/feed"
           element={(
