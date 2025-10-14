@@ -600,6 +600,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       ),
     ],
     actions: [
+      _RoleAction(icon: Icons.fact_check_outlined, label: 'Review assessments', route: '/dashboard/assessments'),
       _RoleAction(icon: Icons.travel_explore_outlined, label: 'Launch explorer', route: '/explorer'),
       _RoleAction(icon: Icons.dashboard_outlined, label: 'Open learner dashboard', route: '/dashboard/learner'),
       _RoleAction(icon: Icons.dynamic_feed_outlined, label: 'Browse feed', route: '/feed'),

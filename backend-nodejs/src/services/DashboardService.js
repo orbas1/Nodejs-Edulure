@@ -199,6 +199,37 @@ export function humanizeRelativeTime(date, referenceDate = new Date()) {
   return `${diffYears}y ago`;
 }
 
+function humanizeFutureTime(date, referenceDate = new Date()) {
+  if (!date) return 'TBD';
+  const target = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
+  const diffMs = target.getTime() - referenceDate.getTime();
+  if (diffMs <= 0) {
+    const diffAbsMinutes = Math.round(Math.abs(diffMs) / 60000);
+    if (diffAbsMinutes < 60) return 'Past due';
+    const diffAbsHours = Math.round(diffAbsMinutes / 60);
+    if (diffAbsHours < 24) return 'Past due';
+    const diffAbsDays = Math.round(diffAbsHours / 24);
+    return diffAbsDays === 1 ? '1 day late' : `${diffAbsDays}d late`;
+  }
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes < 60) return `In ${diffMinutes}m`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    if (diffHours === 0) return 'Later today';
+    return `In ${diffHours}h`;
+  }
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays < 7) return `In ${diffDays}d`;
+  const diffWeeks = Math.round(diffDays / 7);
+  if (diffWeeks < 5) return `In ${diffWeeks}w`;
+  const diffMonths = Math.round(diffDays / 30);
+  if (diffMonths < 12) return `In ${diffMonths}mo`;
+  const diffYears = Math.round(diffDays / 365);
+  return `In ${diffYears}y`;
+}
+
 export function calculateLearningStreak(completionDates, referenceDate = new Date()) {
   if (!completionDates?.length) {
     return { current: 0, longest: 0 };
@@ -820,6 +851,7 @@ export function buildInstructorDashboard({
   communitySubscriptions = [],
   ebookRows = [],
   ebookProgressRows = []
+} = {}) {
 }) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -840,11 +872,16 @@ export function buildInstructorDashboard({
   const managedCommunities = [];
 
   const upsertManagedCommunity = (communityId, payload) => {
+    const existing = communityLookup.get(communityId);
+    const merged = existing ? { ...existing, ...payload } : payload;
     const merged = { ...(communityLookup.get(communityId) ?? {}), ...payload };
     communityLookup.set(communityId, merged);
     if (!managedCommunityIds.has(communityId)) {
       managedCommunities.push(merged);
     } else {
+      const index = managedCommunities.findIndex((entry) => Number(entry.communityId) === Number(communityId));
+      if (index !== -1) {
+        managedCommunities[index] = { ...managedCommunities[index], ...merged };
       const index = managedCommunities.findIndex(
         (community) => Number(community.communityId) === communityId
       );
@@ -1017,6 +1054,7 @@ export function buildInstructorDashboard({
     const base = assignment.courseReleaseAt ? new Date(assignment.courseReleaseAt) : new Date(now.getTime());
     const offset = Number(assignment.dueOffsetDays ?? 0);
     const dueDate = new Date(base.getTime() + offset * 24 * 60 * 60 * 1000);
+    const resolvedMaxScore = Number(assignment.maxScore ?? metadata.maxScore ?? metadata.points ?? 0);
     const fallbackOwnerName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
     const resolvedOwner = metadata.owner ?? (fallbackOwnerName || user.email);
     return {
@@ -1026,6 +1064,12 @@ export function buildInstructorDashboard({
       courseTitle: assignment.courseTitle,
       title: assignment.title,
       dueDate,
+      moduleTitle: assignment.moduleTitle,
+      instructions: assignment.instructions ?? metadata.instructions ?? null,
+      maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
+      owner:
+        metadata.owner ??
+        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)),
       owner: resolvedOwner,
       owner:
         metadata.owner ??
@@ -1047,6 +1091,108 @@ export function buildInstructorDashboard({
     .filter((assignment) => assignment.dueDate && assignment.dueDate >= now)
     .sort((a, b) => a.dueDate - b.dueDate)
     .slice(0, 20);
+
+  const instructorAssessmentRecords = assignmentsNormalised.map((assignment) => {
+    const metadata = assignment.metadata ?? {};
+    const submissions = Array.isArray(metadata.submissions)
+      ? metadata.submissions.map((entry) => ({ ...entry }))
+      : Array.isArray(metadata.queue)
+        ? metadata.queue.map((entry) => ({ ...entry }))
+        : [];
+    const resolveScore = (submission) => {
+      const scoreValue = toNumber(
+        submission?.score ?? submission?.points ?? submission?.grade ?? submission?.percentage ?? submission?.result
+      );
+      if (!Number.isFinite(scoreValue) || scoreValue <= 0) return null;
+      return scoreValue;
+    };
+    const gradedSubmissions = submissions.filter((submission) => {
+      const status = (submission?.status ?? submission?.state ?? '').toString().toLowerCase();
+      if (status === 'graded' || status === 'complete') {
+        return true;
+      }
+      return resolveScore(submission) !== null;
+    });
+    const pendingSubmissions = submissions.filter((submission) => {
+      const status = (submission?.status ?? submission?.state ?? '').toString().toLowerCase();
+      if (status === 'graded' || status === 'complete') return false;
+      if (status === 'in_review' || status === 'awaiting_review') return true;
+      if (resolveScore(submission) !== null) return false;
+      return Boolean(submission?.submittedAt || submission?.submitted_at);
+    });
+    const flaggedSubmissions = submissions.filter((submission) => {
+      if (submission?.flagged || submission?.needsReview) return true;
+      const status = (submission?.status ?? submission?.state ?? '').toString().toLowerCase();
+      return status === 'needs_review' || status === 'flagged';
+    });
+    const totalScore = gradedSubmissions.reduce((total, submission) => total + (resolveScore(submission) ?? 0), 0);
+    const maxScore = Number.isFinite(assignment.maxScore) ? assignment.maxScore : 100;
+    const averageScore = gradedSubmissions.length
+      ? Math.round((totalScore / (gradedSubmissions.length * maxScore)) * 100)
+      : null;
+    const latestSubmissionAt = submissions
+      .map((submission) => submission?.submittedAt ?? submission?.submitted_at ?? null)
+      .filter(Boolean)
+      .map((value) => new Date(value))
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    const type = (metadata.type ?? metadata.category ?? metadata.kind ?? '').toString() ||
+      (metadata.isExam ? 'Exam' : metadata.isQuiz ? 'Quiz' : 'Assignment');
+    const weight = Number(
+      metadata.weight ??
+        metadata.weightPercent ??
+        metadata.weighting ??
+        metadata.weightingPercent ??
+        metadata.weight_percentage ??
+        0
+    );
+    const dueAt = assignment.dueDate instanceof Date ? assignment.dueDate : null;
+    let status = 'Scheduled';
+    if (dueAt && dueAt < now && gradedSubmissions.length === submissions.length && submissions.length > 0) {
+      status = 'Completed';
+    } else if (pendingSubmissions.length > 0) {
+      status = 'Awaiting grading';
+    } else if (dueAt && dueAt < now && submissions.length === 0) {
+      status = 'Past due';
+    } else if (dueAt && dueAt.getTime() - now.getTime() <= 3 * DAY_IN_MS) {
+      status = 'Due soon';
+    }
+
+    return {
+      id: `assessment-${assignment.id}`,
+      assignmentId: assignment.id,
+      courseId: assignment.courseId,
+      courseTitle: assignment.courseTitle,
+      moduleTitle: assignment.moduleTitle,
+      title: assignment.title,
+      instructions: assignment.instructions,
+      type,
+      weight: Number.isFinite(weight) ? Math.max(weight, 0) : 0,
+      dueAt,
+      dueLabel: dueAt ? formatDateTime(dueAt, { dateStyle: 'medium', timeStyle: undefined }) : 'Schedule pending',
+      dueIn: dueAt ? humanizeFutureTime(dueAt, now) : 'TBD',
+      status,
+      averageScore,
+      gradedSubmissions: gradedSubmissions.length,
+      pendingSubmissions: pendingSubmissions.length,
+      totalSubmissions: submissions.length,
+      flaggedSubmissions: flaggedSubmissions.length,
+      latestSubmissionAt,
+      maxScore,
+      metadata
+    };
+  });
+
+  const upcomingAssessmentRecords = instructorAssessmentRecords
+    .filter((record) => record.dueAt && record.dueAt >= now)
+    .sort((a, b) => a.dueAt - b.dueAt);
+
+  const overdueAssessmentRecords = instructorAssessmentRecords
+    .filter((record) => record.dueAt && record.dueAt < now && record.totalSubmissions === 0)
+    .sort((a, b) => a.dueAt - b.dueAt);
+
+  const completedAssessmentRecords = instructorAssessmentRecords
+    .filter((record) => record.status === 'Completed')
+    .sort((a, b) => (b.latestSubmissionAt?.getTime() ?? 0) - (a.latestSubmissionAt?.getTime() ?? 0));
 
   const liveSessions = liveClassrooms.map((session) => ({
     ...session,
@@ -1080,6 +1226,8 @@ export function buildInstructorDashboard({
     .map((booking) => ({
       id: `booking-${booking.id}`,
       status: 'Requested',
+      learner:
+        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
       learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
       topic: booking.metadata.topic ?? 'Mentorship session'
@@ -1090,6 +1238,8 @@ export function buildInstructorDashboard({
     .map((booking) => ({
       id: `booking-${booking.id}`,
       topic: booking.metadata.topic ?? 'Mentorship session',
+      learner:
+        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
       learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
     }));
@@ -1335,6 +1485,19 @@ export function buildInstructorDashboard({
     updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
   }));
 
+  const normaliseFilename = (name) => {
+    if (!name) return 'Untitled asset';
+    const leaf = name.split('/').pop();
+    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const assetsNormalised = assets.map((asset) => ({
+    ...asset,
+    metadata: safeJsonParse(asset.metadata, {}),
+    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+  }));
+
   const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
   const assetEventGroups = new Map();
   assetEvents.forEach((event) => {
@@ -1455,6 +1618,7 @@ export function buildInstructorDashboard({
         stage,
         progress,
         lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
+        owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor'),
         owner: resolveName(user.firstName, user.lastName, 'Instructor'),
         nextActions,
         reference,
@@ -1832,6 +1996,7 @@ export function buildInstructorDashboard({
     ...upcomingLessons.map((lesson) => ({
       id: `lesson-${lesson.id}`,
       asset: `${lesson.courseTitle} · ${lesson.title}`,
+      owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'),
       owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
       status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
       type: 'Lesson'
@@ -2249,6 +2414,7 @@ export function buildInstructorDashboard({
     topic: lesson.title,
     course: lesson.courseTitle,
     date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
+    facilitator: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator')
     facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
   }));
 
@@ -2337,6 +2503,271 @@ export function buildInstructorDashboard({
     revenueStreams
   };
 
+  const assessmentsByCourse = new Map();
+  instructorAssessmentRecords.forEach((record) => {
+    const entry = assessmentsByCourse.get(record.courseId) ?? {
+      courseId: record.courseId,
+      courseTitle: record.courseTitle,
+      count: 0,
+      upcoming: [],
+      completed: 0,
+      pendingSubmissions: 0,
+      flagged: 0,
+      averageScoreTotal: 0,
+      scored: 0,
+      weight: 0
+    };
+    entry.count += 1;
+    if (record.dueAt && record.dueAt >= now) {
+      entry.upcoming.push(record);
+    }
+    if (record.status === 'Completed') {
+      entry.completed += 1;
+    }
+    entry.pendingSubmissions += record.pendingSubmissions;
+    entry.flagged += record.flaggedSubmissions;
+    entry.weight += Number.isFinite(record.weight) ? record.weight : 0;
+    if (record.averageScore !== null) {
+      entry.averageScoreTotal += record.averageScore;
+      entry.scored += 1;
+    }
+    assessmentsByCourse.set(record.courseId, entry);
+  });
+
+  const assessmentCourses = courseSummaries
+    .map((course) => {
+      const metrics = assessmentsByCourse.get(course.id) ?? {
+        count: 0,
+        upcoming: [],
+        pendingSubmissions: 0,
+        flagged: 0,
+        averageScoreTotal: 0,
+        scored: 0
+      };
+      const nextDue = [...metrics.upcoming].sort((a, b) => a.dueAt - b.dueAt)[0] ?? null;
+      const averageScore = metrics.scored > 0 ? Math.round(metrics.averageScoreTotal / metrics.scored) : null;
+      return {
+        id: `assessment-course-${course.id}`,
+        name: course.title,
+        learners: `${course.total} learners`,
+        assessments: metrics.count,
+        pendingSubmissions: metrics.pendingSubmissions,
+        flagged: metrics.flagged,
+        averageScore,
+        nextDue: nextDue
+          ? {
+              title: nextDue.title,
+              due: nextDue.dueLabel,
+              dueIn: nextDue.dueIn,
+              type: nextDue.type
+            }
+          : null
+      };
+    })
+    .filter((entry) => entry.assessments > 0 || entry.pendingSubmissions > 0 || entry.nextDue);
+
+  const pendingGradingTotal = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.pendingSubmissions,
+    0
+  );
+  const flaggedTotal = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.flaggedSubmissions,
+    0
+  );
+  const scoredAssessments = instructorAssessmentRecords.filter((record) => record.averageScore !== null);
+  const averageAssessmentScore = scoredAssessments.length
+    ? Math.round(
+        scoredAssessments.reduce((sum, record) => sum + (record.averageScore ?? 0), 0) /
+          scoredAssessments.length
+      )
+    : null;
+  const dueWithinSevenDays = upcomingAssessmentRecords.filter((record) => {
+    if (!record.dueAt) return false;
+    return record.dueAt.getTime() - now.getTime() <= 7 * DAY_IN_MS;
+  }).length;
+  const totalAssessmentWeight = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + (Number.isFinite(record.weight) ? record.weight : 0),
+    0
+  );
+
+  const assessmentOverview = [
+    {
+      id: 'active-assessments',
+      label: 'Active assessments',
+      value: `${instructorAssessmentRecords.length}`,
+      context: `${dueWithinSevenDays} due in 7 days`,
+      tone: instructorAssessmentRecords.length > 0 ? 'primary' : 'muted'
+    },
+    {
+      id: 'grading-queue',
+      label: 'Needs grading',
+      value: `${pendingGradingTotal}`,
+      context: pendingGradingTotal > 0 ? 'Awaiting review' : 'All graded',
+      tone: pendingGradingTotal > 0 ? 'warning' : 'positive'
+    },
+    {
+      id: 'assessment-quality',
+      label: 'Avg cohort score',
+      value: averageAssessmentScore !== null ? `${averageAssessmentScore}%` : '—',
+      context: scoredAssessments.length > 0 ? 'Across graded submissions' : 'No graded work yet',
+      tone:
+        averageAssessmentScore !== null
+          ? averageAssessmentScore >= 80
+            ? 'positive'
+            : averageAssessmentScore >= 60
+              ? 'neutral'
+              : 'warning'
+          : 'muted'
+    },
+    {
+      id: 'assessment-flags',
+      label: 'Flagged submissions',
+      value: `${flaggedTotal}`,
+      context: flaggedTotal > 0 ? 'Escalation required' : 'No escalations',
+      tone: flaggedTotal > 0 ? 'alert' : 'positive'
+    }
+  ];
+
+  const presentInstructorAssessment = (record) => ({
+    id: record.id,
+    title: record.title,
+    course: record.courseTitle,
+    type: record.type,
+    due: record.dueLabel,
+    dueIn: record.dueIn,
+    status: record.status,
+    submissions: `${record.gradedSubmissions}/${record.totalSubmissions}`,
+    pending: record.pendingSubmissions,
+    averageScore: record.averageScore !== null ? `${record.averageScore}%` : null
+  });
+
+  const gradingQueue = instructorAssessmentRecords
+    .filter((record) => record.pendingSubmissions > 0)
+    .sort((a, b) => {
+      if (a.dueAt && b.dueAt) {
+        return a.dueAt - b.dueAt;
+      }
+      if (a.dueAt) return -1;
+      if (b.dueAt) return 1;
+      return (b.latestSubmissionAt?.getTime() ?? 0) - (a.latestSubmissionAt?.getTime() ?? 0);
+    })
+    .slice(0, 8)
+    .map((record) => ({
+      id: record.id,
+      title: record.title,
+      course: record.courseTitle,
+      pending: `${record.pendingSubmissions} submission${record.pendingSubmissions === 1 ? '' : 's'}`,
+      lastSubmission: record.latestSubmissionAt
+        ? humanizeRelativeTime(record.latestSubmissionAt, now)
+        : 'Awaiting submission',
+      due: record.dueIn
+    }));
+
+  const flaggedQueue = instructorAssessmentRecords
+    .filter((record) => record.flaggedSubmissions > 0)
+    .sort((a, b) => b.flaggedSubmissions - a.flaggedSubmissions)
+    .slice(0, 6)
+    .map((record) => ({
+      id: `${record.id}-flagged`,
+      title: record.title,
+      course: record.courseTitle,
+      flagged: `${record.flaggedSubmissions} flagged`,
+      status: record.status,
+      due: record.dueIn
+    }));
+
+  const releasePlan = upcomingAssessmentRecords.slice(0, 8).map((record) => ({
+    id: `${record.id}-release`,
+    title: record.title,
+    course: record.courseTitle,
+    due: record.dueLabel,
+    weight: record.weight > 0 ? `${Math.round(record.weight)}%` : null,
+    type: record.type
+  }));
+
+  const scheduleSessions = upcomingLiveClasses.slice(0, 5).map((session) => ({
+    id: `live-${session.id}`,
+    title: session.title,
+    start: formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }),
+    host: session.communityName ?? 'Live classroom',
+    seats:
+      session.capacity && session.capacity > 0
+        ? `${Number(session.reservedSeats ?? 0)}/${Number(session.capacity ?? 0)} seats`
+        : null
+  }));
+
+  const totalAssessmentSubmissions = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.totalSubmissions,
+    0
+  );
+  const totalGradedSubmissions = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.gradedSubmissions,
+    0
+  );
+  const completionRate = totalAssessmentSubmissions > 0
+    ? Math.round((totalGradedSubmissions / totalAssessmentSubmissions) * 100)
+    : null;
+
+  const typeAnalyticsMap = new Map();
+  instructorAssessmentRecords.forEach((record) => {
+    const key = record.type || 'Assessment';
+    const entry = typeAnalyticsMap.get(key) ?? {
+      type: key,
+      count: 0,
+      averageScoreTotal: 0,
+      scored: 0,
+      weight: 0
+    };
+    entry.count += 1;
+    entry.weight += Number.isFinite(record.weight) ? record.weight : 0;
+    if (record.averageScore !== null) {
+      entry.averageScoreTotal += record.averageScore;
+      entry.scored += 1;
+    }
+    typeAnalyticsMap.set(key, entry);
+  });
+
+  const assessmentTypeAnalytics = Array.from(typeAnalyticsMap.values()).map((entry) => ({
+    type: entry.type,
+    count: entry.count,
+    weightShare:
+      totalAssessmentWeight > 0 ? Math.round((entry.weight / totalAssessmentWeight) * 100) : null,
+    averageScore: entry.scored > 0 ? Math.round(entry.averageScoreTotal / entry.scored) : null
+  }));
+
+  const averageLeadTimeDays = upcomingAssessmentRecords.length
+    ? Math.round(
+        upcomingAssessmentRecords.reduce((total, record) => {
+          if (!record.dueAt) return total;
+          const diff = Math.max(0, Math.round((record.dueAt.getTime() - now.getTime()) / DAY_IN_MS));
+          return total + diff;
+        }, 0) / upcomingAssessmentRecords.length
+      )
+    : null;
+
+  const instructorAssessments = {
+    overview: assessmentOverview,
+    timeline: {
+      upcoming: upcomingAssessmentRecords.map(presentInstructorAssessment),
+      overdue: overdueAssessmentRecords.map(presentInstructorAssessment),
+      completed: completedAssessmentRecords.map(presentInstructorAssessment)
+    },
+    courses: assessmentCourses,
+    grading: {
+      queue: gradingQueue,
+      flagged: flaggedQueue
+    },
+    schedule: {
+      releasePlan,
+      liveSessions: scheduleSessions
+    },
+    analytics: {
+      byType: assessmentTypeAnalytics,
+      completionRate,
+      averageLeadTimeDays
+    }
+  };
+
   const metrics = [
     {
       label: 'Active learners',
@@ -2386,6 +2817,13 @@ export function buildInstructorDashboard({
       title: session.title,
       url: '/dashboard/instructor/calendar'
     })),
+    {
+      id: 'search-instructor-assessments',
+      role: 'instructor',
+      type: 'Assessments',
+      title: 'Assessment studio',
+      url: '/dashboard/instructor/assessments'
+    }
     ...tutorRoster.map((tutor) => ({
       id: `search-instructor-tutor-${tutor.id}`,
       role: 'instructor',
@@ -2474,7 +2912,8 @@ export function buildInstructorDashboard({
         subscriptions: pricingSubscriptions,
         sessions: pricingSessions,
         insights: pricingInsights
-      }
+      },
+      assessments: instructorAssessments
     },
     searchIndex,
     profileStats,
@@ -4391,6 +4830,7 @@ export default class DashboardService {
 
       return {
         id: enrollment.courseSlug,
+        courseId: Number(enrollment.courseId ?? 0),
         title: enrollment.courseTitle,
         status: 'In progress',
         progress: Math.round(Number(enrollment.progressPercent ?? 0)),
@@ -4474,6 +4914,95 @@ export default class DashboardService {
         };
       })
       .filter((assignment) => assignment && assignment.dueDate >= now);
+
+    const learnerAssessmentRecords = communityAssignments
+      .map((assignment) => {
+        if (!assignment.enrollmentStartedAt) return null;
+        const metadata = safeJsonParse(assignment.metadata, {});
+        const dueDate = new Date(assignment.enrollmentStartedAt);
+        dueDate.setDate(dueDate.getDate() + Number(assignment.dueOffsetDays ?? 0));
+        const submissions = Array.isArray(metadata.submissions)
+          ? metadata.submissions
+          : Array.isArray(metadata.queue)
+            ? metadata.queue
+            : [];
+        const learnerSubmission = submissions.find((submission) => {
+          const submissionUser = submission?.userId ?? submission?.learnerId ?? submission?.studentId;
+          return Number(submissionUser) === Number(user.id);
+        }) ?? metadata.submission;
+        const resolvedMaxScore = toNumber(
+          learnerSubmission?.maxScore ?? metadata.maxScore ?? metadata.points ?? metadata.totalPoints ?? 0
+        );
+        const rawScore = toNumber(
+          learnerSubmission?.score ??
+            learnerSubmission?.points ??
+            learnerSubmission?.grade ??
+            learnerSubmission?.percentage ??
+            metadata.score ??
+            metadata.grade
+        );
+        const scorePercent = resolvedMaxScore > 0 && rawScore >= 0
+          ? Math.round((rawScore / resolvedMaxScore) * 100)
+          : null;
+        const submissionStatus = (learnerSubmission?.status ?? learnerSubmission?.state ?? metadata.status ?? '')
+          .toString()
+          .toLowerCase();
+        const submittedAtRaw = learnerSubmission?.submittedAt ?? learnerSubmission?.submitted_at ?? metadata.submittedAt;
+        const submittedAt = submittedAtRaw ? new Date(submittedAtRaw) : null;
+        const gradedAtRaw = learnerSubmission?.gradedAt ?? learnerSubmission?.graded_at ?? metadata.gradedAt;
+        const gradedAt = gradedAtRaw ? new Date(gradedAtRaw) : null;
+        const type = (metadata.type ?? metadata.category ?? metadata.kind ?? '').toString() ||
+          (metadata.isExam ? 'Exam' : metadata.isQuiz ? 'Quiz' : 'Assignment');
+        const mode = metadata.mode ?? metadata.delivery ?? metadata.format ?? 'Asynchronous';
+        const weight = Number(
+          metadata.weight ??
+            metadata.weightPercent ??
+            metadata.weighting ??
+            metadata.weightingPercent ??
+            metadata.weight_percentage ??
+            0
+        );
+        let status = 'Scheduled';
+        if (submissionStatus === 'graded' || submissionStatus === 'complete' || gradedAt || scorePercent !== null) {
+          status = 'Completed';
+        } else if (submittedAt) {
+          status = 'Submitted';
+        } else if (dueDate < now) {
+          status = 'Overdue';
+        } else if (dueDate.getTime() - now.getTime() <= 3 * DAY_IN_MS) {
+          status = 'Due soon';
+        }
+        return {
+          id: `assessment-${assignment.id}`,
+          assignmentId: assignment.id,
+          courseId: Number(assignment.courseId),
+          courseTitle: assignment.courseTitle,
+          title: assignment.title,
+          type,
+          mode,
+          dueAt: dueDate,
+          dueLabel: formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }),
+          dueIn: humanizeFutureTime(dueDate, now),
+          status,
+          weight: Number.isFinite(weight) ? Math.max(weight, 0) : 0,
+          scorePercent,
+          submittedAt,
+          gradedAt,
+          resources: Array.isArray(metadata.resources)
+            ? metadata.resources.filter(Boolean).map((resource) => resource.toString()).slice(0, 4)
+            : [],
+          recommendedMinutes: Number(
+            metadata.estimatedMinutes ??
+              metadata.durationMinutes ??
+              metadata.timeboxMinutes ??
+              metadata.recommendedMinutes ??
+              0
+          ),
+          submissionUrl: metadata.submissionUrl ?? metadata.turnInLink ?? metadata.lmsUrl ?? null,
+          instructions: metadata.instructions ?? metadata.brief ?? null
+        };
+      })
+      .filter(Boolean);
 
     const upcomingEvents = [];
     liveClassRows.forEach((session) => {
@@ -4825,6 +5354,232 @@ export default class DashboardService {
       });
     }
 
+    const upcomingLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.dueAt && record.dueAt >= now && record.status !== 'Completed')
+      .sort((a, b) => a.dueAt - b.dueAt);
+
+    const overdueLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.status === 'Overdue')
+      .sort((a, b) => (a.dueAt?.getTime() ?? 0) - (b.dueAt?.getTime() ?? 0));
+
+    const submittedLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.status === 'Submitted')
+      .sort((a, b) => (a.dueAt?.getTime() ?? 0) - (b.dueAt?.getTime() ?? 0));
+
+    const completedLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.status === 'Completed')
+      .sort((a, b) => (b.gradedAt?.getTime() ?? b.dueAt?.getTime() ?? 0) - (a.gradedAt?.getTime() ?? a.dueAt?.getTime() ?? 0));
+
+    const dueThisWeekCount = upcomingLearnerAssessments.filter((record) => {
+      if (!record.dueAt) return false;
+      return record.dueAt.getTime() - now.getTime() <= 7 * DAY_IN_MS;
+    }).length;
+    const overdueCount = overdueLearnerAssessments.length;
+    const awaitingReviewCount = submittedLearnerAssessments.length;
+    const gradedAssessments = learnerAssessmentRecords.filter((record) => record.scorePercent !== null);
+    const averageLearnerScore = gradedAssessments.length
+      ? Math.round(
+          gradedAssessments.reduce((sum, record) => sum + (record.scorePercent ?? 0), 0) /
+            gradedAssessments.length
+        )
+      : null;
+    const workloadWeight = learnerAssessmentRecords
+      .filter((record) => record.status !== 'Completed')
+      .reduce((total, record) => total + (Number.isFinite(record.weight) ? record.weight : 0), 0);
+
+    const learnerAssessmentOverview = [
+      {
+        id: 'due-this-week',
+        label: 'Due this week',
+        value: `${dueThisWeekCount}`,
+        context: dueThisWeekCount > 0 ? 'Prioritise upcoming tasks' : 'All quiet',
+        tone: dueThisWeekCount > 0 ? 'warning' : 'positive'
+      },
+      {
+        id: 'overdue',
+        label: 'Overdue items',
+        value: `${overdueCount}`,
+        context: overdueCount > 0 ? 'Resolve immediately' : 'On schedule',
+        tone: overdueCount > 0 ? 'alert' : 'positive'
+      },
+      {
+        id: 'awaiting-review',
+        label: 'Awaiting grading',
+        value: `${awaitingReviewCount}`,
+        context: awaitingReviewCount > 0 ? 'Instructor feedback pending' : 'No submissions pending',
+        tone: awaitingReviewCount > 0 ? 'neutral' : 'positive'
+      },
+      {
+        id: 'average-score',
+        label: 'Average score',
+        value: averageLearnerScore !== null ? `${averageLearnerScore}%` : '—',
+        context: gradedAssessments.length > 0 ? 'Across graded work' : 'Awaiting results',
+        tone:
+          averageLearnerScore !== null
+            ? averageLearnerScore >= 85
+              ? 'positive'
+              : averageLearnerScore >= 70
+                ? 'neutral'
+                : 'warning'
+            : 'muted'
+      }
+    ];
+
+    const presentLearnerAssessment = (record) => ({
+      id: record.id,
+      title: record.title,
+      course: record.courseTitle,
+      type: record.type,
+      due: record.dueLabel,
+      dueIn: record.dueIn,
+      status: record.status,
+      weight: record.weight > 0 ? `${Math.round(record.weight)}%` : null,
+      score: record.scorePercent !== null ? `${record.scorePercent}%` : null,
+      mode: record.mode,
+      recommended: record.recommendedMinutes > 0 ? minutesToReadable(record.recommendedMinutes) : null,
+      submissionUrl: record.submissionUrl,
+      instructions: record.instructions
+    });
+
+    const courseAssessmentMap = new Map();
+    learnerAssessmentRecords.forEach((record) => {
+      const courseId = Number(record.courseId);
+      if (!Number.isFinite(courseId) || courseId <= 0) return;
+      const entry = courseAssessmentMap.get(courseId) ?? {
+        upcoming: [],
+        overdue: 0,
+        completed: 0,
+        awaiting: 0,
+        scoreTotal: 0,
+        scored: 0
+      };
+      if (record.status === 'Completed') {
+        entry.completed += 1;
+      } else if (record.status === 'Submitted') {
+        entry.awaiting += 1;
+        entry.upcoming.push(record);
+      } else if (record.status === 'Overdue') {
+        entry.overdue += 1;
+        entry.upcoming.push(record);
+      } else {
+        entry.upcoming.push(record);
+      }
+      if (record.scorePercent !== null) {
+        entry.scoreTotal += record.scorePercent;
+        entry.scored += 1;
+      }
+      courseAssessmentMap.set(courseId, entry);
+    });
+
+    const learnerCourseReports = learnerCourseSummaries.map((course) => {
+      const courseId = Number(course.courseId ?? 0);
+      const metrics = courseAssessmentMap.get(courseId) ?? {
+        upcoming: [],
+        overdue: 0,
+        completed: 0,
+        awaiting: 0,
+        scoreTotal: 0,
+        scored: 0
+      };
+      const nextDue = [...metrics.upcoming].sort((a, b) => (a.dueAt?.getTime() ?? Infinity) - (b.dueAt?.getTime() ?? Infinity))[0] ?? null;
+      const averageScore = metrics.scored > 0 ? Math.round(metrics.scoreTotal / metrics.scored) : null;
+      return {
+        id: `learner-assessment-course-${course.id}`,
+        name: course.title,
+        progress: `${course.progress}% complete`,
+        status: nextDue
+          ? `${nextDue.type} due ${nextDue.dueLabel}`
+          : metrics.overdue > 0
+            ? 'Resolve overdue items'
+            : 'All clear',
+        upcoming: metrics.upcoming.length,
+        overdue: metrics.overdue,
+        awaitingFeedback: metrics.awaiting,
+        averageScore: averageScore !== null ? `${averageScore}%` : null
+      };
+    });
+
+    const studyPlan = upcomingLearnerAssessments.slice(0, 4).map((record, index) => ({
+      id: `${record.id}-plan-${index}`,
+      focus: record.title,
+      course: record.courseTitle,
+      window: record.dueIn,
+      duration:
+        record.recommendedMinutes > 0
+          ? minutesToReadable(record.recommendedMinutes)
+          : index === 0
+            ? '60 mins'
+            : '45 mins',
+      mode: record.mode,
+      submissionUrl: record.submissionUrl
+    }));
+
+    const assessmentTypeMap = new Map();
+    learnerAssessmentRecords.forEach((record) => {
+      const key = record.type || 'Assessment';
+      const entry = assessmentTypeMap.get(key) ?? {
+        type: key,
+        count: 0,
+        weight: 0,
+        scoreTotal: 0,
+        scored: 0
+      };
+      entry.count += 1;
+      entry.weight += Number.isFinite(record.weight) ? record.weight : 0;
+      if (record.scorePercent !== null) {
+        entry.scoreTotal += record.scorePercent;
+        entry.scored += 1;
+      }
+      assessmentTypeMap.set(key, entry);
+    });
+
+    const learnerAssessmentTypeAnalytics = Array.from(assessmentTypeMap.values()).map((entry) => ({
+      type: entry.type,
+      count: entry.count,
+      weightShare: workloadWeight > 0 ? Math.round((entry.weight / workloadWeight) * 100) : null,
+      averageScore: entry.scored > 0 ? Math.round(entry.scoreTotal / entry.scored) : null
+    }));
+
+    const averageLearnerLeadTimeDays = upcomingLearnerAssessments.length
+      ? Math.round(
+          upcomingLearnerAssessments.reduce((total, record) => {
+            if (!record.dueAt) return total;
+            const diff = Math.max(0, Math.round((record.dueAt.getTime() - now.getTime()) / DAY_IN_MS));
+            return total + diff;
+          }, 0) / upcomingLearnerAssessments.length
+        )
+      : null;
+
+    const supportResources = Array.from(
+      new Set(
+        learnerAssessmentRecords
+          .flatMap((record) => record.resources ?? [])
+          .filter((resource) => typeof resource === 'string' && resource.trim().length > 0)
+      )
+    ).slice(0, 5);
+
+    const learnerAssessments = {
+      overview: learnerAssessmentOverview,
+      timeline: {
+        upcoming: upcomingLearnerAssessments.map(presentLearnerAssessment),
+        overdue: overdueLearnerAssessments.map(presentLearnerAssessment),
+        completed: [...completedLearnerAssessments, ...submittedLearnerAssessments].map(presentLearnerAssessment)
+      },
+      courses: learnerCourseReports,
+      schedule: {
+        studyPlan,
+        events: upcomingDisplay
+      },
+      analytics: {
+        byType: learnerAssessmentTypeAnalytics,
+        pendingReviews: awaitingReviewCount,
+        overdue: overdueCount,
+        averageLeadTimeDays: averageLearnerLeadTimeDays,
+        workloadWeight
+      },
+      resources: supportResources
+    };
+
     const roles = [{ id: 'learner', label: 'Learner' }];
     if (communityDashboard) {
       roles.push(communityDashboard.role);
@@ -4877,6 +5632,7 @@ export default class DashboardService {
           unreadMessages: unreadThreads,
           items: notifications
         },
+        assessments: learnerAssessments,
         blog: {
           highlights: blogHighlights,
           featured: blogHighlights.find((entry) => entry.heroImage) ?? blogHighlights[0] ?? null
@@ -4969,6 +5725,13 @@ export default class DashboardService {
         title: event.title,
         url: '/dashboard/learner/calendar'
       })),
+      {
+        id: 'search-learner-assessments',
+        role: 'learner',
+        type: 'Assessments',
+        title: 'Assessment schedule',
+        url: '/dashboard/learner/assessments'
+      }
       ...blogSearchEntries
     ];
 
@@ -5705,6 +6468,7 @@ export default class DashboardService {
         blog: blogOperations,
         compliance,
         activity: { alerts, events },
+        compliance,
         settings: {
           monetization: monetizationSettings
         }

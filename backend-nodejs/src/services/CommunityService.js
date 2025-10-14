@@ -10,7 +10,7 @@ import DomainEventModel from '../models/DomainEventModel.js';
 import AdsPlacementService from './AdsPlacementService.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
-const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator', 'member']);
+const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 
 function parseJsonColumn(value, fallback) {
   if (!value) return fallback;
@@ -74,7 +74,12 @@ export default class CommunityService {
       throw error;
     }
 
-    const { items, pagination } = await CommunityPostModel.paginateForCommunity(community.id, filters);
+    const searchQuery =
+      typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
+    const { items, pagination } = await CommunityPostModel.paginateForCommunity(community.id, {
+      ...filters,
+      query: searchQuery
+    });
     const serialised = items.map((item) => this.serializePost(item, community));
     const decorated = await AdsPlacementService.decorateFeed({
       posts: serialised,
@@ -82,10 +87,6 @@ export default class CommunityService {
       page: filters.page,
       perPage: filters.perPage,
       metadata: { communityId: community.id }
-    const searchQuery = typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
-    const { items, pagination } = await CommunityPostModel.paginateForCommunity(community.id, {
-      ...filters,
-      query: searchQuery
     });
     return {
       items: decorated.items,
@@ -95,7 +96,12 @@ export default class CommunityService {
   }
 
   static async listFeedForUser(userId, filters = {}) {
-    const { items, pagination } = await CommunityPostModel.paginateForUser(userId, filters);
+    const searchQuery =
+      typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
+    const { items, pagination } = await CommunityPostModel.paginateForUser(userId, {
+      ...filters,
+      query: searchQuery
+    });
     const serialised = items.map((item) => this.serializePost(item));
     const decorated = await AdsPlacementService.decorateFeed({
       posts: serialised,
@@ -103,10 +109,6 @@ export default class CommunityService {
       page: filters.page,
       perPage: filters.perPage,
       metadata: { userId }
-    const searchQuery = typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
-    const { items, pagination } = await CommunityPostModel.paginateForUser(userId, {
-      ...filters,
-      query: searchQuery
     });
     return {
       items: decorated.items,

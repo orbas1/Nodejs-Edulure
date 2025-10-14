@@ -44,6 +44,7 @@ import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
 import FixnadoAds from './pages/dashboard/FixnadoAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
+import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
 import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
 import CommunityOverview from './pages/dashboard/community/CommunityOverview.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
@@ -135,6 +136,7 @@ function App() {
         <Route path="communities" element={<LearnerCommunities />} />
         <Route path="courses" element={<LearnerCourses />} />
         <Route path="courses/:courseId" element={<CourseViewer />} />
+        <Route path="assessments" element={<DashboardAssessments />} />
         <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
         <Route path="calendar" element={<DashboardCalendar />} />
         <Route path="bookings" element={<DashboardBookingsSwitch />} />

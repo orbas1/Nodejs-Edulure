@@ -16,6 +16,7 @@ import 'screens/tutor_booking_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
 import 'screens/instructor_dashboard_screen.dart';
+import 'screens/assessments_screen.dart';
 import 'screens/blog_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/community_dashboard_screen.dart';
@@ -55,6 +56,7 @@ class EdulureApp extends StatelessWidget {
         '/inbox': (_) => const InboxScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/dashboard/learner': (_) => const LearnerDashboardScreen(),
+        '/dashboard/assessments': (_) => const AssessmentsScreen(),
         '/dashboard/community': (_) => const CommunityDashboardScreen(),
         '/content': (_) => const ContentLibraryScreen(),
         '/tutor-bookings': (_) => const TutorBookingScreen(),
