@@ -3,7 +3,7 @@ const SUBSCRIPTION_STATUSES = ['incomplete', 'trialing', 'active', 'past_due', '
 const AFFILIATE_STATUSES = ['pending', 'approved', 'suspended', 'revoked'];
 const PAYOUT_STATUSES = ['pending', 'processing', 'paid', 'failed'];
 
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasAffiliatesTable = await knex.schema.hasTable('community_affiliates');
   if (!hasAffiliatesTable) {
     await knex.schema.createTable('community_affiliates', (table) => {
@@ -68,7 +68,7 @@ exports.up = async function up(knex) {
         .timestamp('updated_at')
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['community_id', 'role_key']);
-      table.index(['community_id', 'is_default_assignable']);
+      table.index(['community_id', 'is_default_assignable'], 'community_role_assignable_idx');
     });
   }
 
@@ -201,9 +201,9 @@ exports.up = async function up(knex) {
     table.string('role', 60).notNullable().defaultTo('member').alter();
     table.enum('status', ['active', 'pending', 'banned', 'suspended']).notNullable().defaultTo('active').alter();
   });
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.alterTable('community_members', (table) => {
     table.enum('role', ['owner', 'admin', 'moderator', 'member']).notNullable().defaultTo('member').alter();
     table.enum('status', ['active', 'pending', 'banned']).notNullable().defaultTo('active').alter();
@@ -214,4 +214,4 @@ exports.down = async function down(knex) {
   await knex.schema.dropTableIfExists('community_paywall_tiers');
   await knex.schema.dropTableIfExists('community_role_definitions');
   await knex.schema.dropTableIfExists('community_affiliates');
-};
+}

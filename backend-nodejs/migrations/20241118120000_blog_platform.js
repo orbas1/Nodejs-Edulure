@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasCategories = await knex.schema.hasTable('blog_categories');
   if (!hasCategories) {
     await knex.schema.createTable('blog_categories', (table) => {
@@ -109,12 +109,12 @@ exports.up = async function up(knex) {
       table.timestamp('created_at').defaultTo(knex.fn.now());
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('blog_media');
   await knex.schema.dropTableIfExists('blog_post_tags');
   await knex.schema.dropTableIfExists('blog_posts');
   await knex.schema.dropTableIfExists('blog_tags');
   await knex.schema.dropTableIfExists('blog_categories');
-};
+}

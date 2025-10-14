@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasContentAssets = await knex.schema.hasTable('content_assets');
   if (!hasContentAssets) {
     await knex.schema.createTable('content_assets', (table) => {
@@ -174,13 +174,13 @@ exports.up = async function up(knex) {
       table.index(['occurred_at']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('content_asset_events');
   await knex.schema.dropTableIfExists('content_audit_logs');
   await knex.schema.dropTableIfExists('ebook_read_progress');
   await knex.schema.dropTableIfExists('asset_conversion_outputs');
   await knex.schema.dropTableIfExists('asset_ingestion_jobs');
   await knex.schema.dropTableIfExists('content_assets');
-};
+}

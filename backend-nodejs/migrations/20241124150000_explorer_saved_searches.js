@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasTable = await knex.schema.hasTable('saved_searches');
   if (!hasTable) {
     await knex.schema.createTable('saved_searches', (table) => {
@@ -27,11 +27,11 @@ exports.up = async function up(knex) {
       table.index(['user_id', 'last_used_at']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   const hasTable = await knex.schema.hasTable('saved_searches');
   if (hasTable) {
     await knex.schema.dropTable('saved_searches');
   }
-};
+}
