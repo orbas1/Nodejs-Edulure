@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 
 export default function PageHero({ title, description, subtitle, cta }) {
   const heroDescription = description ?? subtitle;
+  const bodyCopy = heroDescription;
   const roleBadges = ['Operators', 'Instructors', 'Creators'];
 
   return (
@@ -19,6 +20,11 @@ export default function PageHero({ title, description, subtitle, cta }) {
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
             {title}
           </h1>
+          {bodyCopy ? <p className="mt-6 text-lg leading-8 text-slate-200">{bodyCopy}</p> : null}
+          {cta ? <div className="mt-10 flex flex-wrap items-center gap-4">{cta}</div> : null}
+          <div className="mt-8 flex items-center gap-4 text-sm text-white/80">
+            {["Strategists", "Designers", "Founders", "Mentors"].map((label) => (
+              <span key={label} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
           {heroDescription && (
             <p className="mt-6 max-w-xl text-base leading-7 text-white/80 md:text-lg md:leading-8">
               {heroDescription}
