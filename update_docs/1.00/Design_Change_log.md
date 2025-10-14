@@ -111,6 +111,7 @@ Version 1.00 consolidates the recommendations captured across `ui-ux_updates/Des
 - Logic flow diagrams align provider workflows with learner experiences while exposing advanced analytics and financial controls.
 - Documented npm workspace runtime requirements so design token packages, storybook previews, and frontend builds rely on the same Node/npm versions enforced across engineering environments.
 - Confirmed runtime flag gating and admin disable states continue to render as designed after the backend test-to-development environment alias; no visual adjustments required.
+- Captured the new Flutter architecture primitives—Riverpod provider scope, authenticated route gating, feature flag checks, and telemetry banners—inside `App_screens_drawings.md`, `dashboard_drawings.md`, `menu_drawings.md`, and `Application_Design_Update_Plan/Application Design Update.md` so mobile shells, authentication flows, and experiment callouts stay visually aligned with the refreshed engineering bootstrap.
 
 ## Open Items & Follow-Ups
 - **Advanced Data Visualisation:** Validate charting libraries for analytics-heavy dashboards before engineering handoff.

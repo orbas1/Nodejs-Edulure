@@ -9,7 +9,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 3 – Communities, Social Graph & Engagement Systems | 90% | 98% | 94% | 96% | 90% | 94% | 94% |
 | Task 4 – Explorer Search, Ads & Intelligence Platform | 86% | 100% | 97% | 98% | 94% | 97% | 95% |
 | Task 5 – Dashboards, Profiles & Operational Consoles | 90% | 100% | 98% | 99% | 94% | 98% | 97% |
-| Task 6 – Mobile Parity & Store Readiness | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| Task 6 – Mobile Parity & Store Readiness | 35% | 20% | 30% | 30% | 25% | 30% | 28% |
 | Task 7 – Quality Assurance, Policies & Launch Operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 
 ### Sprint Breakdowns for Tasks 5–7
@@ -18,7 +18,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 | Task 5 – Sprint 5A | Component foundations | 60% | API payload definitions, responsive skeletons, cache hooks |
 | Task 5 – Sprint 5B | Role dashboards | 92% | Learner widgets, instructor analytics, admin operational console (approvals, policy hub, export tooling) |
 | Task 5 – Sprint 5C | Compliance & verification | 100% | KYC pipeline live with document ingestion, learner/instructor upload flows, admin review queue, audit trails, and design/documentation sign-off |
-| Task 6 – Sprint 6A | Core shell & networking | 0% | Flutter shell, dio client + secure storage, shared tokens |
+| Task 6 – Sprint 6A | Core shell & networking | 45% | Flutter shell, dio client + secure storage, shared tokens |
 | Task 6 – Sprint 6B | Learner modules | 0% | Community/explorer readers, course/eBook playback, live class joins |
 | Task 6 – Sprint 6C | Instructor & store prep | 0% | Instructor dashboards, payouts/inbox parity, store submission ops |
 | Task 7 – Sprint 7A | Automation foundations | 0% | CI stability, accessibility/visual regression, load/security scans |
@@ -39,6 +39,7 @@ Progress is tracked per task with percentage measures for security, completion, 
 - Social graph services now run with transactional privacy enforcement, reciprocal recommendation orchestration, defensive mute and block cleanup, hardened environment controls, and swagger-validated OpenAPI contracts backed by service + HTTP Vitest suites to unlock feed ranking, discovery, and moderation tooling.
 - Messaging design overlays (chat docks, DM inbox/thread panes, moderation consoles, presence beacons, unread badges, and DND prompts) now reference `dashboard_drawings.md`, `menu_drawings.md`, `website_drawings.md`, `Admin_panel_drawings.md`, and `App_screens_drawings.md`, aligning the refreshed documentation with the backend pagination and TTL contracts introduced this cycle.
 - Social, explorer, dashboard, mobile, and QA programmes await foundational dependencies; progress is intentionally gated until upstream services stabilise.
+- Mobile architecture work kicked off with a production-grade Flutter bootstrap: Riverpod now governs global state, the new `AppBootstrap` initialises secure storage + push notifications, shared Dio interceptors attach auth/telemetry, Sentry instrumentation captures crashes, and feature flags hydrate from the runtime service for experimentation controls.
 - Dashboards, mobile parity, and launch-readiness workstreams now have three micro-sprints apiece to reduce risk and unblock incremental delivery despite previous broad task failures.
 - Explorer infrastructure now includes ingestion: SearchIngestionService batches and parallelises ETL for communities, courses, ebooks, tutors, profiles, ads, and events with incremental `since` filters, Prometheus coverage (`edulure_search_ingestion_documents_total`, `edulure_search_ingestion_failures_total`, `edulure_search_ingestion_last_run_seconds`), and the operational `npm run search:reindex` CLI. Fresh migrations/seed data hydrate course, ebook, tutor, live classroom, and ads intelligence tables so Meilisearch indexes receive production-ready payloads after each deploy.
 - Explorer UX shipped with production fidelity: `/explorer` orchestrates cross-entity tabs, adaptive facet rails, controlled saved-search CRUD flows, keyboard-accessible geo markers, zero-result education, optimistic loading toasts, and Meilisearch-backed telemetry wiring. Navigation, auth guards, and analytics IDs align with design artefacts, while backend Prometheus metrics surface in the operator consoles.

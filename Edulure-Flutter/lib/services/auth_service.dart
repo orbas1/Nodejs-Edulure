@@ -1,16 +1,11 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'api_config.dart';
+import '../core/network/dio_provider.dart';
 import 'session_manager.dart';
 
 class AuthService {
-  AuthService()
-      : _dio = Dio(
-          BaseOptions(
-            baseUrl: apiBaseUrl,
-            connectTimeout: const Duration(seconds: 12),
-          ),
-        );
+  AuthService(this._dio);
 
   final Dio _dio;
 
@@ -20,7 +15,11 @@ class AuthService {
       'password': password,
       if (twoFactorCode != null && twoFactorCode.trim().isNotEmpty) 'twoFactorCode': twoFactorCode.trim(),
     };
-    final response = await _dio.post('/auth/login', data: payload);
+    final response = await _dio.post(
+      '/auth/login',
+      data: payload,
+      options: Options(extra: {'requiresAuth': false}),
+    );
     final session = response.data['data'] as Map<String, dynamic>;
     await SessionManager.saveSession(session);
     return session;
@@ -46,7 +45,11 @@ class AuthService {
       if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
       'twoFactor': {'enabled': enableTwoFactor},
     };
-    final response = await _dio.post('/auth/register', data: payload);
+    final response = await _dio.post(
+      '/auth/register',
+      data: payload,
+      options: Options(extra: {'requiresAuth': false}),
+    );
     final data = response.data['data'];
     if (data is Map<String, dynamic>) {
       return data;
@@ -54,3 +57,8 @@ class AuthService {
     return {};
   }
 }
+
+final authServiceProvider = Provider<AuthService>((ref) {
+  final dio = ref.watch(dioProvider);
+  return AuthService(dio);
+});

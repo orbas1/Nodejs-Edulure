@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import '../core/security/secure_storage_service.dart';
+
 class SessionManager {
   static const _sessionBox = 'session';
   static const _assetsBox = 'content_assets';
@@ -10,6 +12,11 @@ class SessionManager {
   static const _dashboardBox = 'dashboard_snapshots';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
+  static const _secureAccessTokenKey = 'session.accessToken';
+  static const _secureRefreshTokenKey = 'session.refreshToken';
+
+  static String? _accessToken;
+  static String? _refreshToken;
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -19,6 +26,8 @@ class SessionManager {
     await Hive.openBox(_ebookProgressBox);
     await Hive.openBox(_readerSettingsBox);
     await Hive.openBox(_dashboardBox);
+    _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
+    _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
 
   static Box get _session => Hive.box(_sessionBox);
@@ -29,10 +38,30 @@ class SessionManager {
   static Box get dashboardCache => Hive.box(_dashboardBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
-    await _session.put(_sessionKey, session);
+    final sanitized = Map<String, dynamic>.from(session);
+    final tokens = sanitized.remove('tokens');
+    await _session.put(_sessionKey, sanitized);
     final userRole = session['user'] is Map ? session['user']['role'] : null;
     if (userRole is String && userRole.isNotEmpty) {
       await _session.put(_activeRoleKey, userRole);
+    }
+    if (tokens is Map) {
+      final accessToken = tokens['accessToken'];
+      final refreshToken = tokens['refreshToken'];
+      if (accessToken is String && accessToken.isNotEmpty) {
+        _accessToken = accessToken;
+        await SecureStorageService.instance.write(
+          key: _secureAccessTokenKey,
+          value: accessToken,
+        );
+      }
+      if (refreshToken is String && refreshToken.isNotEmpty) {
+        _refreshToken = refreshToken;
+        await SecureStorageService.instance.write(
+          key: _secureRefreshTokenKey,
+          value: refreshToken,
+        );
+      }
     }
   }
 
@@ -62,19 +91,38 @@ class SessionManager {
     await _session.put(_activeRoleKey, role);
   }
 
-  static String? getAccessToken() {
-    final session = getSession();
-    final tokens = session?['tokens'];
-    if (tokens is Map && tokens['accessToken'] is String) {
-      return tokens['accessToken'] as String;
-    }
-    return null;
+  static String? getAccessToken() => _accessToken;
+
+  static String? getRefreshToken() => _refreshToken;
+
+  static Future<void> persistAccessToken(String accessToken) async {
+    _accessToken = accessToken;
+    await SecureStorageService.instance.write(
+      key: _secureAccessTokenKey,
+      value: accessToken,
+    );
+  }
+
+  static Future<void> persistRefreshToken(String refreshToken) async {
+    _refreshToken = refreshToken;
+    await SecureStorageService.instance.write(
+      key: _secureRefreshTokenKey,
+      value: refreshToken,
+    );
   }
 
   static Future<void> clear() async {
     await _session.delete(_sessionKey);
     await _session.delete(_activeRoleKey);
     await dashboardCache.clear();
+    await SecureStorageService.instance.deleteAll(
+      keys: const {
+        _secureAccessTokenKey,
+        _secureRefreshTokenKey,
+      },
+    );
+    _accessToken = null;
+    _refreshToken = null;
   }
 
   static Future<void> cacheDashboardSnapshot(String role, Map<String, dynamic> snapshot) async {
