@@ -1,4 +1,4 @@
-import centroidsData from '../data/countryCentroids.json' assert { type: 'json' };
+import centroidsData from '../data/countryCentroids.json' with { type: 'json' };
 
 const countryCentroids = new Map(
   Object.entries(centroidsData.countries).map(([code, value]) => [code.toUpperCase(), value])

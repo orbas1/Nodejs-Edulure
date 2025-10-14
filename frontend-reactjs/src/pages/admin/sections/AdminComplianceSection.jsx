@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 
 const STATUS_LABELS = {
@@ -373,13 +373,16 @@ export default function AdminComplianceSection({
     setNotes((prev) => ({ ...prev, [caseId]: value }));
   };
 
-  const resolveRiskValue = (item) => {
-    const override = riskOverrides[item.id];
-    if (override !== undefined) {
-      return override;
-    }
-    return defaultRisk.get(item.id) ?? '0.0';
-  };
+  const resolveRiskValue = useCallback(
+    (item) => {
+      const override = riskOverrides[item.id];
+      if (override !== undefined) {
+        return override;
+      }
+      return defaultRisk.get(item.id) ?? '0.0';
+    },
+    [riskOverrides, defaultRisk]
+  );
 
   const filteredQueue = useMemo(() => {
     const term = searchQuery.trim().toLowerCase();

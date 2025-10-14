@@ -8,6 +8,7 @@ import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import IdentityVerificationService from './IdentityVerificationService.js';
 import BlogService from './BlogService.js';
+import { buildFieldServiceWorkspace } from './FieldServiceWorkspace.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -492,7 +493,10 @@ export function buildCommunityDashboard({
         severity: metadata.severity ?? 'medium',
         status: metadata.escalation?.status ?? 'triage',
         openedAt: message.deliveredAt ? new Date(message.deliveredAt) : null,
-        owner: metadata.escalation?.owner ?? metadata.moderator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator',
+        owner:
+          metadata.escalation?.owner ??
+          metadata.moderator ??
+          (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator'),
         summary: metadata.summary ?? (metadata.flaggedReason ?? message.body?.slice(0, 120) ?? 'Flagged conversation')
       };
     })
@@ -1092,7 +1096,8 @@ export function buildCommunityDashboard({
       return {
         id: `resource-${resource.id}`,
         title: resource.title ?? 'Operations playbook',
-        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team',
+        owner:
+          metadata.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team'),
         updatedAt: resource.publishedAt
           ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
           : 'Draft',
@@ -1112,7 +1117,8 @@ export function buildCommunityDashboard({
       return {
         id: `assignment-${assignment.id}`,
         title: assignment.title ?? 'Operational task',
-        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team',
+        owner:
+          metadata.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team'),
         status: metadata.status ?? 'open',
         due: formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }),
         community: assignment.courseTitle ?? metadata.communityName ?? 'Community'
@@ -1126,7 +1132,10 @@ export function buildCommunityDashboard({
       id: `event-${session.id}`,
       title: session.title ?? 'Live session',
       date: formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }),
-      facilitator: session.hostName ?? session.metadata?.facilitator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host',
+      facilitator:
+        session.hostName ??
+        session.metadata?.facilitator ??
+        (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host'),
       seats: `${Number(session.reservedSeats ?? 0)}/${Number(session.capacity ?? 0)} booked`,
       status: session.status ?? 'scheduled'
     }));
@@ -1411,7 +1420,6 @@ export function buildInstructorDashboard({
   ebookRows = [],
   ebookProgressRows = []
 } = {}) {
-}) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const communityStatsMap = new Map();
@@ -1431,24 +1439,20 @@ export function buildInstructorDashboard({
   const managedCommunities = [];
 
   const upsertManagedCommunity = (communityId, payload) => {
-    const existing = communityLookup.get(communityId);
-    const merged = existing ? { ...existing, ...payload } : payload;
     const merged = { ...(communityLookup.get(communityId) ?? {}), ...payload };
     communityLookup.set(communityId, merged);
     if (!managedCommunityIds.has(communityId)) {
+      managedCommunityIds.add(communityId);
       managedCommunities.push(merged);
-    } else {
-      const index = managedCommunities.findIndex((entry) => Number(entry.communityId) === Number(communityId));
-      if (index !== -1) {
-        managedCommunities[index] = { ...managedCommunities[index], ...merged };
-      const index = managedCommunities.findIndex(
-        (community) => Number(community.communityId) === communityId
-      );
-      if (index !== -1) {
-        managedCommunities[index] = merged;
-      }
+      return;
     }
-    managedCommunityIds.add(communityId);
+
+    const index = managedCommunities.findIndex(
+      (community) => Number(community.communityId) === Number(communityId)
+    );
+    if (index !== -1) {
+      managedCommunities[index] = { ...managedCommunities[index], ...merged };
+    }
   };
 
   communityMemberships.forEach((membership) => {
@@ -1616,27 +1620,20 @@ export function buildInstructorDashboard({
     const resolvedMaxScore = Number(assignment.maxScore ?? metadata.maxScore ?? metadata.points ?? 0);
     const fallbackOwnerName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
     const resolvedOwner = metadata.owner ?? (fallbackOwnerName || user.email);
-    return {
-      id: Number(assignment.id),
-      courseId: Number(assignment.courseId),
-      moduleId: assignment.moduleId ? Number(assignment.moduleId) : null,
-      courseTitle: assignment.courseTitle,
-      title: assignment.title,
-      dueDate,
-      moduleTitle: assignment.moduleTitle,
-      instructions: assignment.instructions ?? metadata.instructions ?? null,
-      maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
-      owner:
-        metadata.owner ??
-        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)),
-      owner: resolvedOwner,
-      owner:
-        metadata.owner ??
-        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()) || user.email),
-      owner: metadata.owner ?? resolveName(user.firstName, user.lastName, user.email),
-      metadata
-    };
-  });
+      return {
+        id: Number(assignment.id),
+        courseId: Number(assignment.courseId),
+        moduleId: assignment.moduleId ? Number(assignment.moduleId) : null,
+        courseTitle: assignment.courseTitle,
+        title: assignment.title,
+        dueDate,
+        moduleTitle: assignment.moduleTitle,
+        instructions: assignment.instructions ?? metadata.instructions ?? null,
+        maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
+        owner: resolvedOwner,
+        metadata
+      };
+    });
 
   const assignmentsByModule = new Map();
   assignmentsNormalised.forEach((assignment) => {
@@ -1781,28 +1778,24 @@ export function buildInstructorDashboard({
     scheduledEnd: booking.scheduledEnd ? new Date(booking.scheduledEnd) : null
   }));
 
-  const pipelineBookings = tutorBookingsNormalised
-    .filter((booking) => booking.status === 'requested')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      status: 'Requested',
-      learner:
-        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
-      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
-      requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
-      topic: booking.metadata.topic ?? 'Mentorship session'
-    }));
+    const pipelineBookings = tutorBookingsNormalised
+      .filter((booking) => booking.status === 'requested')
+      .map((booking) => ({
+        id: `booking-${booking.id}`,
+        status: 'Requested',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
+        topic: booking.metadata.topic ?? 'Mentorship session'
+      }));
 
   const confirmedBookings = tutorBookingsNormalised
     .filter((booking) => booking.status === 'confirmed')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      topic: booking.metadata.topic ?? 'Mentorship session',
-      learner:
-        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
-      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
-      date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
-    }));
+      .map((booking) => ({
+        id: `booking-${booking.id}`,
+        topic: booking.metadata.topic ?? 'Mentorship session',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+      }));
 
   const tutorProfileMap = new Map();
   tutorProfiles.forEach((profile) => {
@@ -2032,6 +2025,11 @@ export function buildInstructorDashboard({
       });
     });
 
+    const normaliseFilename = (name) => {
+      if (!name) return 'Untitled asset';
+      const leaf = name.split('/').pop();
+      return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+    };
   const serviceCapacityByMonth = new Map();
   upcomingTutorSlots.forEach((slot) => {
     if (!slot.startAt) return;
@@ -2344,26 +2342,26 @@ export function buildInstructorDashboard({
     return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
   };
 
-  const assetsNormalised = assets.map((asset) => ({
-    ...asset,
-    metadata: safeJsonParse(asset.metadata, {}),
-    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
-    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
-  }));
+    const assetsNormalised = assets.map((asset) => ({
+      ...asset,
+      metadata: safeJsonParse(asset.metadata, {}),
+      createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+      updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+    }));
 
-  const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
-  const assetEventGroups = new Map();
-  assetEvents.forEach((event) => {
-    const assetId = Number(event.assetId);
-    const list = assetEventGroups.get(assetId) ?? [];
-    const occurredAt = event.occurredAt
-      ? event.occurredAt instanceof Date
-        ? event.occurredAt
-        : new Date(event.occurredAt)
-      : null;
-    list.push({ ...event, occurredAt, metadata: safeJsonParse(event.metadata, {}) });
-    assetEventGroups.set(assetId, list);
-  });
+    const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
+    const assetEventGroups = new Map();
+    assetEvents.forEach((event) => {
+      const assetId = Number(event.assetId);
+      const list = assetEventGroups.get(assetId) ?? [];
+      const occurredAt = event.occurredAt
+        ? event.occurredAt instanceof Date
+          ? event.occurredAt
+          : new Date(event.occurredAt)
+        : null;
+      list.push({ ...event, occurredAt, metadata: safeJsonParse(event.metadata, {}) });
+      assetEventGroups.set(assetId, list);
+    });
 
   const managedCommunityNames = new Set(
     managedCommunities.map((community) => community.communityName?.toLowerCase()).filter(Boolean)
@@ -2471,7 +2469,6 @@ export function buildInstructorDashboard({
         stage,
         progress,
         lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
-        owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor'),
         owner: resolveName(user.firstName, user.lastName, 'Instructor'),
         nextActions,
         reference,
@@ -2846,14 +2843,13 @@ export function buildInstructorDashboard({
       status: assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate, { dateStyle: 'medium', timeStyle: undefined })}` : 'Scheduling',
       type: 'Assignment'
     })),
-    ...upcomingLessons.map((lesson) => ({
-      id: `lesson-${lesson.id}`,
-      asset: `${lesson.courseTitle} · ${lesson.title}`,
-      owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'),
-      owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
-      status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
-      type: 'Lesson'
-    }))
+      ...upcomingLessons.map((lesson) => ({
+        id: `lesson-${lesson.id}`,
+        asset: `${lesson.courseTitle} · ${lesson.title}`,
+        owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
+        status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
+        type: 'Lesson'
+      }))
   ].slice(0, 12);
 
   const library = assetsNormalised
@@ -3021,8 +3017,8 @@ export function buildInstructorDashboard({
           title: lesson.title ?? 'Refresher session',
           format: lesson.format ?? 'Live',
           cadence: lesson.cadence ?? 'Quarterly',
-          owner:
-            lesson.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team',
+            owner:
+              lesson.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team'),
           status: lesson.status ?? 'Planned',
           nextSession: lesson.nextSessionAt
             ? formatDateTime(new Date(lesson.nextSessionAt), { dateStyle: 'medium', timeStyle: 'short' })
@@ -3262,14 +3258,13 @@ export function buildInstructorDashboard({
       callToAction: session.callToAction
     }));
 
-  const lessonSchedule = upcomingLessons.map((lesson) => ({
-    id: `lesson-${lesson.id}`,
-    topic: lesson.title,
-    course: lesson.courseTitle,
-    date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
-    facilitator: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator')
-    facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
-  }));
+    const lessonSchedule = upcomingLessons.map((lesson) => ({
+      id: `lesson-${lesson.id}`,
+      topic: lesson.title,
+      course: lesson.courseTitle,
+      date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
+      facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
+    }));
 
   const calendarEntries = [];
   upcomingLiveClasses.forEach((session) => {
@@ -3670,6 +3665,21 @@ export function buildInstructorDashboard({
       title: session.title,
       url: '/dashboard/instructor/calendar'
     })),
+      {
+        id: 'search-instructor-assessments',
+        role: 'instructor',
+        type: 'Assessments',
+        title: 'Assessment studio',
+        url: '/dashboard/instructor/assessments'
+      },
+      ...tutorRoster.map((tutor) => ({
+        id: `search-instructor-tutor-${tutor.id}`,
+        role: 'instructor',
+        type: 'Tutor',
+        title: tutor.name,
+        url: '/dashboard/instructor/tutor-management'
+      }))
+    ];
     {
       id: 'search-instructor-assessments',
       role: 'instructor',
@@ -4203,7 +4213,7 @@ export function buildAffiliateOverview({
     }
   ];
 
-  const upcomingPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+  const nextPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
     .filter((payout) => payout.status !== 'completed')
     .map((payout) => {
       const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
@@ -4211,14 +4221,11 @@ export function buildAffiliateOverview({
       );
       return {
         status: payout.status,
-        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        amountCents: Number(payout.amountCents ?? 0),
         scheduledAt: payout.scheduledAt,
-        scheduledLabel: formatDateTime(payout.scheduledAt, {
-          dateStyle: 'medium',
-          timeStyle: 'short'
-        }),
-        referralCode: affiliate?.referralCode,
-        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName
+        referralCode: affiliate?.referralCode ?? null,
+        communityName:
+          affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName ?? null
       };
     })
     .sort((a, b) => new Date(a.scheduledAt ?? now) - new Date(b.scheduledAt ?? now))[0] ?? null;
@@ -4288,7 +4295,15 @@ export function buildAffiliateOverview({
         activePrograms,
         pendingPrograms
       },
-      nextPayout
+      nextPayout: nextPayout
+        ? {
+            status: nextPayout.status,
+            amountFormatted: formatCurrency(nextPayout.amountCents, 'USD'),
+            scheduledAt: nextPayout.scheduledAt,
+            referralCode: nextPayout.referralCode,
+            communityName: nextPayout.communityName
+          }
+        : null
     },
     programs: affiliatePrograms,
     payouts: payoutTimeline,
@@ -4347,6 +4362,8 @@ function minutesToReadable(minutes) {
 function resolveName(firstName, lastName, fallback) {
   const candidate = `${firstName ?? ''} ${lastName ?? ''}`.trim();
   return candidate.length > 0 ? candidate : fallback;
+}
+
 const LIVE_JOIN_WINDOW_MINUTES = 15;
 const GROUP_SESSION_KEYWORDS = ['group', 'cohort', 'bootcamp', 'lab', 'studio', 'masterclass', 'workshop', 'breakout'];
 const WHITEBOARD_READY_STATES = new Set(['ready', 'live', 'approved', 'published']);
@@ -4717,7 +4734,7 @@ export default class DashboardService {
 
     const [
       privacySettings,
-      courseStats,
+      _courseStats,
       enrollmentRows,
       progressRows,
       membershipRows,
@@ -4758,6 +4775,9 @@ export default class DashboardService {
       adsMetricRows,
       communityPaywallTierRows,
       communitySubscriptionRows,
+      fieldServiceOrderRows,
+      fieldServiceEventRows,
+      fieldServiceProviderRows,
       platformMonetizationSettings
     ] = await Promise.all([
       UserPrivacySettingModel.getForUser(userId),
@@ -5353,6 +5373,83 @@ export default class DashboardService {
           'community.owner_id as ownerId',
           'community.name as communityName'
         ),
+      db('field_service_orders as fso')
+        .leftJoin('field_service_providers as fsp', 'fsp.id', 'fso.provider_id')
+        .leftJoin('users as customer', 'customer.id', 'fso.customer_user_id')
+        .select(
+          'fso.id',
+          'fso.reference',
+          'fso.customer_user_id as customerUserId',
+          'fso.provider_id as providerId',
+          'fso.status',
+          'fso.priority',
+          'fso.service_type as serviceType',
+          'fso.summary',
+          'fso.requested_at as requestedAt',
+          'fso.scheduled_for as scheduledFor',
+          'fso.eta_minutes as etaMinutes',
+          'fso.sla_minutes as slaMinutes',
+          'fso.distance_km as distanceKm',
+          'fso.location_lat as locationLat',
+          'fso.location_lng as locationLng',
+          'fso.location_label as locationLabel',
+          'fso.address_line_1 as addressLine1',
+          'fso.address_line_2 as addressLine2',
+          'fso.city',
+          'fso.region',
+          'fso.postal_code as postalCode',
+          'fso.country',
+          'fso.metadata',
+          'fso.created_at as createdAt',
+          'fso.updated_at as updatedAt',
+          'fsp.user_id as providerUserId',
+          'fsp.name as providerName',
+          'fsp.email as providerEmail',
+          'fsp.phone as providerPhone',
+          'fsp.status as providerStatus',
+          'fsp.specialties as providerSpecialties',
+          'fsp.rating as providerRating',
+          'fsp.last_check_in_at as providerLastCheckInAt',
+          'fsp.location_lat as providerLocationLat',
+          'fsp.location_lng as providerLocationLng',
+          'fsp.location_label as providerLocationLabel',
+          'fsp.location_updated_at as providerLocationUpdatedAt',
+          'fsp.metadata as providerMetadata',
+          'customer.first_name as customerFirstName',
+          'customer.last_name as customerLastName',
+          'customer.email as customerEmail'
+        ),
+      db('field_service_events as fse')
+        .select(
+          'fse.id',
+          'fse.order_id as orderId',
+          'fse.event_type as eventType',
+          'fse.status',
+          'fse.notes',
+          'fse.author',
+          'fse.occurred_at as occurredAt',
+          'fse.metadata',
+          'fse.created_at as createdAt'
+        ),
+      db('field_service_providers as fsp')
+        .select(
+          'fsp.id',
+          'fsp.user_id as userId',
+          'fsp.name',
+          'fsp.email',
+          'fsp.phone',
+          'fsp.status',
+          'fsp.specialties',
+          'fsp.rating',
+          'fsp.last_check_in_at as lastCheckInAt',
+          'fsp.location_lat as locationLat',
+          'fsp.location_lng as locationLng',
+          'fsp.location_label as locationLabel',
+          'fsp.location_updated_at as locationUpdatedAt',
+          'fsp.metadata',
+          'fsp.created_at as createdAt',
+          'fsp.updated_at as updatedAt'
+        ),
       PlatformSettingsService.getMonetizationSettings()
     ]);
     const communityStatsMap = new Map();
@@ -5394,6 +5491,8 @@ export default class DashboardService {
       memberships: membershipRows,
       monetizationSettings: platformMonetizationSettings,
       now
+    });
+
     const communityDashboard = buildCommunityDashboard({
       user,
       now,
@@ -5592,10 +5691,9 @@ export default class DashboardService {
       };
       const subscription = subscriptionByCommunity.get(Number(row.communityId));
       const affiliate = affiliateByCommunity.get(Number(row.communityId));
-      const affiliatePayouts = affiliate ? affiliatePayoutByAffiliate.get(affiliate.id) ?? [] : [];
-      const upcomingSessions = liveClassRows.filter(
-        (session) => Number(session.communityId ?? 0) === Number(row.communityId)
-      );
+        const upcomingSessions = liveClassRows.filter(
+          (session) => Number(session.communityId ?? 0) === Number(row.communityId)
+        );
 
       const initiatives = [];
       if (subscription) {
@@ -6595,6 +6693,14 @@ export default class DashboardService {
       roles.push(instructorDashboard.role);
     }
 
+    const fieldServiceWorkspace = buildFieldServiceWorkspace({
+      now,
+      user,
+      orders: fieldServiceOrderRows,
+      events: fieldServiceEventRows,
+      providers: fieldServiceProviderRows
+    });
+
     const dashboards = {
       learner: {
         metrics,
@@ -6678,8 +6784,31 @@ export default class DashboardService {
       }
     };
 
-    if (instructorDashboard?.dashboard) {
-      instructorDashboard.dashboard.affiliate = affiliateOverview;
+    if (fieldServiceWorkspace?.customer) {
+      dashboards.learner.fieldServices = fieldServiceWorkspace.customer;
+    }
+
+    if (instructorDashboard) {
+      if (instructorDashboard.dashboard) {
+        instructorDashboard.dashboard.affiliate = affiliateOverview;
+        instructorDashboard.dashboard.fieldServices = fieldServiceWorkspace?.provider ?? null;
+      }
+      const providerTotals = fieldServiceWorkspace?.provider?.summary?.totals ?? null;
+      if (providerTotals && providerTotals.total > 0) {
+        instructorDashboard.profileStats.push({
+          label: 'Field services',
+          value: `${providerTotals.active} active`
+        });
+        const providerBio = `Coordinating ${providerTotals.total} field service engagement${
+          providerTotals.total === 1 ? '' : 's'
+        } with ${providerTotals.incidents} incident${providerTotals.incidents === 1 ? '' : 's'} in queue.`;
+        instructorDashboard.profileBio = [
+          instructorDashboard.profileBio,
+          providerBio
+        ]
+          .filter(Boolean)
+          .join(' ');
+      }
     }
 
     if (communityDashboard) {
@@ -6738,7 +6867,7 @@ export default class DashboardService {
         type: 'Assessments',
         title: 'Assessment schedule',
         url: '/dashboard/learner/assessments'
-      }
+      },
       ...blogSearchEntries
     ];
 
@@ -6767,9 +6896,28 @@ export default class DashboardService {
     if (instructorDashboard) {
       searchIndex.push(...instructorDashboard.searchIndex);
     }
+    if (fieldServiceWorkspace?.searchIndex?.length) {
+      searchIndex.push(...fieldServiceWorkspace.searchIndex);
+    }
     if (adminDashboard?.searchIndex?.length) {
       searchIndex.push(...adminDashboard.searchIndex);
     }
+
+    const learnerFieldTotals = fieldServiceWorkspace?.customer?.summary?.totals ?? null;
+    const learnerFieldActiveLabel =
+      learnerFieldTotals && learnerFieldTotals.total > 0 ? `${learnerFieldTotals.active} active` : null;
+    const learnerFieldTitleSegment =
+      learnerFieldTotals && learnerFieldTotals.total > 0
+        ? `${learnerFieldTotals.total} field service engagement${learnerFieldTotals.total === 1 ? '' : 's'}`
+        : null;
+    const learnerFieldBioSegment = (() => {
+      if (!learnerFieldTotals || learnerFieldTotals.total === 0) return null;
+      const incidentDescriptor =
+        learnerFieldTotals.incidents > 0
+          ? `${learnerFieldTotals.incidents} incident${learnerFieldTotals.incidents === 1 ? '' : 's'} monitored`
+          : 'Maintaining service coverage';
+      return `Supporting ${learnerFieldActiveLabel} with ${incidentDescriptor}.`;
+    })();
 
     const communityNames = memberships.map((membership) => membership.name).filter(Boolean);
     const primaryProgram = learnerCourseSummaries[0]?.title ?? 'Edulure programs';
@@ -6777,6 +6925,9 @@ export default class DashboardService {
       ? `Currently collaborating across ${communityNames.join(', ')} while progressing through ${primaryProgram}.`
       : `Progressing through ${primaryProgram}.`;
     const profileBioSegments = [learnerProfileBio];
+    if (learnerFieldBioSegment) {
+      profileBioSegments.push(learnerFieldBioSegment);
+    }
     if (communityDashboard?.profileBio) {
       profileBioSegments.push(communityDashboard.profileBio);
     }
@@ -6798,6 +6949,11 @@ export default class DashboardService {
         label: 'Affiliate earned',
         value: affiliateOverview.summary.totals.earnedFormatted
       });
+    }
+    if (learnerFieldActiveLabel) {
+      profileStats.push({ label: 'Field services', value: learnerFieldActiveLabel });
+    }
+
     if (communityDashboard) {
       profileStats.push(...communityDashboard.profileStats);
     }
@@ -6812,6 +6968,9 @@ export default class DashboardService {
       `${memberships.length} communities`,
       `${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`
     ];
+    if (learnerFieldTitleSegment) {
+      profileTitleSegments.push(learnerFieldTitleSegment);
+    }
     if (affiliateOverview?.summary?.totals?.programCount) {
       const programmeCount = affiliateOverview.summary.totals.programCount;
       if (programmeCount > 0) {
@@ -6820,7 +6979,6 @@ export default class DashboardService {
         );
       }
     }
-    if (instructorDashboard) {
     if (communityDashboard) {
       const managedCommunitiesCount =
         communityDashboard.dashboard?.health?.overview?.length ?? 0;
@@ -7967,6 +8125,23 @@ export default class DashboardService {
       { id: 'admin-blog', role: 'admin', type: 'Content', title: 'Blog management', url: '/admin#blog' }
     ];
 
+      return {
+        role: { id: 'admin', label: 'Admin' },
+        dashboard: {
+          metrics,
+          approvals,
+          revenue,
+          operations,
+          blog: blogOperations,
+          compliance,
+          activity: { alerts, events },
+          settings: {
+            monetization: monetizationSettings
+          }
+        },
+        profileStats,
+        profileBio,
+        profileTitleSegment: 'Platform operations oversight',
     return {
       role: { id: 'admin', label: 'Admin' },
       dashboard: {

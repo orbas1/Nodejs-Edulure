@@ -1,5 +1,3 @@
-import { useOutletContext } from 'react-router-dom';
-
 import DashboardSectionHeader from '../../components/dashboard/DashboardSectionHeader.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
