@@ -1,0 +1,16 @@
+# Screens Update Logic Flow Map – Application Design Update v1.50
+
+| Flow | Entry Point | Actors | Key Steps | Decision Points | Exit Conditions | Analytics Events |
+| --- | --- | --- | --- | --- | --- | --- |
+| Learner Onboarding | Splash CTA / Deep link | Learner, Auth Service, Profile Service | Welcome carousel → Auth selection (Email/Google/Apple) → Verification → Profile basics (name, avatar, pronouns) → Learning goals & availability → Cohort recommendations → Confirmation checklist | Email verified? → Payment required? → Cohort selected? | User status `active`, personalization tags stored, checklist activated | `onboard_start`, `onboard_step_complete`, `cohort_joined`, `onboard_complete` |
+| Provider Cohort Creation | Dashboard "Create" FAB | Provider, Cohort Service, Pricing Service | Cohort basics → Curriculum builder → Pricing & payouts → Communication preferences → Preview → Publish | Curriculum complete? → Pricing valid? → Compliance docs uploaded? | Cohort status `upcoming`, notifications queued, analytics seeded | `cohort_create_start`, `curriculum_saved`, `pricing_validated`, `cohort_published` |
+| Lesson Consumption | Timeline, notification, deep link | Learner, Content Service | Timeline tap → Lesson detail → Playback/reading → Interactions (quiz, notes) → Completion feedback | Quiz passed? → Required attachments downloaded? | Lesson marked complete, progress updated, badge check executed | `lesson_open`, `lesson_interaction`, `lesson_complete`, `lesson_feedback_submitted` |
+| Assignment Submission | Timeline card / Notification | Learner, Assignment Service, Storage Service | Assignment overview → Submission form → File upload → Review summary → Submit confirmation | Files uploaded successfully? → Rubric acknowledgements complete? | Submission stored, confirmation toast, mentor notified | `assignment_open`, `attachment_upload`, `assignment_submit`, `assignment_success_toast` |
+| Conversation Reply | Notification center / Messages tab | Learner/Provider, Messaging Service | Thread list → Thread view → Compose reply → Send → Optional reaction | Connection available? → SLA threshold exceeded? | Message delivered, read receipts updated, notification cleared | `message_thread_open`, `message_send_attempt`, `message_send_success`, `reaction_add` |
+| Settings Update | Profile avatar → Settings | User, Settings Service, Security Service | Settings list → Detail view → Edit fields/toggles → Save/Auto-save → Confirmation toast | Requires re-auth? → Validation errors? | Preferences persisted, analytics event logged | `settings_open`, `setting_changed`, `setting_save_success` |
+| Analytics Insight Handling | Dashboard insight card | Provider, Analytics Service | View insights → Expand detail → Accept/Ignore → Optional task creation | Insight actionable? → Task already exists? | Task created or insight dismissed | `insight_view`, `insight_accept`, `insight_dismiss` |
+
+## Supplemental Notes
+- Flow maps maintained in Figma with swimlanes; export PNG/SVG for inclusion in documentation bundles.
+- Each flow includes error paths (network failure, validation failure) documented in companion spec.
+- Analytics events tracked consistently across platforms with standard parameters (`user_role`, `cohort_id`, `screen_name`).
