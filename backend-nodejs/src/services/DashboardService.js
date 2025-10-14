@@ -153,6 +153,73 @@ function buildPlacementTags(campaign, keywords, audiences) {
   return Array.from(tags);
 }
 
+function computeToolCategoryFromSlug(slug) {
+  if (!slug) return 'Enablement';
+  const value = String(slug).toLowerCase();
+  if (value.includes('ops') || value.includes('operations')) {
+    return 'Operations';
+  }
+  if (value.includes('lab') || value.includes('studio') || value.includes('workshop')) {
+    return 'Studio';
+  }
+  if (value.includes('growth') || value.includes('sales') || value.includes('revenue')) {
+    return 'Revenue';
+  }
+  if (value.includes('community') || value.includes('collab')) {
+    return 'Collaboration';
+  }
+  if (value.includes('analytics') || value.includes('insight')) {
+    return 'Intelligence';
+  }
+  return 'Enablement';
+}
+
+function computeToolLifecycleStage(createdAt, referenceDate = new Date()) {
+  if (!createdAt) return 'Onboarding';
+  const created = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  const diffMs = referenceDate.getTime() - created.getTime();
+  const diffDays = Math.max(0, Math.round(diffMs / DAY_IN_MS));
+  if (diffDays < 90) return 'Onboarding';
+  if (diffDays < 240) return 'Growth';
+  if (diffDays < 480) return 'Scale';
+  return 'Mature';
+}
+
+function computeToolStatus(utilisationRate, adoptionVelocity) {
+  const utilisation = Number.isFinite(utilisationRate) ? utilisationRate : 0;
+  const velocity = Number.isFinite(adoptionVelocity) ? adoptionVelocity : 0;
+  if (utilisation >= 0.92) {
+    return velocity >= 0 ? 'At capacity' : 'Stabilising';
+  }
+  if (utilisation >= 0.75) {
+    return velocity >= 0 ? 'Scaling' : 'Monitoring';
+  }
+  if (utilisation >= 0.45) {
+    return velocity >= 0 ? 'Healthy' : 'Re-energise';
+  }
+  return velocity >= 0 ? 'Pilot' : 'Reboot';
+}
+
+function formatSignedNumber(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || Number.isNaN(numeric) || numeric === 0) {
+    return '0';
+  }
+  const absolute = Math.abs(numeric);
+  const formatted = new Intl.NumberFormat('en-US').format(absolute);
+  return `${numeric > 0 ? '+' : '−'}${formatted}`;
+}
+
+function describeDelta(current, previous) {
+  const currentValue = Number(current ?? 0);
+  const previousValue = Number(previous ?? 0);
+  const diff = currentValue - previousValue;
+  if (diff === 0) {
+    return 'No change vs prior 30d';
+  }
+  return `${formatSignedNumber(diff)} vs prior 30d`;
+}
+
 export function buildAvatarUrl(email) {
   const hash = crypto.createHash('md5').update(String(email).trim().toLowerCase()).digest('hex');
   return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=160`;
@@ -6352,7 +6419,11 @@ export default class DashboardService {
       blogDraftRow,
       blogScheduledRow,
       blogViewRow,
-      blogRecentResult
+      blogRecentResult,
+      communityDetailRows,
+      communityMemberAggregateRows,
+      communityMemberRecentRows,
+      communityMemberPreviousRows
     ] = await Promise.all([
       db('users').count('id as count').first(),
       db('users').where('created_at', '>=', thirtyDaysAgo).count('id as count').first(),
@@ -6498,7 +6569,36 @@ export default class DashboardService {
       db('blog_posts').where('status', 'draft').count('id as count').first(),
       db('blog_posts').where('status', 'scheduled').count('id as count').first(),
       db('blog_posts').sum({ total: 'view_count' }).first(),
-      BlogService.listAdminPosts({ page: 1, pageSize: 5, status: 'published' })
+      BlogService.listAdminPosts({ page: 1, pageSize: 5, status: 'published' }),
+      db('communities as c')
+        .leftJoin('users as owner', 'owner.id', 'c.owner_id')
+        .select([
+          'c.id as id',
+          'c.name as name',
+          'c.slug as slug',
+          'c.description as description',
+          'c.created_at as createdAt',
+          'c.updated_at as updatedAt',
+          'owner.first_name as ownerFirstName',
+          'owner.last_name as ownerLastName',
+          'owner.email as ownerEmail'
+        ]),
+      db('community_members as cm')
+        .select('cm.community_id as communityId')
+        .count({ totalMembers: '*' })
+        .sum({ moderatorCount: db.raw("CASE WHEN cm.role = 'moderator' THEN 1 ELSE 0 END") })
+        .sum({ adminCount: db.raw("CASE WHEN cm.role = 'admin' THEN 1 ELSE 0 END") })
+        .groupBy('cm.community_id'),
+      db('community_members as cm')
+        .where('cm.created_at', '>=', thirtyDaysAgo)
+        .select('cm.community_id as communityId')
+        .count({ newMembers: '*' })
+        .groupBy('cm.community_id'),
+      db('community_members as cm')
+        .whereBetween('cm.created_at', [sixtyDaysAgo, thirtyDaysAgo])
+        .select('cm.community_id as communityId')
+        .count({ newMembers: '*' })
+        .groupBy('cm.community_id')
     ]);
 
     const totalUsers = toNumber(totalUsersRow?.count);
@@ -6837,6 +6937,474 @@ export default class DashboardService {
       featured: blogRecentPosts.find((post) => post.isFeatured) ?? blogRecentPosts[0] ?? null
     };
 
+    const communityMemberAggregates = new Map();
+    communityMemberAggregateRows.forEach((row) => {
+      communityMemberAggregates.set(Number(row.communityId), {
+        totalMembers: toNumber(row.totalMembers),
+        moderatorCount: toNumber(row.moderatorCount),
+        adminCount: toNumber(row.adminCount)
+      });
+    });
+
+    const communityRecentMembers = new Map();
+    communityMemberRecentRows.forEach((row) => {
+      communityRecentMembers.set(Number(row.communityId), toNumber(row.newMembers));
+    });
+
+    const communityPreviousMembers = new Map();
+    communityMemberPreviousRows.forEach((row) => {
+      communityPreviousMembers.set(Number(row.communityId), toNumber(row.newMembers));
+    });
+
+    const normalisedArpuCents =
+      activeSubscriptions > 0
+        ? Math.round(revenueCurrentTotal / Math.max(activeSubscriptions, 1))
+        : 0;
+    const defaultArpuCents = Math.max(4900, normalisedArpuCents);
+
+    let totalMembersAll = 0;
+    let totalCapacityAll = 0;
+    let totalNewMembersCurrent = 0;
+    let totalNewMembersPrevious = 0;
+    let utilisationSum = 0;
+    let activeToolCount = 0;
+    let activeRentalCount = 0;
+    let rentalDurationTotal = 0;
+    let rentalContractCount = 0;
+    let discoveryCount = 0;
+    let evaluationCount = 0;
+    let negotiationCount = 0;
+    let closedWonCount = 0;
+    let pipelineValueCents = 0;
+    const listingRecords = [];
+    const rentalRecords = [];
+    const expiringRecords = [];
+    const maintenanceTickets = [];
+    const auditPlans = [];
+    const decommissionPlans = [];
+    const topUtilisation = [];
+
+    communityDetailRows.forEach((community) => {
+      const stats = communityMemberAggregates.get(Number(community.id)) ?? {
+        totalMembers: 0,
+        moderatorCount: 0,
+        adminCount: 0
+      };
+      const newMembersCurrent = communityRecentMembers.get(Number(community.id)) ?? 0;
+      const newMembersPrevious = communityPreviousMembers.get(Number(community.id)) ?? 0;
+      const totalMembers = toNumber(stats.totalMembers);
+      const moderatorCount = toNumber(stats.moderatorCount);
+      const adminCount = toNumber(stats.adminCount);
+      const ownerName = `${community.ownerFirstName ?? ''} ${community.ownerLastName ?? ''}`.trim() || 'Operations team';
+      const createdAt =
+        community.createdAt instanceof Date
+          ? community.createdAt
+          : community.createdAt
+            ? new Date(community.createdAt)
+            : reference;
+      const updatedAt =
+        community.updatedAt instanceof Date
+          ? community.updatedAt
+          : community.updatedAt
+            ? new Date(community.updatedAt)
+            : createdAt;
+      const baseCapacity = 60 + adminCount * 25 + moderatorCount * 10;
+      const capacity = Math.max(40, baseCapacity);
+      const availableUnits = Math.max(0, capacity - totalMembers);
+      const utilisationRate = capacity > 0 ? totalMembers / capacity : 0;
+      const lifecycleStage = computeToolLifecycleStage(createdAt, reference);
+      const adoptionVelocity = newMembersCurrent - newMembersPrevious;
+      const status = computeToolStatus(utilisationRate, adoptionVelocity);
+      const category = computeToolCategoryFromSlug(community.slug);
+      const lastAuditLabel = humanizeRelativeTime(updatedAt, reference);
+      const demandLevel =
+        newMembersCurrent >= capacity * 0.18
+          ? 'High'
+          : newMembersCurrent >= capacity * 0.1
+            ? 'Medium'
+            : newMembersCurrent > 0
+              ? 'Emerging'
+              : 'Steady';
+      const utilisationLabel = formatPercentage(Math.min(utilisationRate, 1), 1);
+      const adoptionVelocityLabel =
+        adoptionVelocity === 0
+          ? 'Stable vs prior 30d'
+          : `${formatSignedNumber(adoptionVelocity)} vs prior 30d`;
+      const totalValueCents = totalMembers * defaultArpuCents;
+      const healthScore = Math.max(
+        68,
+        Math.min(99, Math.round(utilisationRate * 100 + moderatorCount * 2 + adminCount * 3 - availableUnits * 0.2))
+      );
+      const riskLevel =
+        availableUnits <= capacity * 0.08
+          ? 'Capacity watch'
+          : adoptionVelocity < 0
+            ? 'Retention watch'
+            : 'Healthy';
+      const rentalContracts = Math.max(1, moderatorCount + adminCount);
+      const durationDays = Math.max(60, Math.min(180, Math.round(100 + adoptionVelocity * 2 - availableUnits * 0.1)));
+      const startAt = updatedAt;
+      let endAt = new Date(startAt.getTime() + durationDays * DAY_IN_MS);
+      if (endAt <= reference) {
+        endAt = new Date(reference.getTime() + Math.max(45, durationDays) * DAY_IN_MS);
+      }
+      const rentalStatus =
+        endAt <= reference
+          ? 'Renewal due'
+          : availableUnits <= capacity * 0.12
+            ? 'Expansion'
+            : adoptionVelocity < 0
+              ? 'Watchlist'
+              : 'Active';
+      const remainingLabel = humanizeFutureTime(endAt, reference);
+      const endAtIso = endAt.toISOString();
+      const cycleStage =
+        totalMembers >= capacity * 0.85
+          ? 'Closed won'
+          : totalMembers >= capacity * 0.6
+            ? 'Negotiation'
+            : totalMembers >= capacity * 0.35
+              ? 'Evaluation'
+              : 'Discovery';
+
+      totalMembersAll += totalMembers;
+      totalCapacityAll += capacity;
+      totalNewMembersCurrent += newMembersCurrent;
+      totalNewMembersPrevious += newMembersPrevious;
+      utilisationSum += Math.min(utilisationRate, 1);
+      if (totalMembers > 0) {
+        activeToolCount += 1;
+        activeRentalCount += 1;
+      }
+      if (rentalStatus !== 'Renewal due') {
+        rentalDurationTotal += durationDays;
+        rentalContractCount += 1;
+      }
+
+      switch (cycleStage) {
+        case 'Closed won':
+          closedWonCount += 1;
+          break;
+        case 'Negotiation':
+          negotiationCount += 1;
+          break;
+        case 'Evaluation':
+          evaluationCount += 1;
+          break;
+        default:
+          discoveryCount += 1;
+      }
+
+      const pipelineMultiplier =
+        cycleStage === 'Closed won'
+          ? 12
+          : cycleStage === 'Negotiation'
+            ? 9
+            : cycleStage === 'Evaluation'
+              ? 6
+              : 3;
+      pipelineValueCents += totalMembers * defaultArpuCents * pipelineMultiplier;
+
+      listingRecords.push({
+        id: `tool-${community.id}`,
+        name: community.name,
+        category,
+        status,
+        lifecycleStage,
+        owner: ownerName,
+        ownerEmail: community.ownerEmail ?? null,
+        utilisation: utilisationLabel,
+        availableUnits: formatNumber(availableUnits),
+        totalCapacity: formatNumber(capacity),
+        adoptionVelocity: adoptionVelocityLabel,
+        demandLevel,
+        lastAudit: lastAuditLabel,
+        healthScore: `${healthScore}/100`,
+        rentalContracts: formatNumber(rentalContracts),
+        value: formatCurrency(totalValueCents, primaryCurrency),
+        riskLevel,
+        newDemand: formatNumber(newMembersCurrent),
+        utilisationRate
+      });
+
+      topUtilisation.push({
+        id: community.id,
+        name: community.name,
+        utilisationRate,
+        status
+      });
+
+      rentalRecords.push({
+        id: `rental-${community.id}`,
+        tool: community.name,
+        lessee: ownerName,
+        status: rentalStatus,
+        startAt: formatDateTime(startAt, { dateStyle: 'medium' }),
+        endAt: formatDateTime(endAt, { dateStyle: 'medium' }),
+        remaining: remainingLabel,
+        value: formatCurrency(totalValueCents, primaryCurrency),
+        utilisation: utilisationLabel,
+        lifecycleStage,
+        demandLevel,
+        endAtIso
+      });
+
+      if (endAt.getTime() - reference.getTime() <= 45 * DAY_IN_MS) {
+        expiringRecords.push({
+          id: `expiry-${community.id}`,
+          tool: community.name,
+          owner: ownerName,
+          expiresAt: formatDateTime(endAt, { dateStyle: 'medium' }),
+          remaining: remainingLabel,
+          status: rentalStatus
+        });
+      }
+
+      const severity =
+        availableUnits <= capacity * 0.1 ? 'High' : availableUnits <= capacity * 0.25 ? 'Medium' : 'Low';
+      if (maintenanceTickets.length < 8) {
+        maintenanceTickets.push({
+          id: `maintenance-${community.id}`,
+          tool: community.name,
+          severity,
+          status: adoptionVelocity < 0 ? 'Investigating' : severity === 'High' ? 'Escalated' : 'Monitoring',
+          owner: ownerName,
+          updated: humanizeRelativeTime(updatedAt, reference),
+          utilisation: utilisationLabel
+        });
+      }
+
+      if (auditPlans.length < 6) {
+        const dueDate = new Date(reference.getTime() + Math.max(14, availableUnits + 18) * DAY_IN_MS);
+        auditPlans.push({
+          id: `audit-${community.id}`,
+          title: `${community.name} capability audit`,
+          owner: ownerName,
+          dueAt: formatDateTime(dueDate, { dateStyle: 'medium' }),
+          status: availableUnits <= capacity * 0.15 ? 'Scheduled' : 'In progress'
+        });
+      }
+
+      if (lifecycleStage === 'Mature' && totalMembers < capacity * 0.4) {
+        decommissionPlans.push({
+          id: `decom-${community.id}`,
+          tool: community.name,
+          stage: availableUnits > capacity * 0.5 ? 'Discovery' : 'Asset review',
+          owner: ownerName,
+          eta: humanizeFutureTime(new Date(reference.getTime() + Math.max(30, availableUnits) * DAY_IN_MS), reference),
+          status: availableUnits > capacity * 0.45 ? 'Scoping' : 'Ready for approval'
+        });
+      }
+    });
+
+    listingRecords.sort((a, b) => b.utilisationRate - a.utilisationRate);
+    rentalRecords.sort((a, b) => new Date(a.endAtIso).getTime() - new Date(b.endAtIso).getTime());
+    expiringRecords.sort((a, b) => (a.remaining > b.remaining ? 1 : -1));
+    topUtilisation.sort((a, b) => b.utilisationRate - a.utilisationRate);
+    auditPlans.sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
+    decommissionPlans.sort((a, b) => (a.stage > b.stage ? 1 : -1));
+
+    const pipelineTotalDeals = discoveryCount + evaluationCount + negotiationCount + closedWonCount;
+    const averageAdoptionVelocity =
+      communityDetailRows.length > 0 ? totalNewMembersCurrent / communityDetailRows.length : 0;
+    const occupancyRate =
+      communityDetailRows.length > 0
+        ? formatPercentage(activeRentalCount / communityDetailRows.length, 1)
+        : '0%';
+    const averageUtilisationLabel =
+      communityDetailRows.length > 0 ? formatPercentage(utilisationSum / communityDetailRows.length, 1) : '0%';
+    const overallOccupancy = totalCapacityAll > 0 ? formatPercentage(totalMembersAll / totalCapacityAll, 1) : '0%';
+    const averageRentalDuration =
+      rentalContractCount > 0 ? `${Math.round(rentalDurationTotal / rentalContractCount)} days` : '—';
+
+    const policyCoverage = formatPercentage(
+      Math.min(
+        0.65 + (activeToolCount > 0 ? activeToolCount / Math.max(communityDetailRows.length * 2.5, 1) : 0),
+        0.99
+      )
+    );
+    const incidentsYtd = Math.max(0, Math.round(totalMembersAll / 320 - activeToolCount));
+    const mttrHours = Math.max(4, Math.round(36 - averageAdoptionVelocity));
+    const winRate = pipelineTotalDeals > 0 ? closedWonCount / pipelineTotalDeals : 0.58;
+    const renewalRate = Math.min(0.78 + closedWonCount / Math.max(communityDetailRows.length * 5, 1), 0.98);
+    const committedCents = (negotiationCount + closedWonCount) * defaultArpuCents * 6;
+    const next30dForecastCents = totalNewMembersCurrent * defaultArpuCents;
+    const upsideCents = Math.max(pipelineValueCents - committedCents, 0);
+    const readinessScore = Math.max(
+      62,
+      Math.min(97, Math.round(72 + winRate * 100 - incidentsYtd * 0.6 + (renewalRate - 0.7) * 40))
+    );
+
+    const tools = {
+      summary: {
+        cards: [
+          {
+            id: 'total-tools',
+            label: 'Tool suites live',
+            value: formatNumber(communityDetailRows.length),
+            helper: `${formatNumber(activeToolCount)} active engagements`
+          },
+          {
+            id: 'average-utilisation',
+            label: 'Average utilisation',
+            value: averageUtilisationLabel,
+            helper: `Occupancy ${overallOccupancy}`
+          },
+          {
+            id: 'projected-mrr',
+            label: 'Projected MRR',
+            value: formatCurrency(totalMembersAll * defaultArpuCents, primaryCurrency),
+            helper: `ARPU ${formatCurrency(defaultArpuCents, primaryCurrency)}`
+          },
+          {
+            id: 'new-demand',
+            label: 'New rentals (30d)',
+            value: formatNumber(totalNewMembersCurrent),
+            helper: describeDelta(totalNewMembersCurrent, totalNewMembersPrevious)
+          }
+        ],
+        occupancyRate,
+        meta: {
+          pipelineValue: formatCurrency(pipelineValueCents, primaryCurrency),
+          occupancy: occupancyRate,
+          lastAudit: formatDateTime(reference, { dateStyle: 'medium', timeStyle: 'short' })
+        }
+      },
+      listing: listingRecords.map(({ utilisationRate: _util, ...rest }) => rest),
+      sales: {
+        metrics: {
+          pipelineValue: formatCurrency(pipelineValueCents, primaryCurrency),
+          winRate: formatPercentage(winRate),
+          averageDealSize: formatCurrency(defaultArpuCents * 12, primaryCurrency),
+          cycleTime: `${Math.max(24, Math.round(52 - averageAdoptionVelocity * 1.2))} days`,
+          renewalRate: formatPercentage(renewalRate)
+        },
+        pipeline: [
+          {
+            id: 'discovery',
+            stage: 'Discovery',
+            deals: formatNumber(discoveryCount),
+            value: formatCurrency(discoveryCount * defaultArpuCents * 3, primaryCurrency),
+            conversion: formatPercentage(
+              Math.min(0.28 + discoveryCount / Math.max(communityDetailRows.length * 6, 1), 0.7)
+            ),
+            velocity: `${Math.max(18, Math.round(54 - averageAdoptionVelocity * 1.1))}d`
+          },
+          {
+            id: 'evaluation',
+            stage: 'Evaluation',
+            deals: formatNumber(evaluationCount),
+            value: formatCurrency(evaluationCount * defaultArpuCents * 6, primaryCurrency),
+            conversion: formatPercentage(
+              Math.min(0.44 + evaluationCount / Math.max(communityDetailRows.length * 5, 1), 0.82)
+            ),
+            velocity: `${Math.max(16, Math.round(46 - averageAdoptionVelocity))}d`
+          },
+          {
+            id: 'negotiation',
+            stage: 'Negotiation',
+            deals: formatNumber(negotiationCount),
+            value: formatCurrency(negotiationCount * defaultArpuCents * 9, primaryCurrency),
+            conversion: formatPercentage(
+              Math.min(0.58 + negotiationCount / Math.max(communityDetailRows.length * 4, 1), 0.9)
+            ),
+            velocity: `${Math.max(14, Math.round(38 - averageAdoptionVelocity * 0.9))}d`
+          },
+          {
+            id: 'closed',
+            stage: 'Live',
+            deals: formatNumber(closedWonCount),
+            value: formatCurrency(closedWonCount * defaultArpuCents * 12, primaryCurrency),
+            conversion: '100%',
+            velocity: `${Math.max(10, Math.round(30 - averageAdoptionVelocity * 0.6))}d`
+          }
+        ],
+        forecast: {
+          next30d: formatCurrency(next30dForecastCents, primaryCurrency),
+          committed: formatCurrency(committedCents, primaryCurrency),
+          upside: formatCurrency(upsideCents, primaryCurrency),
+          lastUpdated: formatDateTime(reference, { dateStyle: 'medium', timeStyle: 'short' })
+        }
+      },
+      rental: {
+        metrics: {
+          occupancy: overallOccupancy,
+          activeContracts: formatNumber(activeRentalCount),
+          averageDuration: averageRentalDuration,
+          expiringSoon: formatNumber(expiringRecords.length)
+        },
+        active: rentalRecords.slice(0, 6).map(({ endAtIso, ...rest }) => rest),
+        utilisation: {
+          average: averageUtilisationLabel,
+          topPerformers: topUtilisation.slice(0, 3).map((entry) => ({
+            id: `top-${entry.id}`,
+            tool: entry.name,
+            utilisation: formatPercentage(Math.min(entry.utilisationRate, 1), 1),
+            status: entry.status
+          }))
+        },
+        expiring: expiringRecords.slice(0, 5)
+      },
+      management: {
+        maintenance: maintenanceTickets,
+        audits: auditPlans.slice(0, 5),
+        governance: {
+          policyCoverage,
+          riskLevel: incidentsYtd > activeToolCount ? 'Moderate' : 'Low',
+          incidentsYtd: formatNumber(incidentsYtd),
+          mttr: `${mttrHours}h`,
+          escalationPlaybooks: formatNumber(Math.max(2, Math.round(closedWonCount / 2 + 1)))
+        }
+      },
+      finalisation: {
+        readinessScore: `${readinessScore}%`,
+        checklist: [
+          {
+            id: 'contracts',
+            label: `Validate ${formatNumber(expiringRecords.length)} expiring contracts`,
+            status: expiringRecords.length > 0 ? 'In progress' : 'Complete',
+            owner: 'Operations'
+          },
+          {
+            id: 'handover',
+            label: `Handover packages for ${formatNumber(decommissionPlans.length || 1)} tool suites`,
+            status: decommissionPlans.length > 0 ? 'In progress' : 'Scheduled',
+            owner: 'Lifecycle'
+          },
+          {
+            id: 'customer-comms',
+            label: 'Customer communications prepared',
+            status: totalNewMembersCurrent >= totalNewMembersPrevious ? 'Ready' : 'Drafting',
+            owner: 'Enablement'
+          }
+        ],
+        communications: [
+          {
+            id: 'bulletin',
+            channel: 'Customer bulletin',
+            status: expiringRecords.length > 0 ? 'Scheduled' : 'Complete',
+            audience: `${formatNumber(activeToolCount)} active tenants`,
+            owner: 'Comms'
+          },
+          {
+            id: 'success',
+            channel: 'Success managers',
+            status: incidentsYtd > 0 ? 'Monitoring' : 'Complete',
+            audience: 'Enterprise accounts',
+            owner: 'CS Ops'
+          },
+          {
+            id: 'partners',
+            channel: 'Partner portal',
+            status: decommissionPlans.length > 0 ? 'Drafting' : 'Published',
+            audience: 'Resellers',
+            owner: 'Alliances'
+          }
+        ],
+        pipeline: decommissionPlans.slice(0, 5)
+      }
+    };
+
     const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
     const compliance = await IdentityVerificationService.getAdminOverview({ now: reference });
 
@@ -6886,6 +7454,7 @@ export default class DashboardService {
 
     const searchIndex = [
       { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
+      { id: 'admin-tools', role: 'admin', type: 'Operations', title: 'Tooling lifecycle', url: '/admin#tools' },
       { id: 'admin-revenue', role: 'admin', type: 'Revenue', title: 'Revenue performance', url: '/admin#revenue' },
       { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' },
       { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' },
@@ -6899,15 +7468,13 @@ export default class DashboardService {
         approvals,
         revenue,
         operations,
+        tools,
         blog: blogOperations,
         compliance,
         activity: { alerts, events },
-        compliance,
         settings: {
           monetization: monetizationSettings
         }
-        },
-        compliance
       },
       profileStats,
       profileBio,

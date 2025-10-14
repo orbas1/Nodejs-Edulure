@@ -16,6 +16,7 @@ import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
 import AdminTopCommunitiesSection from './admin/sections/AdminTopCommunitiesSection.jsx';
 import AdminUpcomingLaunchesSection from './admin/sections/AdminUpcomingLaunchesSection.jsx';
 import AdminActivitySection from './admin/sections/AdminActivitySection.jsx';
+import AdminToolsSection from './admin/sections/AdminToolsSection.jsx';
 import AdminBlogSection from './admin/sections/AdminBlogSection.jsx';
 import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
@@ -28,6 +29,7 @@ const SECTION_NAVIGATION = Object.freeze([
   { id: 'revenue', label: 'Revenue' },
   { id: 'monetization', label: 'Monetization' },
   { id: 'communities', label: 'Communities' },
+  { id: 'tools', label: 'Tools' },
   { id: 'operations', label: 'Operations' },
   { id: 'blog', label: 'Blog' },
   { id: 'compliance', label: 'Compliance' },
@@ -154,6 +156,7 @@ export default function Admin() {
   const risk = operations.risk ?? EMPTY_OBJECT;
   const platform = operations.platform ?? EMPTY_OBJECT;
   const upcomingLaunches = operations.upcomingLaunches ?? EMPTY_ARRAY;
+  const tools = adminData.tools ?? EMPTY_OBJECT;
 
   const compliance = adminData.compliance ?? EMPTY_OBJECT;
   const complianceMetrics = compliance.metrics ?? EMPTY_ARRAY;
@@ -334,6 +337,7 @@ export default function Admin() {
   const handleOpenAnalytics = useCallback(() => navigate('/analytics'), [navigate]);
 
   const sectionNavigation = useMemo(() => SECTION_NAVIGATION, []);
+  const toolsData = useMemo(() => tools, [tools]);
 
   if (!adminConsoleEnabled && !overallLoading) {
     return (
@@ -505,6 +509,8 @@ export default function Admin() {
               communities={topCommunities}
               formatNumber={formatNumber}
             />
+
+            <AdminToolsSection sectionId="tools" tools={toolsData} />
 
             <AdminOperationsSection
               sectionId="operations"
