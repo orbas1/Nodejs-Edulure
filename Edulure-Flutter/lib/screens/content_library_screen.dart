@@ -25,6 +25,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
   bool _marketplaceLoading = true;
   String? _marketplaceError;
   String? _purchaseStatus;
+  String? _pendingPurchaseId;
 
   @override
   void initState() {
@@ -48,6 +49,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
     setState(() {
       _loading = true;
       _purchaseStatus = null;
+      _pendingPurchaseId = null;
     });
     try {
       final assets = await _service.fetchAssets();
@@ -86,6 +88,198 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
         setState(() => _marketplaceLoading = false);
       }
     }
+  }
+
+  Future<void> _attemptPurchase(EbookMarketplaceItem item) async {
+    final token = SessionManager.getAccessToken();
+    if (token == null) {
+      if (!mounted) return;
+      setState(() {
+        _purchaseStatus = 'Sign in to purchase premium titles.';
+        _pendingPurchaseId = null;
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _pendingPurchaseId = item.id;
+        _purchaseStatus = 'Creating secure checkout for ${item.title}…';
+      });
+    }
+
+    try {
+      final intent = await _service.createEbookPurchaseIntent(item.id);
+      if (!mounted) return;
+      setState(() {
+        _purchaseStatus = 'Checkout created. Payment ID ${intent.paymentId}';
+        _pendingPurchaseId = null;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _purchaseStatus = 'Unable to start checkout: $error';
+        _pendingPurchaseId = null;
+      });
+    }
+  }
+
+  Widget _buildMarketplaceHighlights(BuildContext context) {
+    if (_marketplace.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final highlights = _marketplace.take(3).toList();
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Featured drops',
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: _brandPrimaryDark,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 210,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: highlights.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 16),
+            itemBuilder: (context, index) {
+              final item = highlights[index];
+              final pending = _pendingPurchaseId == item.id;
+              return Container(
+                width: 240,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      _brandPrimary.withOpacity(0.12),
+                      Colors.white,
+                      _brandPrimary.withOpacity(0.08),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: _brandPrimary.withOpacity(0.18)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _brandPrimary.withOpacity(0.12),
+                      blurRadius: 28,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Featured drop',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: _brandPrimaryDark,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: _brandPrimaryDark,
+                          ),
+                        ),
+                        if (item.subtitle != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            item.subtitle!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.blueGrey.shade600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.price,
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Downloads · ${item.downloads}',
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: pending ? null : () => _attemptPurchase(item),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _brandPrimaryDark,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                          child: Text(pending ? 'Preparing…' : 'Secure checkout'),
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildMarketplaceEmptyState(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: _brandSurface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: _brandPrimary.withOpacity(0.1)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.menu_book_outlined, size: 40, color: _brandPrimaryDark),
+            const SizedBox(height: 12),
+            Text(
+              'Marketplace is getting ready',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'We are onboarding new author releases. Pull to refresh for the latest drops.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blueGrey),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _download(ContentAsset asset) async {
@@ -362,96 +556,85 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                   textAlign: TextAlign.center,
                                 ),
                               )
-                            : ListView.builder(
-                                physics: const BouncingScrollPhysics(),
-                                itemCount: _marketplace.length,
-                                itemBuilder: (context, index) {
-                                  final item = _marketplace[index];
-                                  return Card(
-                                    margin: const EdgeInsets.only(bottom: 16),
-                                    color: Colors.white,
-                                    elevation: 2,
-                                    shadowColor: _brandPrimary.withOpacity(0.06),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                      side: BorderSide(color: _brandPrimary.withOpacity(0.08)),
-                                    ),
-                                    child: ListTile(
-                                      contentPadding: const EdgeInsets.all(20),
-                                      tileColor: Colors.white,
-                                      title: Text(item.title,
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium
-                                              ?.copyWith(fontWeight: FontWeight.w600)),
-                                      subtitle: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (item.subtitle != null)
-                                            Padding(
-                                              padding: const EdgeInsets.only(top: 4),
-                                              child: Text(item.subtitle!,
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .bodySmall
-                                                      ?.copyWith(color: Colors.blueGrey)),
-                                            ),
-                                          Padding(
-                                            padding: const EdgeInsets.only(top: 8),
-                                            child: Text('Downloads · ${item.downloads.toString()}',
+                            : _marketplace.isEmpty
+                                ? _buildMarketplaceEmptyState(context)
+                                : ListView(
+                                    physics: const BouncingScrollPhysics(),
+                                    children: [
+                                      _buildMarketplaceHighlights(context),
+                                      ..._marketplace.map((item) {
+                                        final pending = _pendingPurchaseId == item.id;
+                                        return Card(
+                                          margin: const EdgeInsets.only(bottom: 16),
+                                          color: Colors.white,
+                                          elevation: 2,
+                                          shadowColor: _brandPrimary.withOpacity(0.06),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(20),
+                                            side: BorderSide(color: _brandPrimary.withOpacity(0.08)),
+                                          ),
+                                          child: ListTile(
+                                            contentPadding: const EdgeInsets.all(20),
+                                            tileColor: Colors.white,
+                                            title: Text(item.title,
                                                 style: Theme.of(context)
                                                     .textTheme
-                                                    .bodySmall
-                                                    ?.copyWith(color: Colors.blueGrey)),
-                                          ),
-                                        ],
-                                      ),
-                                      trailing: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.end,
-                                        children: [
-                                          Text(item.price,
-                                              style: Theme.of(context)
-                                                  .textTheme
-                                                  .titleSmall
-                                                  ?.copyWith(fontWeight: FontWeight.bold)),
-                                          const SizedBox(height: 8),
-                                          FilledButton(
-                                            onPressed: () async {
-                                              if (token == null) {
-                                                setState(() {
-                                                  _purchaseStatus = 'Sign in to purchase premium titles.';
-                                                });
-                                                return;
-                                              }
-                                              try {
-                                                final intent = await _service.createEbookPurchaseIntent(item.id);
-                                                setState(() {
-                                                  _purchaseStatus =
-                                                      'Checkout created. Payment ID ${intent.paymentId}';
-                                                });
-                                              } catch (error) {
-                                                setState(() {
-                                                  _purchaseStatus = 'Unable to start checkout: $error';
-                                                });
-                                              }
-                                            },
-                                            style: FilledButton.styleFrom(
-                                              backgroundColor: _brandPrimary,
-                                              foregroundColor: Colors.white,
-                                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.circular(999),
-                                              ),
+                                                    .titleMedium
+                                                    ?.copyWith(fontWeight: FontWeight.w600)),
+                                            subtitle: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                if (item.subtitle != null)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(top: 4),
+                                                    child: Text(item.subtitle!,
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(color: Colors.blueGrey)),
+                                                  ),
+                                                Padding(
+                                                  padding: const EdgeInsets.only(top: 8),
+                                                  child: Text('Downloads · ${item.downloads.toString()}',
+                                                      style: Theme.of(context)
+                                                          .textTheme
+                                                          .bodySmall
+                                                          ?.copyWith(color: Colors.blueGrey)),
+                                                ),
+                                              ],
                                             ),
-                                            child: const Text('Purchase'),
-                                          )
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
+                                            trailing: Column(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              crossAxisAlignment: CrossAxisAlignment.end,
+                                              children: [
+                                                Text(item.price,
+                                                    style: Theme.of(context)
+                                                        .textTheme
+                                                        .titleSmall
+                                                        ?.copyWith(fontWeight: FontWeight.bold)),
+                                                const SizedBox(height: 8),
+                                                FilledButton(
+                                                  onPressed:
+                                                      pending ? null : () => _attemptPurchase(item),
+                                                  style: FilledButton.styleFrom(
+                                                    backgroundColor: _brandPrimary,
+                                                    foregroundColor: Colors.white,
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 20, vertical: 12),
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius: BorderRadius.circular(999),
+                                                    ),
+                                                  ),
+                                                  child: Text(pending ? 'Preparing…' : 'Secure checkout'),
+                                                )
+                                              ],
+                                            ),
+                                          ),
+                                        );
+                                      }).toList(),
+                                      const SizedBox(height: 12),
+                                    ],
+                                  ),
                   ),
                 ],
               ),
