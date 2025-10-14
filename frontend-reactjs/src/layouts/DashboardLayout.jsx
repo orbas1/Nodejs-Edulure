@@ -14,7 +14,8 @@ import {
   PlayCircleIcon,
   Squares2X2Icon,
   UserGroupIcon,
-  UsersIcon
+  UsersIcon,
+  VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useDashboard } from '../context/DashboardContext.jsx';
@@ -26,6 +27,7 @@ const navigationByRole = {
     { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
+    { name: 'Live classrooms', to: `${basePath}/live-classes`, icon: VideoCameraIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
@@ -37,6 +39,7 @@ const navigationByRole = {
     { name: 'Create community', to: `${basePath}/communities/create`, icon: UserGroupIcon },
     { name: 'Manage communities', to: `${basePath}/communities/manage`, icon: Cog6ToothIcon },
     { name: 'Webinars', to: `${basePath}/communities/webinars`, icon: PlayCircleIcon },
+    { name: 'Live classrooms', to: `${basePath}/live-classes`, icon: VideoCameraIcon },
     { name: 'Podcasts', to: `${basePath}/communities/podcasts`, icon: MicrophoneIcon },
     { name: 'Create course', to: `${basePath}/courses/create`, icon: DocumentTextIcon },
     { name: 'Recorded library', to: `${basePath}/courses/library`, icon: PlayCircleIcon },
