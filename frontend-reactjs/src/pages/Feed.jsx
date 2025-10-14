@@ -16,6 +16,7 @@ import FeedSponsoredCard from '../components/FeedSponsoredCard.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import CommunityHero from '../components/CommunityHero.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useAuthorization } from '../hooks/useAuthorization.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -75,6 +76,7 @@ const FEATURED_CREATORS = [
 export default function Feed() {
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken;
+  const { canAccessCommunityFeed, canPostToCommunities, canJoinCommunities } = useAuthorization();
 
   const [communities, setCommunities] = useState([ALL_COMMUNITIES_NODE]);
   const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
@@ -161,7 +163,7 @@ export default function Feed() {
 
   const loadFeed = useCallback(
     async ({ page = 1, append = false, queryOverride } = {}) => {
-      if (!token) return;
+      if (!token || !canAccessCommunityFeed) return;
       const isAggregate = selectedCommunity?.id === 'all';
       const setLoading = append ? setIsLoadingMore : setIsLoadingFeed;
       const queryTerm = queryOverride !== undefined ? queryOverride : searchQueryRef.current;
@@ -198,12 +200,12 @@ export default function Feed() {
         setLoading(false);
       }
     },
-    [selectedCommunity, token]
+    [selectedCommunity, token, canAccessCommunityFeed]
   );
 
   const loadCommunityDetail = useCallback(
     async (communityId) => {
-      if (!token || !communityId) {
+      if (!token || !communityId || !canAccessCommunityFeed) {
         setCommunityDetail(null);
         setCommunityDetailError(null);
         setResources([]);
@@ -267,14 +269,14 @@ export default function Feed() {
         setIsLoadingResources(false);
       }
     },
-    [token]
+    [token, canAccessCommunityFeed]
   );
 
   useEffect(() => {
-    if (!token) return;
+    if (!token || !canAccessCommunityFeed) return;
     loadFeed({ page: 1, append: false });
     loadCommunityDetail(selectedCommunity?.id);
-  }, [selectedCommunity, token, loadFeed, loadCommunityDetail]);
+  }, [selectedCommunity, token, loadFeed, loadCommunityDetail, canAccessCommunityFeed]);
 
   const canLoadMore = feedMeta.page < feedMeta.pageCount;
   const handleLoadMore = () => {
@@ -314,6 +316,10 @@ export default function Feed() {
 
   const handleJoinCommunity = async () => {
     if (!token || !communityDetail?.id) return;
+    if (!canJoinCommunities) {
+      setJoinError('Your role does not have permission to join communities directly. Please contact an administrator.');
+      return;
+    }
     setJoinError(null);
     setIsJoiningCommunity(true);
 
@@ -347,6 +353,9 @@ export default function Feed() {
   };
 
   const handlePostCreated = async () => {
+    if (!canPostToCommunities) {
+      return;
+    }
     await loadFeed({ page: 1, append: false, queryOverride: searchQuery });
     if (selectedCommunity?.id && selectedCommunity.id !== 'all') {
       await loadCommunityDetail(selectedCommunity.id);
@@ -354,7 +363,7 @@ export default function Feed() {
   };
 
   const loadMoreResources = useCallback(async () => {
-    if (!token) return;
+    if (!token || !canAccessCommunityFeed) return;
     const communityId = selectedCommunity?.id;
     if (!communityId || communityId === 'all') return;
     if (resources.length >= resourcesMeta.total) return;
@@ -380,9 +389,27 @@ export default function Feed() {
     } finally {
       setIsLoadingResources(false);
     }
-  }, [token, selectedCommunity, resources.length, resourcesMeta]);
+  }, [token, selectedCommunity, resources.length, resourcesMeta, canAccessCommunityFeed]);
 
   const hasMoreResources = resourcesMeta.total > resources.length;
+
+  if (!canAccessCommunityFeed) {
+    return (
+      <div className="bg-slate-50/80 py-24">
+        <div className="mx-auto max-w-2xl rounded-4xl border border-slate-200 bg-white px-8 py-12 text-center shadow-card">
+          <h1 className="text-2xl font-semibold text-slate-900">Community feed unavailable</h1>
+          <p className="mt-4 text-sm text-slate-600">
+            Your current role does not provide access to the enterprise community feed or its related workspaces. Reach out to
+            your platform administrator to request the appropriate permissions.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const joinDisabledReason = canJoinCommunities
+    ? null
+    : 'Your current role is limited to read-only access. Contact an administrator to manage membership changes.';
 
   return (
     <div className="bg-slate-50/70 py-16">
@@ -443,17 +470,24 @@ export default function Feed() {
             onJoin={communityDetail?.membership?.status === 'active' ? null : handleJoinCommunity}
             isJoining={isJoiningCommunity}
             joinError={joinError}
+            canJoin={canJoinCommunities}
+            joinDisabledReason={joinDisabledReason}
           />
         )}
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
           <div className="space-y-6">
-            {isAuthenticated && (
+            {isAuthenticated && canPostToCommunities && (
               <FeedComposer
                 communities={composerCommunities}
                 defaultCommunityId={composerDefaultCommunityId}
-                disabled={isLoadingCommunities}
+                disabled={isLoadingCommunities || !canPostToCommunities}
                 onPostCreated={handlePostCreated}
               />
+            )}
+            {isAuthenticated && !canPostToCommunities && (
+              <div className="rounded-3xl border border-slate-200 bg-white/70 p-6 text-sm text-slate-600">
+                Your workspace is configured for read-only visibility. Ask an administrator to enable community posting access.
+              </div>
             )}
             <div className="space-y-4">
               {isLoadingFeed && !isLoadingMore ? (

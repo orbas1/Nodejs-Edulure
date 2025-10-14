@@ -10,9 +10,9 @@ export default function SkewedMenu({ activeState = 'all', onSelect, activeItem }
   const items = menuStates[activeState];
 
   return (
-    <div className="relative overflow-hidden">
-      <div className="absolute inset-y-0 left-0 w-1/5 -skew-x-12 bg-primary/10" aria-hidden />
-      <nav className="relative flex flex-wrap gap-3 py-4">
+    <div className="relative overflow-hidden rounded-3xl bg-white/70">
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-1/5 -skew-x-12 bg-primary/10" aria-hidden />
+      <nav className="relative flex gap-3 overflow-x-auto py-4" aria-label={`${activeState} navigation`}>
         {items.map((item) => {
           const isActive = activeItem === item;
           return (

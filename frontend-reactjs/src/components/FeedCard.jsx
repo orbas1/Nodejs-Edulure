@@ -50,8 +50,8 @@ export default function FeedCard({ post }) {
             </div>
             <span className="text-xs font-semibold uppercase tracking-wide text-primary">{publishedLabel}</span>
           </div>
-          {post.title && <h4 className="mt-4 text-sm font-semibold text-slate-900">{post.title}</h4>}
-          <p className="mt-3 text-sm leading-6 text-slate-700">{post.body}</p>
+          {post.title && <h4 className="mt-4 break-words text-sm font-semibold text-slate-900">{post.title}</h4>}
+          <p className="mt-3 break-words text-sm leading-6 text-slate-700">{post.body}</p>
           {tags.length > 0 && (
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium text-primary">
               {tags.map((tag) => (
