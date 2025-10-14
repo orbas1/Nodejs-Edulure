@@ -18,8 +18,7 @@ import {
   UserGroupIcon,
   UsersIcon,
   Bars3Icon,
-  XMarkIcon
-  ShieldCheckIcon
+  XMarkIcon,
   VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
@@ -61,7 +60,7 @@ const navigationByRole = {
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },
-    { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
+    { name: 'Fixnado Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
     { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon }
   ],
   admin: (basePath) => [
@@ -74,8 +73,8 @@ const navigationByRole = {
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
     { name: 'Platform ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
-    { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon }
-    { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
+    { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon },
+    { name: 'Fixnado Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
   ],
   community: (basePath) => [
     { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
