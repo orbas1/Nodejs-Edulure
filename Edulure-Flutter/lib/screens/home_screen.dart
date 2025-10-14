@@ -119,6 +119,17 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.videocam_outlined),
+                    title: const Text('Live classrooms'),
+                    subtitle: const Text('Preview upcoming rooms, whiteboards, and facilitator readiness.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      final role = SessionManager.getActiveRole();
+                      final target = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
+                      Navigator.pushNamed(context, target);
+                    },
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.travel_explore_outlined),
                     title: const Text('Explorer intelligence'),
                     subtitle: const Text('Search cohorts, talent, and campaigns across the network.'),
@@ -592,11 +603,44 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       _RoleAction(icon: Icons.settings_outlined, label: 'Settings', route: '/settings'),
     ],
   ),
+  'community': _RoleHomeDetails(
+    heroTitle: 'Steward thriving communities',
+    heroSubtitle: 'Monitor rituals, incidents, and monetisation signals from your command deck.',
+    heroGradient: [Color(0xFF312E81), Color(0xFF6366F1)],
+    features: [
+      _RoleFeature(
+        icon: Icons.groups_3_outlined,
+        title: 'Community health',
+        description: 'Track member activity, pending approvals, and moderator coverage.',
+      ),
+      _RoleFeature(
+        icon: Icons.auto_mode_outlined,
+        title: 'Operations runbooks',
+        description: 'Activate escalation playbooks and measure automation readiness.',
+      ),
+      _RoleFeature(
+        icon: Icons.campaign_outlined,
+        title: 'Growth telemetry',
+        description: 'Review premium tiers, experiments, and communications insights.',
+      ),
+    ],
+    actions: [
+      _RoleAction(icon: Icons.dashboard_outlined, label: 'Open community dashboard', route: '/dashboard/community'),
+      _RoleAction(icon: Icons.calendar_month_outlined, label: 'Review programming', route: '/dashboard/community'),
+      _RoleAction(icon: Icons.campaign_outlined, label: 'Plan broadcasts', route: '/inbox'),
+      _RoleAction(icon: Icons.assignment_turned_in_outlined, label: 'Manage runbooks', route: '/content'),
+    ],
+  ),
   'instructor': _RoleHomeDetails(
     heroTitle: 'Guide every cohort with confidence',
     heroSubtitle: 'Launch community updates, manage bookings, and iterate your curriculum.',
     heroGradient: [Color(0xFF0EA5E9), Color(0xFF6366F1)],
     features: [
+      _RoleFeature(
+        icon: Icons.videocam_outlined,
+        title: 'Live classrooms mission control',
+        description: 'Track occupancy, security, and facilitator readiness for every broadcast.',
+      ),
       _RoleFeature(
         icon: Icons.analytics_outlined,
         title: 'Operational analytics',
@@ -615,7 +659,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
     ],
     actions: [
       _RoleAction(icon: Icons.travel_explore_outlined, label: 'Launch explorer', route: '/explorer'),
-      _RoleAction(icon: Icons.dashboard_customize_outlined, label: 'Open instructor dashboard', route: '/instructor-dashboard'),
+      _RoleAction(icon: Icons.videocam_outlined, label: 'Manage live classrooms', route: '/instructor-dashboard'),
       _RoleAction(icon: Icons.add_circle_outline, label: 'Create course', route: '/content'),
       _RoleAction(icon: Icons.message_outlined, label: 'Open inbox', route: '/feed'),
       _RoleAction(icon: Icons.schedule_outlined, label: 'Plan lesson', route: '/profile'),
@@ -658,6 +702,8 @@ String _roleLabel(String role) {
       return 'Instructor';
     case 'admin':
       return 'Administrator';
+    case 'community':
+      return 'Community';
     default:
       return 'Learner';
   }
@@ -666,9 +712,9 @@ String _roleLabel(String role) {
 List<String> _resolveRolesForUser(String role) {
   switch (role) {
     case 'admin':
-      return const ['admin', 'instructor', 'user'];
+      return const ['admin', 'community', 'instructor', 'user'];
     case 'instructor':
-      return const ['instructor', 'user'];
+      return const ['community', 'instructor', 'user'];
     default:
       return const ['user'];
   }

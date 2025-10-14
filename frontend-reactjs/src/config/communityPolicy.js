@@ -31,6 +31,30 @@ export const COMMUNITY_ROLE_POLICY = {
     canManageSubscriptions: false,
     canViewLocations: true
   },
+  owner: {
+    canViewFeed: true,
+    canPost: true,
+    canJoin: true,
+    canModerate: true,
+    canManageSubscriptions: true,
+    canViewLocations: true
+  },
+  member: {
+    canViewFeed: true,
+    canPost: true,
+    canJoin: false,
+    canModerate: false,
+    canManageSubscriptions: false,
+    canViewLocations: true
+  },
+  'non-member': {
+    canViewFeed: true,
+    canPost: false,
+    canJoin: true,
+    canModerate: false,
+    canManageSubscriptions: false,
+    canViewLocations: false
+  },
   guest: {
     canViewFeed: false,
     canPost: false,

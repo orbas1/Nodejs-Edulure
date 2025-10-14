@@ -13,6 +13,7 @@ import ContentLibrary from './pages/ContentLibrary.jsx';
 import About from './pages/About.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
+import Communities from './pages/Communities.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
@@ -25,6 +26,7 @@ import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.j
 import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
 import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
 import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
+import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
 import InstructorCommunityCreate from './pages/dashboard/InstructorCommunityCreate.jsx';
 import InstructorCommunityManage from './pages/dashboard/InstructorCommunityManage.jsx';
 import InstructorCommunityWebinars from './pages/dashboard/InstructorCommunityWebinars.jsx';
@@ -34,11 +36,18 @@ import InstructorCourseLibrary from './pages/dashboard/InstructorCourseLibrary.j
 import InstructorCourseManage from './pages/dashboard/InstructorCourseManage.jsx';
 import InstructorLessonSchedule from './pages/dashboard/InstructorLessonSchedule.jsx';
 import InstructorTutorSchedule from './pages/dashboard/InstructorTutorSchedule.jsx';
+import InstructorTutorManagement from './pages/dashboard/InstructorTutorManagement.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
 import InstructorAds from './pages/dashboard/InstructorAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
 import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
+import CommunityOverview from './pages/dashboard/community/CommunityOverview.jsx';
+import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
+import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
+import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
+import CommunitySafety from './pages/dashboard/community/CommunitySafety.jsx';
+import CommunityCommunications from './pages/dashboard/community/CommunityCommunications.jsx';
 
 function App() {
   return (
@@ -48,6 +57,14 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/instructor" element={<InstructorRegister />} />
+        <Route
+          path="/communities"
+          element={(
+            <ProtectedRoute allowedRoles={['admin', 'moderator', 'owner', 'member', 'non-member']}>
+              <Communities />
+            </ProtectedRoute>
+          )}
+        />
         <Route
           path="/feed"
           element={(
@@ -113,11 +130,52 @@ function App() {
         <Route path="communities" element={<LearnerCommunities />} />
         <Route path="courses" element={<LearnerCourses />} />
         <Route path="courses/:courseId" element={<CourseViewer />} />
+        <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
         <Route path="calendar" element={<DashboardCalendar />} />
         <Route path="bookings" element={<DashboardBookingsSwitch />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
+        <Route
+          path="operations"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityOperations />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="programming"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityProgramming />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="monetisation"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityMonetisation />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="safety"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunitySafety />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="communications"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityCommunications />
+            </ProtectedRoute>
+          )}
+        />
         <Route path="communities/create" element={<InstructorCommunityCreate />} />
         <Route path="communities/manage" element={<InstructorCommunityManage />} />
         <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />
@@ -129,6 +187,7 @@ function App() {
         <Route path="pricing" element={<InstructorPricing />} />
         <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
+        <Route path="tutor-management" element={<InstructorTutorManagement />} />
         <Route
           path="ebooks/create"
           element={(
@@ -139,6 +198,14 @@ function App() {
         />
         <Route path="ads" element={<InstructorAds />} />
         <Route path="settings" element={<DashboardSettings />} />
+        <Route
+          path="ads"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <InstructorAds />
+            </ProtectedRoute>
+          )}
+        />
       </Route>
     </Routes>
   );

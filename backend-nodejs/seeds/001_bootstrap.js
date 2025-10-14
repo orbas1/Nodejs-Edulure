@@ -804,7 +804,138 @@ export async function seed(knex) {
       is_published: true,
       release_at: trx.fn.now(),
       status: 'published',
-      metadata: JSON.stringify({ syllabusVersion: '2024-Q4', analyticsKey: 'ops-masterclass' })
+      metadata: JSON.stringify({
+        syllabusVersion: '2024-Q4',
+        analyticsKey: 'ops-masterclass',
+        dripCampaign: {
+          cadence: 'weekly',
+          anchor: 'enrollment-date',
+          timezone: 'America/New_York',
+          segments: ['Foundational cohort', 'Advanced operators'],
+          modules: [
+            {
+              moduleSlug: 'launch-command-center',
+              releaseOffsetDays: 0,
+              releaseWindow: 'Mondays 09:00 ET',
+              gating: 'Immediate access',
+              notifications: ['Email 24h before', 'Slack reminder 1h before'],
+              workspace: 'Ops Launch HQ'
+            },
+            {
+              moduleSlug: 'incident-simulation-drills',
+              releaseOffsetDays: 7,
+              releaseWindow: 'Mondays 09:00 ET',
+              gating: 'Requires Module 1 completion',
+              notifications: ['Email 24h before', 'SMS 2h before'],
+              workspace: 'Ops Launch HQ'
+            }
+          ]
+        },
+        refresherLessons: [
+          {
+            id: 'refresh-ops-sim',
+            title: 'Quarterly incident rehearsal',
+            format: 'Live simulation',
+            cadence: 'Quarterly',
+            owner: 'Kai Watanabe',
+            status: 'Scheduled',
+            nextSessionAt: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+            channel: 'Zoom studio',
+            enrollmentWindow: 'Opens 14 days prior'
+          },
+          {
+            id: 'refresh-ops-audit',
+            title: 'Automation audit checklist',
+            format: 'Async module',
+            cadence: 'Bi-annual',
+            owner: 'Kai Watanabe',
+            status: 'Draft',
+            nextSessionAt: null,
+            channel: 'Learning hub',
+            enrollmentWindow: 'Self-paced access'
+          }
+        ],
+        videoLibrary: [
+          {
+            id: 'vid-command-tour',
+            title: 'Command center war room tour',
+            durationMinutes: 18,
+            quality: '1080p',
+            sizeMb: 942,
+            status: 'Encoded',
+            updatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+            language: 'English',
+            aspectRatio: '16:9'
+          },
+          {
+            id: 'vid-incident-sim',
+            title: 'Incident drill facilitation',
+            durationMinutes: 27,
+            quality: '4K',
+            sizeMb: 1460,
+            status: 'Quality review',
+            updatedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            language: 'English',
+            aspectRatio: '16:9'
+          }
+        ],
+        catalogueListings: [
+          {
+            id: 'catalog-marketplace',
+            channel: 'Marketplace',
+            status: 'Published',
+            impressions: 18452,
+            conversions: 136,
+            conversionRate: 0.0737,
+            price: 129900,
+            currency: 'USD',
+            lastSyncedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            id: 'catalog-enterprise',
+            channel: 'Enterprise network',
+            status: 'Pilot',
+            impressions: 42,
+            conversions: 10,
+            conversionRate: 0.238,
+            price: 189900,
+            currency: 'USD',
+            lastSyncedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        ],
+        reviews: [
+          {
+            id: 'review-launchhub',
+            reviewer: 'Lina Gomez',
+            role: 'Director of Operations',
+            company: 'LaunchHub',
+            rating: 5,
+            headline: 'Launch readiness transformed our go-live',
+            feedback:
+              'The drip sequencing and rehearsal cadences meant our entire ops guild showed up prepared. We saw a 38% reduction in launch escalations.',
+            submittedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+            delivery: 'Cohort',
+            experience: 'Web and mobile parity'
+          },
+          {
+            id: 'review-ops-guild',
+            reviewer: 'Ops Guild Collective',
+            role: 'Peer review board',
+            company: 'Ops Guild',
+            rating: 4.6,
+            headline: 'Enterprise-grade runbook system',
+            feedback:
+              'Module creation workflows and refresher loops were robust enough for our multi-market programme. Mobile execution matched the desktop experience.',
+            submittedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            delivery: 'Hybrid cohort',
+            experience: 'Mobile parity certified'
+          }
+        ],
+        mobileParity: {
+          status: 'Aligned',
+          experiences: ['drip modules', 'refresher lessons', 'recorded videos']
+        }
+      })
     });
 
     const [opsModuleKickoffId] = await trx('course_modules').insert({
@@ -813,7 +944,21 @@ export async function seed(knex) {
       slug: 'launch-command-center',
       position: 1,
       release_offset_days: 0,
-      metadata: JSON.stringify({ recommendedDurationMinutes: 120 })
+      metadata: JSON.stringify({
+        recommendedDurationMinutes: 120,
+        drip: {
+          gating: 'Immediate access',
+          prerequisites: [],
+          notifications: ['Email 24h before release'],
+          workspace: 'Ops Launch HQ'
+        },
+        creation: {
+          owner: 'Kai Watanabe',
+          status: 'Approved',
+          lastUpdatedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          qualityGate: 'QA passed'
+        }
+      })
     });
 
     const [opsModuleIncidentId] = await trx('course_modules').insert({
@@ -822,7 +967,21 @@ export async function seed(knex) {
       slug: 'incident-simulation-drills',
       position: 2,
       release_offset_days: 7,
-      metadata: JSON.stringify({ hasSimulation: true })
+      metadata: JSON.stringify({
+        hasSimulation: true,
+        drip: {
+          gating: 'Requires Module 1 completion',
+          prerequisites: ['Launch Command Center'],
+          notifications: ['Email 24h before release', 'SMS 2h before release'],
+          workspace: 'Ops Launch HQ'
+        },
+        creation: {
+          owner: 'Kai Watanabe',
+          status: 'In review',
+          lastUpdatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          qualityGate: 'Needs simulation QA'
+        }
+      })
     });
 
     const [commandCenterLessonId] = await trx('course_lessons').insert({
