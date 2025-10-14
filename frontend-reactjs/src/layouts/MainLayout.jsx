@@ -31,7 +31,6 @@ export default function MainLayout() {
         { name: 'Blog', to: '/blog' },
         { name: 'About', to: '/about' }
       ];
-      return [];
     }
 
     const resolvedRole = (session?.user?.role ?? 'learner').toLowerCase();
@@ -44,13 +43,12 @@ export default function MainLayout() {
     const items = [
       { name: 'Home', to: '/' },
       { name: 'Live feed', to: '/feed' },
-      { name: 'Live Feed', to: '/feed' },
       { name: 'Communities', to: '/communities' },
       { name: 'Explorer', to: '/explorer' },
       { name: 'Profile', to: '/profile' },
-      { name: 'Blog', to: '/blog' }
+      { name: 'Blog', to: '/blog' },
       { name: 'Dashboard', to: baseDashboardPath },
-      { name: 'Communities', to: communitiesPath },
+      { name: 'Community workspace', to: communitiesPath },
       { name: 'About', to: '/about' }
     ];
 

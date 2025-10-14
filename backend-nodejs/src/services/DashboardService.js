@@ -426,7 +426,10 @@ export function buildCommunityDashboard({
         severity: metadata.severity ?? 'medium',
         status: metadata.escalation?.status ?? 'triage',
         openedAt: message.deliveredAt ? new Date(message.deliveredAt) : null,
-        owner: metadata.escalation?.owner ?? metadata.moderator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator',
+        owner:
+          metadata.escalation?.owner ??
+          metadata.moderator ??
+          (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator'),
         summary: metadata.summary ?? (metadata.flaggedReason ?? message.body?.slice(0, 120) ?? 'Flagged conversation')
       };
     })
@@ -534,7 +537,8 @@ export function buildCommunityDashboard({
       return {
         id: `resource-${resource.id}`,
         title: resource.title ?? 'Operations playbook',
-        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team',
+        owner:
+          metadata.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team'),
         updatedAt: resource.publishedAt
           ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
           : 'Draft',
@@ -554,7 +558,8 @@ export function buildCommunityDashboard({
       return {
         id: `assignment-${assignment.id}`,
         title: assignment.title ?? 'Operational task',
-        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team',
+        owner:
+          metadata.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team'),
         status: metadata.status ?? 'open',
         due: formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }),
         community: assignment.courseTitle ?? metadata.communityName ?? 'Community'
@@ -568,7 +573,10 @@ export function buildCommunityDashboard({
       id: `event-${session.id}`,
       title: session.title ?? 'Live session',
       date: formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }),
-      facilitator: session.hostName ?? session.metadata?.facilitator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host',
+      facilitator:
+        session.hostName ??
+        session.metadata?.facilitator ??
+        (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host'),
       seats: `${Number(session.reservedSeats ?? 0)}/${Number(session.capacity ?? 0)} booked`,
       status: session.status ?? 'scheduled'
     }));
@@ -853,7 +861,6 @@ export function buildInstructorDashboard({
   ebookRows = [],
   ebookProgressRows = []
 } = {}) {
-}) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const communityStatsMap = new Map();
@@ -873,24 +880,20 @@ export function buildInstructorDashboard({
   const managedCommunities = [];
 
   const upsertManagedCommunity = (communityId, payload) => {
-    const existing = communityLookup.get(communityId);
-    const merged = existing ? { ...existing, ...payload } : payload;
     const merged = { ...(communityLookup.get(communityId) ?? {}), ...payload };
     communityLookup.set(communityId, merged);
     if (!managedCommunityIds.has(communityId)) {
+      managedCommunityIds.add(communityId);
       managedCommunities.push(merged);
-    } else {
-      const index = managedCommunities.findIndex((entry) => Number(entry.communityId) === Number(communityId));
-      if (index !== -1) {
-        managedCommunities[index] = { ...managedCommunities[index], ...merged };
-      const index = managedCommunities.findIndex(
-        (community) => Number(community.communityId) === communityId
-      );
-      if (index !== -1) {
-        managedCommunities[index] = merged;
-      }
+      return;
     }
-    managedCommunityIds.add(communityId);
+
+    const index = managedCommunities.findIndex(
+      (community) => Number(community.communityId) === Number(communityId)
+    );
+    if (index !== -1) {
+      managedCommunities[index] = { ...managedCommunities[index], ...merged };
+    }
   };
 
   communityMemberships.forEach((membership) => {
@@ -1058,27 +1061,20 @@ export function buildInstructorDashboard({
     const resolvedMaxScore = Number(assignment.maxScore ?? metadata.maxScore ?? metadata.points ?? 0);
     const fallbackOwnerName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
     const resolvedOwner = metadata.owner ?? (fallbackOwnerName || user.email);
-    return {
-      id: Number(assignment.id),
-      courseId: Number(assignment.courseId),
-      moduleId: assignment.moduleId ? Number(assignment.moduleId) : null,
-      courseTitle: assignment.courseTitle,
-      title: assignment.title,
-      dueDate,
-      moduleTitle: assignment.moduleTitle,
-      instructions: assignment.instructions ?? metadata.instructions ?? null,
-      maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
-      owner:
-        metadata.owner ??
-        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)),
-      owner: resolvedOwner,
-      owner:
-        metadata.owner ??
-        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()) || user.email),
-      owner: metadata.owner ?? resolveName(user.firstName, user.lastName, user.email),
-      metadata
-    };
-  });
+      return {
+        id: Number(assignment.id),
+        courseId: Number(assignment.courseId),
+        moduleId: assignment.moduleId ? Number(assignment.moduleId) : null,
+        courseTitle: assignment.courseTitle,
+        title: assignment.title,
+        dueDate,
+        moduleTitle: assignment.moduleTitle,
+        instructions: assignment.instructions ?? metadata.instructions ?? null,
+        maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
+        owner: resolvedOwner,
+        metadata
+      };
+    });
 
   const assignmentsByModule = new Map();
   assignmentsNormalised.forEach((assignment) => {
@@ -1222,28 +1218,24 @@ export function buildInstructorDashboard({
     scheduledEnd: booking.scheduledEnd ? new Date(booking.scheduledEnd) : null
   }));
 
-  const pipelineBookings = tutorBookingsNormalised
-    .filter((booking) => booking.status === 'requested')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      status: 'Requested',
-      learner:
-        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
-      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
-      requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
-      topic: booking.metadata.topic ?? 'Mentorship session'
-    }));
+    const pipelineBookings = tutorBookingsNormalised
+      .filter((booking) => booking.status === 'requested')
+      .map((booking) => ({
+        id: `booking-${booking.id}`,
+        status: 'Requested',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
+        topic: booking.metadata.topic ?? 'Mentorship session'
+      }));
 
   const confirmedBookings = tutorBookingsNormalised
     .filter((booking) => booking.status === 'confirmed')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      topic: booking.metadata.topic ?? 'Mentorship session',
-      learner:
-        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
-      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
-      date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
-    }));
+      .map((booking) => ({
+        id: `booking-${booking.id}`,
+        topic: booking.metadata.topic ?? 'Mentorship session',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+      }));
 
   const tutorProfileMap = new Map();
   tutorProfiles.forEach((profile) => {
@@ -1473,45 +1465,32 @@ export function buildInstructorDashboard({
       });
     });
 
-  const normaliseFilename = (name) => {
-    if (!name) return 'Untitled asset';
-    const leaf = name.split('/').pop();
-    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
-  };
+    const normaliseFilename = (name) => {
+      if (!name) return 'Untitled asset';
+      const leaf = name.split('/').pop();
+      return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+    };
 
-  const assetsNormalised = assets.map((asset) => ({
-    ...asset,
-    metadata: safeJsonParse(asset.metadata, {}),
-    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
-    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
-  }));
+    const assetsNormalised = assets.map((asset) => ({
+      ...asset,
+      metadata: safeJsonParse(asset.metadata, {}),
+      createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+      updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+    }));
 
-  const normaliseFilename = (name) => {
-    if (!name) return 'Untitled asset';
-    const leaf = name.split('/').pop();
-    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
-  };
-
-  const assetsNormalised = assets.map((asset) => ({
-    ...asset,
-    metadata: safeJsonParse(asset.metadata, {}),
-    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
-    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
-  }));
-
-  const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
-  const assetEventGroups = new Map();
-  assetEvents.forEach((event) => {
-    const assetId = Number(event.assetId);
-    const list = assetEventGroups.get(assetId) ?? [];
-    const occurredAt = event.occurredAt
-      ? event.occurredAt instanceof Date
-        ? event.occurredAt
-        : new Date(event.occurredAt)
-      : null;
-    list.push({ ...event, occurredAt, metadata: safeJsonParse(event.metadata, {}) });
-    assetEventGroups.set(assetId, list);
-  });
+    const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
+    const assetEventGroups = new Map();
+    assetEvents.forEach((event) => {
+      const assetId = Number(event.assetId);
+      const list = assetEventGroups.get(assetId) ?? [];
+      const occurredAt = event.occurredAt
+        ? event.occurredAt instanceof Date
+          ? event.occurredAt
+          : new Date(event.occurredAt)
+        : null;
+      list.push({ ...event, occurredAt, metadata: safeJsonParse(event.metadata, {}) });
+      assetEventGroups.set(assetId, list);
+    });
 
   const managedCommunityNames = new Set(
     managedCommunities.map((community) => community.communityName?.toLowerCase()).filter(Boolean)
@@ -1619,7 +1598,6 @@ export function buildInstructorDashboard({
         stage,
         progress,
         lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
-        owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor'),
         owner: resolveName(user.firstName, user.lastName, 'Instructor'),
         nextActions,
         reference,
@@ -1994,14 +1972,13 @@ export function buildInstructorDashboard({
       status: assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate, { dateStyle: 'medium', timeStyle: undefined })}` : 'Scheduling',
       type: 'Assignment'
     })),
-    ...upcomingLessons.map((lesson) => ({
-      id: `lesson-${lesson.id}`,
-      asset: `${lesson.courseTitle} · ${lesson.title}`,
-      owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'),
-      owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
-      status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
-      type: 'Lesson'
-    }))
+      ...upcomingLessons.map((lesson) => ({
+        id: `lesson-${lesson.id}`,
+        asset: `${lesson.courseTitle} · ${lesson.title}`,
+        owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
+        status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
+        type: 'Lesson'
+      }))
   ].slice(0, 12);
 
   const library = assetsNormalised
@@ -2169,8 +2146,8 @@ export function buildInstructorDashboard({
           title: lesson.title ?? 'Refresher session',
           format: lesson.format ?? 'Live',
           cadence: lesson.cadence ?? 'Quarterly',
-          owner:
-            lesson.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team',
+            owner:
+              lesson.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team'),
           status: lesson.status ?? 'Planned',
           nextSession: lesson.nextSessionAt
             ? formatDateTime(new Date(lesson.nextSessionAt), { dateStyle: 'medium', timeStyle: 'short' })
@@ -2410,14 +2387,13 @@ export function buildInstructorDashboard({
       callToAction: session.callToAction
     }));
 
-  const lessonSchedule = upcomingLessons.map((lesson) => ({
-    id: `lesson-${lesson.id}`,
-    topic: lesson.title,
-    course: lesson.courseTitle,
-    date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
-    facilitator: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator')
-    facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
-  }));
+    const lessonSchedule = upcomingLessons.map((lesson) => ({
+      id: `lesson-${lesson.id}`,
+      topic: lesson.title,
+      course: lesson.courseTitle,
+      date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
+      facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
+    }));
 
   const calendarEntries = [];
   upcomingLiveClasses.forEach((session) => {
@@ -2818,22 +2794,21 @@ export function buildInstructorDashboard({
       title: session.title,
       url: '/dashboard/instructor/calendar'
     })),
-    {
-      id: 'search-instructor-assessments',
-      role: 'instructor',
-      type: 'Assessments',
-      title: 'Assessment studio',
-      url: '/dashboard/instructor/assessments'
-    }
-    ...tutorRoster.map((tutor) => ({
-      id: `search-instructor-tutor-${tutor.id}`,
-      role: 'instructor',
-      type: 'Tutor',
-      title: tutor.name,
-      url: '/dashboard/instructor/tutor-management'
-      url: '/dashboard/instructor/live-classes'
-    }))
-  ];
+      {
+        id: 'search-instructor-assessments',
+        role: 'instructor',
+        type: 'Assessments',
+        title: 'Assessment studio',
+        url: '/dashboard/instructor/assessments'
+      },
+      ...tutorRoster.map((tutor) => ({
+        id: `search-instructor-tutor-${tutor.id}`,
+        role: 'instructor',
+        type: 'Tutor',
+        title: tutor.name,
+        url: '/dashboard/instructor/tutor-management'
+      }))
+    ];
 
   const profileStats = [];
   if (courseSummaries.length > 0) {
@@ -3197,7 +3172,7 @@ export function buildAffiliateOverview({
     }
   ];
 
-  const upcomingPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+  const nextPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
     .filter((payout) => payout.status !== 'completed')
     .map((payout) => {
       const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
@@ -3205,14 +3180,11 @@ export function buildAffiliateOverview({
       );
       return {
         status: payout.status,
-        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        amountCents: Number(payout.amountCents ?? 0),
         scheduledAt: payout.scheduledAt,
-        scheduledLabel: formatDateTime(payout.scheduledAt, {
-          dateStyle: 'medium',
-          timeStyle: 'short'
-        }),
-        referralCode: affiliate?.referralCode,
-        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName
+        referralCode: affiliate?.referralCode ?? null,
+        communityName:
+          affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName ?? null
       };
     })
     .sort((a, b) => new Date(a.scheduledAt ?? now) - new Date(b.scheduledAt ?? now))[0] ?? null;
@@ -3282,7 +3254,15 @@ export function buildAffiliateOverview({
         activePrograms,
         pendingPrograms
       },
-      nextPayout
+      nextPayout: nextPayout
+        ? {
+            status: nextPayout.status,
+            amountFormatted: formatCurrency(nextPayout.amountCents, 'USD'),
+            scheduledAt: nextPayout.scheduledAt,
+            referralCode: nextPayout.referralCode,
+            communityName: nextPayout.communityName
+          }
+        : null
     },
     programs: affiliatePrograms,
     payouts: payoutTimeline,
@@ -3341,6 +3321,8 @@ function minutesToReadable(minutes) {
 function resolveName(firstName, lastName, fallback) {
   const candidate = `${firstName ?? ''} ${lastName ?? ''}`.trim();
   return candidate.length > 0 ? candidate : fallback;
+}
+
 const LIVE_JOIN_WINDOW_MINUTES = 15;
 const GROUP_SESSION_KEYWORDS = ['group', 'cohort', 'bootcamp', 'lab', 'studio', 'masterclass', 'workshop', 'breakout'];
 const WHITEBOARD_READY_STATES = new Set(['ready', 'live', 'approved', 'published']);
@@ -3711,7 +3693,7 @@ export default class DashboardService {
 
     const [
       privacySettings,
-      courseStats,
+      _courseStats,
       enrollmentRows,
       progressRows,
       membershipRows,
@@ -4468,6 +4450,8 @@ export default class DashboardService {
       memberships: membershipRows,
       monetizationSettings: platformMonetizationSettings,
       now
+    });
+
     const communityDashboard = buildCommunityDashboard({
       user,
       now,
@@ -4666,10 +4650,9 @@ export default class DashboardService {
       };
       const subscription = subscriptionByCommunity.get(Number(row.communityId));
       const affiliate = affiliateByCommunity.get(Number(row.communityId));
-      const affiliatePayouts = affiliate ? affiliatePayoutByAffiliate.get(affiliate.id) ?? [] : [];
-      const upcomingSessions = liveClassRows.filter(
-        (session) => Number(session.communityId ?? 0) === Number(row.communityId)
-      );
+        const upcomingSessions = liveClassRows.filter(
+          (session) => Number(session.communityId ?? 0) === Number(row.communityId)
+        );
 
       const initiatives = [];
       if (subscription) {
@@ -6599,26 +6582,23 @@ export default class DashboardService {
       { id: 'admin-blog', role: 'admin', type: 'Content', title: 'Blog management', url: '/admin#blog' }
     ];
 
-    return {
-      role: { id: 'admin', label: 'Admin' },
-      dashboard: {
-        metrics,
-        approvals,
-        revenue,
-        operations,
-        blog: blogOperations,
-        compliance,
-        activity: { alerts, events },
-        compliance,
-        settings: {
-          monetization: monetizationSettings
-        }
+      return {
+        role: { id: 'admin', label: 'Admin' },
+        dashboard: {
+          metrics,
+          approvals,
+          revenue,
+          operations,
+          blog: blogOperations,
+          compliance,
+          activity: { alerts, events },
+          settings: {
+            monetization: monetizationSettings
+          }
         },
-        compliance
-      },
-      profileStats,
-      profileBio,
-      profileTitleSegment: 'Platform operations oversight',
+        profileStats,
+        profileBio,
+        profileTitleSegment: 'Platform operations oversight',
       searchIndex
     };
   }

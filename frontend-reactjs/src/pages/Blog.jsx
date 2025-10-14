@@ -243,7 +243,7 @@ export default function Blog() {
               </div>
             ) : error ? (
               <div className="flex flex-col items-center gap-3 rounded-3xl border border-rose-200 bg-rose-50/50 p-10 text-center">
-                <p className="text-base font-semibold text-rose-600">We couldn't load the blog right now.</p>
+                <p className="text-base font-semibold text-rose-600">We couldn&rsquo;t load the blog right now.</p>
                 <p className="text-sm text-rose-500">
                   {error.message ?? 'Please refresh the page or check your connection.'}
                 </p>
@@ -259,7 +259,7 @@ export default function Blog() {
               <div className="rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
                 <h3 className="text-lg font-semibold text-slate-900">No articles yet</h3>
                 <p className="mt-2 text-sm text-slate-500">
-                  We're preparing fresh content for you. Check back soon for enterprise-grade insights.
+                  We&rsquo;re preparing fresh content for you. Check back soon for enterprise-grade insights.
                 </p>
               </div>
             ) : (

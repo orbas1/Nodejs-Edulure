@@ -20,7 +20,7 @@ function parseJson(value, fallback) {
   if (typeof value === 'object') return value;
   try {
     return JSON.parse(value);
-  } catch (error) {
+  } catch (_error) {
     return fallback;
   }
 }
@@ -118,7 +118,6 @@ export default class CommunityChatService {
       const channel = serializeChannel(channels[index]);
       const channelMembership = memberships[index];
       const latestMessage = latestMap.get(channel.id) ?? null;
-      // eslint-disable-next-line no-await-in-loop
       const unreadCount = await CommunityMessageModel.countSince(
         channel.id,
         channelMembership.lastReadAt
@@ -172,7 +171,7 @@ export default class CommunityChatService {
       }
 
       let threadRootId = payload.threadRootId ?? null;
-      let replyToMessageId = payload.replyToMessageId ?? null;
+      const replyToMessageId = payload.replyToMessageId ?? null;
       if (replyToMessageId) {
         const parentMessage = await CommunityMessageModel.findById(replyToMessageId, trx);
         if (!parentMessage || parentMessage.channelId !== channel.id) {

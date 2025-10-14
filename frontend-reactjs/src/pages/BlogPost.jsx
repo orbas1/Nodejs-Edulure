@@ -74,7 +74,7 @@ export default function BlogPost() {
       <main className="bg-gradient-to-b from-slate-50 via-white to-white">
         <div className="mx-auto max-w-4xl px-6 py-24">
           <div className="space-y-6 rounded-3xl border border-rose-200 bg-rose-50/60 p-12 text-center shadow-sm">
-            <h1 className="text-3xl font-semibold text-rose-600">We couldn't find that article</h1>
+            <h1 className="text-3xl font-semibold text-rose-600">We couldn&rsquo;t find that article</h1>
             <p className="text-sm text-rose-500">
               {error?.message ?? 'The article may have been unpublished or the link is incorrect.'}
             </p>

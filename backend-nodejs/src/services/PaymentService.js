@@ -109,8 +109,6 @@ function normalizeProviderStatus(provider, providerStatus) {
         return 'succeeded';
       case 'canceled':
         return 'canceled';
-      case 'requires_payment_method':
-        return 'requires_payment_method';
       default:
         return providerStatus;
     }

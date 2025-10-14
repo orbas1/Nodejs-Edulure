@@ -70,7 +70,6 @@ export default class DirectMessageService {
       if (!viewerParticipant) {
         continue;
       }
-      // eslint-disable-next-line no-await-in-loop
       const unreadCount = await DirectMessageModel.countSince(thread.id, viewerParticipant.lastReadAt);
       results.push({
         thread,
@@ -106,10 +105,10 @@ export default class DirectMessageService {
       thread = await DirectMessageThreadModel.findThreadMatchingParticipants(uniqueIds);
     }
 
-    return db.transaction(async (trx) => {
-      let createdThread = thread;
-      if (!createdThread) {
-        createdThread = await DirectMessageThreadModel.create(
+    const result = await db.transaction(async (trx) => {
+      let activeThread = thread;
+      if (!activeThread) {
+        activeThread = await DirectMessageThreadModel.create(
           {
             subject: payload.subject ?? null,
             isGroup: uniqueIds.length > 2,
@@ -122,7 +121,7 @@ export default class DirectMessageService {
           uniqueIds.map((participantId) =>
             DirectMessageParticipantModel.create(
               {
-                threadId: createdThread.id,
+                threadId: activeThread.id,
                 userId: participantId,
                 role: participantId === creatorId ? 'admin' : 'member'
               },
@@ -134,7 +133,7 @@ export default class DirectMessageService {
         await DomainEventModel.record(
           {
             entityType: 'direct_message_thread',
-            entityId: createdThread.id,
+            entityId: activeThread.id,
             eventType: 'dm.thread.created',
             payload: { creatorId, participantCount: uniqueIds.length },
             performedBy: creatorId
@@ -147,7 +146,7 @@ export default class DirectMessageService {
       if (payload.initialMessage?.body) {
         initialMessage = await DirectMessageModel.create(
           {
-            threadId: createdThread.id,
+            threadId: activeThread.id,
             senderId: creatorId,
             messageType: payload.initialMessage.messageType,
             body: payload.initialMessage.body,
@@ -158,7 +157,7 @@ export default class DirectMessageService {
         );
 
         await DirectMessageThreadModel.updateThreadMetadata(
-          createdThread.id,
+          activeThread.id,
           {
             lastMessageAt: initialMessage.createdAt,
             lastMessagePreview: truncatePreview(initialMessage.body)
@@ -167,7 +166,7 @@ export default class DirectMessageService {
         );
 
         await DirectMessageParticipantModel.updateLastRead(
-          createdThread.id,
+          activeThread.id,
           creatorId,
           { timestamp: new Date(initialMessage.createdAt), messageId: initialMessage.id },
           trx
@@ -178,7 +177,7 @@ export default class DirectMessageService {
             entityType: 'direct_message',
             entityId: initialMessage.id,
             eventType: 'dm.message.created',
-            payload: { threadId: createdThread.id },
+            payload: { threadId: activeThread.id },
             performedBy: creatorId
           },
           trx
@@ -186,17 +185,19 @@ export default class DirectMessageService {
       }
 
       log.info(
-        { threadId: createdThread.id, creatorId, reused: Boolean(thread) },
+        { threadId: activeThread.id, creatorId, reused: Boolean(thread) },
         'direct message thread ready'
       );
 
-      return { thread: createdThread, initialMessage };
+      return { thread: activeThread, initialMessage };
     });
 
-    const participants = await DirectMessageParticipantModel.listForThread(createdThread.id);
-    realtimeService.broadcastThreadUpsert(createdThread, participants, { initialMessage });
+    const participants = await DirectMessageParticipantModel.listForThread(result.thread.id);
+    realtimeService.broadcastThreadUpsert(result.thread, participants, {
+      initialMessage: result.initialMessage
+    });
 
-    return { thread: createdThread, initialMessage };
+    return result;
   }
 
   static async listMessages(threadId, userId, filters = {}) {

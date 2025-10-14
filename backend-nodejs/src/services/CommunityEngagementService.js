@@ -29,7 +29,7 @@ function parseMetadata(value) {
   if (typeof value === 'object') return value;
   try {
     return JSON.parse(value);
-  } catch (error) {
+  } catch (_error) {
     return {};
   }
 }

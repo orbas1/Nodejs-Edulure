@@ -12,7 +12,7 @@ const listSchema = Joi.object({
     Joi.string()
       .trim()
       .max(400)
-      .custom((value, helpers) => value.split(',').map((tag) => tag.trim()).filter(Boolean))
+      .custom((value, _helpers) => value.split(',').map((tag) => tag.trim()).filter(Boolean))
   ),
   search: Joi.string().trim().max(200).allow('').optional()
 });
