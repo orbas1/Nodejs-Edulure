@@ -1909,6 +1909,23 @@
             "type": "string",
             "nullable": true
           },
+          "twoFactorEnabled": {
+            "type": "boolean",
+            "description": "Indicates whether multi-factor authentication is enabled for the account.",
+            "default": false
+          },
+          "twoFactorEnrolledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of initial multi-factor enrollment."
+          },
+          "twoFactorLastVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of the last successful multi-factor verification."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
@@ -6027,6 +6044,62 @@
           "lastGeneratedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "gdpr": {
+            "$ref": "#/components/schemas/GdprComplianceProfile"
+          }
+        }
+      },
+      "GdprComplianceProfile": {
+        "type": "object",
+        "properties": {
+          "dsar": {
+            "type": "object",
+            "properties": {
+              "open": { "type": "integer" },
+              "dueSoon": { "type": "integer" },
+              "overdue": { "type": "integer" },
+              "completed30d": { "type": "integer" },
+              "averageCompletionHours": { "type": "integer" },
+              "slaHours": { "type": "integer" },
+              "owner": { "type": "string" },
+              "nextIcoSubmission": { "type": "string", "format": "date-time" }
+            }
+          },
+          "registers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "owner": { "type": "string" },
+                "status": { "type": "string" },
+                "lastReviewed": { "type": "string", "format": "date-time" },
+                "nextReviewDue": { "type": "string", "format": "date-time" },
+                "coverage": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "retentionPolicy": { "type": "string" }
+              }
+            }
+          },
+          "controls": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "ico": {
+            "type": "object",
+            "properties": {
+              "registrationNumber": { "type": "string" },
+              "status": { "type": "string" },
+              "feeTier": { "type": "string" },
+              "renewalDue": { "type": "string", "format": "date-time" },
+              "lastSubmitted": { "type": "string", "format": "date-time" },
+              "publicRegisterUrl": { "type": "string", "format": "uri" },
+              "reportingOwner": { "type": "string" }
+            }
           }
         }
       },
@@ -7015,6 +7088,15 @@
                   },
                   "address": {
                     "type": "string"
+                  },
+                  "twoFactor": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "description": "Enable multi-factor authentication during registration."
+                      }
+                    }
                   }
                 }
               }
@@ -7046,6 +7128,37 @@
                             },
                             "verification": {
                               "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "twoFactor": {
+                              "type": "object",
+                              "description": "Multi-factor enrollment details for the new account.",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean",
+                                  "description": "Indicates whether multi-factor authentication was enabled during registration.",
+                                  "readOnly": true
+                                },
+                                "enforced": {
+                                  "type": "boolean",
+                                  "description": "True when the selected role requires multi-factor authentication.",
+                                  "readOnly": true
+                                },
+                                "secret": {
+                                  "type": "string",
+                                  "description": "Base32 secret for configuring an authenticator app. Returned only when MFA is enabled.",
+                                  "readOnly": true
+                                },
+                                "otpauthUrl": {
+                                  "type": "string",
+                                  "description": "otpauth:// URI used for QR code generation.",
+                                  "readOnly": true
+                                },
+                                "issuer": {
+                                  "type": "string",
+                                  "description": "Issuer label presented in authenticator applications.",
+                                  "readOnly": true
+                                }
+                              }
                             }
                           }
                         }
@@ -7085,6 +7198,11 @@
                   },
                   "password": {
                     "type": "string"
+                  },
+                  "twoFactorCode": {
+                    "type": "string",
+                    "description": "6-10 digit code generated by the user's authenticator application when multi-factor authentication is enabled.",
+                    "pattern": "^\\d{6,10}$"
                   }
                 }
               }
@@ -7135,10 +7253,13 @@
             }
           },
           "401": {
-            "description": "Invalid credentials"
+            "description": "Invalid credentials or incorrect two-factor code"
           },
           "403": {
-            "description": "Email verification required"
+            "description": "Email verification or multi-factor challenge required"
+          },
+          "409": {
+            "description": "Multi-factor configuration required before access"
           },
           "422": {
             "description": "Validation error"

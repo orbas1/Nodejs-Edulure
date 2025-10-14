@@ -1,10 +1,18 @@
-import { useOutletContext } from 'react-router-dom';
-
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerCommunities() {
-  const { dashboard, refresh } = useOutletContext();
-  const data = dashboard?.communities;
+  const { isLearner, section: data, refresh } = useLearnerDashboardSection('communities');
+
+  if (!isLearner) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Learner workspace required"
+        description="Switch to the learner dashboard to access community operations and engagement pipelines."
+      />
+    );
+  }
 
   if (!data) {
     return (
