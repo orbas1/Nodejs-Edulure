@@ -67,11 +67,21 @@ function normaliseCommunityEngagement(entries) {
 function normaliseNotifications(notifications) {
   if (!Array.isArray(notifications)) return [];
   return notifications
-    .filter((notification) => notification?.id)
+    .filter((notification) =>
+      notification && notification.id !== undefined && notification.id !== null
+    )
     .map((notification) => ({
       id: notification.id,
-      title: notification.title ?? 'Dashboard update',
-      timestamp: notification.timestamp ?? 'Just now',
+      title:
+        typeof notification.title === 'string' && notification.title.trim().length > 0
+          ? notification.title
+          : String(notification.title ?? 'Dashboard update'),
+      timestamp:
+        typeof notification.timestamp === 'string' && notification.timestamp.trim().length > 0
+          ? notification.timestamp
+          : notification.timestamp instanceof Date
+            ? notification.timestamp.toLocaleString()
+            : String(notification.timestamp ?? 'Just now'),
       type: notification.type ?? 'update'
     }));
 }
