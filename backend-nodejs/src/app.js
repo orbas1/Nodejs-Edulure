@@ -14,28 +14,13 @@ import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env.js';
 import logger from './config/logger.js';
 import { healthcheck } from './config/database.js';
-import authRoutes from './routes/auth.routes.js';
-import userRoutes from './routes/user.routes.js';
-import communityRoutes from './routes/community.routes.js';
-import contentRoutes from './routes/content.routes.js';
-import runtimeConfigRoutes from './routes/runtimeConfig.routes.js';
-import paymentRoutes from './routes/payment.routes.js';
-import chatRoutes from './routes/chat.routes.js';
-import socialRoutes from './routes/social.routes.js';
-import explorerRoutes from './routes/explorer.routes.js';
-import adsRoutes from './routes/ads.routes.js';
-import analyticsRoutes from './routes/analytics.routes.js';
-import dashboardRoutes from './routes/dashboard.routes.js';
-import courseRoutes from './routes/course.routes.js';
-import adminRoutes from './routes/admin.routes.js';
-import verificationRoutes from './routes/verification.routes.js';
-import ebookRoutes from './routes/ebook.routes.js';
-import blogRoutes from './routes/blog.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
 import requestContextMiddleware from './middleware/requestContext.js';
 import runtimeConfigMiddleware from './middleware/runtimeConfig.js';
 import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } from './observability/metrics.js';
+import { mountVersionedApi } from './routes/registerApiRoutes.js';
+import { apiRouteRegistry } from './routes/routeRegistry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
@@ -170,24 +155,10 @@ app.get('/health', async (_req, res, next) => {
 });
 
 app.get('/metrics', metricsHandler);
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/communities', communityRoutes);
-app.use('/api/content', contentRoutes);
-app.use('/api/runtime', runtimeConfigRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/social', socialRoutes);
-app.use('/api/explorer', explorerRoutes);
-app.use('/api/ads', adsRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/courses', courseRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/verification', verificationRoutes);
-app.use('/api/ebooks', ebookRoutes);
-app.use('/api/blog', blogRoutes);
+mountVersionedApi(app, { registry: apiRouteRegistry });
+
+app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
+app.get('/api/docs', (_req, res) => res.redirect(308, '/api/v1/docs'));
 
 app.use(errorHandler);
 

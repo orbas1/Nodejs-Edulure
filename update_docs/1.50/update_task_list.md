@@ -7,7 +7,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
 - **Integration Subtasks (8 total):**
   - **Backend:**
     1. Split server bootstrap into web, worker, and realtime services with readiness probes and crash isolation.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L4-L19】 ✅ Completed – modular entrypoints deployed with readiness telemetry, signal-aware shutdown, and per-service health surfaces.
-    2. Implement feature-flagged router loader with `/v1` prefixes and error-boundary middleware.
+    2. Implement feature-flagged router loader with `/v1` prefixes and error-boundary middleware. ✅ Completed – added declarative registry, feature flag gate middleware, legacy redirects, and route-level error boundaries with supporting tests.
   - **Front-end:**
     3. Consume new health-check and capability endpoints to display service availability banners.
     4. Update build pipeline to ingest generated TypeScript SDK from modularised APIs.
