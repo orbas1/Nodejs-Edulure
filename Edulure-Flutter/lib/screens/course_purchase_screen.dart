@@ -182,7 +182,7 @@ class _CoursePurchaseScreenState extends State<CoursePurchaseScreen> {
                   child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
-                      'Learner workspace required. Switch roles to explore cohorts ready for purchase.',
+                      'Learner Learnspace required. Switch roles to explore cohorts ready for purchase.',
                       textAlign: TextAlign.center,
                     ),
                   ),

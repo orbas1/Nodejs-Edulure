@@ -126,7 +126,7 @@ function AssessmentList({ title, items, emptyLabel }) {
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary hover:text-white"
                       >
-                        Open workspace
+                        Open Learnspace
                         <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
                       </a>
                     ) : null}

@@ -40,7 +40,7 @@ export default function InstructorTutorManagement() {
     return (
       <DashboardStateMessage
         title="Tutor management is restricted"
-        description="Only instructor workspaces can manage tutor pods and hiring pipelines."
+        description="Only instructor Learnspaces can manage tutor pods and hiring pipelines."
       />
     );
   }
@@ -50,7 +50,7 @@ export default function InstructorTutorManagement() {
     return (
       <DashboardStateMessage
         title="Tutor data not available"
-        description="We couldn't retrieve your mentor roster. Refresh the workspace to try again."
+        description="We couldn't retrieve your mentor roster. Refresh the Learnspace to try again."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />

@@ -187,7 +187,7 @@ export default function LearnerSafetySection({ privacy, messaging, followers, un
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="dashboard-kicker">Safety & controls</p>
-          <h3 className="mt-2 text-lg font-semibold text-slate-900">Security posture across your workspace</h3>
+          <h3 className="mt-2 text-lg font-semibold text-slate-900">Security posture across your Learnspace</h3>
           <p className="mt-2 text-sm text-slate-600">
             Review privacy, messaging, and network safeguards. Enterprise policies keep sensitive cohorts aligned to SOC2 and GDPR protocols.
           </p>

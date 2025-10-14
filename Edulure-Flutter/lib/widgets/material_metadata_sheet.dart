@@ -391,7 +391,7 @@ class _MaterialMetadataSheetState extends State<MaterialMetadataSheet> {
                       });
                     },
                     items: const [
-                      DropdownMenuItem(value: 'workspace', child: Text('Workspace access')),
+                      DropdownMenuItem(value: 'workspace', child: Text('Learnspace access')),
                       DropdownMenuItem(value: 'private', child: Text('Private access')),
                       DropdownMenuItem(value: 'public', child: Text('Public marketplace')),
                     ],

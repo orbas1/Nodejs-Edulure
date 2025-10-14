@@ -127,7 +127,7 @@ export default function FixnadoAds() {
     return (
       <DashboardStateMessage
         title="Restricted access"
-        description="Switch to an instructor or admin workspace to manage Fixnado Ads placements and experiments."
+        description="Switch to an instructor or admin Learnspace to manage Fixnado Ads placements and experiments."
         actionLabel="Return"
         onAction={() => window.history.back()}
       />
@@ -137,7 +137,7 @@ export default function FixnadoAds() {
   if (!ads) {
     return (
       <DashboardStateMessage
-        title="Fixnado Ads workspace offline"
+        title="Fixnado Ads Learnspace offline"
         description="Performance data hasn't synced from your ad accounts yet. Refresh after connecting channels."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
@@ -169,7 +169,7 @@ export default function FixnadoAds() {
     {
       title: 'Active campaigns',
       value: summary.activeCampaigns ?? 0,
-      hint: 'Connected workspaces'
+      hint: 'Connected Learnspaces'
     },
     {
       title: 'Lifetime spend',

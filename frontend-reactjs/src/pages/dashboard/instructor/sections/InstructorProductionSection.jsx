@@ -33,7 +33,7 @@ function ProductionCard({ asset }) {
         }}
         disabled={!canOpenWorkspace}
       >
-        Open workspace
+        Open Learnspace
         <ArrowTopRightOnSquareIcon className="h-4 w-4" />
       </button>
     </li>

@@ -26,7 +26,7 @@ export default function AdminPolicyHubSection({
           rel="noopener noreferrer"
           className="dashboard-pill inline-flex items-center justify-center gap-2 px-5 py-2 text-sm"
         >
-          View policy workspace
+          View policy Learnspace
           <span aria-hidden="true" className="text-base">↗</span>
         </a>
       </div>

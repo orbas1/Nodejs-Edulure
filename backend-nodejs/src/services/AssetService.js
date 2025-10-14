@@ -39,7 +39,7 @@ function sanitiseHttpsUrl(value) {
       return null;
     }
     return parsed.toString();
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -386,7 +386,7 @@ export default class AssetService {
       throw error;
     }
     if (asset.visibility === 'workspace' && actor.role === 'user') {
-      const error = new Error('This asset is restricted to workspace members');
+      const error = new Error('This asset is restricted to Learnspace members');
       error.status = 403;
       throw error;
     }

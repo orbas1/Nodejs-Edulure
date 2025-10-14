@@ -427,7 +427,7 @@ export default function CourseViewer() {
     return (
       <DashboardStateMessage
         variant="error"
-        title="Learner workspace required"
+        title="Learner Learnspace required"
         description="Switch to your learner dashboard to open course sessions and live cohorts."
       />
     );
@@ -437,7 +437,7 @@ export default function CourseViewer() {
     return (
       <DashboardStateMessage
         title="Courses unavailable"
-        description="We could not find course data for your learner workspace. Refresh the dashboard and try again."
+        description="We could not find course data for your learner Learnspace. Refresh the dashboard and try again."
       />
     );
   }
@@ -496,7 +496,7 @@ export default function CourseViewer() {
         </div>
         <div className="flex gap-3">
           <button type="button" className="dashboard-primary-pill">
-            Launch workspace
+            Launch Learnspace
           </button>
           <Link to="/dashboard/learner/courses" className="dashboard-pill">
             Back to courses

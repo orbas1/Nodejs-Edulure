@@ -68,7 +68,7 @@ const profileData = {
     actions: [
       'Approve 2 pending partner applications',
       'Send Q3 enablement pack to top performers',
-      'Sync payout ledger with finance workspace'
+      'Sync payout ledger with finance Learnspace'
     ],
     highlights: [
       'Top 2% click-to-enrol conversion',

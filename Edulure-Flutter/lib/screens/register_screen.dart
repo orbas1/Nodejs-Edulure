@@ -24,7 +24,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _ageController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _streetAddressController = TextEditingController();
+  final _addressLine2Controller = TextEditingController();
+  final _townController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _countryController = TextEditingController();
+  final _postcodeController = TextEditingController();
 
   final _passwordPattern =
       RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{12,}$');
@@ -54,7 +59,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _ageController.dispose();
-    _addressController.dispose();
+    _streetAddressController.dispose();
+    _addressLine2Controller.dispose();
+    _townController.dispose();
+    _cityController.dispose();
+    _countryController.dispose();
+    _postcodeController.dispose();
     super.dispose();
   }
 
@@ -120,7 +130,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Add this workspace to your authenticator app, then continue to login.',
+                    'Add this Learnspace to your authenticator app, then continue to login.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 12),
@@ -213,6 +223,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     try {
       final authService = ref.read(authServiceProvider);
+      final address = <String, String>{};
+      void addAddressField(String key, TextEditingController controller) {
+        final value = controller.text.trim();
+        if (value.isNotEmpty) {
+          address[key] = value;
+        }
+      }
+
+      addAddressField('streetAddress', _streetAddressController);
+      addAddressField('addressLine2', _addressLine2Controller);
+      addAddressField('town', _townController);
+      addAddressField('city', _cityController);
+      addAddressField('country', _countryController);
+      addAddressField('postcode', _postcodeController);
+
       final result = await authService.register(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
@@ -220,7 +245,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         password: _passwordController.text,
         role: _role,
         age: age,
-        address: _addressController.text,
+        address: address.isEmpty ? null : address,
         enableTwoFactor: _twoFactorLocked ? true : _twoFactorEnabled,
       );
       if (!mounted) return;
@@ -273,7 +298,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _applyTwoFactorPolicy(flags);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create workspace')),
+      appBar: AppBar(title: const Text('Create Learnspace')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -285,7 +310,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Create your Edulure workspace',
+                    'Create your Edulure Learnspace',
                     style: Theme.of(context)
                         .textTheme
                         .headlineSmall
@@ -372,7 +397,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     items: const [
                       DropdownMenuItem(value: 'instructor', child: Text('Instructor')),
                       DropdownMenuItem(value: 'user', child: Text('Learner')),
-                      DropdownMenuItem(value: 'admin', child: Text('Administrator')),
                     ],
                     onChanged: (value) {
                       if (value == null) return;
@@ -385,6 +409,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         }
                       });
                     },
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Need administrator access? Contact your organisation\'s Edulure operations representative to provision it securely.',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.blueGrey.shade500),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -407,11 +439,86 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _addressController,
-                    decoration: const InputDecoration(labelText: 'Address (optional)'),
-                    maxLines: 3,
-                    textInputAction: TextInputAction.newline,
+                  const SizedBox(height: 16),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.blueGrey.shade100),
+                      color: Colors.white,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Address (optional)',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(color: Colors.blueGrey.shade700, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Separate fields help us tailor onboarding and compliance guidance to your location.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.blueGrey.shade500),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _streetAddressController,
+                          decoration: const InputDecoration(labelText: 'Street address'),
+                          textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _addressLine2Controller,
+                          decoration: const InputDecoration(labelText: 'Address line 2'),
+                          textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _townController,
+                                decoration: const InputDecoration(labelText: 'Town'),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _cityController,
+                                decoration: const InputDecoration(labelText: 'City'),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _countryController,
+                                decoration: const InputDecoration(labelText: 'Country'),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: _postcodeController,
+                                decoration: const InputDecoration(labelText: 'Postcode'),
+                                textInputAction: TextInputAction.next,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(

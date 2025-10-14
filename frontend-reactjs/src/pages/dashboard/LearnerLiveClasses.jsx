@@ -149,7 +149,7 @@ export default function LearnerLiveClasses() {
     return (
       <DashboardStateMessage
         title="Live classrooms unavailable"
-        description="We couldn't find an active live classroom schedule for your learner workspace. Refresh to pull the latest data."
+        description="We couldn't find an active live classroom schedule for your learner Learnspace. Refresh to pull the latest data."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />

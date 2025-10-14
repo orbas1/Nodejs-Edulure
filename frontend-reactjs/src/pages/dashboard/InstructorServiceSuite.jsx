@@ -51,7 +51,7 @@ export default function InstructorServiceSuite() {
     return (
       <DashboardStateMessage
         title="Service suite is restricted"
-        description="Only instructor workspaces can access service orchestration and booking controls."
+        description="Only instructor Learnspaces can access service orchestration and booking controls."
       />
     );
   }
@@ -88,7 +88,7 @@ export default function InstructorServiceSuite() {
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">Service creation &amp; orchestration</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-600">
             Design, launch, and govern high-touch service offerings with enterprise-grade booking telemetry and automation.
-            Track intake queues, forward utilisation, and compliance controls in one cohesive workspace.
+            Track intake queues, forward utilisation, and compliance controls in one cohesive Learnspace.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -516,7 +516,7 @@ export default function InstructorServiceSuite() {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Role access</p>
                 <p className="mt-2 text-sm text-slate-600">
-                  Restricted to {controls.restrictedRoles.join(', ')} workspaces. Access requests are logged for audit.
+                  Restricted to {controls.restrictedRoles.join(', ')} Learnspaces. Access requests are logged for audit.
                 </p>
               </div>
             )}

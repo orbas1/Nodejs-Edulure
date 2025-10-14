@@ -99,7 +99,7 @@ export default function InstructorProjects() {
   if (role !== 'instructor') {
     return (
       <DashboardStateMessage
-        title="Project workspace is restricted"
+        title="Project Learnspace is restricted"
         description="Only instructor studios can manage bids and proposals."
       />
     );
@@ -139,7 +139,7 @@ export default function InstructorProjects() {
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">Project bids &amp; proposals</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-600">
             Govern high-stakes engagements with real-time bid telemetry, proposal reviews, and client readiness signals. The
-            workspace keeps web and mobile experiences aligned while enforcing compliance and response SLAs.
+            This Learnspace keeps web and mobile experiences aligned while enforcing compliance and response SLAs.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">

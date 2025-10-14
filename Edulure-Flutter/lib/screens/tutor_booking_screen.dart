@@ -173,7 +173,7 @@ class TutorBookingScreen extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Track inbound mentorship requests, confirm sessions, and maintain tutor availability in one workspace.',
+              'Track inbound mentorship requests, confirm sessions, and maintain tutor availability in one Learnspace.',
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
             ),
             const SizedBox(height: 16),

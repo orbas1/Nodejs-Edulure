@@ -12,23 +12,19 @@ import {
   ChartBarIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
-  HandshakeIcon,
   ClipboardDocumentListIcon,
   IdentificationIcon,
   InboxStackIcon,
+  MapIcon,
   MegaphoneIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
   Squares2X2Icon,
   UserGroupIcon,
+  UserPlusIcon,
   UsersIcon,
   VideoCameraIcon,
   XMarkIcon
-  Bars3Icon,
-  XMarkIcon,
-  VideoCameraIcon,
-  MapIcon
-  BriefcaseIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 
@@ -50,7 +46,7 @@ const navigationByRole = {
     { name: 'Field services', to: `${basePath}/field-services`, icon: MapIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
-    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: UserPlusIcon },
     { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
     { name: 'Become an instructor', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
   ],
@@ -67,7 +63,7 @@ const navigationByRole = {
     { name: 'Assessment studio', to: `${basePath}/assessments`, icon: AcademicCapIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
-    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: UserPlusIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'Service suite', to: `${basePath}/services`, icon: BriefcaseIcon },
@@ -123,8 +119,18 @@ export default function DashboardLayout() {
   const location = useLocation();
   const { session, logout } = useAuth();
   const { activeRole, setActiveRole, roles, dashboards, searchIndex, loading, error, refresh } = useDashboard();
+
   const allowedRoles = useMemo(() => roles.map((r) => r.id), [roles]);
-  const resolvedRole = allowedRoles.length > 0 ? (allowedRoles.includes(role) ? role : allowedRoles[0]) : null;
+  const resolvedRole = useMemo(() => {
+    if (allowedRoles.length === 0) {
+      return null;
+    }
+    if (role && allowedRoles.includes(role)) {
+      return role;
+    }
+    return allowedRoles[0];
+  }, [allowedRoles, role]);
+
   const basePath = resolvedRole ? `/dashboard/${resolvedRole}` : '/dashboard';
 
   useEffect(() => {
@@ -141,10 +147,9 @@ export default function DashboardLayout() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const closeMobileNav = () => setMobileNavOpen(false);
 
   useEffect(() => {
-    closeMobileNav();
+    setMobileNavOpen(false);
   }, [location.pathname, resolvedRole]);
 
   const filteredResults = useMemo(() => {
@@ -156,7 +161,7 @@ export default function DashboardLayout() {
   }, [searchQuery, searchIndex, resolvedRole]);
 
   const navigation = useMemo(() => {
-    const builder = navigationByRole[resolvedRole];
+    const builder = resolvedRole ? navigationByRole[resolvedRole] : null;
     return builder ? builder(basePath) : [];
   }, [resolvedRole, basePath]);
 
@@ -186,7 +191,7 @@ export default function DashboardLayout() {
     mainContent = (
       <DashboardStateMessage
         title="No dashboards available"
-        description="Your account is not associated with an active learner or instructor workspace yet."
+        description="Your account is not associated with an active learner or instructor Learnspace yet."
       />
     );
   } else if (!currentDashboard) {
@@ -257,7 +262,6 @@ export default function DashboardLayout() {
                     placeholder="Search across your dashboard data"
                     className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
-                  {searchQuery ? (
                   {searchQuery && (
                     <button
                       type="button"
@@ -266,8 +270,6 @@ export default function DashboardLayout() {
                     >
                       Clear
                     </button>
-                  ) : null}
-                  {filteredResults.length > 0 ? (
                   )}
                   {filteredResults.length > 0 && (
                     <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
@@ -287,7 +289,6 @@ export default function DashboardLayout() {
                         ))}
                       </ul>
                     </div>
-                  ) : null}
                   )}
                 </div>
                 <div className="hidden items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm lg:flex">
@@ -300,9 +301,6 @@ export default function DashboardLayout() {
                         to={target}
                         className={`rounded-2xl px-4 py-2 transition ${
                           isActive ? 'bg-primary text-white shadow' : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
-                          isActive
-                            ? 'bg-primary text-white shadow'
-                            : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
                         }`}
                       >
                         {roleOption.label}
@@ -310,10 +308,6 @@ export default function DashboardLayout() {
                     );
                   })}
                 </div>
-                      {roleOption.label}
-                    </NavLink>
-                  );
-                })}
               </div>
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
@@ -350,7 +344,7 @@ export default function DashboardLayout() {
       <div
         className={`${mobileNavOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'} fixed inset-0 z-40 bg-slate-950/40 transition-opacity duration-200 lg:hidden`}
         aria-hidden={!mobileNavOpen}
-        onClick={closeMobileNav}
+        onClick={() => setMobileNavOpen(false)}
       />
       <nav
         id="dashboard-mobile-nav"
@@ -362,7 +356,7 @@ export default function DashboardLayout() {
           <button
             type="button"
             className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            onClick={closeMobileNav}
+            onClick={() => setMobileNavOpen(false)}
           >
             <XMarkIcon className="h-5 w-5" />
             <span className="sr-only">Close menu</span>
@@ -382,7 +376,7 @@ export default function DashboardLayout() {
                     : 'border border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary'
                 }`}
                 end
-                onClick={closeMobileNav}
+                onClick={() => setMobileNavOpen(false)}
               >
                 {roleOption.label}
               </NavLink>
@@ -402,7 +396,7 @@ export default function DashboardLayout() {
                       : 'border-slate-200 text-slate-600 hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
                   }`
                 }
-                onClick={closeMobileNav}
+                onClick={() => setMobileNavOpen(false)}
               >
                 <item.icon className="h-5 w-5 text-slate-400" />
                 <span>{item.name}</span>

@@ -167,7 +167,7 @@ class _AssessmentsScreenState extends State<AssessmentsScreen> {
             Icon(Icons.lock_outline, size: 56, color: Colors.blueGrey.shade300),
             const SizedBox(height: 16),
             Text(
-              'Switch to the learner workspace to access assessment insights.',
+              'Switch to the learner Learnspace to access assessment insights.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),

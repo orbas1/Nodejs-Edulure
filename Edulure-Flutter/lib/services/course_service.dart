@@ -45,7 +45,7 @@ class CourseService {
 
     final instructor = dashboards['instructor'];
     if (instructor is! Map<String, dynamic>) {
-      throw Exception('Instructor workspace is not configured for this account');
+      throw Exception('Instructor Learnspace is not configured for this account');
     }
 
     return CourseDashboard.fromJson(instructor);
@@ -93,12 +93,12 @@ class CourseService {
 
     final instructor = dashboards['instructor'];
     if (instructor is! Map<String, dynamic>) {
-      throw Exception('Instructor workspace is not configured for this account');
+      throw Exception('Instructor Learnspace is not configured for this account');
     }
 
     final services = instructor['services'];
     if (services is! Map<String, dynamic>) {
-      throw Exception('Service suite is not configured for this workspace');
+      throw Exception('Service suite is not configured for this Learnspace');
     }
 
     return ServiceSuite.fromJson(Map<String, dynamic>.from(services));

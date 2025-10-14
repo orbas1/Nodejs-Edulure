@@ -254,7 +254,7 @@ export default function DashboardAffiliate() {
   if (!affiliate) {
     return (
       <DashboardStateMessage
-        title="Affiliate workspace not ready"
+        title="Affiliate Learnspace not ready"
         description="Connect at least one affiliate programme to surface referral analytics and payout controls."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
@@ -281,7 +281,7 @@ export default function DashboardAffiliate() {
             Affiliate revenue control center
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            Monitor referrals, commission performance, and payout readiness for the {role} workspace.
+            Monitor referrals, commission performance, and payout readiness for the {role} Learnspace.
           </p>
           <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
             <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">

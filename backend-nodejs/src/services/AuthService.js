@@ -16,6 +16,44 @@ function hashRefreshToken(token) {
   return crypto.createHmac('sha256', env.security.jwtRefreshSecret).update(token).digest('hex');
 }
 
+function parseStoredAddress(address) {
+  if (!address) {
+    return null;
+  }
+
+  if (typeof address === 'object' && !Array.isArray(address)) {
+    return Object.keys(address).length ? address : null;
+  }
+
+  if (typeof address !== 'string') {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(address);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const entries = Object.entries(parsed).reduce((acc, [key, value]) => {
+        if (typeof value === 'string' && value.trim().length > 0) {
+          acc[key] = value.trim();
+        }
+        return acc;
+      }, {});
+      return Object.keys(entries).length ? entries : null;
+    }
+  } catch (_error) {
+    // Fall back to treating legacy string addresses as the primary street address.
+    if (address.trim().length > 0) {
+      return { streetAddress: address.trim() };
+    }
+  }
+
+  if (address.trim().length > 0) {
+    return { streetAddress: address.trim() };
+  }
+
+  return null;
+}
+
 function sanitizeUserRecord(user) {
   return {
     id: user.id,
@@ -24,7 +62,7 @@ function sanitizeUserRecord(user) {
     email: user.email,
     role: user.role,
     age: user.age,
-    address: user.address,
+    address: parseStoredAddress(user.address),
     twoFactorEnabled: TwoFactorService.isTwoFactorEnabled(user),
     twoFactorEnrolledAt: user.twoFactorEnrolledAt ?? user.two_factor_enrolled_at ?? null,
     twoFactorLastVerifiedAt: user.twoFactorLastVerifiedAt ?? user.two_factor_last_verified_at ?? null,

@@ -8,7 +8,7 @@ export default function LearnerFinancial() {
     return (
       <DashboardStateMessage
         variant="error"
-        title="Learner workspace required"
+        title="Learner Learnspace required"
         description="Switch to the learner dashboard to access tuition insights and invoice history."
       />
     );

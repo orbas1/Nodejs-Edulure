@@ -111,7 +111,7 @@ export default function Login() {
             onChange={handleChange}
             placeholder="••••••••"
             required
-            helper="Use the password you created when registering your workspace."
+            helper="Use the password you created when registering your Learnspace."
           />
           <div className="space-y-3">
             {showTwoFactorInput ? (
@@ -166,19 +166,23 @@ export default function Login() {
           >
             {isLoading ? 'Authenticating…' : 'Log in securely'}
           </button>
+        </form>
+        <div className="space-y-4">
           <div className="relative flex items-center gap-3">
             <span className="h-px flex-1 bg-slate-200" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">or</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              or try an alternative login
+            </span>
             <span className="h-px flex-1 bg-slate-200" />
           </div>
           <SocialSignOn onSelect={handleSocialSignOn} />
-          <div className="text-sm text-slate-500">
-            New to Edulure?{' '}
-            <Link to="/register" className="font-semibold text-primary">
-              Create your account
-            </Link>
-          </div>
-        </form>
+        </div>
+        <div className="text-sm text-slate-500">
+          New to Edulure?{' '}
+          <Link to="/register" className="font-semibold text-primary">
+            Create your account
+          </Link>
+        </div>
       </div>
     </AuthCard>
   );

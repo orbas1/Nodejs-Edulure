@@ -32,7 +32,7 @@ class AuthService {
     required String password,
     required String role,
     int? age,
-    String? address,
+    Map<String, String>? address,
     bool enableTwoFactor = false,
   }) async {
     final payload = {
@@ -42,7 +42,7 @@ class AuthService {
       'password': password,
       'role': role,
       if (age != null) 'age': age,
-      if (address != null && address.trim().isNotEmpty) 'address': address.trim(),
+      if (address != null && address.isNotEmpty) 'address': address,
       'twoFactor': {'enabled': enableTwoFactor},
     };
     final response = await _dio.post(

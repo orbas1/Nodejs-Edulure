@@ -14,11 +14,12 @@ const SOCIAL_ROUTES = {
 
 const ROLE_OPTIONS = [
   { value: 'instructor', label: 'Instructor' },
-  { value: 'user', label: 'Learner' },
-  { value: 'admin', label: 'Administrator' }
+  { value: 'user', label: 'Learner' }
 ];
 
-const ENFORCED_TWO_FACTOR_ROLES = new Set(['admin']);
+const ENFORCED_TWO_FACTOR_ROLES = new Set();
+const ADMIN_REQUEST_NOTE =
+  'Need administrator access? Contact your organisation\'s Edulure operations representative to provision it securely.';
 
 const passwordHint = 'Use at least 12 characters with upper, lower, number, and symbol.';
 
@@ -33,7 +34,14 @@ export default function Register() {
     confirmPassword: '',
     role: defaultRole,
     age: '',
-    address: ''
+    address: {
+      streetAddress: '',
+      addressLine2: '',
+      town: '',
+      city: '',
+      country: '',
+      postcode: ''
+    }
   });
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,6 +87,17 @@ export default function Register() {
       setTwoFactorEnrollment(null);
       setCopiedSecret(false);
     }
+  };
+
+  const handleAddressChange = (event) => {
+    const { name, value } = event.target;
+    setFormState((prev) => ({
+      ...prev,
+      address: {
+        ...prev.address,
+        [name]: value
+      }
+    }));
   };
 
   const handleCopySecret = useCallback(async () => {
@@ -131,7 +150,22 @@ export default function Register() {
         password: formState.password,
         role: formState.role,
         ...(age ? { age } : {}),
-        ...(formState.address.trim() ? { address: formState.address.trim() } : {}),
+        ...(() => {
+          const normalizedAddress = Object.entries(formState.address ?? {}).reduce(
+            (acc, [key, fieldValue]) => {
+              if (typeof fieldValue !== 'string') {
+                return acc;
+              }
+              const trimmed = fieldValue.trim();
+              if (trimmed) {
+                acc[key] = trimmed;
+              }
+              return acc;
+            },
+            {}
+          );
+          return Object.keys(normalizedAddress).length ? { address: normalizedAddress } : {};
+        })(),
         twoFactor: { enabled: twoFactorLocked ? true : twoFactorEnabled }
       };
       const response = await httpClient.post('/auth/register', requestBody);
@@ -164,16 +198,10 @@ export default function Register() {
 
   return (
     <AuthCard
-      title="Create your Edulure workspace"
+      title="Create your Edulure Learnspace"
       subtitle="Tell us about yourself so we can tailor onboarding for your communities, instructors, and learners."
     >
       <div className="space-y-8">
-        <SocialSignOn onSelect={handleSocialSignOn} />
-        <div className="relative flex items-center gap-3">
-          <span className="h-px flex-1 bg-slate-200" />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">or continue with credentials</span>
-          <span className="h-px flex-1 bg-slate-200" />
-        </div>
         <form className="space-y-6" onSubmit={handleSubmit}>
           {error ? <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
           {success ? <p className="rounded-lg bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{success}</p> : null}
@@ -217,27 +245,73 @@ export default function Register() {
                 </option>
               ))}
             </select>
+            <p className="mt-2 text-xs text-slate-500">{ADMIN_REQUEST_NOTE}</p>
           </FormField>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField
-              label="Age"
-              name="age"
-              type="number"
-              placeholder="Optional"
-              value={formState.age}
-              onChange={handleChange}
-              min="16"
-            />
-            <FormField label="Address" name="address">
-              <textarea
-                name="address"
-                value={formState.address}
-                onChange={handleChange}
-                rows={3}
-                placeholder="Optional"
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          <FormField
+            label="Age"
+            name="age"
+            type="number"
+            placeholder="Optional"
+            value={formState.age}
+            onChange={handleChange}
+            min="16"
+            required={false}
+          />
+          <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white/90 px-5 py-5 shadow-inner">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Address (optional)</p>
+              <p className="text-xs text-slate-500">Provide as much detail as possible to help us tailor regional onboarding.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <FormField
+                label="Street address"
+                name="streetAddress"
+                placeholder="123 Example Street"
+                value={formState.address.streetAddress}
+                onChange={handleAddressChange}
+                required={false}
               />
-            </FormField>
+              <FormField
+                label="Address line 2"
+                name="addressLine2"
+                placeholder="Apartment, suite, etc."
+                value={formState.address.addressLine2}
+                onChange={handleAddressChange}
+                required={false}
+              />
+              <FormField
+                label="Town"
+                name="town"
+                placeholder="Town"
+                value={formState.address.town}
+                onChange={handleAddressChange}
+                required={false}
+              />
+              <FormField
+                label="City"
+                name="city"
+                placeholder="City"
+                value={formState.address.city}
+                onChange={handleAddressChange}
+                required={false}
+              />
+              <FormField
+                label="Country"
+                name="country"
+                placeholder="Country"
+                value={formState.address.country}
+                onChange={handleAddressChange}
+                required={false}
+              />
+              <FormField
+                label="Postcode"
+                name="postcode"
+                placeholder="Postal code"
+                value={formState.address.postcode}
+                onChange={handleAddressChange}
+                required={false}
+              />
+            </div>
           </div>
           <FormField
             label="Password"
@@ -303,7 +377,7 @@ export default function Register() {
           {twoFactorEnrollment?.enabled ? (
             <div className="space-y-4 rounded-3xl border border-primary/30 bg-white/90 px-6 py-6 shadow-card ring-1 ring-primary/10">
               <div className="space-y-1">
-                <p className="text-sm font-semibold text-primary">Finish securing your workspace</p>
+                <p className="text-sm font-semibold text-primary">Finish securing your Learnspace</p>
                 <p className="text-xs text-slate-500">
                   Add Edulure to your authenticator app using this secret, then return to sign in with your new security code.
                 </p>
@@ -378,18 +452,28 @@ export default function Register() {
             className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/40"
           >
             {twoFactorEnrollment?.enabled
-              ? 'Workspace secured'
+              ? 'Learnspace secured'
               : isSubmitting
               ? 'Creating account…'
-              : 'Launch workspace'}
+              : 'Launch Learnspace'}
           </button>
-          <p className="text-sm text-slate-500">
-            Already have an account?{' '}
-            <Link to="/login" className="font-semibold text-primary">
-              Sign in
-            </Link>
-          </p>
         </form>
+        <div className="space-y-4">
+          <div className="relative flex items-center gap-3">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              or try an alternative login
+            </span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+          <SocialSignOn onSelect={handleSocialSignOn} />
+        </div>
+        <p className="text-sm text-slate-500">
+          Already have an account?{' '}
+          <Link to="/login" className="font-semibold text-primary">
+            Sign in
+          </Link>
+        </p>
       </div>
     </AuthCard>
   );

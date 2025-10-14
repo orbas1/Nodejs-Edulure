@@ -39,7 +39,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen> {
 
   static const Map<CommunityRole, _RolePolicy> _rolePolicies = {
     CommunityRole.learner: _RolePolicy(
-      label: 'Learner workspace',
+      label: 'Learner Learnspace',
       summary: 'Members participate in programming, follow communities, and manage subscriptions.',
       canViewFeed: true,
       canPost: true,
@@ -49,7 +49,7 @@ class _CommunitiesScreenState extends State<CommunitiesScreen> {
       canViewLocations: true,
     ),
     CommunityRole.instructor: _RolePolicy(
-      label: 'Instructor workspace',
+      label: 'Instructor Learnspace',
       summary: 'Creators orchestrate cohorts, publish playbooks, and unlock monetisation.',
       canViewFeed: true,
       canPost: true,

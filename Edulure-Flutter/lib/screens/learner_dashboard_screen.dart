@@ -74,7 +74,7 @@ class _LearnerDashboardScreenState extends State<LearnerDashboardScreen> {
                 const Icon(Icons.lock_outline, size: 56, color: Colors.grey),
                 const SizedBox(height: 16),
                 Text(
-                  'Switch to the learner workspace role to access this dashboard.',
+                  'Switch to the learner Learnspace role to access this dashboard.',
                   style: Theme.of(context).textTheme.bodyMedium,
                   textAlign: TextAlign.center,
                 ),

@@ -38,7 +38,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
     final ads = _dashboard?.ads;
     if (ads == null) {
       return _EmptyStateCard(
-        title: 'Ads workspace offline',
+        title: 'Ads Learnspace offline',
         description: 'Connect your ad accounts to sync placements, targeting, and experiments.',
       );
     }
@@ -82,7 +82,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
             spacing: 12,
             runSpacing: 12,
             children: [
-              _buildAdsSummaryCard(context, 'Active campaigns', '${summary.activeCampaigns}', 'Live across workspaces'),
+              _buildAdsSummaryCard(context, 'Active campaigns', '${summary.activeCampaigns}', 'Live across Learnspaces'),
               _buildAdsSummaryCard(context, 'Lifetime spend', summary.totalSpendFormatted, 'Synced from channels'),
               _buildAdsSummaryCard(
                 context,
@@ -683,7 +683,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Switch to your instructor workspace or contact an administrator to get access to the instructor dashboard.',
+              'Switch to your instructor Learnspace or contact an administrator to get access to the instructor dashboard.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -738,7 +738,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                     Row(
                       children: [
                         Chip(
-                          label: const Text('Instructor workspace'),
+                          label: const Text('Instructor Learnspace'),
                           avatar: const Icon(Icons.school_outlined, color: Colors.white, size: 18),
                           labelStyle: const TextStyle(color: Colors.white),
                           backgroundColor: Colors.white.withOpacity(0.2),

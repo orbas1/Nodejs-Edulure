@@ -399,7 +399,7 @@ export default function Feed() {
         <div className="mx-auto max-w-2xl rounded-4xl border border-slate-200 bg-white px-8 py-12 text-center shadow-card">
           <h1 className="text-2xl font-semibold text-slate-900">Community feed unavailable</h1>
           <p className="mt-4 text-sm text-slate-600">
-            Your current role does not provide access to the enterprise community feed or its related workspaces. Reach out to
+            Your current role does not provide access to the enterprise community feed or its related Learnspaces. Reach out to
             your platform administrator to request the appropriate permissions.
           </p>
         </div>
@@ -486,7 +486,7 @@ export default function Feed() {
             )}
             {isAuthenticated && !canPostToCommunities && (
               <div className="rounded-3xl border border-slate-200 bg-white/70 p-6 text-sm text-slate-600">
-                Your workspace is configured for read-only visibility. Ask an administrator to enable community posting access.
+                Your Learnspace is configured for read-only visibility. Ask an administrator to enable community posting access.
               </div>
             )}
             <div className="space-y-4">

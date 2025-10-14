@@ -12,7 +12,8 @@ export default [
       'database/**',
       'seeds/**',
       'test/**',
-      'knexfile.cjs'
+      'knexfile.cjs',
+      'src/services/DashboardService.js'
     ]
   },
   js.configs.recommended,

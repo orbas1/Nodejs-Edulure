@@ -120,7 +120,7 @@ export default function CourseLifecyclePlanner({ lifecycles }) {
                           <td className="py-3 text-slate-600">
                             {entry.notifications?.length ? entry.notifications.join(' • ') : 'No alerts configured'}
                             {entry.workspace ? (
-                              <p className="text-xs text-slate-500">Workspace: {entry.workspace}</p>
+                              <p className="text-xs text-slate-500">Learnspace: {entry.workspace}</p>
                             ) : null}
                           </td>
                         </tr>

@@ -8,7 +8,7 @@ export default function LearnerBookings() {
     return (
       <DashboardStateMessage
         variant="error"
-        title="Learner workspace required"
+        title="Learner Learnspace required"
         description="Switch to the learner dashboard to review tutor bookings and mentorship history."
       />
     );
