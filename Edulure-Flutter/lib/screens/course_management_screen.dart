@@ -23,6 +23,15 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
   }
 
   Future<void> _load() async {
+    final role = SessionManager.getActiveRole();
+    if (role != 'instructor') {
+      setState(() {
+        _dashboard = null;
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -86,6 +95,8 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
   @override
   Widget build(BuildContext context) {
     final token = SessionManager.getAccessToken();
+    final role = SessionManager.getActiveRole();
+    final isInstructor = role == 'instructor';
     return Scaffold(
       appBar: AppBar(
         title: const Text('Course management'),
@@ -93,7 +104,7 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
           IconButton(
             icon: const Icon(Icons.note_add_outlined),
             tooltip: 'Create launch brief',
-            onPressed: _showBriefSheet,
+            onPressed: isInstructor ? _showBriefSheet : null,
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -108,6 +119,16 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                 child: Text('Please log in to see course pipeline and production tasks.'),
               ),
             )
+          : !isInstructor
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'Switch to your instructor workspace to access course management insights.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
           : RefreshIndicator(
               onRefresh: _load,
               child: _loading && _dashboard == null

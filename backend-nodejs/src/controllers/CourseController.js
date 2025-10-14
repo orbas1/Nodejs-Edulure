@@ -3,6 +3,7 @@ import Joi from 'joi';
 import videoPlaybackService from '../services/VideoPlaybackService.js';
 import courseLiveService from '../services/CourseLiveService.js';
 import realtimeService from '../services/RealtimeService.js';
+import courseAccessService from '../services/CourseAccessService.js';
 import { success } from '../utils/httpResponse.js';
 
 const chatMessageSchema = Joi.object({
@@ -22,6 +23,7 @@ export default class CourseController {
         error.status = 400;
         throw error;
       }
+      await courseAccessService.ensureCourseAccess(courseId, req.user, { allowInvited: true });
       const session = videoPlaybackService.getPlaybackSession(courseId, req.user);
       return success(res, {
         data: session,
@@ -40,6 +42,7 @@ export default class CourseController {
         error.status = 400;
         throw error;
       }
+      await courseAccessService.ensureCourseAccess(courseId, req.user, { allowInvited: true });
       const presence = courseLiveService.getPresence(courseId);
       return success(res, {
         data: {
@@ -62,6 +65,7 @@ export default class CourseController {
         throw error;
       }
       const query = await listChatSchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
+      await courseAccessService.ensureCourseAccess(courseId, req.user, { allowInvited: true });
       const messages = courseLiveService.listMessages(courseId, { limit: query.limit });
       return success(res, {
         data: messages,
@@ -87,6 +91,9 @@ export default class CourseController {
       const payload = await chatMessageSchema.validateAsync(req.body, {
         abortEarly: false,
         stripUnknown: true
+      });
+      await courseAccessService.ensureCourseAccess(courseId, req.user, {
+        requireActiveEnrollment: true
       });
       const message = courseLiveService.postMessage(courseId, req.user, payload.body);
       realtimeService.broadcastCourseMessage(courseId, message);
