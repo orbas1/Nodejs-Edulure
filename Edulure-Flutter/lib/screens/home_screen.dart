@@ -471,6 +471,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       ),
     ],
     actions: [
+      _RoleAction(icon: Icons.dashboard_outlined, label: 'Open learner dashboard', route: '/dashboard/learner'),
       _RoleAction(icon: Icons.dynamic_feed_outlined, label: 'Browse feed', route: '/feed'),
       _RoleAction(icon: Icons.bookmark_border, label: 'Open content library', route: '/content'),
       _RoleAction(icon: Icons.calendar_today_outlined, label: 'Review timetable', route: '/profile'),
