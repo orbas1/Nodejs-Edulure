@@ -3,23 +3,31 @@ import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-rout
 import {
   AcademicCapIcon,
   ArrowLeftOnRectangleIcon,
-  BanknotesIcon,
   ArrowTopRightOnSquareIcon,
+  BanknotesIcon,
   BookOpenIcon,
   CalendarDaysIcon,
   ChartBarIcon,
   Cog6ToothIcon,
+  IdentificationIcon,
   DocumentTextIcon,
   InboxStackIcon,
+  HandshakeIcon,
   MegaphoneIcon,
   PlayCircleIcon,
+  ShieldCheckIcon,
   Squares2X2Icon,
   UserGroupIcon,
-  UsersIcon
+  UsersIcon,
+  Bars3Icon,
+  XMarkIcon,
+  VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
+import UserMenu from '../components/navigation/UserMenu.jsx';
 
 const navigationByRole = {
   learner: (basePath) => [
@@ -28,10 +36,13 @@ const navigationByRole = {
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
     { name: 'Assessments', to: `${basePath}/assessments`, icon: AcademicCapIcon },
+    { name: 'Live classrooms', to: `${basePath}/live-classes`, icon: VideoCameraIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
+    { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
     { name: 'Become an instructor', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
   ],
   instructor: (basePath) => [
@@ -39,6 +50,7 @@ const navigationByRole = {
     { name: 'Create community', to: `${basePath}/communities/create`, icon: UserGroupIcon },
     { name: 'Manage communities', to: `${basePath}/communities/manage`, icon: Cog6ToothIcon },
     { name: 'Webinars', to: `${basePath}/communities/webinars`, icon: PlayCircleIcon },
+    { name: 'Live classrooms', to: `${basePath}/live-classes`, icon: VideoCameraIcon },
     { name: 'Podcasts', to: `${basePath}/communities/podcasts`, icon: MicrophoneIcon },
     { name: 'Create course', to: `${basePath}/courses/create`, icon: DocumentTextIcon },
     { name: 'Recorded library', to: `${basePath}/courses/library`, icon: PlayCircleIcon },
@@ -46,13 +58,37 @@ const navigationByRole = {
     { name: 'Assessment studio', to: `${basePath}/assessments`, icon: AcademicCapIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'Tutor management', to: `${basePath}/tutor-management`, icon: IdentificationIcon },
     { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },
-    { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
+    { name: 'Fixnado Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
+    { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon }
+  ],
+  admin: (basePath) => [
+    { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
+    { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
+    { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
+    { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
+    { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
+    { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
+    { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
+    { name: 'Platform ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
+    { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon },
+    { name: 'Fixnado Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
+  ],
+  community: (basePath) => [
+    { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
+    { name: 'Operations', to: `${basePath}/operations`, icon: Cog6ToothIcon },
+    { name: 'Programming', to: `${basePath}/programming`, icon: CalendarDaysIcon },
+    { name: 'Monetisation', to: `${basePath}/monetisation`, icon: BanknotesIcon },
+    { name: 'Safety', to: `${basePath}/safety`, icon: ShieldCheckIcon },
+    { name: 'Communications', to: `${basePath}/communications`, icon: MegaphoneIcon }
   ]
 };
 
@@ -74,6 +110,7 @@ export default function DashboardLayout() {
   const { role } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { session, logout } = useAuth();
   const { activeRole, setActiveRole, roles, dashboards, searchIndex, loading, error, refresh } = useDashboard();
   const allowedRoles = useMemo(() => roles.map((r) => r.id), [roles]);
   const resolvedRole = allowedRoles.length > 0 ? (allowedRoles.includes(role) ? role : allowedRoles[0]) : null;
@@ -92,6 +129,13 @@ export default function DashboardLayout() {
   }, [resolvedRole, activeRole, setActiveRole]);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = () => setMobileNavOpen(false);
+
+  useEffect(() => {
+    closeMobileNav();
+  }, [location.pathname, resolvedRole]);
+
   const filteredResults = useMemo(() => {
     if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
@@ -194,15 +238,16 @@ export default function DashboardLayout() {
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative flex-1">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search across your dashboard data"
-                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
+              <div className="flex flex-col gap-4 lg:flex-1 lg:flex-row lg:items-center lg:gap-6">
+                <div className="relative flex-1">
+                  <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search across your dashboard data"
+                    className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
                 {searchQuery && (
                   <button
                     type="button"
@@ -232,7 +277,7 @@ export default function DashboardLayout() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm">
+              <div className="hidden items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm lg:flex">
                 {roles.map((roleOption) => {
                   const target = `/dashboard/${roleOption.id}`;
                   const isActive = resolvedRole === roleOption.id;
@@ -250,7 +295,39 @@ export default function DashboardLayout() {
                     </NavLink>
                   );
                 })}
+                <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm">
+                  {roles.map((roleOption) => {
+                    const target = `/dashboard/${roleOption.id}`;
+                    const isActive = resolvedRole === roleOption.id;
+                    return (
+                      <NavLink
+                        key={roleOption.id}
+                        to={target}
+                        className={`rounded-2xl px-4 py-2 transition ${
+                          isActive
+                            ? 'bg-primary text-white shadow'
+                            : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+                        }`}
+                      >
+                        {roleOption.label}
+                      </NavLink>
+                    );
+                  })}
+                </div>
               </div>
+              <div className="self-start lg:self-center">
+                <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
+              </div>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
+                onClick={() => setMobileNavOpen((open) => !open)}
+                aria-expanded={mobileNavOpen}
+                aria-controls="dashboard-mobile-nav"
+              >
+                <Bars3Icon className="h-5 w-5" />
+                Menu
+              </button>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-slate-500">
               <span>
@@ -272,6 +349,83 @@ export default function DashboardLayout() {
           </div>
         </main>
       </div>
+      <div
+        className={`${
+          mobileNavOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        } fixed inset-0 z-40 bg-slate-950/40 transition-opacity duration-200 lg:hidden`}
+        aria-hidden={!mobileNavOpen}
+        onClick={closeMobileNav}
+      />
+      <nav
+        id="dashboard-mobile-nav"
+        className={`${
+          mobileNavOpen ? 'translate-x-0' : 'translate-x-full'
+        } fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl transition-transform duration-200 lg:hidden`}
+        aria-label="Dashboard navigation"
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Navigate</p>
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            onClick={closeMobileNav}
+          >
+            <XMarkIcon className="h-5 w-5" />
+            <span className="sr-only">Close menu</span>
+          </button>
+        </div>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {roles.map((roleOption) => {
+            const target = `/dashboard/${roleOption.id}`;
+            const isActive = resolvedRole === roleOption.id;
+            return (
+              <NavLink
+                key={roleOption.id}
+                to={target}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                  isActive
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'border border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary'
+                }`}
+                end
+                onClick={closeMobileNav}
+              >
+                {roleOption.label}
+              </NavLink>
+            );
+          })}
+        </div>
+        <ul className="mt-8 space-y-2">
+          {navigation.map((item) => (
+            <li key={item.to}>
+              <NavLink
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
+                    isActive
+                      ? 'border-primary/60 bg-primary/10 text-primary shadow-sm'
+                      : 'border-slate-200 text-slate-600 hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
+                  }`
+                }
+                onClick={closeMobileNav}
+              >
+                <item.icon className="h-5 w-5 text-slate-400" />
+                <span>{item.name}</span>
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-6 border-t border-slate-200 pt-6">
+          <a
+            href="/"
+            className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-primary/40 hover:text-primary"
+          >
+            <span>Return to site</span>
+            <ArrowLeftOnRectangleIcon className="h-4 w-4" />
+          </a>
+        </div>
+      </nav>
     </div>
   );
 }

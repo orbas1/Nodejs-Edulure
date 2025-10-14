@@ -1,11 +1,21 @@
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerCourses() {
-  const { dashboard, refresh } = useOutletContext();
+  const { isLearner, section: data, refresh } = useLearnerDashboardSection('courses');
   const navigate = useNavigate();
-  const data = dashboard?.courses;
+
+  if (!isLearner) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Learner workspace required"
+        description="Switch to your learner dashboard to manage active programs and personalised course recommendations."
+      />
+    );
+  }
 
   if (!data) {
     return (

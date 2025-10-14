@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
@@ -204,6 +205,12 @@ const envSchema = z
     CORS_ALLOWED_ORIGINS: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
     JWT_SECRET: z.string().min(32).optional(),
+    TWO_FACTOR_ENCRYPTION_KEY: z.string().min(32).optional(),
+    TWO_FACTOR_REQUIRED_ROLES: z.string().optional(),
+    TWO_FACTOR_ISSUER: z.string().optional(),
+    TWO_FACTOR_DIGITS: z.coerce.number().int().min(6).max(10).default(6),
+    TWO_FACTOR_STEP_SECONDS: z.coerce.number().int().min(15).max(120).default(30),
+    TWO_FACTOR_WINDOW: z.coerce.number().int().min(0).max(2).default(1),
     JWT_REFRESH_SECRET: z
       .string()
       .min(32, 'JWT_REFRESH_SECRET must be at least 32 characters to provide adequate entropy'),
@@ -484,6 +491,14 @@ const corsOrigins = (raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL)
 const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
 const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');
 const searchAllowedIps = parseCsv(raw.MEILISEARCH_ALLOWED_IPS ?? '');
+const configuredTwoFactorRoles = parseCsv(raw.TWO_FACTOR_REQUIRED_ROLES ?? '');
+const twoFactorRequiredRoles = (configuredTwoFactorRoles.length > 0
+  ? configuredTwoFactorRoles
+  : ['admin']
+).map((role) => role.toLowerCase());
+const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRESH_SECRET;
+const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
+const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
 
 export const env = {
   nodeEnv: raw.NODE_ENV,
@@ -515,7 +530,15 @@ export const env = {
     accountLockoutWindowMinutes: raw.ACCOUNT_LOCKOUT_WINDOW_MINUTES,
     accountLockoutDurationMinutes: raw.ACCOUNT_LOCKOUT_DURATION_MINUTES,
     sessionValidationCacheTtlMs: raw.SESSION_VALIDATION_CACHE_TTL_MS,
-    maxActiveSessionsPerUser: raw.MAX_ACTIVE_SESSIONS_PER_USER
+    maxActiveSessionsPerUser: raw.MAX_ACTIVE_SESSIONS_PER_USER,
+    twoFactor: {
+      encryptionKey: twoFactorEncryptionKey,
+      issuer: twoFactorIssuer,
+      requiredRoles: twoFactorRequiredRoles,
+      digits: raw.TWO_FACTOR_DIGITS,
+      stepSeconds: raw.TWO_FACTOR_STEP_SECONDS,
+      window: raw.TWO_FACTOR_WINDOW
+    }
   },
   database: {
     host: raw.DB_HOST,

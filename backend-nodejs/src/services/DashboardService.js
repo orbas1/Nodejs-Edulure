@@ -7,6 +7,7 @@ import UserFollowModel from '../models/UserFollowModel.js';
 import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import IdentityVerificationService from './IdentityVerificationService.js';
+import BlogService from './BlogService.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -30,6 +31,126 @@ function toNumber(value) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat('en-US').format(toNumber(value));
+}
+
+function normaliseStringArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry).trim())
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[')) {
+      const parsed = safeJsonParse(trimmed, []);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((entry) => String(entry).trim())
+          .filter((entry) => entry.length > 0);
+      }
+    }
+    return trimmed
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === 'object') {
+    return Object.values(value)
+      .map((entry) => String(entry).trim())
+      .filter((entry) => entry.length > 0);
+  }
+  return [];
+}
+
+function formatPercentage(value, digits = 2) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || Number.isNaN(numeric)) {
+    return '0.00%';
+  }
+  return `${(numeric * 100).toFixed(digits)}%`;
+}
+
+function formatRoasFromCents(revenueCents, spendCents) {
+  const spend = Number(spendCents ?? 0);
+  const revenue = Number(revenueCents ?? 0);
+  if (spend <= 0) return null;
+  const ratio = revenue / spend;
+  if (!Number.isFinite(ratio)) return null;
+  return `${ratio.toFixed(2)}x`;
+}
+
+function formatScheduleRange(startAt, endAt) {
+  if (!startAt && !endAt) {
+    return 'Schedule pending';
+  }
+  if (startAt && endAt) {
+    return `${formatDateTime(startAt, { dateStyle: 'medium' })} – ${formatDateTime(endAt, { dateStyle: 'medium' })}`;
+  }
+  if (startAt) {
+    return `Starts ${formatDateTime(startAt, { dateStyle: 'medium' })}`;
+  }
+  return `Runs until ${formatDateTime(endAt, { dateStyle: 'medium' })}`;
+}
+
+function accumulateCurrency(map, currency, cents) {
+  if (!currency) return;
+  const current = map.get(currency) ?? 0;
+  map.set(currency, current + Number(cents ?? 0));
+}
+
+function capitalise(value) {
+  if (!value) return '';
+  const stringValue = String(value);
+  if (!stringValue.length) return '';
+  return stringValue.charAt(0).toUpperCase() + stringValue.slice(1);
+}
+
+function resolvePlacementSurface(campaign) {
+  const featureFlag = campaign.metadata?.featureFlag;
+  if (typeof featureFlag === 'string' && featureFlag.includes('explorer')) {
+    return 'Explorer';
+  }
+  if (typeof featureFlag === 'string' && featureFlag.includes('feed')) {
+    return 'Learning feed';
+  }
+  if (campaign.metadata?.promotedCommunityId) {
+    return 'Community spotlight';
+  }
+  return 'Learning feed';
+}
+
+function resolvePlacementSlot(campaign) {
+  switch (campaign.objective) {
+    case 'conversions':
+      return 'Conversion spotlight';
+    case 'leads':
+      return 'Lead capture hero';
+    case 'traffic':
+      return 'Traffic accelerator';
+    case 'awareness':
+    default:
+      return 'Awareness banner';
+  }
+}
+
+function buildPlacementTags(campaign, keywords, audiences) {
+  const tags = new Set();
+  if (campaign.objective) {
+    tags.add(`Objective · ${capitalise(campaign.objective)}`);
+  }
+  const featureFlag = campaign.metadata?.featureFlag;
+  if (featureFlag) {
+    tags.add(`Flag · ${featureFlag}`);
+  }
+  const promotedCommunityId = campaign.metadata?.promotedCommunityId;
+  if (promotedCommunityId) {
+    tags.add(`Community · #${promotedCommunityId}`);
+  }
+  keywords.slice(0, 2).forEach((keyword) => tags.add(`Keyword · ${keyword}`));
+  audiences.slice(0, 2).forEach((audience) => tags.add(`Audience · ${audience}`));
+  return Array.from(tags);
 }
 
 export function buildAvatarUrl(email) {
@@ -178,6 +299,534 @@ export function buildLearningPace(completions, referenceDate = new Date()) {
   return days.map((entry) => ({ day: entry.key, minutes: entry.minutes }));
 }
 
+export function buildCommunityDashboard({
+  user,
+  now,
+  communityMemberships,
+  communityStats,
+  communityResources,
+  communityPosts,
+  communityMessages,
+  communityMessageContributions,
+  communityAssignments,
+  liveClassrooms,
+  tutorBookings,
+  adsCampaigns,
+  adsMetrics,
+  communityPaywallTiers,
+  communitySubscriptions
+}) {
+  const managedCommunityIds = new Set();
+  const communityLookup = new Map();
+
+  communityMemberships.forEach((membership) => {
+    const communityId = Number(membership.communityId);
+    if (!Number.isFinite(communityId)) return;
+    const normalised = {
+      communityId,
+      communityName: membership.communityName ?? `Community ${communityId}`,
+      role: membership.role ?? 'member',
+      status: membership.status ?? 'pending',
+      ownerId: Number(membership.ownerId ?? membership.userId ?? 0),
+      joinedAt: membership.joinedAt ? new Date(membership.joinedAt) : null,
+      metadata: safeJsonParse(membership.membershipMetadata, {})
+    };
+    communityLookup.set(communityId, normalised);
+    if (normalised.ownerId === user.id || normalised.role !== 'member') {
+      managedCommunityIds.add(communityId);
+    }
+  });
+
+  communityPaywallTiers.forEach((tier) => {
+    const communityId = Number(tier.communityId);
+    if (!Number.isFinite(communityId)) return;
+    const ownerId = Number(tier.ownerId);
+    if (ownerId && ownerId === user.id) {
+      managedCommunityIds.add(communityId);
+      if (!communityLookup.has(communityId)) {
+        communityLookup.set(communityId, {
+          communityId,
+          communityName: tier.communityName ?? `Community ${communityId}`,
+          role: 'owner',
+          status: 'active',
+          ownerId,
+          joinedAt: null,
+          metadata: {}
+        });
+      }
+    }
+  });
+
+  liveClassrooms.forEach((session) => {
+    const communityId = Number(session.communityId);
+    if (!Number.isFinite(communityId)) return;
+    if (managedCommunityIds.has(communityId)) return;
+    if (session.instructorId && Number(session.instructorId) === user.id) {
+      managedCommunityIds.add(communityId);
+      communityLookup.set(communityId, {
+        communityId,
+        communityName: session.communityName ?? `Community ${communityId}`,
+        role: 'host',
+        status: session.status ?? 'scheduled',
+        ownerId: Number(session.instructorId),
+        joinedAt: session.startAt ? new Date(session.startAt) : null,
+        metadata: safeJsonParse(session.metadata, {})
+      });
+    }
+  });
+
+  if (managedCommunityIds.size === 0) {
+    return null;
+  }
+
+  const statsByCommunity = new Map();
+  communityStats.forEach((stat) => {
+    const communityId = Number(stat.community_id ?? stat.communityId);
+    if (!Number.isFinite(communityId)) return;
+    statsByCommunity.set(communityId, {
+      activeMembers: Number(stat.active_members ?? stat.activeMembers ?? 0),
+      pendingMembers: Number(stat.pending_members ?? stat.pendingMembers ?? 0),
+      moderators: Number(stat.moderators ?? stat.moderatorCount ?? stat.moderator_count ?? 0),
+      escalationsOpen: Number(stat.escalations_open ?? stat.escalationsOpen ?? 0),
+      incidentsOpen: Number(stat.incidents_open ?? stat.incidentsOpen ?? 0)
+    });
+  });
+
+  const liveSessions = liveClassrooms.map((session) => ({
+    ...session,
+    startAt: session.startAt ? new Date(session.startAt) : null,
+    endAt: session.endAt ? new Date(session.endAt) : null,
+    metadata: safeJsonParse(session.metadata, {})
+  }));
+
+  const tutorBookingsNormalised = tutorBookings.map((booking) => ({
+    ...booking,
+    scheduledStart: booking.scheduledStart ? new Date(booking.scheduledStart) : null,
+    metadata: safeJsonParse(booking.metadata, {})
+  }));
+
+  const contributionByCommunity = new Map();
+  communityMessageContributions.forEach((row) => {
+    const communityId = Number(row.communityId ?? row.community_id);
+    if (!Number.isFinite(communityId)) return;
+    contributionByCommunity.set(communityId, Number(row.contribution_count ?? 0));
+  });
+
+  const incidentsFromMessages = communityMessages
+    .map((message) => {
+      const metadata = safeJsonParse(message.metadata, {});
+      if (!metadata.flagged && !metadata.escalation) return null;
+      const communityId = Number(message.communityId ?? metadata.communityId ?? 0);
+      if (!managedCommunityIds.has(communityId)) return null;
+      return {
+        id: `incident-${message.id}`,
+        communityId,
+        communityName: message.communityName ?? communityLookup.get(communityId)?.communityName ?? 'Community',
+        severity: metadata.severity ?? 'medium',
+        status: metadata.escalation?.status ?? 'triage',
+        openedAt: message.deliveredAt ? new Date(message.deliveredAt) : null,
+        owner: metadata.escalation?.owner ?? metadata.moderator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator',
+        summary: metadata.summary ?? (metadata.flaggedReason ?? message.body?.slice(0, 120) ?? 'Flagged conversation')
+      };
+    })
+    .filter(Boolean);
+
+  const totalActiveMembers = Array.from(managedCommunityIds).reduce((total, communityId) => {
+    const stats = statsByCommunity.get(communityId);
+    return total + Number(stats?.activeMembers ?? 0);
+  }, 0);
+
+  const totalPendingMembers = Array.from(managedCommunityIds).reduce((total, communityId) => {
+    const stats = statsByCommunity.get(communityId);
+    return total + Number(stats?.pendingMembers ?? 0);
+  }, 0);
+
+  const totalModerators = Array.from(managedCommunityIds).reduce((total, communityId) => {
+    const stats = statsByCommunity.get(communityId);
+    return total + Number(stats?.moderators ?? 0);
+  }, 0);
+
+  const engagementMessages = communityMessages.filter((message) => {
+    const communityId = Number(message.communityId ?? 0);
+    return managedCommunityIds.has(communityId);
+  });
+
+  const metrics = [
+    {
+      label: 'Active members',
+      value: formatNumber(totalActiveMembers),
+      change:
+        totalPendingMembers > 0
+          ? `+${formatNumber(totalPendingMembers)} awaiting approval`
+          : totalActiveMembers > 0
+            ? 'Roster steady'
+            : 'Invite members',
+      trend: totalPendingMembers > 0 ? 'up' : 'steady'
+    },
+    {
+      label: 'Moderator coverage',
+      value: `${formatNumber(totalModerators)} leaders`,
+      change:
+        totalModerators > 0
+          ? `${Math.max(1, Math.round(totalActiveMembers / Math.max(totalModerators, 1)))} members per lead`
+          : 'Assign moderators',
+      trend: totalModerators > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Weekly contributions',
+      value: `${formatNumber(engagementMessages.length)}`,
+      change:
+        engagementMessages.length > 0
+          ? `${formatNumber(incidentsFromMessages.length)} escalations`
+          : 'No logged activity',
+      trend: engagementMessages.length > incidentsFromMessages.length ? 'up' : 'steady'
+    },
+    {
+      label: 'Automation readiness',
+      value: `${communityResources.filter((resource) => safeJsonParse(resource.metadata, {}).automation === true).length} playbooks`,
+      change: `${communityAssignments.length} open assignments`,
+      trend: communityAssignments.length > 0 ? 'up' : 'steady'
+    }
+  ];
+
+  const healthDeck = Array.from(managedCommunityIds).map((communityId) => {
+    const lookup = communityLookup.get(communityId);
+    const stats = statsByCommunity.get(communityId) ?? {
+      activeMembers: 0,
+      pendingMembers: 0,
+      moderators: 0,
+      incidentsOpen: 0,
+      escalationsOpen: 0
+    };
+    const contributions = contributionByCommunity.get(communityId) ?? 0;
+    const activityScore = stats.activeMembers + stats.pendingMembers > 0
+      ? stats.activeMembers / (stats.activeMembers + stats.pendingMembers)
+      : 0;
+    let healthLabel = 'Stable';
+    if (activityScore >= 0.85) healthLabel = 'Excellent';
+    else if (activityScore >= 0.7) healthLabel = 'Healthy';
+    else if (activityScore > 0) healthLabel = 'Needs attention';
+    const backlog = stats.escalationsOpen + stats.incidentsOpen;
+    const trend = backlog > 0
+      ? `${backlog} open escalation${backlog === 1 ? '' : 's'}`
+      : contributions > 0
+        ? `${formatNumber(contributions)} posts`
+        : 'Recruit momentum';
+    return {
+      id: `community-${communityId}`,
+      name: lookup?.communityName ?? `Community ${communityId}`,
+      members: `${formatNumber(stats.activeMembers)} active`,
+      moderators: `${formatNumber(stats.moderators)} moderators`,
+      health: healthLabel,
+      trend,
+      approvalsPending: stats.pendingMembers,
+      incidentsOpen: stats.incidentsOpen,
+      escalationsOpen: stats.escalationsOpen
+    };
+  });
+
+  const runbooks = communityResources
+    .filter((resource) => managedCommunityIds.has(Number(resource.communityId ?? resource.community_id ?? 0)))
+    .map((resource) => {
+      const tags = safeJsonParse(resource.tags, []);
+      const metadata = safeJsonParse(resource.metadata, {});
+      return {
+        id: `resource-${resource.id}`,
+        title: resource.title ?? 'Operations playbook',
+        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team',
+        updatedAt: resource.publishedAt
+          ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
+          : 'Draft',
+        tags: Array.isArray(tags) && tags.length ? tags.slice(0, 4) : ['Runbook'],
+        automationReady: metadata.automation === true
+      };
+    });
+
+  const escalations = communityAssignments
+    .filter((assignment) => managedCommunityIds.has(Number(assignment.communityId ?? assignment.courseId ?? 0)))
+    .map((assignment) => {
+      const metadata = safeJsonParse(assignment.metadata, {});
+      const dueOffsetDays = Number(assignment.dueOffsetDays ?? metadata.dueOffsetDays ?? 0);
+      const dueDate = assignment.enrollmentStartedAt
+        ? new Date(new Date(assignment.enrollmentStartedAt).getTime() + dueOffsetDays * DAY_IN_MS)
+        : now;
+      return {
+        id: `assignment-${assignment.id}`,
+        title: assignment.title ?? 'Operational task',
+        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team',
+        status: metadata.status ?? 'open',
+        due: formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }),
+        community: assignment.courseTitle ?? metadata.communityName ?? 'Community'
+      };
+    });
+
+  const upcomingEvents = liveSessions
+    .filter((session) => session.startAt && managedCommunityIds.has(Number(session.communityId ?? 0)))
+    .sort((a, b) => a.startAt - b.startAt)
+    .map((session) => ({
+      id: `event-${session.id}`,
+      title: session.title ?? 'Live session',
+      date: formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }),
+      facilitator: session.hostName ?? session.metadata?.facilitator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host',
+      seats: `${Number(session.reservedSeats ?? 0)}/${Number(session.capacity ?? 0)} booked`,
+      status: session.status ?? 'scheduled'
+    }));
+
+  const tutorPods = tutorBookingsNormalised
+    .filter((booking) => managedCommunityIds.has(Number(booking.communityId ?? 0)))
+    .map((booking) => ({
+      id: `tutor-${booking.id}`,
+      mentor: booking.tutorName ?? booking.metadata.tutor ?? 'Mentor',
+      focus: booking.metadata.topic ?? 'Mentorship session',
+      scheduled:
+        booking.scheduledStart && booking.scheduledStart >= now
+          ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Awaiting scheduling',
+      status: booking.status ?? 'pending'
+    }));
+
+  const broadcasts = communityPosts
+    .filter((post) => managedCommunityIds.has(Number(post.communityId ?? post.community_id ?? 0)))
+    .map((post) => ({
+      id: `broadcast-${post.id}`,
+      title: post.title ?? 'Announcement',
+      stage: post.status === 'published' ? 'Published' : 'Draft',
+      release: post.publishedAt
+        ? formatDateTime(post.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
+        : 'Unscheduled',
+      channel: post.channel ?? 'Feed'
+    }));
+
+  const experimentsMetrics = new Map();
+  adsMetrics.forEach((metric) => {
+    const campaignId = Number(metric.campaignId ?? metric.campaign_id);
+    if (!Number.isFinite(campaignId)) return;
+    const list = experimentsMetrics.get(campaignId) ?? [];
+    list.push({
+      ...metric,
+      metricDate: metric.metricDate ? new Date(metric.metricDate) : null,
+      conversions: Number(metric.conversions ?? 0),
+      revenueCents: Number(metric.revenueCents ?? metric.revenue_cents ?? 0)
+    });
+    experimentsMetrics.set(campaignId, list);
+  });
+
+  const experiments = adsCampaigns
+    .map((campaign) => {
+      const metadata = safeJsonParse(campaign.metadata, {});
+      const communityId = Number(metadata.promotedCommunityId ?? metadata.communityId ?? 0);
+      if (communityId && !managedCommunityIds.has(communityId)) return null;
+      const series = (experimentsMetrics.get(Number(campaign.id)) ?? []).sort(
+        (a, b) => (b.metricDate?.getTime() ?? 0) - (a.metricDate?.getTime() ?? 0)
+      );
+      const latest = series[0];
+      const previous = series[1];
+      const conversionDelta = latest && previous ? latest.conversions - previous.conversions : latest?.conversions ?? 0;
+      const hypothesis = latest
+        ? `${conversionDelta >= 0 ? '+' : '−'}${Math.abs(conversionDelta)} conversions · ${formatCurrency(
+            latest.revenueCents,
+            campaign.spendCurrency ?? 'USD'
+          )}`
+        : 'Awaiting telemetry';
+      return {
+        id: `experiment-${campaign.id}`,
+        name: campaign.name ?? 'Growth experiment',
+        status: campaign.status ?? 'draft',
+        community: communityId ? communityLookup.get(communityId)?.communityName ?? `Community ${communityId}` : 'Cross-community',
+        hypothesis
+      };
+    })
+    .filter(Boolean);
+
+  const tierStats = new Map();
+  communitySubscriptions.forEach((subscription) => {
+    const communityId = Number(subscription.communityId ?? subscription.community_id ?? 0);
+    if (!managedCommunityIds.has(communityId)) return;
+    const tierName = subscription.tierName ?? subscription.tier_name ?? 'Tier';
+    const key = `${communityId}-${tierName}`;
+    const stats = tierStats.get(key) ?? {
+      communityId,
+      communityName: subscription.communityName ?? communityLookup.get(communityId)?.communityName ?? `Community ${communityId}`,
+      tierName,
+      currency: subscription.currency ?? subscription.currency_code ?? 'USD',
+      priceCents: Number(subscription.priceCents ?? subscription.price_cents ?? 0),
+      active: 0,
+      cancelled: 0,
+      renewals: []
+    };
+    if (subscription.status === 'active') {
+      stats.active += 1;
+      if (subscription.currentPeriodEnd) {
+        stats.renewals.push(new Date(subscription.currentPeriodEnd));
+      }
+    } else if (subscription.status === 'cancelled') {
+      stats.cancelled += 1;
+    }
+    tierStats.set(key, stats);
+  });
+
+  const tiers = Array.from(tierStats.values()).map((tier, index) => {
+    const nextRenewal = tier.renewals.sort((a, b) => (a?.getTime() ?? 0) - (b?.getTime() ?? 0))[0] ?? null;
+    return {
+      id: `tier-${index}`,
+      name: `${tier.communityName} · ${tier.tierName}`,
+      price: formatCurrency(tier.priceCents, tier.currency),
+      members: `${formatNumber(tier.active)} active`,
+      churn: tier.cancelled > 0 ? `${formatNumber(tier.cancelled)} cancellations` : 'Retention steady',
+      renewal: nextRenewal ? formatDateTime(nextRenewal, { dateStyle: 'medium', timeStyle: undefined }) : 'Auto-renewal'
+    };
+  });
+
+  const totalSubscriptionRevenue = Array.from(tierStats.values()).reduce(
+    (total, tier) => total + tier.priceCents * tier.active,
+    0
+  );
+
+  const monetisationInsights = [];
+  if (tiers.length > 0) {
+    const topTier = tiers.reduce((current, candidate) => {
+      const currentMembers = Number(current.members.replace(/\D/g, '')) || 0;
+      const candidateMembers = Number(candidate.members.replace(/\D/g, '')) || 0;
+      return candidateMembers > currentMembers ? candidate : current;
+    }, tiers[0]);
+    monetisationInsights.push(`${topTier.name} leads premium adoption.`);
+  }
+  if (totalSubscriptionRevenue > 0) {
+    monetisationInsights.push(
+      `${formatCurrency(totalSubscriptionRevenue, tiers[0]?.currency ?? 'USD')} in recurring revenue across communities.`
+    );
+  }
+  if (experiments.length > 0) {
+    monetisationInsights.push('Active growth experiments are feeding new membership cohorts.');
+  }
+
+  const communicationsHighlights = engagementMessages.slice(0, 12).map((message) => {
+    const metadata = safeJsonParse(message.metadata, {});
+    const communityId = Number(message.communityId ?? 0);
+    return {
+      id: `highlight-${message.id}`,
+      community: message.communityName ?? communityLookup.get(communityId)?.communityName ?? 'Community',
+      preview: message.body?.slice(0, 140) ?? 'New update shared',
+      tags: Array.isArray(metadata.tags) && metadata.tags.length ? metadata.tags.slice(0, 3) : ['Update'],
+      postedAt: message.deliveredAt ? humanizeRelativeTime(message.deliveredAt, now) : 'Recently',
+      reactions: metadata.reactions ?? 0
+    };
+  });
+
+  const moderators = communityMemberships
+    .filter((membership) => managedCommunityIds.has(Number(membership.communityId)) && membership.role && membership.role !== 'member')
+    .map((membership) => {
+      const metadata = safeJsonParse(membership.membershipMetadata, {});
+      return {
+        id: `moderator-${membership.membershipId ?? membership.id ?? `${membership.communityId}-${membership.userId}`}`,
+        community: membership.communityName ?? `Community ${membership.communityId}`,
+        role: membership.role ?? 'Moderator',
+        timezone: metadata.timezone ?? 'UTC',
+        coverage: metadata.coverage ?? 'Full-time'
+      };
+    });
+
+  const communicationsTrends = Array.from(managedCommunityIds).map((communityId) => {
+    const contributions = contributionByCommunity.get(communityId) ?? 0;
+    const stats = statsByCommunity.get(communityId) ?? { activeMembers: 0, pendingMembers: 0 };
+    const contributionRate = stats.activeMembers > 0 ? Math.round((contributions / stats.activeMembers) * 100) : 0;
+    return {
+      id: `trend-${communityId}`,
+      metric: communityLookup.get(communityId)?.communityName ?? `Community ${communityId}`,
+      current: `${contributionRate}% active`,
+      previous: stats.pendingMembers > 0 ? `${stats.pendingMembers} pending approvals` : 'All members onboarded'
+    };
+  });
+
+  const searchIndex = [
+    ...healthDeck.map((entry) => ({
+      id: `search-community-overview-${entry.id}`,
+      role: 'community',
+      type: 'Community',
+      title: entry.name,
+      url: '/dashboard/community/operations'
+    })),
+    ...runbooks.map((runbook) => ({
+      id: `search-community-runbook-${runbook.id}`,
+      role: 'community',
+      type: 'Runbook',
+      title: runbook.title,
+      url: '/dashboard/community/operations'
+    })),
+    ...upcomingEvents.map((event) => ({
+      id: `search-community-event-${event.id}`,
+      role: 'community',
+      type: 'Event',
+      title: event.title,
+      url: '/dashboard/community/programming'
+    })),
+    ...tiers.map((tier) => ({
+      id: `search-community-tier-${tier.id}`,
+      role: 'community',
+      type: 'Tier',
+      title: tier.name,
+      url: '/dashboard/community/monetisation'
+    }))
+  ];
+
+  const profileStats = [
+    { label: 'Communities', value: `${managedCommunityIds.size} stewarded` },
+    { label: 'Moderators', value: `${formatNumber(moderators.length)} leads` },
+    { label: 'Recurring revenue', value: formatCurrency(totalSubscriptionRevenue, tiers[0]?.currency ?? 'USD') }
+  ];
+
+  const bioSegments = [];
+  if (managedCommunityIds.size > 0) {
+    bioSegments.push(`stewarding ${managedCommunityIds.size} community${managedCommunityIds.size === 1 ? '' : 'ies'}`);
+  }
+  if (totalActiveMembers > 0) {
+    bioSegments.push(`supporting ${formatNumber(totalActiveMembers)} active members`);
+  }
+  if (tiers.length > 0) {
+    bioSegments.push(`shipping ${tiers.length} premium tier${tiers.length === 1 ? '' : 's'}`);
+  }
+  const profileBio = bioSegments.length ? `Currently ${bioSegments.join(', ')}.` : '';
+
+  return {
+    role: { id: 'community', label: 'Community' },
+    dashboard: {
+      metrics,
+      health: {
+        overview: healthDeck,
+        moderators,
+        communicationsTrends
+      },
+      operations: {
+        runbooks,
+        escalations
+      },
+      programming: {
+        upcomingEvents,
+        tutorPods,
+        broadcasts
+      },
+      monetisation: {
+        tiers,
+        experiments,
+        insights: monetisationInsights
+      },
+      safety: {
+        incidents: incidentsFromMessages,
+        backlog: escalations,
+        moderators
+      },
+      communications: {
+        highlights: communicationsHighlights,
+        broadcasts,
+        trends: communicationsTrends
+      }
+    },
+    searchIndex,
+    profileStats,
+    profileBio
+  };
+}
+
 export function buildInstructorDashboard({
   user,
   now,
@@ -203,6 +852,7 @@ export function buildInstructorDashboard({
   ebookRows = [],
   ebookProgressRows = []
 } = {}) {
+}) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const communityStatsMap = new Map();
@@ -224,6 +874,7 @@ export function buildInstructorDashboard({
   const upsertManagedCommunity = (communityId, payload) => {
     const existing = communityLookup.get(communityId);
     const merged = existing ? { ...existing, ...payload } : payload;
+    const merged = { ...(communityLookup.get(communityId) ?? {}), ...payload };
     communityLookup.set(communityId, merged);
     if (!managedCommunityIds.has(communityId)) {
       managedCommunities.push(merged);
@@ -231,6 +882,11 @@ export function buildInstructorDashboard({
       const index = managedCommunities.findIndex((entry) => Number(entry.communityId) === Number(communityId));
       if (index !== -1) {
         managedCommunities[index] = { ...managedCommunities[index], ...merged };
+      const index = managedCommunities.findIndex(
+        (community) => Number(community.communityId) === communityId
+      );
+      if (index !== -1) {
+        managedCommunities[index] = merged;
       }
     }
     managedCommunityIds.add(communityId);
@@ -399,6 +1055,8 @@ export function buildInstructorDashboard({
     const offset = Number(assignment.dueOffsetDays ?? 0);
     const dueDate = new Date(base.getTime() + offset * 24 * 60 * 60 * 1000);
     const resolvedMaxScore = Number(assignment.maxScore ?? metadata.maxScore ?? metadata.points ?? 0);
+    const fallbackOwnerName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+    const resolvedOwner = metadata.owner ?? (fallbackOwnerName || user.email);
     return {
       id: Number(assignment.id),
       courseId: Number(assignment.courseId),
@@ -412,6 +1070,11 @@ export function buildInstructorDashboard({
       owner:
         metadata.owner ??
         ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)),
+      owner: resolvedOwner,
+      owner:
+        metadata.owner ??
+        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()) || user.email),
+      owner: metadata.owner ?? resolveName(user.firstName, user.lastName, user.email),
       metadata
     };
   });
@@ -565,6 +1228,7 @@ export function buildInstructorDashboard({
       status: 'Requested',
       learner:
         (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
+      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
       topic: booking.metadata.topic ?? 'Mentorship session'
     }));
@@ -576,6 +1240,7 @@ export function buildInstructorDashboard({
       topic: booking.metadata.topic ?? 'Mentorship session',
       learner:
         (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
+      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
     }));
 
@@ -588,12 +1253,28 @@ export function buildInstructorDashboard({
   upcomingTutorSlots.forEach((slot) => {
     const tutorId = Number(slot.tutorId);
     const base = tutorScheduleMap.get(tutorId) ?? {
-      mentor: slot.tutorName ?? tutorProfileMap.get(tutorId)?.displayName ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+      mentor:
+        slot.tutorName ??
+        tutorProfileMap.get(tutorId)?.displayName ??
+        `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
       slots: 0,
       learners: 0,
-      notes: new Set()
+      notes: new Set(),
+      openSlots: 0,
+      nextSlotAt: null,
+      nextOpenSlot: null,
+      nextSession: null
     };
     base.slots += 1;
+    if (slot.startAt && (!base.nextSlotAt || slot.startAt < base.nextSlotAt)) {
+      base.nextSlotAt = slot.startAt;
+    }
+    if (slot.status === 'open') {
+      base.openSlots += 1;
+      if (slot.startAt && (!base.nextOpenSlot || slot.startAt < base.nextOpenSlot)) {
+        base.nextOpenSlot = slot.startAt;
+      }
+    }
     if (slot.metadata.channel) base.notes.add(`#${slot.metadata.channel}`);
     if (slot.metadata.durationMinutes) base.notes.add(`${slot.metadata.durationMinutes} mins`);
     tutorScheduleMap.set(tutorId, base);
@@ -604,21 +1285,204 @@ export function buildInstructorDashboard({
     .forEach((booking) => {
       const tutorId = Number(booking.tutorId);
       const base = tutorScheduleMap.get(tutorId) ?? {
-        mentor: tutorProfileMap.get(tutorId)?.displayName ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+        mentor:
+          tutorProfileMap.get(tutorId)?.displayName ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
         slots: 0,
         learners: 0,
-        notes: new Set()
+        notes: new Set(),
+        openSlots: 0,
+        nextSlotAt: null,
+        nextOpenSlot: null,
+        nextSession: null
       };
       base.learners += 1;
+      if (booking.scheduledStart && (!base.nextSession || booking.scheduledStart < base.nextSession)) {
+        base.nextSession = booking.scheduledStart;
+      }
       tutorScheduleMap.set(tutorId, base);
     });
 
-  const tutorSchedule = Array.from(tutorScheduleMap.entries()).map(([tutorId, entry]) => ({
-    id: `tutor-${tutorId}`,
-    mentor: entry.mentor,
-    slots: `${entry.slots} slot${entry.slots === 1 ? '' : 's'}`,
-    learners: `${entry.learners} learner${entry.learners === 1 ? '' : 's'}`,
-    notes: Array.from(entry.notes).join(' • ') || 'Capacity in sync'
+  const tutorSchedule = Array.from(tutorScheduleMap.entries()).map(([tutorId, entry]) => {
+    const noteItems = Array.from(entry.notes);
+    if (entry.openSlots > 0) {
+      noteItems.push(`${entry.openSlots} open slot${entry.openSlots === 1 ? '' : 's'}`);
+    }
+    return {
+      id: `tutor-${tutorId}`,
+      mentor: entry.mentor,
+      slots: `${entry.slots} slot${entry.slots === 1 ? '' : 's'}`,
+      slotsCount: entry.slots,
+      learners: `${entry.learners} learner${entry.learners === 1 ? '' : 's'}`,
+      learnersCount: entry.learners,
+      nextAvailability: entry.nextOpenSlot
+        ? formatDateTime(entry.nextOpenSlot, { dateStyle: 'medium', timeStyle: 'short' })
+        : null,
+      nextSession: entry.nextSession
+        ? formatDateTime(entry.nextSession, { dateStyle: 'medium', timeStyle: 'short' })
+        : null,
+      notes: noteItems.length ? noteItems.join(' • ') : 'Capacity in sync',
+      noteItems
+    };
+  });
+
+  const scheduleLookup = new Map(tutorSchedule.map((entry) => [entry.id, entry]));
+
+  const tutorRoster = tutorProfiles.map((profile) => {
+    const metadata = safeJsonParse(profile.metadata, {});
+    const skills = safeJsonParse(profile.skills, []);
+    const languages = safeJsonParse(profile.languages, []);
+    const timezones = safeJsonParse(profile.timezones, []);
+    const availabilityPreferences = safeJsonParse(profile.availabilityPreferences, {});
+    const scheduleEntry = scheduleLookup.get(`tutor-${profile.id}`);
+    const openSlots = upcomingTutorSlots
+      .filter((slot) => Number(slot.tutorId) === Number(profile.id))
+      .sort((a, b) => {
+        if (!a.startAt && !b.startAt) return 0;
+        if (!a.startAt) return 1;
+        if (!b.startAt) return -1;
+        return a.startAt - b.startAt;
+      });
+    const nextOpenSlot = openSlots.find((slot) => slot.status === 'open');
+    const rateAmount = Number(profile.hourlyRateAmount ?? 0);
+    const rateCurrency = profile.hourlyRateCurrency ?? 'USD';
+    const ratingAverage = Number(profile.ratingAverage ?? 0);
+    const ratingCount = Number(profile.ratingCount ?? 0);
+    const responseMinutes = Number(profile.responseTimeMinutes ?? metadata.responseTimeMinutes ?? 0);
+    const completedSessions = Number(profile.completedSessions ?? 0);
+
+    const focusAreas = [];
+    if (Array.isArray(skills)) {
+      focusAreas.push(...skills.filter(Boolean).slice(0, 2));
+    }
+    if (Array.isArray(languages)) {
+      focusAreas.push(...languages.filter(Boolean).slice(0, 1));
+    }
+
+    const statusKey = metadata.onboardingStatus ?? (profile.isVerified ? 'active' : 'onboarding');
+    const statusLabelMap = {
+      active: 'Active',
+      complete: 'Active',
+      onboarding: 'Onboarding',
+      reviewing: 'Under review',
+      paused: 'Paused',
+      draft: 'Draft'
+    };
+    const statusToneMap = {
+      active: 'success',
+      complete: 'success',
+      onboarding: 'info',
+      reviewing: 'info',
+      paused: 'warning',
+      draft: 'neutral'
+    };
+    const statusLabel = statusLabelMap[statusKey] ?? 'Active';
+    const statusTone = statusToneMap[statusKey] ?? 'success';
+
+    const timezone = Array.isArray(timezones) && timezones.length > 0 ? timezones[0] : 'Etc/UTC';
+    const weeklyHours = Number(availabilityPreferences.weeklyHours ?? availabilityPreferences.weekly_hours ?? 0);
+
+    const availabilityLabel = scheduleEntry?.nextAvailability
+      ? scheduleEntry.nextAvailability
+      : nextOpenSlot?.startAt
+        ? formatDateTime(nextOpenSlot.startAt, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'Sync calendar';
+
+    const workloadLabel = scheduleEntry
+      ? `${scheduleEntry.learners} • ${scheduleEntry.slots}`
+      : 'No scheduled capacity';
+
+    const defaultName = resolveName(user.firstName, user.lastName, 'Tutor');
+    return {
+      id: `tutor-${profile.id}`,
+      name:
+        profile.displayName ??
+        tutorScheduleMap.get(Number(profile.id))?.mentor ??
+        defaultName,
+      headline: profile.headline ?? metadata.specialty ?? metadata.title ?? 'Mentor',
+      status: statusLabel,
+      statusTone,
+      focusAreas,
+      availability: availabilityLabel,
+      timezone,
+      weeklyHours: weeklyHours > 0 ? `${weeklyHours} hrs/week` : null,
+      rate: rateAmount > 0 ? `${formatCurrency(rateAmount, rateCurrency)}/hr` : 'Rate pending',
+      rating:
+        ratingAverage > 0
+          ? `${ratingAverage.toFixed(1)} • ${ratingCount} review${ratingCount === 1 ? '' : 's'}`
+          : 'Awaiting reviews',
+      responseTime: responseMinutes > 0 ? minutesToReadable(responseMinutes) : 'SLA pending',
+      workload: workloadLabel,
+      sessions: completedSessions > 0 ? `${completedSessions} sessions` : null,
+      notes: scheduleEntry?.noteItems ?? [],
+      nextSession: scheduleEntry?.nextSession ?? null
+    };
+  });
+
+  const tutorNotifications = [];
+  if (pipelineBookings.length > 0) {
+    tutorNotifications.push({
+      id: 'tutor-pipeline-backlog',
+      severity: 'warning',
+      title: `${pipelineBookings.length} tutor request${pipelineBookings.length === 1 ? '' : 's'} awaiting assignment`,
+      detail: 'Route learners to active mentors to maintain your SLA window.',
+      ctaLabel: 'Review queue',
+      ctaPath: '/dashboard/instructor/bookings'
+    });
+  }
+
+  tutorSchedule
+    .filter((entry) => Number(entry.slotsCount ?? 0) > 0 && Number(entry.learnersCount ?? 0) > Number(entry.slotsCount ?? 0))
+    .forEach((entry) => {
+      tutorNotifications.push({
+        id: `${entry.id}-capacity`,
+        severity: 'warning',
+        title: `${entry.mentor} is over capacity`,
+        detail: `${entry.learnersCount} learners across ${entry.slotsCount} slot${entry.slotsCount === 1 ? '' : 's'}.`,
+        ctaLabel: 'Adjust load',
+        ctaPath: '/dashboard/instructor/tutor-schedule'
+      });
+    });
+
+  tutorRoster
+    .filter((tutor) => tutor.availability === 'Sync calendar')
+    .forEach((tutor) => {
+      tutorNotifications.push({
+        id: `${tutor.id}-sync`,
+        severity: 'info',
+        title: `${tutor.name} calendar needs syncing`,
+        detail: 'Reconnect the integration so learners can self-book available slots.',
+        ctaLabel: 'Sync calendar',
+        ctaPath: '/dashboard/instructor/tutor-schedule'
+      });
+    });
+
+  tutorBookingsNormalised
+    .filter((booking) => booking.status === 'confirmed' && booking.scheduledStart && booking.scheduledStart >= now)
+    .filter((booking) => booking.scheduledStart.getTime() - now.getTime() <= 48 * 60 * 60 * 1000)
+    .slice(0, 5)
+    .forEach((booking) => {
+      const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
+      tutorNotifications.push({
+        id: `booking-${booking.id}-due`,
+        severity: 'info',
+        title: `${booking.metadata.topic ?? 'Mentor session'} with ${learnerName}`,
+        detail: `Begins ${formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })}.`,
+        ctaLabel: 'Review brief',
+        ctaPath: '/dashboard/instructor/bookings'
+      });
+    });
+
+  const normaliseFilename = (name) => {
+    if (!name) return 'Untitled asset';
+    const leaf = name.split('/').pop();
+    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const assetsNormalised = assets.map((asset) => ({
+    ...asset,
+    metadata: safeJsonParse(asset.metadata, {}),
+    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
   }));
 
   const normaliseFilename = (name) => {
@@ -755,6 +1619,7 @@ export function buildInstructorDashboard({
         progress,
         lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
         owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor'),
+        owner: resolveName(user.firstName, user.lastName, 'Instructor'),
         nextActions,
         reference,
         latestActivity
@@ -781,34 +1646,278 @@ export function buildInstructorDashboard({
       return promotedCommunityId && managedCommunityIds.has(Number(promotedCommunityId));
     });
 
-  const activeCampaigns = relevantCampaigns
-    .filter((campaign) => campaign.status === 'active')
-    .map((campaign) => ({
+  const campaignsDetailed = relevantCampaigns.map((campaign) => {
+    const metricsSeries = (metricsByCampaign.get(Number(campaign.id)) ?? [])
+      .map((metric) => ({
+        date: metric.metricDate ? new Date(metric.metricDate) : null,
+        impressions: Number(metric.impressions ?? 0),
+        clicks: Number(metric.clicks ?? 0),
+        conversions: Number(metric.conversions ?? 0),
+        spendCents: Number(metric.spendCents ?? 0),
+        revenueCents: Number(metric.revenueCents ?? 0),
+        metadata: metric.metadata
+      }))
+      .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+
+    const lifetime = metricsSeries.reduce(
+      (acc, metric) => {
+        acc.impressions += metric.impressions;
+        acc.clicks += metric.clicks;
+        acc.conversions += metric.conversions;
+        acc.spendCents += metric.spendCents;
+        acc.revenueCents += metric.revenueCents;
+        return acc;
+      },
+      { impressions: 0, clicks: 0, conversions: 0, spendCents: 0, revenueCents: 0 }
+    );
+
+    const latestMetric = metricsSeries[0] ?? null;
+    const previousMetric = metricsSeries[1] ?? null;
+    const keywords = normaliseStringArray(campaign.targetingKeywords);
+    const audiences = normaliseStringArray(campaign.targetingAudiences);
+    const locations = normaliseStringArray(campaign.targetingLocations);
+    const languages = normaliseStringArray(campaign.targetingLanguages);
+    const startAt = campaign.startAt ? new Date(campaign.startAt) : null;
+    const endAt = campaign.endAt ? new Date(campaign.endAt) : null;
+    const spendCurrency = campaign.spendCurrency ?? campaign.budgetCurrency ?? 'USD';
+    const budgetCurrency = campaign.budgetCurrency ?? spendCurrency;
+    const spendCents = Number(campaign.spendTotalCents ?? 0);
+    const budgetCents = Number(campaign.budgetDailyCents ?? 0);
+    const cpcCents = Number(campaign.cpcCents ?? 0);
+    const cpaCents = Number(campaign.cpaCents ?? 0);
+    const placementSurface = resolvePlacementSurface(campaign);
+    const placementSlot = resolvePlacementSlot(campaign);
+    const placementTags = buildPlacementTags(campaign, keywords, audiences);
+
+    return {
+      campaign,
+      metricsSeries,
+      lifetime,
+      latestMetric,
+      previousMetric,
+      keywords,
+      audiences,
+      locations,
+      languages,
+      startAt,
+      endAt,
+      spendCurrency,
+      budgetCurrency,
+      spendCents,
+      budgetCents,
+      cpcCents,
+      cpaCents,
+      placementSurface,
+      placementSlot,
+      placementTags
+    };
+  });
+
+  const activeCampaignEntries = campaignsDetailed.filter((entry) => entry.campaign.status === 'active');
+
+  const keywordSet = new Set();
+  const audienceSet = new Set();
+  const locationSet = new Set();
+  const languageSet = new Set();
+  const spendByCurrency = new Map();
+  const revenueByCurrency = new Map();
+  let totalImpressions = 0;
+  let totalClicks = 0;
+  let totalConversions = 0;
+  let latestSynced = null;
+
+  campaignsDetailed.forEach((entry) => {
+    entry.keywords.forEach((keyword) => keywordSet.add(keyword));
+    entry.audiences.forEach((audience) => audienceSet.add(audience));
+    entry.locations.forEach((location) => locationSet.add(location));
+    entry.languages.forEach((language) => languageSet.add(language));
+    if (entry.latestMetric?.date) {
+      if (!latestSynced || entry.latestMetric.date > latestSynced) {
+        latestSynced = entry.latestMetric.date;
+      }
+    }
+  });
+
+  activeCampaignEntries.forEach((entry) => {
+    totalImpressions += entry.lifetime.impressions;
+    totalClicks += entry.lifetime.clicks;
+    totalConversions += entry.lifetime.conversions;
+    accumulateCurrency(spendByCurrency, entry.spendCurrency, entry.lifetime.spendCents);
+    accumulateCurrency(revenueByCurrency, entry.spendCurrency, entry.lifetime.revenueCents);
+  });
+
+  const spendCurrencies = Array.from(spendByCurrency.keys());
+  const totalSpendCents = Array.from(spendByCurrency.values()).reduce((sum, value) => sum + value, 0);
+  const totalRevenueCents = Array.from(revenueByCurrency.values()).reduce((sum, value) => sum + value, 0);
+  const singleCurrency = spendCurrencies.length === 1 ? spendCurrencies[0] : null;
+  const averageCtr = totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(2)}%` : '0.00%';
+  const averageCpc =
+    singleCurrency && totalClicks > 0
+      ? `${formatCurrency(Math.round(totalSpendCents / totalClicks), singleCurrency)} / click`
+      : '—';
+  const averageCpa =
+    singleCurrency && totalConversions > 0
+      ? `${formatCurrency(Math.round(totalSpendCents / totalConversions), singleCurrency)} / acquisition`
+      : '—';
+  const roas = singleCurrency && totalSpendCents > 0 ? `${(totalRevenueCents / totalSpendCents).toFixed(2)}x` : '—';
+
+  const summary = {
+    activeCampaigns: activeCampaignEntries.length,
+    totalImpressions,
+    totalClicks,
+    totalConversions,
+    totalSpend: {
+      currency: singleCurrency,
+      cents: totalSpendCents,
+      formatted: singleCurrency ? formatCurrency(totalSpendCents, singleCurrency) : 'Multi-currency spend'
+    },
+    averageCtr,
+    averageCpc,
+    averageCpa,
+    roas,
+    lastSyncedAt: latestSynced ? latestSynced.toISOString() : null,
+    lastSyncedLabel: latestSynced ? formatDateTime(latestSynced, { dateStyle: 'medium', timeStyle: 'short' }) : null
+  };
+
+  const adsActive = activeCampaignEntries.map((entry) => {
+    const { campaign, latestMetric, lifetime } = entry;
+    return {
       id: `campaign-${campaign.id}`,
       name: campaign.name,
-      format: campaign.objective,
-      spend: formatCurrency(campaign.spendTotalCents ?? 0, campaign.spendCurrency ?? 'USD'),
-      performance: `${((campaign.ctr ?? 0) * 100).toFixed(2)}% CTR · Score ${Number(campaign.performanceScore ?? 0).toFixed(1)}`
-    }));
+      objective: campaign.objective,
+      status: campaign.status,
+      spend: {
+        currency: entry.spendCurrency,
+        cents: entry.spendCents,
+        formatted: formatCurrency(entry.spendCents, entry.spendCurrency),
+        label: `Lifetime ${formatCurrency(entry.spendCents, entry.spendCurrency)}`
+      },
+      dailyBudget: {
+        currency: entry.budgetCurrency,
+        cents: entry.budgetCents,
+        formatted: formatCurrency(entry.budgetCents, entry.budgetCurrency),
+        label: `Daily ${formatCurrency(entry.budgetCents, entry.budgetCurrency)}`
+      },
+      performanceScore: Number(campaign.performanceScore ?? 0),
+      ctr: formatPercentage(campaign.ctr ?? 0),
+      cpc: `${formatCurrency(entry.cpcCents, entry.spendCurrency)} CPC`,
+      cpa: `${formatCurrency(entry.cpaCents, entry.spendCurrency)} CPA`,
+      metrics: {
+        lastSyncedAt: latestMetric?.date ? latestMetric.date.toISOString() : null,
+        lastSyncedLabel: latestMetric?.date ? formatDateTime(latestMetric.date, { dateStyle: 'medium' }) : null,
+        impressions: lifetime.impressions,
+        clicks: lifetime.clicks,
+        conversions: lifetime.conversions,
+        spendFormatted: formatCurrency(lifetime.spendCents, entry.spendCurrency),
+        revenueFormatted: formatCurrency(lifetime.revenueCents, entry.spendCurrency),
+        roas: formatRoasFromCents(lifetime.revenueCents, lifetime.spendCents)
+      },
+      placement: {
+        surface: entry.placementSurface,
+        slot: entry.placementSlot,
+        tags: entry.placementTags,
+        scheduleLabel: formatScheduleRange(entry.startAt, entry.endAt)
+      },
+      targeting: {
+        keywords: entry.keywords,
+        audiences: entry.audiences,
+        locations: entry.locations,
+        languages: entry.languages.map((language) => language.toUpperCase())
+      },
+      creative: {
+        headline: campaign.creativeHeadline ?? '',
+        description: campaign.creativeDescription ?? '',
+        url: campaign.creativeUrl ?? ''
+      }
+    };
+  });
 
-  const adExperiments = relevantCampaigns
-    .map((campaign) => {
-      const series = (metricsByCampaign.get(Number(campaign.id)) ?? []).sort(
-        (a, b) => (b.metricDate?.getTime() ?? 0) - (a.metricDate?.getTime() ?? 0)
-      );
-      if (!series.length) return null;
-      const latest = series[0];
-      const previous = series[1];
-      const conversionDelta = previous ? latest.conversions - previous.conversions : latest.conversions;
-      const deltaLabel = previous ? `${conversionDelta >= 0 ? '+' : ''}${conversionDelta}` : `${latest.conversions}`;
+  const adExperiments = campaignsDetailed
+    .map((entry) => {
+      if (!entry.latestMetric) return null;
+      const { campaign, latestMetric, previousMetric } = entry;
+      const conversionsDelta = previousMetric
+        ? latestMetric.conversions - previousMetric.conversions
+        : latestMetric.conversions;
+      const deltaLabel = `${conversionsDelta >= 0 ? '+' : ''}${conversionsDelta}`;
       return {
         id: `experiment-${campaign.id}`,
         name: campaign.name,
         status: campaign.status === 'active' ? 'Live' : 'Completed',
-        hypothesis: `${deltaLabel} conversions · ${formatCurrency(latest.revenueCents ?? 0, campaign.spendCurrency ?? 'USD')} revenue`
+        hypothesis: `${deltaLabel} conversions · ${formatCurrency(latestMetric.revenueCents, entry.spendCurrency)} revenue`,
+        conversionsDeltaLabel: deltaLabel,
+        lastObservedAt: latestMetric.date ? latestMetric.date.toISOString() : null,
+        lastObservedLabel: latestMetric.date ? formatDateTime(latestMetric.date, { dateStyle: 'medium' }) : null,
+        baselineLabel: previousMetric
+          ? `${previousMetric.conversions} conversions · ${formatCurrency(previousMetric.revenueCents, entry.spendCurrency)}`
+          : null
       };
     })
     .filter(Boolean);
+
+  const adsPlacements = campaignsDetailed.map((entry) => ({
+    id: `placement-${entry.campaign.id}`,
+    name: entry.campaign.name,
+    surface: entry.placementSurface,
+    slot: entry.placementSlot,
+    status: entry.campaign.status,
+    scheduleLabel: formatScheduleRange(entry.startAt, entry.endAt),
+    budgetLabel: `Daily ${formatCurrency(entry.budgetCents, entry.budgetCurrency)}`,
+    optimisation: entry.campaign.objective ? `${capitalise(entry.campaign.objective)} objective` : 'Optimisation pending',
+    tags: entry.placementTags
+  }));
+
+  const targetingSummaryParts = [];
+  if (keywordSet.size) targetingSummaryParts.push(`${keywordSet.size} keywords`);
+  if (audienceSet.size) targetingSummaryParts.push(`${audienceSet.size} audiences`);
+  if (locationSet.size) targetingSummaryParts.push(`${locationSet.size} regions`);
+  if (languageSet.size) targetingSummaryParts.push(`${languageSet.size} languages`);
+
+  const targeting = {
+    keywords: Array.from(keywordSet),
+    audiences: Array.from(audienceSet),
+    locations: Array.from(locationSet),
+    languages: Array.from(languageSet).map((language) => language.toUpperCase()),
+    summary: targetingSummaryParts.length ? targetingSummaryParts.join(' · ') : 'No targeting configured'
+  };
+
+  const tagMap = new Map();
+  const pushTag = (category, label) => {
+    if (!label) return;
+    const key = `${category}:${label}`;
+    if (!tagMap.has(key)) {
+      tagMap.set(key, { category, label });
+    }
+  };
+
+  campaignsDetailed.forEach((entry) => {
+    entry.keywords.forEach((keyword) => pushTag('Keyword', keyword));
+    entry.audiences.forEach((audience) => pushTag('Audience', audience));
+    entry.locations.forEach((location) => pushTag('Location', location));
+    entry.languages.forEach((language) => pushTag('Language', language.toUpperCase()));
+    if (entry.campaign.objective) {
+      pushTag('Objective', capitalise(entry.campaign.objective));
+    }
+    const featureFlag = entry.campaign.metadata?.featureFlag;
+    if (featureFlag) {
+      pushTag('Feature flag', featureFlag);
+    }
+    const promotedCommunityId = entry.campaign.metadata?.promotedCommunityId;
+    if (promotedCommunityId) {
+      pushTag('Placement', `Community #${promotedCommunityId}`);
+    }
+  });
+
+  const adsTags = Array.from(tagMap.values());
+
+  const adsWorkspace = {
+    active: adsActive,
+    experiments: adExperiments,
+    placements: adsPlacements,
+    targeting,
+    tags: adsTags,
+    summary
+  };
 
   const liveRevenue = liveSessions.reduce(
     (total, session) => total + Number(session.priceAmount ?? 0) * Number(session.reservedSeats ?? 0),
@@ -888,6 +1997,7 @@ export function buildInstructorDashboard({
       id: `lesson-${lesson.id}`,
       asset: `${lesson.courseTitle} · ${lesson.title}`,
       owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'),
+      owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
       status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
       type: 'Lesson'
     }))
@@ -909,14 +2019,18 @@ export function buildInstructorDashboard({
     return 'Kick-off required';
   };
 
-  const creationBlueprints = courseSummaries.map((course) => {
+  const moduleBlueprintsByCourse = new Map();
+  courseSummaries.forEach((course) => {
     const courseModules = [...(modulesByCourse.get(course.id) ?? [])].sort((a, b) => a.position - b.position);
     const moduleSummaries = courseModules.map((module) => {
       const moduleLessons = lessonsByModule.get(module.id) ?? [];
       const moduleAssignments = assignmentsByModule.get(module.id) ?? [];
+      const moduleMetadata = module.metadata ?? {};
+      const creationMeta = moduleMetadata.creation ?? {};
+      const dripMeta = moduleMetadata.drip ?? {};
       const lessonDuration = moduleLessons.reduce((total, lesson) => total + Number(lesson.durationMinutes ?? 0), 0);
       const recommendedMinutes = Number(
-        module.metadata?.recommendedDurationMinutes ?? module.metadata?.estimatedMinutes ?? 0
+        moduleMetadata.recommendedDurationMinutes ?? moduleMetadata.estimatedMinutes ?? 0
       );
       const durationMinutes = lessonDuration > 0 ? lessonDuration : recommendedMinutes;
       const outstanding = [];
@@ -926,12 +2040,15 @@ export function buildInstructorDashboard({
       if (course.deliveryFormat === 'cohort' && moduleAssignments.length === 0) {
         outstanding.push('Attach assignment');
       }
-      if (!module.metadata?.ritual && !module.metadata?.hasSimulation) {
+      if (!moduleMetadata.ritual && !moduleMetadata.hasSimulation) {
         outstanding.push('Document ritual');
       }
       if (durationMinutes === 0) {
         outstanding.push('Estimate duration');
       }
+
+      const ownerFallback = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator';
+
       return {
         id: module.id,
         title: module.title,
@@ -939,10 +2056,28 @@ export function buildInstructorDashboard({
         assignments: moduleAssignments.length,
         durationMinutes,
         releaseLabel: formatReleaseOffsetLabel(module.releaseOffsetDays),
-        outstanding
+        outstanding,
+        creation: {
+          owner: creationMeta.owner ?? ownerFallback,
+          status: creationMeta.status ?? 'Draft',
+          lastUpdatedAt: creationMeta.lastUpdatedAt ? new Date(creationMeta.lastUpdatedAt) : null,
+          qualityGate: creationMeta.qualityGate ?? 'Pending sign-off'
+        },
+        drip: {
+          gating:
+            dripMeta.gating ?? (course.deliveryFormat === 'cohort' ? 'Paced release' : 'Always on access'),
+          prerequisites: Array.isArray(dripMeta.prerequisites) ? dripMeta.prerequisites : [],
+          notifications: Array.isArray(dripMeta.notifications) ? dripMeta.notifications : [],
+          workspace: dripMeta.workspace ?? null
+        }
       };
     });
 
+    moduleBlueprintsByCourse.set(course.id, moduleSummaries);
+  });
+
+  const creationBlueprints = courseSummaries.map((course) => {
+    const moduleSummaries = moduleBlueprintsByCourse.get(course.id) ?? [];
     const modulesReady = moduleSummaries.filter((module) => module.outstanding.length === 0).length;
     const readinessScore = moduleSummaries.length
       ? Math.round((modulesReady / moduleSummaries.length) * 100)
@@ -1013,6 +2148,136 @@ export function buildInstructorDashboard({
     };
   });
 
+  const courseLifecycle = courseSummaries.map((course) => {
+    const moduleSummaries = moduleBlueprintsByCourse.get(course.id) ?? [];
+    const dripCampaign = course.metadata?.dripCampaign ?? {};
+    const dripSegments = Array.isArray(dripCampaign.segments) ? dripCampaign.segments : ['All learners'];
+    const dripSchedule = moduleSummaries.map((module) => ({
+      id: `module-${module.id}`,
+      title: module.title,
+      releaseLabel: module.releaseLabel,
+      gating: module.drip.gating,
+      prerequisites: module.drip.prerequisites,
+      notifications: module.drip.notifications,
+      workspace: module.drip.workspace
+    }));
+
+    const refresherLessons = Array.isArray(course.metadata?.refresherLessons)
+      ? course.metadata.refresherLessons.map((lesson) => ({
+          id: lesson.id ?? `refresher-${course.id}-${lesson.title ?? 'session'}`,
+          title: lesson.title ?? 'Refresher session',
+          format: lesson.format ?? 'Live',
+          cadence: lesson.cadence ?? 'Quarterly',
+          owner:
+            lesson.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team',
+          status: lesson.status ?? 'Planned',
+          nextSession: lesson.nextSessionAt
+            ? formatDateTime(new Date(lesson.nextSessionAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'To be scheduled',
+          channel: lesson.channel ?? 'Virtual',
+          enrollmentWindow: lesson.enrollmentWindow ?? 'Announcement pending'
+        }))
+      : [];
+
+    const recordedVideos = Array.isArray(course.metadata?.videoLibrary)
+      ? course.metadata.videoLibrary.map((video) => ({
+          id: video.id ?? `video-${course.id}-${video.title ?? 'asset'}`,
+          title: video.title ?? 'Recorded session',
+          duration: video.durationMinutes ? minutesToReadable(video.durationMinutes) : 'Processing',
+          quality: video.quality ?? '1080p',
+          status: video.status ?? 'Encoding',
+          updated: video.updatedAt
+            ? formatDateTime(new Date(video.updatedAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Pending upload',
+          size: video.sizeMb ? `${Number(video.sizeMb).toLocaleString()} MB` : null,
+          language: video.language ?? 'English',
+          aspectRatio: video.aspectRatio ?? '16:9'
+        }))
+      : [];
+
+    const catalogueListings = Array.isArray(course.metadata?.catalogueListings)
+      ? course.metadata.catalogueListings.map((listing) => ({
+          id: listing.id ?? `catalog-${course.id}-${listing.channel ?? 'listing'}`,
+          channel: listing.channel ?? 'Marketplace',
+          status: listing.status ?? 'Draft',
+          price: formatCurrency(
+            Number(listing.price ?? course.priceAmount),
+            listing.currency ?? course.priceCurrency ?? 'USD'
+          ),
+          impressions: Number(listing.impressions ?? 0),
+          conversions: Number(listing.conversions ?? 0),
+          conversionRate:
+            typeof listing.conversionRate === 'number'
+              ? `${(listing.conversionRate * 100).toFixed(1)}%`
+              : listing.conversions && listing.impressions
+                ? `${percentage(listing.conversions, listing.impressions, 1)}%`
+                : '—',
+          lastSynced: listing.lastSyncedAt
+            ? formatDateTime(new Date(listing.lastSyncedAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Sync pending'
+        }))
+      : [];
+
+    const reviews = Array.isArray(course.metadata?.reviews)
+      ? course.metadata.reviews.map((review) => ({
+          id: review.id ?? `review-${course.id}-${review.reviewer ?? 'learner'}`,
+          reviewer: review.reviewer ?? 'Learner',
+          role: review.role ?? '',
+          company: review.company ?? '',
+          rating: Number(review.rating ?? 0),
+          headline: review.headline ?? '',
+          feedback: review.feedback ?? '',
+          submittedAt: review.submittedAt
+            ? formatDateTime(new Date(review.submittedAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Recently submitted',
+          delivery: review.delivery ?? course.deliveryFormat ?? 'cohort',
+          experience: review.experience ?? 'Web'
+        }))
+      : [];
+
+    const averageReview = reviews.length
+      ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1)
+      : '0.0';
+
+    const mobile = {
+      status: course.metadata?.mobileParity?.status ?? 'Not evaluated',
+      experiences: Array.isArray(course.metadata?.mobileParity?.experiences)
+        ? course.metadata.mobileParity.experiences
+        : []
+    };
+
+    return {
+      id: `lifecycle-${course.id}`,
+      courseId: course.id,
+      courseTitle: course.title,
+      stage: statusLabels[course.status] ?? course.status,
+      drip: {
+        cadence: dripCampaign.cadence ?? 'manual',
+        anchor: dripCampaign.anchor ?? 'enrollment-date',
+        timezone: dripCampaign.timezone ?? 'UTC',
+        segments: dripSegments,
+        schedule: dripSchedule
+      },
+      modules: moduleSummaries.map((module) => ({
+        id: `module-${module.id}`,
+        title: module.title,
+        status: module.creation.status,
+        owner: module.creation.owner,
+        lastUpdated: module.creation.lastUpdatedAt
+          ? formatDateTime(module.creation.lastUpdatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Not updated',
+        qualityGate: module.creation.qualityGate,
+        tasksOutstanding: module.outstanding
+      })),
+      refresherLessons,
+      recordedVideos,
+      catalogue: catalogueListings,
+      reviews,
+      reviewSummary: `${averageReview} (${reviews.length} review${reviews.length === 1 ? '' : 's'})`,
+      mobile
+    };
+  });
+
   const managedCommunitiesSummaries = managedCommunities.map((community) => {
     const communityId = Number(community.communityId);
     const stats = communityStatsMap.get(communityId) ?? { activeMembers: 0, pendingMembers: 0, moderators: 0 };
@@ -1065,12 +2330,92 @@ export function buildInstructorDashboard({
     release: post.publishedAt ? formatDateTime(post.publishedAt, { dateStyle: 'medium', timeStyle: undefined }) : 'Unscheduled'
   }));
 
+  const instructorLiveClassSessions = liveSessions.map((session) =>
+    normaliseLiveClassroom(
+      {
+        ...session,
+        metadata: session.metadata ?? {}
+      },
+      { now, perspective: 'instructor', allowJoinLink: true }
+    )
+  );
+  const instructorUpcomingLive = instructorLiveClassSessions.filter((session) =>
+    ['upcoming', 'check-in'].includes(session.status)
+  );
+  const instructorActiveLive = instructorLiveClassSessions.filter((session) => session.status === 'live');
+  const instructorCompletedLive = instructorLiveClassSessions
+    .filter((session) => session.status === 'completed')
+    .sort((a, b) => {
+      const aTime = a.endAt ? new Date(a.endAt).getTime() : a.startAt ? new Date(a.startAt).getTime() : 0;
+      const bTime = b.endAt ? new Date(b.endAt).getTime() : b.startAt ? new Date(b.startAt).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 6);
+  const instructorWhiteboardSnapshots = buildLiveClassWhiteboardSnapshots(instructorLiveClassSessions).slice(0, 8);
+  const instructorReadiness = buildLiveClassReadiness(instructorLiveClassSessions);
+  const instructorAverageOccupancy = averageOccupancyRate(instructorLiveClassSessions);
+
+  const instructorRevenuePotential = new Map();
+  const instructorRevenueCommitted = new Map();
+  instructorLiveClassSessions.forEach((session) => {
+    const currency = session.pricing?.currency ?? 'USD';
+    const capacity = Number(session.occupancy?.capacity ?? 0);
+    const priceCents = Number(session.pricing?.priceAmountCents ?? 0);
+    const collectedCents = Number(session.pricing?.collectedAmountCents ?? 0);
+    if (capacity > 0 && priceCents > 0) {
+      instructorRevenuePotential.set(currency, (instructorRevenuePotential.get(currency) ?? 0) + priceCents * capacity);
+    }
+    if (collectedCents > 0) {
+      instructorRevenueCommitted.set(currency, (instructorRevenueCommitted.get(currency) ?? 0) + collectedCents);
+    }
+  });
+
+  const formatMultiCurrencyTotal = (entriesMap) => {
+    const entries = Array.from(entriesMap.entries());
+    if (!entries.length) return null;
+    return entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' • ');
+  };
+
+  const instructorLiveMetrics = [
+    {
+      label: 'Live sessions scheduled',
+      value: String(instructorUpcomingLive.length),
+      change: instructorActiveLive.length > 0 ? `${instructorActiveLive.length} live now` : 'All in preparation',
+      trend: instructorUpcomingLive.length > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Average seat fill',
+      value: instructorAverageOccupancy !== null ? `${instructorAverageOccupancy}%` : '—',
+      change: `${liveSessions.length} session${liveSessions.length === 1 ? '' : 's'} tracked`,
+      trend: instructorAverageOccupancy !== null && instructorAverageOccupancy >= 70 ? 'up' : 'down'
+    },
+    {
+      label: 'Projected revenue',
+      value: formatMultiCurrencyTotal(instructorRevenuePotential) ?? 'No ticketing',
+      change: formatMultiCurrencyTotal(instructorRevenueCommitted) ?? 'No payments captured',
+      trend: instructorRevenuePotential.size > 0 ? 'up' : 'down'
+    }
+  ];
+
+  const instructorGroupSessions = instructorLiveClassSessions
+    .filter((session) => session.isGroupSession)
+    .map((session) => ({
+      id: session.id,
+      title: session.title,
+      stage: session.stage,
+      startLabel: session.startLabel,
+      occupancy: session.occupancy,
+      breakoutRooms: session.breakoutRooms,
+      callToAction: session.callToAction
+    }));
+
   const lessonSchedule = upcomingLessons.map((lesson) => ({
     id: `lesson-${lesson.id}`,
     topic: lesson.title,
     course: lesson.courseTitle,
     date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
     facilitator: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator')
+    facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
   }));
 
   const calendarEntries = [];
@@ -1479,6 +2824,14 @@ export function buildInstructorDashboard({
       title: 'Assessment studio',
       url: '/dashboard/instructor/assessments'
     }
+    ...tutorRoster.map((tutor) => ({
+      id: `search-instructor-tutor-${tutor.id}`,
+      role: 'instructor',
+      type: 'Tutor',
+      title: tutor.name,
+      url: '/dashboard/instructor/tutor-management'
+      url: '/dashboard/instructor/live-classes'
+    }))
   ];
 
   const profileStats = [];
@@ -1514,7 +2867,8 @@ export function buildInstructorDashboard({
         pipeline,
         production,
         library,
-        creationBlueprints
+        creationBlueprints,
+        lifecycle: courseLifecycle
       },
       communities: {
         manageDeck: managedCommunitiesSummaries,
@@ -1522,9 +2876,26 @@ export function buildInstructorDashboard({
         webinars,
         podcasts
       },
+      liveClassrooms: {
+        metrics: instructorLiveMetrics,
+        sessions: instructorLiveClassSessions,
+        active: instructorActiveLive,
+        upcoming: instructorUpcomingLive,
+        completed: instructorCompletedLive,
+        groups: instructorGroupSessions.slice(0, 8),
+        whiteboard: {
+          snapshots: instructorWhiteboardSnapshots,
+          readiness: instructorReadiness
+        }
+      },
       schedules: {
         lessons: lessonSchedule,
         tutor: tutorSchedule
+      },
+      tutors: {
+        roster: tutorRoster,
+        availability: tutorSchedule,
+        notifications: tutorNotifications
       },
       bookings: {
         pipeline: pipelineBookings,
@@ -1534,10 +2905,7 @@ export function buildInstructorDashboard({
         catalogue: ebookCatalogue,
         creationPipelines
       },
-      ads: {
-        active: activeCampaigns,
-        experiments: adExperiments
-      },
+      ads: adsWorkspace,
       calendar,
       pricing: {
         offers: pricingOffers,
@@ -1580,6 +2948,366 @@ function buildCalendarEntries(entries) {
   }));
 }
 
+function formatBasisPoints(rateBps) {
+  const numeric = Number(rateBps ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return '0%';
+  }
+  const percent = numeric / 100;
+  const precision = percent >= 10 ? 1 : percent >= 1 ? 1 : 2;
+  return `${percent.toFixed(precision)}%`;
+}
+
+export function buildAffiliateOverview({
+  affiliates = [],
+  affiliatePayouts = [],
+  paymentIntents = [],
+  memberships = [],
+  monetizationSettings = {},
+  now = new Date()
+} = {}) {
+  const defaultAffiliate = monetizationSettings?.affiliate ?? {};
+  const defaultCommission = defaultAffiliate.defaultCommission ?? {};
+  const defaultTiers = Array.isArray(defaultCommission.tiers)
+    ? defaultCommission.tiers
+    : [{ thresholdCents: 0, rateBps: 1000 }];
+
+  const membershipByCommunity = new Map();
+  memberships.forEach((membership) => {
+    const communityId = Number(membership.communityId ?? membership.community_id);
+    if (!Number.isFinite(communityId)) return;
+    membershipByCommunity.set(communityId, membership);
+  });
+
+  const referralMetrics = new Map();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_IN_MS);
+  paymentIntents.forEach((intent) => {
+    const metadata = safeJsonParse(intent.metadata, {});
+    const referralCode =
+      metadata.referralCode ?? metadata.affiliateCode ?? metadata.affiliate?.code ?? null;
+    if (!referralCode) {
+      return;
+    }
+    const entry = referralMetrics.get(referralCode) ?? {
+      conversions: 0,
+      conversions30d: 0,
+      amountCents: 0,
+      amount30d: 0,
+      lastConversionAt: null
+    };
+    const amount = Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0);
+    entry.conversions += 1;
+    entry.amountCents += amount;
+    const timestamp = intent.capturedAt ?? intent.createdAt ?? null;
+    const occurredAt = timestamp ? new Date(timestamp) : null;
+    if (occurredAt) {
+      if (!entry.lastConversionAt || occurredAt > entry.lastConversionAt) {
+        entry.lastConversionAt = occurredAt;
+      }
+      if (occurredAt >= thirtyDaysAgo) {
+        entry.conversions30d += 1;
+        entry.amount30d += amount;
+      }
+    }
+    referralMetrics.set(referralCode, entry);
+  });
+
+  const affiliatePrograms = (Array.isArray(affiliates) ? affiliates : []).map((affiliate) => {
+    const metadata = safeJsonParse(affiliate.metadata, {});
+    const referralCode = affiliate.referralCode ?? metadata.referralCode ?? `AFF-${affiliate.id}`;
+    const performance = referralMetrics.get(referralCode) ?? {
+      conversions: 0,
+      conversions30d: 0,
+      amountCents: 0,
+      amount30d: 0,
+      lastConversionAt: null
+    };
+    const totalEarnedCents = Number(affiliate.totalEarnedCents ?? 0);
+    const totalPaidCents = Number(affiliate.totalPaidCents ?? 0);
+    const outstandingCents = Math.max(totalEarnedCents - totalPaidCents, 0);
+
+    const payouts = (Array.isArray(affiliatePayouts) ? affiliatePayouts : []).filter(
+      (payout) => Number(payout.affiliateId) === Number(affiliate.id)
+    );
+    const sortedPayouts = [...payouts].sort((a, b) => {
+      const aTime = new Date(a.processedAt ?? a.scheduledAt ?? now).getTime();
+      const bTime = new Date(b.processedAt ?? b.scheduledAt ?? now).getTime();
+      return aTime - bTime;
+    });
+    const upcomingPayout = sortedPayouts.find((payout) => payout.status !== 'completed') ?? null;
+    const completedPayouts = [...sortedPayouts].filter((payout) => payout.status === 'completed');
+    const lastPayout = completedPayouts.length
+      ? completedPayouts[completedPayouts.length - 1]
+      : null;
+
+    const commissionRateBps = Number(
+      affiliate.commissionRateBps ?? metadata.commissionRateBps ?? defaultTiers[0]?.rateBps ?? 0
+    );
+    const matchedTierIndex = defaultTiers.findIndex(
+      (tier) => Number(tier.rateBps) === commissionRateBps
+    );
+    const recurrence = metadata.recurrence ?? defaultCommission.recurrence ?? 'infinite';
+    const maxOccurrences =
+      recurrence === 'finite'
+        ? metadata.maxOccurrences ?? defaultCommission.maxOccurrences ?? null
+        : null;
+
+    const communityId = Number(affiliate.communityId);
+    const communityMeta = membershipByCommunity.get(communityId) ?? {};
+    const communityName =
+      affiliate.communityName ??
+      communityMeta.communityName ??
+      communityMeta.name ??
+      metadata.communityName ??
+      'Community';
+    const communitySlug =
+      affiliate.communitySlug ?? communityMeta.communitySlug ?? metadata.communitySlug ?? null;
+
+    const programmeHighlights = [];
+    programmeHighlights.push(`${performance.conversions ?? 0} lifetime conversions`);
+    programmeHighlights.push(
+      `${formatCurrency(performance.amountCents ?? 0, 'USD')} attributed volume`
+    );
+    if (outstandingCents > 0) {
+      programmeHighlights.push(
+        `${formatCurrency(outstandingCents, 'USD')} pending payout`
+      );
+    }
+
+    return {
+      id: String(affiliate.id),
+      community: {
+        id: communityId,
+        name: communityName,
+        slug: communitySlug
+      },
+      status: affiliate.status ?? metadata.status ?? 'pending',
+      referralCode,
+      commission: {
+        rateBps: commissionRateBps,
+        rateLabel: formatBasisPoints(commissionRateBps),
+        tierLabel: matchedTierIndex >= 0 ? `Tier ${matchedTierIndex + 1}` : 'Custom rate',
+        recurrence,
+        maxOccurrences: recurrence === 'finite' ? Number(maxOccurrences ?? 0) : null
+      },
+      earnings: {
+        totalCents: totalEarnedCents,
+        totalFormatted: formatCurrency(totalEarnedCents, 'USD'),
+        paidCents: totalPaidCents,
+        paidFormatted: formatCurrency(totalPaidCents, 'USD'),
+        outstandingCents,
+        outstandingFormatted: formatCurrency(outstandingCents, 'USD')
+      },
+      performance: {
+        conversions: performance.conversions ?? 0,
+        conversions30d: performance.conversions30d ?? 0,
+        volumeCents: performance.amountCents ?? 0,
+        volumeFormatted: formatCurrency(performance.amountCents ?? 0, 'USD'),
+        volume30dCents: performance.amount30d ?? 0,
+        volume30dFormatted: formatCurrency(performance.amount30d ?? 0, 'USD'),
+        lastConversionAt: performance.lastConversionAt,
+        lastConversionLabel: performance.lastConversionAt
+          ? humanizeRelativeTime(performance.lastConversionAt, now)
+          : 'No conversions yet'
+      },
+      payouts: {
+        next: upcomingPayout
+          ? {
+              status: upcomingPayout.status,
+              amount: formatCurrency(Number(upcomingPayout.amountCents ?? 0), 'USD'),
+              scheduledAt: upcomingPayout.scheduledAt,
+              scheduledLabel: formatDateTime(upcomingPayout.scheduledAt, {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              })
+            }
+          : null,
+        last: lastPayout
+          ? {
+              status: lastPayout.status,
+              amount: formatCurrency(Number(lastPayout.amountCents ?? 0), 'USD'),
+              processedAt: lastPayout.processedAt,
+              processedLabel: formatDateTime(lastPayout.processedAt ?? lastPayout.scheduledAt, {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              })
+            }
+          : null
+      },
+      links: {
+        landingPage: metadata.landingPage ?? metadata.landing_page ?? null,
+        mediaKit: metadata.mediaKit ?? metadata.media_kit ?? null
+      },
+      highlights: programmeHighlights
+    };
+  });
+
+  const totalEarnedCents = sum(affiliatePrograms, (program) => program.earnings.totalCents);
+  const totalOutstandingCents = sum(
+    affiliatePrograms,
+    (program) => program.earnings.outstandingCents
+  );
+  const totalPaidCents = sum(affiliatePrograms, (program) => program.earnings.paidCents);
+  const totalConversions30d = sum(
+    affiliatePrograms,
+    (program) => program.performance.conversions30d
+  );
+  const totalVolume30dCents = sum(
+    affiliatePrograms,
+    (program) => program.performance.volume30dCents
+  );
+
+  const activePrograms = affiliatePrograms.filter((program) =>
+    ['approved', 'active'].includes((program.status ?? '').toLowerCase())
+  ).length;
+  const pendingPrograms = affiliatePrograms.filter((program) =>
+    ['pending', 'review'].includes((program.status ?? '').toLowerCase())
+  ).length;
+
+  const summaryMetrics = [
+    {
+      label: 'Lifetime earnings',
+      value: formatCurrency(totalEarnedCents, 'USD'),
+      change: `Paid ${formatCurrency(totalPaidCents, 'USD')}`
+    },
+    {
+      label: 'Outstanding balance',
+      value: formatCurrency(totalOutstandingCents, 'USD'),
+      change:
+        totalOutstandingCents > 0
+          ? 'Release pending payout'
+          : 'All payouts cleared',
+      trend: totalOutstandingCents > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Active programmes',
+      value: `${activePrograms}`,
+      change:
+        pendingPrograms > 0
+          ? `${pendingPrograms} awaiting approval`
+          : 'All programmes live',
+      trend: activePrograms > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Conversions (30d)',
+      value: `${totalConversions30d}`,
+      change: `Volume ${formatCurrency(totalVolume30dCents, 'USD')}`,
+      trend: totalConversions30d > 0 ? 'up' : 'down'
+    }
+  ];
+
+  const upcomingPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+    .filter((payout) => payout.status !== 'completed')
+    .map((payout) => {
+      const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
+        (entry) => Number(entry.id) === Number(payout.affiliateId)
+      );
+      return {
+        status: payout.status,
+        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        scheduledAt: payout.scheduledAt,
+        scheduledLabel: formatDateTime(payout.scheduledAt, {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        }),
+        referralCode: affiliate?.referralCode,
+        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName
+      };
+    })
+    .sort((a, b) => new Date(a.scheduledAt ?? now) - new Date(b.scheduledAt ?? now))[0] ?? null;
+
+  const payoutTimeline = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+    .map((payout) => {
+      const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
+        (entry) => Number(entry.id) === Number(payout.affiliateId)
+      );
+      return {
+        id: String(payout.id),
+        status: payout.status,
+        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        scheduledAt: payout.scheduledAt,
+        processedAt: payout.processedAt,
+        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName ?? 'Community',
+        referralCode: affiliate?.referralCode
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.processedAt ?? b.scheduledAt ?? now).getTime() -
+        new Date(a.processedAt ?? a.scheduledAt ?? now).getTime()
+    )
+    .slice(0, 8);
+
+  const actions = [];
+  if (totalOutstandingCents > 0) {
+    actions.push(
+      `Release ${formatCurrency(totalOutstandingCents, 'USD')} in pending affiliate payouts.`
+    );
+  }
+  if (pendingPrograms > 0) {
+    actions.push(`Review ${pendingPrograms} pending affiliate application${pendingPrograms === 1 ? '' : 's'}.`);
+  }
+  if (actions.length === 0) {
+    actions.push('Invite high-performing learners into the affiliate programme.');
+  }
+
+  const resources = [
+    {
+      id: 'affiliate-starter-kit',
+      title: 'Affiliate starter kit',
+      description: 'Download co-branded assets, copy decks, and onboarding emails.',
+      action: 'Download kit',
+      href: '/content/affiliate-playbook'
+    },
+    {
+      id: 'affiliate-policy',
+      title: 'Policy & compliance checklist',
+      description: 'Ensure payout eligibility, tax documentation, and brand guidelines stay aligned.',
+      action: 'Open checklist',
+      href: '/policies/affiliate'
+    }
+  ];
+
+  return {
+    summary: {
+      metrics: summaryMetrics,
+      totals: {
+        earnedCents: totalEarnedCents,
+        earnedFormatted: formatCurrency(totalEarnedCents, 'USD'),
+        outstandingCents: totalOutstandingCents,
+        outstandingFormatted: formatCurrency(totalOutstandingCents, 'USD'),
+        paidCents: totalPaidCents,
+        programCount: affiliatePrograms.length,
+        activePrograms,
+        pendingPrograms
+      },
+      nextPayout
+    },
+    programs: affiliatePrograms,
+    payouts: payoutTimeline,
+    commission: {
+      recurrence: defaultCommission.recurrence ?? 'infinite',
+      maxOccurrences: defaultCommission.recurrence === 'finite' ? defaultCommission.maxOccurrences ?? null : null,
+      tiers: defaultTiers.map((tier, index) => ({
+        thresholdCents: Number(tier.thresholdCents ?? 0),
+        rateBps: Number(tier.rateBps ?? 0),
+        label: index === 0 ? 'Base tier' : `Tier ${index + 1}`,
+        rateLabel: formatBasisPoints(tier.rateBps)
+      }))
+    },
+    compliance: {
+      autoApprove: Boolean(defaultAffiliate.autoApprove),
+      requireTaxInformation: Boolean(defaultAffiliate.requireTaxInformation),
+      blockSelfReferral: Boolean(defaultAffiliate.security?.blockSelfReferral),
+      enforceTwoFactorForPayouts: Boolean(defaultAffiliate.security?.enforceTwoFactorForPayouts),
+      payoutScheduleDays: Number(defaultAffiliate.payoutScheduleDays ?? 30),
+      cookieWindowDays: Number(defaultAffiliate.cookieWindowDays ?? 30)
+    },
+    actions,
+    resources
+  };
+}
+
 function formatDateTime(date, options = {}) {
   if (!date) return 'TBD';
   const resolved = typeof date === 'string' ? new Date(date) : date;
@@ -1607,6 +3335,366 @@ function minutesToReadable(minutes) {
     return `${hours} hrs`;
   }
   return `${hours}h ${remaining}m`;
+}
+
+function resolveName(firstName, lastName, fallback) {
+  const candidate = `${firstName ?? ''} ${lastName ?? ''}`.trim();
+  return candidate.length > 0 ? candidate : fallback;
+const LIVE_JOIN_WINDOW_MINUTES = 15;
+const GROUP_SESSION_KEYWORDS = ['group', 'cohort', 'bootcamp', 'lab', 'studio', 'masterclass', 'workshop', 'breakout'];
+const WHITEBOARD_READY_STATES = new Set(['ready', 'live', 'approved', 'published']);
+
+function resolveLiveClassStatus(startAt, endAt, reference) {
+  if (!startAt && !endAt) {
+    return 'draft';
+  }
+  if (startAt) {
+    const startTime = startAt instanceof Date ? startAt.getTime() : new Date(startAt).getTime();
+    if (reference.getTime() < startTime) {
+      const diff = startTime - reference.getTime();
+      if (diff <= LIVE_JOIN_WINDOW_MINUTES * 60 * 1000) {
+        return 'check-in';
+      }
+      return 'upcoming';
+    }
+  }
+  if (endAt) {
+    const endTime = endAt instanceof Date ? endAt.getTime() : new Date(endAt).getTime();
+    if (reference.getTime() >= endTime) {
+      return 'completed';
+    }
+  }
+  return 'live';
+}
+
+function determineStageFromStatus(status) {
+  switch (status) {
+    case 'upcoming':
+      return 'Preparation';
+    case 'check-in':
+      return 'Check-in';
+    case 'live':
+      return 'Broadcasting';
+    case 'completed':
+      return 'Retrospective';
+    default:
+      return 'Draft';
+  }
+}
+
+function normaliseLiveClassroom(session, { now, perspective = 'learner', allowJoinLink = false } = {}) {
+  const metadataSource =
+    session.metadata && typeof session.metadata === 'object'
+      ? session.metadata
+      : safeJsonParse(session.metadata, {});
+  const metadata = metadataSource && typeof metadataSource === 'object' ? metadataSource : {};
+
+  const startAt = session.startAt ? new Date(session.startAt) : null;
+  const endAt = session.endAt ? new Date(session.endAt) : null;
+  const status = resolveLiveClassStatus(startAt, endAt, now);
+  const stage = determineStageFromStatus(status);
+  const timezone = session.timezone ?? metadata.timezone ?? metadata.timeZone ?? 'UTC';
+
+  const typeRaw = String(session.type ?? metadata.type ?? 'live').toLowerCase();
+  const typeLabel = typeRaw
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+  const isGroupSession = Boolean(
+    metadata.isGroup === true ||
+      metadata.groupSession === true ||
+      (Array.isArray(metadata.breakoutRooms) && metadata.breakoutRooms.length > 0) ||
+      GROUP_SESSION_KEYWORDS.some((keyword) => typeRaw.includes(keyword))
+  );
+
+  const capacity = Number(session.capacity ?? metadata.capacity ?? 0) || null;
+  const reservedSeats = Number(
+    session.reservedSeats ?? metadata.reservedSeats ?? metadata.attendees ?? metadata.registered ?? 0
+  ) || 0;
+  const occupancyRate =
+    capacity && capacity > 0 ? Math.min(Math.round((reservedSeats / capacity) * 100), 100) : null;
+
+  const joinWindowMs = LIVE_JOIN_WINDOW_MINUTES * 60 * 1000;
+  const joinEligible = allowJoinLink && startAt && now.getTime() >= startAt.getTime() - joinWindowMs;
+  const joinUrl = joinEligible ? metadata.joinUrl ?? metadata.attendeeUrl ?? null : null;
+  const hostUrl = metadata.hostUrl ?? metadata.presenterUrl ?? null;
+
+  const registration = session.registrationStatus ?? metadata.registrationStatus ?? null;
+  const amountPaidCents = Number(session.amountPaid ?? metadata.amountPaid ?? 0) || 0;
+  const registrationCurrency =
+    session.registrationCurrency ?? metadata.registrationCurrency ?? session.priceCurrency ?? metadata.priceCurrency ?? 'USD';
+  const priceAmountCents = Number(session.priceAmount ?? metadata.priceAmount ?? 0) || 0;
+  const priceCurrency = session.priceCurrency ?? metadata.priceCurrency ?? 'USD';
+
+  const facilitators = Array.isArray(metadata.facilitators)
+    ? metadata.facilitators.map((value) => String(value))
+    : metadata.host
+      ? [String(metadata.host)]
+      : session.communityName
+        ? [String(session.communityName)]
+        : [];
+
+  const breakoutRooms = Array.isArray(metadata.breakoutRooms)
+    ? metadata.breakoutRooms
+        .map((room) => {
+          if (typeof room === 'string') {
+            return { name: room };
+          }
+          if (room && typeof room === 'object') {
+            const name = room.name ?? room.title ?? 'Breakout room';
+            const facilitator = room.facilitator ?? room.host ?? null;
+            const capacityValue = Number(room.capacity ?? room.size ?? room.limit ?? 0) || null;
+            return {
+              name: String(name),
+              facilitator: facilitator ? String(facilitator) : undefined,
+              capacity: capacityValue
+            };
+          }
+          return null;
+        })
+        .filter(Boolean)
+    : [];
+
+  const whiteboardMetaRaw =
+    typeof metadata.whiteboard === 'string'
+      ? { url: metadata.whiteboard }
+      : metadata.whiteboard && typeof metadata.whiteboard === 'object'
+        ? { ...metadata.whiteboard }
+        : {};
+
+  if (!whiteboardMetaRaw.url && metadata.whiteboardUrl) {
+    whiteboardMetaRaw.url = metadata.whiteboardUrl;
+  }
+  if (!whiteboardMetaRaw.template && metadata.whiteboardTemplate) {
+    whiteboardMetaRaw.template = metadata.whiteboardTemplate;
+  }
+  if (!whiteboardMetaRaw.status && metadata.whiteboardStatus) {
+    whiteboardMetaRaw.status = metadata.whiteboardStatus;
+  }
+  if (!whiteboardMetaRaw.updatedAt && metadata.whiteboardUpdatedAt) {
+    whiteboardMetaRaw.updatedAt = metadata.whiteboardUpdatedAt;
+  }
+
+  const whiteboardReady =
+    whiteboardMetaRaw.ready === true ||
+    WHITEBOARD_READY_STATES.has(String(whiteboardMetaRaw.status ?? '').toLowerCase()) ||
+    metadata.whiteboardReady === true;
+
+  const whiteboardUpdatedAt = whiteboardMetaRaw.updatedAt
+    ? new Date(whiteboardMetaRaw.updatedAt)
+    : metadata.whiteboardLastEditedAt
+      ? new Date(metadata.whiteboardLastEditedAt)
+      : null;
+
+  const callToAction = (() => {
+    let label = 'View briefing';
+    let action = 'details';
+    let enabled = true;
+
+    if (status === 'live' && joinEligible && joinUrl) {
+      label = 'Join live classroom';
+      action = 'join';
+    } else if (status === 'check-in' && joinEligible && joinUrl) {
+      label = 'Enter waiting room';
+      action = 'check-in';
+    } else if (status === 'upcoming' && registration === 'registered') {
+      label = 'Manage ticket';
+      action = 'manage';
+    } else if (status === 'upcoming' && registration === 'waitlisted') {
+      label = 'View waitlist';
+      action = 'waitlist';
+    } else if (status === 'completed' && metadata.recordingUrl) {
+      label = 'Watch recording';
+      action = 'recording';
+    } else if (perspective === 'instructor' && hostUrl) {
+      label = status === 'completed' ? 'Review analytics' : 'Open host controls';
+      action = 'host';
+    }
+
+    if ((action === 'join' || action === 'check-in') && !joinUrl) {
+      enabled = false;
+    }
+
+    return { label, action, enabled };
+  })();
+
+  const durationMinutes =
+    startAt && endAt ? Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60000)) : null;
+
+  const security = {
+    waitingRoom: metadata.waitingRoom !== false,
+    passcodeRequired: metadata.passcodeRequired === true || Boolean(metadata.passcode),
+    recordingConsent: metadata.recordingConsent === true || metadata.recordingConsentRequired === true,
+    attendeeMfa: metadata.attendeeMfa === true
+  };
+
+  const recordingEnabled = metadata.recordingEnabled === true || metadata.recording === 'recorded';
+  const resources = Array.isArray(metadata.resources)
+    ? metadata.resources.map((item) => String(item)).slice(0, 6)
+    : [];
+
+  return {
+    id: session.id
+      ? String(session.id)
+      : `live-${session.classroomId ?? session.publicId ?? session.slug ?? metadata.id ?? Date.now()}`,
+    classroomId: session.classroomId ?? session.id ?? null,
+    slug: session.slug ?? null,
+    title: session.title ?? metadata.title ?? 'Live classroom',
+    summary: session.summary ?? metadata.summary ?? null,
+    type: typeRaw,
+    typeLabel,
+    isGroupSession,
+    community: session.communityName ?? metadata.community ?? null,
+    stage,
+    status,
+    registration,
+    timezone,
+    startAt: startAt ? startAt.toISOString() : null,
+    endAt: endAt ? endAt.toISOString() : null,
+    startLabel: startAt
+      ? formatDateTime(startAt, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone })
+      : 'TBD',
+    endLabel: endAt ? formatDateTime(endAt, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }) : null,
+    countdownMinutes: startAt ? Math.max(0, Math.round((startAt.getTime() - now.getTime()) / 60000)) : null,
+    durationMinutes,
+    facilitators,
+    breakoutRooms,
+    occupancy: {
+      capacity,
+      reserved: reservedSeats,
+      rate: occupancyRate
+    },
+    security,
+    recordingEnabled,
+    resources,
+    callToAction,
+    joinUrl,
+    hostUrl: perspective === 'instructor' ? hostUrl : undefined,
+    pricing: {
+      price: priceAmountCents ? formatCurrency(priceAmountCents, priceCurrency) : null,
+      priceAmountCents,
+      currency: priceCurrency,
+      collectedAmountCents: amountPaidCents,
+      collectedLabel: amountPaidCents ? formatCurrency(amountPaidCents, registrationCurrency) : null,
+      registrationCurrency,
+      ticketType: session.ticketType ?? metadata.ticketType ?? 'general'
+    },
+    whiteboard: {
+      url: whiteboardMetaRaw.url ?? null,
+      template: whiteboardMetaRaw.template ?? 'Collaborative board',
+      status: whiteboardMetaRaw.status ?? (whiteboardReady ? 'Ready' : 'Draft'),
+      ready: whiteboardReady,
+      lastUpdatedAt: whiteboardUpdatedAt ? whiteboardUpdatedAt.toISOString() : null,
+      lastUpdatedLabel: whiteboardUpdatedAt ? humanizeRelativeTime(whiteboardUpdatedAt, now) : null,
+      facilitators: Array.isArray(whiteboardMetaRaw.facilitators)
+        ? whiteboardMetaRaw.facilitators.map((value) => String(value))
+        : facilitators,
+      notes: Array.isArray(whiteboardMetaRaw.notes)
+        ? whiteboardMetaRaw.notes.map((value) => String(value))
+        : []
+    },
+    support: {
+      moderator: metadata.moderator ? String(metadata.moderator) : null,
+      helpDesk: metadata.helpDesk ? String(metadata.helpDesk) : null
+    }
+  };
+}
+
+function buildLiveClassReadiness(sessions) {
+  if (!sessions?.length) {
+    return [
+      {
+        id: 'no-sessions',
+        label: 'No live sessions scheduled',
+        status: 'ready',
+        detail: 'Schedule a classroom to populate readiness insights.'
+      }
+    ];
+  }
+
+  const waitingRoomMissing = sessions.filter((session) => !session.security?.waitingRoom).length;
+  const passcodeMissing = sessions.filter((session) => !session.security?.passcodeRequired).length;
+  const whiteboardsPending = sessions.filter((session) => session.whiteboard && session.whiteboard.ready === false).length;
+  const consentMissing = sessions.filter((session) => !session.security?.recordingConsent).length;
+
+  const statusFor = (count) => {
+    if (count <= 0) return 'ready';
+    if (count === 1) return 'attention';
+    return 'action';
+  };
+
+  return [
+    {
+      id: 'waiting-room',
+      label: 'Waiting room enforcement',
+      status: statusFor(waitingRoomMissing),
+      detail:
+        waitingRoomMissing === 0
+          ? 'All sessions require host admission before joining.'
+          : `${waitingRoomMissing} session${waitingRoomMissing === 1 ? '' : 's'} allow direct entry.`
+    },
+    {
+      id: 'passcode',
+      label: 'Passcode protection',
+      status: statusFor(passcodeMissing),
+      detail:
+        passcodeMissing === 0
+          ? 'Passcodes are enabled across every upcoming classroom.'
+          : `${passcodeMissing} session${passcodeMissing === 1 ? '' : 's'} should add a passcode.`
+    },
+    {
+      id: 'whiteboard',
+      label: 'Whiteboard readiness',
+      status: statusFor(whiteboardsPending),
+      detail:
+        whiteboardsPending === 0
+          ? 'Every live board is prepped and ready.'
+          : `${whiteboardsPending} board${whiteboardsPending === 1 ? ' is' : 's are'} still in draft.`
+    },
+    {
+      id: 'recording',
+      label: 'Recording consent workflow',
+      status: statusFor(consentMissing),
+      detail:
+        consentMissing === 0
+          ? 'Recording consent is captured before each broadcast.'
+          : `${consentMissing} session${consentMissing === 1 ? '' : 's'} need consent prompts.`
+    }
+  ];
+}
+
+function buildLiveClassWhiteboardSnapshots(sessions) {
+  if (!sessions?.length) return [];
+  return sessions
+    .map((session) => {
+      const whiteboard = session.whiteboard ?? {};
+      if (!whiteboard.url && !whiteboard.template) {
+        return null;
+      }
+      return {
+        id: session.id,
+        title: session.title,
+        template: whiteboard.template ?? 'Collaborative board',
+        status: whiteboard.status ?? (whiteboard.ready ? 'Ready' : 'Draft'),
+        ready: Boolean(whiteboard.ready),
+        lastUpdatedLabel: whiteboard.lastUpdatedLabel ?? null,
+        facilitators: session.facilitators ?? [],
+        url: whiteboard.url ?? null
+      };
+    })
+    .filter(Boolean);
+}
+
+function averageOccupancyRate(sessions) {
+  if (!sessions?.length) return null;
+  const rates = sessions
+    .map((session) => Number(session.occupancy?.rate))
+    .filter((value) => Number.isFinite(value));
+  if (!rates.length) return null;
+  const total = rates.reduce((sum, value) => sum + value, 0);
+  return Math.round(total / rates.length);
 }
 
 export default class DashboardService {
@@ -1662,7 +3750,8 @@ export default class DashboardService {
       adsCampaignRows,
       adsMetricRows,
       communityPaywallTierRows,
-      communitySubscriptionRows
+      communitySubscriptionRows,
+      platformMonetizationSettings
     ] = await Promise.all([
       UserPrivacySettingModel.getForUser(userId),
       db('course_enrollments as ce')
@@ -2060,11 +4149,18 @@ export default class DashboardService {
           'tp.id',
           'tp.display_name as displayName',
           'tp.headline',
+          'tp.bio',
+          'tp.skills',
+          'tp.languages',
+          'tp.timezones',
+          'tp.availability_preferences as availabilityPreferences',
           'tp.hourly_rate_amount as hourlyRateAmount',
           'tp.hourly_rate_currency as hourlyRateCurrency',
           'tp.rating_average as ratingAverage',
           'tp.rating_count as ratingCount',
           'tp.completed_sessions as completedSessions',
+          'tp.response_time_minutes as responseTimeMinutes',
+          'tp.is_verified as isVerified',
           'tp.metadata'
         ),
       db('tutor_availability_slots as slot')
@@ -2193,8 +4289,12 @@ export default class DashboardService {
           'campaign.targeting_keywords as targetingKeywords',
           'campaign.targeting_audiences as targetingAudiences',
           'campaign.targeting_locations as targetingLocations',
+          'campaign.targeting_languages as targetingLanguages',
           'campaign.start_at as startAt',
           'campaign.end_at as endAt',
+          'campaign.creative_headline as creativeHeadline',
+          'campaign.creative_description as creativeDescription',
+          'campaign.creative_url as creativeUrl',
           'campaign.metadata',
           'campaign.created_by as createdBy',
           'creator.first_name as creatorFirstName',
@@ -2245,7 +4345,8 @@ export default class DashboardService {
           'tier.billing_interval as billingInterval',
           'community.owner_id as ownerId',
           'community.name as communityName'
-        )
+        ),
+      PlatformSettingsService.getMonetizationSettings()
     ]);
     const communityStatsMap = new Map();
     communityStatRows.forEach((row) => {
@@ -2277,6 +4378,31 @@ export default class DashboardService {
       const entry = affiliatePayoutByAffiliate.get(row.affiliateId) ?? [];
       entry.push({ ...row, metadata: safeJsonParse(row.metadata, {}) });
       affiliatePayoutByAffiliate.set(row.affiliateId, entry);
+    });
+
+    const affiliateOverview = buildAffiliateOverview({
+      affiliates: affiliateRows,
+      affiliatePayouts: affiliatePayoutRows,
+      paymentIntents: paymentIntentRows,
+      memberships: membershipRows,
+      monetizationSettings: platformMonetizationSettings,
+      now
+    const communityDashboard = buildCommunityDashboard({
+      user,
+      now,
+      communityMemberships: membershipRows,
+      communityStats: communityStatRows,
+      communityResources: communityResourceRows,
+      communityPosts: communityPostRows,
+      communityMessages: communityMessageRows,
+      communityMessageContributions: communityMessageContributionRows,
+      communityAssignments,
+      liveClassrooms: instructorLiveClassRows,
+      tutorBookings: instructorBookingRows,
+      adsCampaigns: adsCampaignRows,
+      adsMetrics: adsMetricRows,
+      communityPaywallTiers: communityPaywallTierRows,
+      communitySubscriptions: communitySubscriptionRows
     });
 
     const instructorDashboard = buildInstructorDashboard({
@@ -2565,6 +4691,69 @@ export default class DashboardService {
       );
       const lessonProgress = progressByEnrollmentLesson.get(enrollment.enrollmentId) ?? new Map();
 
+      const deriveLessonType = (lesson, progressRecord) => {
+        const metadata = lesson.metadata ?? {};
+        const explicitType = metadata.type ?? metadata.lessonType ?? metadata.category;
+        if (typeof explicitType === 'string' && explicitType.trim()) {
+          return explicitType.trim().toLowerCase();
+        }
+
+        const tags = Array.isArray(metadata.tags)
+          ? metadata.tags.map((tag) => String(tag).toLowerCase())
+          : [];
+        if (tags.includes('assessment') || tags.includes('quiz')) return 'assessment';
+        if (tags.includes('exam')) return 'exam';
+        if (tags.includes('assignment') || tags.includes('project')) return 'assignment';
+        if (tags.includes('refresher') || tags.includes('recap')) return 'refresher';
+        if (tags.includes('live') || tags.includes('live-class')) return 'live-class';
+        if (tags.includes('report')) return 'report';
+        if (tags.includes('catalog') || tags.includes('catalogue')) return 'catalogue';
+        if (tags.includes('drip')) return 'drip';
+
+        const title = (lesson.title ?? '').toLowerCase();
+        if (title.includes('assessment') || title.includes('quiz') || title.includes('checkpoint')) {
+          return 'assessment';
+        }
+        if (title.includes('exam') || title.includes('final') || title.includes('test')) {
+          return 'exam';
+        }
+        if (title.includes('assignment') || title.includes('project') || title.includes('capstone')) {
+          return 'assignment';
+        }
+        if (title.includes('refresher') || title.includes('recap') || title.includes('review')) {
+          return 'refresher';
+        }
+        if (title.includes('live') || title.includes('workshop') || title.includes('webinar')) {
+          return 'live-class';
+        }
+        if (title.includes('report') || title.includes('insight') || title.includes('analysis')) {
+          return 'report';
+        }
+        if (title.includes('catalogue') || title.includes('catalog')) {
+          return 'catalogue';
+        }
+        if (progressRecord?.completed && progressRecord?.durationMinutes === 0) {
+          return 'recording-review';
+        }
+        if (metadata.dripRelease || metadata.drip === true) {
+          return 'drip';
+        }
+        return 'lesson';
+      };
+
+      const resolveMetadataBoolean = (value, defaultValue = true) => {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') {
+          const normalised = value.trim().toLowerCase();
+          if (!normalised) return defaultValue;
+          return ['true', '1', 'yes', 'required'].includes(normalised);
+        }
+        if (typeof value === 'number') {
+          return value !== 0;
+        }
+        return defaultValue;
+      };
+
       const moduleSummaries = modules.map((module) => {
         const lessonRows = [...(learnerLessonsByModule.get(module.id) ?? [])].sort(
           (a, b) => a.position - b.position
@@ -2575,6 +4764,16 @@ export default class DashboardService {
           const releaseAtIso = lesson.releaseAt ? lesson.releaseAt.toISOString() : null;
           const available = !lesson.releaseAt || lesson.releaseAt <= now;
           const status = completed ? 'completed' : available ? 'available' : 'scheduled';
+          const completedAtIso = progress?.completedAt
+            ? new Date(progress.completedAt).toISOString()
+            : null;
+          const scoreValue = Number(progress?.score ?? progress?.grade ?? NaN);
+          const attemptsValue = Number(progress?.attemptCount ?? progress?.attempts ?? NaN);
+          const lessonType = deriveLessonType(lesson, progress);
+          const format =
+            lesson.metadata?.format ??
+            lesson.metadata?.contentType ??
+            (lessonType === 'live-class' ? 'live' : 'asynchronous');
           return {
             id: `lesson-${lesson.id}`,
             title: lesson.title,
@@ -2582,8 +4781,14 @@ export default class DashboardService {
             durationMinutes: lesson.durationMinutes,
             releaseAt: releaseAtIso,
             completed,
-            completedAt: progress?.completedAt ?? null,
-            status
+            completedAt: completedAtIso,
+            status,
+            type: lessonType,
+            format,
+            required: resolveMetadataBoolean(lesson.metadata?.required, true),
+            score: Number.isFinite(scoreValue) ? scoreValue : null,
+            attempts: Number.isFinite(attemptsValue) ? attemptsValue : null,
+            metadata: lesson.metadata
           };
         });
 
@@ -2630,6 +4835,15 @@ export default class DashboardService {
         status: 'In progress',
         progress: Math.round(Number(enrollment.progressPercent ?? 0)),
         instructor: `${enrollment.instructorFirstName} ${enrollment.instructorLastName}`.trim(),
+        startedAt: enrollment.startedAt ? new Date(enrollment.startedAt).toISOString() : null,
+        completedAt: enrollment.completedAt ? new Date(enrollment.completedAt).toISOString() : null,
+        lastAccessedAt: enrollment.lastAccessedAt ? new Date(enrollment.lastAccessedAt).toISOString() : null,
+        deliveryFormat: enrollment.deliveryFormat ?? null,
+        level: enrollment.courseLevel ?? null,
+        ratingAverage: Number(enrollment.courseRating ?? 0),
+        ratingCount: Number(enrollment.courseRatingCount ?? 0),
+        enrolmentCount: Number(enrollment.enrolmentCount ?? 0),
+        metadata: safeJsonParse(enrollment.courseMetadata, {}),
         nextLesson: nextLesson ? `${nextLesson.moduleTitle} · ${nextLesson.title}` : 'Review completed lessons',
         nextLessonDetail: nextLesson
           ? {
@@ -2877,6 +5091,84 @@ export default class DashboardService {
         }))
     };
 
+    const learnerLiveClassSessions = liveClassRows.map((session) =>
+      normaliseLiveClassroom(
+        {
+          ...session,
+          metadata: safeJsonParse(session.classroomMetadata, {}),
+          registrationStatus: session.registrationStatus,
+          ticketType: session.ticketType,
+          amountPaid: session.amountPaid,
+          registrationCurrency: session.registrationCurrency,
+          priceAmount: session.priceAmount,
+          priceCurrency: session.priceCurrency
+        },
+        { now, perspective: 'learner', allowJoinLink: session.registrationStatus === 'registered' }
+      )
+    );
+
+    const learnerUpcomingLive = learnerLiveClassSessions.filter((session) =>
+      ['upcoming', 'check-in'].includes(session.status)
+    );
+    const learnerActiveLive = learnerLiveClassSessions.filter((session) => session.status === 'live');
+    const learnerCompletedLive = learnerLiveClassSessions
+      .filter((session) => session.status === 'completed')
+      .sort((a, b) => {
+        const aTime = a.endAt ? new Date(a.endAt).getTime() : a.startAt ? new Date(a.startAt).getTime() : 0;
+        const bTime = b.endAt ? new Date(b.endAt).getTime() : b.startAt ? new Date(b.startAt).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 6);
+
+    const learnerGroupSessions = learnerLiveClassSessions
+      .filter((session) => session.isGroupSession)
+      .map((session) => ({
+        id: session.id,
+        title: session.title,
+        stage: session.stage,
+        status: session.status,
+        startLabel: session.startLabel,
+        occupancy: session.occupancy,
+        callToAction: session.callToAction,
+        facilitators: session.facilitators,
+        breakoutRooms: session.breakoutRooms
+      }));
+
+    const learnerWhiteboardSnapshots = buildLiveClassWhiteboardSnapshots(learnerLiveClassSessions).slice(0, 6);
+    const learnerReadiness = buildLiveClassReadiness(learnerLiveClassSessions);
+    const registeredLiveCount = learnerLiveClassSessions.filter((session) => session.registration === 'registered').length;
+    const waitlistedLiveCount = learnerLiveClassSessions.filter((session) => session.registration === 'waitlisted').length;
+    const averageLearnerOccupancy = averageOccupancyRate(learnerLiveClassSessions);
+    const readyWhiteboards = learnerWhiteboardSnapshots.filter((snapshot) => snapshot.ready).length;
+
+    const learnerLiveMetrics = [
+      {
+        label: 'Registered live classes',
+        value: String(registeredLiveCount),
+        change: learnerActiveLive.length > 0 ? `${learnerActiveLive.length} streaming now` : 'All sessions scheduled',
+        trend: registeredLiveCount > 0 ? 'up' : 'down'
+      },
+      {
+        label: 'Average seat fill',
+        value: averageLearnerOccupancy !== null ? `${averageLearnerOccupancy}%` : 'N/A',
+        change: waitlistedLiveCount > 0 ? `${waitlistedLiveCount} waitlisted` : 'No waitlist pressure',
+        trend: averageLearnerOccupancy !== null && averageLearnerOccupancy >= 70 ? 'up' : 'down'
+      },
+      {
+        label: 'Whiteboard readiness',
+        value:
+          learnerWhiteboardSnapshots.length > 0
+            ? `${readyWhiteboards}/${learnerWhiteboardSnapshots.length} ready`
+            : 'No boards queued',
+        change:
+          learnerWhiteboardSnapshots.length === 0
+            ? 'Boards open on demand'
+            : `${learnerWhiteboardSnapshots.length - readyWhiteboards} in preparation`,
+        trend:
+          learnerWhiteboardSnapshots.length === 0 || readyWhiteboards === learnerWhiteboardSnapshots.length ? 'up' : 'down'
+      }
+    ];
+
     const totalSpent = paymentIntentRows
       .filter((intent) => intent.status === 'succeeded')
       .reduce((total, intent) => total + Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0), 0);
@@ -2976,6 +5268,8 @@ export default class DashboardService {
       reason: entry.recommendation.reasonCode.replace(/_/g, ' '),
       email: entry.user.email
     }));
+
+    const blogHighlights = await BlogService.getDashboardHighlights({ limit: 6 });
 
     const feedHighlights = communityMessageRows.map((row) => {
       const metadata = safeJsonParse(row.metadata, {});
@@ -3287,6 +5581,9 @@ export default class DashboardService {
     };
 
     const roles = [{ id: 'learner', label: 'Learner' }];
+    if (communityDashboard) {
+      roles.push(communityDashboard.role);
+    }
     if (instructorDashboard) {
       roles.push(instructorDashboard.role);
     }
@@ -3307,6 +5604,18 @@ export default class DashboardService {
           active: learnerCourseSummaries,
           recommendations: courseRecommendations
         },
+        liveClassrooms: {
+          metrics: learnerLiveMetrics,
+          sessions: learnerLiveClassSessions,
+          active: learnerActiveLive,
+          upcoming: learnerUpcomingLive,
+          completed: learnerCompletedLive,
+          groups: learnerGroupSessions.slice(0, 6),
+          whiteboard: {
+            snapshots: learnerWhiteboardSnapshots,
+            readiness: learnerReadiness
+          }
+        },
         calendar: calendarEntries,
         tutorBookings,
         ebooks: {
@@ -3317,12 +5626,17 @@ export default class DashboardService {
           summary: financialSummary,
           invoices
         },
+        affiliate: affiliateOverview,
         notifications: {
           total: notifications.length,
           unreadMessages: unreadThreads,
           items: notifications
         },
         assessments: learnerAssessments,
+        blog: {
+          highlights: blogHighlights,
+          featured: blogHighlights.find((entry) => entry.heroImage) ?? blogHighlights[0] ?? null
+        },
         followers: {
           followers: followersCount,
           following: followingCount,
@@ -3357,6 +5671,13 @@ export default class DashboardService {
       }
     };
 
+    if (instructorDashboard?.dashboard) {
+      instructorDashboard.dashboard.affiliate = affiliateOverview;
+    }
+
+    if (communityDashboard) {
+      dashboards.community = communityDashboard.dashboard;
+    }
     if (instructorDashboard) {
       dashboards.instructor = instructorDashboard.dashboard;
     }
@@ -3366,6 +5687,14 @@ export default class DashboardService {
       adminDashboard = await DashboardService.buildAdminDashboard({ now });
       dashboards.admin = adminDashboard.dashboard;
     }
+
+    const blogSearchEntries = blogHighlights.map((post) => ({
+      id: `search-blog-${post.slug}`,
+      role: 'learner',
+      type: 'Blog',
+      title: post.title,
+      url: `/blog/${post.slug}`
+    }));
 
     const searchIndex = [
       ...learnerCourseSummaries.map((course) => ({
@@ -3382,6 +5711,13 @@ export default class DashboardService {
         title: community.name,
         url: '/dashboard/learner/communities'
       })),
+      ...learnerUpcomingLive.map((session) => ({
+        id: `search-learner-live-${session.id}`,
+        role: 'learner',
+        type: 'Live classroom',
+        title: session.title,
+        url: '/dashboard/learner/live-classes'
+      })),
       ...upcomingDisplay.map((event) => ({
         id: `search-event-${event.id}`,
         role: 'learner',
@@ -3396,8 +5732,31 @@ export default class DashboardService {
         title: 'Assessment schedule',
         url: '/dashboard/learner/assessments'
       }
+      ...blogSearchEntries
     ];
 
+    if (affiliateOverview?.programs?.length) {
+      searchIndex.push({
+        id: 'search-affiliate-learner',
+        role: 'learner',
+        type: 'Affiliate',
+        title: 'Affiliate workspace',
+        url: '/dashboard/learner/affiliate'
+      });
+      if (instructorDashboard) {
+        searchIndex.push({
+          id: 'search-affiliate-instructor',
+          role: 'instructor',
+          type: 'Affiliate',
+          title: 'Affiliate workspace',
+          url: '/dashboard/instructor/affiliate'
+        });
+      }
+    }
+
+    if (communityDashboard) {
+      searchIndex.push(...communityDashboard.searchIndex);
+    }
     if (instructorDashboard) {
       searchIndex.push(...instructorDashboard.searchIndex);
     }
@@ -3411,6 +5770,9 @@ export default class DashboardService {
       ? `Currently collaborating across ${communityNames.join(', ')} while progressing through ${primaryProgram}.`
       : `Progressing through ${primaryProgram}.`;
     const profileBioSegments = [learnerProfileBio];
+    if (communityDashboard?.profileBio) {
+      profileBioSegments.push(communityDashboard.profileBio);
+    }
     if (instructorDashboard?.profileBio) {
       profileBioSegments.push(instructorDashboard.profileBio);
     }
@@ -3424,6 +5786,14 @@ export default class DashboardService {
       { label: 'Courses', value: `${activeEnrollments.length} active` },
       { label: 'Badges', value: `${learningCompletions.length} milestones` }
     ];
+    if (affiliateOverview?.summary?.totals?.earnedFormatted) {
+      profileStats.push({
+        label: 'Affiliate earned',
+        value: affiliateOverview.summary.totals.earnedFormatted
+      });
+    if (communityDashboard) {
+      profileStats.push(...communityDashboard.profileStats);
+    }
     if (instructorDashboard) {
       profileStats.push(...instructorDashboard.profileStats);
     }
@@ -3435,7 +5805,25 @@ export default class DashboardService {
       `${memberships.length} communities`,
       `${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`
     ];
+    if (affiliateOverview?.summary?.totals?.programCount) {
+      const programmeCount = affiliateOverview.summary.totals.programCount;
+      if (programmeCount > 0) {
+        profileTitleSegments.push(
+          `${programmeCount} affiliate programme${programmeCount === 1 ? '' : 's'}`
+        );
+      }
+    }
     if (instructorDashboard) {
+    if (communityDashboard) {
+      const managedCommunitiesCount =
+        communityDashboard.dashboard?.health?.overview?.length ?? 0;
+      if (managedCommunitiesCount > 0) {
+        profileTitleSegments.push(
+          `${managedCommunitiesCount} community${managedCommunitiesCount === 1 ? '' : 'ies'} stewarded`
+        );
+      }
+    }
+    if (instructorDashboard && (!communityDashboard || !communityDashboard.dashboard?.health?.overview?.length)) {
       const managedCommunitiesCount =
         instructorDashboard.dashboard?.communities?.manageDeck?.length ?? 0;
       if (managedCommunitiesCount > 0) {
@@ -3525,7 +5913,12 @@ export default class DashboardService {
       topCommunitiesRows,
       tutorResponseRow,
       refundsPendingRow,
-      upcomingLiveClassRows
+      upcomingLiveClassRows,
+      blogPublishedRow,
+      blogDraftRow,
+      blogScheduledRow,
+      blogViewRow,
+      blogRecentResult
     ] = await Promise.all([
       db('users').count('id as count').first(),
       db('users').where('created_at', '>=', thirtyDaysAgo).count('id as count').first(),
@@ -3666,7 +6059,12 @@ export default class DashboardService {
           'c.name as communityName'
         ])
         .orderBy('lc.start_at', 'asc')
-        .limit(5)
+        .limit(5),
+      db('blog_posts').where('status', 'published').count('id as count').first(),
+      db('blog_posts').where('status', 'draft').count('id as count').first(),
+      db('blog_posts').where('status', 'scheduled').count('id as count').first(),
+      db('blog_posts').sum({ total: 'view_count' }).first(),
+      BlogService.listAdminPosts({ page: 1, pageSize: 5, status: 'published' })
     ]);
 
     const totalUsers = toNumber(totalUsersRow?.count);
@@ -3697,6 +6095,12 @@ export default class DashboardService {
         : new Date(subscription.startedAt);
       return startedAt >= sixtyDaysAgo && startedAt < thirtyDaysAgo;
     }).length;
+
+    const blogPublishedCount = toNumber(blogPublishedRow?.count);
+    const blogDraftCount = toNumber(blogDraftRow?.count);
+    const blogScheduledCount = toNumber(blogScheduledRow?.count);
+    const blogTotalViews = toNumber(blogViewRow?.total);
+    const blogRecentPosts = Array.isArray(blogRecentResult?.data) ? blogRecentResult.data : [];
 
     const computeAnnualised = (priceCents, interval) => {
       switch (interval) {
@@ -3976,6 +6380,29 @@ export default class DashboardService {
       };
     });
 
+    const blogOperations = {
+      summary: {
+        published: blogPublishedCount,
+        drafts: blogDraftCount,
+        scheduled: blogScheduledCount,
+        totalViews: blogTotalViews
+      },
+      recent: blogRecentPosts.map((post) => ({
+        id: post.id,
+        title: post.title,
+        slug: post.slug,
+        status: post.status,
+        publishedAt: post.publishedAt,
+        readingTimeMinutes: post.readingTimeMinutes,
+        category: post.category,
+        tags: post.tags,
+        featured: post.isFeatured,
+        heroImage: post.media?.[0]?.mediaUrl ?? null,
+        views: Number(post.viewCount ?? 0)
+      })),
+      featured: blogRecentPosts.find((post) => post.isFeatured) ?? blogRecentPosts[0] ?? null
+    };
+
     const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
     const compliance = await IdentityVerificationService.getAdminOverview({ now: reference });
 
@@ -4004,7 +6431,8 @@ export default class DashboardService {
         communitiesLive: formatNumber(communityTotal),
         instructors: formatNumber(instructorCount)
       },
-      upcomingLaunches
+      upcomingLaunches,
+      blog: blogOperations.summary
     };
 
     const profileStats = [
@@ -4026,7 +6454,8 @@ export default class DashboardService {
       { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
       { id: 'admin-revenue', role: 'admin', type: 'Revenue', title: 'Revenue performance', url: '/admin#revenue' },
       { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' },
-      { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' }
+      { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' },
+      { id: 'admin-blog', role: 'admin', type: 'Content', title: 'Blog management', url: '/admin#blog' }
     ];
 
     return {
@@ -4036,11 +6465,15 @@ export default class DashboardService {
         approvals,
         revenue,
         operations,
+        blog: blogOperations,
+        compliance,
         activity: { alerts, events },
         compliance,
         settings: {
           monetization: monetizationSettings
         }
+        },
+        compliance
       },
       profileStats,
       profileBio,

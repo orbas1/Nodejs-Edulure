@@ -46,7 +46,28 @@ beforeEach(() => {
   serviceMock.submitForReview.mockResolvedValue({ status: 'pending_review' });
   serviceMock.reviewVerification.mockResolvedValue({ status: 'approved' });
   serviceMock.listAuditTrail.mockResolvedValue([{ id: 1, action: 'submitted_for_review' }]);
-  serviceMock.getAdminOverview.mockResolvedValue({ metrics: [], queue: [], slaBreaches: 0, manualReviewQueue: 0 });
+  serviceMock.getAdminOverview.mockResolvedValue({
+    metrics: [],
+    queue: [],
+    slaBreaches: 0,
+    manualReviewQueue: 0,
+    lastGeneratedAt: new Date().toISOString(),
+    gdpr: {
+      dsar: {
+        open: 0,
+        dueSoon: 0,
+        overdue: 0,
+        completed30d: 0,
+        averageCompletionHours: 0,
+        slaHours: 72,
+        owner: 'Data Protection Officer',
+        nextIcoSubmission: new Date().toISOString()
+      },
+      registers: [],
+      controls: {},
+      ico: { registrationNumber: 'ZB765432', status: 'Active' }
+    }
+  });
 });
 
 describe('Identity verification HTTP routes', () => {
@@ -112,6 +133,8 @@ describe('Identity verification HTTP routes', () => {
 
     expect(response.status).toBe(200);
     expect(serviceMock.getAdminOverview).toHaveBeenCalledTimes(1);
+    expect(response.body.data.gdpr).toBeDefined();
+    expect(response.body.data.gdpr.ico.registrationNumber).toBe('ZB765432');
   });
 
   it('allows admins to review verification cases', async () => {

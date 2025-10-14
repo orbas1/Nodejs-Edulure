@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildAffiliateOverview,
   buildInstructorDashboard,
   buildLearningPace,
   calculateLearningStreak,
   humanizeRelativeTime
 } from '../src/services/DashboardService.js';
+import { normaliseMonetization, resolveDefaultMonetization } from '../src/services/PlatformSettingsService.js';
 
 describe('DashboardService helpers', () => {
   it('calculates learning streak with contiguous days', () => {
@@ -45,6 +47,133 @@ describe('DashboardService helpers', () => {
 
     expect(sameHour).toBe('45m ago');
     expect(daysAgo).toBe('5d ago');
+  });
+});
+
+describe('buildAffiliateOverview', () => {
+  it('returns empty affiliate structure when no programmes exist', () => {
+    const overview = buildAffiliateOverview({
+      affiliates: [],
+      affiliatePayouts: [],
+      monetizationSettings: resolveDefaultMonetization(),
+      now: new Date('2024-05-01T00:00:00Z')
+    });
+
+    expect(overview.programs).toHaveLength(0);
+    expect(overview.summary.totals.programCount).toBe(0);
+    expect(overview.summary.totals.outstandingCents).toBe(0);
+    expect(overview.actions).toEqual([
+      'Invite high-performing learners into the affiliate programme.'
+    ]);
+  });
+
+  it('aggregates commissions, payouts, and referral performance signals', () => {
+    const monetizationSettings = normaliseMonetization({
+      affiliate: {
+        defaultCommission: {
+          recurrence: 'finite',
+          maxOccurrences: 6,
+          tiers: [
+            { thresholdCents: 0, rateBps: 1000 },
+            { thresholdCents: 100_000, rateBps: 1500 }
+          ]
+        }
+      }
+    });
+    const now = new Date('2024-05-15T12:00:00Z');
+    const affiliates = [
+      {
+        id: 1,
+        referralCode: 'GROW-ALEX',
+        communityId: 10,
+        communityName: 'Growth Operator Studio',
+        status: 'active',
+        totalEarnedCents: 182_400,
+        totalPaidCents: 148_000,
+        commissionRateBps: 1500
+      },
+      {
+        id: 2,
+        referralCode: 'OPS-LIA',
+        communityId: 11,
+        communityName: 'Ops Leadership Lab',
+        status: 'pending',
+        totalEarnedCents: 68_000,
+        totalPaidCents: 12_000
+      }
+    ];
+    const affiliatePayouts = [
+      {
+        id: 'pay-1',
+        affiliateId: 1,
+        status: 'scheduled',
+        amountCents: 34_200,
+        scheduledAt: '2024-05-30T09:00:00Z'
+      },
+      {
+        id: 'pay-0',
+        affiliateId: 1,
+        status: 'completed',
+        amountCents: 128_000,
+        processedAt: '2024-04-28T09:00:00Z'
+      },
+      {
+        id: 'pay-2',
+        affiliateId: 2,
+        status: 'pending',
+        amountCents: 56_000,
+        scheduledAt: '2024-05-25T09:00:00Z'
+      }
+    ];
+    const paymentIntents = [
+      {
+        metadata: JSON.stringify({ referralCode: 'GROW-ALEX' }),
+        amountTotal: 45_000,
+        amountRefunded: 0,
+        capturedAt: '2024-05-10T12:00:00Z'
+      },
+      {
+        metadata: JSON.stringify({ referralCode: 'GROW-ALEX' }),
+        amountTotal: 18_000,
+        amountRefunded: 2_000,
+        capturedAt: '2024-03-18T12:00:00Z'
+      },
+      {
+        metadata: JSON.stringify({ referralCode: 'OPS-LIA' }),
+        amountTotal: 24_000,
+        amountRefunded: 0,
+        capturedAt: '2024-05-01T12:00:00Z'
+      }
+    ];
+    const memberships = [
+      { communityId: 10, communityName: 'Growth Operator Studio', communitySlug: 'growth-operator' },
+      { communityId: 11, communityName: 'Ops Leadership Lab', communitySlug: 'ops-lab' }
+    ];
+
+    const overview = buildAffiliateOverview({
+      affiliates,
+      affiliatePayouts,
+      paymentIntents,
+      memberships,
+      monetizationSettings,
+      now
+    });
+
+    expect(overview.programs).toHaveLength(2);
+    expect(overview.summary.totals.programCount).toBe(2);
+    expect(overview.summary.totals.outstandingCents).toBe(90_400);
+    expect(overview.summary.nextPayout.amount).toBe('$560.00');
+    expect(overview.payouts[0].id).toBe('pay-1');
+    expect(overview.actions).toEqual([
+      'Release $904.00 in pending affiliate payouts.',
+      'Review 1 pending affiliate application.'
+    ]);
+
+    const growthProgramme = overview.programs.find((program) => program.referralCode === 'GROW-ALEX');
+    expect(growthProgramme.earnings.totalFormatted).toBe('$1,824.00');
+    expect(growthProgramme.performance.conversions).toBe(2);
+    expect(growthProgramme.performance.conversions30d).toBe(1);
+    expect(growthProgramme.performance.volume30dFormatted).toBe('$450.00');
   });
 });
 
@@ -277,11 +406,24 @@ describe('buildInstructorDashboard', () => {
           name: 'Ops Launch Sprint',
           objective: 'leads',
           status: 'active',
+          budgetCurrency: 'USD',
+          budgetDailyCents: 35000,
           spendCurrency: 'USD',
           spendTotalCents: 12500,
           performanceScore: 4.2,
           ctr: 0.054,
-          metadata: JSON.stringify({ promotedCommunityId: 55 }),
+          cpcCents: 145,
+          cpaCents: 975,
+          targetingKeywords: JSON.stringify(['design ops', 'launch sprint']),
+          targetingAudiences: JSON.stringify(['Product Leads']),
+          targetingLocations: JSON.stringify(['US', 'GB']),
+          targetingLanguages: JSON.stringify(['en']),
+          creativeHeadline: 'Launch sprint playbooks',
+          creativeDescription: 'Capture qualified leads for design ops cohorts.',
+          creativeUrl: 'https://edulure.test/ads/ops-launch',
+          startAt: '2024-11-01T00:00:00Z',
+          endAt: '2024-12-01T00:00:00Z',
+          metadata: JSON.stringify({ promotedCommunityId: 55, featureFlag: 'ads-explorer-placements' }),
           createdBy: 7
         }
       ],
@@ -293,6 +435,7 @@ describe('buildInstructorDashboard', () => {
           impressions: 1800,
           clicks: 110,
           conversions: 12,
+          spendCents: 28000,
           revenueCents: 72000,
           metadata: '{}'
         },
@@ -303,6 +446,7 @@ describe('buildInstructorDashboard', () => {
           impressions: 1500,
           clicks: 90,
           conversions: 8,
+          spendCents: 22000,
           revenueCents: 48000,
           metadata: '{}'
         }
@@ -378,6 +522,15 @@ describe('buildInstructorDashboard', () => {
         expect.objectContaining({ id: 'booking-71', status: 'Requested' })
       ])
     );
+    expect(snapshot.dashboard.tutors.roster[0]).toMatchObject({
+      name: 'Ivy Instructor',
+      status: 'Active'
+    });
+    expect(snapshot.dashboard.tutors.availability[0]).toMatchObject({
+      slotsCount: expect.any(Number),
+      learnersCount: expect.any(Number)
+    });
+    expect(snapshot.dashboard.tutors.notifications.length).toBeGreaterThan(0);
     expect(snapshot.dashboard.communities.manageDeck[0]).toMatchObject({
       id: 'community-55',
       title: 'DesignOps Collective'
@@ -386,6 +539,20 @@ describe('buildInstructorDashboard', () => {
       expect.arrayContaining([
         expect.objectContaining({ name: expect.stringContaining('Pro Circle'), members: '1 active' })
       ])
+    );
+    expect(snapshot.dashboard.ads.summary).toMatchObject({
+      activeCampaigns: 1,
+      totalSpend: expect.objectContaining({ formatted: expect.stringContaining('$') }),
+      averageCtr: expect.stringContaining('%')
+    });
+    expect(snapshot.dashboard.ads.active[0]).toMatchObject({
+      name: 'Ops Launch Sprint',
+      placement: expect.objectContaining({ surface: 'Explorer' }),
+      targeting: expect.objectContaining({ keywords: expect.arrayContaining(['design ops']) })
+    });
+    expect(snapshot.dashboard.ads.placements[0].budgetLabel).toContain('$350');
+    expect(snapshot.dashboard.ads.tags).toEqual(
+      expect.arrayContaining([expect.objectContaining({ category: 'Keyword', label: 'design ops' })])
     );
     expect(snapshot.searchIndex).toEqual(
       expect.arrayContaining([
@@ -400,6 +567,9 @@ describe('buildInstructorDashboard', () => {
     expect(snapshot.dashboard.assessments.timeline.upcoming).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ course: 'Design Ops Mastery', type: 'Assignment' })
+    expect(snapshot.searchIndex).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'instructor', type: 'Tutor', title: 'Ivy Instructor' })
       ])
     );
     expect(snapshot.profileStats).toEqual(

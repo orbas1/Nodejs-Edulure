@@ -28,6 +28,7 @@ beforeEach(() => {
     profile: { id: 42, name: 'Test User', email: 'user@test.local', avatar: '', title: '', bio: '', stats: [], feedHighlights: [] },
     roles: [
       { id: 'learner', label: 'Learner' },
+      { id: 'community', label: 'Community' },
       { id: 'instructor', label: 'Instructor' }
     ],
     dashboards: {
@@ -56,6 +57,30 @@ beforeEach(() => {
           messaging: { unreadThreads: 0, notificationsEnabled: true },
           communities: []
         }
+      },
+      community: {
+        metrics: [
+          {
+            label: 'Active members',
+            value: '120',
+            change: '+8 awaiting approval',
+            trend: 'up'
+          }
+        ],
+        health: {
+          overview: [
+            {
+              id: 'community-55',
+              name: 'DesignOps Collective',
+              health: 'Healthy'
+            }
+          ]
+        },
+        operations: { runbooks: [], escalations: [] },
+        programming: { upcomingEvents: [], tutorPods: [], broadcasts: [] },
+        monetisation: { tiers: [], experiments: [], insights: [] },
+        safety: { incidents: [], backlog: [], moderators: [] },
+        communications: { highlights: [], broadcasts: [], trends: [] }
       },
       instructor: {
         metrics: [
@@ -89,7 +114,9 @@ describe('Dashboard HTTP routes', () => {
     expect(response.body.success).toBe(true);
     expect(dashboardServiceMock.getDashboardForUser).toHaveBeenCalledWith(42);
     expect(response.body.data.profile.id).toBe(42);
+    expect(response.body.data.roles).toContainEqual({ id: 'community', label: 'Community' });
     expect(response.body.data.roles).toContainEqual({ id: 'instructor', label: 'Instructor' });
+    expect(response.body.data.dashboards.community.metrics[0].label).toBe('Active members');
     expect(response.body.data.dashboards.instructor.metrics[0].label).toBe('Active learners');
   });
 });

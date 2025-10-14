@@ -15,12 +15,24 @@ const registerSchema = Joi.object({
   }),
   role: Joi.string().valid('user', 'instructor', 'admin').default('user'),
   age: Joi.number().integer().min(16).max(120).optional(),
-  address: Joi.string().trim().max(255).allow('', null)
+  address: Joi.string().trim().max(255).allow('', null),
+  twoFactor: Joi.object({
+    enabled: Joi.boolean().default(false)
+  })
+    .optional()
+    .default({ enabled: false })
 });
 
 const loginSchema = Joi.object({
   email: Joi.string().email().required(),
-  password: Joi.string().required()
+  password: Joi.string().required(),
+  twoFactorCode: Joi.string()
+    .trim()
+    .pattern(/^\d{6,10}$/)
+    .messages({
+      'string.pattern.base': 'Two-factor code must be 6-10 digits.'
+    })
+    .optional()
 });
 
 const verifyEmailSchema = Joi.object({
@@ -74,7 +86,12 @@ export default class AuthController {
         abortEarly: false,
         stripUnknown: true
       });
-      const result = await AuthService.login(payload.email, payload.password, buildContext(req));
+      const result = await AuthService.login(
+        payload.email,
+        payload.password,
+        payload.twoFactorCode ?? null,
+        buildContext(req)
+      );
       return success(res, {
         data: result.data,
         message: 'Login successful'

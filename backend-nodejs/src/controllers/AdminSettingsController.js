@@ -8,6 +8,11 @@ const restrictedFeaturesSchema = Joi.alternatives().try(
   Joi.string().allow('', null)
 );
 
+const commissionTierSchema = Joi.object({
+  thresholdCents: Joi.number().integer().min(0).max(1_000_000_000),
+  rateBps: Joi.number().integer().min(0).max(5000)
+});
+
 const monetizationUpdateSchema = Joi.object({
   commissions: Joi.object({
     enabled: Joi.boolean(),
@@ -25,6 +30,26 @@ const monetizationUpdateSchema = Joi.object({
     defaultProvider: Joi.string().valid('stripe', 'escrow'),
     stripeEnabled: Joi.boolean(),
     escrowEnabled: Joi.boolean()
+  }).optional(),
+  affiliate: Joi.object({
+    enabled: Joi.boolean(),
+    autoApprove: Joi.boolean(),
+    cookieWindowDays: Joi.number().integer().min(1).max(365),
+    payoutScheduleDays: Joi.number().integer().min(7).max(120),
+    requireTaxInformation: Joi.boolean(),
+    defaultCommission: Joi.object({
+      recurrence: Joi.string().valid('once', 'finite', 'infinite'),
+      maxOccurrences: Joi.when('recurrence', {
+        is: 'finite',
+        then: Joi.number().integer().min(1).max(120),
+        otherwise: Joi.number().integer().min(1).max(120).allow(null)
+      }),
+      tiers: Joi.array().items(commissionTierSchema).min(1).max(10)
+    }).optional(),
+    security: Joi.object({
+      blockSelfReferral: Joi.boolean(),
+      enforceTwoFactorForPayouts: Joi.boolean()
+    }).optional()
   }).optional()
 })
   .min(1)

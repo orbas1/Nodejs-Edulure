@@ -16,6 +16,7 @@ import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
 import AdminTopCommunitiesSection from './admin/sections/AdminTopCommunitiesSection.jsx';
 import AdminUpcomingLaunchesSection from './admin/sections/AdminUpcomingLaunchesSection.jsx';
 import AdminActivitySection from './admin/sections/AdminActivitySection.jsx';
+import AdminBlogSection from './admin/sections/AdminBlogSection.jsx';
 import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
 const EMPTY_OBJECT = Object.freeze({});
@@ -28,6 +29,7 @@ const SECTION_NAVIGATION = Object.freeze([
   { id: 'monetization', label: 'Monetization' },
   { id: 'communities', label: 'Communities' },
   { id: 'operations', label: 'Operations' },
+  { id: 'blog', label: 'Blog' },
   { id: 'compliance', label: 'Compliance' },
   { id: 'policies', label: 'Policies' },
   { id: 'launches', label: 'Launches' },
@@ -145,6 +147,7 @@ export default function Admin() {
   const topCommunities = adminData.revenue?.topCommunities ?? EMPTY_ARRAY;
 
   const monetizationSettings = adminData.settings?.monetization ?? null;
+  const blog = adminData.blog ?? null;
 
   const operations = adminData.operations ?? EMPTY_OBJECT;
   const support = operations.support ?? EMPTY_OBJECT;
@@ -157,6 +160,7 @@ export default function Admin() {
   const complianceQueue = compliance.queue ?? EMPTY_ARRAY;
   const complianceSlaBreaches = compliance.slaBreaches ?? 0;
   const complianceManualReview = compliance.manualReviewQueue ?? 0;
+  const complianceGdprProfile = compliance.gdpr ?? EMPTY_OBJECT;
 
   const activity = adminData.activity ?? EMPTY_OBJECT;
   const alerts = activity.alerts ?? EMPTY_ARRAY;
@@ -509,12 +513,15 @@ export default function Admin() {
               platformStats={platformStats}
             />
 
+            <AdminBlogSection sectionId="blog" blog={blog} token={token} onPostCreated={refresh} />
+
             <AdminComplianceSection
               sectionId="compliance"
               metrics={complianceMetrics}
               queue={complianceQueue}
               slaBreaches={complianceSlaBreaches}
               manualReviewQueue={complianceManualReview}
+              gdprProfile={complianceGdprProfile}
               onReview={handleVerificationReview}
             />
 

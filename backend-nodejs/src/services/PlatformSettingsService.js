@@ -23,6 +23,25 @@ const DEFAULT_MONETIZATION = Object.freeze({
     defaultProvider: 'stripe',
     stripeEnabled: true,
     escrowEnabled: false
+  },
+  affiliate: {
+    enabled: true,
+    autoApprove: true,
+    cookieWindowDays: 30,
+    payoutScheduleDays: 30,
+    requireTaxInformation: true,
+    defaultCommission: {
+      recurrence: 'infinite',
+      maxOccurrences: null,
+      tiers: [
+        { thresholdCents: 0, rateBps: 1000 },
+        { thresholdCents: 50_000, rateBps: 1500 }
+      ]
+    },
+    security: {
+      blockSelfReferral: true,
+      enforceTwoFactorForPayouts: true
+    }
   }
 });
 
@@ -90,6 +109,63 @@ function normalizeStringArray(value) {
   });
 
   return result;
+}
+
+function sanitizeCommissionTiers(value) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const tiers = value
+    .map((tier) => {
+      if (!tier || typeof tier !== 'object') {
+        return null;
+      }
+      return {
+        thresholdCents: clampInt(tier.thresholdCents, {
+          min: 0,
+          max: 1_000_000_000,
+          fallback: 0
+        }),
+        rateBps: clampInt(tier.rateBps, { min: 0, max: 5000, fallback: 1000 })
+      };
+    })
+    .filter(Boolean);
+
+  return tiers.length ? tiers : null;
+}
+
+function normaliseCommissionTiers(tiers, fallbackTiers = []) {
+  const source = Array.isArray(tiers) ? tiers : fallbackTiers;
+  const entries = (Array.isArray(source) ? source : []).map((tier) => ({
+    thresholdCents: clampInt(tier.thresholdCents, {
+      min: 0,
+      max: 1_000_000_000,
+      fallback: 0
+    }),
+    rateBps: clampInt(tier.rateBps, { min: 0, max: 5000, fallback: 1000 })
+  }));
+
+  const deduped = [];
+  const seenThresholds = new Set();
+  entries
+    .sort((a, b) => a.thresholdCents - b.thresholdCents)
+    .forEach((tier) => {
+      const key = tier.thresholdCents;
+      if (seenThresholds.has(key)) {
+        return;
+      }
+      seenThresholds.add(key);
+      deduped.push(tier);
+    });
+
+  if (!deduped.some((tier) => tier.thresholdCents === 0)) {
+    const fallbackRate =
+      fallbackTiers?.find((tier) => tier?.thresholdCents === 0)?.rateBps ?? deduped[0]?.rateBps ?? 1000;
+    deduped.unshift({ thresholdCents: 0, rateBps: clampInt(fallbackRate, { min: 0, max: 5000, fallback: 1000 }) });
+  }
+
+  return deduped.slice(0, 10);
 }
 
 function resolveDefaultMonetization() {
@@ -166,6 +242,73 @@ function sanitizeMonetizationPayload(payload = {}) {
     }
   }
 
+  if (payload.affiliate && typeof payload.affiliate === 'object') {
+    const affiliate = {};
+    if (payload.affiliate.enabled !== undefined) {
+      affiliate.enabled = Boolean(payload.affiliate.enabled);
+    }
+    if (payload.affiliate.autoApprove !== undefined) {
+      affiliate.autoApprove = Boolean(payload.affiliate.autoApprove);
+    }
+    if (payload.affiliate.cookieWindowDays !== undefined) {
+      affiliate.cookieWindowDays = clampInt(payload.affiliate.cookieWindowDays, {
+        min: 1,
+        max: 365,
+        fallback: 30
+      });
+    }
+    if (payload.affiliate.payoutScheduleDays !== undefined) {
+      affiliate.payoutScheduleDays = clampInt(payload.affiliate.payoutScheduleDays, {
+        min: 7,
+        max: 120,
+        fallback: 30
+      });
+    }
+    if (payload.affiliate.requireTaxInformation !== undefined) {
+      affiliate.requireTaxInformation = Boolean(payload.affiliate.requireTaxInformation);
+    }
+    if (payload.affiliate.defaultCommission && typeof payload.affiliate.defaultCommission === 'object') {
+      const commission = {};
+      if (payload.affiliate.defaultCommission.recurrence !== undefined) {
+        const recurrence = String(payload.affiliate.defaultCommission.recurrence).toLowerCase();
+        if (['once', 'finite', 'infinite'].includes(recurrence)) {
+          commission.recurrence = recurrence;
+        }
+      }
+      if (payload.affiliate.defaultCommission.maxOccurrences !== undefined) {
+        commission.maxOccurrences = clampInt(payload.affiliate.defaultCommission.maxOccurrences, {
+          min: 1,
+          max: 120,
+          fallback: null
+        });
+      }
+      const tiers = sanitizeCommissionTiers(payload.affiliate.defaultCommission.tiers);
+      if (tiers) {
+        commission.tiers = tiers;
+      }
+      if (Object.keys(commission).length) {
+        affiliate.defaultCommission = commission;
+      }
+    }
+    if (payload.affiliate.security && typeof payload.affiliate.security === 'object') {
+      const security = {};
+      if (payload.affiliate.security.blockSelfReferral !== undefined) {
+        security.blockSelfReferral = Boolean(payload.affiliate.security.blockSelfReferral);
+      }
+      if (payload.affiliate.security.enforceTwoFactorForPayouts !== undefined) {
+        security.enforceTwoFactorForPayouts = Boolean(
+          payload.affiliate.security.enforceTwoFactorForPayouts
+        );
+      }
+      if (Object.keys(security).length) {
+        affiliate.security = security;
+      }
+    }
+    if (Object.keys(affiliate).length) {
+      sanitized.affiliate = affiliate;
+    }
+  }
+
   return sanitized;
 }
 
@@ -195,6 +338,61 @@ function normaliseMonetization(rawSettings = {}) {
   } else {
     merged.payments.defaultProvider = merged.payments.stripeEnabled ? 'stripe' : merged.payments.escrowEnabled ? 'escrow' : 'stripe';
   }
+
+  merged.affiliate = merged.affiliate ?? {};
+  const affiliateDefaults = defaults.affiliate;
+  merged.affiliate.enabled = Boolean(merged.affiliate.enabled);
+  merged.affiliate.autoApprove = Boolean(
+    merged.affiliate.autoApprove ?? affiliateDefaults.autoApprove
+  );
+  merged.affiliate.cookieWindowDays = clampInt(merged.affiliate.cookieWindowDays, {
+    min: 1,
+    max: 365,
+    fallback: affiliateDefaults.cookieWindowDays
+  });
+  merged.affiliate.payoutScheduleDays = clampInt(merged.affiliate.payoutScheduleDays, {
+    min: 7,
+    max: 120,
+    fallback: affiliateDefaults.payoutScheduleDays
+  });
+  merged.affiliate.requireTaxInformation = Boolean(
+    merged.affiliate.requireTaxInformation ?? affiliateDefaults.requireTaxInformation
+  );
+
+  const defaultCommission = merged.affiliate.defaultCommission ?? {};
+  const defaultRecurrence = String(defaultCommission.recurrence ?? affiliateDefaults.defaultCommission.recurrence).toLowerCase();
+  const recurrence = ['once', 'finite', 'infinite'].includes(defaultRecurrence)
+    ? defaultRecurrence
+    : affiliateDefaults.defaultCommission.recurrence;
+  let maxOccurrences = defaultCommission.maxOccurrences;
+  if (recurrence === 'finite') {
+    maxOccurrences = clampInt(maxOccurrences, {
+      min: 1,
+      max: 120,
+      fallback: affiliateDefaults.defaultCommission.maxOccurrences ?? 1
+    });
+  } else {
+    maxOccurrences = null;
+  }
+  const tiers = normaliseCommissionTiers(
+    defaultCommission.tiers,
+    affiliateDefaults.defaultCommission.tiers
+  );
+  merged.affiliate.defaultCommission = {
+    recurrence,
+    maxOccurrences,
+    tiers
+  };
+
+  const security = merged.affiliate.security ?? {};
+  merged.affiliate.security = {
+    blockSelfReferral: Boolean(
+      security.blockSelfReferral ?? affiliateDefaults.security.blockSelfReferral
+    ),
+    enforceTwoFactorForPayouts: Boolean(
+      security.enforceTwoFactorForPayouts ?? affiliateDefaults.security.enforceTwoFactorForPayouts
+    )
+  };
 
   return merged;
 }
@@ -227,6 +425,15 @@ export default class PlatformSettingsService {
         defaultProvider: merged.payments.defaultProvider,
         stripeEnabled: merged.payments.stripeEnabled,
         escrowEnabled: merged.payments.escrowEnabled
+      },
+      affiliate: {
+        enabled: merged.affiliate.enabled,
+        autoApprove: merged.affiliate.autoApprove,
+        cookieWindowDays: merged.affiliate.cookieWindowDays,
+        payoutScheduleDays: merged.affiliate.payoutScheduleDays,
+        requireTaxInformation: merged.affiliate.requireTaxInformation,
+        defaultCommission: merged.affiliate.defaultCommission,
+        security: merged.affiliate.security
       }
     }, connection);
 

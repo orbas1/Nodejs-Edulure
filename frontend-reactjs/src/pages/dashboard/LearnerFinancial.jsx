@@ -1,10 +1,18 @@
-import { useOutletContext } from 'react-router-dom';
-
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerFinancial() {
-  const { dashboard, refresh } = useOutletContext();
-  const financial = dashboard?.financial;
+  const { isLearner, section: financial, refresh } = useLearnerDashboardSection('financial');
+
+  if (!isLearner) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Learner workspace required"
+        description="Switch to the learner dashboard to access tuition insights and invoice history."
+      />
+    );
+  }
 
   if (!financial) {
     return (

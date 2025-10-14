@@ -37,6 +37,66 @@ class TutorBookingScreen extends StatelessWidget {
     },
   ];
 
+  static const List<Map<String, String>> _alerts = [
+    {
+      'title': '3 tutor requests awaiting assignment',
+      'detail': 'Route new learners to mentors to keep SLAs within 24 hours.',
+    },
+    {
+      'title': 'Jordan Miles is over capacity',
+      'detail': '12 learners across 6 slots. Consider opening additional availability.',
+    },
+    {
+      'title': 'Ops pod session with Amelia Rivers',
+      'detail': 'Begins Apr 21 at 9:00 AM PT. Share prep notes with the mentor team.',
+    },
+  ];
+
+  static const List<Map<String, dynamic>> _tutorRoster = [
+    {
+      'name': 'Jordan Miles',
+      'headline': 'RevOps coach & pod lead',
+      'status': 'Active',
+      'tone': 'success',
+      'rate': '\$240/hr',
+      'rating': '4.9 • 86 reviews',
+      'availability': 'Next slot · Apr 21 · 9:00 AM PT',
+      'timezone': 'PT',
+      'weekly': '12 hrs/week',
+      'response': '18 mins',
+      'workload': '12 learners • 6 slots',
+      'focus': ['RevOps', 'Enablement', 'EN'],
+    },
+    {
+      'name': 'Harper Singh',
+      'headline': 'Community monetisation strategist',
+      'status': 'Active',
+      'tone': 'success',
+      'rate': '\$210/hr',
+      'rating': '4.8 • 64 reviews',
+      'availability': 'Next slot · Apr 24 · 4:00 PM PT',
+      'timezone': 'PT',
+      'weekly': '10 hrs/week',
+      'response': '22 mins',
+      'workload': '8 learners • 4 slots',
+      'focus': ['Monetisation', 'Pods', 'EN'],
+    },
+    {
+      'name': 'Robin Yu',
+      'headline': 'Async coaching architect',
+      'status': 'Sync calendar',
+      'tone': 'warning',
+      'rate': '\$195/hr',
+      'rating': '4.9 • 72 reviews',
+      'availability': 'Sync calendar to surface new slots',
+      'timezone': 'APAC',
+      'weekly': '8 hrs/week',
+      'response': '25 mins',
+      'workload': '10 learners • 5 slots',
+      'focus': ['Automation', 'Templates', 'JA'],
+    },
+  ];
+
   static const List<Map<String, String>> _mentorAvailability = [
     {
       'mentor': 'Jordan Miles',
@@ -121,6 +181,37 @@ class TutorBookingScreen extends StatelessWidget {
               spacing: 12,
               runSpacing: 12,
               children: [
+                _SummaryPill(
+                  label: 'Pending requests',
+                  value: _pendingRequests.length.toString(),
+                  description: 'Awaiting routing',
+                  color: Colors.blue,
+                ),
+                _SummaryPill(
+                  label: 'Confirmed sessions',
+                  value: _confirmedSessions.length.toString(),
+                  description: 'On the calendar',
+                  color: Colors.indigo,
+                ),
+                _SummaryPill(
+                  label: 'Active mentors',
+                  value: _tutorRoster.length.toString(),
+                  description: 'Supporting pods',
+                  color: Colors.teal,
+                ),
+                _SummaryPill(
+                  label: 'Alerts',
+                  value: _alerts.length.toString(),
+                  description: 'Action required',
+                  color: Colors.deepOrange,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
                 FilledButton.icon(
                   onPressed: () {},
                   icon: const Icon(Icons.rule_folder_outlined),
@@ -137,6 +228,102 @@ class TutorBookingScreen extends StatelessWidget {
                   label: const Text('Request session'),
                 ),
               ],
+            ),
+            const SizedBox(height: 24),
+            if (_alerts.isNotEmpty) ...[
+              _buildSection(
+                context,
+                title: 'Alerts & notifications',
+                subtitle: 'Stay on top of capacity risks, upcoming sessions, and workflow SLAs.',
+                child: Column(
+                  children: _alerts
+                      .map(
+                        (item) => _DashboardCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['title']!,
+                                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                item['detail']!,
+                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+            _buildSection(
+              context,
+              title: 'Tutor roster',
+              subtitle: 'Review mentor focus areas, response SLAs, and availability for each pod.',
+              child: Column(
+                children: _tutorRoster
+                    .map(
+                      (item) => _DashboardCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item['name'] as String,
+                                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        item['headline'] as String,
+                                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                _StatusChip(
+                                  label: item['status'] as String,
+                                  tone: item['tone'] as String,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: (item['focus'] as List<String>)
+                                  .map(
+                                    (tag) => Chip(
+                                      label: Text(tag),
+                                      backgroundColor: Colors.blueGrey.withOpacity(0.08),
+                                      labelStyle: theme.textTheme.labelSmall?.copyWith(color: Colors.blueGrey[700]),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                            const SizedBox(height: 12),
+                            _RosterStatRow(label: 'Rate', value: item['rate'] as String),
+                            _RosterStatRow(label: 'Rating', value: item['rating'] as String),
+                            _RosterStatRow(label: 'Availability', value: item['availability'] as String),
+                            _RosterStatRow(label: 'Timezone', value: item['timezone'] as String),
+                            _RosterStatRow(label: 'Preference', value: item['weekly'] as String),
+                            _RosterStatRow(label: 'Response SLA', value: item['response'] as String),
+                            _RosterStatRow(label: 'Workload', value: item['workload'] as String),
+                          ],
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
             const SizedBox(height: 24),
             _buildSection(
@@ -400,29 +587,21 @@ class TutorBookingScreen extends StatelessWidget {
     required Widget child,
   }) {
     final theme = Theme.of(context);
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      elevation: 0,
-      color: Colors.grey[50],
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              subtitle,
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[700]),
-            ),
-            const SizedBox(height: 16),
-            child,
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
-      ),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+        ),
+        const SizedBox(height: 16),
+        child,
+      ],
     );
   }
 }
@@ -434,22 +613,144 @@ class _DashboardCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      color: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _SummaryPill extends StatelessWidget {
+  const _SummaryPill({
+    required this.label,
+    required this.value,
+    required this.description,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final String description;
+  final MaterialColor color;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey[200]!),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0C000000),
-            offset: Offset(0, 1),
-            blurRadius: 8,
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: color.shade700,
+                  letterSpacing: 0.6,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context)
+                .textTheme
+                .headlineSmall
+                ?.copyWith(fontWeight: FontWeight.w700, color: color.shade900),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            description,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color.shade700),
+          )
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.label, required this.tone});
+
+  final String label;
+  final String tone;
+
+  Color _resolveColor() {
+    switch (tone) {
+      case 'warning':
+        return Colors.amber;
+      case 'success':
+        return Colors.teal;
+      case 'info':
+        return Colors.blue;
+      default:
+        return Colors.blueGrey;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _resolveColor();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context)
+            .textTheme
+            .labelSmall
+            ?.copyWith(fontWeight: FontWeight.w600, color: color.shade700),
+      ),
+    );
+  }
+}
+
+class _RosterStatRow extends StatelessWidget {
+  const _RosterStatRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey[600], fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(fontWeight: FontWeight.w600, color: Colors.grey[900]),
+            ),
           ),
         ],
       ),
-      child: child,
     );
   }
 }
