@@ -8,7 +8,8 @@ function normaliseSettings(payload = {}) {
   return {
     commissions: payload.commissions ?? null,
     subscriptions: payload.subscriptions ?? null,
-    payments: payload.payments ?? null
+    payments: payload.payments ?? null,
+    affiliate: payload.affiliate ?? null
   };
 }
 
