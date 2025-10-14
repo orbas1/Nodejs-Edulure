@@ -39,7 +39,7 @@ function sanitiseHttpsUrl(value) {
       return null;
     }
     return parsed.toString();
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
