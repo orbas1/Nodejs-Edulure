@@ -13,6 +13,8 @@ import ContentLibrary from './pages/ContentLibrary.jsx';
 import About from './pages/About.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
+import Blog from './pages/Blog.jsx';
+import BlogPost from './pages/BlogPost.jsx';
 import Communities from './pages/Communities.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
@@ -26,6 +28,7 @@ import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.j
 import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
 import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
 import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
+import DashboardAffiliate from './pages/dashboard/DashboardAffiliate.jsx';
 import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
 import InstructorCommunityCreate from './pages/dashboard/InstructorCommunityCreate.jsx';
 import InstructorCommunityManage from './pages/dashboard/InstructorCommunityManage.jsx';
@@ -37,10 +40,12 @@ import InstructorCourseManage from './pages/dashboard/InstructorCourseManage.jsx
 import InstructorLessonSchedule from './pages/dashboard/InstructorLessonSchedule.jsx';
 import InstructorTutorSchedule from './pages/dashboard/InstructorTutorSchedule.jsx';
 import InstructorTutorManagement from './pages/dashboard/InstructorTutorManagement.jsx';
+import InstructorServiceSuite from './pages/dashboard/InstructorServiceSuite.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
-import InstructorAds from './pages/dashboard/InstructorAds.jsx';
+import FixnadoAds from './pages/dashboard/FixnadoAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
+import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
 import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
 import CommunityOverview from './pages/dashboard/community/CommunityOverview.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
@@ -113,6 +118,8 @@ function App() {
             </ProtectedRoute>
           )}
         />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
@@ -130,11 +137,13 @@ function App() {
         <Route path="communities" element={<LearnerCommunities />} />
         <Route path="courses" element={<LearnerCourses />} />
         <Route path="courses/:courseId" element={<CourseViewer />} />
+        <Route path="assessments" element={<DashboardAssessments />} />
         <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
         <Route path="calendar" element={<DashboardCalendar />} />
         <Route path="bookings" element={<DashboardBookingsSwitch />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
+        <Route path="affiliate" element={<DashboardAffiliate />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
         <Route
           path="operations"
@@ -189,6 +198,14 @@ function App() {
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
         <Route path="tutor-management" element={<InstructorTutorManagement />} />
         <Route
+          path="services"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <InstructorServiceSuite />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
           path="ebooks/create"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
@@ -196,13 +213,13 @@ function App() {
             </ProtectedRoute>
           )}
         />
-        <Route path="ads" element={<InstructorAds />} />
+        <Route path="ads" element={<FixnadoAds />} />
         <Route path="settings" element={<DashboardSettings />} />
         <Route
           path="ads"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorAds />
+              <FixnadoAds />
             </ProtectedRoute>
           )}
         />

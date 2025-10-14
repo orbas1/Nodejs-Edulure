@@ -7,6 +7,7 @@ import UserFollowModel from '../models/UserFollowModel.js';
 import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import IdentityVerificationService from './IdentityVerificationService.js';
+import BlogService from './BlogService.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -196,6 +197,37 @@ export function humanizeRelativeTime(date, referenceDate = new Date()) {
   if (diffMonths < 12) return `${diffMonths}mo ago`;
   const diffYears = Math.round(diffDays / 365);
   return `${diffYears}y ago`;
+}
+
+function humanizeFutureTime(date, referenceDate = new Date()) {
+  if (!date) return 'TBD';
+  const target = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
+  const diffMs = target.getTime() - referenceDate.getTime();
+  if (diffMs <= 0) {
+    const diffAbsMinutes = Math.round(Math.abs(diffMs) / 60000);
+    if (diffAbsMinutes < 60) return 'Past due';
+    const diffAbsHours = Math.round(diffAbsMinutes / 60);
+    if (diffAbsHours < 24) return 'Past due';
+    const diffAbsDays = Math.round(diffAbsHours / 24);
+    return diffAbsDays === 1 ? '1 day late' : `${diffAbsDays}d late`;
+  }
+  const diffMinutes = Math.round(diffMs / 60000);
+  if (diffMinutes < 60) return `In ${diffMinutes}m`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) {
+    if (diffHours === 0) return 'Later today';
+    return `In ${diffHours}h`;
+  }
+  const diffDays = Math.round(diffHours / 24);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays < 7) return `In ${diffDays}d`;
+  const diffWeeks = Math.round(diffDays / 7);
+  if (diffWeeks < 5) return `In ${diffWeeks}w`;
+  const diffMonths = Math.round(diffDays / 30);
+  if (diffMonths < 12) return `In ${diffMonths}mo`;
+  const diffYears = Math.round(diffDays / 365);
+  return `In ${diffYears}y`;
 }
 
 export function calculateLearningStreak(completionDates, referenceDate = new Date()) {
@@ -798,27 +830,28 @@ export function buildCommunityDashboard({
 export function buildInstructorDashboard({
   user,
   now,
-  courses,
-  courseEnrollments,
-  modules,
-  lessons,
-  assignments,
-  tutorProfiles,
-  tutorAvailability,
-  tutorBookings,
-  liveClassrooms,
-  assets,
-  assetEvents,
-  communityMemberships,
-  communityStats,
-  communityResources,
-  communityPosts,
-  adsCampaigns,
-  adsMetrics,
-  paywallTiers,
-  communitySubscriptions,
-  ebookRows,
-  ebookProgressRows
+  courses = [],
+  courseEnrollments = [],
+  modules = [],
+  lessons = [],
+  assignments = [],
+  tutorProfiles = [],
+  tutorAvailability = [],
+  tutorBookings = [],
+  liveClassrooms = [],
+  assets = [],
+  assetEvents = [],
+  communityMemberships = [],
+  communityStats = [],
+  communityResources = [],
+  communityPosts = [],
+  adsCampaigns = [],
+  adsMetrics = [],
+  paywallTiers = [],
+  communitySubscriptions = [],
+  ebookRows = [],
+  ebookProgressRows = []
+} = {}) {
 }) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -839,9 +872,22 @@ export function buildInstructorDashboard({
   const managedCommunities = [];
 
   const upsertManagedCommunity = (communityId, payload) => {
-    if (!communityLookup.has(communityId)) {
-      communityLookup.set(communityId, payload);
-      managedCommunities.push(payload);
+    const existing = communityLookup.get(communityId);
+    const merged = existing ? { ...existing, ...payload } : payload;
+    const merged = { ...(communityLookup.get(communityId) ?? {}), ...payload };
+    communityLookup.set(communityId, merged);
+    if (!managedCommunityIds.has(communityId)) {
+      managedCommunities.push(merged);
+    } else {
+      const index = managedCommunities.findIndex((entry) => Number(entry.communityId) === Number(communityId));
+      if (index !== -1) {
+        managedCommunities[index] = { ...managedCommunities[index], ...merged };
+      const index = managedCommunities.findIndex(
+        (community) => Number(community.communityId) === communityId
+      );
+      if (index !== -1) {
+        managedCommunities[index] = merged;
+      }
     }
     managedCommunityIds.add(communityId);
   };
@@ -892,7 +938,6 @@ export function buildInstructorDashboard({
   });
 
   const hasInstructorSignals =
-    user.role === 'instructor' ||
     courses.length > 0 ||
     tutorProfiles.length > 0 ||
     managedCommunityIds.size > 0 ||
@@ -1009,6 +1054,9 @@ export function buildInstructorDashboard({
     const base = assignment.courseReleaseAt ? new Date(assignment.courseReleaseAt) : new Date(now.getTime());
     const offset = Number(assignment.dueOffsetDays ?? 0);
     const dueDate = new Date(base.getTime() + offset * 24 * 60 * 60 * 1000);
+    const resolvedMaxScore = Number(assignment.maxScore ?? metadata.maxScore ?? metadata.points ?? 0);
+    const fallbackOwnerName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+    const resolvedOwner = metadata.owner ?? (fallbackOwnerName || user.email);
     return {
       id: Number(assignment.id),
       courseId: Number(assignment.courseId),
@@ -1016,6 +1064,16 @@ export function buildInstructorDashboard({
       courseTitle: assignment.courseTitle,
       title: assignment.title,
       dueDate,
+      moduleTitle: assignment.moduleTitle,
+      instructions: assignment.instructions ?? metadata.instructions ?? null,
+      maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
+      owner:
+        metadata.owner ??
+        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)),
+      owner: resolvedOwner,
+      owner:
+        metadata.owner ??
+        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()) || user.email),
       owner: metadata.owner ?? resolveName(user.firstName, user.lastName, user.email),
       metadata
     };
@@ -1033,6 +1091,108 @@ export function buildInstructorDashboard({
     .filter((assignment) => assignment.dueDate && assignment.dueDate >= now)
     .sort((a, b) => a.dueDate - b.dueDate)
     .slice(0, 20);
+
+  const instructorAssessmentRecords = assignmentsNormalised.map((assignment) => {
+    const metadata = assignment.metadata ?? {};
+    const submissions = Array.isArray(metadata.submissions)
+      ? metadata.submissions.map((entry) => ({ ...entry }))
+      : Array.isArray(metadata.queue)
+        ? metadata.queue.map((entry) => ({ ...entry }))
+        : [];
+    const resolveScore = (submission) => {
+      const scoreValue = toNumber(
+        submission?.score ?? submission?.points ?? submission?.grade ?? submission?.percentage ?? submission?.result
+      );
+      if (!Number.isFinite(scoreValue) || scoreValue <= 0) return null;
+      return scoreValue;
+    };
+    const gradedSubmissions = submissions.filter((submission) => {
+      const status = (submission?.status ?? submission?.state ?? '').toString().toLowerCase();
+      if (status === 'graded' || status === 'complete') {
+        return true;
+      }
+      return resolveScore(submission) !== null;
+    });
+    const pendingSubmissions = submissions.filter((submission) => {
+      const status = (submission?.status ?? submission?.state ?? '').toString().toLowerCase();
+      if (status === 'graded' || status === 'complete') return false;
+      if (status === 'in_review' || status === 'awaiting_review') return true;
+      if (resolveScore(submission) !== null) return false;
+      return Boolean(submission?.submittedAt || submission?.submitted_at);
+    });
+    const flaggedSubmissions = submissions.filter((submission) => {
+      if (submission?.flagged || submission?.needsReview) return true;
+      const status = (submission?.status ?? submission?.state ?? '').toString().toLowerCase();
+      return status === 'needs_review' || status === 'flagged';
+    });
+    const totalScore = gradedSubmissions.reduce((total, submission) => total + (resolveScore(submission) ?? 0), 0);
+    const maxScore = Number.isFinite(assignment.maxScore) ? assignment.maxScore : 100;
+    const averageScore = gradedSubmissions.length
+      ? Math.round((totalScore / (gradedSubmissions.length * maxScore)) * 100)
+      : null;
+    const latestSubmissionAt = submissions
+      .map((submission) => submission?.submittedAt ?? submission?.submitted_at ?? null)
+      .filter(Boolean)
+      .map((value) => new Date(value))
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    const type = (metadata.type ?? metadata.category ?? metadata.kind ?? '').toString() ||
+      (metadata.isExam ? 'Exam' : metadata.isQuiz ? 'Quiz' : 'Assignment');
+    const weight = Number(
+      metadata.weight ??
+        metadata.weightPercent ??
+        metadata.weighting ??
+        metadata.weightingPercent ??
+        metadata.weight_percentage ??
+        0
+    );
+    const dueAt = assignment.dueDate instanceof Date ? assignment.dueDate : null;
+    let status = 'Scheduled';
+    if (dueAt && dueAt < now && gradedSubmissions.length === submissions.length && submissions.length > 0) {
+      status = 'Completed';
+    } else if (pendingSubmissions.length > 0) {
+      status = 'Awaiting grading';
+    } else if (dueAt && dueAt < now && submissions.length === 0) {
+      status = 'Past due';
+    } else if (dueAt && dueAt.getTime() - now.getTime() <= 3 * DAY_IN_MS) {
+      status = 'Due soon';
+    }
+
+    return {
+      id: `assessment-${assignment.id}`,
+      assignmentId: assignment.id,
+      courseId: assignment.courseId,
+      courseTitle: assignment.courseTitle,
+      moduleTitle: assignment.moduleTitle,
+      title: assignment.title,
+      instructions: assignment.instructions,
+      type,
+      weight: Number.isFinite(weight) ? Math.max(weight, 0) : 0,
+      dueAt,
+      dueLabel: dueAt ? formatDateTime(dueAt, { dateStyle: 'medium', timeStyle: undefined }) : 'Schedule pending',
+      dueIn: dueAt ? humanizeFutureTime(dueAt, now) : 'TBD',
+      status,
+      averageScore,
+      gradedSubmissions: gradedSubmissions.length,
+      pendingSubmissions: pendingSubmissions.length,
+      totalSubmissions: submissions.length,
+      flaggedSubmissions: flaggedSubmissions.length,
+      latestSubmissionAt,
+      maxScore,
+      metadata
+    };
+  });
+
+  const upcomingAssessmentRecords = instructorAssessmentRecords
+    .filter((record) => record.dueAt && record.dueAt >= now)
+    .sort((a, b) => a.dueAt - b.dueAt);
+
+  const overdueAssessmentRecords = instructorAssessmentRecords
+    .filter((record) => record.dueAt && record.dueAt < now && record.totalSubmissions === 0)
+    .sort((a, b) => a.dueAt - b.dueAt);
+
+  const completedAssessmentRecords = instructorAssessmentRecords
+    .filter((record) => record.status === 'Completed')
+    .sort((a, b) => (b.latestSubmissionAt?.getTime() ?? 0) - (a.latestSubmissionAt?.getTime() ?? 0));
 
   const liveSessions = liveClassrooms.map((session) => ({
     ...session,
@@ -1066,6 +1226,8 @@ export function buildInstructorDashboard({
     .map((booking) => ({
       id: `booking-${booking.id}`,
       status: 'Requested',
+      learner:
+        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
       learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
       topic: booking.metadata.topic ?? 'Mentorship session'
@@ -1076,6 +1238,8 @@ export function buildInstructorDashboard({
     .map((booking) => ({
       id: `booking-${booking.id}`,
       topic: booking.metadata.topic ?? 'Mentorship session',
+      learner:
+        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
       learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
     }));
@@ -1308,6 +1472,325 @@ export function buildInstructorDashboard({
       });
     });
 
+  const serviceCapacityByMonth = new Map();
+  upcomingTutorSlots.forEach((slot) => {
+    if (!slot.startAt) return;
+    const key = toUtcMonthKey(slot.startAt);
+    if (!key) return;
+    serviceCapacityByMonth.set(key, (serviceCapacityByMonth.get(key) ?? 0) + 1);
+  });
+
+  const rosterLookup = new Map();
+  tutorRoster.forEach((entry) => {
+    const tutorId = Number(String(entry.id ?? '').replace('tutor-', ''));
+    if (Number.isNaN(tutorId)) return;
+    rosterLookup.set(tutorId, entry);
+  });
+
+  const serviceOfferings = tutorProfiles
+    .map((profile) => {
+      const metadata = safeJsonParse(profile.metadata, {});
+      const serviceMetadata =
+        (metadata.service && typeof metadata.service === 'object')
+          ? metadata.service
+          : (metadata.services && typeof metadata.services === 'object')
+            ? metadata.services.primary ?? metadata.services.default ?? metadata.services
+            : {};
+      const rosterEntry = rosterLookup.get(Number(profile.id));
+      const baseName =
+        serviceMetadata.name ??
+        profile.displayName ??
+        rosterEntry?.name ??
+        resolveName(user.firstName, user.lastName, 'Service');
+      const category = serviceMetadata.category ?? metadata.specialty ?? 'Mentorship service';
+      const priceLabel =
+        serviceMetadata.priceLabel ??
+        (serviceMetadata.priceCents
+          ? formatCurrency(serviceMetadata.priceCents, serviceMetadata.priceCurrency ?? 'USD')
+          : rosterEntry?.rate ?? 'Custom pricing');
+      const durationMinutes = Number(
+        serviceMetadata.durationMinutes ??
+          serviceMetadata.duration ??
+          metadata.defaultDuration ??
+          metadata.durationMinutes ??
+          0
+      );
+      const durationLabel =
+        serviceMetadata.durationLabel ??
+        (durationMinutes > 0 ? minutesToReadable(durationMinutes) : rosterEntry?.weeklyHours ?? '45 mins standard');
+      const tags = new Set([
+        ...(Array.isArray(rosterEntry?.focusAreas) ? rosterEntry.focusAreas : []),
+        ...normaliseStringArray(serviceMetadata.tags),
+        ...normaliseStringArray(metadata.expertise)
+      ]);
+      const csatScore = Number(profile.ratingAverage ?? serviceMetadata.csat ?? 0);
+      const clientsServed = Number(
+        profile.completedSessions ??
+          serviceMetadata.clientsServed ??
+          serviceMetadata.clients ??
+          0
+      );
+      const automationRate = Number(serviceMetadata.automationRate ?? 0);
+      const slaMinutes = Number(
+        serviceMetadata.slaMinutes ??
+          metadata.responseTimeMinutes ??
+          profile.responseTimeMinutes ??
+          0
+      );
+      const statusTone = serviceMetadata.statusTone ?? rosterEntry?.statusTone ?? 'success';
+      const statusLabel = serviceMetadata.statusLabel ?? rosterEntry?.status ?? 'Active';
+
+      const description =
+        serviceMetadata.description ??
+        metadata.bio ??
+        'High-touch advisory service with enterprise-grade playbooks and reporting.';
+
+      return {
+        id: `service-${profile.id}`,
+        name: baseName,
+        category,
+        status: serviceMetadata.status ?? statusLabel.toLowerCase(),
+        statusLabel,
+        statusTone,
+        description,
+        priceLabel,
+        durationLabel,
+        deliveryLabel: serviceMetadata.delivery ?? 'Virtual session',
+        tags: Array.from(tags).slice(0, 6),
+        csatLabel:
+          csatScore > 0 ? `${csatScore.toFixed(1)} / 5 (${Number(profile.ratingCount ?? 0)} reviews)` : 'Awaiting feedback',
+        clientsServedLabel:
+          clientsServed > 0 ? `${clientsServed} client${clientsServed === 1 ? '' : 's'} served` : 'First client onboarding',
+        automationLabel:
+          automationRate > 0 ? `${Math.round(automationRate)}% automated flow` : 'Manual qualification',
+        slaLabel: slaMinutes > 0 ? `${minutesToReadable(slaMinutes)} response SLA` : 'SLA pending',
+        utilisationLabel: rosterEntry?.workload ?? 'Capacity aligned'
+      };
+    })
+    .filter(Boolean);
+
+  const serviceEvents = tutorBookingsNormalised
+    .filter((booking) => booking.status === 'confirmed' || booking.status === 'requested' || booking.status === 'in_review')
+    .map((booking) => {
+      const scheduledStart = booking.scheduledStart ?? booking.requestedAt ?? null;
+      if (!scheduledStart) {
+        return null;
+      }
+      const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
+      const statusLabelMap = {
+        confirmed: 'Confirmed',
+        requested: 'Awaiting confirmation',
+        in_review: 'Under review'
+      };
+      const stageMap = {
+        confirmed: 'Delivery',
+        requested: 'Intake',
+        in_review: 'QA'
+      };
+      return {
+        id: `service-booking-${booking.id}`,
+        topic: booking.metadata.topic ?? 'Strategy session',
+        status: booking.status,
+        statusLabel: statusLabelMap[booking.status] ?? capitalise(booking.status ?? 'Pipeline'),
+        learner: learnerName,
+        stage: stageMap[booking.status] ?? 'Pipeline',
+        startAt: scheduledStart,
+        timeLabel: formatDateTime(scheduledStart, { timeStyle: 'short' }),
+        scheduledLabel: formatDateTime(scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+      };
+    })
+    .filter(Boolean);
+
+  const serviceCalendarMonths = buildServiceCalendarMonths(serviceEvents, {
+    now,
+    months: 12,
+    capacityByMonth: serviceCapacityByMonth
+  });
+
+  const confirmedServiceBookings = serviceEvents.filter((event) => event.status === 'confirmed');
+  const pendingServiceBookings = serviceEvents.filter((event) => event.status !== 'confirmed');
+  const utilisationRate = upcomingTutorSlots.length > 0
+    ? Math.round((confirmedServiceBookings.length / upcomingTutorSlots.length) * 100)
+    : null;
+
+  const serviceSummary = [
+    {
+      id: 'services-active',
+      label: 'Active services',
+      value: `${serviceOfferings.length}`,
+      detail:
+        serviceOfferings.length > 0
+          ? `${serviceOfferings.filter((entry) => entry.statusTone === 'success').length} live for booking`
+          : 'Configure at least one service to go live',
+      tone: serviceOfferings.length > 0 ? 'primary' : 'neutral',
+      trend: serviceOfferings.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'services-confirmed',
+      label: 'Confirmed bookings (90d)',
+      value: `${confirmedServiceBookings.filter((event) => event.startAt >= new Date(now.getTime() - 90 * DAY_IN_MS)).length}`,
+      detail: `${confirmedServiceBookings.length} upcoming across calendar`,
+      tone: 'success',
+      trend: confirmedServiceBookings.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'services-pending',
+      label: 'Pending intake',
+      value: `${pendingServiceBookings.length}`,
+      detail: pendingServiceBookings.length > 0 ? 'Route requests within 4h SLA' : 'Queue clear',
+      tone: pendingServiceBookings.length > 0 ? 'warning' : 'success',
+      trend: pendingServiceBookings.length > 0 ? 'up' : 'down'
+    },
+    {
+      id: 'services-utilisation',
+      label: 'Forward utilisation',
+      value: utilisationRate !== null ? `${utilisationRate}%` : 'No capacity',
+      detail: `${upcomingTutorSlots.length} published slot${upcomingTutorSlots.length === 1 ? '' : 's'}`,
+      tone: utilisationRate !== null && utilisationRate >= 80 ? 'warning' : 'info',
+      trend: utilisationRate !== null && utilisationRate >= 65 ? 'up' : 'neutral'
+    }
+  ];
+
+  const upcomingServiceBookings = serviceEvents
+    .filter((event) => event.startAt && event.startAt >= now)
+    .sort((a, b) => a.startAt - b.startAt)
+    .slice(0, 12)
+    .map((event) => ({
+      id: event.id,
+      label: event.topic,
+      status: event.status,
+      statusLabel: event.statusLabel,
+      learner: event.learner,
+      scheduledFor: event.scheduledLabel,
+      stage: event.stage,
+      timeLabel: event.timeLabel
+    }));
+
+  const monthlySummaries = serviceCalendarMonths.map((month) => ({
+    id: month.id,
+    label: month.label,
+    confirmed: month.confirmed,
+    pending: month.pending,
+    capacity: month.capacity,
+    utilisationRate: month.utilisationRate,
+    note:
+      month.capacity > 0
+        ? `${month.capacity} slot${month.capacity === 1 ? '' : 's'} published`
+        : 'No capacity published'
+  }));
+
+  const serviceAlerts = tutorNotifications.map((notification) => ({
+    id: notification.id,
+    severity: notification.severity ?? 'info',
+    title: notification.title,
+    detail: notification.detail,
+    ctaLabel: notification.ctaLabel,
+    ctaPath: notification.ctaPath
+  }));
+
+  const serviceWorkflow = {
+    owner: 'Service operations desk',
+    automationRate: serviceOfferings.length > 0 ? 78 : 42,
+    breachCount: serviceAlerts.filter((alert) => alert.severity === 'warning').length,
+    stages: [
+      {
+        id: 'intake',
+        title: 'Intake & qualification',
+        tone: pendingServiceBookings.length > 0 ? 'warning' : 'success',
+        status: pendingServiceBookings.length > 0 ? 'Action required' : 'On track',
+        description:
+          pendingServiceBookings.length > 0
+            ? `${pendingServiceBookings.length} request${pendingServiceBookings.length === 1 ? '' : 's'} awaiting routing.`
+            : 'All inbound requests triaged within SLA.',
+        kpis: ['4h intake SLA', `${pipelineBookings.length} queued`]
+      },
+      {
+        id: 'delivery',
+        title: 'Delivery orchestration',
+        tone: utilisationRate !== null && utilisationRate >= 85 ? 'warning' : 'info',
+        status: utilisationRate !== null && utilisationRate >= 85 ? 'Monitor' : 'Healthy',
+        description:
+          utilisationRate !== null
+            ? `Forward utilisation at ${utilisationRate}% across mentor pods.`
+            : 'Publish mentor availability to unlock utilisation telemetry.',
+        kpis: [`${upcomingTutorSlots.length} future slots`, `${serviceOfferings.length} offerings`] 
+      },
+      {
+        id: 'feedback',
+        title: 'Feedback & QA',
+        tone: confirmedServiceBookings.length > 0 ? 'info' : 'neutral',
+        status: confirmedServiceBookings.length > 0 ? 'Running' : 'Awaiting sessions',
+        description: confirmedServiceBookings.length > 0
+          ? 'Capture CSAT immediately after each engagement and feed automation rules.'
+          : 'No confirmed sessions to score yet.',
+        kpis: [
+          serviceOfferings.length > 0
+            ? `${serviceOfferings.filter((entry) => (entry.csatLabel ?? '').includes('/')).length} services with CSAT`
+            : 'Enable CSAT collection'
+        ]
+      }
+    ],
+    notes: [
+      `${confirmedServiceBookings.length} confirmed booking${confirmedServiceBookings.length === 1 ? '' : 's'} in-flight`,
+      utilisationRate !== null ? `Utilisation projected at ${utilisationRate}% over next 12 months` : 'Utilisation pending capacity publish'
+    ]
+  };
+
+  const serviceControls = {
+    owner: 'Service operations desk',
+    lastAudit: formatDateTime(now, { dateStyle: 'long' }),
+    restrictedRoles: ['instructor'],
+    encryption: 'TLS 1.3 in transit, AES-256 at rest',
+    automationRate: serviceWorkflow.automationRate,
+    retentionDays: 1095,
+    monitoring: '24/7 monitoring with anomaly detection and auto-escalation to operations.',
+    policies: [
+      'Dual approval required for service launch or pricing change.',
+      'SAML enforced for staff and instructors managing services.',
+      'PII is masked in exports and redacted after 36 months.'
+    ],
+    auditLog: 'Comprehensive audit trails retained for 36 months and exportable on request.'
+  };
+
+  const serviceSuite = {
+    summary: serviceSummary,
+    workflow: serviceWorkflow,
+    catalogue: serviceOfferings,
+    bookings: {
+      monthly: monthlySummaries,
+      upcoming: upcomingServiceBookings,
+      calendar: serviceCalendarMonths
+    },
+    alerts: serviceAlerts,
+    controls: serviceControls
+  };
+
+  const normaliseFilename = (name) => {
+    if (!name) return 'Untitled asset';
+    const leaf = name.split('/').pop();
+    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const assetsNormalised = assets.map((asset) => ({
+    ...asset,
+    metadata: safeJsonParse(asset.metadata, {}),
+    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+  }));
+
+  const normaliseFilename = (name) => {
+    if (!name) return 'Untitled asset';
+    const leaf = name.split('/').pop();
+    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const assetsNormalised = assets.map((asset) => ({
+    ...asset,
+    metadata: safeJsonParse(asset.metadata, {}),
+    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+  }));
+
   const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
   const assetEventGroups = new Map();
   assetEvents.forEach((event) => {
@@ -1428,6 +1911,7 @@ export function buildInstructorDashboard({
         stage,
         progress,
         lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
+        owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor'),
         owner: resolveName(user.firstName, user.lastName, 'Instructor'),
         nextActions,
         reference,
@@ -1805,24 +2289,12 @@ export function buildInstructorDashboard({
     ...upcomingLessons.map((lesson) => ({
       id: `lesson-${lesson.id}`,
       asset: `${lesson.courseTitle} · ${lesson.title}`,
+      owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'),
       owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
       status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
       type: 'Lesson'
     }))
   ].slice(0, 12);
-
-  const normaliseFilename = (name) => {
-    if (!name) return 'Untitled asset';
-    const leaf = name.split('/').pop();
-    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
-  };
-
-  const assetsNormalised = assets.map((asset) => ({
-    ...asset,
-    metadata: safeJsonParse(asset.metadata, {}),
-    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
-    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
-  }));
 
   const library = assetsNormalised
     .filter((asset) => asset.status === 'ready')
@@ -2235,6 +2707,7 @@ export function buildInstructorDashboard({
     topic: lesson.title,
     course: lesson.courseTitle,
     date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
+    facilitator: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator')
     facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
   }));
 
@@ -2323,6 +2796,271 @@ export function buildInstructorDashboard({
     revenueStreams
   };
 
+  const assessmentsByCourse = new Map();
+  instructorAssessmentRecords.forEach((record) => {
+    const entry = assessmentsByCourse.get(record.courseId) ?? {
+      courseId: record.courseId,
+      courseTitle: record.courseTitle,
+      count: 0,
+      upcoming: [],
+      completed: 0,
+      pendingSubmissions: 0,
+      flagged: 0,
+      averageScoreTotal: 0,
+      scored: 0,
+      weight: 0
+    };
+    entry.count += 1;
+    if (record.dueAt && record.dueAt >= now) {
+      entry.upcoming.push(record);
+    }
+    if (record.status === 'Completed') {
+      entry.completed += 1;
+    }
+    entry.pendingSubmissions += record.pendingSubmissions;
+    entry.flagged += record.flaggedSubmissions;
+    entry.weight += Number.isFinite(record.weight) ? record.weight : 0;
+    if (record.averageScore !== null) {
+      entry.averageScoreTotal += record.averageScore;
+      entry.scored += 1;
+    }
+    assessmentsByCourse.set(record.courseId, entry);
+  });
+
+  const assessmentCourses = courseSummaries
+    .map((course) => {
+      const metrics = assessmentsByCourse.get(course.id) ?? {
+        count: 0,
+        upcoming: [],
+        pendingSubmissions: 0,
+        flagged: 0,
+        averageScoreTotal: 0,
+        scored: 0
+      };
+      const nextDue = [...metrics.upcoming].sort((a, b) => a.dueAt - b.dueAt)[0] ?? null;
+      const averageScore = metrics.scored > 0 ? Math.round(metrics.averageScoreTotal / metrics.scored) : null;
+      return {
+        id: `assessment-course-${course.id}`,
+        name: course.title,
+        learners: `${course.total} learners`,
+        assessments: metrics.count,
+        pendingSubmissions: metrics.pendingSubmissions,
+        flagged: metrics.flagged,
+        averageScore,
+        nextDue: nextDue
+          ? {
+              title: nextDue.title,
+              due: nextDue.dueLabel,
+              dueIn: nextDue.dueIn,
+              type: nextDue.type
+            }
+          : null
+      };
+    })
+    .filter((entry) => entry.assessments > 0 || entry.pendingSubmissions > 0 || entry.nextDue);
+
+  const pendingGradingTotal = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.pendingSubmissions,
+    0
+  );
+  const flaggedTotal = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.flaggedSubmissions,
+    0
+  );
+  const scoredAssessments = instructorAssessmentRecords.filter((record) => record.averageScore !== null);
+  const averageAssessmentScore = scoredAssessments.length
+    ? Math.round(
+        scoredAssessments.reduce((sum, record) => sum + (record.averageScore ?? 0), 0) /
+          scoredAssessments.length
+      )
+    : null;
+  const dueWithinSevenDays = upcomingAssessmentRecords.filter((record) => {
+    if (!record.dueAt) return false;
+    return record.dueAt.getTime() - now.getTime() <= 7 * DAY_IN_MS;
+  }).length;
+  const totalAssessmentWeight = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + (Number.isFinite(record.weight) ? record.weight : 0),
+    0
+  );
+
+  const assessmentOverview = [
+    {
+      id: 'active-assessments',
+      label: 'Active assessments',
+      value: `${instructorAssessmentRecords.length}`,
+      context: `${dueWithinSevenDays} due in 7 days`,
+      tone: instructorAssessmentRecords.length > 0 ? 'primary' : 'muted'
+    },
+    {
+      id: 'grading-queue',
+      label: 'Needs grading',
+      value: `${pendingGradingTotal}`,
+      context: pendingGradingTotal > 0 ? 'Awaiting review' : 'All graded',
+      tone: pendingGradingTotal > 0 ? 'warning' : 'positive'
+    },
+    {
+      id: 'assessment-quality',
+      label: 'Avg cohort score',
+      value: averageAssessmentScore !== null ? `${averageAssessmentScore}%` : '—',
+      context: scoredAssessments.length > 0 ? 'Across graded submissions' : 'No graded work yet',
+      tone:
+        averageAssessmentScore !== null
+          ? averageAssessmentScore >= 80
+            ? 'positive'
+            : averageAssessmentScore >= 60
+              ? 'neutral'
+              : 'warning'
+          : 'muted'
+    },
+    {
+      id: 'assessment-flags',
+      label: 'Flagged submissions',
+      value: `${flaggedTotal}`,
+      context: flaggedTotal > 0 ? 'Escalation required' : 'No escalations',
+      tone: flaggedTotal > 0 ? 'alert' : 'positive'
+    }
+  ];
+
+  const presentInstructorAssessment = (record) => ({
+    id: record.id,
+    title: record.title,
+    course: record.courseTitle,
+    type: record.type,
+    due: record.dueLabel,
+    dueIn: record.dueIn,
+    status: record.status,
+    submissions: `${record.gradedSubmissions}/${record.totalSubmissions}`,
+    pending: record.pendingSubmissions,
+    averageScore: record.averageScore !== null ? `${record.averageScore}%` : null
+  });
+
+  const gradingQueue = instructorAssessmentRecords
+    .filter((record) => record.pendingSubmissions > 0)
+    .sort((a, b) => {
+      if (a.dueAt && b.dueAt) {
+        return a.dueAt - b.dueAt;
+      }
+      if (a.dueAt) return -1;
+      if (b.dueAt) return 1;
+      return (b.latestSubmissionAt?.getTime() ?? 0) - (a.latestSubmissionAt?.getTime() ?? 0);
+    })
+    .slice(0, 8)
+    .map((record) => ({
+      id: record.id,
+      title: record.title,
+      course: record.courseTitle,
+      pending: `${record.pendingSubmissions} submission${record.pendingSubmissions === 1 ? '' : 's'}`,
+      lastSubmission: record.latestSubmissionAt
+        ? humanizeRelativeTime(record.latestSubmissionAt, now)
+        : 'Awaiting submission',
+      due: record.dueIn
+    }));
+
+  const flaggedQueue = instructorAssessmentRecords
+    .filter((record) => record.flaggedSubmissions > 0)
+    .sort((a, b) => b.flaggedSubmissions - a.flaggedSubmissions)
+    .slice(0, 6)
+    .map((record) => ({
+      id: `${record.id}-flagged`,
+      title: record.title,
+      course: record.courseTitle,
+      flagged: `${record.flaggedSubmissions} flagged`,
+      status: record.status,
+      due: record.dueIn
+    }));
+
+  const releasePlan = upcomingAssessmentRecords.slice(0, 8).map((record) => ({
+    id: `${record.id}-release`,
+    title: record.title,
+    course: record.courseTitle,
+    due: record.dueLabel,
+    weight: record.weight > 0 ? `${Math.round(record.weight)}%` : null,
+    type: record.type
+  }));
+
+  const scheduleSessions = upcomingLiveClasses.slice(0, 5).map((session) => ({
+    id: `live-${session.id}`,
+    title: session.title,
+    start: formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }),
+    host: session.communityName ?? 'Live classroom',
+    seats:
+      session.capacity && session.capacity > 0
+        ? `${Number(session.reservedSeats ?? 0)}/${Number(session.capacity ?? 0)} seats`
+        : null
+  }));
+
+  const totalAssessmentSubmissions = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.totalSubmissions,
+    0
+  );
+  const totalGradedSubmissions = instructorAssessmentRecords.reduce(
+    (sum, record) => sum + record.gradedSubmissions,
+    0
+  );
+  const completionRate = totalAssessmentSubmissions > 0
+    ? Math.round((totalGradedSubmissions / totalAssessmentSubmissions) * 100)
+    : null;
+
+  const typeAnalyticsMap = new Map();
+  instructorAssessmentRecords.forEach((record) => {
+    const key = record.type || 'Assessment';
+    const entry = typeAnalyticsMap.get(key) ?? {
+      type: key,
+      count: 0,
+      averageScoreTotal: 0,
+      scored: 0,
+      weight: 0
+    };
+    entry.count += 1;
+    entry.weight += Number.isFinite(record.weight) ? record.weight : 0;
+    if (record.averageScore !== null) {
+      entry.averageScoreTotal += record.averageScore;
+      entry.scored += 1;
+    }
+    typeAnalyticsMap.set(key, entry);
+  });
+
+  const assessmentTypeAnalytics = Array.from(typeAnalyticsMap.values()).map((entry) => ({
+    type: entry.type,
+    count: entry.count,
+    weightShare:
+      totalAssessmentWeight > 0 ? Math.round((entry.weight / totalAssessmentWeight) * 100) : null,
+    averageScore: entry.scored > 0 ? Math.round(entry.averageScoreTotal / entry.scored) : null
+  }));
+
+  const averageLeadTimeDays = upcomingAssessmentRecords.length
+    ? Math.round(
+        upcomingAssessmentRecords.reduce((total, record) => {
+          if (!record.dueAt) return total;
+          const diff = Math.max(0, Math.round((record.dueAt.getTime() - now.getTime()) / DAY_IN_MS));
+          return total + diff;
+        }, 0) / upcomingAssessmentRecords.length
+      )
+    : null;
+
+  const instructorAssessments = {
+    overview: assessmentOverview,
+    timeline: {
+      upcoming: upcomingAssessmentRecords.map(presentInstructorAssessment),
+      overdue: overdueAssessmentRecords.map(presentInstructorAssessment),
+      completed: completedAssessmentRecords.map(presentInstructorAssessment)
+    },
+    courses: assessmentCourses,
+    grading: {
+      queue: gradingQueue,
+      flagged: flaggedQueue
+    },
+    schedule: {
+      releasePlan,
+      liveSessions: scheduleSessions
+    },
+    analytics: {
+      byType: assessmentTypeAnalytics,
+      completionRate,
+      averageLeadTimeDays
+    }
+  };
+
   const metrics = [
     {
       label: 'Active learners',
@@ -2372,13 +3110,33 @@ export function buildInstructorDashboard({
       title: session.title,
       url: '/dashboard/instructor/calendar'
     })),
+    {
+      id: 'search-instructor-assessments',
+      role: 'instructor',
+      type: 'Assessments',
+      title: 'Assessment studio',
+      url: '/dashboard/instructor/assessments'
+    },
+    {
+      id: 'search-instructor-services',
+      role: 'instructor',
+      type: 'Services',
+      title: 'Service suite',
+      url: '/dashboard/instructor/services'
+    },
+    ...serviceOfferings.map((service) => ({
+      id: `search-instructor-service-${service.id}`,
+      role: 'instructor',
+      type: 'Service',
+      title: service.name,
+      url: '/dashboard/instructor/services'
+    })),
     ...tutorRoster.map((tutor) => ({
       id: `search-instructor-tutor-${tutor.id}`,
       role: 'instructor',
       type: 'Tutor',
       title: tutor.name,
       url: '/dashboard/instructor/tutor-management'
-      url: '/dashboard/instructor/live-classes'
     }))
   ];
 
@@ -2449,6 +3207,7 @@ export function buildInstructorDashboard({
         pipeline: pipelineBookings,
         confirmed: confirmedBookings
       },
+      services: serviceSuite,
       ebooks: {
         catalogue: ebookCatalogue,
         creationPipelines
@@ -2460,7 +3219,8 @@ export function buildInstructorDashboard({
         subscriptions: pricingSubscriptions,
         sessions: pricingSessions,
         insights: pricingInsights
-      }
+      },
+      assessments: instructorAssessments
     },
     searchIndex,
     profileStats,
@@ -2493,6 +3253,493 @@ function buildCalendarEntries(entries) {
     day,
     items
   }));
+}
+
+function toUtcDateKey(date) {
+  if (!date) return null;
+  const value = typeof date === 'string' ? new Date(date) : date;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return null;
+  }
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(value.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function toUtcMonthKey(date) {
+  if (!date) return null;
+  const value = typeof date === 'string' ? new Date(date) : date;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return null;
+  }
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function startOfIsoWeek(date) {
+  const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const weekday = (value.getUTCDay() + 6) % 7; // Monday as first day
+  value.setUTCDate(value.getUTCDate() - weekday);
+  return value;
+}
+
+function addUtcDays(date, days) {
+  const value = new Date(date.getTime());
+  value.setUTCDate(value.getUTCDate() + days);
+  return value;
+}
+
+function formatMonthLabel(date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(date);
+}
+
+function buildServiceCalendarMonths(events = [], { now = new Date(), months = 12, capacityByMonth = new Map() } = {}) {
+  const validEvents = events
+    .map((event) => {
+      const startAt = event.startAt ? new Date(event.startAt) : null;
+      if (!startAt || Number.isNaN(startAt.getTime())) {
+        return null;
+      }
+      return {
+        ...event,
+        startAt,
+        dateKey: toUtcDateKey(startAt),
+        monthKey: toUtcMonthKey(startAt)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.startAt - b.startAt);
+
+  const eventsByDate = new Map();
+  validEvents.forEach((event) => {
+    const key = event.dateKey;
+    if (!key) return;
+    const list = eventsByDate.get(key) ?? [];
+    list.push(event);
+    eventsByDate.set(key, list);
+  });
+
+  const calendarMonths = [];
+  for (let offset = 0; offset < months; offset += 1) {
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+    const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    const gridStart = startOfIsoWeek(monthStart);
+    const totalDays = Math.ceil(((monthEnd.getTime() - gridStart.getTime()) / DAY_IN_MS + 1) / 7) * 7;
+    const weeks = [];
+    let cursor = gridStart;
+    const weekCount = totalDays / 7;
+    for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
+      const days = [];
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        const key = toUtcDateKey(cursor);
+        const bookings = key ? eventsByDate.get(key) ?? [] : [];
+        days.push({
+          id: key ?? `placeholder-${offset}-${weekIndex}-${dayIndex}`,
+          date: cursor.toISOString(),
+          day: cursor.getUTCDate(),
+          isCurrentMonth: cursor.getUTCMonth() === monthStart.getUTCMonth(),
+          bookings: bookings.map((booking) => ({
+            id: booking.id,
+            label: booking.topic,
+            status: booking.status,
+            timeLabel: booking.timeLabel,
+            learner: booking.learner
+          }))
+        });
+        cursor = addUtcDays(cursor, 1);
+      }
+      weeks.push({ id: `week-${weekIndex}`, days });
+    }
+
+    const monthEvents = validEvents.filter(
+      (event) => event.startAt >= monthStart && event.startAt <= monthEnd
+    );
+    const confirmed = monthEvents.filter((event) => event.status === 'confirmed').length;
+    const pending = monthEvents.filter((event) => event.status !== 'confirmed').length;
+    const monthKey = toUtcMonthKey(monthStart);
+    const capacity = monthKey ? capacityByMonth.get(monthKey) ?? 0 : 0;
+    const utilisationRate = capacity > 0 ? Math.round((confirmed / capacity) * 100) : null;
+
+    calendarMonths.push({
+      id: `service-month-${monthStart.getUTCFullYear()}-${monthStart.getUTCMonth() + 1}`,
+      label: formatMonthLabel(monthStart),
+      year: monthStart.getUTCFullYear(),
+      month: monthStart.getUTCMonth() + 1,
+      confirmed,
+      pending,
+      capacity,
+      utilisationRate,
+      weeks
+    });
+  }
+
+  return calendarMonths;
+}
+
+function formatBasisPoints(rateBps) {
+  const numeric = Number(rateBps ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return '0%';
+  }
+  const percent = numeric / 100;
+  const precision = percent >= 10 ? 1 : percent >= 1 ? 1 : 2;
+  return `${percent.toFixed(precision)}%`;
+}
+
+export function buildAffiliateOverview({
+  affiliates = [],
+  affiliatePayouts = [],
+  paymentIntents = [],
+  memberships = [],
+  monetizationSettings = {},
+  now = new Date()
+} = {}) {
+  const defaultAffiliate = monetizationSettings?.affiliate ?? {};
+  const defaultCommission = defaultAffiliate.defaultCommission ?? {};
+  const defaultTiers = Array.isArray(defaultCommission.tiers)
+    ? defaultCommission.tiers
+    : [{ thresholdCents: 0, rateBps: 1000 }];
+
+  const membershipByCommunity = new Map();
+  memberships.forEach((membership) => {
+    const communityId = Number(membership.communityId ?? membership.community_id);
+    if (!Number.isFinite(communityId)) return;
+    membershipByCommunity.set(communityId, membership);
+  });
+
+  const referralMetrics = new Map();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_IN_MS);
+  paymentIntents.forEach((intent) => {
+    const metadata = safeJsonParse(intent.metadata, {});
+    const referralCode =
+      metadata.referralCode ?? metadata.affiliateCode ?? metadata.affiliate?.code ?? null;
+    if (!referralCode) {
+      return;
+    }
+    const entry = referralMetrics.get(referralCode) ?? {
+      conversions: 0,
+      conversions30d: 0,
+      amountCents: 0,
+      amount30d: 0,
+      lastConversionAt: null
+    };
+    const amount = Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0);
+    entry.conversions += 1;
+    entry.amountCents += amount;
+    const timestamp = intent.capturedAt ?? intent.createdAt ?? null;
+    const occurredAt = timestamp ? new Date(timestamp) : null;
+    if (occurredAt) {
+      if (!entry.lastConversionAt || occurredAt > entry.lastConversionAt) {
+        entry.lastConversionAt = occurredAt;
+      }
+      if (occurredAt >= thirtyDaysAgo) {
+        entry.conversions30d += 1;
+        entry.amount30d += amount;
+      }
+    }
+    referralMetrics.set(referralCode, entry);
+  });
+
+  const affiliatePrograms = (Array.isArray(affiliates) ? affiliates : []).map((affiliate) => {
+    const metadata = safeJsonParse(affiliate.metadata, {});
+    const referralCode = affiliate.referralCode ?? metadata.referralCode ?? `AFF-${affiliate.id}`;
+    const performance = referralMetrics.get(referralCode) ?? {
+      conversions: 0,
+      conversions30d: 0,
+      amountCents: 0,
+      amount30d: 0,
+      lastConversionAt: null
+    };
+    const totalEarnedCents = Number(affiliate.totalEarnedCents ?? 0);
+    const totalPaidCents = Number(affiliate.totalPaidCents ?? 0);
+    const outstandingCents = Math.max(totalEarnedCents - totalPaidCents, 0);
+
+    const payouts = (Array.isArray(affiliatePayouts) ? affiliatePayouts : []).filter(
+      (payout) => Number(payout.affiliateId) === Number(affiliate.id)
+    );
+    const sortedPayouts = [...payouts].sort((a, b) => {
+      const aTime = new Date(a.processedAt ?? a.scheduledAt ?? now).getTime();
+      const bTime = new Date(b.processedAt ?? b.scheduledAt ?? now).getTime();
+      return aTime - bTime;
+    });
+    const upcomingPayout = sortedPayouts.find((payout) => payout.status !== 'completed') ?? null;
+    const completedPayouts = [...sortedPayouts].filter((payout) => payout.status === 'completed');
+    const lastPayout = completedPayouts.length
+      ? completedPayouts[completedPayouts.length - 1]
+      : null;
+
+    const commissionRateBps = Number(
+      affiliate.commissionRateBps ?? metadata.commissionRateBps ?? defaultTiers[0]?.rateBps ?? 0
+    );
+    const matchedTierIndex = defaultTiers.findIndex(
+      (tier) => Number(tier.rateBps) === commissionRateBps
+    );
+    const recurrence = metadata.recurrence ?? defaultCommission.recurrence ?? 'infinite';
+    const maxOccurrences =
+      recurrence === 'finite'
+        ? metadata.maxOccurrences ?? defaultCommission.maxOccurrences ?? null
+        : null;
+
+    const communityId = Number(affiliate.communityId);
+    const communityMeta = membershipByCommunity.get(communityId) ?? {};
+    const communityName =
+      affiliate.communityName ??
+      communityMeta.communityName ??
+      communityMeta.name ??
+      metadata.communityName ??
+      'Community';
+    const communitySlug =
+      affiliate.communitySlug ?? communityMeta.communitySlug ?? metadata.communitySlug ?? null;
+
+    const programmeHighlights = [];
+    programmeHighlights.push(`${performance.conversions ?? 0} lifetime conversions`);
+    programmeHighlights.push(
+      `${formatCurrency(performance.amountCents ?? 0, 'USD')} attributed volume`
+    );
+    if (outstandingCents > 0) {
+      programmeHighlights.push(
+        `${formatCurrency(outstandingCents, 'USD')} pending payout`
+      );
+    }
+
+    return {
+      id: String(affiliate.id),
+      community: {
+        id: communityId,
+        name: communityName,
+        slug: communitySlug
+      },
+      status: affiliate.status ?? metadata.status ?? 'pending',
+      referralCode,
+      commission: {
+        rateBps: commissionRateBps,
+        rateLabel: formatBasisPoints(commissionRateBps),
+        tierLabel: matchedTierIndex >= 0 ? `Tier ${matchedTierIndex + 1}` : 'Custom rate',
+        recurrence,
+        maxOccurrences: recurrence === 'finite' ? Number(maxOccurrences ?? 0) : null
+      },
+      earnings: {
+        totalCents: totalEarnedCents,
+        totalFormatted: formatCurrency(totalEarnedCents, 'USD'),
+        paidCents: totalPaidCents,
+        paidFormatted: formatCurrency(totalPaidCents, 'USD'),
+        outstandingCents,
+        outstandingFormatted: formatCurrency(outstandingCents, 'USD')
+      },
+      performance: {
+        conversions: performance.conversions ?? 0,
+        conversions30d: performance.conversions30d ?? 0,
+        volumeCents: performance.amountCents ?? 0,
+        volumeFormatted: formatCurrency(performance.amountCents ?? 0, 'USD'),
+        volume30dCents: performance.amount30d ?? 0,
+        volume30dFormatted: formatCurrency(performance.amount30d ?? 0, 'USD'),
+        lastConversionAt: performance.lastConversionAt,
+        lastConversionLabel: performance.lastConversionAt
+          ? humanizeRelativeTime(performance.lastConversionAt, now)
+          : 'No conversions yet'
+      },
+      payouts: {
+        next: upcomingPayout
+          ? {
+              status: upcomingPayout.status,
+              amount: formatCurrency(Number(upcomingPayout.amountCents ?? 0), 'USD'),
+              scheduledAt: upcomingPayout.scheduledAt,
+              scheduledLabel: formatDateTime(upcomingPayout.scheduledAt, {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              })
+            }
+          : null,
+        last: lastPayout
+          ? {
+              status: lastPayout.status,
+              amount: formatCurrency(Number(lastPayout.amountCents ?? 0), 'USD'),
+              processedAt: lastPayout.processedAt,
+              processedLabel: formatDateTime(lastPayout.processedAt ?? lastPayout.scheduledAt, {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              })
+            }
+          : null
+      },
+      links: {
+        landingPage: metadata.landingPage ?? metadata.landing_page ?? null,
+        mediaKit: metadata.mediaKit ?? metadata.media_kit ?? null
+      },
+      highlights: programmeHighlights
+    };
+  });
+
+  const totalEarnedCents = sum(affiliatePrograms, (program) => program.earnings.totalCents);
+  const totalOutstandingCents = sum(
+    affiliatePrograms,
+    (program) => program.earnings.outstandingCents
+  );
+  const totalPaidCents = sum(affiliatePrograms, (program) => program.earnings.paidCents);
+  const totalConversions30d = sum(
+    affiliatePrograms,
+    (program) => program.performance.conversions30d
+  );
+  const totalVolume30dCents = sum(
+    affiliatePrograms,
+    (program) => program.performance.volume30dCents
+  );
+
+  const activePrograms = affiliatePrograms.filter((program) =>
+    ['approved', 'active'].includes((program.status ?? '').toLowerCase())
+  ).length;
+  const pendingPrograms = affiliatePrograms.filter((program) =>
+    ['pending', 'review'].includes((program.status ?? '').toLowerCase())
+  ).length;
+
+  const summaryMetrics = [
+    {
+      label: 'Lifetime earnings',
+      value: formatCurrency(totalEarnedCents, 'USD'),
+      change: `Paid ${formatCurrency(totalPaidCents, 'USD')}`
+    },
+    {
+      label: 'Outstanding balance',
+      value: formatCurrency(totalOutstandingCents, 'USD'),
+      change:
+        totalOutstandingCents > 0
+          ? 'Release pending payout'
+          : 'All payouts cleared',
+      trend: totalOutstandingCents > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Active programmes',
+      value: `${activePrograms}`,
+      change:
+        pendingPrograms > 0
+          ? `${pendingPrograms} awaiting approval`
+          : 'All programmes live',
+      trend: activePrograms > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Conversions (30d)',
+      value: `${totalConversions30d}`,
+      change: `Volume ${formatCurrency(totalVolume30dCents, 'USD')}`,
+      trend: totalConversions30d > 0 ? 'up' : 'down'
+    }
+  ];
+
+  const upcomingPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+    .filter((payout) => payout.status !== 'completed')
+    .map((payout) => {
+      const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
+        (entry) => Number(entry.id) === Number(payout.affiliateId)
+      );
+      return {
+        status: payout.status,
+        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        scheduledAt: payout.scheduledAt,
+        scheduledLabel: formatDateTime(payout.scheduledAt, {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        }),
+        referralCode: affiliate?.referralCode,
+        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName
+      };
+    })
+    .sort((a, b) => new Date(a.scheduledAt ?? now) - new Date(b.scheduledAt ?? now))[0] ?? null;
+
+  const payoutTimeline = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+    .map((payout) => {
+      const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
+        (entry) => Number(entry.id) === Number(payout.affiliateId)
+      );
+      return {
+        id: String(payout.id),
+        status: payout.status,
+        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        scheduledAt: payout.scheduledAt,
+        processedAt: payout.processedAt,
+        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName ?? 'Community',
+        referralCode: affiliate?.referralCode
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.processedAt ?? b.scheduledAt ?? now).getTime() -
+        new Date(a.processedAt ?? a.scheduledAt ?? now).getTime()
+    )
+    .slice(0, 8);
+
+  const actions = [];
+  if (totalOutstandingCents > 0) {
+    actions.push(
+      `Release ${formatCurrency(totalOutstandingCents, 'USD')} in pending affiliate payouts.`
+    );
+  }
+  if (pendingPrograms > 0) {
+    actions.push(`Review ${pendingPrograms} pending affiliate application${pendingPrograms === 1 ? '' : 's'}.`);
+  }
+  if (actions.length === 0) {
+    actions.push('Invite high-performing learners into the affiliate programme.');
+  }
+
+  const resources = [
+    {
+      id: 'affiliate-starter-kit',
+      title: 'Affiliate starter kit',
+      description: 'Download co-branded assets, copy decks, and onboarding emails.',
+      action: 'Download kit',
+      href: '/content/affiliate-playbook'
+    },
+    {
+      id: 'affiliate-policy',
+      title: 'Policy & compliance checklist',
+      description: 'Ensure payout eligibility, tax documentation, and brand guidelines stay aligned.',
+      action: 'Open checklist',
+      href: '/policies/affiliate'
+    }
+  ];
+
+  return {
+    summary: {
+      metrics: summaryMetrics,
+      totals: {
+        earnedCents: totalEarnedCents,
+        earnedFormatted: formatCurrency(totalEarnedCents, 'USD'),
+        outstandingCents: totalOutstandingCents,
+        outstandingFormatted: formatCurrency(totalOutstandingCents, 'USD'),
+        paidCents: totalPaidCents,
+        programCount: affiliatePrograms.length,
+        activePrograms,
+        pendingPrograms
+      },
+      nextPayout
+    },
+    programs: affiliatePrograms,
+    payouts: payoutTimeline,
+    commission: {
+      recurrence: defaultCommission.recurrence ?? 'infinite',
+      maxOccurrences: defaultCommission.recurrence === 'finite' ? defaultCommission.maxOccurrences ?? null : null,
+      tiers: defaultTiers.map((tier, index) => ({
+        thresholdCents: Number(tier.thresholdCents ?? 0),
+        rateBps: Number(tier.rateBps ?? 0),
+        label: index === 0 ? 'Base tier' : `Tier ${index + 1}`,
+        rateLabel: formatBasisPoints(tier.rateBps)
+      }))
+    },
+    compliance: {
+      autoApprove: Boolean(defaultAffiliate.autoApprove),
+      requireTaxInformation: Boolean(defaultAffiliate.requireTaxInformation),
+      blockSelfReferral: Boolean(defaultAffiliate.security?.blockSelfReferral),
+      enforceTwoFactorForPayouts: Boolean(defaultAffiliate.security?.enforceTwoFactorForPayouts),
+      payoutScheduleDays: Number(defaultAffiliate.payoutScheduleDays ?? 30),
+      cookieWindowDays: Number(defaultAffiliate.cookieWindowDays ?? 30)
+    },
+    actions,
+    resources
+  };
 }
 
 function formatDateTime(date, options = {}) {
@@ -2937,7 +4184,8 @@ export default class DashboardService {
       adsCampaignRows,
       adsMetricRows,
       communityPaywallTierRows,
-      communitySubscriptionRows
+      communitySubscriptionRows,
+      platformMonetizationSettings
     ] = await Promise.all([
       UserPrivacySettingModel.getForUser(userId),
       db('course_enrollments as ce')
@@ -3531,7 +4779,8 @@ export default class DashboardService {
           'tier.billing_interval as billingInterval',
           'community.owner_id as ownerId',
           'community.name as communityName'
-        )
+        ),
+      PlatformSettingsService.getMonetizationSettings()
     ]);
     const communityStatsMap = new Map();
     communityStatRows.forEach((row) => {
@@ -3565,6 +4814,13 @@ export default class DashboardService {
       affiliatePayoutByAffiliate.set(row.affiliateId, entry);
     });
 
+    const affiliateOverview = buildAffiliateOverview({
+      affiliates: affiliateRows,
+      affiliatePayouts: affiliatePayoutRows,
+      paymentIntents: paymentIntentRows,
+      memberships: membershipRows,
+      monetizationSettings: platformMonetizationSettings,
+      now
     const communityDashboard = buildCommunityDashboard({
       user,
       now,
@@ -4008,6 +5264,7 @@ export default class DashboardService {
 
       return {
         id: enrollment.courseSlug,
+        courseId: Number(enrollment.courseId ?? 0),
         title: enrollment.courseTitle,
         status: 'In progress',
         progress: Math.round(Number(enrollment.progressPercent ?? 0)),
@@ -4091,6 +5348,95 @@ export default class DashboardService {
         };
       })
       .filter((assignment) => assignment && assignment.dueDate >= now);
+
+    const learnerAssessmentRecords = communityAssignments
+      .map((assignment) => {
+        if (!assignment.enrollmentStartedAt) return null;
+        const metadata = safeJsonParse(assignment.metadata, {});
+        const dueDate = new Date(assignment.enrollmentStartedAt);
+        dueDate.setDate(dueDate.getDate() + Number(assignment.dueOffsetDays ?? 0));
+        const submissions = Array.isArray(metadata.submissions)
+          ? metadata.submissions
+          : Array.isArray(metadata.queue)
+            ? metadata.queue
+            : [];
+        const learnerSubmission = submissions.find((submission) => {
+          const submissionUser = submission?.userId ?? submission?.learnerId ?? submission?.studentId;
+          return Number(submissionUser) === Number(user.id);
+        }) ?? metadata.submission;
+        const resolvedMaxScore = toNumber(
+          learnerSubmission?.maxScore ?? metadata.maxScore ?? metadata.points ?? metadata.totalPoints ?? 0
+        );
+        const rawScore = toNumber(
+          learnerSubmission?.score ??
+            learnerSubmission?.points ??
+            learnerSubmission?.grade ??
+            learnerSubmission?.percentage ??
+            metadata.score ??
+            metadata.grade
+        );
+        const scorePercent = resolvedMaxScore > 0 && rawScore >= 0
+          ? Math.round((rawScore / resolvedMaxScore) * 100)
+          : null;
+        const submissionStatus = (learnerSubmission?.status ?? learnerSubmission?.state ?? metadata.status ?? '')
+          .toString()
+          .toLowerCase();
+        const submittedAtRaw = learnerSubmission?.submittedAt ?? learnerSubmission?.submitted_at ?? metadata.submittedAt;
+        const submittedAt = submittedAtRaw ? new Date(submittedAtRaw) : null;
+        const gradedAtRaw = learnerSubmission?.gradedAt ?? learnerSubmission?.graded_at ?? metadata.gradedAt;
+        const gradedAt = gradedAtRaw ? new Date(gradedAtRaw) : null;
+        const type = (metadata.type ?? metadata.category ?? metadata.kind ?? '').toString() ||
+          (metadata.isExam ? 'Exam' : metadata.isQuiz ? 'Quiz' : 'Assignment');
+        const mode = metadata.mode ?? metadata.delivery ?? metadata.format ?? 'Asynchronous';
+        const weight = Number(
+          metadata.weight ??
+            metadata.weightPercent ??
+            metadata.weighting ??
+            metadata.weightingPercent ??
+            metadata.weight_percentage ??
+            0
+        );
+        let status = 'Scheduled';
+        if (submissionStatus === 'graded' || submissionStatus === 'complete' || gradedAt || scorePercent !== null) {
+          status = 'Completed';
+        } else if (submittedAt) {
+          status = 'Submitted';
+        } else if (dueDate < now) {
+          status = 'Overdue';
+        } else if (dueDate.getTime() - now.getTime() <= 3 * DAY_IN_MS) {
+          status = 'Due soon';
+        }
+        return {
+          id: `assessment-${assignment.id}`,
+          assignmentId: assignment.id,
+          courseId: Number(assignment.courseId),
+          courseTitle: assignment.courseTitle,
+          title: assignment.title,
+          type,
+          mode,
+          dueAt: dueDate,
+          dueLabel: formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }),
+          dueIn: humanizeFutureTime(dueDate, now),
+          status,
+          weight: Number.isFinite(weight) ? Math.max(weight, 0) : 0,
+          scorePercent,
+          submittedAt,
+          gradedAt,
+          resources: Array.isArray(metadata.resources)
+            ? metadata.resources.filter(Boolean).map((resource) => resource.toString()).slice(0, 4)
+            : [],
+          recommendedMinutes: Number(
+            metadata.estimatedMinutes ??
+              metadata.durationMinutes ??
+              metadata.timeboxMinutes ??
+              metadata.recommendedMinutes ??
+              0
+          ),
+          submissionUrl: metadata.submissionUrl ?? metadata.turnInLink ?? metadata.lmsUrl ?? null,
+          instructions: metadata.instructions ?? metadata.brief ?? null
+        };
+      })
+      .filter(Boolean);
 
     const upcomingEvents = [];
     liveClassRows.forEach((session) => {
@@ -4357,6 +5703,8 @@ export default class DashboardService {
       email: entry.user.email
     }));
 
+    const blogHighlights = await BlogService.getDashboardHighlights({ limit: 6 });
+
     const feedHighlights = communityMessageRows.map((row) => {
       const metadata = safeJsonParse(row.metadata, {});
       const tags = Array.isArray(metadata.tags) ? metadata.tags : [];
@@ -4440,6 +5788,232 @@ export default class DashboardService {
       });
     }
 
+    const upcomingLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.dueAt && record.dueAt >= now && record.status !== 'Completed')
+      .sort((a, b) => a.dueAt - b.dueAt);
+
+    const overdueLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.status === 'Overdue')
+      .sort((a, b) => (a.dueAt?.getTime() ?? 0) - (b.dueAt?.getTime() ?? 0));
+
+    const submittedLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.status === 'Submitted')
+      .sort((a, b) => (a.dueAt?.getTime() ?? 0) - (b.dueAt?.getTime() ?? 0));
+
+    const completedLearnerAssessments = learnerAssessmentRecords
+      .filter((record) => record.status === 'Completed')
+      .sort((a, b) => (b.gradedAt?.getTime() ?? b.dueAt?.getTime() ?? 0) - (a.gradedAt?.getTime() ?? a.dueAt?.getTime() ?? 0));
+
+    const dueThisWeekCount = upcomingLearnerAssessments.filter((record) => {
+      if (!record.dueAt) return false;
+      return record.dueAt.getTime() - now.getTime() <= 7 * DAY_IN_MS;
+    }).length;
+    const overdueCount = overdueLearnerAssessments.length;
+    const awaitingReviewCount = submittedLearnerAssessments.length;
+    const gradedAssessments = learnerAssessmentRecords.filter((record) => record.scorePercent !== null);
+    const averageLearnerScore = gradedAssessments.length
+      ? Math.round(
+          gradedAssessments.reduce((sum, record) => sum + (record.scorePercent ?? 0), 0) /
+            gradedAssessments.length
+        )
+      : null;
+    const workloadWeight = learnerAssessmentRecords
+      .filter((record) => record.status !== 'Completed')
+      .reduce((total, record) => total + (Number.isFinite(record.weight) ? record.weight : 0), 0);
+
+    const learnerAssessmentOverview = [
+      {
+        id: 'due-this-week',
+        label: 'Due this week',
+        value: `${dueThisWeekCount}`,
+        context: dueThisWeekCount > 0 ? 'Prioritise upcoming tasks' : 'All quiet',
+        tone: dueThisWeekCount > 0 ? 'warning' : 'positive'
+      },
+      {
+        id: 'overdue',
+        label: 'Overdue items',
+        value: `${overdueCount}`,
+        context: overdueCount > 0 ? 'Resolve immediately' : 'On schedule',
+        tone: overdueCount > 0 ? 'alert' : 'positive'
+      },
+      {
+        id: 'awaiting-review',
+        label: 'Awaiting grading',
+        value: `${awaitingReviewCount}`,
+        context: awaitingReviewCount > 0 ? 'Instructor feedback pending' : 'No submissions pending',
+        tone: awaitingReviewCount > 0 ? 'neutral' : 'positive'
+      },
+      {
+        id: 'average-score',
+        label: 'Average score',
+        value: averageLearnerScore !== null ? `${averageLearnerScore}%` : '—',
+        context: gradedAssessments.length > 0 ? 'Across graded work' : 'Awaiting results',
+        tone:
+          averageLearnerScore !== null
+            ? averageLearnerScore >= 85
+              ? 'positive'
+              : averageLearnerScore >= 70
+                ? 'neutral'
+                : 'warning'
+            : 'muted'
+      }
+    ];
+
+    const presentLearnerAssessment = (record) => ({
+      id: record.id,
+      title: record.title,
+      course: record.courseTitle,
+      type: record.type,
+      due: record.dueLabel,
+      dueIn: record.dueIn,
+      status: record.status,
+      weight: record.weight > 0 ? `${Math.round(record.weight)}%` : null,
+      score: record.scorePercent !== null ? `${record.scorePercent}%` : null,
+      mode: record.mode,
+      recommended: record.recommendedMinutes > 0 ? minutesToReadable(record.recommendedMinutes) : null,
+      submissionUrl: record.submissionUrl,
+      instructions: record.instructions
+    });
+
+    const courseAssessmentMap = new Map();
+    learnerAssessmentRecords.forEach((record) => {
+      const courseId = Number(record.courseId);
+      if (!Number.isFinite(courseId) || courseId <= 0) return;
+      const entry = courseAssessmentMap.get(courseId) ?? {
+        upcoming: [],
+        overdue: 0,
+        completed: 0,
+        awaiting: 0,
+        scoreTotal: 0,
+        scored: 0
+      };
+      if (record.status === 'Completed') {
+        entry.completed += 1;
+      } else if (record.status === 'Submitted') {
+        entry.awaiting += 1;
+        entry.upcoming.push(record);
+      } else if (record.status === 'Overdue') {
+        entry.overdue += 1;
+        entry.upcoming.push(record);
+      } else {
+        entry.upcoming.push(record);
+      }
+      if (record.scorePercent !== null) {
+        entry.scoreTotal += record.scorePercent;
+        entry.scored += 1;
+      }
+      courseAssessmentMap.set(courseId, entry);
+    });
+
+    const learnerCourseReports = learnerCourseSummaries.map((course) => {
+      const courseId = Number(course.courseId ?? 0);
+      const metrics = courseAssessmentMap.get(courseId) ?? {
+        upcoming: [],
+        overdue: 0,
+        completed: 0,
+        awaiting: 0,
+        scoreTotal: 0,
+        scored: 0
+      };
+      const nextDue = [...metrics.upcoming].sort((a, b) => (a.dueAt?.getTime() ?? Infinity) - (b.dueAt?.getTime() ?? Infinity))[0] ?? null;
+      const averageScore = metrics.scored > 0 ? Math.round(metrics.scoreTotal / metrics.scored) : null;
+      return {
+        id: `learner-assessment-course-${course.id}`,
+        name: course.title,
+        progress: `${course.progress}% complete`,
+        status: nextDue
+          ? `${nextDue.type} due ${nextDue.dueLabel}`
+          : metrics.overdue > 0
+            ? 'Resolve overdue items'
+            : 'All clear',
+        upcoming: metrics.upcoming.length,
+        overdue: metrics.overdue,
+        awaitingFeedback: metrics.awaiting,
+        averageScore: averageScore !== null ? `${averageScore}%` : null
+      };
+    });
+
+    const studyPlan = upcomingLearnerAssessments.slice(0, 4).map((record, index) => ({
+      id: `${record.id}-plan-${index}`,
+      focus: record.title,
+      course: record.courseTitle,
+      window: record.dueIn,
+      duration:
+        record.recommendedMinutes > 0
+          ? minutesToReadable(record.recommendedMinutes)
+          : index === 0
+            ? '60 mins'
+            : '45 mins',
+      mode: record.mode,
+      submissionUrl: record.submissionUrl
+    }));
+
+    const assessmentTypeMap = new Map();
+    learnerAssessmentRecords.forEach((record) => {
+      const key = record.type || 'Assessment';
+      const entry = assessmentTypeMap.get(key) ?? {
+        type: key,
+        count: 0,
+        weight: 0,
+        scoreTotal: 0,
+        scored: 0
+      };
+      entry.count += 1;
+      entry.weight += Number.isFinite(record.weight) ? record.weight : 0;
+      if (record.scorePercent !== null) {
+        entry.scoreTotal += record.scorePercent;
+        entry.scored += 1;
+      }
+      assessmentTypeMap.set(key, entry);
+    });
+
+    const learnerAssessmentTypeAnalytics = Array.from(assessmentTypeMap.values()).map((entry) => ({
+      type: entry.type,
+      count: entry.count,
+      weightShare: workloadWeight > 0 ? Math.round((entry.weight / workloadWeight) * 100) : null,
+      averageScore: entry.scored > 0 ? Math.round(entry.scoreTotal / entry.scored) : null
+    }));
+
+    const averageLearnerLeadTimeDays = upcomingLearnerAssessments.length
+      ? Math.round(
+          upcomingLearnerAssessments.reduce((total, record) => {
+            if (!record.dueAt) return total;
+            const diff = Math.max(0, Math.round((record.dueAt.getTime() - now.getTime()) / DAY_IN_MS));
+            return total + diff;
+          }, 0) / upcomingLearnerAssessments.length
+        )
+      : null;
+
+    const supportResources = Array.from(
+      new Set(
+        learnerAssessmentRecords
+          .flatMap((record) => record.resources ?? [])
+          .filter((resource) => typeof resource === 'string' && resource.trim().length > 0)
+      )
+    ).slice(0, 5);
+
+    const learnerAssessments = {
+      overview: learnerAssessmentOverview,
+      timeline: {
+        upcoming: upcomingLearnerAssessments.map(presentLearnerAssessment),
+        overdue: overdueLearnerAssessments.map(presentLearnerAssessment),
+        completed: [...completedLearnerAssessments, ...submittedLearnerAssessments].map(presentLearnerAssessment)
+      },
+      courses: learnerCourseReports,
+      schedule: {
+        studyPlan,
+        events: upcomingDisplay
+      },
+      analytics: {
+        byType: learnerAssessmentTypeAnalytics,
+        pendingReviews: awaitingReviewCount,
+        overdue: overdueCount,
+        averageLeadTimeDays: averageLearnerLeadTimeDays,
+        workloadWeight
+      },
+      resources: supportResources
+    };
+
     const roles = [{ id: 'learner', label: 'Learner' }];
     if (communityDashboard) {
       roles.push(communityDashboard.role);
@@ -4486,10 +6060,16 @@ export default class DashboardService {
           summary: financialSummary,
           invoices
         },
+        affiliate: affiliateOverview,
         notifications: {
           total: notifications.length,
           unreadMessages: unreadThreads,
           items: notifications
+        },
+        assessments: learnerAssessments,
+        blog: {
+          highlights: blogHighlights,
+          featured: blogHighlights.find((entry) => entry.heroImage) ?? blogHighlights[0] ?? null
         },
         followers: {
           followers: followersCount,
@@ -4525,6 +6105,10 @@ export default class DashboardService {
       }
     };
 
+    if (instructorDashboard?.dashboard) {
+      instructorDashboard.dashboard.affiliate = affiliateOverview;
+    }
+
     if (communityDashboard) {
       dashboards.community = communityDashboard.dashboard;
     }
@@ -4537,6 +6121,14 @@ export default class DashboardService {
       adminDashboard = await DashboardService.buildAdminDashboard({ now });
       dashboards.admin = adminDashboard.dashboard;
     }
+
+    const blogSearchEntries = blogHighlights.map((post) => ({
+      id: `search-blog-${post.slug}`,
+      role: 'learner',
+      type: 'Blog',
+      title: post.title,
+      url: `/blog/${post.slug}`
+    }));
 
     const searchIndex = [
       ...learnerCourseSummaries.map((course) => ({
@@ -4566,8 +6158,35 @@ export default class DashboardService {
         type: event.type,
         title: event.title,
         url: '/dashboard/learner/calendar'
-      }))
+      })),
+      {
+        id: 'search-learner-assessments',
+        role: 'learner',
+        type: 'Assessments',
+        title: 'Assessment schedule',
+        url: '/dashboard/learner/assessments'
+      }
+      ...blogSearchEntries
     ];
+
+    if (affiliateOverview?.programs?.length) {
+      searchIndex.push({
+        id: 'search-affiliate-learner',
+        role: 'learner',
+        type: 'Affiliate',
+        title: 'Affiliate workspace',
+        url: '/dashboard/learner/affiliate'
+      });
+      if (instructorDashboard) {
+        searchIndex.push({
+          id: 'search-affiliate-instructor',
+          role: 'instructor',
+          type: 'Affiliate',
+          title: 'Affiliate workspace',
+          url: '/dashboard/instructor/affiliate'
+        });
+      }
+    }
 
     if (communityDashboard) {
       searchIndex.push(...communityDashboard.searchIndex);
@@ -4601,6 +6220,11 @@ export default class DashboardService {
       { label: 'Courses', value: `${activeEnrollments.length} active` },
       { label: 'Badges', value: `${learningCompletions.length} milestones` }
     ];
+    if (affiliateOverview?.summary?.totals?.earnedFormatted) {
+      profileStats.push({
+        label: 'Affiliate earned',
+        value: affiliateOverview.summary.totals.earnedFormatted
+      });
     if (communityDashboard) {
       profileStats.push(...communityDashboard.profileStats);
     }
@@ -4615,6 +6239,15 @@ export default class DashboardService {
       `${memberships.length} communities`,
       `${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`
     ];
+    if (affiliateOverview?.summary?.totals?.programCount) {
+      const programmeCount = affiliateOverview.summary.totals.programCount;
+      if (programmeCount > 0) {
+        profileTitleSegments.push(
+          `${programmeCount} affiliate programme${programmeCount === 1 ? '' : 's'}`
+        );
+      }
+    }
+    if (instructorDashboard) {
     if (communityDashboard) {
       const managedCommunitiesCount =
         communityDashboard.dashboard?.health?.overview?.length ?? 0;
@@ -4714,7 +6347,12 @@ export default class DashboardService {
       topCommunitiesRows,
       tutorResponseRow,
       refundsPendingRow,
-      upcomingLiveClassRows
+      upcomingLiveClassRows,
+      blogPublishedRow,
+      blogDraftRow,
+      blogScheduledRow,
+      blogViewRow,
+      blogRecentResult
     ] = await Promise.all([
       db('users').count('id as count').first(),
       db('users').where('created_at', '>=', thirtyDaysAgo).count('id as count').first(),
@@ -4855,7 +6493,12 @@ export default class DashboardService {
           'c.name as communityName'
         ])
         .orderBy('lc.start_at', 'asc')
-        .limit(5)
+        .limit(5),
+      db('blog_posts').where('status', 'published').count('id as count').first(),
+      db('blog_posts').where('status', 'draft').count('id as count').first(),
+      db('blog_posts').where('status', 'scheduled').count('id as count').first(),
+      db('blog_posts').sum({ total: 'view_count' }).first(),
+      BlogService.listAdminPosts({ page: 1, pageSize: 5, status: 'published' })
     ]);
 
     const totalUsers = toNumber(totalUsersRow?.count);
@@ -4886,6 +6529,12 @@ export default class DashboardService {
         : new Date(subscription.startedAt);
       return startedAt >= sixtyDaysAgo && startedAt < thirtyDaysAgo;
     }).length;
+
+    const blogPublishedCount = toNumber(blogPublishedRow?.count);
+    const blogDraftCount = toNumber(blogDraftRow?.count);
+    const blogScheduledCount = toNumber(blogScheduledRow?.count);
+    const blogTotalViews = toNumber(blogViewRow?.total);
+    const blogRecentPosts = Array.isArray(blogRecentResult?.data) ? blogRecentResult.data : [];
 
     const computeAnnualised = (priceCents, interval) => {
       switch (interval) {
@@ -5165,6 +6814,29 @@ export default class DashboardService {
       };
     });
 
+    const blogOperations = {
+      summary: {
+        published: blogPublishedCount,
+        drafts: blogDraftCount,
+        scheduled: blogScheduledCount,
+        totalViews: blogTotalViews
+      },
+      recent: blogRecentPosts.map((post) => ({
+        id: post.id,
+        title: post.title,
+        slug: post.slug,
+        status: post.status,
+        publishedAt: post.publishedAt,
+        readingTimeMinutes: post.readingTimeMinutes,
+        category: post.category,
+        tags: post.tags,
+        featured: post.isFeatured,
+        heroImage: post.media?.[0]?.mediaUrl ?? null,
+        views: Number(post.viewCount ?? 0)
+      })),
+      featured: blogRecentPosts.find((post) => post.isFeatured) ?? blogRecentPosts[0] ?? null
+    };
+
     const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
     const compliance = await IdentityVerificationService.getAdminOverview({ now: reference });
 
@@ -5193,7 +6865,8 @@ export default class DashboardService {
         communitiesLive: formatNumber(communityTotal),
         instructors: formatNumber(instructorCount)
       },
-      upcomingLaunches
+      upcomingLaunches,
+      blog: blogOperations.summary
     };
 
     const profileStats = [
@@ -5215,7 +6888,8 @@ export default class DashboardService {
       { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
       { id: 'admin-revenue', role: 'admin', type: 'Revenue', title: 'Revenue performance', url: '/admin#revenue' },
       { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' },
-      { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' }
+      { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' },
+      { id: 'admin-blog', role: 'admin', type: 'Content', title: 'Blog management', url: '/admin#blog' }
     ];
 
     return {
@@ -5225,9 +6899,13 @@ export default class DashboardService {
         approvals,
         revenue,
         operations,
+        blog: blogOperations,
+        compliance,
         activity: { alerts, events },
+        compliance,
         settings: {
           monetization: monetizationSettings
+        }
         },
         compliance
       },

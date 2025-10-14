@@ -29,6 +29,11 @@ export default function MainLayout() {
 
   const navigation = useMemo(() => {
     if (!isAuthenticated) {
+      return [
+        { name: 'Home', to: '/' },
+        { name: 'Blog', to: '/blog' },
+        { name: 'About', to: '/about' }
+      ];
       return [];
     }
 
@@ -45,6 +50,8 @@ export default function MainLayout() {
       { name: 'Live Feed', to: '/feed' },
       { name: 'Communities', to: '/communities' },
       { name: 'Explorer', to: '/explorer' },
+      { name: 'Profile', to: '/profile' },
+      { name: 'Blog', to: '/blog' }
       { name: 'Dashboard', to: baseDashboardPath },
       { name: 'Communities', to: communitiesPath },
       { name: 'About', to: '/about' }

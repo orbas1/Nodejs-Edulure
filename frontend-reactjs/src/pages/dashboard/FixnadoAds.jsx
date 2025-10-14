@@ -1,7 +1,10 @@
 import PropTypes from 'prop-types';
+import { useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+
+const ALLOWED_ROLES = new Set(['instructor', 'admin']);
 
 const compactNumberFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
@@ -56,15 +59,75 @@ Chip.propTypes = {
   children: PropTypes.node.isRequired
 };
 
-export default function InstructorAds() {
+export default function FixnadoAds() {
   const { role, dashboard, refresh } = useOutletContext();
-  const ads = dashboard?.ads;
+  const adsRaw = dashboard?.ads ?? null;
+  const ads = useMemo(() => {
+    if (!adsRaw || typeof adsRaw !== 'object') return null;
+    const asArray = (value) => (Array.isArray(value) ? value : []);
+    const asObject = (value) => (value && typeof value === 'object' ? value : {});
 
-  if (role && role !== 'instructor') {
+    const sanitizeCampaign = (campaign) => {
+      const safeCampaign = asObject(campaign);
+      const metrics = asObject(safeCampaign.metrics);
+      const placement = asObject(safeCampaign.placement);
+      const targeting = asObject(safeCampaign.targeting);
+      const creative = asObject(safeCampaign.creative);
+
+      return {
+        ...safeCampaign,
+        metrics: {
+          impressions: Number(metrics.impressions ?? 0),
+          clicks: Number(metrics.clicks ?? 0),
+          conversions: Number(metrics.conversions ?? 0),
+          revenueFormatted: metrics.revenueFormatted ?? '—',
+          roas: metrics.roas ?? null,
+          lastSyncedAt: metrics.lastSyncedAt ?? null
+        },
+        placement: {
+          ...placement,
+          tags: asArray(placement.tags)
+        },
+        targeting: {
+          keywords: asArray(targeting.keywords),
+          audiences: asArray(targeting.audiences),
+          locations: asArray(targeting.locations),
+          languages: asArray(targeting.languages)
+        },
+        creative: {
+          headline: creative.headline ?? 'Untitled creative',
+          description: creative.description ?? 'Add a compelling description to improve engagement.',
+          url: creative.url ?? null
+        },
+        spend: asObject(safeCampaign.spend),
+        dailyBudget: asObject(safeCampaign.dailyBudget)
+      };
+    };
+
+    return {
+      summary: asObject(adsRaw.summary),
+      active: asArray(adsRaw.active).map(sanitizeCampaign),
+      experiments: asArray(adsRaw.experiments).map(asObject),
+      placements: asArray(adsRaw.placements).map((placement) => ({
+        ...asObject(placement),
+        tags: asArray(placement?.tags)
+      })),
+      targeting: {
+        summary: adsRaw.targeting?.summary ?? '',
+        keywords: asArray(adsRaw.targeting?.keywords),
+        audiences: asArray(adsRaw.targeting?.audiences),
+        locations: asArray(adsRaw.targeting?.locations),
+        languages: asArray(adsRaw.targeting?.languages)
+      },
+      tags: asArray(adsRaw.tags).map(asObject)
+    };
+  }, [adsRaw]);
+
+  if (role && !ALLOWED_ROLES.has(role)) {
     return (
       <DashboardStateMessage
-        title="Instructor access required"
-        description="Switch to your instructor workspace to manage Edulure Ads placements and experiments."
+        title="Restricted access"
+        description="Switch to an instructor or admin workspace to manage Fixnado Ads placements and experiments."
         actionLabel="Return"
         onAction={() => window.history.back()}
       />
@@ -74,7 +137,7 @@ export default function InstructorAds() {
   if (!ads) {
     return (
       <DashboardStateMessage
-        title="Ads workspace offline"
+        title="Fixnado Ads workspace offline"
         description="Performance data hasn't synced from your ad accounts yet. Refresh after connecting channels."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
@@ -93,7 +156,7 @@ export default function InstructorAds() {
     return (
       <DashboardStateMessage
         title="No ads telemetry yet"
-        description="Launch your first Edulure Ads placement or import an existing campaign to populate performance analytics."
+        description="Launch your first Fixnado Ads placement or import an existing campaign to populate performance analytics."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />
@@ -145,7 +208,7 @@ export default function InstructorAds() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Edulure Ads</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Fixnado Ads</h1>
           <p className="mt-2 text-sm text-slate-600">
             Orchestrate placements, fine-tune targeting, and monitor revenue quality in real time.
           </p>
@@ -169,19 +232,19 @@ export default function InstructorAds() {
       </div>
 
       <section className="dashboard-section">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Performance overview</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Last synced {formatDateLabel(summary.lastSyncedAt ?? summary.lastSyncedLabel)}
-            </p>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Performance overview</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Last synced {formatDateLabel(summary.lastSyncedAt ?? summary.lastSyncedLabel)}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+              <Chip>{formatInteger(summary.totalImpressions ?? 0)} impressions</Chip>
+              <Chip>{formatInteger(summary.totalClicks ?? 0)} clicks</Chip>
+              <Chip>{formatInteger(summary.totalConversions ?? 0)} conversions</Chip>
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-            <Chip>{formatInteger(summary.totalImpressions ?? 0)} impressions</Chip>
-            <Chip>{formatInteger(summary.totalClicks ?? 0)} clicks</Chip>
-            <Chip>{formatInteger(summary.totalConversions ?? 0)} conversions</Chip>
-          </div>
-        </div>
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {overviewMetrics.map((metric) => (
             <div
@@ -213,25 +276,27 @@ export default function InstructorAds() {
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">{campaign.objective}</p>
-                  <h3 className="mt-2 text-xl font-semibold text-slate-950">{campaign.name}</h3>
-                  <p className="mt-1 text-xs text-slate-500">{campaign.placement.scheduleLabel}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">{campaign.objective ?? 'Campaign objective'}</p>
+                  <h3 className="mt-2 text-xl font-semibold text-slate-950">{campaign.name ?? 'Untitled campaign'}</h3>
+                  <p className="mt-1 text-xs text-slate-500">{campaign.placement.scheduleLabel ?? 'Schedule syncing'}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Chip>{campaign.status === 'active' ? 'Live' : campaign.status}</Chip>
-                  {campaign.metrics.roas && <Chip>{campaign.metrics.roas} ROAS</Chip>}
+                  <Chip>{campaign.status === 'active' ? 'Live' : campaign.status ?? 'Draft'}</Chip>
+                  {campaign.metrics.roas ? <Chip>{campaign.metrics.roas} ROAS</Chip> : null}
                 </div>
               </div>
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lifetime spend</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.spend.label}</p>
-                  <p className="mt-1 text-xs text-slate-500">{campaign.dailyBudget.label}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.spend.label ?? '—'}</p>
+                  <p className="mt-1 text-xs text-slate-500">{campaign.dailyBudget.label ?? 'Budget syncing'}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Click health</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.ctr}</p>
-                  <p className="mt-1 text-xs text-slate-500">{campaign.cpc} · {campaign.cpa}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.ctr ?? '—'}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {(campaign.cpc ?? '—')} · {(campaign.cpa ?? '—')}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Volume</p>
@@ -277,6 +342,11 @@ export default function InstructorAds() {
                         {language}
                       </span>
                     ))}
+                    {campaign.targeting.keywords.length +
+                      campaign.targeting.audiences.length +
+                      campaign.targeting.locations.length +
+                      campaign.targeting.languages.length ===
+                      0 && <span className="text-xs text-slate-400">No targeting dimensions configured yet.</span>}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-slate-200 bg-white/60 p-4">
@@ -385,10 +455,10 @@ export default function InstructorAds() {
               <div className="mt-2 flex flex-wrap gap-2">
                 {tags.map((tag) => (
                   <span
-                    key={`${tag.category}-${tag.label}`}
+                    key={`${tag.category ?? 'tag'}-${tag.label ?? 'label'}`}
                     className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600"
                   >
-                    {tag.category}: {tag.label}
+                    {(tag.category ?? 'Tag').trim()}: {(tag.label ?? 'Unspecified').trim()}
                   </span>
                 ))}
                 {tags.length === 0 && <span className="text-slate-400">No tags available</span>}
@@ -407,19 +477,22 @@ export default function InstructorAds() {
           {placements.map((placement) => (
             <div key={placement.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-900">{placement.name}</h3>
-                <Chip>{placement.status}</Chip>
+                <h3 className="text-sm font-semibold text-slate-900">{placement.name ?? 'Untitled placement'}</h3>
+                <Chip>{placement.status ?? 'Draft'}</Chip>
               </div>
-              <p className="mt-1 text-xs text-slate-500">{placement.surface} · {placement.slot}</p>
-              <p className="mt-2 text-xs font-semibold text-slate-700">{placement.budgetLabel}</p>
-              <p className="mt-1 text-xs text-slate-500">{placement.optimisation}</p>
-              <p className="mt-1 text-xs text-slate-500">{placement.scheduleLabel}</p>
+              <p className="mt-1 text-xs text-slate-500">{[placement.surface, placement.slot].filter(Boolean).join(' · ') || 'Surface syncing'}</p>
+              <p className="mt-2 text-xs font-semibold text-slate-700">{placement.budgetLabel ?? 'Budget syncing'}</p>
+              <p className="mt-1 text-xs text-slate-500">{placement.optimisation ?? 'Optimisation pending'}</p>
+              <p className="mt-1 text-xs text-slate-500">{placement.scheduleLabel ?? 'Schedule pending'}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {placement.tags.map((tag) => (
                   <span key={`${placement.id}-${tag}`} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-600">
                     {tag}
                   </span>
                 ))}
+                {placement.tags.length === 0 && (
+                  <span className="text-[11px] text-slate-400">No placement tags</span>
+                )}
               </div>
             </div>
           ))}

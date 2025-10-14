@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  AcademicCapIcon,
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
   BanknotesIcon,
@@ -12,6 +13,7 @@ import {
   DocumentTextIcon,
   IdentificationIcon,
   InboxStackIcon,
+  HandshakeIcon,
   MegaphoneIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
@@ -20,6 +22,10 @@ import {
   UsersIcon,
   VideoCameraIcon,
   XMarkIcon
+  Bars3Icon,
+  XMarkIcon,
+  VideoCameraIcon,
+  BriefcaseIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -33,11 +39,13 @@ const navigationByRole = {
     { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
+    { name: 'Assessments', to: `${basePath}/assessments`, icon: AcademicCapIcon },
     { name: 'Live classrooms', to: `${basePath}/live-classes`, icon: VideoCameraIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
     { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
     { name: 'Become an instructor', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
   ],
@@ -51,16 +59,19 @@ const navigationByRole = {
     { name: 'Create course', to: `${basePath}/courses/create`, icon: DocumentTextIcon },
     { name: 'Recorded library', to: `${basePath}/courses/library`, icon: PlayCircleIcon },
     { name: 'Manage courses', to: `${basePath}/courses/manage`, icon: Cog6ToothIcon },
+    { name: 'Assessment studio', to: `${basePath}/assessments`, icon: AcademicCapIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'Service suite', to: `${basePath}/services`, icon: BriefcaseIcon },
     { name: 'Tutor management', to: `${basePath}/tutor-management`, icon: IdentificationIcon },
     { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },
-    { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
+    { name: 'Fixnado Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
     { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon }
   ],
   admin: (basePath) => [
@@ -75,6 +86,7 @@ const navigationByRole = {
     { name: 'Platform ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
     { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon },
     { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
+    { name: 'Fixnado Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
   ],
   community: (basePath) => [
     { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
