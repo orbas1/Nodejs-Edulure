@@ -1,0 +1,1 @@
+{"version":3,"file":"DashboardTutorBooking.d.ts","sourceRoot":"","sources":["../../../src/generated/models/DashboardTutorBooking.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,qBAAqB,GAAG;IAChC,EAAE,EAAE,MAAM,CAAC;IACX,KAAK,EAAE,MAAM,CAAC;IACd,MAAM,EAAE,MAAM,CAAC;IACf,IAAI,EAAE,MAAM,CAAC;IACb,MAAM,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IACvB,MAAM,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;CAC1B,CAAC"}

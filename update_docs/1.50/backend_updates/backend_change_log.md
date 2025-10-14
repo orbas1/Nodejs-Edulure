@@ -17,7 +17,15 @@
 - Added dedicated middleware for feature flag gating and route-level error boundaries so disabled capabilities return structured responses instead of falling through the global error handler, and so operators can trace failures with correlation IDs.【F:backend-nodejs/src/middleware/featureFlagGate.js†L1-L123】【F:backend-nodejs/src/middleware/routeErrorBoundary.js†L1-L56】
 - Updated OpenAPI server entries to advertise the `/api/v1` base path for SDK generators and partner integrations, keeping the specification aligned with the new routing contract.【F:backend-nodejs/src/docs/openapi.json†L9-L19】
 
+## Capability Manifest & Health Aggregation
+- Implemented a capability manifest service that evaluates feature flag exposure, correlates dependencies with readiness probes across the web, worker, and realtime processes, and surfaces availability summaries for clients and operator tooling.【F:backend-nodejs/src/services/CapabilityManifestService.js†L1-L209】
+- Extended the runtime configuration controller with a public `/api/v1/runtime/manifest` endpoint so web and mobile clients can fetch real-time service availability, capability gating reasons, and dependency impact metadata in a single call.【F:backend-nodejs/src/controllers/RuntimeConfigController.js†L1-L155】【F:backend-nodejs/src/routes/runtimeConfig.routes.js†L1-L11】
+
 ## Configuration & Testing
 - Expanded environment schema support for per-service ports, probe bindings, and bootstrap retry tuning so infrastructure-as-code can provision independent deployment targets.【F:backend-nodejs/src/config/env.js†L200-L215】【F:backend-nodejs/src/config/env.js†L455-L507】
 - Added a Vitest suite for the readiness tracker to ensure future regressions in health reporting are caught automatically.【F:backend-nodejs/test/readinessTracker.test.js†L1-L33】
 - Introduced router loader tests that validate feature gating, legacy redirects, and error boundary responses so versioned APIs remain deterministic during rollout.【F:backend-nodejs/test/routerLoader.test.js†L1-L68】
+
+## Contract Distribution & SDK Automation
+- Normalised OpenAPI path definitions and documented capability manifest schemas so `/api/v1` consumers receive accurate paths and typed payloads when generating SDKs from the contract.【F:backend-nodejs/src/docs/openapi.json†L1-L205】【F:backend-nodejs/src/docs/openapi.json†L15004-L15037】
+- Delivered a dedicated TypeScript SDK package that regenerates clients from the OpenAPI spec, compiles them for bundler consumption, and exposes a configuration helper so web and mobile shells share capability gating logic without duplicating DTOs.【F:sdk-typescript/scripts/generate-sdk.mjs†L1-L66】【F:sdk-typescript/src/index.ts†L1-L3】【F:sdk-typescript/src/runtime/configure.ts†L1-L83】

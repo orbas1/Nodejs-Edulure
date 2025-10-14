@@ -1,0 +1,1 @@
+{"version":3,"file":"BlockRequest.d.ts","sourceRoot":"","sources":["../../../src/generated/models/BlockRequest.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,YAAY,GAAG;IACvB,MAAM,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IACvB,SAAS,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IAC1B,QAAQ,CAAC,EAAE,MAAM,CAAC,MAAM,EAAE,GAAG,CAAC,CAAC;CAClC,CAAC"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"AdsInsightsResponse.d.ts","sourceRoot":"","sources":["../../../src/generated/models/AdsInsightsResponse.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,eAAe,EAAE,MAAM,mBAAmB,CAAC;AACzD,OAAO,KAAK,EAAE,iBAAiB,EAAE,MAAM,qBAAqB,CAAC;AAC7D,MAAM,MAAM,mBAAmB,GAAG;IAC9B,OAAO,CAAC,EAAE,iBAAiB,CAAC;IAC5B,KAAK,CAAC,EAAE,KAAK,CAAC,eAAe,CAAC,CAAC;CAClC,CAAC"}

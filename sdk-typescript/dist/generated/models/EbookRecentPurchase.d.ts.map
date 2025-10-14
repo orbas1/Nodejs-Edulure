@@ -1,0 +1,1 @@
+{"version":3,"file":"EbookRecentPurchase.d.ts","sourceRoot":"","sources":["../../../src/generated/models/EbookRecentPurchase.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,mBAAmB,GAAG;IAC9B,aAAa,EAAE,MAAM,CAAC;IACtB,WAAW,EAAE,MAAM,CAAC;IACpB,QAAQ,EAAE,MAAM,CAAC;IACjB,UAAU,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IAC3B,SAAS,CAAC,EAAE,MAAM,CAAC;CACtB,CAAC"}

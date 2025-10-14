@@ -1,0 +1,1 @@
+{"version":3,"file":"EbookPurchaseIntentResponse.d.ts","sourceRoot":"","sources":["../../../src/generated/models/EbookPurchaseIntentResponse.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,2BAA2B,EAAE,MAAM,+BAA+B,CAAC;AACjF,OAAO,KAAK,EAAE,mBAAmB,EAAE,MAAM,uBAAuB,CAAC;AACjE,MAAM,MAAM,2BAA2B,GAAG;IACtC,OAAO,EAAE,2BAA2B,CAAC;IACrC,MAAM,CAAC,EAAE,mBAAmB,CAAC;CAChC,CAAC"}

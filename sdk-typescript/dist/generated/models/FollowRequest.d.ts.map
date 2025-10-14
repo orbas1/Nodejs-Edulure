@@ -1,0 +1,1 @@
+{"version":3,"file":"FollowRequest.d.ts","sourceRoot":"","sources":["../../../src/generated/models/FollowRequest.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,aAAa,GAAG;IACxB,MAAM,CAAC,EAAE,MAAM,CAAC;IAChB,MAAM,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IACvB,QAAQ,CAAC,EAAE,MAAM,CAAC,MAAM,EAAE,GAAG,CAAC,CAAC;CAClC,CAAC"}

@@ -39,6 +39,25 @@ export function registerReadinessProbe(getStatus) {
   }
 }
 
+export function getCurrentReadinessReport() {
+  try {
+    const report = readinessReporter();
+    if (report && typeof report === 'object') {
+      return report;
+    }
+  } catch (_error) {
+    // fall through to default payload below
+  }
+
+  return {
+    service: 'web-service',
+    ready: false,
+    status: 'not_ready',
+    timestamp: new Date().toISOString(),
+    message: 'Readiness probe not initialised'
+  };
+}
+
 const app = express();
 
 app.disable('x-powered-by');

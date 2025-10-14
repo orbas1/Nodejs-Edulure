@@ -1,0 +1,23 @@
+{
+  "name": "@edulure/api-sdk",
+  "version": "1.50.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist src/generated",
+    "generate": "node ./scripts/generate-sdk.mjs",
+    "build": "npm run clean && npm run generate && tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "openapi-typescript-codegen": "^0.29.0",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.6.3"
+  }
+}

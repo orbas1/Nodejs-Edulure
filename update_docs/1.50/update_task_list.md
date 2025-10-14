@@ -9,8 +9,8 @@ All tasks start at **0%** completion. Percentages will be updated during executi
     1. Split server bootstrap into web, worker, and realtime services with readiness probes and crash isolation.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L4-L19】 ✅ Completed – modular entrypoints deployed with readiness telemetry, signal-aware shutdown, and per-service health surfaces.
     2. Implement feature-flagged router loader with `/v1` prefixes and error-boundary middleware. ✅ Completed – added declarative registry, feature flag gate middleware, legacy redirects, and route-level error boundaries with supporting tests.
   - **Front-end:**
-    3. Consume new health-check and capability endpoints to display service availability banners.
-    4. Update build pipeline to ingest generated TypeScript SDK from modularised APIs.
+    3. Consume new health-check and capability endpoints to display service availability banners. ✅ Completed – frontend shell polls capability manifest, renders global service alerts, and surfaces outage messaging across layouts.【F:frontend-reactjs/src/context/ServiceHealthContext.jsx†L1-L165】【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L1-L96】
+    4. Update build pipeline to ingest generated TypeScript SDK from modularised APIs. ✅ Completed – React prebuild/dev hooks compile the shared SDK workspace so bundlers consume regenerated clients on every build.【F:frontend-reactjs/package.json†L10-L23】【F:sdk-typescript/scripts/generate-sdk.mjs†L1-L66】
   - **User Phone App:**
     5. Adjust environment bootstrap to handle new capability manifest, including fallback messaging when services degrade.【F:update_docs/1.50/features_to_add.md†L237-L286】
   - **Provider Phone App:**

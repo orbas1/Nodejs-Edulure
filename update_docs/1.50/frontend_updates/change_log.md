@@ -1,0 +1,6 @@
+# Frontend Change Log – Version 1.50
+
+- Introduced a service health context and polling provider that consumes the capability manifest endpoint, exposing alerts, readiness metadata, and refresh controls to downstream components.【F:frontend-reactjs/src/context/ServiceHealthContext.jsx†L1-L165】
+- Added reusable `ServiceHealthBanner` component and integrated it into public and dashboard layouts so operators and learners see real-time outage/degradation messaging, refresh actions, and impacted capability summaries.【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L1-L96】【F:frontend-reactjs/src/layouts/MainLayout.jsx†L1-L260】【F:frontend-reactjs/src/layouts/DashboardLayout.jsx†L1-L380】
+- Updated navigation headers and mobile menus with live platform status badges powered by the manifest data, ensuring consistent messaging across responsive breakpoints.【F:frontend-reactjs/src/layouts/MainLayout.jsx†L24-L260】【F:frontend-reactjs/src/layouts/DashboardLayout.jsx†L1-L380】
+- Wired Vite prebuild/dev scripts to compile the shared TypeScript SDK before bundling so React surfaces always consume the latest contract definitions, using the generated manifest client instead of bespoke Axios calls.【F:frontend-reactjs/package.json†L10-L23】【F:frontend-reactjs/src/context/ServiceHealthContext.jsx†L1-L165】【F:frontend-reactjs/src/api/sdkClient.js†L1-L44】

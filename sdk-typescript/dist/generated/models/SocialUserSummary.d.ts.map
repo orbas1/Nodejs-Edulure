@@ -1,0 +1,1 @@
+{"version":3,"file":"SocialUserSummary.d.ts","sourceRoot":"","sources":["../../../src/generated/models/SocialUserSummary.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,iBAAiB,GAAG;IAC5B,EAAE,EAAE,MAAM,CAAC;IACX,SAAS,EAAE,MAAM,CAAC;IAClB,QAAQ,EAAE,MAAM,CAAC;IACjB,IAAI,EAAE,MAAM,CAAC;IACb,KAAK,EAAE,MAAM,CAAC;IACd,eAAe,CAAC,EAAE,MAAM,CAAC;CAC5B,CAAC"}

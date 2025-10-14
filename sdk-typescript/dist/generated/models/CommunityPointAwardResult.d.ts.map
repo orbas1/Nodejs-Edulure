@@ -1,0 +1,1 @@
+{"version":3,"file":"CommunityPointAwardResult.d.ts","sourceRoot":"","sources":["../../../src/generated/models/CommunityPointAwardResult.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,qBAAqB,EAAE,MAAM,yBAAyB,CAAC;AACrE,OAAO,KAAK,EAAE,yBAAyB,EAAE,MAAM,6BAA6B,CAAC;AAC7E,MAAM,MAAM,yBAAyB,GAAG;IACpC,OAAO,EAAE,qBAAqB,CAAC;IAC/B,WAAW,EAAE,yBAAyB,CAAC;CAC1C,CAAC"}

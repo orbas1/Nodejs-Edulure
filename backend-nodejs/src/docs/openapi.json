@@ -6082,14 +6082,31 @@
           "dsar": {
             "type": "object",
             "properties": {
-              "open": { "type": "integer" },
-              "dueSoon": { "type": "integer" },
-              "overdue": { "type": "integer" },
-              "completed30d": { "type": "integer" },
-              "averageCompletionHours": { "type": "integer" },
-              "slaHours": { "type": "integer" },
-              "owner": { "type": "string" },
-              "nextIcoSubmission": { "type": "string", "format": "date-time" }
+              "open": {
+                "type": "integer"
+              },
+              "dueSoon": {
+                "type": "integer"
+              },
+              "overdue": {
+                "type": "integer"
+              },
+              "completed30d": {
+                "type": "integer"
+              },
+              "averageCompletionHours": {
+                "type": "integer"
+              },
+              "slaHours": {
+                "type": "integer"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "nextIcoSubmission": {
+                "type": "string",
+                "format": "date-time"
+              }
             }
           },
           "registers": {
@@ -6097,17 +6114,35 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "name": { "type": "string" },
-                "owner": { "type": "string" },
-                "status": { "type": "string" },
-                "lastReviewed": { "type": "string", "format": "date-time" },
-                "nextReviewDue": { "type": "string", "format": "date-time" },
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "lastReviewed": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "nextReviewDue": {
+                  "type": "string",
+                  "format": "date-time"
+                },
                 "coverage": {
                   "type": "array",
-                  "items": { "type": "string" }
+                  "items": {
+                    "type": "string"
+                  }
                 },
-                "retentionPolicy": { "type": "string" }
+                "retentionPolicy": {
+                  "type": "string"
+                }
               }
             }
           },
@@ -6118,13 +6153,30 @@
           "ico": {
             "type": "object",
             "properties": {
-              "registrationNumber": { "type": "string" },
-              "status": { "type": "string" },
-              "feeTier": { "type": "string" },
-              "renewalDue": { "type": "string", "format": "date-time" },
-              "lastSubmitted": { "type": "string", "format": "date-time" },
-              "publicRegisterUrl": { "type": "string", "format": "uri" },
-              "reportingOwner": { "type": "string" }
+              "registrationNumber": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "feeTier": {
+                "type": "string"
+              },
+              "renewalDue": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "lastSubmitted": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "publicRegisterUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "reportingOwner": {
+                "type": "string"
+              }
             }
           }
         }
@@ -6693,6 +6745,407 @@
         "required": [
           "payment"
         ]
+      },
+      "FeatureFlagVariant": {
+        "type": "object",
+        "description": "Weighted variant definition used when rolling out feature flags.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Variant key returned to clients when selected."
+          },
+          "weight": {
+            "type": "number",
+            "nullable": true,
+            "description": "Distribution weight applied during percentage or schedule rollouts."
+          },
+          "payload": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Optional JSON payload returned with the variant selection."
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "FeatureFlagDefinition": {
+        "type": "object",
+        "description": "Full feature flag definition used to evaluate capability access.",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "environments": {
+            "type": "array",
+            "nullable": true,
+            "description": "Environments where the flag is allowed to run.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rolloutStrategy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Strategy controlling exposure such as percentage or schedule."
+          },
+          "rolloutPercentage": {
+            "type": "number",
+            "nullable": true,
+            "description": "Percentage of traffic eligible when using percentage-based rollouts."
+          },
+          "killSwitch": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Indicates whether the kill switch is forcing the flag off."
+          },
+          "variants": {
+            "type": "array",
+            "nullable": true,
+            "description": "Set of variants available for multivariate rollouts.",
+            "items": {
+              "$ref": "#/components/schemas/FeatureFlagVariant"
+            }
+          },
+          "segmentRules": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Segment targeting rules evaluated during rollout."
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "FeatureFlagEvaluation": {
+        "type": "object",
+        "description": "Result of evaluating a feature flag for a particular request context.",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason describing why the capability is enabled or disabled."
+          },
+          "variant": {
+            "type": "string",
+            "nullable": true,
+            "description": "Variant key selected for the user when enabled."
+          },
+          "bucket": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "description": "Deterministic rollout bucket used when evaluating audience splits."
+          },
+          "strategy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Rollout strategy applied during the evaluation."
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the evaluation was performed."
+          },
+          "definition": {
+            "$ref": "#/components/schemas/FeatureFlagDefinition",
+            "nullable": true,
+            "description": "Snapshot of the flag definition used during evaluation when requested."
+          }
+        },
+        "required": [
+          "key",
+          "enabled",
+          "reason",
+          "evaluatedAt"
+        ]
+      },
+      "CapabilityManifestComponentStatus": {
+        "type": "object",
+        "description": "Individual component readiness reported by a service probe.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Component level availability state such as ready or degraded."
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "ready"
+        ]
+      },
+      "CapabilityManifestServiceStatus": {
+        "type": "object",
+        "description": "Availability state for a core platform service.",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "degraded",
+              "outage",
+              "unknown"
+            ],
+            "description": "Overall service status derived from readiness checks."
+          },
+          "summary": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityManifestComponentStatus"
+            }
+          },
+          "raw": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Raw readiness payload returned by the probed service."
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "type",
+          "ready",
+          "status",
+          "summary",
+          "checkedAt",
+          "components"
+        ]
+      },
+      "CapabilityManifestCapability": {
+        "type": "object",
+        "description": "Capability exposure information derived from feature flags and service dependencies.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "capability": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "basePath": {
+            "type": "string"
+          },
+          "flagKey": {
+            "type": "string"
+          },
+          "defaultState": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ],
+            "description": "Default rollout state applied when the flag definition is missing."
+          },
+          "audience": {
+            "type": "string",
+            "nullable": true,
+            "description": "Audience tier allowed to consume the capability."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "degraded",
+              "outage",
+              "disabled"
+            ],
+            "description": "Availability derived from dependencies and flag evaluation."
+          },
+          "summary": {
+            "type": "string"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dependencyStatuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "accessible": {
+            "type": "boolean"
+          },
+          "severityRank": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Numeric severity ranking to help clients order incidents."
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/FeatureFlagEvaluation"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "capability",
+          "flagKey",
+          "defaultState",
+          "enabled",
+          "status",
+          "summary",
+          "dependencies",
+          "dependencyStatuses",
+          "accessible",
+          "severityRank",
+          "evaluation",
+          "generatedAt"
+        ]
+      },
+      "CapabilityManifestSummaryBreakdown": {
+        "type": "object",
+        "description": "Counts of services or capabilities by availability status.",
+        "properties": {
+          "operational": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "degraded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "disabled": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "required": [
+          "operational",
+          "degraded",
+          "outage"
+        ]
+      },
+      "CapabilityManifestSummary": {
+        "type": "object",
+        "description": "Summary counters representing capability and service health.",
+        "properties": {
+          "services": {
+            "$ref": "#/components/schemas/CapabilityManifestSummaryBreakdown"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilityManifestSummaryBreakdown"
+          }
+        },
+        "required": [
+          "services",
+          "capabilities"
+        ]
+      },
+      "CapabilityManifest": {
+        "type": "object",
+        "description": "Aggregated readiness report combining service health, capability exposure, and summary counts.",
+        "properties": {
+          "environment": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityManifestServiceStatus"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityManifestCapability"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CapabilityManifestSummary"
+          }
+        },
+        "required": [
+          "environment",
+          "generatedAt",
+          "audience",
+          "services",
+          "capabilities",
+          "summary"
+        ]
       }
     }
   },
@@ -6717,7 +7170,7 @@
         }
       }
     },
-    "/api/payments": {
+    "/payments": {
       "post": {
         "summary": "Create Stripe or PayPal payment intent",
         "security": [
@@ -6776,7 +7229,7 @@
         }
       }
     },
-    "/api/payments/paypal/{paymentId}/capture": {
+    "/payments/paypal/{paymentId}/capture": {
       "post": {
         "summary": "Capture an approved PayPal order",
         "security": [
@@ -6832,7 +7285,7 @@
         }
       }
     },
-    "/api/payments/{paymentId}/refunds": {
+    "/payments/{paymentId}/refunds": {
       "post": {
         "summary": "Issue a Stripe or PayPal refund",
         "security": [
@@ -6901,7 +7354,7 @@
         }
       }
     },
-    "/api/payments/reports/summary": {
+    "/payments/reports/summary": {
       "get": {
         "summary": "Finance summary by currency",
         "security": [
@@ -6976,7 +7429,7 @@
         }
       }
     },
-    "/api/payments/coupons/{code}": {
+    "/payments/coupons/{code}": {
       "get": {
         "summary": "Retrieve coupon details",
         "security": [
@@ -7029,7 +7482,7 @@
         }
       }
     },
-    "/api/payments/webhooks/stripe": {
+    "/payments/webhooks/stripe": {
       "post": {
         "summary": "Stripe webhook receiver",
         "requestBody": {
@@ -7068,7 +7521,7 @@
         }
       }
     },
-    "/api/auth/register": {
+    "/auth/register": {
       "post": {
         "summary": "Register a new user",
         "requestBody": {
@@ -7230,7 +7683,7 @@
         }
       }
     },
-    "/api/auth/login": {
+    "/auth/login": {
       "post": {
         "summary": "Authenticate user",
         "requestBody": {
@@ -7322,7 +7775,7 @@
         }
       }
     },
-    "/api/auth/refresh": {
+    "/auth/refresh": {
       "post": {
         "summary": "Refresh session tokens",
         "requestBody": {
@@ -7398,7 +7851,7 @@
         }
       }
     },
-    "/api/auth/logout": {
+    "/auth/logout": {
       "post": {
         "summary": "Revoke current session",
         "security": [
@@ -7447,7 +7900,7 @@
         }
       }
     },
-    "/api/auth/logout-all": {
+    "/auth/logout-all": {
       "post": {
         "summary": "Revoke other active sessions",
         "security": [
@@ -7519,7 +7972,7 @@
         }
       }
     },
-    "/api/users/me": {
+    "/users/me": {
       "get": {
         "summary": "Current user profile",
         "security": [
@@ -7544,7 +7997,7 @@
         }
       }
     },
-    "/api/users": {
+    "/users": {
       "get": {
         "summary": "List users",
         "security": [
@@ -7593,7 +8046,7 @@
         }
       }
     },
-    "/api/dashboard/me": {
+    "/dashboard/me": {
       "get": {
         "summary": "Learner dashboard aggregate",
         "security": [
@@ -7630,7 +8083,7 @@
         }
       }
     },
-    "/api/communities": {
+    "/communities": {
       "get": {
         "summary": "Communities for current user",
         "security": [
@@ -7722,7 +8175,7 @@
         }
       }
     },
-    "/api/communities/feed": {
+    "/communities/feed": {
       "get": {
         "summary": "Aggregated community feed",
         "security": [
@@ -7836,7 +8289,7 @@
         }
       }
     },
-    "/api/communities/{communityId}": {
+    "/communities/{communityId}": {
       "get": {
         "summary": "Community detail",
         "security": [
@@ -7889,7 +8342,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/posts": {
+    "/communities/{communityId}/posts": {
       "get": {
         "summary": "Community feed",
         "security": [
@@ -8133,7 +8586,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/resources": {
+    "/communities/{communityId}/resources": {
       "get": {
         "summary": "Community resources",
         "security": [
@@ -8365,7 +8818,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/chat/channels": {
+    "/communities/{communityId}/chat/channels": {
       "get": {
         "summary": "List community chat channels",
         "security": [
@@ -8421,7 +8874,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/chat/channels/{channelId}/messages": {
+    "/communities/{communityId}/chat/channels/{channelId}/messages": {
       "get": {
         "summary": "List channel messages",
         "security": [
@@ -8624,7 +9077,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/chat/channels/{channelId}/read": {
+    "/communities/{communityId}/chat/channels/{channelId}/read": {
       "post": {
         "summary": "Mark channel as read",
         "security": [
@@ -8695,7 +9148,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/reactions": {
+    "/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/reactions": {
       "post": {
         "summary": "Add message reaction",
         "security": [
@@ -8851,7 +9304,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/moderate": {
+    "/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/moderate": {
       "post": {
         "summary": "Moderate a community message",
         "security": [
@@ -8930,7 +9383,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/chat/presence": {
+    "/communities/{communityId}/chat/presence": {
       "get": {
         "summary": "List active presence sessions",
         "security": [
@@ -9041,7 +9494,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/engagement/progress": {
+    "/communities/{communityId}/engagement/progress": {
       "get": {
         "summary": "Member engagement progress",
         "security": [
@@ -9094,7 +9547,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/engagement/points": {
+    "/communities/{communityId}/engagement/points": {
       "post": {
         "summary": "Award community points",
         "security": [
@@ -9201,7 +9654,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/engagement/streaks/check-in": {
+    "/communities/{communityId}/engagement/streaks/check-in": {
       "post": {
         "summary": "Record streak activity",
         "security": [
@@ -9270,7 +9723,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/engagement/leaderboard": {
+    "/communities/{communityId}/engagement/leaderboard": {
       "get": {
         "summary": "Community leaderboard",
         "security": [
@@ -9356,7 +9809,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/events": {
+    "/communities/{communityId}/events": {
       "get": {
         "summary": "List community events",
         "security": [
@@ -9624,7 +10077,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/events/{eventId}/rsvp": {
+    "/communities/{communityId}/events/{eventId}/rsvp": {
       "post": {
         "summary": "RSVP to community event",
         "security": [
@@ -9711,7 +10164,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/events/{eventId}/reminders": {
+    "/communities/{communityId}/events/{eventId}/reminders": {
       "post": {
         "summary": "Schedule event reminder",
         "security": [
@@ -9803,7 +10256,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/calendar": {
+    "/communities/{communityId}/calendar": {
       "get": {
         "summary": "Community calendar",
         "security": [
@@ -9883,7 +10336,7 @@
         }
       }
     },
-    "/api/content/assets": {
+    "/content/assets": {
       "get": {
         "summary": "List content assets",
         "description": "Requires instructor or admin Learnspace access.",
@@ -9947,7 +10400,7 @@
         }
       }
     },
-    "/api/content/assets/upload-session": {
+    "/content/assets/upload-session": {
       "post": {
         "summary": "Create signed upload session",
         "security": [
@@ -10011,7 +10464,7 @@
         }
       }
     },
-    "/api/content/assets/{assetId}/ingest": {
+    "/content/assets/{assetId}/ingest": {
       "post": {
         "summary": "Confirm upload and queue ingestion",
         "security": [
@@ -10070,7 +10523,7 @@
         }
       }
     },
-    "/api/content/assets/{assetId}": {
+    "/content/assets/{assetId}": {
       "get": {
         "summary": "Retrieve content asset",
         "security": [
@@ -10105,7 +10558,7 @@
         }
       }
     },
-    "/api/content/assets/{assetId}/viewer-token": {
+    "/content/assets/{assetId}/viewer-token": {
       "get": {
         "summary": "Generate viewer token",
         "security": [
@@ -10143,7 +10596,7 @@
         }
       }
     },
-    "/api/content/assets/{assetId}/progress": {
+    "/content/assets/{assetId}/progress": {
       "get": {
         "summary": "Retrieve ebook progress",
         "security": [
@@ -10225,7 +10678,7 @@
         }
       }
     },
-    "/api/content/assets/{assetId}/events": {
+    "/content/assets/{assetId}/events": {
       "post": {
         "summary": "Record asset event",
         "security": [
@@ -10274,7 +10727,7 @@
         }
       }
     },
-    "/api/content/assets/{assetId}/analytics": {
+    "/content/assets/{assetId}/analytics": {
       "get": {
         "summary": "Content analytics",
         "security": [
@@ -10312,7 +10765,7 @@
         }
       }
     },
-    "/api/auth/verify-email": {
+    "/auth/verify-email": {
       "post": {
         "summary": "Confirm email ownership",
         "requestBody": {
@@ -10378,7 +10831,7 @@
         }
       }
     },
-    "/api/auth/resend-verification": {
+    "/auth/resend-verification": {
       "post": {
         "summary": "Resend verification email",
         "requestBody": {
@@ -10446,7 +10899,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/roles": {
+    "/communities/{communityId}/roles": {
       "get": {
         "summary": "List community roles",
         "tags": [
@@ -10564,7 +11017,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/members/{userId}/role": {
+    "/communities/{communityId}/members/{userId}/role": {
       "patch": {
         "summary": "Assign community member role",
         "tags": [
@@ -10635,7 +11088,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/paywall/tiers": {
+    "/communities/{communityId}/paywall/tiers": {
       "get": {
         "summary": "List community paywall tiers",
         "tags": [
@@ -10744,7 +11197,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/paywall/tiers/{tierId}": {
+    "/communities/{communityId}/paywall/tiers/{tierId}": {
       "patch": {
         "summary": "Update paywall tier",
         "tags": [
@@ -10807,7 +11260,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/paywall/checkout": {
+    "/communities/{communityId}/paywall/checkout": {
       "post": {
         "summary": "Start subscription checkout",
         "tags": [
@@ -10886,7 +11339,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/subscriptions/me": {
+    "/communities/{communityId}/subscriptions/me": {
       "get": {
         "summary": "List my community subscriptions",
         "tags": [
@@ -10934,7 +11387,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/subscriptions/{subscriptionId}/cancel": {
+    "/communities/{communityId}/subscriptions/{subscriptionId}/cancel": {
       "post": {
         "summary": "Cancel community subscription",
         "tags": [
@@ -11002,7 +11455,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/affiliates": {
+    "/communities/{communityId}/affiliates": {
       "get": {
         "summary": "List community affiliates",
         "tags": [
@@ -11058,7 +11511,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/affiliates/apply": {
+    "/communities/{communityId}/affiliates/apply": {
       "post": {
         "summary": "Apply to community affiliate program",
         "tags": [
@@ -11124,7 +11577,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/affiliates/{affiliateId}": {
+    "/communities/{communityId}/affiliates/{affiliateId}": {
       "patch": {
         "summary": "Update community affiliate",
         "tags": [
@@ -11201,7 +11654,7 @@
         }
       }
     },
-    "/api/communities/{communityId}/affiliates/{affiliateId}/payouts": {
+    "/communities/{communityId}/affiliates/{affiliateId}/payouts": {
       "post": {
         "summary": "Record affiliate payout",
         "tags": [
@@ -11292,7 +11745,7 @@
         }
       }
     },
-    "/api/chat/threads": {
+    "/chat/threads": {
       "get": {
         "summary": "List direct message threads",
         "security": [
@@ -11423,7 +11876,7 @@
         }
       }
     },
-    "/api/chat/threads/{threadId}/messages": {
+    "/chat/threads/{threadId}/messages": {
       "get": {
         "summary": "List messages in a direct message thread",
         "security": [
@@ -11593,7 +12046,7 @@
         }
       }
     },
-    "/api/chat/threads/{threadId}/read": {
+    "/chat/threads/{threadId}/read": {
       "post": {
         "summary": "Mark a thread as read",
         "security": [
@@ -11656,7 +12109,7 @@
         }
       }
     },
-    "/api/social/followers": {
+    "/social/followers": {
       "get": {
         "summary": "Followers for current user",
         "security": [
@@ -11760,7 +12213,7 @@
         }
       }
     },
-    "/api/social/users/{userId}/followers": {
+    "/social/users/{userId}/followers": {
       "get": {
         "summary": "Followers for specified user",
         "security": [
@@ -11872,7 +12325,7 @@
         }
       }
     },
-    "/api/social/following": {
+    "/social/following": {
       "get": {
         "summary": "Accounts the current user follows",
         "security": [
@@ -11976,7 +12429,7 @@
         }
       }
     },
-    "/api/social/users/{userId}/following": {
+    "/social/users/{userId}/following": {
       "get": {
         "summary": "Accounts a specific user follows",
         "security": [
@@ -12088,7 +12541,7 @@
         }
       }
     },
-    "/api/social/recommendations": {
+    "/social/recommendations": {
       "get": {
         "summary": "Recommended accounts to follow",
         "security": [
@@ -12139,7 +12592,7 @@
         }
       }
     },
-    "/api/social/follows/{userId}": {
+    "/social/follows/{userId}": {
       "post": {
         "summary": "Follow a user",
         "security": [
@@ -12251,7 +12704,7 @@
         }
       }
     },
-    "/api/social/users/{userId}/followers/{followerId}/approve": {
+    "/social/users/{userId}/followers/{followerId}/approve": {
       "post": {
         "summary": "Approve pending follow",
         "security": [
@@ -12306,7 +12759,7 @@
         }
       }
     },
-    "/api/social/users/{userId}/followers/{followerId}/decline": {
+    "/social/users/{userId}/followers/{followerId}/decline": {
       "post": {
         "summary": "Decline pending follow",
         "security": [
@@ -12361,7 +12814,7 @@
         }
       }
     },
-    "/api/social/mutes/{userId}": {
+    "/social/mutes/{userId}": {
       "post": {
         "summary": "Mute notifications from a user",
         "security": [
@@ -12466,7 +12919,7 @@
         }
       }
     },
-    "/api/social/blocks/{userId}": {
+    "/social/blocks/{userId}": {
       "post": {
         "summary": "Block a user",
         "security": [
@@ -12570,7 +13023,7 @@
         }
       }
     },
-    "/api/social/privacy": {
+    "/social/privacy": {
       "get": {
         "summary": "Get privacy settings for current user",
         "security": [
@@ -12652,7 +13105,7 @@
         }
       }
     },
-    "/api/social/users/{userId}/privacy": {
+    "/social/users/{userId}/privacy": {
       "get": {
         "summary": "Get privacy settings for specific user",
         "security": [
@@ -12754,7 +13207,7 @@
         }
       }
     },
-    "/api/explorer/search": {
+    "/explorer/search": {
       "post": {
         "tags": [
           "Explorer"
@@ -12806,7 +13259,7 @@
         }
       }
     },
-    "/api/explorer/saved-searches": {
+    "/explorer/saved-searches": {
       "get": {
         "tags": [
           "Explorer"
@@ -12907,7 +13360,7 @@
         }
       }
     },
-    "/api/explorer/saved-searches/{savedSearchId}": {
+    "/explorer/saved-searches/{savedSearchId}": {
       "parameters": [
         {
           "name": "savedSearchId",
@@ -13041,7 +13494,7 @@
         }
       }
     },
-    "/api/analytics/explorer/summary": {
+    "/analytics/explorer/summary": {
       "get": {
         "tags": [
           "Analytics"
@@ -13108,7 +13561,7 @@
         }
       }
     },
-    "/api/analytics/explorer/alerts": {
+    "/analytics/explorer/alerts": {
       "get": {
         "tags": [
           "Analytics"
@@ -13172,7 +13625,7 @@
         }
       }
     },
-    "/api/analytics/explorer/interactions": {
+    "/analytics/explorer/interactions": {
       "post": {
         "tags": [
           "Analytics"
@@ -13227,7 +13680,7 @@
         }
       }
     },
-    "/api/ads/campaigns": {
+    "/ads/campaigns": {
       "get": {
         "tags": [
           "Ads"
@@ -13372,7 +13825,7 @@
         }
       }
     },
-    "/api/ads/campaigns/{campaignId}": {
+    "/ads/campaigns/{campaignId}": {
       "get": {
         "tags": [
           "Ads"
@@ -13474,7 +13927,7 @@
         ]
       }
     },
-    "/api/ads/campaigns/{campaignId}/pause": {
+    "/ads/campaigns/{campaignId}/pause": {
       "post": {
         "tags": [
           "Ads"
@@ -13521,7 +13974,7 @@
         }
       }
     },
-    "/api/ads/campaigns/{campaignId}/resume": {
+    "/ads/campaigns/{campaignId}/resume": {
       "post": {
         "tags": [
           "Ads"
@@ -13568,7 +14021,7 @@
         }
       }
     },
-    "/api/ads/campaigns/{campaignId}/metrics": {
+    "/ads/campaigns/{campaignId}/metrics": {
       "post": {
         "tags": [
           "Ads"
@@ -13625,7 +14078,7 @@
         }
       }
     },
-    "/api/ads/campaigns/{campaignId}/insights": {
+    "/ads/campaigns/{campaignId}/insights": {
       "get": {
         "tags": [
           "Ads"
@@ -13682,7 +14135,7 @@
         }
       }
     },
-    "/api/verification/me": {
+    "/verification/me": {
       "get": {
         "summary": "Identity verification summary",
         "security": [
@@ -13719,7 +14172,7 @@
         }
       }
     },
-    "/api/verification/me/upload-requests": {
+    "/verification/me/upload-requests": {
       "post": {
         "summary": "Request presigned upload for verification documents",
         "security": [
@@ -13789,7 +14242,7 @@
         }
       }
     },
-    "/api/verification/me/documents": {
+    "/verification/me/documents": {
       "post": {
         "summary": "Attach uploaded verification document metadata",
         "security": [
@@ -13871,7 +14324,7 @@
         }
       }
     },
-    "/api/verification/me/submit": {
+    "/verification/me/submit": {
       "post": {
         "summary": "Submit verification for manual review",
         "security": [
@@ -13911,7 +14364,7 @@
         }
       }
     },
-    "/api/verification/admin/overview": {
+    "/verification/admin/overview": {
       "get": {
         "summary": "Administrative verification overview",
         "security": [
@@ -13951,7 +14404,7 @@
         }
       }
     },
-    "/api/verification/{verificationId}/review": {
+    "/verification/{verificationId}/review": {
       "post": {
         "summary": "Review verification submission",
         "security": [
@@ -14018,7 +14471,7 @@
         }
       }
     },
-    "/api/verification/{verificationId}/audit": {
+    "/verification/{verificationId}/audit": {
       "get": {
         "summary": "Verification audit trail",
         "security": [
@@ -14075,7 +14528,7 @@
         }
       }
     },
-    "/api/ebooks": {
+    "/ebooks": {
       "get": {
         "summary": "List published ebooks",
         "parameters": [
@@ -14230,7 +14683,7 @@
         }
       }
     },
-    "/api/ebooks/catalogue": {
+    "/ebooks/catalogue": {
       "get": {
         "summary": "List instructor ebook catalogue",
         "security": [
@@ -14303,7 +14756,7 @@
         }
       }
     },
-    "/api/ebooks/{ebookId}": {
+    "/ebooks/{ebookId}": {
       "patch": {
         "summary": "Update ebook listing",
         "security": [
@@ -14369,7 +14822,7 @@
         }
       }
     },
-    "/api/ebooks/{ebookId}/state": {
+    "/ebooks/{ebookId}/state": {
       "post": {
         "summary": "Update ebook publication state",
         "security": [
@@ -14435,7 +14888,7 @@
         }
       }
     },
-    "/api/ebooks/{ebookId}/purchase-intent": {
+    "/ebooks/{ebookId}/purchase-intent": {
       "post": {
         "summary": "Create ebook purchase intent",
         "security": [
@@ -14504,7 +14957,7 @@
         }
       }
     },
-    "/api/ebooks/slug/{slug}": {
+    "/ebooks/slug/{slug}": {
       "get": {
         "summary": "Retrieve ebook details",
         "parameters": [
@@ -14544,6 +14997,40 @@
             "description": "Ebook not found"
           }
         }
+      }
+    },
+    "/runtime/manifest": {
+      "get": {
+        "summary": "Capability manifest and service health",
+        "description": "Returns aggregated readiness, incident, and capability exposure data so clients can render service health indicators and gate features consistently.",
+        "responses": {
+          "200": {
+            "description": "Capability manifest generated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CapabilityManifest"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Capability manifest could not be generated."
+          }
+        },
+        "operationId": "getRuntimeCapabilityManifest"
       }
     }
   }

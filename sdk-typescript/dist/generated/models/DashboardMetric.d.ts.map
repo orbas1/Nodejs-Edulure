@@ -1,0 +1,1 @@
+{"version":3,"file":"DashboardMetric.d.ts","sourceRoot":"","sources":["../../../src/generated/models/DashboardMetric.ts"],"names":[],"mappings":"AAIA,MAAM,MAAM,eAAe,GAAG;IAC1B,KAAK,EAAE,MAAM,CAAC;IACd,KAAK,EAAE,MAAM,CAAC;IACd,MAAM,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IACvB,KAAK,CAAC,EAAE,IAAI,GAAG,MAAM,GAAG,IAAI,CAAC;CAChC,CAAC"}

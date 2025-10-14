@@ -1,0 +1,30 @@
+export type CommunityEvent = {
+    id: number;
+    communityId: number;
+    createdBy: number;
+    title: string;
+    slug: string;
+    summary?: string | null;
+    description?: string | null;
+    startAt: string;
+    endAt: string;
+    timezone: string;
+    visibility: string;
+    status: string;
+    attendanceLimit?: number | null;
+    attendanceCount: number;
+    waitlistCount: number;
+    requiresRsvp: boolean;
+    isOnline: boolean;
+    meetingUrl?: string | null;
+    locationName?: string | null;
+    locationAddress?: string | null;
+    locationLatitude?: number | null;
+    locationLongitude?: number | null;
+    coverImageUrl?: string | null;
+    recurrenceRule?: string | null;
+    metadata: Record<string, any>;
+    createdAt: string;
+    updatedAt: string;
+};
+//# sourceMappingURL=CommunityEvent.d.ts.map

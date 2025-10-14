@@ -1,0 +1,1 @@
+{"version":3,"file":"CommunityCalendar.d.ts","sourceRoot":"","sources":["../../../src/generated/models/CommunityCalendar.ts"],"names":[],"mappings":"AAIA,OAAO,KAAK,EAAE,sBAAsB,EAAE,MAAM,0BAA0B,CAAC;AACvE,MAAM,MAAM,iBAAiB,GAAG;IAC5B,KAAK,EAAE,MAAM,CAAC;IACd,IAAI,EAAE,MAAM,CAAC;IACb,YAAY,EAAE,MAAM,CAAC,MAAM,EAAE,KAAK,CAAC,sBAAsB,CAAC,CAAC,CAAC;CAC/D,CAAC"}
