@@ -1,0 +1,27 @@
+# Profile Styling Specifications – Web Application v1.50
+
+## Typography
+- Name: Heading LG (32/40, weight 600).
+- Role & location: Body SM (14/22) muted color (#475569).
+- Stats labels: Caption uppercase with letter-spacing 0.6px.
+
+## Color Palette
+- Cover gradient options: Indigo→Violet, Teal→Sky for customization.
+- Avatar ring colors: Online (#10B981), Offline (#94A3B8), Busy (#F59E0B).
+- Section cards background (#FFFFFF) with border (#E2E8F0) and drop shadow (0 10px 24px rgba(15,23,42,0.08)).
+
+## Components
+- Edit buttons use tertiary style with icon and label.
+- Tabs within profile (Overview, Activity, Reviews) use pill indicator.
+- Activity feed items use timeline with vertical line and icon markers.
+
+## Accessibility
+- Ensure color combinations meet contrast requirements. Provide alt text for media.
+- Keyboard focus visible on tabs, edit buttons, and timeline items.
+
+## Responsive Adjustments
+- On mobile, stats cards convert to horizontal scroll. Tabs convert to dropdown.
+
+## Implementation Notes
+- Provide CSS variables for customizable gradients and ring colors.
+- Document analytics events for profile interactions (edit, share, message).
