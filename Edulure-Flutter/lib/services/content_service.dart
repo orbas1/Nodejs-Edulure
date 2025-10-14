@@ -33,6 +33,27 @@ class ContentService {
     return assets;
   }
 
+  Future<List<EbookMarketplaceItem>> fetchMarketplaceEbooks() async {
+    final response = await _dio.get('/ebooks');
+    final data = response.data['data'] as List<dynamic>? ?? [];
+    return data
+        .map((item) => EbookMarketplaceItem.fromJson(Map<String, dynamic>.from(item as Map)))
+        .toList();
+  }
+
+  Future<EbookPurchaseIntent> createEbookPurchaseIntent(String ebookId) async {
+    final token = SessionManager.getAccessToken();
+    if (token == null) {
+      throw Exception('Authentication required');
+    }
+    final response = await _dio.post(
+      '/ebooks/$ebookId/purchase-intent',
+      data: {'provider': 'stripe'},
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+    return EbookPurchaseIntent.fromJson(response.data['data'] as Map<String, dynamic>);
+  }
+
   List<ContentAsset> loadCachedAssets() {
     final cached = SessionManager.assetsCache.get('items');
     if (cached is List) {
@@ -182,6 +203,61 @@ class ContentAsset {
       'updatedAt': updatedAt,
       'metadata': metadata
     };
+  }
+}
+
+class EbookMarketplaceItem {
+  EbookMarketplaceItem({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.price,
+    required this.downloads,
+  });
+
+  final String id;
+  final String title;
+  final String? subtitle;
+  final String price;
+  final int downloads;
+
+  factory EbookMarketplaceItem.fromJson(Map<String, dynamic> json) {
+    final analytics = json['analytics'] as Map<String, dynamic>? ?? {};
+    final price = json['price'] as Map<String, dynamic>?;
+    return EbookMarketplaceItem(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      subtitle: json['subtitle'] as String?,
+      price: price != null ? (price['formatted'] as String? ?? 'Contact support') : 'Contact support',
+      downloads: (analytics['downloads'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class EbookPurchaseIntent {
+  EbookPurchaseIntent({
+    required this.paymentId,
+    required this.provider,
+    required this.status,
+    this.clientSecret,
+    this.approvalUrl,
+  });
+
+  final String paymentId;
+  final String provider;
+  final String status;
+  final String? clientSecret;
+  final String? approvalUrl;
+
+  factory EbookPurchaseIntent.fromJson(Map<String, dynamic> json) {
+    final payment = json['payment'] as Map<String, dynamic>? ?? {};
+    return EbookPurchaseIntent(
+      paymentId: payment['paymentId'] as String? ?? '',
+      provider: payment['provider'] as String? ?? 'stripe',
+      status: payment['status'] as String? ?? 'pending',
+      clientSecret: payment['clientSecret'] as String?,
+      approvalUrl: payment['approvalUrl'] as String?,
+    );
   }
 }
 
