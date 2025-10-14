@@ -378,6 +378,15 @@ describe('buildInstructorDashboard', () => {
         expect.objectContaining({ id: 'booking-71', status: 'Requested' })
       ])
     );
+    expect(snapshot.dashboard.tutors.roster[0]).toMatchObject({
+      name: 'Ivy Instructor',
+      status: 'Active'
+    });
+    expect(snapshot.dashboard.tutors.availability[0]).toMatchObject({
+      slotsCount: expect.any(Number),
+      learnersCount: expect.any(Number)
+    });
+    expect(snapshot.dashboard.tutors.notifications.length).toBeGreaterThan(0);
     expect(snapshot.dashboard.communities.manageDeck[0]).toMatchObject({
       id: 'community-55',
       title: 'DesignOps Collective'
@@ -390,6 +399,11 @@ describe('buildInstructorDashboard', () => {
     expect(snapshot.searchIndex).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ role: 'instructor', type: 'Course', title: 'Design Ops Mastery' })
+      ])
+    );
+    expect(snapshot.searchIndex).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ role: 'instructor', type: 'Tutor', title: 'Ivy Instructor' })
       ])
     );
     expect(snapshot.profileStats).toEqual(
