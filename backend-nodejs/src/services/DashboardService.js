@@ -762,14 +762,18 @@ export function buildInstructorDashboard({
     return 'Kick-off required';
   };
 
-  const creationBlueprints = courseSummaries.map((course) => {
+  const moduleBlueprintsByCourse = new Map();
+  courseSummaries.forEach((course) => {
     const courseModules = [...(modulesByCourse.get(course.id) ?? [])].sort((a, b) => a.position - b.position);
     const moduleSummaries = courseModules.map((module) => {
       const moduleLessons = lessonsByModule.get(module.id) ?? [];
       const moduleAssignments = assignmentsByModule.get(module.id) ?? [];
+      const moduleMetadata = module.metadata ?? {};
+      const creationMeta = moduleMetadata.creation ?? {};
+      const dripMeta = moduleMetadata.drip ?? {};
       const lessonDuration = moduleLessons.reduce((total, lesson) => total + Number(lesson.durationMinutes ?? 0), 0);
       const recommendedMinutes = Number(
-        module.metadata?.recommendedDurationMinutes ?? module.metadata?.estimatedMinutes ?? 0
+        moduleMetadata.recommendedDurationMinutes ?? moduleMetadata.estimatedMinutes ?? 0
       );
       const durationMinutes = lessonDuration > 0 ? lessonDuration : recommendedMinutes;
       const outstanding = [];
@@ -779,12 +783,15 @@ export function buildInstructorDashboard({
       if (course.deliveryFormat === 'cohort' && moduleAssignments.length === 0) {
         outstanding.push('Attach assignment');
       }
-      if (!module.metadata?.ritual && !module.metadata?.hasSimulation) {
+      if (!moduleMetadata.ritual && !moduleMetadata.hasSimulation) {
         outstanding.push('Document ritual');
       }
       if (durationMinutes === 0) {
         outstanding.push('Estimate duration');
       }
+
+      const ownerFallback = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator';
+
       return {
         id: module.id,
         title: module.title,
@@ -792,10 +799,28 @@ export function buildInstructorDashboard({
         assignments: moduleAssignments.length,
         durationMinutes,
         releaseLabel: formatReleaseOffsetLabel(module.releaseOffsetDays),
-        outstanding
+        outstanding,
+        creation: {
+          owner: creationMeta.owner ?? ownerFallback,
+          status: creationMeta.status ?? 'Draft',
+          lastUpdatedAt: creationMeta.lastUpdatedAt ? new Date(creationMeta.lastUpdatedAt) : null,
+          qualityGate: creationMeta.qualityGate ?? 'Pending sign-off'
+        },
+        drip: {
+          gating:
+            dripMeta.gating ?? (course.deliveryFormat === 'cohort' ? 'Paced release' : 'Always on access'),
+          prerequisites: Array.isArray(dripMeta.prerequisites) ? dripMeta.prerequisites : [],
+          notifications: Array.isArray(dripMeta.notifications) ? dripMeta.notifications : [],
+          workspace: dripMeta.workspace ?? null
+        }
       };
     });
 
+    moduleBlueprintsByCourse.set(course.id, moduleSummaries);
+  });
+
+  const creationBlueprints = courseSummaries.map((course) => {
+    const moduleSummaries = moduleBlueprintsByCourse.get(course.id) ?? [];
     const modulesReady = moduleSummaries.filter((module) => module.outstanding.length === 0).length;
     const readinessScore = moduleSummaries.length
       ? Math.round((modulesReady / moduleSummaries.length) * 100)
@@ -863,6 +888,136 @@ export function buildInstructorDashboard({
       upcoming: upcomingMilestones,
       learners: course.total,
       price: formatCurrency(course.priceAmount, course.priceCurrency ?? 'USD')
+    };
+  });
+
+  const courseLifecycle = courseSummaries.map((course) => {
+    const moduleSummaries = moduleBlueprintsByCourse.get(course.id) ?? [];
+    const dripCampaign = course.metadata?.dripCampaign ?? {};
+    const dripSegments = Array.isArray(dripCampaign.segments) ? dripCampaign.segments : ['All learners'];
+    const dripSchedule = moduleSummaries.map((module) => ({
+      id: `module-${module.id}`,
+      title: module.title,
+      releaseLabel: module.releaseLabel,
+      gating: module.drip.gating,
+      prerequisites: module.drip.prerequisites,
+      notifications: module.drip.notifications,
+      workspace: module.drip.workspace
+    }));
+
+    const refresherLessons = Array.isArray(course.metadata?.refresherLessons)
+      ? course.metadata.refresherLessons.map((lesson) => ({
+          id: lesson.id ?? `refresher-${course.id}-${lesson.title ?? 'session'}`,
+          title: lesson.title ?? 'Refresher session',
+          format: lesson.format ?? 'Live',
+          cadence: lesson.cadence ?? 'Quarterly',
+          owner:
+            lesson.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team',
+          status: lesson.status ?? 'Planned',
+          nextSession: lesson.nextSessionAt
+            ? formatDateTime(new Date(lesson.nextSessionAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'To be scheduled',
+          channel: lesson.channel ?? 'Virtual',
+          enrollmentWindow: lesson.enrollmentWindow ?? 'Announcement pending'
+        }))
+      : [];
+
+    const recordedVideos = Array.isArray(course.metadata?.videoLibrary)
+      ? course.metadata.videoLibrary.map((video) => ({
+          id: video.id ?? `video-${course.id}-${video.title ?? 'asset'}`,
+          title: video.title ?? 'Recorded session',
+          duration: video.durationMinutes ? minutesToReadable(video.durationMinutes) : 'Processing',
+          quality: video.quality ?? '1080p',
+          status: video.status ?? 'Encoding',
+          updated: video.updatedAt
+            ? formatDateTime(new Date(video.updatedAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Pending upload',
+          size: video.sizeMb ? `${Number(video.sizeMb).toLocaleString()} MB` : null,
+          language: video.language ?? 'English',
+          aspectRatio: video.aspectRatio ?? '16:9'
+        }))
+      : [];
+
+    const catalogueListings = Array.isArray(course.metadata?.catalogueListings)
+      ? course.metadata.catalogueListings.map((listing) => ({
+          id: listing.id ?? `catalog-${course.id}-${listing.channel ?? 'listing'}`,
+          channel: listing.channel ?? 'Marketplace',
+          status: listing.status ?? 'Draft',
+          price: formatCurrency(
+            Number(listing.price ?? course.priceAmount),
+            listing.currency ?? course.priceCurrency ?? 'USD'
+          ),
+          impressions: Number(listing.impressions ?? 0),
+          conversions: Number(listing.conversions ?? 0),
+          conversionRate:
+            typeof listing.conversionRate === 'number'
+              ? `${(listing.conversionRate * 100).toFixed(1)}%`
+              : listing.conversions && listing.impressions
+                ? `${percentage(listing.conversions, listing.impressions, 1)}%`
+                : '—',
+          lastSynced: listing.lastSyncedAt
+            ? formatDateTime(new Date(listing.lastSyncedAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Sync pending'
+        }))
+      : [];
+
+    const reviews = Array.isArray(course.metadata?.reviews)
+      ? course.metadata.reviews.map((review) => ({
+          id: review.id ?? `review-${course.id}-${review.reviewer ?? 'learner'}`,
+          reviewer: review.reviewer ?? 'Learner',
+          role: review.role ?? '',
+          company: review.company ?? '',
+          rating: Number(review.rating ?? 0),
+          headline: review.headline ?? '',
+          feedback: review.feedback ?? '',
+          submittedAt: review.submittedAt
+            ? formatDateTime(new Date(review.submittedAt), { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Recently submitted',
+          delivery: review.delivery ?? course.deliveryFormat ?? 'cohort',
+          experience: review.experience ?? 'Web'
+        }))
+      : [];
+
+    const averageReview = reviews.length
+      ? (reviews.reduce((total, review) => total + review.rating, 0) / reviews.length).toFixed(1)
+      : '0.0';
+
+    const mobile = {
+      status: course.metadata?.mobileParity?.status ?? 'Not evaluated',
+      experiences: Array.isArray(course.metadata?.mobileParity?.experiences)
+        ? course.metadata.mobileParity.experiences
+        : []
+    };
+
+    return {
+      id: `lifecycle-${course.id}`,
+      courseId: course.id,
+      courseTitle: course.title,
+      stage: statusLabels[course.status] ?? course.status,
+      drip: {
+        cadence: dripCampaign.cadence ?? 'manual',
+        anchor: dripCampaign.anchor ?? 'enrollment-date',
+        timezone: dripCampaign.timezone ?? 'UTC',
+        segments: dripSegments,
+        schedule: dripSchedule
+      },
+      modules: moduleSummaries.map((module) => ({
+        id: `module-${module.id}`,
+        title: module.title,
+        status: module.creation.status,
+        owner: module.creation.owner,
+        lastUpdated: module.creation.lastUpdatedAt
+          ? formatDateTime(module.creation.lastUpdatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Not updated',
+        qualityGate: module.creation.qualityGate,
+        tasksOutstanding: module.outstanding
+      })),
+      refresherLessons,
+      recordedVideos,
+      catalogue: catalogueListings,
+      reviews,
+      reviewSummary: `${averageReview} (${reviews.length} review${reviews.length === 1 ? '' : 's'})`,
+      mobile
     };
   });
 
@@ -1095,7 +1250,8 @@ export function buildInstructorDashboard({
         pipeline,
         production,
         library,
-        creationBlueprints
+        creationBlueprints,
+        lifecycle: courseLifecycle
       },
       communities: {
         manageDeck: managedCommunitiesSummaries,
