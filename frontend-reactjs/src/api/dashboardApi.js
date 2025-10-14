@@ -14,7 +14,14 @@ export async function fetchDashboard({ token, signal } = {}) {
     throw new Error('Authentication token is required to fetch dashboard data');
   }
 
-  const response = await httpClient.get('/dashboard/me', { token, signal });
+  const response = await httpClient.get('/dashboard/me', {
+    token,
+    signal,
+    cache: {
+      ttl: 1000 * 60,
+      tags: [`dashboard:me:${token}`]
+    }
+  });
   return normaliseDashboardResponse(response);
 }
 

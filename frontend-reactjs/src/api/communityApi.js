@@ -6,12 +6,24 @@ const mapResponse = (response) => ({
 });
 
 export async function fetchCommunities(token) {
-  const response = await httpClient.get('/communities', { token });
+  const response = await httpClient.get('/communities', {
+    token,
+    cache: {
+      ttl: 1000 * 60 * 5,
+      tags: ['communities:list']
+    }
+  });
   return mapResponse(response);
 }
 
 export async function fetchCommunityDetail(communityId, token) {
-  const response = await httpClient.get(`/communities/${communityId}`, { token });
+  const response = await httpClient.get(`/communities/${communityId}`, {
+    token,
+    cache: {
+      ttl: 1000 * 60 * 3,
+      tags: [`community:${communityId}:detail`]
+    }
+  });
   return mapResponse(response);
 }
 
@@ -34,6 +46,10 @@ export async function fetchCommunityFeed({
       postType,
       visibility,
       query
+    },
+    cache: {
+      ttl: 1000 * 60 * 2,
+      tags: [`community:${communityId}:feed`]
     }
   });
   return mapResponse(response);
@@ -48,6 +64,10 @@ export async function fetchAggregatedFeed({ token, page = 1, perPage = 10, postT
       postType,
       visibility,
       query
+    },
+    cache: {
+      ttl: 1000 * 60 * 2,
+      tags: ['communities:aggregatedFeed']
     }
   });
   return mapResponse(response);
@@ -60,17 +80,40 @@ export async function fetchCommunityResources({ communityId, token, limit = 6, o
       limit,
       offset,
       resourceType
+    },
+    cache: {
+      ttl: 1000 * 60 * 10,
+      tags: [`community:${communityId}:resources`]
     }
   });
   return mapResponse(response);
 }
 
 export async function createCommunityPost({ communityId, token, payload }) {
-  const response = await httpClient.post(`/communities/${communityId}/posts`, payload, { token });
+  const response = await httpClient.post(`/communities/${communityId}/posts`, payload, {
+    token,
+    cache: {
+      invalidateTags: [
+        `community:${communityId}:feed`,
+        `community:${communityId}:resources`,
+        'communities:aggregatedFeed'
+      ]
+    }
+  });
   return mapResponse(response);
 }
 
 export async function joinCommunity({ communityId, token }) {
-  const response = await httpClient.post(`/communities/${communityId}/join`, {}, { token });
+  const response = await httpClient.post(`/communities/${communityId}/join`, {}, {
+    token,
+    cache: {
+      invalidateTags: [
+        'communities:list',
+        `community:${communityId}:detail`,
+        `community:${communityId}:feed`,
+        'communities:aggregatedFeed'
+      ]
+    }
+  });
   return mapResponse(response);
 }

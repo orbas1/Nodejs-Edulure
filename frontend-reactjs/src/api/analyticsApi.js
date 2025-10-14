@@ -4,7 +4,11 @@ export async function fetchExplorerSummary({ range = '7d', token, signal } = {})
   return httpClient.get('/analytics/explorer/summary', {
     params: { range },
     token,
-    signal
+    signal,
+    cache: {
+      ttl: 1000 * 60 * 5,
+      tags: [`analytics:explorer:summary:${range}`]
+    }
   });
 }
 
@@ -12,7 +16,11 @@ export async function fetchExplorerAlerts({ includeResolved = false, token, sign
   return httpClient.get('/analytics/explorer/alerts', {
     params: { includeResolved },
     token,
-    signal
+    signal,
+    cache: {
+      ttl: 1000 * 60 * 2,
+      tags: [`analytics:explorer:alerts:${includeResolved}`]
+    }
   });
 }
 
