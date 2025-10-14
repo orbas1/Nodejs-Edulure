@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useOutletContext, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 
 import { fetchCoursePlayer, fetchCourseLiveChat, postCourseLiveChat } from '../../api/courseApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useRealtime } from '../../context/RealtimeContext.jsx';
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { useLearnerDashboardContext } from '../../hooks/useLearnerDashboard.js';
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -11,8 +13,11 @@ function classNames(...classes) {
 
 export default function CourseViewer() {
   const { courseId } = useParams();
-  const { dashboard } = useOutletContext();
-  const course = useMemo(() => dashboard?.courses?.active.find((item) => item.id === courseId), [dashboard, courseId]);
+  const { isLearner, dashboard } = useLearnerDashboardContext();
+  const course = useMemo(
+    () => dashboard?.courses?.active.find((item) => item.id === courseId),
+    [dashboard, courseId]
+  );
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const { socket } = useRealtime();
@@ -152,6 +157,25 @@ export default function CourseViewer() {
 
   const presencePreview = useMemo(() => presence.viewers?.slice?.(0, 3) ?? [], [presence]);
   const extraViewers = Math.max(0, (presence.totalViewers ?? 0) - presencePreview.length);
+
+  if (!isLearner) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Learner workspace required"
+        description="Switch to your learner dashboard to open course sessions and live cohorts."
+      />
+    );
+  }
+
+  if (!dashboard?.courses) {
+    return (
+      <DashboardStateMessage
+        title="Courses unavailable"
+        description="We could not find course data for your learner workspace. Refresh the dashboard and try again."
+      />
+    );
+  }
 
   if (!course) {
     return (
