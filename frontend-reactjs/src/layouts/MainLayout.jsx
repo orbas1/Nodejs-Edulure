@@ -27,6 +27,7 @@ export default function MainLayout() {
     const items = [
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
+      { name: 'Communities', to: '/communities' },
       { name: 'Explorer', to: '/explorer' },
       { name: 'Profile', to: '/profile' }
     ];
