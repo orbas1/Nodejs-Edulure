@@ -42,6 +42,14 @@ beforeEach(() => {
         ebooks: { library: [], recommendations: [] },
         financial: { summary: [], invoices: [] },
         notifications: { total: 0, unreadMessages: 0, items: [] },
+        assessments: {
+          overview: [],
+          timeline: { upcoming: [], overdue: [], completed: [] },
+          courses: [],
+          schedule: { studyPlan: [], events: [] },
+          analytics: { byType: [], pendingReviews: 0, overdue: 0, averageLeadTimeDays: null, workloadWeight: 0 },
+          resources: []
+        },
         followers: { followers: 0, following: 0, pending: [], outgoing: [], recommendations: [] },
         settings: {
           privacy: { visibility: 'public', followApprovalRequired: false, shareActivity: true, messagePermission: 'followers' },
@@ -58,7 +66,15 @@ beforeEach(() => {
             trend: 'up'
           }
         ],
-        analytics: { revenueStreams: [] }
+        analytics: { revenueStreams: [] },
+        assessments: {
+          overview: [],
+          timeline: { upcoming: [], overdue: [], completed: [] },
+          courses: [],
+          grading: { queue: [], flagged: [] },
+          schedule: { releasePlan: [], liveSessions: [] },
+          analytics: { byType: [], completionRate: null, averageLeadTimeDays: null }
+        }
       }
     },
     searchIndex: []

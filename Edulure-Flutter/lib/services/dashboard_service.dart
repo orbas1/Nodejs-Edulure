@@ -211,6 +211,412 @@ class DashboardNotification {
   }
 }
 
+class AssessmentOverviewMetric {
+  AssessmentOverviewMetric({
+    required this.label,
+    required this.value,
+    this.context,
+    this.tone,
+  });
+
+  final String label;
+  final String value;
+  final String? context;
+  final String? tone;
+
+  factory AssessmentOverviewMetric.fromJson(Map<String, dynamic> json) {
+    return AssessmentOverviewMetric(
+      label: json['label']?.toString() ?? 'Metric',
+      value: json['value']?.toString() ?? '0',
+      context: json['context']?.toString(),
+      tone: json['tone']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'label': label,
+      'value': value,
+      if (context != null) 'context': context,
+      if (tone != null) 'tone': tone,
+    };
+  }
+}
+
+class AssessmentTimelineItem {
+  AssessmentTimelineItem({
+    required this.id,
+    required this.title,
+    required this.course,
+    this.type,
+    this.due,
+    this.dueIn,
+    this.status,
+    this.weight,
+    this.mode,
+    this.score,
+    this.recommended,
+    this.submissionUrl,
+    this.instructions,
+  });
+
+  final String id;
+  final String title;
+  final String course;
+  final String? type;
+  final String? due;
+  final String? dueIn;
+  final String? status;
+  final String? weight;
+  final String? mode;
+  final String? score;
+  final String? recommended;
+  final String? submissionUrl;
+  final String? instructions;
+
+  factory AssessmentTimelineItem.fromJson(Map<String, dynamic> json) {
+    return AssessmentTimelineItem(
+      id: json['id']?.toString() ?? json['title']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? 'Assessment',
+      course: json['course']?.toString() ?? 'Course',
+      type: json['type']?.toString(),
+      due: json['due']?.toString(),
+      dueIn: json['dueIn']?.toString(),
+      status: json['status']?.toString(),
+      weight: json['weight']?.toString(),
+      mode: json['mode']?.toString(),
+      score: json['score']?.toString(),
+      recommended: json['recommended']?.toString(),
+      submissionUrl: json['submissionUrl']?.toString(),
+      instructions: json['instructions']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'course': course,
+      if (type != null) 'type': type,
+      if (due != null) 'due': due,
+      if (dueIn != null) 'dueIn': dueIn,
+      if (status != null) 'status': status,
+      if (weight != null) 'weight': weight,
+      if (mode != null) 'mode': mode,
+      if (score != null) 'score': score,
+      if (recommended != null) 'recommended': recommended,
+      if (submissionUrl != null) 'submissionUrl': submissionUrl,
+      if (instructions != null) 'instructions': instructions,
+    };
+  }
+}
+
+class AssessmentCourseReport {
+  AssessmentCourseReport({
+    required this.id,
+    required this.name,
+    required this.progress,
+    required this.status,
+    required this.upcoming,
+    required this.awaitingFeedback,
+    required this.overdue,
+    this.averageScore,
+  });
+
+  final String id;
+  final String name;
+  final String progress;
+  final String status;
+  final int upcoming;
+  final int awaitingFeedback;
+  final int overdue;
+  final String? averageScore;
+
+  factory AssessmentCourseReport.fromJson(Map<String, dynamic> json) {
+    return AssessmentCourseReport(
+      id: json['id']?.toString() ?? json['name']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      name: json['name']?.toString() ?? 'Course',
+      progress: json['progress']?.toString() ?? '0% complete',
+      status: json['status']?.toString() ?? 'On track',
+      upcoming: (json['upcoming'] is num) ? (json['upcoming'] as num).round() : int.tryParse('${json['upcoming'] ?? 0}') ?? 0,
+      awaitingFeedback: (json['awaitingFeedback'] is num)
+          ? (json['awaitingFeedback'] as num).round()
+          : int.tryParse('${json['awaitingFeedback'] ?? 0}') ?? 0,
+      overdue: (json['overdue'] is num) ? (json['overdue'] as num).round() : int.tryParse('${json['overdue'] ?? 0}') ?? 0,
+      averageScore: json['averageScore']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'progress': progress,
+      'status': status,
+      'upcoming': upcoming,
+      'awaitingFeedback': awaitingFeedback,
+      'overdue': overdue,
+      if (averageScore != null) 'averageScore': averageScore,
+    };
+  }
+}
+
+class AssessmentPlanBlock {
+  AssessmentPlanBlock({
+    required this.id,
+    required this.focus,
+    required this.course,
+    required this.window,
+    required this.duration,
+    this.mode,
+    this.submissionUrl,
+  });
+
+  final String id;
+  final String focus;
+  final String course;
+  final String window;
+  final String duration;
+  final String? mode;
+  final String? submissionUrl;
+
+  factory AssessmentPlanBlock.fromJson(Map<String, dynamic> json) {
+    return AssessmentPlanBlock(
+      id: json['id']?.toString() ?? json['focus']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      focus: json['focus']?.toString() ?? 'Focus block',
+      course: json['course']?.toString() ?? 'Course',
+      window: json['window']?.toString() ?? 'Upcoming',
+      duration: json['duration']?.toString() ?? '45 mins',
+      mode: json['mode']?.toString(),
+      submissionUrl: json['submissionUrl']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'focus': focus,
+      'course': course,
+      'window': window,
+      'duration': duration,
+      if (mode != null) 'mode': mode,
+      if (submissionUrl != null) 'submissionUrl': submissionUrl,
+    };
+  }
+}
+
+class AssessmentScheduleEvent {
+  AssessmentScheduleEvent({
+    required this.id,
+    required this.title,
+    required this.date,
+  });
+
+  final String id;
+  final String title;
+  final String date;
+
+  factory AssessmentScheduleEvent.fromJson(Map<String, dynamic> json) {
+    return AssessmentScheduleEvent(
+      id: json['id']?.toString() ?? json['title']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? 'Event',
+      date: json['date']?.toString() ?? 'Upcoming',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'date': date,
+    };
+  }
+}
+
+class AssessmentTypeInsight {
+  AssessmentTypeInsight({
+    required this.type,
+    required this.count,
+    this.weightShare,
+    this.averageScore,
+  });
+
+  final String type;
+  final int count;
+  final int? weightShare;
+  final int? averageScore;
+
+  factory AssessmentTypeInsight.fromJson(Map<String, dynamic> json) {
+    return AssessmentTypeInsight(
+      type: json['type']?.toString() ?? 'Assessment',
+      count: (json['count'] is num) ? (json['count'] as num).round() : int.tryParse('${json['count'] ?? 0}') ?? 0,
+      weightShare: (json['weightShare'] is num)
+          ? (json['weightShare'] as num).round()
+          : int.tryParse('${json['weightShare'] ?? json['weight_share'] ?? 0}') ?? 0,
+      averageScore: (json['averageScore'] is num)
+          ? (json['averageScore'] as num).round()
+          : int.tryParse('${json['averageScore'] ?? json['average_score'] ?? 0}') ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'count': count,
+      if (weightShare != null) 'weightShare': weightShare,
+      if (averageScore != null) 'averageScore': averageScore,
+    };
+  }
+}
+
+class AssessmentAnalytics {
+  AssessmentAnalytics({
+    required this.byType,
+    this.pendingReviews,
+    this.overdue,
+    this.averageLeadTimeDays,
+    this.workloadWeight,
+    this.completionRate,
+  });
+
+  final List<AssessmentTypeInsight> byType;
+  final int? pendingReviews;
+  final int? overdue;
+  final int? averageLeadTimeDays;
+  final num? workloadWeight;
+  final int? completionRate;
+
+  factory AssessmentAnalytics.fromJson(Map<String, dynamic> json) {
+    final byTypeJson = json['byType'];
+    return AssessmentAnalytics(
+      byType: byTypeJson is List
+          ? byTypeJson
+              .map((item) => AssessmentTypeInsight.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentTypeInsight>[],
+      pendingReviews: (json['pendingReviews'] is num)
+          ? (json['pendingReviews'] as num).round()
+          : int.tryParse('${json['pendingReviews'] ?? 0}') ?? 0,
+      overdue: (json['overdue'] is num)
+          ? (json['overdue'] as num).round()
+          : int.tryParse('${json['overdue'] ?? 0}') ?? 0,
+      averageLeadTimeDays: (json['averageLeadTimeDays'] is num)
+          ? (json['averageLeadTimeDays'] as num).round()
+          : int.tryParse('${json['averageLeadTimeDays'] ?? 0}') ?? 0,
+      workloadWeight: json['workloadWeight'] is num
+          ? (json['workloadWeight'] as num)
+          : num.tryParse(json['workloadWeight']?.toString() ?? ''),
+      completionRate: (json['completionRate'] is num)
+          ? (json['completionRate'] as num).round()
+          : int.tryParse('${json['completionRate'] ?? 0}') ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'byType': byType.map((entry) => entry.toJson()).toList(),
+      if (pendingReviews != null) 'pendingReviews': pendingReviews,
+      if (overdue != null) 'overdue': overdue,
+      if (averageLeadTimeDays != null) 'averageLeadTimeDays': averageLeadTimeDays,
+      if (workloadWeight != null) 'workloadWeight': workloadWeight,
+      if (completionRate != null) 'completionRate': completionRate,
+    };
+  }
+}
+
+class LearnerAssessmentsData {
+  LearnerAssessmentsData({
+    required this.overview,
+    required this.upcoming,
+    required this.overdue,
+    required this.completed,
+    required this.courses,
+    required this.studyPlan,
+    required this.events,
+    required this.analytics,
+    required this.resources,
+  });
+
+  final List<AssessmentOverviewMetric> overview;
+  final List<AssessmentTimelineItem> upcoming;
+  final List<AssessmentTimelineItem> overdue;
+  final List<AssessmentTimelineItem> completed;
+  final List<AssessmentCourseReport> courses;
+  final List<AssessmentPlanBlock> studyPlan;
+  final List<AssessmentScheduleEvent> events;
+  final AssessmentAnalytics analytics;
+  final List<String> resources;
+
+  factory LearnerAssessmentsData.fromJson(Map<String, dynamic> json) {
+    final overviewJson = json['overview'];
+    final timelineJson = json['timeline'] is Map ? Map<String, dynamic>.from(json['timeline'] as Map) : const {};
+    final coursesJson = json['courses'];
+    final scheduleJson = json['schedule'] is Map ? Map<String, dynamic>.from(json['schedule'] as Map) : const {};
+    final analyticsJson = json['analytics'] is Map ? Map<String, dynamic>.from(json['analytics'] as Map) : const {};
+    final resourcesJson = json['resources'];
+
+    return LearnerAssessmentsData(
+      overview: overviewJson is List
+          ? overviewJson
+              .map((item) => AssessmentOverviewMetric.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentOverviewMetric>[],
+      upcoming: timelineJson['upcoming'] is List
+          ? (timelineJson['upcoming'] as List)
+              .map((item) => AssessmentTimelineItem.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentTimelineItem>[],
+      overdue: timelineJson['overdue'] is List
+          ? (timelineJson['overdue'] as List)
+              .map((item) => AssessmentTimelineItem.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentTimelineItem>[],
+      completed: timelineJson['completed'] is List
+          ? (timelineJson['completed'] as List)
+              .map((item) => AssessmentTimelineItem.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentTimelineItem>[],
+      courses: coursesJson is List
+          ? coursesJson
+              .map((item) => AssessmentCourseReport.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentCourseReport>[],
+      studyPlan: scheduleJson['studyPlan'] is List
+          ? (scheduleJson['studyPlan'] as List)
+              .map((item) => AssessmentPlanBlock.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentPlanBlock>[],
+      events: scheduleJson['events'] is List
+          ? (scheduleJson['events'] as List)
+              .map((item) => AssessmentScheduleEvent.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <AssessmentScheduleEvent>[],
+      analytics: AssessmentAnalytics.fromJson(analyticsJson),
+      resources: resourcesJson is List
+          ? resourcesJson.map((item) => item.toString()).toList()
+          : <String>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'overview': overview.map((metric) => metric.toJson()).toList(),
+      'timeline': {
+        'upcoming': upcoming.map((item) => item.toJson()).toList(),
+        'overdue': overdue.map((item) => item.toJson()).toList(),
+        'completed': completed.map((item) => item.toJson()).toList(),
+      },
+      'courses': courses.map((course) => course.toJson()).toList(),
+      'schedule': {
+        'studyPlan': studyPlan.map((item) => item.toJson()).toList(),
+        'events': events.map((event) => event.toJson()).toList(),
+      },
+      'analytics': analytics.toJson(),
+      'resources': resources,
+    };
+  }
+}
+
 class ProfileStat {
   ProfileStat({
     required this.label,
@@ -421,6 +827,7 @@ class LearnerDashboardSnapshot {
     required this.unreadMessages,
     required this.totalNotifications,
     required this.syncedAt,
+    this.assessments,
     this.isFromCache = false,
   });
 
@@ -437,6 +844,7 @@ class LearnerDashboardSnapshot {
   final int unreadMessages;
   final int totalNotifications;
   final DateTime syncedAt;
+  final LearnerAssessmentsData? assessments;
   final bool isFromCache;
 
   LearnerDashboardSnapshot copyWith({bool? isFromCache}) {
@@ -478,6 +886,9 @@ class LearnerDashboardSnapshot {
     final followersJson = learnerJson['followers'] is Map
         ? Map<String, dynamic>.from(learnerJson['followers'] as Map)
         : <String, dynamic>{};
+    final assessmentsJson = learnerJson['assessments'] is Map
+        ? Map<String, dynamic>.from(learnerJson['assessments'] as Map)
+        : null;
 
     return LearnerDashboardSnapshot(
       profile: DashboardProfile.fromJson(profileJson),
@@ -525,11 +936,16 @@ class LearnerDashboardSnapshot {
           ? (notificationsJson['total'] as num).round()
           : int.tryParse('${notificationsJson['total'] ?? 0}') ?? 0,
       syncedAt: syncedAt ?? DateTime.now(),
+      assessments:
+          assessmentsJson != null ? LearnerAssessmentsData.fromJson(assessmentsJson) : null,
     );
   }
 
   factory LearnerDashboardSnapshot.fromCache(Map<String, dynamic> json) {
     final profileJson = json['profile'] is Map ? Map<String, dynamic>.from(json['profile'] as Map) : <String, dynamic>{};
+    final assessmentsJson = json['assessments'] is Map
+        ? Map<String, dynamic>.from(json['assessments'] as Map)
+        : null;
     return LearnerDashboardSnapshot(
       profile: DashboardProfile.fromJson(profileJson),
       metrics: json['metrics'] is List
@@ -578,6 +994,7 @@ class LearnerDashboardSnapshot {
           ? (json['totalNotifications'] as num).round()
           : int.tryParse('${json['totalNotifications'] ?? 0}') ?? 0,
       syncedAt: json['syncedAt'] is String ? DateTime.tryParse(json['syncedAt'] as String) ?? DateTime.now() : DateTime.now(),
+      assessments: assessmentsJson != null ? LearnerAssessmentsData.fromJson(assessmentsJson) : null,
       isFromCache: true,
     );
   }
@@ -597,6 +1014,7 @@ class LearnerDashboardSnapshot {
       'unreadMessages': unreadMessages,
       'totalNotifications': totalNotifications,
       'syncedAt': syncedAt.toIso8601String(),
+      if (assessments != null) 'assessments': assessments!.toJson(),
     };
   }
 }

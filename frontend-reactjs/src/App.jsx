@@ -37,6 +37,7 @@ import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
 import InstructorAds from './pages/dashboard/InstructorAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
+import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
 
 function App() {
   return (
@@ -111,6 +112,7 @@ function App() {
         <Route path="communities" element={<LearnerCommunities />} />
         <Route path="courses" element={<LearnerCourses />} />
         <Route path="courses/:courseId" element={<CourseViewer />} />
+        <Route path="assessments" element={<DashboardAssessments />} />
         <Route path="calendar" element={<DashboardCalendar />} />
         <Route path="bookings" element={<DashboardBookingsSwitch />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />

@@ -392,6 +392,16 @@ describe('buildInstructorDashboard', () => {
         expect.objectContaining({ role: 'instructor', type: 'Course', title: 'Design Ops Mastery' })
       ])
     );
+    expect(snapshot.dashboard.assessments.overview).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'active-assessments', label: 'Active assessments' })
+      ])
+    );
+    expect(snapshot.dashboard.assessments.timeline.upcoming).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ course: 'Design Ops Mastery', type: 'Assignment' })
+      ])
+    );
     expect(snapshot.profileStats).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ label: 'Cohorts', value: '1 active' })

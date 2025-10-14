@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
+  AcademicCapIcon,
   ArrowLeftOnRectangleIcon,
   BanknotesIcon,
   ArrowTopRightOnSquareIcon,
@@ -26,6 +27,7 @@ const navigationByRole = {
     { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
+    { name: 'Assessments', to: `${basePath}/assessments`, icon: AcademicCapIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
@@ -41,6 +43,7 @@ const navigationByRole = {
     { name: 'Create course', to: `${basePath}/courses/create`, icon: DocumentTextIcon },
     { name: 'Recorded library', to: `${basePath}/courses/library`, icon: PlayCircleIcon },
     { name: 'Manage courses', to: `${basePath}/courses/manage`, icon: Cog6ToothIcon },
+    { name: 'Assessment studio', to: `${basePath}/assessments`, icon: AcademicCapIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
