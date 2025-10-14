@@ -101,6 +101,17 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.videocam_outlined),
+                    title: const Text('Live classrooms'),
+                    subtitle: const Text('Preview upcoming rooms, whiteboards, and facilitator readiness.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      final role = SessionManager.getActiveRole();
+                      final target = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
+                      Navigator.pushNamed(context, target);
+                    },
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.travel_explore_outlined),
                     title: const Text('Explorer intelligence'),
                     subtitle: const Text('Search cohorts, talent, and campaigns across the network.'),
@@ -519,6 +530,11 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
     heroGradient: [Color(0xFF0EA5E9), Color(0xFF6366F1)],
     features: [
       _RoleFeature(
+        icon: Icons.videocam_outlined,
+        title: 'Live classrooms mission control',
+        description: 'Track occupancy, security, and facilitator readiness for every broadcast.',
+      ),
+      _RoleFeature(
         icon: Icons.analytics_outlined,
         title: 'Operational analytics',
         description: 'Monitor enrolment health, retention, and student sentiment in real time.',
@@ -536,7 +552,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
     ],
     actions: [
       _RoleAction(icon: Icons.travel_explore_outlined, label: 'Launch explorer', route: '/explorer'),
-      _RoleAction(icon: Icons.dashboard_customize_outlined, label: 'Open instructor dashboard', route: '/instructor-dashboard'),
+      _RoleAction(icon: Icons.videocam_outlined, label: 'Manage live classrooms', route: '/instructor-dashboard'),
       _RoleAction(icon: Icons.add_circle_outline, label: 'Create course', route: '/content'),
       _RoleAction(icon: Icons.message_outlined, label: 'Open inbox', route: '/feed'),
       _RoleAction(icon: Icons.schedule_outlined, label: 'Plan lesson', route: '/profile'),

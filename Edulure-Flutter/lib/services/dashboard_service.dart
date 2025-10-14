@@ -211,6 +211,367 @@ class DashboardNotification {
   }
 }
 
+class LiveClassOccupancy {
+  LiveClassOccupancy({
+    required this.reserved,
+    this.capacity,
+    this.rate,
+  });
+
+  final int reserved;
+  final int? capacity;
+  final int? rate;
+
+  factory LiveClassOccupancy.fromJson(Map<String, dynamic> json) {
+    final capacityValue = json['capacity'];
+    final rateValue = json['rate'];
+    return LiveClassOccupancy(
+      reserved: json['reserved'] is num
+          ? (json['reserved'] as num).round()
+          : int.tryParse('${json['reserved'] ?? 0}') ?? 0,
+      capacity: capacityValue is num ? capacityValue.round() : int.tryParse('${capacityValue ?? ''}'),
+      rate: rateValue is num ? rateValue.round() : int.tryParse('${rateValue ?? ''}'),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'reserved': reserved,
+      if (capacity != null) 'capacity': capacity,
+      if (rate != null) 'rate': rate,
+    };
+  }
+}
+
+class LiveClassSecurity {
+  LiveClassSecurity({
+    required this.waitingRoom,
+    required this.passcodeRequired,
+    required this.recordingConsent,
+  });
+
+  final bool waitingRoom;
+  final bool passcodeRequired;
+  final bool recordingConsent;
+
+  factory LiveClassSecurity.fromJson(Map<String, dynamic> json) {
+    return LiveClassSecurity(
+      waitingRoom: json['waitingRoom'] != false,
+      passcodeRequired: json['passcodeRequired'] == true,
+      recordingConsent: json['recordingConsent'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'waitingRoom': waitingRoom,
+      'passcodeRequired': passcodeRequired,
+      'recordingConsent': recordingConsent,
+    };
+  }
+}
+
+class LiveClassWhiteboard {
+  LiveClassWhiteboard({
+    this.template,
+    required this.ready,
+    this.lastUpdatedLabel,
+    required this.facilitators,
+  });
+
+  final String? template;
+  final bool ready;
+  final String? lastUpdatedLabel;
+  final List<String> facilitators;
+
+  factory LiveClassWhiteboard.fromJson(Map<String, dynamic> json) {
+    final facilitatorsRaw = json['facilitators'];
+    return LiveClassWhiteboard(
+      template: json['template']?.toString(),
+      ready: json['ready'] == true,
+      lastUpdatedLabel: json['lastUpdatedLabel']?.toString(),
+      facilitators: facilitatorsRaw is List
+          ? facilitatorsRaw.map((item) => item.toString()).where((item) => item.isNotEmpty).toList()
+          : <String>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (template != null) 'template': template,
+      'ready': ready,
+      if (lastUpdatedLabel != null) 'lastUpdatedLabel': lastUpdatedLabel,
+      'facilitators': facilitators,
+    };
+  }
+}
+
+class LiveClassCallToAction {
+  LiveClassCallToAction({
+    required this.label,
+    required this.action,
+    required this.enabled,
+  });
+
+  final String label;
+  final String action;
+  final bool enabled;
+
+  factory LiveClassCallToAction.fromJson(Map<String, dynamic> json) {
+    return LiveClassCallToAction(
+      label: json['label']?.toString() ?? 'View details',
+      action: json['action']?.toString() ?? 'details',
+      enabled: json['enabled'] != false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'label': label,
+      'action': action,
+      'enabled': enabled,
+    };
+  }
+}
+
+class LiveClassSessionSummary {
+  LiveClassSessionSummary({
+    required this.id,
+    required this.title,
+    required this.stage,
+    required this.status,
+    required this.startLabel,
+    this.timezone,
+    this.community,
+    this.summary,
+    required this.occupancy,
+    required this.security,
+    this.whiteboard,
+    this.callToAction,
+    required this.isGroup,
+    required this.breakoutRooms,
+  });
+
+  final String id;
+  final String title;
+  final String stage;
+  final String status;
+  final String startLabel;
+  final String? timezone;
+  final String? community;
+  final String? summary;
+  final LiveClassOccupancy occupancy;
+  final LiveClassSecurity security;
+  final LiveClassWhiteboard? whiteboard;
+  final LiveClassCallToAction? callToAction;
+  final bool isGroup;
+  final List<String> breakoutRooms;
+
+  factory LiveClassSessionSummary.fromJson(Map<String, dynamic> json) {
+    final occupancyJson = json['occupancy'];
+    final securityJson = json['security'];
+    final whiteboardJson = json['whiteboard'];
+    final callToActionJson = json['callToAction'];
+    final breakoutRoomsRaw = json['breakoutRooms'];
+    return LiveClassSessionSummary(
+      id: json['id']?.toString() ?? json['slug']?.toString() ?? 'live-${DateTime.now().millisecondsSinceEpoch}',
+      title: json['title']?.toString() ?? 'Live classroom',
+      stage: json['stage']?.toString() ?? 'Preparation',
+      status: json['status']?.toString() ?? 'upcoming',
+      startLabel: json['startLabel']?.toString() ?? 'TBD',
+      timezone: json['timezone']?.toString(),
+      community: json['community']?.toString(),
+      summary: json['summary']?.toString(),
+      occupancy: LiveClassOccupancy.fromJson(
+        occupancyJson is Map ? Map<String, dynamic>.from(occupancyJson as Map) : const {},
+      ),
+      security: LiveClassSecurity.fromJson(
+        securityJson is Map ? Map<String, dynamic>.from(securityJson as Map) : const {},
+      ),
+      whiteboard: whiteboardJson is Map
+          ? LiveClassWhiteboard.fromJson(Map<String, dynamic>.from(whiteboardJson as Map))
+          : null,
+      callToAction: callToActionJson is Map
+          ? LiveClassCallToAction.fromJson(Map<String, dynamic>.from(callToActionJson as Map))
+          : null,
+      isGroup: json['isGroupSession'] == true,
+      breakoutRooms: breakoutRoomsRaw is List
+          ? breakoutRoomsRaw
+              .map((room) => room is Map
+                  ? room['name']?.toString() ?? room['title']?.toString() ?? ''
+                  : room?.toString() ?? '')
+              .where((value) => value.isNotEmpty)
+              .toList()
+          : <String>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'stage': stage,
+      'status': status,
+      'startLabel': startLabel,
+      if (timezone != null) 'timezone': timezone,
+      if (community != null) 'community': community,
+      if (summary != null) 'summary': summary,
+      'occupancy': occupancy.toJson(),
+      'security': security.toJson(),
+      if (whiteboard != null) 'whiteboard': whiteboard!.toJson(),
+      if (callToAction != null) 'callToAction': callToAction!.toJson(),
+      'isGroupSession': isGroup,
+      'breakoutRooms': breakoutRooms,
+    };
+  }
+}
+
+class LiveClassReadinessItem {
+  LiveClassReadinessItem({
+    required this.id,
+    required this.label,
+    required this.status,
+    required this.detail,
+  });
+
+  final String id;
+  final String label;
+  final String status;
+  final String detail;
+
+  factory LiveClassReadinessItem.fromJson(Map<String, dynamic> json) {
+    return LiveClassReadinessItem(
+      id: json['id']?.toString() ?? json['label']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      label: json['label']?.toString() ?? 'Readiness check',
+      status: json['status']?.toString() ?? 'ready',
+      detail: json['detail']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'label': label,
+      'status': status,
+      'detail': detail,
+    };
+  }
+}
+
+class LiveClassWhiteboardSnapshot {
+  LiveClassWhiteboardSnapshot({
+    required this.id,
+    required this.title,
+    required this.template,
+    required this.ready,
+    this.lastUpdatedLabel,
+    required this.facilitators,
+  });
+
+  final String id;
+  final String title;
+  final String template;
+  final bool ready;
+  final String? lastUpdatedLabel;
+  final List<String> facilitators;
+
+  factory LiveClassWhiteboardSnapshot.fromJson(Map<String, dynamic> json) {
+    final facilitatorsRaw = json['facilitators'];
+    return LiveClassWhiteboardSnapshot(
+      id: json['id']?.toString() ?? json['title']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? 'Live board',
+      template: json['template']?.toString() ?? 'Collaborative board',
+      ready: json['ready'] == true,
+      lastUpdatedLabel: json['lastUpdatedLabel']?.toString(),
+      facilitators: facilitatorsRaw is List
+          ? facilitatorsRaw.map((item) => item.toString()).where((item) => item.isNotEmpty).toList()
+          : <String>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'template': template,
+      'ready': ready,
+      if (lastUpdatedLabel != null) 'lastUpdatedLabel': lastUpdatedLabel,
+      'facilitators': facilitators,
+    };
+  }
+}
+
+class LiveClassroomsSnapshot {
+  LiveClassroomsSnapshot({
+    required this.metrics,
+    required this.active,
+    required this.upcoming,
+    required this.completed,
+    required this.groups,
+    required this.whiteboardSnapshots,
+    required this.readiness,
+  });
+
+  final List<DashboardMetric> metrics;
+  final List<LiveClassSessionSummary> active;
+  final List<LiveClassSessionSummary> upcoming;
+  final List<LiveClassSessionSummary> completed;
+  final List<LiveClassSessionSummary> groups;
+  final List<LiveClassWhiteboardSnapshot> whiteboardSnapshots;
+  final List<LiveClassReadinessItem> readiness;
+
+  factory LiveClassroomsSnapshot.fromJson(Map<String, dynamic> json) {
+    final whiteboardJson = json['whiteboard'] is Map
+        ? Map<String, dynamic>.from(json['whiteboard'] as Map)
+        : const <String, dynamic>{};
+    final parseSessions = (String key) {
+      final value = json[key];
+      if (value is List) {
+        return value
+            .map((item) => LiveClassSessionSummary.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+      return <LiveClassSessionSummary>[];
+    };
+
+    return LiveClassroomsSnapshot(
+      metrics: json['metrics'] is List
+          ? (json['metrics'] as List)
+              .map((item) => DashboardMetric.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <DashboardMetric>[],
+      active: parseSessions('active'),
+      upcoming: parseSessions('upcoming'),
+      completed: parseSessions('completed'),
+      groups: parseSessions('groups'),
+      whiteboardSnapshots: whiteboardJson['snapshots'] is List
+          ? (whiteboardJson['snapshots'] as List)
+              .map((item) => LiveClassWhiteboardSnapshot.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <LiveClassWhiteboardSnapshot>[],
+      readiness: whiteboardJson['readiness'] is List
+          ? (whiteboardJson['readiness'] as List)
+              .map((item) => LiveClassReadinessItem.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <LiveClassReadinessItem>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'metrics': metrics.map((metric) => metric.toJson()).toList(),
+      'active': active.map((session) => session.toJson()).toList(),
+      'upcoming': upcoming.map((session) => session.toJson()).toList(),
+      'completed': completed.map((session) => session.toJson()).toList(),
+      'groups': groups.map((session) => session.toJson()).toList(),
+      'whiteboard': {
+        'snapshots': whiteboardSnapshots.map((snapshot) => snapshot.toJson()).toList(),
+        'readiness': readiness.map((item) => item.toJson()).toList(),
+      },
+    };
+  }
+}
+
 class ProfileStat {
   ProfileStat({
     required this.label,
@@ -421,6 +782,7 @@ class LearnerDashboardSnapshot {
     required this.unreadMessages,
     required this.totalNotifications,
     required this.syncedAt,
+    this.liveClassrooms,
     this.isFromCache = false,
   });
 
@@ -437,6 +799,7 @@ class LearnerDashboardSnapshot {
   final int unreadMessages;
   final int totalNotifications;
   final DateTime syncedAt;
+  final LiveClassroomsSnapshot? liveClassrooms;
   final bool isFromCache;
 
   LearnerDashboardSnapshot copyWith({bool? isFromCache}) {
@@ -454,6 +817,7 @@ class LearnerDashboardSnapshot {
       unreadMessages: unreadMessages,
       totalNotifications: totalNotifications,
       syncedAt: syncedAt,
+      liveClassrooms: liveClassrooms,
       isFromCache: isFromCache ?? this.isFromCache,
     );
   }
@@ -477,6 +841,9 @@ class LearnerDashboardSnapshot {
         : <String, dynamic>{};
     final followersJson = learnerJson['followers'] is Map
         ? Map<String, dynamic>.from(learnerJson['followers'] as Map)
+        : <String, dynamic>{};
+    final liveClassroomsJson = learnerJson['liveClassrooms'] is Map
+        ? Map<String, dynamic>.from(learnerJson['liveClassrooms'] as Map)
         : <String, dynamic>{};
 
     return LearnerDashboardSnapshot(
@@ -518,6 +885,8 @@ class LearnerDashboardSnapshot {
         settingsJson['messaging'] is Map ? Map<String, dynamic>.from(settingsJson['messaging'] as Map) : const {},
       ),
       followers: FollowersSummary.fromJson(followersJson),
+      liveClassrooms:
+          liveClassroomsJson.isEmpty ? null : LiveClassroomsSnapshot.fromJson(liveClassroomsJson),
       unreadMessages: (notificationsJson['unreadMessages'] is num)
           ? (notificationsJson['unreadMessages'] as num).round()
           : int.tryParse('${notificationsJson['unreadMessages'] ?? 0}') ?? 0,
@@ -571,6 +940,9 @@ class LearnerDashboardSnapshot {
       followers: FollowersSummary.fromJson(
         json['followers'] is Map ? Map<String, dynamic>.from(json['followers'] as Map) : const {},
       ),
+      liveClassrooms: json['liveClassrooms'] is Map
+          ? LiveClassroomsSnapshot.fromJson(Map<String, dynamic>.from(json['liveClassrooms'] as Map))
+          : null,
       unreadMessages: (json['unreadMessages'] is num)
           ? (json['unreadMessages'] as num).round()
           : int.tryParse('${json['unreadMessages'] ?? 0}') ?? 0,
@@ -594,6 +966,7 @@ class LearnerDashboardSnapshot {
       'privacy': privacySettings.toJson(),
       'messaging': messagingSettings.toJson(),
       'followers': followers.toJson(),
+      if (liveClassrooms != null) 'liveClassrooms': liveClassrooms!.toJson(),
       'unreadMessages': unreadMessages,
       'totalNotifications': totalNotifications,
       'syncedAt': syncedAt.toIso8601String(),
