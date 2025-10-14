@@ -75,7 +75,7 @@ class _PublicHomeView extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Learning communities engineered for scale',
+                  'Learning communities built for scale',
                   style: Theme.of(context)
                       .textTheme
                       .headlineSmall
@@ -83,7 +83,7 @@ class _PublicHomeView extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Blend courses, community, and live sessions into one seamless mobile experience.',
+                  'Run courses, community, and live sessions from one secure app.',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 24),
@@ -102,84 +102,85 @@ class _PublicHomeView extends StatelessWidget {
           ValueListenableBuilder(
             valueListenable: SessionManager.assetsCache.listenable(),
             builder: (context, box, _) {
+              final role = SessionManager.getActiveRole();
+              final classroomTarget = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
+
               return Column(
                 children: [
                   ListTile(
                     leading: const Icon(Icons.groups_3_outlined),
                     title: const Text('Communities'),
-                    subtitle: const Text('Curate your hubs and monitor health in real time.'),
+                    subtitle: const Text('Track health across every hub.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/communities'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.dashboard_customize_outlined),
                     title: const Text('Live feed'),
-                    subtitle: const Text('Stay up to date with every community in a unified stream.'),
+                    subtitle: const Text('Monitor updates across workspaces.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.library_books_outlined),
-                    title: const Text('Edulure blog'),
-                    subtitle: const Text('Read enterprise updates and best practices.'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.pushNamed(context, '/blog'),
                     leading: const Icon(Icons.videocam_outlined),
                     title: const Text('Live classrooms'),
-                    subtitle: const Text('Preview upcoming rooms, whiteboards, and facilitator readiness.'),
+                    subtitle: const Text('Prep upcoming rooms and materials in seconds.'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      final role = SessionManager.getActiveRole();
-                      final target = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
-                      Navigator.pushNamed(context, target);
-                    },
+                    onTap: () => Navigator.pushNamed(context, classroomTarget),
                   ),
                   ListTile(
                     leading: const Icon(Icons.travel_explore_outlined),
                     title: const Text('Explorer intelligence'),
-                    subtitle: const Text('Search cohorts, talent, and campaigns across the network.'),
+                    subtitle: const Text('Search cohorts, talent, and campaigns.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/explorer'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.library_books_outlined),
+                    title: const Text('Edulure blog'),
+                    subtitle: const Text('Platform updates and playbooks.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/blog'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.inbox_outlined),
                     title: const Text('Messages'),
-                    subtitle: const Text('Coordinate with faculty and members in threaded conversations.'),
+                    subtitle: const Text('Coordinate with members in threads.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/inbox'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.person_outline),
                     title: const Text('Profile'),
-                    subtitle: const Text('Personalise your instructor and member presence.'),
+                    subtitle: const Text('Tailor your instructor or learner presence.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/profile'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.calendar_month_outlined),
                     title: const Text('Tutor bookings'),
-                    subtitle: const Text('Manage mentor requests, schedules, and session history.'),
+                    subtitle: const Text('Manage mentor requests and schedules.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/tutor-bookings'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.library_books_outlined),
                     title: const Text('Content library'),
-                    subtitle: const Text('Download decks and ebooks with offline support.'),
+                    subtitle: const Text('Access decks and ebooks with offline support.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/content'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.dashboard_outlined),
                     title: const Text('Course management'),
-                    subtitle: const Text('Track cohorts, assign production tasks, and monitor operations.'),
+                    subtitle: const Text('Track cohorts and production tasks.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/courses/manage'),
                   ),
                   ListTile(
                     leading: const Icon(Icons.shopping_bag_outlined),
                     title: const Text('Purchase courses'),
-                    subtitle: const Text('Review offers, apply coupons, and confirm learner enrolments.'),
+                    subtitle: const Text('Review offers and confirm enrollments.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/courses/purchase'),
                   ),
