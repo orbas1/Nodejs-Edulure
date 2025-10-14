@@ -6,7 +6,7 @@ import { updateMonetizationSettings } from '../../../api/adminApi.js';
 const DEFAULT_SETTINGS = Object.freeze({
   commissions: {
     enabled: true,
-    rateBps: 1500,
+    rateBps: 250,
     minimumFeeCents: 0,
     allowCommunityOverride: true
   },
@@ -39,6 +39,14 @@ const DEFAULT_SETTINGS = Object.freeze({
       blockSelfReferral: true,
       enforceTwoFactorForPayouts: true
     }
+  },
+  workforce: {
+    providerControlsCompensation: true,
+    minimumServicemanShareBps: 0,
+    recommendedServicemanShareBps: 7500,
+    nonCustodialWallets: true,
+    complianceNarrative:
+      'Commission is fixed at 2.5% for the platform. Providers decide service professional rates while the ledger operates on a non-custodial basis.'
   }
 });
 
@@ -138,6 +146,23 @@ function normaliseSettings(settings) {
             defaultAffiliate.security.enforceTwoFactorForPayouts
         )
       }
+    },
+    workforce: {
+      providerControlsCompensation: Boolean(
+        settings.workforce?.providerControlsCompensation ?? DEFAULT_SETTINGS.workforce.providerControlsCompensation
+      ),
+      minimumServicemanShareBps: Number(
+        settings.workforce?.minimumServicemanShareBps ?? DEFAULT_SETTINGS.workforce.minimumServicemanShareBps
+      ),
+      recommendedServicemanShareBps: Number(
+        settings.workforce?.recommendedServicemanShareBps ??
+          DEFAULT_SETTINGS.workforce.recommendedServicemanShareBps
+      ),
+      nonCustodialWallets: Boolean(
+        settings.workforce?.nonCustodialWallets ?? DEFAULT_SETTINGS.workforce.nonCustodialWallets
+      ),
+      complianceNarrative:
+        (settings.workforce?.complianceNarrative ?? DEFAULT_SETTINGS.workforce.complianceNarrative) || ''
     }
   };
 }
@@ -168,7 +193,12 @@ function buildFormState(settings) {
         : '',
     affiliateTiers: monetization.affiliate.defaultCommission.tiers,
     affiliateSecurityBlockSelfReferral: monetization.affiliate.security.blockSelfReferral,
-    affiliateSecurityTwoFactor: monetization.affiliate.security.enforceTwoFactorForPayouts
+    affiliateSecurityTwoFactor: monetization.affiliate.security.enforceTwoFactorForPayouts,
+    workforceProviderControls: monetization.workforce.providerControlsCompensation,
+    workforceMinimumShareBps: monetization.workforce.minimumServicemanShareBps,
+    workforceRecommendedShareBps: monetization.workforce.recommendedServicemanShareBps,
+    workforceNonCustodialWallets: monetization.workforce.nonCustodialWallets,
+    workforceComplianceNarrative: monetization.workforce.complianceNarrative ?? ''
   };
 }
 
@@ -182,6 +212,20 @@ function parseRestrictedFeatures(input) {
     .map((entry) => entry.trim())
     .filter((entry, index, arr) => entry && arr.indexOf(entry) === index)
     .slice(0, 50);
+}
+
+function clampBasisPoints(value, fallback) {
+  if (value === '' || value === null || value === undefined) {
+    return fallback;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+
+  const rounded = Math.round(numeric);
+  return Math.min(Math.max(rounded, 0), 10_000);
 }
 
 export default function AdminMonetizationSettingsSection({
@@ -378,6 +422,21 @@ export default function AdminMonetizationSettingsSection({
           : DEFAULT_SETTINGS.affiliate.defaultCommission.maxOccurrences ?? 1
         : null;
 
+    const minimumShareBps = clampBasisPoints(
+      formState.workforceMinimumShareBps,
+      DEFAULT_SETTINGS.workforce.minimumServicemanShareBps
+    );
+    let recommendedShareBps = clampBasisPoints(
+      formState.workforceRecommendedShareBps,
+      DEFAULT_SETTINGS.workforce.recommendedServicemanShareBps
+    );
+    if (recommendedShareBps < minimumShareBps) {
+      recommendedShareBps = minimumShareBps;
+    }
+    const workforceNarrative = String(formState.workforceComplianceNarrative ?? '')
+      .trim()
+      .slice(0, 2000);
+
     const payload = {
       commissions: {
         enabled: Boolean(formState.commissionsEnabled),
@@ -421,6 +480,13 @@ export default function AdminMonetizationSettingsSection({
           blockSelfReferral: Boolean(formState.affiliateSecurityBlockSelfReferral),
           enforceTwoFactorForPayouts: Boolean(formState.affiliateSecurityTwoFactor)
         }
+      },
+      workforce: {
+        providerControlsCompensation: Boolean(formState.workforceProviderControls),
+        minimumServicemanShareBps: minimumShareBps,
+        recommendedServicemanShareBps: recommendedShareBps,
+        nonCustodialWallets: Boolean(formState.workforceNonCustodialWallets),
+        complianceNarrative: workforceNarrative
       }
     };
 
@@ -449,8 +515,9 @@ export default function AdminMonetizationSettingsSection({
         <div>
           <h2 className="text-xl font-semibold text-slate-900">Monetization controls</h2>
           <p className="text-sm text-slate-600">
-            Configure platform commissions, subscription entitlements, and payment providers for the
-            marketplace.
+            Configure the fixed 2.5% platform commission, provider-led workforce payouts, subscription
+            entitlements, and payment providers for the marketplace without drifting into FCA
+            custodial activity.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -722,6 +789,80 @@ export default function AdminMonetizationSettingsSection({
           </div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <h3 className="text-base font-semibold text-slate-900">Service workforce compensation</h3>
+          <p className="mt-1 text-sm text-slate-600">
+            Providers retain discretion over how much to pay vetted service professionals while the
+            platform captures a fixed 2.5% commission and keeps wallets non-custodial.
+          </p>
+          <div className="mt-4 space-y-4">
+            <label className="flex items-start gap-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-slate-300"
+                checked={formState.workforceProviderControls}
+                onChange={handleToggle('workforceProviderControls')}
+              />
+              Allow providers to set their own serviceman compensation rates
+            </label>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-sm text-slate-600">
+                Minimum serviceman share (basis points)
+                <input
+                  type="number"
+                  min="0"
+                  max="10000"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-primary focus:outline-none"
+                  value={formState.workforceMinimumShareBps}
+                  onChange={handleNumberChange('workforceMinimumShareBps')}
+                />
+              </label>
+              <label className="text-sm text-slate-600">
+                Recommended serviceman share (basis points)
+                <input
+                  type="number"
+                  min="0"
+                  max="10000"
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-primary focus:outline-none"
+                  value={formState.workforceRecommendedShareBps}
+                  onChange={handleNumberChange('workforceRecommendedShareBps')}
+                />
+              </label>
+            </div>
+            <label className="flex items-start gap-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                className="mt-1 h-4 w-4 rounded border-slate-300"
+                checked={formState.workforceNonCustodialWallets}
+                onChange={handleToggle('workforceNonCustodialWallets')}
+              />
+              Keep platform wallets non-custodial (funds settle provider ⇄ serviceman directly)
+            </label>
+            <label className="text-sm text-slate-600">
+              Compliance notes
+              <textarea
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                rows={3}
+                value={formState.workforceComplianceNarrative}
+                onChange={handleInputChange('workforceComplianceNarrative')}
+                placeholder="Document guardrails for ledgers, wage transparency, and Apple platform disclosures."
+              />
+            </label>
+            <div className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-primary-dark">
+              <p className="font-semibold">Apple App Store &amp; FCA-light guardrails</p>
+              <p className="mt-1 leading-relaxed">
+                Double-entry ledgering with mirrored debit/credit entries and non-custodial settlement
+                keeps the platform outside FCA client-money permissions. Apple guidelines permit
+                external payments when digital goods are not unlocked inside the iOS app—surface the
+                2.5% platform fee transparently and send users to the web checkout when needed.
+              </p>
+              <p className="mt-1 leading-relaxed">
+                Providers remain responsible for honouring wage commitments, local employment rules,
+                and communicating serviceman earnings before work is accepted.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
           <h3 className="text-base font-semibold text-slate-900">Payout guardrails &amp; compliance</h3>
           <p className="mt-1 text-sm text-slate-600">
             Configure eligibility, attribution, and security policies to keep affiliate payouts audit-ready.
@@ -838,7 +979,8 @@ AdminMonetizationSettingsSection.propTypes = {
     commissions: PropTypes.object,
     subscriptions: PropTypes.object,
     payments: PropTypes.object,
-    affiliate: PropTypes.object
+    affiliate: PropTypes.object,
+    workforce: PropTypes.object
   }),
   token: PropTypes.string,
   onSettingsUpdated: PropTypes.func

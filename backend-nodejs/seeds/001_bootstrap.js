@@ -1125,7 +1125,7 @@ export async function seed(knex) {
       user_id: learnerId,
       status: 'approved',
       referral_code: affiliateReferralCode,
-      commission_rate_bps: 2000,
+      commission_rate_bps: 250,
       total_earned_cents: 0,
       total_paid_cents: 0,
       metadata: JSON.stringify({ campaign: 'beta-cohort', payoutEmail: 'noemi.carvalho@edulure.test' }),

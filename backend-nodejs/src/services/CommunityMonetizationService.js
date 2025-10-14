@@ -454,7 +454,7 @@ export default class CommunityMonetizationService {
       userId,
       status: 'pending',
       referralCode,
-      commissionRateBasisPoints: payload.commissionRateBasisPoints ?? 1500,
+      commissionRateBasisPoints: payload.commissionRateBasisPoints ?? 250,
       metadata: payload.metadata ?? {}
     });
 

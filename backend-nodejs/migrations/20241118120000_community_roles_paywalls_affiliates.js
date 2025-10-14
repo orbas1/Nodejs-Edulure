@@ -24,7 +24,7 @@ export async function up(knex) {
         .onDelete('CASCADE');
       table.enum('status', AFFILIATE_STATUSES).notNullable().defaultTo('pending');
       table.string('referral_code', 60).notNullable();
-      table.integer('commission_rate_bps').unsigned().notNullable().defaultTo(1500);
+      table.integer('commission_rate_bps').unsigned().notNullable().defaultTo(250);
       table.integer('total_earned_cents').unsigned().notNullable().defaultTo(0);
       table.integer('total_paid_cents').unsigned().notNullable().defaultTo(0);
       table.json('metadata').notNullable().defaultTo('{}');

@@ -9,7 +9,8 @@ function normaliseSettings(payload = {}) {
     commissions: payload.commissions ?? null,
     subscriptions: payload.subscriptions ?? null,
     payments: payload.payments ?? null,
-    affiliate: payload.affiliate ?? null
+    affiliate: payload.affiliate ?? null,
+    workforce: payload.workforce ?? null
   };
 }
 

@@ -50,13 +50,13 @@ const checkoutSchema = Joi.object({
 
 const affiliateApplySchema = Joi.object({
   referralCode: Joi.string().max(60).optional(),
-  commissionRateBasisPoints: Joi.number().integer().min(500).max(5000).optional(),
+  commissionRateBasisPoints: Joi.number().integer().min(250).max(5000).optional(),
   metadata: Joi.object().default({})
 });
 
 const affiliateUpdateSchema = Joi.object({
   status: Joi.string().valid('pending', 'approved', 'suspended', 'revoked').optional(),
-  commissionRateBasisPoints: Joi.number().integer().min(500).max(5000).optional(),
+  commissionRateBasisPoints: Joi.number().integer().min(250).max(5000).optional(),
   referralCode: Joi.string().max(60).optional(),
   metadata: Joi.object().optional()
 });
