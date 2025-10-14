@@ -164,6 +164,37 @@ export default function CourseViewer() {
     );
   }
 
+  const modules = Array.isArray(course.modules) ? course.modules : [];
+  const nextLessonDetail = course.nextLessonDetail ?? null;
+  const completedLessonsCount = modules.reduce(
+    (total, module) => total + (module.progress?.completedLessons ?? 0),
+    0
+  );
+  const totalLessonsCount = modules.reduce(
+    (total, module) => total + (module.progress?.totalLessons ?? 0),
+    0
+  );
+
+  const formatLessonAvailability = (lesson) => {
+    if (lesson.completed) {
+      return 'Completed';
+    }
+    if (lesson.status === 'scheduled') {
+      if (!lesson.releaseAt) {
+        return 'Scheduled';
+      }
+      const releaseDate = new Date(lesson.releaseAt);
+      return `Unlocks ${releaseDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+    }
+    return 'Ready to start';
+  };
+
+  const lessonStatusTone = (lesson) => {
+    if (lesson.completed) return 'text-emerald-600';
+    if (lesson.status === 'scheduled') return 'text-amber-500';
+    return 'text-primary';
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -171,6 +202,19 @@ export default function CourseViewer() {
           <p className="text-xs uppercase tracking-wide text-slate-500">Course viewer</p>
           <h1 className="text-2xl font-semibold text-slate-900">{course.title}</h1>
           <p className="text-sm text-slate-600">Facilitated by {course.instructor}</p>
+          {nextLessonDetail ? (
+            <p className="mt-1 text-xs font-semibold text-primary">
+              Next up: {nextLessonDetail.moduleTitle} · {nextLessonDetail.lessonTitle}
+              {nextLessonDetail.status === 'scheduled' && nextLessonDetail.releaseAt
+                ? ` • Unlocks ${new Date(nextLessonDetail.releaseAt).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric'
+                  })}`
+                : ''}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs font-semibold text-emerald-600">All scheduled lessons completed.</p>
+          )}
         </div>
         <div className="flex gap-3">
           <button type="button" className="dashboard-primary-pill">
@@ -297,27 +341,72 @@ export default function CourseViewer() {
       <section className="grid gap-6 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">Lesson queue</h2>
-          <p className="mt-2 text-sm text-slate-600">Dive into the structured journey. Progress auto-saves when you leave.</p>
-          <ul className="mt-5 space-y-4">
-            {[
-              'Lesson 1 · Systems baseline assessment',
-              'Lesson 2 · Ritual inventory mapping',
-              'Lesson 3 · Sprint retrospectives live lab',
-              'Lesson 4 · Automation roundtable'
-            ].map((lesson, index) => (
-              <li key={lesson} className="dashboard-card-muted p-4">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center dashboard-pill text-sm font-semibold text-slate-600">
-                    {index + 1}
-                  </span>
+          <p className="mt-2 text-sm text-slate-600">
+            Navigate cohorts with confidence. Lesson states update instantly as you wrap activities or as modules unlock.
+          </p>
+          {modules.length === 0 ? (
+            <div className="mt-6 rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500">
+              Modules for this program will appear here once your instructor publishes the curriculum.
+            </div>
+          ) : (
+            <div className="mt-6 space-y-4">
+              {modules.map((module, index) => (
+                <div key={module.id ?? `module-${index}`} className="dashboard-card-muted space-y-4 p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="dashboard-kicker">Module {index + 1}</p>
+                      <p className="text-sm font-semibold text-slate-900">{module.title}</p>
+                      <p className="text-xs text-slate-500">{module.releaseLabel}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {module.progress?.completionPercent ?? 0}%
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {module.progress
+                          ? `${module.progress.completedLessons}/${module.progress.totalLessons} lessons`
+                          : 'No lessons yet'}
+                      </p>
+                    </div>
+                  </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">{lesson}</p>
-                    {index === 2 ? <p className="text-xs text-primary">Next lesson · {course.nextLesson}</p> : null}
+                    {module.nextLesson ? (
+                      <p className="text-xs font-semibold text-primary">
+                        Next lesson · {module.nextLesson.title}
+                        {module.nextLesson.status === 'scheduled' && module.nextLesson.releaseAt
+                          ? ` • Unlocks ${new Date(module.nextLesson.releaseAt).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric'
+                            })}`
+                          : ''}
+                      </p>
+                    ) : (
+                      <p className="text-xs font-semibold text-emerald-600">Module complete</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    {(module.lessons ?? []).slice(0, 4).map((lesson) => (
+                      <div
+                        key={lesson.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-slate-800">{lesson.title}</p>
+                          <p className="text-xs text-slate-500">{formatLessonAvailability(lesson)}</p>
+                        </div>
+                        <span className={`text-xs font-semibold ${lessonStatusTone(lesson)}`}>
+                          {lesson.completed ? 'Done' : lesson.status === 'scheduled' ? 'Scheduled' : 'Ready'}
+                        </span>
+                      </div>
+                    ))}
+                    {module.lessons?.length > 4 ? (
+                      <p className="text-xs text-slate-400">+{module.lessons.length - 4} more lessons</p>
+                    ) : null}
                   </div>
                 </div>
-              </li>
-            ))}
-          </ul>
+              ))}
+            </div>
+          )}
         </div>
         <div className="space-y-6">
           <div className="dashboard-section">
@@ -326,7 +415,22 @@ export default function CourseViewer() {
             <div className="mt-4 h-2 rounded-full bg-slate-200">
               <div className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark" style={{ width: `${course.progress}%` }} />
             </div>
-            <p className="mt-3 text-xs text-slate-500">Next action: {course.nextLesson}</p>
+            <p className="mt-3 text-xs text-slate-500">
+              {completedLessonsCount} of {totalLessonsCount} lessons wrapped
+            </p>
+            {nextLessonDetail ? (
+              <p className="mt-2 text-xs text-primary">
+                Next action: {nextLessonDetail.moduleTitle} · {nextLessonDetail.lessonTitle}
+                {nextLessonDetail.status === 'scheduled' && nextLessonDetail.releaseAt
+                  ? ` • Unlocks ${new Date(nextLessonDetail.releaseAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric'
+                    })}`
+                  : ''}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-emerald-600">You&apos;ve completed the learning path.</p>
+            )}
           </div>
           <div className="dashboard-section">
             <h2 className="text-lg font-semibold text-slate-900">Resources</h2>

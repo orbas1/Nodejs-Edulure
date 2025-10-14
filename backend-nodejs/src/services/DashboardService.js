@@ -47,6 +47,18 @@ export function formatCurrency(amountCents, currency = 'USD') {
   return formatter.format(amount);
 }
 
+export function formatReleaseOffsetLabel(offsetDays) {
+  const offset = Number.isFinite(Number(offsetDays)) ? Number(offsetDays) : null;
+  if (offset === null || Number.isNaN(offset) || offset <= 0) {
+    return 'Launch week';
+  }
+  if (offset % 7 === 0) {
+    const week = offset / 7 + 1;
+    return `Week ${week}`;
+  }
+  return `Day ${offset}`;
+}
+
 export function humanizeRelativeTime(date, referenceDate = new Date()) {
   if (!date) return 'Unknown';
   const target = typeof date === 'string' ? new Date(date) : new Date(date.getTime());
@@ -743,18 +755,6 @@ export function buildInstructorDashboard({
       updated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: undefined })
     }));
 
-  const formatReleaseOffsetLabel = (offsetDays) => {
-    const offset = Number.isFinite(Number(offsetDays)) ? Number(offsetDays) : null;
-    if (offset === null || Number.isNaN(offset) || offset <= 0) {
-      return 'Launch week';
-    }
-    if (offset % 7 === 0) {
-      const week = offset / 7 + 1;
-      return `Week ${week}`;
-    }
-    return `Day ${offset}`;
-  };
-
   const readinessLabelForScore = (score) => {
     if (score >= 80) return 'Launch-ready';
     if (score >= 50) return 'In build';
@@ -1291,6 +1291,7 @@ export default class DashboardService {
           'cp.completed as completed',
           'cp.completed_at as completedAt',
           'cp.progress_percent as progressPercent',
+          'cl.module_id as moduleId',
           'cl.title as lessonTitle',
           'cl.slug as lessonSlug',
           'cl.position as lessonPosition',
@@ -1884,11 +1885,112 @@ export default class DashboardService {
       ebookProgressRows
     });
 
-    const progressByEnrollment = new Map();
+    const progressByEnrollmentLesson = new Map();
     progressRows.forEach((row) => {
-      const list = progressByEnrollment.get(row.enrollmentId) ?? [];
-      list.push(row);
-      progressByEnrollment.set(row.enrollmentId, list);
+      const lessonSlug = row.lessonSlug ?? row.lessonTitle ?? `lesson-${row.lessonPosition}`;
+      const lessonMap = progressByEnrollmentLesson.get(row.enrollmentId) ?? new Map();
+      if (lessonSlug) {
+        lessonMap.set(String(lessonSlug), row);
+      }
+      progressByEnrollmentLesson.set(row.enrollmentId, lessonMap);
+    });
+
+    const enrollmentCourseIds = Array.from(
+      new Set(
+        enrollmentRows
+          .map((row) => Number(row.courseId))
+          .filter((id) => Number.isFinite(id) && id > 0)
+      )
+    );
+    const instructorCourseIds = new Set(
+      instructorCourseRows.map((course) => Number(course.id)).filter((id) => Number.isFinite(id) && id > 0)
+    );
+    const learnerCourseIds = enrollmentCourseIds.filter((id) => !instructorCourseIds.has(id));
+
+    let learnerCourseModuleRows = [];
+    let learnerLessonRows = [];
+
+    if (learnerCourseIds.length > 0) {
+      learnerCourseModuleRows = await db('course_modules as module')
+        .select(
+          'module.id',
+          'module.course_id as courseId',
+          'module.title',
+          'module.slug as moduleSlug',
+          'module.position',
+          'module.release_offset_days as releaseOffsetDays',
+          'module.metadata'
+        )
+        .whereIn('module.course_id', learnerCourseIds);
+
+      learnerLessonRows = await db('course_lessons as lesson')
+        .innerJoin('course_modules as module', 'module.id', 'lesson.module_id')
+        .innerJoin('courses as course', 'course.id', 'lesson.course_id')
+        .select(
+          'lesson.id',
+          'lesson.course_id as courseId',
+          'lesson.module_id as moduleId',
+          'lesson.title',
+          'lesson.slug as lessonSlug',
+          'lesson.position',
+          'lesson.release_at as releaseAt',
+          'lesson.duration_minutes as durationMinutes',
+          'lesson.metadata',
+          'course.title as courseTitle',
+          'course.release_at as courseReleaseAt',
+          'module.title as moduleTitle',
+          'module.release_offset_days as moduleReleaseOffsetDays'
+        )
+        .whereIn('lesson.course_id', learnerCourseIds);
+    }
+
+    const learnerModulesByCourse = new Map();
+    const learnerLessonsByModule = new Map();
+
+    const normaliseModuleRow = (row) => ({
+      id: Number(row.id),
+      courseId: Number(row.courseId),
+      title: row.title,
+      slug: row.moduleSlug ?? row.slug,
+      position: Number(row.position ?? 0),
+      releaseOffsetDays: Number(row.releaseOffsetDays ?? 0),
+      metadata: safeJsonParse(row.metadata, {})
+    });
+
+    [...instructorCourseModuleRows, ...learnerCourseModuleRows].forEach((row) => {
+      const module = normaliseModuleRow(row);
+      if (!Number.isFinite(module.courseId)) return;
+      const modules = learnerModulesByCourse.get(module.courseId) ?? [];
+      modules.push(module);
+      learnerModulesByCourse.set(module.courseId, modules);
+    });
+
+    const normaliseLessonRow = (row) => {
+      const moduleOffset = Number(row.moduleReleaseOffsetDays ?? 0);
+      let releaseAt = row.releaseAt ? new Date(row.releaseAt) : null;
+      if (!releaseAt && row.courseReleaseAt) {
+        const base = new Date(row.courseReleaseAt);
+        releaseAt = new Date(base.getTime() + moduleOffset * DAY_IN_MS);
+      }
+      return {
+        id: Number(row.id),
+        courseId: Number(row.courseId),
+        moduleId: Number(row.moduleId),
+        slug: row.lessonSlug ?? row.slug,
+        title: row.title,
+        position: Number(row.position ?? 0),
+        releaseAt,
+        durationMinutes: Number(row.durationMinutes ?? 0),
+        metadata: safeJsonParse(row.metadata, {})
+      };
+    };
+
+    [...instructorLessonRows, ...learnerLessonRows].forEach((row) => {
+      const lesson = normaliseLessonRow(row);
+      if (!Number.isFinite(lesson.moduleId)) return;
+      const lessons = learnerLessonsByModule.get(lesson.moduleId) ?? [];
+      lessons.push(lesson);
+      learnerLessonsByModule.set(lesson.moduleId, lessons);
     });
 
     const learningCompletions = progressRows
@@ -2037,17 +2139,89 @@ export default class DashboardService {
 
     const activeEnrollments = enrollmentRows.filter((row) => row.status === 'active');
     const learnerCourseSummaries = activeEnrollments.map((enrollment) => {
-      const lessons = (progressByEnrollment.get(enrollment.enrollmentId) ?? []).sort(
-        (a, b) => a.lessonPosition - b.lessonPosition
+      const courseId = Number(enrollment.courseId);
+      const modules = [...(learnerModulesByCourse.get(courseId) ?? [])].sort(
+        (a, b) => a.position - b.position
       );
-      const nextLesson = lessons.find((lesson) => !lesson.completed);
+      const lessonProgress = progressByEnrollmentLesson.get(enrollment.enrollmentId) ?? new Map();
+
+      const moduleSummaries = modules.map((module) => {
+        const lessonRows = [...(learnerLessonsByModule.get(module.id) ?? [])].sort(
+          (a, b) => a.position - b.position
+        );
+        const lessons = lessonRows.map((lesson) => {
+          const progress = lessonProgress.get(lesson.slug ?? `lesson-${lesson.id}`) ?? null;
+          const completed = Boolean(progress?.completed);
+          const releaseAtIso = lesson.releaseAt ? lesson.releaseAt.toISOString() : null;
+          const available = !lesson.releaseAt || lesson.releaseAt <= now;
+          const status = completed ? 'completed' : available ? 'available' : 'scheduled';
+          return {
+            id: `lesson-${lesson.id}`,
+            title: lesson.title,
+            slug: lesson.slug,
+            durationMinutes: lesson.durationMinutes,
+            releaseAt: releaseAtIso,
+            completed,
+            completedAt: progress?.completedAt ?? null,
+            status
+          };
+        });
+
+        const completedLessons = lessons.filter((lesson) => lesson.completed).length;
+        const totalLessons = lessons.length;
+        const completionPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+        const nextLesson = lessons.find((lesson) => !lesson.completed);
+
+        return {
+          id: `module-${module.id}`,
+          title: module.title,
+          position: module.position,
+          releaseLabel: formatReleaseOffsetLabel(module.releaseOffsetDays),
+          lessons,
+          progress: {
+            completedLessons,
+            totalLessons,
+            completionPercent
+          },
+          nextLesson: nextLesson
+            ? {
+                lessonId: nextLesson.id,
+                title: nextLesson.title,
+                status: nextLesson.status,
+                releaseAt: nextLesson.releaseAt
+              }
+            : null
+        };
+      });
+
+      const orderedLessons = moduleSummaries.flatMap((module) =>
+        module.lessons.map((lesson) => ({
+          ...lesson,
+          moduleTitle: module.title,
+          moduleReleaseLabel: module.releaseLabel
+        }))
+      );
+      const nextLesson = orderedLessons.find((lesson) => !lesson.completed);
+
       return {
         id: enrollment.courseSlug,
         title: enrollment.courseTitle,
         status: 'In progress',
         progress: Math.round(Number(enrollment.progressPercent ?? 0)),
         instructor: `${enrollment.instructorFirstName} ${enrollment.instructorLastName}`.trim(),
-        nextLesson: nextLesson ? nextLesson.lessonTitle : 'Review completed lessons'
+        nextLesson: nextLesson ? `${nextLesson.moduleTitle} · ${nextLesson.title}` : 'Review completed lessons',
+        nextLessonDetail: nextLesson
+          ? {
+              lessonId: nextLesson.id,
+              lessonTitle: nextLesson.title,
+              moduleTitle: nextLesson.moduleTitle,
+              releaseAt: nextLesson.releaseAt,
+              completed: nextLesson.completed,
+              status: nextLesson.status,
+              moduleReleaseLabel: nextLesson.moduleReleaseLabel
+            }
+          : null,
+        modules: moduleSummaries
       };
     });
 

@@ -31,6 +31,15 @@ class _CoursePurchaseScreenState extends State<CoursePurchaseScreen> {
   }
 
   Future<void> _load() async {
+    final role = SessionManager.getActiveRole();
+    if (role != 'learner') {
+      setState(() {
+        _dashboard = null;
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -152,6 +161,8 @@ class _CoursePurchaseScreenState extends State<CoursePurchaseScreen> {
   @override
   Widget build(BuildContext context) {
     final token = SessionManager.getAccessToken();
+    final role = SessionManager.getActiveRole();
+    final isLearner = role == 'learner';
     return Scaffold(
       appBar: AppBar(
         title: const Text('Purchase courses'),
@@ -166,6 +177,16 @@ class _CoursePurchaseScreenState extends State<CoursePurchaseScreen> {
                 child: Text('Log in from the home screen to view purchase-ready cohorts and live sessions.'),
               ),
             )
+          : !isLearner
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'Learner workspace required. Switch roles to explore cohorts ready for purchase.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
           : RefreshIndicator(
               onRefresh: _load,
               child: _loading && _dashboard == null
