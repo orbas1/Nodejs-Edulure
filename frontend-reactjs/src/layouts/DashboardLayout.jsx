@@ -17,6 +17,8 @@ import {
   Squares2X2Icon,
   UserGroupIcon,
   UsersIcon,
+  Bars3Icon,
+  XMarkIcon
   ShieldCheckIcon
   VideoCameraIcon
 } from '@heroicons/react/24/outline';
@@ -122,6 +124,13 @@ export default function DashboardLayout() {
   }, [resolvedRole, activeRole, setActiveRole]);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = () => setMobileNavOpen(false);
+
+  useEffect(() => {
+    closeMobileNav();
+  }, [location.pathname, resolvedRole]);
+
   const filteredResults = useMemo(() => {
     if (!searchQuery) return [];
     const query = searchQuery.toLowerCase();
@@ -263,6 +272,24 @@ export default function DashboardLayout() {
                   </div>
                 )}
               </div>
+              <div className="hidden items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm lg:flex">
+                {roles.map((roleOption) => {
+                  const target = `/dashboard/${roleOption.id}`;
+                  const isActive = resolvedRole === roleOption.id;
+                  return (
+                    <NavLink
+                      key={roleOption.id}
+                      to={target}
+                      className={`rounded-2xl px-4 py-2 transition ${
+                        isActive
+                          ? 'bg-primary text-white shadow'
+                          : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+                      }`}
+                    >
+                      {roleOption.label}
+                    </NavLink>
+                  );
+                })}
                 <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm">
                   {roles.map((roleOption) => {
                     const target = `/dashboard/${roleOption.id}`;
@@ -286,6 +313,16 @@ export default function DashboardLayout() {
               <div className="self-start lg:self-center">
                 <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
               </div>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
+                onClick={() => setMobileNavOpen((open) => !open)}
+                aria-expanded={mobileNavOpen}
+                aria-controls="dashboard-mobile-nav"
+              >
+                <Bars3Icon className="h-5 w-5" />
+                Menu
+              </button>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-slate-500">
               <span>
@@ -307,6 +344,83 @@ export default function DashboardLayout() {
           </div>
         </main>
       </div>
+      <div
+        className={`${
+          mobileNavOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
+        } fixed inset-0 z-40 bg-slate-950/40 transition-opacity duration-200 lg:hidden`}
+        aria-hidden={!mobileNavOpen}
+        onClick={closeMobileNav}
+      />
+      <nav
+        id="dashboard-mobile-nav"
+        className={`${
+          mobileNavOpen ? 'translate-x-0' : 'translate-x-full'
+        } fixed inset-y-0 right-0 z-50 w-80 max-w-[85vw] overflow-y-auto border-l border-slate-200 bg-white p-6 shadow-2xl transition-transform duration-200 lg:hidden`}
+        aria-label="Dashboard navigation"
+      >
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Navigate</p>
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 p-2 text-slate-500 transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            onClick={closeMobileNav}
+          >
+            <XMarkIcon className="h-5 w-5" />
+            <span className="sr-only">Close menu</span>
+          </button>
+        </div>
+        <div className="mt-6 flex flex-wrap gap-2">
+          {roles.map((roleOption) => {
+            const target = `/dashboard/${roleOption.id}`;
+            const isActive = resolvedRole === roleOption.id;
+            return (
+              <NavLink
+                key={roleOption.id}
+                to={target}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
+                  isActive
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'border border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary'
+                }`}
+                end
+                onClick={closeMobileNav}
+              >
+                {roleOption.label}
+              </NavLink>
+            );
+          })}
+        </div>
+        <ul className="mt-8 space-y-2">
+          {navigation.map((item) => (
+            <li key={item.to}>
+              <NavLink
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition-all ${
+                    isActive
+                      ? 'border-primary/60 bg-primary/10 text-primary shadow-sm'
+                      : 'border-slate-200 text-slate-600 hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
+                  }`
+                }
+                onClick={closeMobileNav}
+              >
+                <item.icon className="h-5 w-5 text-slate-400" />
+                <span>{item.name}</span>
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-6 border-t border-slate-200 pt-6">
+          <a
+            href="/"
+            className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-primary/40 hover:text-primary"
+          >
+            <span>Return to site</span>
+            <ArrowLeftOnRectangleIcon className="h-4 w-4" />
+          </a>
+        </div>
+      </nav>
     </div>
   );
 }

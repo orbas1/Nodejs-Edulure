@@ -21,14 +21,33 @@ class CourseService {
     if (token == null) {
       throw Exception('Authentication required');
     }
+
     final response = await _dio.get(
       '/dashboard/me',
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
-    final data = response.data['data'];
-    if (data is! Map<String, dynamic>) {
+
+    final payload = response.data;
+    if (payload is! Map<String, dynamic>) {
       throw Exception('Unexpected dashboard payload');
     }
+
+    final data = payload['data'];
+    if (data is! Map<String, dynamic>) {
+      throw Exception('Malformed dashboard response');
+    }
+
+    final dashboards = data['dashboards'];
+    if (dashboards is! Map<String, dynamic>) {
+      throw Exception('Dashboards not available for this account');
+    }
+
+    final instructor = dashboards['instructor'];
+    if (instructor is! Map<String, dynamic>) {
+      throw Exception('Instructor workspace is not configured for this account');
+    }
+
+    return CourseDashboard.fromJson(instructor);
     final dashboards = data['dashboards'];
     Map<String, dynamic> instructorJson = <String, dynamic>{};
     if (dashboards is Map<String, dynamic>) {
@@ -48,6 +67,8 @@ class CourseService {
 
 class CourseDashboard {
   CourseDashboard({
+    required this.metrics,
+    required this.revenueMix,
     required this.pipeline,
     required this.production,
     required this.offers,
@@ -57,6 +78,8 @@ class CourseDashboard {
   });
 
   factory CourseDashboard.fromJson(Map<String, dynamic> json) {
+    final metrics = <DashboardMetric>[];
+    final revenueMix = <RevenueSlice>[];
     final courses = json['courses'];
     final pricing = json['pricing'];
     final adsJson = json['ads'];
@@ -81,6 +104,74 @@ class CourseDashboard {
     final insights = <String>[];
     AdsWorkspace? ads;
 
+    final rawMetrics = json['metrics'];
+    if (rawMetrics is List) {
+      for (final entry in rawMetrics) {
+        if (entry is Map<String, dynamic>) {
+          metrics.add(DashboardMetric.fromJson(entry));
+        }
+      }
+    }
+
+    final analytics = json['analytics'];
+    if (analytics is Map<String, dynamic>) {
+      final rawRevenue = analytics['revenueStreams'];
+      if (rawRevenue is List) {
+        for (final entry in rawRevenue) {
+          if (entry is Map<String, dynamic>) {
+            revenueMix.add(RevenueSlice.fromJson(entry));
+          }
+        }
+      }
+    }
+
+    final courses = json['courses'];
+    if (courses is Map<String, dynamic>) {
+      final rawPipeline = courses['pipeline'];
+      if (rawPipeline is List) {
+        for (final item in rawPipeline) {
+          if (item is Map<String, dynamic>) {
+            pipeline.add(CoursePipelineEntry.fromJson(item));
+          }
+        }
+      }
+
+      final rawProduction = courses['production'];
+      if (rawProduction is List) {
+        for (final item in rawProduction) {
+          if (item is Map<String, dynamic>) {
+            production.add(CourseProductionTask.fromJson(item));
+          }
+        }
+      }
+    }
+
+    final pricing = json['pricing'];
+    if (pricing is Map<String, dynamic>) {
+      final rawOffers = pricing['offers'];
+      if (rawOffers is List) {
+        for (final item in rawOffers) {
+          if (item is Map<String, dynamic>) {
+            offers.add(CourseOffer.fromJson(item));
+          }
+        }
+      }
+
+      final rawSessions = pricing['sessions'];
+      if (rawSessions is List) {
+        for (final item in rawSessions) {
+          if (item is Map<String, dynamic>) {
+            sessions.add(CourseSession.fromJson(item));
+          }
+        }
+      }
+
+      final rawInsights = pricing['insights'];
+      if (rawInsights is List) {
+        for (final insight in rawInsights) {
+          if (insight is String && insight.trim().isNotEmpty) {
+            insights.add(insight.trim());
+          }
     final rawPipeline = coursesSection['pipeline'];
     if (rawPipeline is List) {
       for (final item in rawPipeline) {
@@ -128,6 +219,8 @@ class CourseDashboard {
     }
 
     return CourseDashboard(
+      metrics: metrics,
+      revenueMix: revenueMix,
       pipeline: pipeline,
       production: production,
       offers: offers,
@@ -139,6 +232,8 @@ class CourseDashboard {
     );
   }
 
+  final List<DashboardMetric> metrics;
+  final List<RevenueSlice> revenueMix;
   final List<CoursePipelineEntry> pipeline;
   final List<CourseProductionTask> production;
   final List<CourseOffer> offers;
@@ -148,10 +243,59 @@ class CourseDashboard {
   final LiveClassroomsSnapshot? liveClassrooms;
 
   bool get hasSignals =>
+      metrics.isNotEmpty ||
+      revenueMix.isNotEmpty ||
       pipeline.isNotEmpty ||
       production.isNotEmpty ||
       offers.isNotEmpty ||
       sessions.isNotEmpty ||
+      insights.isNotEmpty;
+}
+
+class DashboardMetric {
+  DashboardMetric({
+    required this.label,
+    required this.value,
+    this.change,
+    this.trend,
+  });
+
+  factory DashboardMetric.fromJson(Map<String, dynamic> json) {
+    return DashboardMetric(
+      label: (json['label'] ?? 'Metric').toString(),
+      value: (json['value'] ?? '').toString(),
+      change: json['change']?.toString(),
+      trend: json['trend']?.toString(),
+    );
+  }
+
+  final String label;
+  final String value;
+  final String? change;
+  final String? trend;
+
+  bool get isDownward => (trend ?? '').toLowerCase() == 'down';
+}
+
+class RevenueSlice {
+  RevenueSlice({
+    required this.name,
+    required this.percent,
+  });
+
+  factory RevenueSlice.fromJson(Map<String, dynamic> json) {
+    final value = json['percent'] ?? json['value'] ?? 0;
+    final numeric = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0;
+    return RevenueSlice(
+      name: (json['name'] ?? 'Stream').toString(),
+      percent: numeric.clamp(0, 100),
+    );
+  }
+
+  final String name;
+  final double percent;
+
+  String get formattedPercent => '${percent.toStringAsFixed(percent % 1 == 0 ? 0 : 1)}%';
       insights.isNotEmpty ||
       (ads?.hasSignals ?? false);
       (liveClassrooms != null &&
