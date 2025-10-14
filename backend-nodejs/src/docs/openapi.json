@@ -6044,6 +6044,62 @@
           "lastGeneratedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "gdpr": {
+            "$ref": "#/components/schemas/GdprComplianceProfile"
+          }
+        }
+      },
+      "GdprComplianceProfile": {
+        "type": "object",
+        "properties": {
+          "dsar": {
+            "type": "object",
+            "properties": {
+              "open": { "type": "integer" },
+              "dueSoon": { "type": "integer" },
+              "overdue": { "type": "integer" },
+              "completed30d": { "type": "integer" },
+              "averageCompletionHours": { "type": "integer" },
+              "slaHours": { "type": "integer" },
+              "owner": { "type": "string" },
+              "nextIcoSubmission": { "type": "string", "format": "date-time" }
+            }
+          },
+          "registers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "name": { "type": "string" },
+                "owner": { "type": "string" },
+                "status": { "type": "string" },
+                "lastReviewed": { "type": "string", "format": "date-time" },
+                "nextReviewDue": { "type": "string", "format": "date-time" },
+                "coverage": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "retentionPolicy": { "type": "string" }
+              }
+            }
+          },
+          "controls": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "ico": {
+            "type": "object",
+            "properties": {
+              "registrationNumber": { "type": "string" },
+              "status": { "type": "string" },
+              "feeTier": { "type": "string" },
+              "renewalDue": { "type": "string", "format": "date-time" },
+              "lastSubmitted": { "type": "string", "format": "date-time" },
+              "publicRegisterUrl": { "type": "string", "format": "uri" },
+              "reportingOwner": { "type": "string" }
+            }
           }
         }
       },

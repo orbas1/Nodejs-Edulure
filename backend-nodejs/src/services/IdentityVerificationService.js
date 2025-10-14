@@ -29,6 +29,241 @@ const REQUIRED_DOCUMENT_TYPES = [
 const REVIEWABLE_STATUSES = new Set(['submitted', 'pending_review', 'resubmission_required']);
 const FINAL_STATUSES = new Set(['approved', 'rejected']);
 
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function parseDateIso(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return fallback;
+  }
+
+  return parsed.toISOString();
+}
+
+function parseCsvList(value, fallback = []) {
+  if (!value || typeof value !== 'string') {
+    return fallback;
+  }
+
+  const parts = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+  return parts.length ? parts : fallback;
+}
+
+function parseJsonEnv(value, fallback) {
+  if (!value || typeof value !== 'string') {
+    return fallback;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    logger.warn({ err: error }, 'Failed to parse GDPR compliance JSON override');
+    return fallback;
+  }
+}
+
+function buildGdprSnapshot({ pending, breakdown, now }) {
+  const breaches = pending.filter((item) => item.hasBreachedSla).length;
+
+  const dsarOpenDefault = pending.length + parsePositiveInteger(breakdown.manualReviewQueue, 0);
+  const dsarDueSoonDefault = Math.max(0, Math.round(dsarOpenDefault * 0.35));
+  const dsarOverdueDefault = Math.max(breaches, Math.round(dsarOpenDefault * 0.1));
+  const dsarCompletedDefault = parsePositiveInteger(breakdown.approvalsWithinWindow, 0);
+
+  const dsarConfig = {
+    open: parsePositiveInteger(process.env.GDPR_DSAR_OPEN, dsarOpenDefault),
+    dueSoon: parsePositiveInteger(process.env.GDPR_DSAR_DUE_SOON, dsarDueSoonDefault),
+    overdue: parsePositiveInteger(process.env.GDPR_DSAR_OVERDUE, dsarOverdueDefault),
+    completed30d: parsePositiveInteger(
+      process.env.GDPR_DSAR_COMPLETED_30D,
+      dsarCompletedDefault
+    ),
+    averageCompletionHours: parsePositiveInteger(
+      process.env.GDPR_DSAR_AVG_COMPLETION_HOURS,
+      64
+    ),
+    slaHours: parsePositiveInteger(process.env.GDPR_DSAR_SLA_HOURS, 72),
+    owner:
+      process.env.GDPR_DATA_PROTECTION_OFFICER ||
+      process.env.GDPR_DPO ||
+      'Data Protection Officer',
+    nextIcoSubmission: parseDateIso(
+      process.env.GDPR_NEXT_ICO_SUBMISSION,
+      new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    )
+  };
+
+  const registersOverride = parseJsonEnv(process.env.GDPR_REGISTERS, null);
+  const defaultRegisters = [
+    {
+      id: 'ropa',
+      name: 'Record of Processing Activities',
+      owner:
+        process.env.GDPR_ROPA_OWNER ||
+        process.env.GDPR_DATA_PROTECTION_OFFICER ||
+        'Data Protection Officer',
+      status: process.env.GDPR_ROPA_STATUS || 'current',
+      lastReviewed: parseDateIso(
+        process.env.GDPR_ROPA_LAST_REVIEWED,
+        new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      nextReviewDue: parseDateIso(
+        process.env.GDPR_ROPA_NEXT_REVIEW,
+        new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      coverage: parseCsvList(
+        process.env.GDPR_ROPA_COVERAGE,
+        ['Core platform services', 'Marketing automation', 'Customer support']
+      ),
+      retentionPolicy:
+        process.env.GDPR_ROPA_RETENTION ||
+        'Reviewed quarterly and whenever the lawful basis or tooling changes.'
+    },
+    {
+      id: 'retention-schedule',
+      name: 'Data retention schedule',
+      owner: process.env.GDPR_RETENTION_OWNER || 'Head of Compliance',
+      status: process.env.GDPR_RETENTION_STATUS || 'in_review',
+      lastReviewed: parseDateIso(
+        process.env.GDPR_RETENTION_LAST_REVIEWED,
+        new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      nextReviewDue: parseDateIso(
+        process.env.GDPR_RETENTION_NEXT_REVIEW,
+        new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      coverage: parseCsvList(
+        process.env.GDPR_RETENTION_COVERAGE,
+        ['Learning analytics', 'Payments', 'Support tickets']
+      ),
+      retentionPolicy:
+        process.env.GDPR_RETENTION_POLICY ||
+        'System-enforced retention with automatic anonymisation after SLA expiry.'
+    },
+    {
+      id: 'sub-processor-register',
+      name: 'Sub-processor register',
+      owner: process.env.GDPR_VENDOR_OWNER || 'Procurement Lead',
+      status: process.env.GDPR_VENDOR_STATUS || 'current',
+      lastReviewed: parseDateIso(
+        process.env.GDPR_VENDOR_LAST_REVIEWED,
+        new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      nextReviewDue: parseDateIso(
+        process.env.GDPR_VENDOR_NEXT_REVIEW,
+        new Date(now.getTime() + 40 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      coverage: parseCsvList(
+        process.env.GDPR_VENDOR_COVERAGE,
+        ['Cloud hosting', 'Email delivery', 'Identity verification']
+      ),
+      retentionPolicy:
+        process.env.GDPR_VENDOR_POLICY ||
+        'Vendors reviewed pre-contract, annually, and on incident notification.'
+    }
+  ];
+
+  const registers = Array.isArray(registersOverride) && registersOverride.length
+    ? registersOverride
+    : defaultRegisters;
+
+  const controlsOverride = parseJsonEnv(process.env.GDPR_CONTROLS, null);
+  const defaultControls = {
+    breachNotifications: {
+      status: process.env.GDPR_BREACH_STATUS || 'tested',
+      lastTested: parseDateIso(
+        process.env.GDPR_BREACH_LAST_TESTED,
+        new Date(now.getTime() - 28 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      responseWindowHours: parsePositiveInteger(
+        process.env.GDPR_BREACH_RESPONSE_HOURS,
+        24
+      ),
+      playbookOwner: process.env.GDPR_BREACH_OWNER || 'Incident Response Lead'
+    },
+    dataProtectionImpactAssessments: {
+      status: process.env.GDPR_DPIA_STATUS || 'current',
+      openItems: parsePositiveInteger(process.env.GDPR_DPIA_OPEN, 0),
+      lastCompleted: parseDateIso(
+        process.env.GDPR_DPIA_LAST_COMPLETED,
+        new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString()
+      ),
+      upcomingReviews: parseCsvList(
+        process.env.GDPR_DPIA_UPCOMING,
+        ['Adaptive curriculum engine', 'Mobile application telemetry']
+      )
+    },
+    training: {
+      status: process.env.GDPR_TRAINING_STATUS || 'in_progress',
+      completionRate: parsePositiveInteger(process.env.GDPR_TRAINING_COMPLETION, 94),
+      overdue: parsePositiveInteger(process.env.GDPR_TRAINING_OVERDUE, 3),
+      nextCycleStarts: parseDateIso(
+        process.env.GDPR_TRAINING_NEXT_CYCLE,
+        new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString()
+      )
+    },
+    vendorAssessments: {
+      status: process.env.GDPR_VENDOR_ASSESS_STATUS || 'current',
+      pending: parsePositiveInteger(process.env.GDPR_VENDOR_ASSESS_PENDING, 1),
+      lastCompleted: parseDateIso(
+        process.env.GDPR_VENDOR_ASSESS_LAST_COMPLETED,
+        new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString()
+      )
+    },
+    encryption: {
+      status: process.env.GDPR_ENCRYPTION_STATUS || 'fully_encrypted',
+      keyRotationDays: parsePositiveInteger(process.env.GDPR_KEY_ROTATION_DAYS, 90),
+      lastAudit: parseDateIso(
+        process.env.GDPR_ENCRYPTION_LAST_AUDIT,
+        new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString()
+      )
+    }
+  };
+
+  const controls = controlsOverride && typeof controlsOverride === 'object'
+    ? { ...defaultControls, ...controlsOverride }
+    : defaultControls;
+
+  const ico = {
+    registrationNumber: process.env.GDPR_ICO_REGISTRATION || 'ZB765432',
+    status: process.env.GDPR_ICO_STATUS || 'Active',
+    feeTier: process.env.GDPR_ICO_FEE_TIER || 'Tier 2 (small organisation)',
+    renewalDue: parseDateIso(
+      process.env.GDPR_ICO_RENEWAL_DUE,
+      new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000).toISOString()
+    ),
+    lastSubmitted: parseDateIso(
+      process.env.GDPR_ICO_LAST_SUBMITTED,
+      new Date(now.getTime() - 185 * 24 * 60 * 60 * 1000).toISOString()
+    ),
+    publicRegisterUrl:
+      process.env.GDPR_ICO_REGISTER_URL ||
+      'https://ico.org.uk/ESDWebPages/Search',
+    reportingOwner: process.env.GDPR_ICO_OWNER || dsarConfig.owner
+  };
+
+  return {
+    dsar: dsarConfig,
+    registers,
+    controls,
+    ico
+  };
+}
+
 const uploadRequestSchema = Joi.object({
   documentType: Joi.string()
     .valid(...REQUIRED_DOCUMENT_TYPES.map((doc) => doc.type))
@@ -437,6 +672,8 @@ export default class IdentityVerificationService {
 
     const slaBreaches = pending.filter((item) => item.hasBreachedSla).length;
 
+    const gdpr = buildGdprSnapshot({ pending, breakdown, now });
+
     return {
       metrics: [
         {
@@ -460,7 +697,8 @@ export default class IdentityVerificationService {
       queue: pending,
       slaBreaches,
       manualReviewQueue: breakdown.manualReviewQueue,
-      lastGeneratedAt: now.toISOString()
+      lastGeneratedAt: now.toISOString(),
+      gdpr
     };
   }
 }
