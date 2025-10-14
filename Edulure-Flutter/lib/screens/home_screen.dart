@@ -3,6 +3,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 
 import '../services/session_manager.dart';
 
+enum _MenuAction { dashboard, profile, settings, signOut }
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -28,7 +30,23 @@ class _PublicHomeView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edulure'),
+        automaticallyImplyLeading: false,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0.4,
+        toolbarHeight: 72,
+        titleSpacing: 20,
+        title: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                'https://i.ibb.co/twQyCm1N/Edulure-Logo.png',
+                height: 40,
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pushNamed(context, '/login'),
@@ -39,7 +57,7 @@ class _PublicHomeView extends StatelessWidget {
             onPressed: () => Navigator.pushNamed(context, '/register'),
             child: const Text('Join Edulure'),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 16),
         ],
       ),
       body: ListView(
@@ -218,11 +236,39 @@ class _AuthenticatedHomeViewState extends State<_AuthenticatedHomeView> {
     );
   }
 
+  String get _dashboardRoute {
+    switch (_activeRole) {
+      case 'instructor':
+        return '/instructor-dashboard';
+      case 'admin':
+        return '/dashboard/learner';
+      default:
+        return '/dashboard/learner';
+    }
+  }
+
   void _setActiveRole(String role) {
     setState(() {
       _activeRole = role;
     });
     SessionManager.setActiveRole(role);
+  }
+
+  void _handleMenuAction(_MenuAction action) {
+    switch (action) {
+      case _MenuAction.dashboard:
+        Navigator.pushNamed(context, _dashboardRoute);
+        break;
+      case _MenuAction.profile:
+        Navigator.pushNamed(context, '/profile');
+        break;
+      case _MenuAction.settings:
+        Navigator.pushNamed(context, '/settings');
+        break;
+      case _MenuAction.signOut:
+        _logout();
+        break;
+    }
   }
 
   @override
@@ -233,19 +279,79 @@ class _AuthenticatedHomeViewState extends State<_AuthenticatedHomeView> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Welcome back, $_userDisplayName'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0.4,
+        toolbarHeight: 84,
+        titleSpacing: 0,
+        leadingWidth: 72,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: CircleAvatar(
+            backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+            child: Text(_initials, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Welcome back, $_userDisplayName',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            if (email != null)
+              Text(
+                email!,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.blueGrey),
+              ),
+          ],
+        ),
         actions: [
-          IconButton(
-            tooltip: 'Profile',
-            onPressed: () => Navigator.pushNamed(context, '/profile'),
-            icon: const Icon(Icons.person_outline),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Chip(
+              avatar: const Icon(Icons.badge_outlined, size: 16),
+              label: Text(_roleLabel(_activeRole)),
+              backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+            ),
           ),
-          IconButton(
-            tooltip: 'Sign out',
-            onPressed: _logout,
-            icon: const Icon(Icons.logout_outlined),
+          PopupMenuButton<_MenuAction>(
+            tooltip: 'Workspace menu',
+            onSelected: _handleMenuAction,
+            itemBuilder: (context) => [
+              PopupMenuItem<_MenuAction>(
+                value: _MenuAction.dashboard,
+                child: const ListTile(
+                  leading: Icon(Icons.dashboard_customize_outlined),
+                  title: Text('Open dashboard'),
+                ),
+              ),
+              PopupMenuItem<_MenuAction>(
+                value: _MenuAction.profile,
+                child: const ListTile(
+                  leading: Icon(Icons.person_outline),
+                  title: Text('View profile'),
+                ),
+              ),
+              PopupMenuItem<_MenuAction>(
+                value: _MenuAction.settings,
+                child: const ListTile(
+                  leading: Icon(Icons.settings_outlined),
+                  title: Text('Settings'),
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem<_MenuAction>(
+                value: _MenuAction.signOut,
+                child: const ListTile(
+                  leading: Icon(Icons.logout_outlined, color: Colors.redAccent),
+                  title: Text('Sign out'),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
         ],
       ),
       body: ListView(
@@ -483,6 +589,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       _RoleAction(icon: Icons.dynamic_feed_outlined, label: 'Browse feed', route: '/feed'),
       _RoleAction(icon: Icons.bookmark_border, label: 'Open content library', route: '/content'),
       _RoleAction(icon: Icons.calendar_today_outlined, label: 'Review timetable', route: '/profile'),
+      _RoleAction(icon: Icons.settings_outlined, label: 'Settings', route: '/settings'),
     ],
   ),
   'instructor': _RoleHomeDetails(
@@ -512,6 +619,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       _RoleAction(icon: Icons.add_circle_outline, label: 'Create course', route: '/content'),
       _RoleAction(icon: Icons.message_outlined, label: 'Open inbox', route: '/feed'),
       _RoleAction(icon: Icons.schedule_outlined, label: 'Plan lesson', route: '/profile'),
+      _RoleAction(icon: Icons.settings_outlined, label: 'Settings', route: '/settings'),
     ],
   ),
   'admin': _RoleHomeDetails(
@@ -539,7 +647,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       _RoleAction(icon: Icons.travel_explore_outlined, label: 'Open explorer', route: '/explorer'),
       _RoleAction(icon: Icons.admin_panel_settings_outlined, label: 'Manage roles', route: '/profile'),
       _RoleAction(icon: Icons.insights_outlined, label: 'View analytics', route: '/content'),
-      _RoleAction(icon: Icons.settings_outlined, label: 'Workspace settings', route: '/profile'),
+      _RoleAction(icon: Icons.settings_outlined, label: 'Workspace settings', route: '/settings'),
     ],
   ),
 };
