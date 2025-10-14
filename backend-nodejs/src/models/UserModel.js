@@ -34,7 +34,10 @@ export default class UserModel {
       password_hash: user.passwordHash,
       role: user.role ?? 'user',
       age: user.age ?? null,
-      address: user.address ?? null,
+      address:
+        user.address && typeof user.address === 'object'
+          ? JSON.stringify(user.address)
+          : user.address ?? null,
       two_factor_enabled: user.twoFactorEnabled ? 1 : 0,
       two_factor_secret: user.twoFactorSecret ?? null,
       two_factor_enrolled_at: user.twoFactorEnrolledAt ?? null,
