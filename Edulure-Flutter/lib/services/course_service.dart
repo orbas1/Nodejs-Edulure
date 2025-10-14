@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'api_config.dart';
+import 'dashboard_service.dart';
 import 'session_manager.dart';
 
 class CourseService {
@@ -28,7 +29,20 @@ class CourseService {
     if (data is! Map<String, dynamic>) {
       throw Exception('Unexpected dashboard payload');
     }
-    return CourseDashboard.fromJson(data);
+    final dashboards = data['dashboards'];
+    Map<String, dynamic> instructorJson = <String, dynamic>{};
+    if (dashboards is Map<String, dynamic>) {
+      final instructor = dashboards['instructor'];
+      if (instructor is Map<String, dynamic>) {
+        instructorJson = Map<String, dynamic>.from(instructor);
+      }
+    }
+
+    if (instructorJson.isEmpty) {
+      instructorJson = Map<String, dynamic>.from(data);
+    }
+
+    return CourseDashboard.fromJson(instructorJson);
   }
 }
 
@@ -46,6 +60,19 @@ class CourseDashboard {
     final courses = json['courses'];
     final pricing = json['pricing'];
     final adsJson = json['ads'];
+    this.liveClassrooms,
+  });
+
+  factory CourseDashboard.fromJson(Map<String, dynamic> json) {
+    final coursesSection = json['courses'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['courses'] as Map)
+        : json;
+    final pricingSection = json['pricing'] is Map<String, dynamic>
+        ? Map<String, dynamic>.from(json['pricing'] as Map)
+        : <String, dynamic>{};
+    final liveClassroomsJson = json['liveClassrooms'] is Map
+        ? Map<String, dynamic>.from(json['liveClassrooms'] as Map)
+        : null;
 
     final pipeline = <CoursePipelineEntry>[];
     final production = <CourseProductionTask>[];
@@ -54,48 +81,44 @@ class CourseDashboard {
     final insights = <String>[];
     AdsWorkspace? ads;
 
-    if (courses is Map<String, dynamic>) {
-      final rawPipeline = courses['pipeline'];
-      if (rawPipeline is List) {
-        for (final item in rawPipeline) {
-          if (item is Map<String, dynamic>) {
-            pipeline.add(CoursePipelineEntry.fromJson(item));
-          }
+    final rawPipeline = coursesSection['pipeline'];
+    if (rawPipeline is List) {
+      for (final item in rawPipeline) {
+        if (item is Map<String, dynamic>) {
+          pipeline.add(CoursePipelineEntry.fromJson(item));
         }
       }
-      final rawProduction = courses['production'];
-      if (rawProduction is List) {
-        for (final item in rawProduction) {
-          if (item is Map<String, dynamic>) {
-            production.add(CourseProductionTask.fromJson(item));
-          }
+    }
+    final rawProduction = coursesSection['production'];
+    if (rawProduction is List) {
+      for (final item in rawProduction) {
+        if (item is Map<String, dynamic>) {
+          production.add(CourseProductionTask.fromJson(item));
         }
       }
     }
 
-    if (pricing is Map<String, dynamic>) {
-      final rawOffers = pricing['offers'];
-      if (rawOffers is List) {
-        for (final item in rawOffers) {
-          if (item is Map<String, dynamic>) {
-            offers.add(CourseOffer.fromJson(item));
-          }
+    final rawOffers = pricingSection['offers'];
+    if (rawOffers is List) {
+      for (final item in rawOffers) {
+        if (item is Map<String, dynamic>) {
+          offers.add(CourseOffer.fromJson(item));
         }
       }
-      final rawSessions = pricing['sessions'];
-      if (rawSessions is List) {
-        for (final item in rawSessions) {
-          if (item is Map<String, dynamic>) {
-            sessions.add(CourseSession.fromJson(item));
-          }
+    }
+    final rawSessions = pricingSection['sessions'];
+    if (rawSessions is List) {
+      for (final item in rawSessions) {
+        if (item is Map<String, dynamic>) {
+          sessions.add(CourseSession.fromJson(item));
         }
       }
-      final rawInsights = pricing['insights'];
-      if (rawInsights is List) {
-        for (final item in rawInsights) {
-          if (item is String && item.trim().isNotEmpty) {
-            insights.add(item.trim());
-          }
+    }
+    final rawInsights = pricingSection['insights'];
+    if (rawInsights is List) {
+      for (final item in rawInsights) {
+        if (item is String && item.trim().isNotEmpty) {
+          insights.add(item.trim());
         }
       }
     }
@@ -111,6 +134,8 @@ class CourseDashboard {
       sessions: sessions,
       insights: insights,
       ads: ads,
+      liveClassrooms:
+          liveClassroomsJson == null ? null : LiveClassroomsSnapshot.fromJson(liveClassroomsJson),
     );
   }
 
@@ -120,6 +145,7 @@ class CourseDashboard {
   final List<CourseSession> sessions;
   final List<String> insights;
   final AdsWorkspace? ads;
+  final LiveClassroomsSnapshot? liveClassrooms;
 
   bool get hasSignals =>
       pipeline.isNotEmpty ||
@@ -128,6 +154,12 @@ class CourseDashboard {
       sessions.isNotEmpty ||
       insights.isNotEmpty ||
       (ads?.hasSignals ?? false);
+      (liveClassrooms != null &&
+          (liveClassrooms!.metrics.isNotEmpty ||
+              liveClassrooms!.active.isNotEmpty ||
+              liveClassrooms!.upcoming.isNotEmpty ||
+              liveClassrooms!.completed.isNotEmpty ||
+              liveClassrooms!.readiness.isNotEmpty));
 }
 
 class CoursePipelineEntry {

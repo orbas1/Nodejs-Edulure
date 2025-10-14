@@ -24,6 +24,7 @@ import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.j
 import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
 import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
 import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
+import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
 import InstructorCommunityCreate from './pages/dashboard/InstructorCommunityCreate.jsx';
 import InstructorCommunityManage from './pages/dashboard/InstructorCommunityManage.jsx';
 import InstructorCommunityWebinars from './pages/dashboard/InstructorCommunityWebinars.jsx';
@@ -111,6 +112,7 @@ function App() {
         <Route path="communities" element={<LearnerCommunities />} />
         <Route path="courses" element={<LearnerCourses />} />
         <Route path="courses/:courseId" element={<CourseViewer />} />
+        <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
         <Route path="calendar" element={<DashboardCalendar />} />
         <Route path="bookings" element={<DashboardBookingsSwitch />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />

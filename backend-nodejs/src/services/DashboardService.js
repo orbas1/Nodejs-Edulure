@@ -1282,6 +1282,85 @@ export function buildInstructorDashboard({
     release: post.publishedAt ? formatDateTime(post.publishedAt, { dateStyle: 'medium', timeStyle: undefined }) : 'Unscheduled'
   }));
 
+  const instructorLiveClassSessions = liveSessions.map((session) =>
+    normaliseLiveClassroom(
+      {
+        ...session,
+        metadata: session.metadata ?? {}
+      },
+      { now, perspective: 'instructor', allowJoinLink: true }
+    )
+  );
+  const instructorUpcomingLive = instructorLiveClassSessions.filter((session) =>
+    ['upcoming', 'check-in'].includes(session.status)
+  );
+  const instructorActiveLive = instructorLiveClassSessions.filter((session) => session.status === 'live');
+  const instructorCompletedLive = instructorLiveClassSessions
+    .filter((session) => session.status === 'completed')
+    .sort((a, b) => {
+      const aTime = a.endAt ? new Date(a.endAt).getTime() : a.startAt ? new Date(a.startAt).getTime() : 0;
+      const bTime = b.endAt ? new Date(b.endAt).getTime() : b.startAt ? new Date(b.startAt).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 6);
+  const instructorWhiteboardSnapshots = buildLiveClassWhiteboardSnapshots(instructorLiveClassSessions).slice(0, 8);
+  const instructorReadiness = buildLiveClassReadiness(instructorLiveClassSessions);
+  const instructorAverageOccupancy = averageOccupancyRate(instructorLiveClassSessions);
+
+  const instructorRevenuePotential = new Map();
+  const instructorRevenueCommitted = new Map();
+  instructorLiveClassSessions.forEach((session) => {
+    const currency = session.pricing?.currency ?? 'USD';
+    const capacity = Number(session.occupancy?.capacity ?? 0);
+    const priceCents = Number(session.pricing?.priceAmountCents ?? 0);
+    const collectedCents = Number(session.pricing?.collectedAmountCents ?? 0);
+    if (capacity > 0 && priceCents > 0) {
+      instructorRevenuePotential.set(currency, (instructorRevenuePotential.get(currency) ?? 0) + priceCents * capacity);
+    }
+    if (collectedCents > 0) {
+      instructorRevenueCommitted.set(currency, (instructorRevenueCommitted.get(currency) ?? 0) + collectedCents);
+    }
+  });
+
+  const formatMultiCurrencyTotal = (entriesMap) => {
+    const entries = Array.from(entriesMap.entries());
+    if (!entries.length) return null;
+    return entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' • ');
+  };
+
+  const instructorLiveMetrics = [
+    {
+      label: 'Live sessions scheduled',
+      value: String(instructorUpcomingLive.length),
+      change: instructorActiveLive.length > 0 ? `${instructorActiveLive.length} live now` : 'All in preparation',
+      trend: instructorUpcomingLive.length > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Average seat fill',
+      value: instructorAverageOccupancy !== null ? `${instructorAverageOccupancy}%` : '—',
+      change: `${liveSessions.length} session${liveSessions.length === 1 ? '' : 's'} tracked`,
+      trend: instructorAverageOccupancy !== null && instructorAverageOccupancy >= 70 ? 'up' : 'down'
+    },
+    {
+      label: 'Projected revenue',
+      value: formatMultiCurrencyTotal(instructorRevenuePotential) ?? 'No ticketing',
+      change: formatMultiCurrencyTotal(instructorRevenueCommitted) ?? 'No payments captured',
+      trend: instructorRevenuePotential.size > 0 ? 'up' : 'down'
+    }
+  ];
+
+  const instructorGroupSessions = instructorLiveClassSessions
+    .filter((session) => session.isGroupSession)
+    .map((session) => ({
+      id: session.id,
+      title: session.title,
+      stage: session.stage,
+      startLabel: session.startLabel,
+      occupancy: session.occupancy,
+      breakoutRooms: session.breakoutRooms,
+      callToAction: session.callToAction
+    }));
+
   const lessonSchedule = upcomingLessons.map((lesson) => ({
     id: `lesson-${lesson.id}`,
     topic: lesson.title,
@@ -1422,7 +1501,7 @@ export function buildInstructorDashboard({
       role: 'instructor',
       type: 'Live session',
       title: session.title,
-      url: '/dashboard/instructor/calendar'
+      url: '/dashboard/instructor/live-classes'
     }))
   ];
 
@@ -1466,6 +1545,18 @@ export function buildInstructorDashboard({
         createTemplates: templates,
         webinars,
         podcasts
+      },
+      liveClassrooms: {
+        metrics: instructorLiveMetrics,
+        sessions: instructorLiveClassSessions,
+        active: instructorActiveLive,
+        upcoming: instructorUpcomingLive,
+        completed: instructorCompletedLive,
+        groups: instructorGroupSessions.slice(0, 8),
+        whiteboard: {
+          snapshots: instructorWhiteboardSnapshots,
+          readiness: instructorReadiness
+        }
       },
       schedules: {
         lessons: lessonSchedule,
@@ -1548,6 +1639,363 @@ function minutesToReadable(minutes) {
     return `${hours} hrs`;
   }
   return `${hours}h ${remaining}m`;
+}
+
+const LIVE_JOIN_WINDOW_MINUTES = 15;
+const GROUP_SESSION_KEYWORDS = ['group', 'cohort', 'bootcamp', 'lab', 'studio', 'masterclass', 'workshop', 'breakout'];
+const WHITEBOARD_READY_STATES = new Set(['ready', 'live', 'approved', 'published']);
+
+function resolveLiveClassStatus(startAt, endAt, reference) {
+  if (!startAt && !endAt) {
+    return 'draft';
+  }
+  if (startAt) {
+    const startTime = startAt instanceof Date ? startAt.getTime() : new Date(startAt).getTime();
+    if (reference.getTime() < startTime) {
+      const diff = startTime - reference.getTime();
+      if (diff <= LIVE_JOIN_WINDOW_MINUTES * 60 * 1000) {
+        return 'check-in';
+      }
+      return 'upcoming';
+    }
+  }
+  if (endAt) {
+    const endTime = endAt instanceof Date ? endAt.getTime() : new Date(endAt).getTime();
+    if (reference.getTime() >= endTime) {
+      return 'completed';
+    }
+  }
+  return 'live';
+}
+
+function determineStageFromStatus(status) {
+  switch (status) {
+    case 'upcoming':
+      return 'Preparation';
+    case 'check-in':
+      return 'Check-in';
+    case 'live':
+      return 'Broadcasting';
+    case 'completed':
+      return 'Retrospective';
+    default:
+      return 'Draft';
+  }
+}
+
+function normaliseLiveClassroom(session, { now, perspective = 'learner', allowJoinLink = false } = {}) {
+  const metadataSource =
+    session.metadata && typeof session.metadata === 'object'
+      ? session.metadata
+      : safeJsonParse(session.metadata, {});
+  const metadata = metadataSource && typeof metadataSource === 'object' ? metadataSource : {};
+
+  const startAt = session.startAt ? new Date(session.startAt) : null;
+  const endAt = session.endAt ? new Date(session.endAt) : null;
+  const status = resolveLiveClassStatus(startAt, endAt, now);
+  const stage = determineStageFromStatus(status);
+  const timezone = session.timezone ?? metadata.timezone ?? metadata.timeZone ?? 'UTC';
+
+  const typeRaw = String(session.type ?? metadata.type ?? 'live').toLowerCase();
+  const typeLabel = typeRaw
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+  const isGroupSession = Boolean(
+    metadata.isGroup === true ||
+      metadata.groupSession === true ||
+      (Array.isArray(metadata.breakoutRooms) && metadata.breakoutRooms.length > 0) ||
+      GROUP_SESSION_KEYWORDS.some((keyword) => typeRaw.includes(keyword))
+  );
+
+  const capacity = Number(session.capacity ?? metadata.capacity ?? 0) || null;
+  const reservedSeats = Number(
+    session.reservedSeats ?? metadata.reservedSeats ?? metadata.attendees ?? metadata.registered ?? 0
+  ) || 0;
+  const occupancyRate =
+    capacity && capacity > 0 ? Math.min(Math.round((reservedSeats / capacity) * 100), 100) : null;
+
+  const joinWindowMs = LIVE_JOIN_WINDOW_MINUTES * 60 * 1000;
+  const joinEligible = allowJoinLink && startAt && now.getTime() >= startAt.getTime() - joinWindowMs;
+  const joinUrl = joinEligible ? metadata.joinUrl ?? metadata.attendeeUrl ?? null : null;
+  const hostUrl = metadata.hostUrl ?? metadata.presenterUrl ?? null;
+
+  const registration = session.registrationStatus ?? metadata.registrationStatus ?? null;
+  const amountPaidCents = Number(session.amountPaid ?? metadata.amountPaid ?? 0) || 0;
+  const registrationCurrency =
+    session.registrationCurrency ?? metadata.registrationCurrency ?? session.priceCurrency ?? metadata.priceCurrency ?? 'USD';
+  const priceAmountCents = Number(session.priceAmount ?? metadata.priceAmount ?? 0) || 0;
+  const priceCurrency = session.priceCurrency ?? metadata.priceCurrency ?? 'USD';
+
+  const facilitators = Array.isArray(metadata.facilitators)
+    ? metadata.facilitators.map((value) => String(value))
+    : metadata.host
+      ? [String(metadata.host)]
+      : session.communityName
+        ? [String(session.communityName)]
+        : [];
+
+  const breakoutRooms = Array.isArray(metadata.breakoutRooms)
+    ? metadata.breakoutRooms
+        .map((room) => {
+          if (typeof room === 'string') {
+            return { name: room };
+          }
+          if (room && typeof room === 'object') {
+            const name = room.name ?? room.title ?? 'Breakout room';
+            const facilitator = room.facilitator ?? room.host ?? null;
+            const capacityValue = Number(room.capacity ?? room.size ?? room.limit ?? 0) || null;
+            return {
+              name: String(name),
+              facilitator: facilitator ? String(facilitator) : undefined,
+              capacity: capacityValue
+            };
+          }
+          return null;
+        })
+        .filter(Boolean)
+    : [];
+
+  const whiteboardMetaRaw =
+    typeof metadata.whiteboard === 'string'
+      ? { url: metadata.whiteboard }
+      : metadata.whiteboard && typeof metadata.whiteboard === 'object'
+        ? { ...metadata.whiteboard }
+        : {};
+
+  if (!whiteboardMetaRaw.url && metadata.whiteboardUrl) {
+    whiteboardMetaRaw.url = metadata.whiteboardUrl;
+  }
+  if (!whiteboardMetaRaw.template && metadata.whiteboardTemplate) {
+    whiteboardMetaRaw.template = metadata.whiteboardTemplate;
+  }
+  if (!whiteboardMetaRaw.status && metadata.whiteboardStatus) {
+    whiteboardMetaRaw.status = metadata.whiteboardStatus;
+  }
+  if (!whiteboardMetaRaw.updatedAt && metadata.whiteboardUpdatedAt) {
+    whiteboardMetaRaw.updatedAt = metadata.whiteboardUpdatedAt;
+  }
+
+  const whiteboardReady =
+    whiteboardMetaRaw.ready === true ||
+    WHITEBOARD_READY_STATES.has(String(whiteboardMetaRaw.status ?? '').toLowerCase()) ||
+    metadata.whiteboardReady === true;
+
+  const whiteboardUpdatedAt = whiteboardMetaRaw.updatedAt
+    ? new Date(whiteboardMetaRaw.updatedAt)
+    : metadata.whiteboardLastEditedAt
+      ? new Date(metadata.whiteboardLastEditedAt)
+      : null;
+
+  const callToAction = (() => {
+    let label = 'View briefing';
+    let action = 'details';
+    let enabled = true;
+
+    if (status === 'live' && joinEligible && joinUrl) {
+      label = 'Join live classroom';
+      action = 'join';
+    } else if (status === 'check-in' && joinEligible && joinUrl) {
+      label = 'Enter waiting room';
+      action = 'check-in';
+    } else if (status === 'upcoming' && registration === 'registered') {
+      label = 'Manage ticket';
+      action = 'manage';
+    } else if (status === 'upcoming' && registration === 'waitlisted') {
+      label = 'View waitlist';
+      action = 'waitlist';
+    } else if (status === 'completed' && metadata.recordingUrl) {
+      label = 'Watch recording';
+      action = 'recording';
+    } else if (perspective === 'instructor' && hostUrl) {
+      label = status === 'completed' ? 'Review analytics' : 'Open host controls';
+      action = 'host';
+    }
+
+    if ((action === 'join' || action === 'check-in') && !joinUrl) {
+      enabled = false;
+    }
+
+    return { label, action, enabled };
+  })();
+
+  const durationMinutes =
+    startAt && endAt ? Math.max(0, Math.round((endAt.getTime() - startAt.getTime()) / 60000)) : null;
+
+  const security = {
+    waitingRoom: metadata.waitingRoom !== false,
+    passcodeRequired: metadata.passcodeRequired === true || Boolean(metadata.passcode),
+    recordingConsent: metadata.recordingConsent === true || metadata.recordingConsentRequired === true,
+    attendeeMfa: metadata.attendeeMfa === true
+  };
+
+  const recordingEnabled = metadata.recordingEnabled === true || metadata.recording === 'recorded';
+  const resources = Array.isArray(metadata.resources)
+    ? metadata.resources.map((item) => String(item)).slice(0, 6)
+    : [];
+
+  return {
+    id: session.id
+      ? String(session.id)
+      : `live-${session.classroomId ?? session.publicId ?? session.slug ?? metadata.id ?? Date.now()}`,
+    classroomId: session.classroomId ?? session.id ?? null,
+    slug: session.slug ?? null,
+    title: session.title ?? metadata.title ?? 'Live classroom',
+    summary: session.summary ?? metadata.summary ?? null,
+    type: typeRaw,
+    typeLabel,
+    isGroupSession,
+    community: session.communityName ?? metadata.community ?? null,
+    stage,
+    status,
+    registration,
+    timezone,
+    startAt: startAt ? startAt.toISOString() : null,
+    endAt: endAt ? endAt.toISOString() : null,
+    startLabel: startAt
+      ? formatDateTime(startAt, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone })
+      : 'TBD',
+    endLabel: endAt ? formatDateTime(endAt, { dateStyle: 'medium', timeStyle: 'short', timeZone: timezone }) : null,
+    countdownMinutes: startAt ? Math.max(0, Math.round((startAt.getTime() - now.getTime()) / 60000)) : null,
+    durationMinutes,
+    facilitators,
+    breakoutRooms,
+    occupancy: {
+      capacity,
+      reserved: reservedSeats,
+      rate: occupancyRate
+    },
+    security,
+    recordingEnabled,
+    resources,
+    callToAction,
+    joinUrl,
+    hostUrl: perspective === 'instructor' ? hostUrl : undefined,
+    pricing: {
+      price: priceAmountCents ? formatCurrency(priceAmountCents, priceCurrency) : null,
+      priceAmountCents,
+      currency: priceCurrency,
+      collectedAmountCents: amountPaidCents,
+      collectedLabel: amountPaidCents ? formatCurrency(amountPaidCents, registrationCurrency) : null,
+      registrationCurrency,
+      ticketType: session.ticketType ?? metadata.ticketType ?? 'general'
+    },
+    whiteboard: {
+      url: whiteboardMetaRaw.url ?? null,
+      template: whiteboardMetaRaw.template ?? 'Collaborative board',
+      status: whiteboardMetaRaw.status ?? (whiteboardReady ? 'Ready' : 'Draft'),
+      ready: whiteboardReady,
+      lastUpdatedAt: whiteboardUpdatedAt ? whiteboardUpdatedAt.toISOString() : null,
+      lastUpdatedLabel: whiteboardUpdatedAt ? humanizeRelativeTime(whiteboardUpdatedAt, now) : null,
+      facilitators: Array.isArray(whiteboardMetaRaw.facilitators)
+        ? whiteboardMetaRaw.facilitators.map((value) => String(value))
+        : facilitators,
+      notes: Array.isArray(whiteboardMetaRaw.notes)
+        ? whiteboardMetaRaw.notes.map((value) => String(value))
+        : []
+    },
+    support: {
+      moderator: metadata.moderator ? String(metadata.moderator) : null,
+      helpDesk: metadata.helpDesk ? String(metadata.helpDesk) : null
+    }
+  };
+}
+
+function buildLiveClassReadiness(sessions) {
+  if (!sessions?.length) {
+    return [
+      {
+        id: 'no-sessions',
+        label: 'No live sessions scheduled',
+        status: 'ready',
+        detail: 'Schedule a classroom to populate readiness insights.'
+      }
+    ];
+  }
+
+  const waitingRoomMissing = sessions.filter((session) => !session.security?.waitingRoom).length;
+  const passcodeMissing = sessions.filter((session) => !session.security?.passcodeRequired).length;
+  const whiteboardsPending = sessions.filter((session) => session.whiteboard && session.whiteboard.ready === false).length;
+  const consentMissing = sessions.filter((session) => !session.security?.recordingConsent).length;
+
+  const statusFor = (count) => {
+    if (count <= 0) return 'ready';
+    if (count === 1) return 'attention';
+    return 'action';
+  };
+
+  return [
+    {
+      id: 'waiting-room',
+      label: 'Waiting room enforcement',
+      status: statusFor(waitingRoomMissing),
+      detail:
+        waitingRoomMissing === 0
+          ? 'All sessions require host admission before joining.'
+          : `${waitingRoomMissing} session${waitingRoomMissing === 1 ? '' : 's'} allow direct entry.`
+    },
+    {
+      id: 'passcode',
+      label: 'Passcode protection',
+      status: statusFor(passcodeMissing),
+      detail:
+        passcodeMissing === 0
+          ? 'Passcodes are enabled across every upcoming classroom.'
+          : `${passcodeMissing} session${passcodeMissing === 1 ? '' : 's'} should add a passcode.`
+    },
+    {
+      id: 'whiteboard',
+      label: 'Whiteboard readiness',
+      status: statusFor(whiteboardsPending),
+      detail:
+        whiteboardsPending === 0
+          ? 'Every live board is prepped and ready.'
+          : `${whiteboardsPending} board${whiteboardsPending === 1 ? ' is' : 's are'} still in draft.`
+    },
+    {
+      id: 'recording',
+      label: 'Recording consent workflow',
+      status: statusFor(consentMissing),
+      detail:
+        consentMissing === 0
+          ? 'Recording consent is captured before each broadcast.'
+          : `${consentMissing} session${consentMissing === 1 ? '' : 's'} need consent prompts.`
+    }
+  ];
+}
+
+function buildLiveClassWhiteboardSnapshots(sessions) {
+  if (!sessions?.length) return [];
+  return sessions
+    .map((session) => {
+      const whiteboard = session.whiteboard ?? {};
+      if (!whiteboard.url && !whiteboard.template) {
+        return null;
+      }
+      return {
+        id: session.id,
+        title: session.title,
+        template: whiteboard.template ?? 'Collaborative board',
+        status: whiteboard.status ?? (whiteboard.ready ? 'Ready' : 'Draft'),
+        ready: Boolean(whiteboard.ready),
+        lastUpdatedLabel: whiteboard.lastUpdatedLabel ?? null,
+        facilitators: session.facilitators ?? [],
+        url: whiteboard.url ?? null
+      };
+    })
+    .filter(Boolean);
+}
+
+function averageOccupancyRate(sessions) {
+  if (!sessions?.length) return null;
+  const rates = sessions
+    .map((session) => Number(session.occupancy?.rate))
+    .filter((value) => Number.isFinite(value));
+  if (!rates.length) return null;
+  const total = rates.reduce((sum, value) => sum + value, 0);
+  return Math.round(total / rates.length);
 }
 
 export default class DashboardService {
@@ -2732,6 +3180,84 @@ export default class DashboardService {
         }))
     };
 
+    const learnerLiveClassSessions = liveClassRows.map((session) =>
+      normaliseLiveClassroom(
+        {
+          ...session,
+          metadata: safeJsonParse(session.classroomMetadata, {}),
+          registrationStatus: session.registrationStatus,
+          ticketType: session.ticketType,
+          amountPaid: session.amountPaid,
+          registrationCurrency: session.registrationCurrency,
+          priceAmount: session.priceAmount,
+          priceCurrency: session.priceCurrency
+        },
+        { now, perspective: 'learner', allowJoinLink: session.registrationStatus === 'registered' }
+      )
+    );
+
+    const learnerUpcomingLive = learnerLiveClassSessions.filter((session) =>
+      ['upcoming', 'check-in'].includes(session.status)
+    );
+    const learnerActiveLive = learnerLiveClassSessions.filter((session) => session.status === 'live');
+    const learnerCompletedLive = learnerLiveClassSessions
+      .filter((session) => session.status === 'completed')
+      .sort((a, b) => {
+        const aTime = a.endAt ? new Date(a.endAt).getTime() : a.startAt ? new Date(a.startAt).getTime() : 0;
+        const bTime = b.endAt ? new Date(b.endAt).getTime() : b.startAt ? new Date(b.startAt).getTime() : 0;
+        return bTime - aTime;
+      })
+      .slice(0, 6);
+
+    const learnerGroupSessions = learnerLiveClassSessions
+      .filter((session) => session.isGroupSession)
+      .map((session) => ({
+        id: session.id,
+        title: session.title,
+        stage: session.stage,
+        status: session.status,
+        startLabel: session.startLabel,
+        occupancy: session.occupancy,
+        callToAction: session.callToAction,
+        facilitators: session.facilitators,
+        breakoutRooms: session.breakoutRooms
+      }));
+
+    const learnerWhiteboardSnapshots = buildLiveClassWhiteboardSnapshots(learnerLiveClassSessions).slice(0, 6);
+    const learnerReadiness = buildLiveClassReadiness(learnerLiveClassSessions);
+    const registeredLiveCount = learnerLiveClassSessions.filter((session) => session.registration === 'registered').length;
+    const waitlistedLiveCount = learnerLiveClassSessions.filter((session) => session.registration === 'waitlisted').length;
+    const averageLearnerOccupancy = averageOccupancyRate(learnerLiveClassSessions);
+    const readyWhiteboards = learnerWhiteboardSnapshots.filter((snapshot) => snapshot.ready).length;
+
+    const learnerLiveMetrics = [
+      {
+        label: 'Registered live classes',
+        value: String(registeredLiveCount),
+        change: learnerActiveLive.length > 0 ? `${learnerActiveLive.length} streaming now` : 'All sessions scheduled',
+        trend: registeredLiveCount > 0 ? 'up' : 'down'
+      },
+      {
+        label: 'Average seat fill',
+        value: averageLearnerOccupancy !== null ? `${averageLearnerOccupancy}%` : 'N/A',
+        change: waitlistedLiveCount > 0 ? `${waitlistedLiveCount} waitlisted` : 'No waitlist pressure',
+        trend: averageLearnerOccupancy !== null && averageLearnerOccupancy >= 70 ? 'up' : 'down'
+      },
+      {
+        label: 'Whiteboard readiness',
+        value:
+          learnerWhiteboardSnapshots.length > 0
+            ? `${readyWhiteboards}/${learnerWhiteboardSnapshots.length} ready`
+            : 'No boards queued',
+        change:
+          learnerWhiteboardSnapshots.length === 0
+            ? 'Boards open on demand'
+            : `${learnerWhiteboardSnapshots.length - readyWhiteboards} in preparation`,
+        trend:
+          learnerWhiteboardSnapshots.length === 0 || readyWhiteboards === learnerWhiteboardSnapshots.length ? 'up' : 'down'
+      }
+    ];
+
     const totalSpent = paymentIntentRows
       .filter((intent) => intent.status === 'succeeded')
       .reduce((total, intent) => total + Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0), 0);
@@ -2936,6 +3462,18 @@ export default class DashboardService {
           active: learnerCourseSummaries,
           recommendations: courseRecommendations
         },
+        liveClassrooms: {
+          metrics: learnerLiveMetrics,
+          sessions: learnerLiveClassSessions,
+          active: learnerActiveLive,
+          upcoming: learnerUpcomingLive,
+          completed: learnerCompletedLive,
+          groups: learnerGroupSessions.slice(0, 6),
+          whiteboard: {
+            snapshots: learnerWhiteboardSnapshots,
+            readiness: learnerReadiness
+          }
+        },
         calendar: calendarEntries,
         tutorBookings,
         ebooks: {
@@ -3009,6 +3547,13 @@ export default class DashboardService {
         type: 'Community',
         title: community.name,
         url: '/dashboard/learner/communities'
+      })),
+      ...learnerUpcomingLive.map((session) => ({
+        id: `search-learner-live-${session.id}`,
+        role: 'learner',
+        type: 'Live classroom',
+        title: session.title,
+        url: '/dashboard/learner/live-classes'
       })),
       ...upcomingDisplay.map((event) => ({
         id: `search-event-${event.id}`,
