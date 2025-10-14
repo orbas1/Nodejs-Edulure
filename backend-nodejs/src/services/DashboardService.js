@@ -2145,6 +2145,69 @@ export default class DashboardService {
       );
       const lessonProgress = progressByEnrollmentLesson.get(enrollment.enrollmentId) ?? new Map();
 
+      const deriveLessonType = (lesson, progressRecord) => {
+        const metadata = lesson.metadata ?? {};
+        const explicitType = metadata.type ?? metadata.lessonType ?? metadata.category;
+        if (typeof explicitType === 'string' && explicitType.trim()) {
+          return explicitType.trim().toLowerCase();
+        }
+
+        const tags = Array.isArray(metadata.tags)
+          ? metadata.tags.map((tag) => String(tag).toLowerCase())
+          : [];
+        if (tags.includes('assessment') || tags.includes('quiz')) return 'assessment';
+        if (tags.includes('exam')) return 'exam';
+        if (tags.includes('assignment') || tags.includes('project')) return 'assignment';
+        if (tags.includes('refresher') || tags.includes('recap')) return 'refresher';
+        if (tags.includes('live') || tags.includes('live-class')) return 'live-class';
+        if (tags.includes('report')) return 'report';
+        if (tags.includes('catalog') || tags.includes('catalogue')) return 'catalogue';
+        if (tags.includes('drip')) return 'drip';
+
+        const title = (lesson.title ?? '').toLowerCase();
+        if (title.includes('assessment') || title.includes('quiz') || title.includes('checkpoint')) {
+          return 'assessment';
+        }
+        if (title.includes('exam') || title.includes('final') || title.includes('test')) {
+          return 'exam';
+        }
+        if (title.includes('assignment') || title.includes('project') || title.includes('capstone')) {
+          return 'assignment';
+        }
+        if (title.includes('refresher') || title.includes('recap') || title.includes('review')) {
+          return 'refresher';
+        }
+        if (title.includes('live') || title.includes('workshop') || title.includes('webinar')) {
+          return 'live-class';
+        }
+        if (title.includes('report') || title.includes('insight') || title.includes('analysis')) {
+          return 'report';
+        }
+        if (title.includes('catalogue') || title.includes('catalog')) {
+          return 'catalogue';
+        }
+        if (progressRecord?.completed && progressRecord?.durationMinutes === 0) {
+          return 'recording-review';
+        }
+        if (metadata.dripRelease || metadata.drip === true) {
+          return 'drip';
+        }
+        return 'lesson';
+      };
+
+      const resolveMetadataBoolean = (value, defaultValue = true) => {
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') {
+          const normalised = value.trim().toLowerCase();
+          if (!normalised) return defaultValue;
+          return ['true', '1', 'yes', 'required'].includes(normalised);
+        }
+        if (typeof value === 'number') {
+          return value !== 0;
+        }
+        return defaultValue;
+      };
+
       const moduleSummaries = modules.map((module) => {
         const lessonRows = [...(learnerLessonsByModule.get(module.id) ?? [])].sort(
           (a, b) => a.position - b.position
@@ -2155,6 +2218,16 @@ export default class DashboardService {
           const releaseAtIso = lesson.releaseAt ? lesson.releaseAt.toISOString() : null;
           const available = !lesson.releaseAt || lesson.releaseAt <= now;
           const status = completed ? 'completed' : available ? 'available' : 'scheduled';
+          const completedAtIso = progress?.completedAt
+            ? new Date(progress.completedAt).toISOString()
+            : null;
+          const scoreValue = Number(progress?.score ?? progress?.grade ?? NaN);
+          const attemptsValue = Number(progress?.attemptCount ?? progress?.attempts ?? NaN);
+          const lessonType = deriveLessonType(lesson, progress);
+          const format =
+            lesson.metadata?.format ??
+            lesson.metadata?.contentType ??
+            (lessonType === 'live-class' ? 'live' : 'asynchronous');
           return {
             id: `lesson-${lesson.id}`,
             title: lesson.title,
@@ -2162,8 +2235,14 @@ export default class DashboardService {
             durationMinutes: lesson.durationMinutes,
             releaseAt: releaseAtIso,
             completed,
-            completedAt: progress?.completedAt ?? null,
-            status
+            completedAt: completedAtIso,
+            status,
+            type: lessonType,
+            format,
+            required: resolveMetadataBoolean(lesson.metadata?.required, true),
+            score: Number.isFinite(scoreValue) ? scoreValue : null,
+            attempts: Number.isFinite(attemptsValue) ? attemptsValue : null,
+            metadata: lesson.metadata
           };
         });
 
@@ -2209,6 +2288,15 @@ export default class DashboardService {
         status: 'In progress',
         progress: Math.round(Number(enrollment.progressPercent ?? 0)),
         instructor: `${enrollment.instructorFirstName} ${enrollment.instructorLastName}`.trim(),
+        startedAt: enrollment.startedAt ? new Date(enrollment.startedAt).toISOString() : null,
+        completedAt: enrollment.completedAt ? new Date(enrollment.completedAt).toISOString() : null,
+        lastAccessedAt: enrollment.lastAccessedAt ? new Date(enrollment.lastAccessedAt).toISOString() : null,
+        deliveryFormat: enrollment.deliveryFormat ?? null,
+        level: enrollment.courseLevel ?? null,
+        ratingAverage: Number(enrollment.courseRating ?? 0),
+        ratingCount: Number(enrollment.courseRatingCount ?? 0),
+        enrolmentCount: Number(enrollment.enrolmentCount ?? 0),
+        metadata: safeJsonParse(enrollment.courseMetadata, {}),
         nextLesson: nextLesson ? `${nextLesson.moduleTitle} · ${nextLesson.title}` : 'Review completed lessons',
         nextLessonDetail: nextLesson
           ? {
