@@ -3,6 +3,17 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { env } from '../src/config/env.js';
 import PaymentService from '../src/services/PaymentService.js';
 
+const platformSettingsServiceMock = vi.hoisted(() => ({
+  getMonetizationSettings: vi.fn(async () => ({
+    commissions: {
+      enabled: true,
+      rateBps: 1500,
+      minimumFeeCents: 0
+    }
+  })),
+  calculateCommission: vi.fn(() => 0)
+}));
+
 vi.mock('../src/config/logger.js', () => ({
   default: {
     child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
@@ -21,6 +32,10 @@ vi.mock('../src/config/database.js', () => ({
   default: {
     transaction: transactionSpy
   }
+}));
+
+vi.mock('../src/services/PlatformSettingsService.js', () => ({
+  default: platformSettingsServiceMock
 }));
 
 const mockedModules = vi.hoisted(() => {
@@ -97,6 +112,36 @@ describe('PaymentService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     transactionSpy.mockClear();
+    platformSettingsServiceMock.getMonetizationSettings.mockResolvedValue({
+      commissions: {
+        enabled: true,
+        rateBps: 1500,
+        minimumFeeCents: 0
+      },
+      subscriptions: {
+        enabled: true,
+        restrictedFeatures: [],
+        gracePeriodDays: 7,
+        restrictOnFailure: true
+      },
+      payments: {
+        defaultProvider: 'stripe',
+        stripeEnabled: true,
+        escrowEnabled: false
+      },
+      affiliate: {
+        defaultCommission: {
+          recurrence: 'infinite',
+          maxOccurrences: null,
+          tiers: []
+        },
+        security: {
+          blockSelfReferral: true,
+          enforceTwoFactorForPayouts: true
+        }
+      }
+    });
+    platformSettingsServiceMock.calculateCommission.mockReturnValue(0);
     env.payments.allowedCurrencies.splice(0, env.payments.allowedCurrencies.length, ...originalAllowedCurrencies);
     env.payments.tax.inclusive = originalTaxConfig.inclusive;
     env.payments.tax.minimumRate = originalTaxConfig.minimumRate;

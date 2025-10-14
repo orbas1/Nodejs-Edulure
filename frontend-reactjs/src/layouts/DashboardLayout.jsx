@@ -11,6 +11,7 @@ import {
   IdentificationIcon,
   DocumentTextIcon,
   InboxStackIcon,
+  HandshakeIcon,
   MegaphoneIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
@@ -38,6 +39,7 @@ const navigationByRole = {
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
     { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
     { name: 'Become an instructor', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
   ],
@@ -53,6 +55,7 @@ const navigationByRole = {
     { name: 'Manage courses', to: `${basePath}/courses/manage`, icon: Cog6ToothIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
+    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'Tutor management', to: `${basePath}/tutor-management`, icon: IdentificationIcon },

@@ -28,6 +28,7 @@ import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.j
 import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
 import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
 import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
+import DashboardAffiliate from './pages/dashboard/DashboardAffiliate.jsx';
 import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
 import InstructorCommunityCreate from './pages/dashboard/InstructorCommunityCreate.jsx';
 import InstructorCommunityManage from './pages/dashboard/InstructorCommunityManage.jsx';
@@ -139,6 +140,7 @@ function App() {
         <Route path="bookings" element={<DashboardBookingsSwitch />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
+        <Route path="affiliate" element={<DashboardAffiliate />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
         <Route
           path="operations"

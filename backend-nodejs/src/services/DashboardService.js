@@ -1017,6 +1017,8 @@ export function buildInstructorDashboard({
     const base = assignment.courseReleaseAt ? new Date(assignment.courseReleaseAt) : new Date(now.getTime());
     const offset = Number(assignment.dueOffsetDays ?? 0);
     const dueDate = new Date(base.getTime() + offset * 24 * 60 * 60 * 1000);
+    const fallbackOwnerName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+    const resolvedOwner = metadata.owner ?? (fallbackOwnerName || user.email);
     return {
       id: Number(assignment.id),
       courseId: Number(assignment.courseId),
@@ -1024,6 +1026,7 @@ export function buildInstructorDashboard({
       courseTitle: assignment.courseTitle,
       title: assignment.title,
       dueDate,
+      owner: resolvedOwner,
       owner:
         metadata.owner ??
         ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()) || user.email),
@@ -2506,6 +2509,366 @@ function buildCalendarEntries(entries) {
   }));
 }
 
+function formatBasisPoints(rateBps) {
+  const numeric = Number(rateBps ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return '0%';
+  }
+  const percent = numeric / 100;
+  const precision = percent >= 10 ? 1 : percent >= 1 ? 1 : 2;
+  return `${percent.toFixed(precision)}%`;
+}
+
+export function buildAffiliateOverview({
+  affiliates = [],
+  affiliatePayouts = [],
+  paymentIntents = [],
+  memberships = [],
+  monetizationSettings = {},
+  now = new Date()
+} = {}) {
+  const defaultAffiliate = monetizationSettings?.affiliate ?? {};
+  const defaultCommission = defaultAffiliate.defaultCommission ?? {};
+  const defaultTiers = Array.isArray(defaultCommission.tiers)
+    ? defaultCommission.tiers
+    : [{ thresholdCents: 0, rateBps: 1000 }];
+
+  const membershipByCommunity = new Map();
+  memberships.forEach((membership) => {
+    const communityId = Number(membership.communityId ?? membership.community_id);
+    if (!Number.isFinite(communityId)) return;
+    membershipByCommunity.set(communityId, membership);
+  });
+
+  const referralMetrics = new Map();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_IN_MS);
+  paymentIntents.forEach((intent) => {
+    const metadata = safeJsonParse(intent.metadata, {});
+    const referralCode =
+      metadata.referralCode ?? metadata.affiliateCode ?? metadata.affiliate?.code ?? null;
+    if (!referralCode) {
+      return;
+    }
+    const entry = referralMetrics.get(referralCode) ?? {
+      conversions: 0,
+      conversions30d: 0,
+      amountCents: 0,
+      amount30d: 0,
+      lastConversionAt: null
+    };
+    const amount = Number(intent.amountTotal ?? 0) - Number(intent.amountRefunded ?? 0);
+    entry.conversions += 1;
+    entry.amountCents += amount;
+    const timestamp = intent.capturedAt ?? intent.createdAt ?? null;
+    const occurredAt = timestamp ? new Date(timestamp) : null;
+    if (occurredAt) {
+      if (!entry.lastConversionAt || occurredAt > entry.lastConversionAt) {
+        entry.lastConversionAt = occurredAt;
+      }
+      if (occurredAt >= thirtyDaysAgo) {
+        entry.conversions30d += 1;
+        entry.amount30d += amount;
+      }
+    }
+    referralMetrics.set(referralCode, entry);
+  });
+
+  const affiliatePrograms = (Array.isArray(affiliates) ? affiliates : []).map((affiliate) => {
+    const metadata = safeJsonParse(affiliate.metadata, {});
+    const referralCode = affiliate.referralCode ?? metadata.referralCode ?? `AFF-${affiliate.id}`;
+    const performance = referralMetrics.get(referralCode) ?? {
+      conversions: 0,
+      conversions30d: 0,
+      amountCents: 0,
+      amount30d: 0,
+      lastConversionAt: null
+    };
+    const totalEarnedCents = Number(affiliate.totalEarnedCents ?? 0);
+    const totalPaidCents = Number(affiliate.totalPaidCents ?? 0);
+    const outstandingCents = Math.max(totalEarnedCents - totalPaidCents, 0);
+
+    const payouts = (Array.isArray(affiliatePayouts) ? affiliatePayouts : []).filter(
+      (payout) => Number(payout.affiliateId) === Number(affiliate.id)
+    );
+    const sortedPayouts = [...payouts].sort((a, b) => {
+      const aTime = new Date(a.processedAt ?? a.scheduledAt ?? now).getTime();
+      const bTime = new Date(b.processedAt ?? b.scheduledAt ?? now).getTime();
+      return aTime - bTime;
+    });
+    const upcomingPayout = sortedPayouts.find((payout) => payout.status !== 'completed') ?? null;
+    const completedPayouts = [...sortedPayouts].filter((payout) => payout.status === 'completed');
+    const lastPayout = completedPayouts.length
+      ? completedPayouts[completedPayouts.length - 1]
+      : null;
+
+    const commissionRateBps = Number(
+      affiliate.commissionRateBps ?? metadata.commissionRateBps ?? defaultTiers[0]?.rateBps ?? 0
+    );
+    const matchedTierIndex = defaultTiers.findIndex(
+      (tier) => Number(tier.rateBps) === commissionRateBps
+    );
+    const recurrence = metadata.recurrence ?? defaultCommission.recurrence ?? 'infinite';
+    const maxOccurrences =
+      recurrence === 'finite'
+        ? metadata.maxOccurrences ?? defaultCommission.maxOccurrences ?? null
+        : null;
+
+    const communityId = Number(affiliate.communityId);
+    const communityMeta = membershipByCommunity.get(communityId) ?? {};
+    const communityName =
+      affiliate.communityName ??
+      communityMeta.communityName ??
+      communityMeta.name ??
+      metadata.communityName ??
+      'Community';
+    const communitySlug =
+      affiliate.communitySlug ?? communityMeta.communitySlug ?? metadata.communitySlug ?? null;
+
+    const programmeHighlights = [];
+    programmeHighlights.push(`${performance.conversions ?? 0} lifetime conversions`);
+    programmeHighlights.push(
+      `${formatCurrency(performance.amountCents ?? 0, 'USD')} attributed volume`
+    );
+    if (outstandingCents > 0) {
+      programmeHighlights.push(
+        `${formatCurrency(outstandingCents, 'USD')} pending payout`
+      );
+    }
+
+    return {
+      id: String(affiliate.id),
+      community: {
+        id: communityId,
+        name: communityName,
+        slug: communitySlug
+      },
+      status: affiliate.status ?? metadata.status ?? 'pending',
+      referralCode,
+      commission: {
+        rateBps: commissionRateBps,
+        rateLabel: formatBasisPoints(commissionRateBps),
+        tierLabel: matchedTierIndex >= 0 ? `Tier ${matchedTierIndex + 1}` : 'Custom rate',
+        recurrence,
+        maxOccurrences: recurrence === 'finite' ? Number(maxOccurrences ?? 0) : null
+      },
+      earnings: {
+        totalCents: totalEarnedCents,
+        totalFormatted: formatCurrency(totalEarnedCents, 'USD'),
+        paidCents: totalPaidCents,
+        paidFormatted: formatCurrency(totalPaidCents, 'USD'),
+        outstandingCents,
+        outstandingFormatted: formatCurrency(outstandingCents, 'USD')
+      },
+      performance: {
+        conversions: performance.conversions ?? 0,
+        conversions30d: performance.conversions30d ?? 0,
+        volumeCents: performance.amountCents ?? 0,
+        volumeFormatted: formatCurrency(performance.amountCents ?? 0, 'USD'),
+        volume30dCents: performance.amount30d ?? 0,
+        volume30dFormatted: formatCurrency(performance.amount30d ?? 0, 'USD'),
+        lastConversionAt: performance.lastConversionAt,
+        lastConversionLabel: performance.lastConversionAt
+          ? humanizeRelativeTime(performance.lastConversionAt, now)
+          : 'No conversions yet'
+      },
+      payouts: {
+        next: upcomingPayout
+          ? {
+              status: upcomingPayout.status,
+              amount: formatCurrency(Number(upcomingPayout.amountCents ?? 0), 'USD'),
+              scheduledAt: upcomingPayout.scheduledAt,
+              scheduledLabel: formatDateTime(upcomingPayout.scheduledAt, {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              })
+            }
+          : null,
+        last: lastPayout
+          ? {
+              status: lastPayout.status,
+              amount: formatCurrency(Number(lastPayout.amountCents ?? 0), 'USD'),
+              processedAt: lastPayout.processedAt,
+              processedLabel: formatDateTime(lastPayout.processedAt ?? lastPayout.scheduledAt, {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              })
+            }
+          : null
+      },
+      links: {
+        landingPage: metadata.landingPage ?? metadata.landing_page ?? null,
+        mediaKit: metadata.mediaKit ?? metadata.media_kit ?? null
+      },
+      highlights: programmeHighlights
+    };
+  });
+
+  const totalEarnedCents = sum(affiliatePrograms, (program) => program.earnings.totalCents);
+  const totalOutstandingCents = sum(
+    affiliatePrograms,
+    (program) => program.earnings.outstandingCents
+  );
+  const totalPaidCents = sum(affiliatePrograms, (program) => program.earnings.paidCents);
+  const totalConversions30d = sum(
+    affiliatePrograms,
+    (program) => program.performance.conversions30d
+  );
+  const totalVolume30dCents = sum(
+    affiliatePrograms,
+    (program) => program.performance.volume30dCents
+  );
+
+  const activePrograms = affiliatePrograms.filter((program) =>
+    ['approved', 'active'].includes((program.status ?? '').toLowerCase())
+  ).length;
+  const pendingPrograms = affiliatePrograms.filter((program) =>
+    ['pending', 'review'].includes((program.status ?? '').toLowerCase())
+  ).length;
+
+  const summaryMetrics = [
+    {
+      label: 'Lifetime earnings',
+      value: formatCurrency(totalEarnedCents, 'USD'),
+      change: `Paid ${formatCurrency(totalPaidCents, 'USD')}`
+    },
+    {
+      label: 'Outstanding balance',
+      value: formatCurrency(totalOutstandingCents, 'USD'),
+      change:
+        totalOutstandingCents > 0
+          ? 'Release pending payout'
+          : 'All payouts cleared',
+      trend: totalOutstandingCents > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Active programmes',
+      value: `${activePrograms}`,
+      change:
+        pendingPrograms > 0
+          ? `${pendingPrograms} awaiting approval`
+          : 'All programmes live',
+      trend: activePrograms > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Conversions (30d)',
+      value: `${totalConversions30d}`,
+      change: `Volume ${formatCurrency(totalVolume30dCents, 'USD')}`,
+      trend: totalConversions30d > 0 ? 'up' : 'down'
+    }
+  ];
+
+  const upcomingPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+    .filter((payout) => payout.status !== 'completed')
+    .map((payout) => {
+      const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
+        (entry) => Number(entry.id) === Number(payout.affiliateId)
+      );
+      return {
+        status: payout.status,
+        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        scheduledAt: payout.scheduledAt,
+        scheduledLabel: formatDateTime(payout.scheduledAt, {
+          dateStyle: 'medium',
+          timeStyle: 'short'
+        }),
+        referralCode: affiliate?.referralCode,
+        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName
+      };
+    })
+    .sort((a, b) => new Date(a.scheduledAt ?? now) - new Date(b.scheduledAt ?? now))[0] ?? null;
+
+  const payoutTimeline = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+    .map((payout) => {
+      const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
+        (entry) => Number(entry.id) === Number(payout.affiliateId)
+      );
+      return {
+        id: String(payout.id),
+        status: payout.status,
+        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        scheduledAt: payout.scheduledAt,
+        processedAt: payout.processedAt,
+        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName ?? 'Community',
+        referralCode: affiliate?.referralCode
+      };
+    })
+    .sort(
+      (a, b) =>
+        new Date(b.processedAt ?? b.scheduledAt ?? now).getTime() -
+        new Date(a.processedAt ?? a.scheduledAt ?? now).getTime()
+    )
+    .slice(0, 8);
+
+  const actions = [];
+  if (totalOutstandingCents > 0) {
+    actions.push(
+      `Release ${formatCurrency(totalOutstandingCents, 'USD')} in pending affiliate payouts.`
+    );
+  }
+  if (pendingPrograms > 0) {
+    actions.push(`Review ${pendingPrograms} pending affiliate application${pendingPrograms === 1 ? '' : 's'}.`);
+  }
+  if (actions.length === 0) {
+    actions.push('Invite high-performing learners into the affiliate programme.');
+  }
+
+  const resources = [
+    {
+      id: 'affiliate-starter-kit',
+      title: 'Affiliate starter kit',
+      description: 'Download co-branded assets, copy decks, and onboarding emails.',
+      action: 'Download kit',
+      href: '/content/affiliate-playbook'
+    },
+    {
+      id: 'affiliate-policy',
+      title: 'Policy & compliance checklist',
+      description: 'Ensure payout eligibility, tax documentation, and brand guidelines stay aligned.',
+      action: 'Open checklist',
+      href: '/policies/affiliate'
+    }
+  ];
+
+  return {
+    summary: {
+      metrics: summaryMetrics,
+      totals: {
+        earnedCents: totalEarnedCents,
+        earnedFormatted: formatCurrency(totalEarnedCents, 'USD'),
+        outstandingCents: totalOutstandingCents,
+        outstandingFormatted: formatCurrency(totalOutstandingCents, 'USD'),
+        paidCents: totalPaidCents,
+        programCount: affiliatePrograms.length,
+        activePrograms,
+        pendingPrograms
+      },
+      nextPayout
+    },
+    programs: affiliatePrograms,
+    payouts: payoutTimeline,
+    commission: {
+      recurrence: defaultCommission.recurrence ?? 'infinite',
+      maxOccurrences: defaultCommission.recurrence === 'finite' ? defaultCommission.maxOccurrences ?? null : null,
+      tiers: defaultTiers.map((tier, index) => ({
+        thresholdCents: Number(tier.thresholdCents ?? 0),
+        rateBps: Number(tier.rateBps ?? 0),
+        label: index === 0 ? 'Base tier' : `Tier ${index + 1}`,
+        rateLabel: formatBasisPoints(tier.rateBps)
+      }))
+    },
+    compliance: {
+      autoApprove: Boolean(defaultAffiliate.autoApprove),
+      requireTaxInformation: Boolean(defaultAffiliate.requireTaxInformation),
+      blockSelfReferral: Boolean(defaultAffiliate.security?.blockSelfReferral),
+      enforceTwoFactorForPayouts: Boolean(defaultAffiliate.security?.enforceTwoFactorForPayouts),
+      payoutScheduleDays: Number(defaultAffiliate.payoutScheduleDays ?? 30),
+      cookieWindowDays: Number(defaultAffiliate.cookieWindowDays ?? 30)
+    },
+    actions,
+    resources
+  };
+}
+
 function formatDateTime(date, options = {}) {
   if (!date) return 'TBD';
   const resolved = typeof date === 'string' ? new Date(date) : date;
@@ -2948,7 +3311,8 @@ export default class DashboardService {
       adsCampaignRows,
       adsMetricRows,
       communityPaywallTierRows,
-      communitySubscriptionRows
+      communitySubscriptionRows,
+      platformMonetizationSettings
     ] = await Promise.all([
       UserPrivacySettingModel.getForUser(userId),
       db('course_enrollments as ce')
@@ -3542,7 +3906,8 @@ export default class DashboardService {
           'tier.billing_interval as billingInterval',
           'community.owner_id as ownerId',
           'community.name as communityName'
-        )
+        ),
+      PlatformSettingsService.getMonetizationSettings()
     ]);
     const communityStatsMap = new Map();
     communityStatRows.forEach((row) => {
@@ -3576,6 +3941,13 @@ export default class DashboardService {
       affiliatePayoutByAffiliate.set(row.affiliateId, entry);
     });
 
+    const affiliateOverview = buildAffiliateOverview({
+      affiliates: affiliateRows,
+      affiliatePayouts: affiliatePayoutRows,
+      paymentIntents: paymentIntentRows,
+      memberships: membershipRows,
+      monetizationSettings: platformMonetizationSettings,
+      now
     const communityDashboard = buildCommunityDashboard({
       user,
       now,
@@ -4499,6 +4871,7 @@ export default class DashboardService {
           summary: financialSummary,
           invoices
         },
+        affiliate: affiliateOverview,
         notifications: {
           total: notifications.length,
           unreadMessages: unreadThreads,
@@ -4541,6 +4914,10 @@ export default class DashboardService {
         }
       }
     };
+
+    if (instructorDashboard?.dashboard) {
+      instructorDashboard.dashboard.affiliate = affiliateOverview;
+    }
 
     if (communityDashboard) {
       dashboards.community = communityDashboard.dashboard;
@@ -4595,6 +4972,25 @@ export default class DashboardService {
       ...blogSearchEntries
     ];
 
+    if (affiliateOverview?.programs?.length) {
+      searchIndex.push({
+        id: 'search-affiliate-learner',
+        role: 'learner',
+        type: 'Affiliate',
+        title: 'Affiliate workspace',
+        url: '/dashboard/learner/affiliate'
+      });
+      if (instructorDashboard) {
+        searchIndex.push({
+          id: 'search-affiliate-instructor',
+          role: 'instructor',
+          type: 'Affiliate',
+          title: 'Affiliate workspace',
+          url: '/dashboard/instructor/affiliate'
+        });
+      }
+    }
+
     if (communityDashboard) {
       searchIndex.push(...communityDashboard.searchIndex);
     }
@@ -4627,6 +5023,11 @@ export default class DashboardService {
       { label: 'Courses', value: `${activeEnrollments.length} active` },
       { label: 'Badges', value: `${learningCompletions.length} milestones` }
     ];
+    if (affiliateOverview?.summary?.totals?.earnedFormatted) {
+      profileStats.push({
+        label: 'Affiliate earned',
+        value: affiliateOverview.summary.totals.earnedFormatted
+      });
     if (communityDashboard) {
       profileStats.push(...communityDashboard.profileStats);
     }
@@ -4641,6 +5042,15 @@ export default class DashboardService {
       `${memberships.length} communities`,
       `${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`
     ];
+    if (affiliateOverview?.summary?.totals?.programCount) {
+      const programmeCount = affiliateOverview.summary.totals.programCount;
+      if (programmeCount > 0) {
+        profileTitleSegments.push(
+          `${programmeCount} affiliate programme${programmeCount === 1 ? '' : 's'}`
+        );
+      }
+    }
+    if (instructorDashboard) {
     if (communityDashboard) {
       const managedCommunitiesCount =
         communityDashboard.dashboard?.health?.overview?.length ?? 0;
