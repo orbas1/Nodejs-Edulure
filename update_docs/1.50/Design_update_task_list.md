@@ -31,6 +31,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   10. Package Zeplin exports and measurement notes for engineering handoff.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   11. Align analytics instrumentation requirements with data/insights team for critical journeys.【F:update_docs/1.50/Design_Plan.md†L140-L146】
   12. Log risk, dependency, and parity status in design change log for weekly review.【F:update_docs/1.50/Design_Plan.md†L23-L34】
+  - _Progress note:_ Capability manifest incident messaging has been prototyped in Flutter, demonstrating banner placement, cached-state messaging, and refresh controls required for parity with the web operator experience.【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】【F:Edulure-Flutter/lib/main.dart†L1-L140】
 
 ## 3. Web Application Navigation & Funnel Redesign (0%)
 - **Objective:** Restructure marketing funnels and authenticated dashboards with modular components and performance guardrails.【F:update_docs/1.50/Design_Plan.md†L78-L117】

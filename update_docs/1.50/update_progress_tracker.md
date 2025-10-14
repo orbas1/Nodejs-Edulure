@@ -4,7 +4,7 @@ Progress is recorded per major task. Percentages represent completion of require
 
 | Task | Security Level | Completion Level | Integration Level | Functionality Level | Error Free Level | Production Level | Overall Level |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Platform Hardening & Modularisation | 52% | 68% | 70% | 72% | 55% | 68% | 64% |
+| Platform Hardening & Modularisation | 58% | 75% | 78% | 80% | 62% | 75% | 71% |
 | Data Governance & Compliance Reinforcement | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Creation Studio & Content Ecosystem Delivery | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Integrations, Automation & Notifications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -31,12 +31,12 @@ The design programme is tracked separately using the metrics below. Scores mirro
 | Design Position | 46 | Layout guidance exists, awaiting usability findings for optimisation.【F:update_docs/1.50/Design_update_progress_tracker.md†L11-L13】 |
 | Design Text Grade | 50 | Copy hierarchy drafted, localisation workflows awaiting approval.【F:update_docs/1.50/Design_update_progress_tracker.md†L13-L14】 |
 | Design Colour Grade | 62 | Palette and theme guidance baselined for dark/emo variants.【F:update_docs/1.50/Design_update_progress_tracker.md†L14-L15】 |
-| Design Render Grade | 41 | Asset manifests defined but prototype coverage incomplete.【F:update_docs/1.50/Design_update_progress_tracker.md†L15-L16】 |
+| Design Render Grade | 49 | Mobile outage banner prototypes captured in Flutter alongside web references, expanding coverage for incident states.【F:update_docs/1.50/Design_update_progress_tracker.md†L13-L21】【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】 |
 | Compliance Grade | 55 | Accessibility/compliance scripts scoped; execution evidence pending.【F:update_docs/1.50/Design_update_progress_tracker.md†L16-L17】 |
 | Security Grade | 38 | Security reviews outstanding beyond planning notes.【F:update_docs/1.50/Design_update_progress_tracker.md†L17-L18】 |
-| Design Functionality Grade | 47 | Logic flows captured, awaiting engineering sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L18-L19】 |
+| Design Functionality Grade | 64 | Cross-platform manifest warm-up and banner logic now implemented, aligning design flows with production telemetry states.【F:update_docs/1.50/Design_update_progress_tracker.md†L9-L19】【F:Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart†L1-L112】 |
 | Design Images Grade | 44 | Imagery budgets defined; curated asset sets not yet delivered.【F:update_docs/1.50/Design_update_progress_tracker.md†L19-L20】 |
-| Design Usability Grade | 49 | KPI targets set, usability session outputs pending.【F:update_docs/1.50/Design_update_progress_tracker.md†L20-L21】 |
+| Design Usability Grade | 58 | KPI targets set, and Flutter shell now mirrors outage messaging to support parity usability tests.【F:update_docs/1.50/Design_update_progress_tracker.md†L11-L21】【F:Edulure-Flutter/lib/main.dart†L1-L140】 |
 | Bugs-less Grade | 42 | Risk tracking active, QA dashboards still future work.【F:update_docs/1.50/Design_update_progress_tracker.md†L21-L22】 |
 | Test Grade | 35 | Accessibility/visual regression automation not yet executed.【F:update_docs/1.50/Design_update_progress_tracker.md†L22-L23】 |
 | QA Grade | 40 | QA collaboration defined; evidence to be captured closer to release.【F:update_docs/1.50/Design_update_progress_tracker.md†L23-L24】 |

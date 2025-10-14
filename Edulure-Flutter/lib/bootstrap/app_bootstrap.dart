@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/feature_flags/feature_flag_notifier.dart';
 import '../core/state/provider_logger.dart';
 import '../core/telemetry/telemetry_service.dart';
+import '../core/runtime/capability_manifest_notifier.dart';
 import '../services/language_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/session_manager.dart';
@@ -30,7 +31,10 @@ class AppBootstrap {
     await LanguageService.init();
     await container.read(telemetryServiceProvider).prepare();
     await PushNotificationService.instance.initialize();
-    await container.read(featureFlagControllerProvider.notifier).warmUp();
+    await Future.wait([
+      container.read(featureFlagControllerProvider.notifier).warmUp(),
+      container.read(capabilityManifestControllerProvider.notifier).warmUp(),
+    ]);
   }
 
   Future<void> run(Widget app) async {

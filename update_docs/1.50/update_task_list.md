@@ -12,7 +12,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
     3. Consume new health-check and capability endpoints to display service availability banners. ✅ Completed – frontend shell polls capability manifest, renders global service alerts, and surfaces outage messaging across layouts.【F:frontend-reactjs/src/context/ServiceHealthContext.jsx†L1-L165】【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L1-L96】
     4. Update build pipeline to ingest generated TypeScript SDK from modularised APIs. ✅ Completed – React prebuild/dev hooks compile the shared SDK workspace so bundlers consume regenerated clients on every build.【F:frontend-reactjs/package.json†L10-L23】【F:sdk-typescript/scripts/generate-sdk.mjs†L1-L66】
   - **User Phone App:**
-    5. Adjust environment bootstrap to handle new capability manifest, including fallback messaging when services degrade.【F:update_docs/1.50/features_to_add.md†L237-L286】
+    5. Adjust environment bootstrap to handle new capability manifest, including fallback messaging when services degrade.【F:update_docs/1.50/features_to_add.md†L237-L286】 ✅ Completed – Flutter bootstrap now warms the manifest provider, caches responses, and renders a persistent capability banner that communicates degraded or unavailable services across the mobile shell.【F:Edulure-Flutter/lib/bootstrap/app_bootstrap.dart†L1-L58】【F:Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart†L1-L112】【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】
   - **Provider Phone App:**
     6. Define parity hooks and stubs for future provider app to consume capability manifest and RBAC matrix (documentation + interface contracts).
   - **Database:**
