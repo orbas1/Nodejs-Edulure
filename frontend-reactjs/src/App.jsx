@@ -127,7 +127,14 @@ function App() {
         <Route path="pricing" element={<InstructorPricing />} />
         <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
-        <Route path="ebooks/create" element={<InstructorEbookCreate />} />
+        <Route
+          path="ebooks/create"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <InstructorEbookCreate />
+            </ProtectedRoute>
+          )}
+        />
         <Route path="ads" element={<InstructorAds />} />
       </Route>
     </Routes>

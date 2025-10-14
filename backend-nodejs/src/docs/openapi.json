@@ -6107,6 +6107,493 @@
         "required": [
           "status"
         ]
+      },
+      "EbookPrice": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "formatted": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "amountCents"
+        ]
+      },
+      "EbookAnalytics": {
+        "type": "object",
+        "properties": {
+          "downloads": {
+            "type": "integer"
+          },
+          "readers": {
+            "type": "integer"
+          },
+          "purchases": {
+            "type": "integer"
+          },
+          "revenueCents": {
+            "type": "integer"
+          },
+          "revenueFormatted": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "downloads",
+          "readers",
+          "purchases",
+          "revenueCents"
+        ]
+      },
+      "EbookRating": {
+        "type": "object",
+        "properties": {
+          "average": {
+            "type": "number"
+          },
+          "count": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "average",
+          "count"
+        ]
+      },
+      "EbookListing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "price": {
+            "$ref": "#/components/schemas/EbookPrice"
+          },
+          "readingTimeMinutes": {
+            "type": "integer",
+            "nullable": true
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isbn": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "releaseAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "analytics": {
+            "$ref": "#/components/schemas/EbookAnalytics"
+          },
+          "rating": {
+            "$ref": "#/components/schemas/EbookRating"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "assetId",
+          "title",
+          "slug",
+          "price",
+          "status",
+          "isPublic",
+          "metadata",
+          "analytics",
+          "rating"
+        ]
+      },
+      "EbookRevenueSummary": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "formatted": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "amountCents"
+        ]
+      },
+      "EbookCatalogueMetrics": {
+        "type": "object",
+        "properties": {
+          "totalTitles": {
+            "type": "integer"
+          },
+          "publishedTitles": {
+            "type": "integer"
+          },
+          "draftTitles": {
+            "type": "integer"
+          },
+          "totalDownloads": {
+            "type": "integer"
+          },
+          "totalReaders": {
+            "type": "integer"
+          },
+          "revenueByCurrency": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbookRevenueSummary"
+            }
+          }
+        },
+        "required": [
+          "totalTitles",
+          "publishedTitles",
+          "draftTitles",
+          "totalDownloads",
+          "totalReaders",
+          "revenueByCurrency"
+        ]
+      },
+      "EbookRecentPurchase": {
+        "type": "object",
+        "properties": {
+          "ebookPublicId": {
+            "type": "string"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "capturedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "formatted": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ebookPublicId",
+          "amountCents",
+          "currency"
+        ]
+      },
+      "EbookCatalogueResponse": {
+        "type": "object",
+        "properties": {
+          "catalogue": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbookListing"
+            }
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/EbookCatalogueMetrics"
+          },
+          "recentPurchases": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EbookRecentPurchase"
+            }
+          }
+        },
+        "required": [
+          "catalogue",
+          "metrics",
+          "recentPurchases"
+        ]
+      },
+      "EbookCreateRequest": {
+        "type": "object",
+        "required": [
+          "assetId",
+          "title",
+          "price"
+        ],
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isbn": {
+            "type": "string"
+          },
+          "readingTimeMinutes": {
+            "type": "integer"
+          },
+          "price": {
+            "type": "object",
+            "required": [
+              "currency",
+              "amount"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "status": {
+            "type": "string"
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "releaseAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EbookUpdateRequest": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "assetId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "isbn": {
+            "type": "string"
+          },
+          "readingTimeMinutes": {
+            "type": "integer"
+          },
+          "price": {
+            "type": "object",
+            "required": [
+              "currency",
+              "amount"
+            ],
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "status": {
+            "type": "string"
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "releaseAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EbookStateRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "isPublic": {
+            "type": "boolean"
+          },
+          "releaseAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "EbookPurchaseIntentRequest": {
+        "type": "object",
+        "required": [
+          "provider"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "stripe",
+              "paypal"
+            ]
+          },
+          "couponCode": {
+            "type": "string"
+          },
+          "returnUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "cancelUrl": {
+            "type": "string",
+            "format": "uri"
+          },
+          "brandName": {
+            "type": "string"
+          },
+          "receiptEmail": {
+            "type": "string",
+            "format": "email"
+          }
+        }
+      },
+      "EbookPurchaseIntentResponse": {
+        "type": "object",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/PaymentIntentCreateResponse"
+          },
+          "intent": {
+            "$ref": "#/components/schemas/PaymentIntentRecord"
+          }
+        },
+        "required": [
+          "payment"
+        ]
       }
     }
   },
@@ -13407,6 +13894,477 @@
           },
           "404": {
             "description": "Verification record not found"
+          }
+        }
+      }
+    },
+    "/api/ebooks": {
+      "get": {
+        "summary": "List published ebooks",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma separated list of categories"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma separated list of tags"
+          },
+          {
+            "name": "languages",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma separated ISO language codes"
+          },
+          {
+            "name": "minPrice",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          {
+            "name": "maxPrice",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "format": "float"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Marketplace catalogue fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/EbookListing"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create ebook listing",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbookCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ebook listing created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EbookListing"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Asset not found"
+          },
+          "409": {
+            "description": "Listing already exists"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/ebooks/catalogue": {
+      "get": {
+        "summary": "List instructor ebook catalogue",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ebook catalogue fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EbookCatalogueResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
+        }
+      }
+    },
+    "/api/ebooks/{ebookId}": {
+      "patch": {
+        "summary": "Update ebook listing",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ebookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbookUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ebook listing updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EbookListing"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Ebook not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/ebooks/{ebookId}/state": {
+      "post": {
+        "summary": "Update ebook publication state",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ebookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbookStateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ebook state updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EbookListing"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Ebook not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/ebooks/{ebookId}/purchase-intent": {
+      "post": {
+        "summary": "Create ebook purchase intent",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ebookId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EbookPurchaseIntentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Purchase intent created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EbookPurchaseIntentResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Ebook not found"
+          },
+          "409": {
+            "description": "Ebook unavailable"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/api/ebooks/slug/{slug}": {
+      "get": {
+        "summary": "Retrieve ebook details",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ebook fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/EbookListing"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ebook not found"
           }
         }
       }
