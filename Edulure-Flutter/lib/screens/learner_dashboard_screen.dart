@@ -58,8 +58,9 @@ class _LearnerDashboardScreenState extends State<LearnerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeRole = SessionManager.getActiveRole();
-    if (activeRole != 'user') {
+    final activeRole = SessionManager.getActiveRole()?.toLowerCase();
+    const learnerRoles = {'learner', 'user'};
+    if (activeRole == null || !learnerRoles.contains(activeRole)) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Learner dashboard'),

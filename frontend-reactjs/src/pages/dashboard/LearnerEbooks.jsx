@@ -1,15 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { createEbookPurchaseIntent, listMarketplaceEbooks } from '../../api/ebookApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerEbooks() {
-  const { dashboard, refresh } = useOutletContext();
+  const { isLearner, section: ebooks, refresh } = useLearnerDashboardSection('ebooks');
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
-  const ebooks = dashboard?.ebooks;
 
   const [activeTab, setActiveTab] = useState('library');
   const [marketplace, setMarketplace] = useState([]);
@@ -86,6 +85,16 @@ export default function LearnerEbooks() {
     },
     [token]
   );
+
+  if (!isLearner) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Learner workspace required"
+        description="Switch to your learner dashboard to review your e-book library and curated marketplace."
+      />
+    );
+  }
 
   if (!ebooks) {
     return (
