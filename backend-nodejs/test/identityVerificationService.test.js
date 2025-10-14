@@ -111,5 +111,27 @@ describe('IdentityVerificationService.getAdminOverview', () => {
     expect(overview.slaBreaches).toBe(1);
     expect(overview.manualReviewQueue).toBe(2);
     expect(overview.lastGeneratedAt).toBe(now.toISOString());
+    expect(overview.gdpr).toBeTruthy();
+    expect(overview.gdpr.dsar).toMatchObject({
+      open: 4,
+      dueSoon: 1,
+      overdue: 1,
+      completed30d: 5,
+      averageCompletionHours: 64,
+      slaHours: 72,
+      owner: 'Data Protection Officer'
+    });
+    expect(overview.gdpr.dsar.nextIcoSubmission).toBeDefined();
+    expect(overview.gdpr.registers).toHaveLength(3);
+    expect(overview.gdpr.registers[0]).toMatchObject({ id: 'ropa', status: 'current' });
+    expect(overview.gdpr.controls).toMatchObject({
+      breachNotifications: expect.objectContaining({ status: 'tested' }),
+      dataProtectionImpactAssessments: expect.objectContaining({ status: 'current' }),
+      training: expect.objectContaining({ status: 'in_progress' })
+    });
+    expect(overview.gdpr.ico).toMatchObject({
+      registrationNumber: 'ZB765432',
+      status: 'Active'
+    });
   });
 });

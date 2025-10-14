@@ -10,6 +10,7 @@ import UserSessionModel from '../models/UserSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import { emailVerificationService } from './EmailVerificationService.js';
 import { sessionRegistry } from './SessionRegistry.js';
+import TwoFactorService from './TwoFactorService.js';
 
 function hashRefreshToken(token) {
   return crypto.createHmac('sha256', env.security.jwtRefreshSecret).update(token).digest('hex');
@@ -24,6 +25,9 @@ function sanitizeUserRecord(user) {
     role: user.role,
     age: user.age,
     address: user.address,
+    twoFactorEnabled: TwoFactorService.isTwoFactorEnabled(user),
+    twoFactorEnrolledAt: user.twoFactorEnrolledAt ?? user.two_factor_enrolled_at ?? null,
+    twoFactorLastVerifiedAt: user.twoFactorLastVerifiedAt ?? user.two_factor_last_verified_at ?? null,
     createdAt: user.createdAt ?? user.created_at,
     updatedAt: user.updatedAt ?? user.updated_at,
     emailVerifiedAt: user.emailVerifiedAt ?? user.email_verified_at ?? null,
@@ -79,6 +83,24 @@ export default class AuthService {
         throw error;
       }
 
+      const enforceTwoFactor = TwoFactorService.shouldEnforceForRole(payload.role);
+      const wantsTwoFactor = payload.twoFactor?.enabled === true;
+      const enableTwoFactor = enforceTwoFactor || wantsTwoFactor;
+      let encryptedTwoFactorSecret = null;
+      let twoFactorEnrollment = null;
+
+      if (enableTwoFactor) {
+        const enrollment = TwoFactorService.generateEnrollment({ email: payload.email });
+        encryptedTwoFactorSecret = TwoFactorService.encryptSecret(enrollment.secret);
+        twoFactorEnrollment = {
+          enabled: true,
+          enforced: enforceTwoFactor,
+          secret: enrollment.secret,
+          otpauthUrl: enrollment.otpauthUrl,
+          issuer: env.security.twoFactor.issuer
+        };
+      }
+
       const passwordHash = await bcrypt.hash(payload.password, 12);
       const user = await UserModel.create(
         {
@@ -88,7 +110,11 @@ export default class AuthService {
           passwordHash,
           role: payload.role,
           age: payload.age,
-          address: payload.address
+          address: payload.address,
+          twoFactorEnabled: enableTwoFactor,
+          twoFactorSecret: encryptedTwoFactorSecret,
+          twoFactorEnrolledAt: enableTwoFactor ? new Date() : null,
+          twoFactorLastVerifiedAt: null
         },
         trx
       );
@@ -104,6 +130,23 @@ export default class AuthService {
         trx
       );
 
+      if (enableTwoFactor) {
+        await DomainEventModel.record(
+          {
+            entityType: 'user',
+            entityId: user.id,
+            eventType: 'user.two_factor_enrolled',
+            payload: {
+              enforced: enforceTwoFactor,
+              issuer: env.security.twoFactor.issuer,
+              method: 'totp'
+            },
+            performedBy: user.id
+          },
+          trx
+        );
+      }
+
       const verification = await emailVerificationService.issueVerification(user, context, trx);
 
       return {
@@ -112,13 +155,14 @@ export default class AuthService {
           verification: {
             status: 'pending',
             expiresAt: verification.expiresAt.toISOString()
-          }
+          },
+          twoFactor: twoFactorEnrollment ?? { enabled: false, enforced: enforceTwoFactor }
         }
       };
     });
   }
 
-  static async login(email, password, context = {}) {
+  static async login(email, password, twoFactorCode = null, context = {}) {
     return db.transaction(async (trx) => {
       const user = await UserModel.forUpdateByEmail(email, trx);
       if (!user) {
@@ -186,6 +230,64 @@ export default class AuthService {
         error.code = 'EMAIL_VERIFICATION_REQUIRED';
         error.details = { email: user.email };
         throw error;
+      }
+
+      const requiresTwoFactor = TwoFactorService.shouldEnforceForUser(user);
+      if (requiresTwoFactor) {
+        if (!user.two_factor_secret) {
+          const error = new Error('Two-factor authentication must be configured before signing in.');
+          error.status = 409;
+          error.code = 'TWO_FACTOR_SETUP_REQUIRED';
+          error.details = { method: 'totp', enforced: TwoFactorService.shouldEnforceForRole(user.role) };
+          throw error;
+        }
+
+        if (!twoFactorCode) {
+          await DomainEventModel.record(
+            {
+              entityType: 'user',
+              entityId: user.id,
+              eventType: 'user.two_factor_challenge_requested',
+              payload: {
+                method: 'totp',
+                enforced: TwoFactorService.shouldEnforceForRole(user.role),
+                ipAddress: context.ipAddress ?? null,
+                userAgent: context.userAgent ?? null
+              }
+            },
+            trx
+          );
+          const error = new Error('Enter the code from your authenticator app to continue.');
+          error.status = 403;
+          error.code = 'TWO_FACTOR_REQUIRED';
+          error.details = { method: 'totp' };
+          throw error;
+        }
+
+        const validTwoFactor = TwoFactorService.verifyToken(user.two_factor_secret, twoFactorCode);
+        if (!validTwoFactor) {
+          await DomainEventModel.record(
+            {
+              entityType: 'user',
+              entityId: user.id,
+              eventType: 'user.two_factor_challenge_failed',
+              payload: {
+                method: 'totp',
+                enforced: TwoFactorService.shouldEnforceForRole(user.role),
+                ipAddress: context.ipAddress ?? null,
+                userAgent: context.userAgent ?? null
+              }
+            },
+            trx
+          );
+          const error = new Error('Invalid or expired two-factor authentication code.');
+          error.status = 401;
+          error.code = 'TWO_FACTOR_INVALID';
+          error.details = { method: 'totp' };
+          throw error;
+        }
+
+        await UserModel.markTwoFactorVerified(user.id, trx);
       }
 
       await UserModel.clearLoginFailures(user.id, trx);

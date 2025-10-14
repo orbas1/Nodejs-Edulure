@@ -277,11 +277,24 @@ describe('buildInstructorDashboard', () => {
           name: 'Ops Launch Sprint',
           objective: 'leads',
           status: 'active',
+          budgetCurrency: 'USD',
+          budgetDailyCents: 35000,
           spendCurrency: 'USD',
           spendTotalCents: 12500,
           performanceScore: 4.2,
           ctr: 0.054,
-          metadata: JSON.stringify({ promotedCommunityId: 55 }),
+          cpcCents: 145,
+          cpaCents: 975,
+          targetingKeywords: JSON.stringify(['design ops', 'launch sprint']),
+          targetingAudiences: JSON.stringify(['Product Leads']),
+          targetingLocations: JSON.stringify(['US', 'GB']),
+          targetingLanguages: JSON.stringify(['en']),
+          creativeHeadline: 'Launch sprint playbooks',
+          creativeDescription: 'Capture qualified leads for design ops cohorts.',
+          creativeUrl: 'https://edulure.test/ads/ops-launch',
+          startAt: '2024-11-01T00:00:00Z',
+          endAt: '2024-12-01T00:00:00Z',
+          metadata: JSON.stringify({ promotedCommunityId: 55, featureFlag: 'ads-explorer-placements' }),
           createdBy: 7
         }
       ],
@@ -293,6 +306,7 @@ describe('buildInstructorDashboard', () => {
           impressions: 1800,
           clicks: 110,
           conversions: 12,
+          spendCents: 28000,
           revenueCents: 72000,
           metadata: '{}'
         },
@@ -303,6 +317,7 @@ describe('buildInstructorDashboard', () => {
           impressions: 1500,
           clicks: 90,
           conversions: 8,
+          spendCents: 22000,
           revenueCents: 48000,
           metadata: '{}'
         }
@@ -395,6 +410,20 @@ describe('buildInstructorDashboard', () => {
       expect.arrayContaining([
         expect.objectContaining({ name: expect.stringContaining('Pro Circle'), members: '1 active' })
       ])
+    );
+    expect(snapshot.dashboard.ads.summary).toMatchObject({
+      activeCampaigns: 1,
+      totalSpend: expect.objectContaining({ formatted: expect.stringContaining('$') }),
+      averageCtr: expect.stringContaining('%')
+    });
+    expect(snapshot.dashboard.ads.active[0]).toMatchObject({
+      name: 'Ops Launch Sprint',
+      placement: expect.objectContaining({ surface: 'Explorer' }),
+      targeting: expect.objectContaining({ keywords: expect.arrayContaining(['design ops']) })
+    });
+    expect(snapshot.dashboard.ads.placements[0].budgetLabel).toContain('$350');
+    expect(snapshot.dashboard.ads.tags).toEqual(
+      expect.arrayContaining([expect.objectContaining({ category: 'Keyword', label: 'design ops' })])
     );
     expect(snapshot.searchIndex).toEqual(
       expect.arrayContaining([
