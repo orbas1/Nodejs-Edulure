@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeftOnRectangleIcon,
-  BanknotesIcon,
   ArrowTopRightOnSquareIcon,
+  BanknotesIcon,
   BookOpenIcon,
   CalendarDaysIcon,
   ChartBarIcon,
@@ -13,6 +13,7 @@ import {
   InboxStackIcon,
   MegaphoneIcon,
   PlayCircleIcon,
+  ShieldCheckIcon,
   Squares2X2Icon,
   UserGroupIcon,
   UsersIcon,
@@ -20,8 +21,10 @@ import {
   VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
 import DashboardStateMessage from '../components/dashboard/DashboardStateMessage.jsx';
+import UserMenu from '../components/navigation/UserMenu.jsx';
 
 const navigationByRole = {
   learner: (basePath) => [
@@ -34,6 +37,7 @@ const navigationByRole = {
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
+    { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
     { name: 'Become an instructor', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
   ],
   instructor: (basePath) => [
@@ -55,6 +59,20 @@ const navigationByRole = {
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },
+    { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
+    { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon }
+  ],
+  admin: (basePath) => [
+    { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
+    { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
+    { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
+    { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },
+    { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
+    { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
+    { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
+    { name: 'Platform ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
+    { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon }
     { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
   ],
   community: (basePath) => [
@@ -85,6 +103,7 @@ export default function DashboardLayout() {
   const { role } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { session, logout } = useAuth();
   const { activeRole, setActiveRole, roles, dashboards, searchIndex, loading, error, refresh } = useDashboard();
   const allowedRoles = useMemo(() => roles.map((r) => r.id), [roles]);
   const resolvedRole = allowedRoles.length > 0 ? (allowedRoles.includes(role) ? role : allowedRoles[0]) : null;
@@ -205,15 +224,16 @@ export default function DashboardLayout() {
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="relative flex-1">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search across your dashboard data"
-                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
+              <div className="flex flex-col gap-4 lg:flex-1 lg:flex-row lg:items-center lg:gap-6">
+                <div className="relative flex-1">
+                  <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search across your dashboard data"
+                    className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
                 {searchQuery && (
                   <button
                     type="button"
@@ -243,24 +263,28 @@ export default function DashboardLayout() {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm">
-                {roles.map((roleOption) => {
-                  const target = `/dashboard/${roleOption.id}`;
-                  const isActive = resolvedRole === roleOption.id;
-                  return (
-                    <NavLink
-                      key={roleOption.id}
-                      to={target}
-                      className={`rounded-2xl px-4 py-2 transition ${
-                        isActive
-                          ? 'bg-primary text-white shadow'
-                          : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
-                      }`}
-                    >
-                      {roleOption.label}
-                    </NavLink>
-                  );
-                })}
+                <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm">
+                  {roles.map((roleOption) => {
+                    const target = `/dashboard/${roleOption.id}`;
+                    const isActive = resolvedRole === roleOption.id;
+                    return (
+                      <NavLink
+                        key={roleOption.id}
+                        to={target}
+                        className={`rounded-2xl px-4 py-2 transition ${
+                          isActive
+                            ? 'bg-primary text-white shadow'
+                            : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+                        }`}
+                      >
+                        {roleOption.label}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="self-start lg:self-center">
+                <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-slate-500">

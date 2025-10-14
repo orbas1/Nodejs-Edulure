@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import MainLayout from './layouts/MainLayout.jsx';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
@@ -15,6 +15,7 @@ import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
 import Communities from './pages/Communities.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
+import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
 import DashboardHome from './pages/dashboard/DashboardHome.jsx';
 import LearnerCommunities from './pages/dashboard/LearnerCommunities.jsx';
@@ -40,6 +41,7 @@ import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
 import InstructorAds from './pages/dashboard/InstructorAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
+import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
 import CommunityOverview from './pages/dashboard/community/CommunityOverview.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
@@ -115,7 +117,7 @@ function App() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
       </Route>
-      <Route path="/dashboard" element={<Navigate to="/dashboard/learner" replace />} />
+      <Route path="/dashboard" element={<DashboardEntryRedirect />} />
       <Route
         path="/dashboard/:role"
         element={(
@@ -194,6 +196,8 @@ function App() {
             </ProtectedRoute>
           )}
         />
+        <Route path="ads" element={<InstructorAds />} />
+        <Route path="settings" element={<DashboardSettings />} />
         <Route
           path="ads"
           element={(
