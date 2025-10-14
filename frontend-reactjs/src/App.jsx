@@ -137,7 +137,14 @@ function App() {
             </ProtectedRoute>
           )}
         />
-        <Route path="ads" element={<InstructorAds />} />
+        <Route
+          path="ads"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <InstructorAds />
+            </ProtectedRoute>
+          )}
+        />
       </Route>
     </Routes>
   );

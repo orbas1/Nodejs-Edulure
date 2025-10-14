@@ -34,6 +34,458 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
     return role == 'instructor';
   }
 
+  Widget _buildAdsSuite(BuildContext context) {
+    final ads = _dashboard?.ads;
+    if (ads == null) {
+      return _EmptyStateCard(
+        title: 'Ads workspace offline',
+        description: 'Connect your ad accounts to sync placements, targeting, and experiments.',
+      );
+    }
+
+    if (!ads.hasSignals) {
+      return _EmptyStateCard(
+        title: 'No ads telemetry yet',
+        description: 'Launch a campaign or import existing placements to populate your Edulure Ads suite.',
+      );
+    }
+
+    final summary = ads.summary;
+
+    final activeCampaignWidgets = <Widget>[];
+    for (var index = 0; index < ads.active.length; index++) {
+      activeCampaignWidgets.add(_buildAdsCampaignCard(context, ads.active[index]));
+      if (index < ads.active.length - 1) {
+        activeCampaignWidgets.add(const SizedBox(height: 16));
+      }
+    }
+
+    final experimentWidgets = <Widget>[];
+    for (var index = 0; index < ads.experiments.length; index++) {
+      experimentWidgets.add(_buildAdsExperimentTile(context, ads.experiments[index]));
+      if (index < ads.experiments.length - 1) {
+        experimentWidgets.add(const SizedBox(height: 12));
+      }
+    }
+
+    final placementCards = ads.placements
+        .map((placement) => SizedBox(width: 220, child: _buildAdsPlacementCard(context, placement)))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionCard(
+          title: 'Ads performance overview',
+          subtitle: 'Last synced ${summary.syncedLabel}',
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildAdsSummaryCard(context, 'Active campaigns', '${summary.activeCampaigns}', 'Live across workspaces'),
+              _buildAdsSummaryCard(context, 'Lifetime spend', summary.totalSpendFormatted, 'Synced from channels'),
+              _buildAdsSummaryCard(
+                context,
+                'Avg CTR',
+                summary.averageCtr,
+                '${summary.totalImpressions} impressions',
+              ),
+              _buildAdsSummaryCard(context, 'Avg CPC', summary.averageCpc, 'Click efficiency'),
+              _buildAdsSummaryCard(context, 'Avg CPA', summary.averageCpa, 'Acquisition efficiency'),
+              _buildAdsSummaryCard(context, 'ROAS', summary.roas, 'Return on ad spend'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        _SectionCard(
+          title: 'Active placements',
+          subtitle: 'Detailed telemetry across surfaces, budgets, and creative variants.',
+          child: activeCampaignWidgets.isEmpty
+              ? const Text(
+                  'No active campaigns yet. Launch a placement to populate live metrics.',
+                  style: TextStyle(fontSize: 12),
+                )
+              : Column(children: activeCampaignWidgets),
+        ),
+        const SizedBox(height: 20),
+        _SectionCard(
+          title: 'Experiment lab',
+          subtitle: 'Compare creative and placement experiments against prior conversions.',
+          child: experimentWidgets.isEmpty
+              ? const Text(
+                  'No experiments configured. Launch a variant to measure lift.',
+                  style: TextStyle(fontSize: 12),
+                )
+              : Column(children: experimentWidgets),
+        ),
+        const SizedBox(height: 20),
+        _SectionCard(
+          title: 'Targeting intelligence',
+          subtitle: ads.targeting.summary.isEmpty
+              ? 'Layer keywords, audiences, and geo filters to tighten delivery.'
+              : ads.targeting.summary,
+          child: _buildAdsTargeting(context, ads),
+        ),
+        const SizedBox(height: 20),
+        _SectionCard(
+          title: 'Placement board',
+          subtitle: 'Review coverage, scheduling, and optimisation focus for every placement.',
+          child: placementCards.isEmpty
+              ? const Text(
+                  'No placements configured. Launch a campaign to see the placement board.',
+                  style: TextStyle(fontSize: 12),
+                )
+              : Wrap(spacing: 12, runSpacing: 12, children: placementCards),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAdsSummaryCard(BuildContext context, String label, String value, String description) {
+    return Container(
+      width: 170,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF2D62FF).withOpacity(0.1)),
+        color: const Color(0xFFF5F7FF),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: const Color(0xFF2D62FF), fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(description, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdsCampaignCard(BuildContext context, AdsCampaign campaign) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFFFFF), Color(0xFFEFF3FF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: const Color(0xFF2D62FF).withOpacity(0.12)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x11000000), blurRadius: 20, offset: Offset(0, 10)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(campaign.objective.toUpperCase(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                          color: const Color(0xFF2D62FF),
+                        )),
+                    const SizedBox(height: 6),
+                    Text(campaign.name,
+                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, color: const Color(0xFF0D1224))),
+                    const SizedBox(height: 4),
+                    Text(campaign.placement.scheduleLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600)),
+                  ],
+                ),
+              ),
+              _buildAdsChip(campaign.status.toUpperCase(),
+                  background: campaign.status == 'active'
+                      ? const Color(0xFFE5F6FF)
+                      : Colors.blueGrey.shade100,
+                  textColor: campaign.status == 'active' ? const Color(0xFF006EA1) : Colors.blueGrey.shade700),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _buildAdsStatBlock('Lifetime spend', campaign.spendLabel, campaign.dailyBudgetLabel),
+              _buildAdsStatBlock('Click health', campaign.ctr, '${campaign.cpc} · ${campaign.cpa}'),
+              _buildAdsStatBlock(
+                'Volume',
+                '${campaign.metrics.impressions} impressions',
+                '${campaign.metrics.clicks} clicks · ${campaign.metrics.conversions} conversions',
+              ),
+              _buildAdsStatBlock('Revenue', campaign.metrics.revenueFormatted, 'Synced ${campaign.metrics.syncedLabel}'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: campaign.placement.tags
+                .map((tag) => _buildAdsChip(tag, background: const Color(0xFF2D62FF).withOpacity(0.08)))
+                .toList(),
+          ),
+          const SizedBox(height: 16),
+          Text('Targeting', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ...campaign.targeting.keywords
+                  .map((keyword) => _buildAdsChip(keyword, background: const Color(0xFF2D62FF).withOpacity(0.1)))
+                  .toList(),
+              ...campaign.targeting.audiences
+                  .map((audience) => _buildAdsChip(audience, background: const Color(0xFFE6F4EA), textColor: const Color(0xFF10733D)))
+                  .toList(),
+              ...campaign.targeting.locations
+                  .map((location) => _buildAdsChip(location, background: Colors.blueGrey.shade50, textColor: Colors.blueGrey.shade700))
+                  .toList(),
+              ...campaign.targeting.languages
+                  .map((language) => _buildAdsChip(language, background: const Color(0xFFE8E7FF), textColor: const Color(0xFF4338CA)))
+                  .toList(),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Text('Creative', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Text(campaign.creative.headline,
+              style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF0D1224))),
+          if (campaign.creative.description.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(campaign.creative.description,
+                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600)),
+            ),
+          if (campaign.creative.url.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                campaign.creative.url,
+                style: theme.textTheme.bodySmall?.copyWith(color: const Color(0xFF2D62FF), fontWeight: FontWeight.w600),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdsStatBlock(String label, String primary, String secondary) {
+    return Container(
+      width: 160,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.blueGrey.shade50),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1F3BB3))),
+          const SizedBox(height: 6),
+          Text(primary, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF0D1224))),
+          const SizedBox(height: 4),
+          Text(secondary, style: const TextStyle(fontSize: 11, color: Color(0xFF5B6474))),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdsExperimentTile(BuildContext context, AdsExperiment experiment) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blueGrey.shade50),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(experiment.name,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+              if (experiment.conversionsDeltaLabel.isNotEmpty)
+                _buildAdsChip(experiment.conversionsDeltaLabel,
+                    background: const Color(0xFFE6F4EA), textColor: const Color(0xFF0B8A3B)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(experiment.hypothesis, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600)),
+          const SizedBox(height: 6),
+          Text('Observed ${experiment.observedLabel}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade500)),
+          if (experiment.baselineLabel != null && experiment.baselineLabel!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text('Baseline · ${experiment.baselineLabel}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade500)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdsTargeting(BuildContext context, AdsWorkspace ads) {
+    final targeting = ads.targeting;
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Keywords', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: targeting.keywords
+              .map((keyword) => _buildAdsChip(keyword, background: const Color(0xFF2D62FF).withOpacity(0.1)))
+              .toList(),
+        ),
+        if (targeting.keywords.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('No keyword targeting configured.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          ),
+        const SizedBox(height: 16),
+        Text('Audiences', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: targeting.audiences
+              .map((audience) => _buildAdsChip(audience, background: const Color(0xFFE6F4EA), textColor: const Color(0xFF0B8A3B)))
+              .toList(),
+        ),
+        if (targeting.audiences.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('No audience cohorts connected.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          ),
+        const SizedBox(height: 16),
+        Text('Regions & languages', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ...targeting.locations
+                .map((location) => _buildAdsChip(location, background: Colors.blueGrey.shade50, textColor: Colors.blueGrey.shade700))
+                .toList(),
+            ...targeting.languages
+                .map((language) => _buildAdsChip(language, background: const Color(0xFFE8E7FF), textColor: const Color(0xFF4338CA)))
+                .toList(),
+          ],
+        ),
+        if (targeting.locations.isEmpty && targeting.languages.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('No geo or locale filters applied.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          ),
+        const SizedBox(height: 16),
+        Text('Operational tags', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: ads.tags
+              .map((tag) => _buildAdsChip('${tag.category}: ${tag.label}', background: Colors.white, textColor: Colors.blueGrey.shade700, outlined: true))
+              .toList(),
+        ),
+        if (ads.tags.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text('No operational tags available.', style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8))),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAdsPlacementCard(BuildContext context, AdsPlacement placement) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blueGrey.shade50),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(placement.name,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+              ),
+              _buildAdsChip(placement.status.toUpperCase(),
+                  background: const Color(0xFF2D62FF).withOpacity(0.08), textColor: const Color(0xFF2D62FF)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('${placement.surface} · ${placement.slot}',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600)),
+          const SizedBox(height: 6),
+          Text(placement.budgetLabel,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: const Color(0xFF0D1224))),
+          const SizedBox(height: 4),
+          Text(placement.optimisation,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600)),
+          const SizedBox(height: 4),
+          Text(placement.scheduleLabel,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade500)),
+          if (placement.tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children:
+                  placement.tags.map((tag) => _buildAdsChip(tag, background: Colors.blueGrey.shade50, textColor: Colors.blueGrey.shade700)).toList(),
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdsChip(String label, {Color? background, Color? textColor, bool outlined = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: outlined ? Colors.white : (background ?? const Color(0xFFEFF3FF)),
+        borderRadius: BorderRadius.circular(18),
+        border: outlined
+            ? Border.all(color: Colors.blueGrey.shade100)
+            : Border.all(color: Colors.transparent),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: textColor ?? const Color(0xFF2D62FF),
+        ),
+      ),
+    );
+  }
   @override
   void initState() {
     super.initState();
@@ -163,6 +615,8 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                         _buildPipelineSection(context),
                         const SizedBox(height: 20),
                         _buildProductionSection(context),
+                        const SizedBox(height: 20),
+                        _buildAdsSuite(context),
                         const SizedBox(height: 20),
                         _buildRevenueSection(context),
                         const SizedBox(height: 20),
