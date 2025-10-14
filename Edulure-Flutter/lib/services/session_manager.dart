@@ -7,6 +7,7 @@ class SessionManager {
   static const _downloadsBox = 'content_downloads';
   static const _ebookProgressBox = 'ebook_progress';
   static const _readerSettingsBox = 'ebook_reader_settings';
+  static const _dashboardBox = 'dashboard_snapshots';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
 
@@ -17,6 +18,7 @@ class SessionManager {
     await Hive.openBox(_downloadsBox);
     await Hive.openBox(_ebookProgressBox);
     await Hive.openBox(_readerSettingsBox);
+    await Hive.openBox(_dashboardBox);
   }
 
   static Box get _session => Hive.box(_sessionBox);
@@ -24,6 +26,7 @@ class SessionManager {
   static Box get downloadsCache => Hive.box(_downloadsBox);
   static Box get ebookProgressCache => Hive.box(_ebookProgressBox);
   static Box get readerSettingsCache => Hive.box(_readerSettingsBox);
+  static Box get dashboardCache => Hive.box(_dashboardBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     await _session.put(_sessionKey, session);
@@ -71,5 +74,18 @@ class SessionManager {
   static Future<void> clear() async {
     await _session.delete(_sessionKey);
     await _session.delete(_activeRoleKey);
+    await dashboardCache.clear();
+  }
+
+  static Future<void> cacheDashboardSnapshot(String role, Map<String, dynamic> snapshot) async {
+    await dashboardCache.put(role, snapshot);
+  }
+
+  static Map<String, dynamic>? loadCachedDashboardSnapshot(String role) {
+    final data = dashboardCache.get(role);
+    if (data is Map) {
+      return Map<String, dynamic>.from(data as Map);
+    }
+    return null;
   }
 }

@@ -10,10 +10,12 @@ import 'screens/explorer_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
+import 'screens/learner_dashboard_screen.dart';
 import 'services/push_notification_service.dart';
 import 'screens/tutor_booking_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
+import 'screens/instructor_dashboard_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,8 +51,10 @@ class EdulureApp extends StatelessWidget {
         '/explorer': (_) => const ExplorerScreen(),
         '/inbox': (_) => const InboxScreen(),
         '/profile': (_) => const ProfileScreen(),
+        '/dashboard/learner': (_) => const LearnerDashboardScreen(),
         '/content': (_) => const ContentLibraryScreen(),
         '/tutor-bookings': (_) => const TutorBookingScreen(),
+        '/instructor-dashboard': (_) => const InstructorDashboardScreen(),
         '/courses/manage': (_) => const CourseManagementScreen(),
         '/courses/purchase': (_) => const CoursePurchaseScreen(),
       },

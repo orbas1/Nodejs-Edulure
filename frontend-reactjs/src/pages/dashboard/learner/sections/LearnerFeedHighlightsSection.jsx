@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import clsx from 'clsx';
 
 const highlightPropType = PropTypes.shape({
   id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
@@ -11,15 +12,15 @@ const highlightPropType = PropTypes.shape({
 
 function HighlightCard({ highlight }) {
   return (
-    <li className="dashboard-card-muted p-4">
-      <div className="flex items-center justify-between text-xs text-slate-500">
+    <li className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md">
+      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
         <span>{highlight.time}</span>
-        <span>{highlight.tags.join(' • ')}</span>
+        <span className="truncate text-right">{highlight.tags.join(' • ')}</span>
       </div>
-      <p className="mt-2 text-sm font-semibold text-slate-900">{highlight.headline}</p>
-      <div className="mt-3 flex items-center gap-4 text-xs text-slate-500">
-        <span>❤️ {highlight.reactions}</span>
-        <span>💬 {highlight.comments}</span>
+      <p className="mt-3 text-sm font-semibold text-slate-900">{highlight.headline}</p>
+      <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
+        <span aria-label="Reactions">❤️ {highlight.reactions}</span>
+        <span aria-label="Comments">💬 {highlight.comments}</span>
       </div>
     </li>
   );
@@ -29,12 +30,13 @@ HighlightCard.propTypes = {
   highlight: highlightPropType.isRequired
 };
 
-export default function LearnerFeedHighlightsSection({ highlights }) {
-  if (highlights.length === 0) return null;
+export default function LearnerFeedHighlightsSection({ highlights, className }) {
+  if (!Array.isArray(highlights) || highlights.length === 0) return null;
 
   return (
-    <section className="dashboard-section">
+    <section className={clsx('dashboard-section h-full', className)}>
       <p className="dashboard-kicker">Feed highlights</p>
+      <h3 className="mt-2 text-lg font-semibold text-slate-900">Signals from your communities</h3>
       <ul className="mt-4 space-y-4">
         {highlights.map((item) => (
           <HighlightCard key={item.id} highlight={item} />
@@ -45,9 +47,11 @@ export default function LearnerFeedHighlightsSection({ highlights }) {
 }
 
 LearnerFeedHighlightsSection.propTypes = {
-  highlights: PropTypes.arrayOf(highlightPropType)
+  highlights: PropTypes.arrayOf(highlightPropType),
+  className: PropTypes.string
 };
 
 LearnerFeedHighlightsSection.defaultProps = {
-  highlights: []
+  highlights: [],
+  className: ''
 };
