@@ -160,6 +160,7 @@ export default function Admin() {
   const complianceQueue = compliance.queue ?? EMPTY_ARRAY;
   const complianceSlaBreaches = compliance.slaBreaches ?? 0;
   const complianceManualReview = compliance.manualReviewQueue ?? 0;
+  const complianceGdprProfile = compliance.gdpr ?? EMPTY_OBJECT;
 
   const activity = adminData.activity ?? EMPTY_OBJECT;
   const alerts = activity.alerts ?? EMPTY_ARRAY;
@@ -520,6 +521,7 @@ export default function Admin() {
               queue={complianceQueue}
               slaBreaches={complianceSlaBreaches}
               manualReviewQueue={complianceManualReview}
+              gdprProfile={complianceGdprProfile}
               onReview={handleVerificationReview}
             />
 

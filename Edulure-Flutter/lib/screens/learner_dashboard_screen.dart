@@ -58,8 +58,9 @@ class _LearnerDashboardScreenState extends State<LearnerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeRole = SessionManager.getActiveRole();
-    if (activeRole != 'user') {
+    final activeRole = SessionManager.getActiveRole()?.toLowerCase();
+    const learnerRoles = {'learner', 'user'};
+    if (activeRole == null || !learnerRoles.contains(activeRole)) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Learner dashboard'),
@@ -221,6 +222,11 @@ class _LearnerDashboardScreenState extends State<LearnerDashboardScreen> {
     content.add(const SizedBox(height: 24));
     content.add(_buildMetricsGrid(context, snapshot));
     content.add(const SizedBox(height: 24));
+
+    if (snapshot.liveClassrooms != null) {
+      content.add(_buildLiveClassesCard(context, snapshot.liveClassrooms!, isWide));
+      content.add(const SizedBox(height: 24));
+    }
 
     final paceCard = _buildPaceCard(context, snapshot);
     final communityCard = _buildCommunityCard(context, snapshot);
@@ -489,6 +495,404 @@ class _LearnerDashboardScreenState extends State<LearnerDashboardScreen> {
                         ],
                       ),
                     ),
+                ],
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _buildLiveClassesCard(
+    BuildContext context,
+    LiveClassroomsSnapshot snapshot,
+    bool isWide,
+  ) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF1F5FF), Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: const Color(0xFFDCE5FF)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x0F2D62FF), blurRadius: 28, offset: Offset(0, 18)),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Live classrooms',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Preview readiness, whiteboards, and access controls before you go live.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blueGrey.shade600),
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: snapshot.metrics.isEmpty
+                ? [
+                    Text(
+                      'Metrics will populate once a classroom is scheduled.',
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey),
+                    ),
+                  ]
+                : snapshot.metrics
+                    .map((metric) => _buildLiveMetricChip(context, metric))
+                    .toList(),
+          ),
+          const SizedBox(height: 24),
+          if (snapshot.active.isNotEmpty) ...[
+            Text(
+              'Streaming now',
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            ...snapshot.active.map((session) => _buildLiveSessionTile(context, session)),
+            const SizedBox(height: 20),
+          ],
+          Text(
+            'Upcoming',
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 12),
+          if (snapshot.upcoming.isEmpty)
+            _buildLiveEmptyState(context, 'No upcoming live classrooms yet. Schedule one to populate this view.')
+          else
+            ...snapshot.upcoming.map((session) => _buildLiveSessionTile(context, session)),
+          const SizedBox(height: 20),
+          if (snapshot.whiteboardSnapshots.isNotEmpty)
+            _buildWhiteboardSnapshotRow(context, snapshot.whiteboardSnapshots, isWide),
+          const SizedBox(height: 20),
+          _buildReadinessList(context, snapshot.readiness),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveMetricChip(BuildContext context, DashboardMetric metric) {
+    final isDown = metric.trend == 'down';
+    return Container(
+      width: 200,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE3EAFD)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x142D62FF), blurRadius: 18, offset: Offset(0, 12)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            metric.label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.blueGrey.shade600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            metric.value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          if (metric.change != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                metric.change!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: isDown ? const Color(0xFFD14353) : const Color(0xFF1B8C5D),
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveSessionTile(BuildContext context, LiveClassSessionSummary session) {
+    final theme = Theme.of(context);
+    final occupancy = session.occupancy;
+    final security = session.security;
+    final whiteboard = session.whiteboard;
+    final callToAction = session.callToAction;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE3EAFD)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x142D62FF), blurRadius: 18, offset: Offset(0, 12)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.title,
+                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${session.startLabel}${session.timezone != null ? ' • ${session.timezone}' : ''}${session.community != null ? ' • ${session.community}' : ''}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+                    ),
+                  ],
+                ),
+              ),
+              if (callToAction != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: callToAction.enabled ? const Color(0xFF2D62FF) : Colors.blueGrey.shade100,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    callToAction.label,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: callToAction.enabled ? Colors.white : Colors.blueGrey,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if (session.summary != null && session.summary!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(
+                session.summary!,
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              Chip(
+                label: Text(
+                  occupancy.capacity != null
+                      ? '${occupancy.reserved}/${occupancy.capacity} seats'
+                      : '${occupancy.reserved} learners',
+                ),
+                avatar: const Icon(Icons.people_alt_outlined, size: 18),
+              ),
+              Chip(
+                label: Text(security.waitingRoom ? 'Waiting room' : 'Direct entry'),
+                avatar: Icon(
+                  security.waitingRoom ? Icons.lock_outline : Icons.vpn_key_off,
+                  size: 18,
+                ),
+              ),
+              Chip(
+                label: Text(security.passcodeRequired ? 'Passcode ready' : 'Add passcode'),
+                avatar: Icon(
+                  security.passcodeRequired ? Icons.verified_user_outlined : Icons.error_outline,
+                  size: 18,
+                ),
+              ),
+            ],
+          ),
+          if (whiteboard != null && whiteboard.template != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(
+                  whiteboard.ready ? Icons.check_circle_outline : Icons.draw_outlined,
+                  color: whiteboard.ready ? const Color(0xFF1B8C5D) : const Color(0xFFB7791F),
+                  size: 20,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        whiteboard.template!,
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      if (whiteboard.lastUpdatedLabel != null)
+                        Text(
+                          'Updated ${whiteboard.lastUpdatedLabel}',
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveEmptyState(BuildContext context, String message) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade50,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.blueGrey.shade100),
+      ),
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+      ),
+    );
+  }
+
+  Widget _buildWhiteboardSnapshotRow(
+    BuildContext context,
+    List<LiveClassWhiteboardSnapshot> snapshots,
+    bool isWide,
+  ) {
+    final items = snapshots.take(isWide ? 5 : 3).toList();
+    if (items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return SizedBox(
+      height: 150,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 16),
+        itemBuilder: (context, index) {
+          final snapshot = items[index];
+          return Container(
+            width: isWide ? 220 : 200,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFDCE5FF)),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEEF2FF), Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  snapshot.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  snapshot.template,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+                ),
+                const Spacer(),
+                Row(
+                  children: [
+                    Icon(
+                      snapshot.ready ? Icons.check_circle_outline : Icons.pending_actions_outlined,
+                      color: snapshot.ready ? const Color(0xFF1B8C5D) : const Color(0xFFB7791F),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        snapshot.ready ? 'Ready' : 'Prep required',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: snapshot.ready ? const Color(0xFF1B8C5D) : const Color(0xFFB7791F),
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (snapshot.lastUpdatedLabel != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      'Updated ${snapshot.lastUpdatedLabel}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildReadinessList(BuildContext context, List<LiveClassReadinessItem> readiness) {
+    final theme = Theme.of(context);
+    if (readiness.isEmpty) {
+      return Text(
+        'No readiness checks available yet.',
+        style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: readiness
+          .map(
+            (item) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE3EAFD)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    item.status == 'ready'
+                        ? Icons.check_circle_outline
+                        : item.status == 'attention'
+                            ? Icons.warning_amber_outlined
+                            : Icons.priority_high_rounded,
+                    color: item.status == 'ready'
+                        ? const Color(0xFF1B8C5D)
+                        : item.status == 'attention'
+                            ? const Color(0xFFB7791F)
+                            : const Color(0xFFD14353),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.label,
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.detail,
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
