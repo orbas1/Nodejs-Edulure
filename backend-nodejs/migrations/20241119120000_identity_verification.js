@@ -88,10 +88,10 @@ export const up = async (knex) => {
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     table.index(['verification_id', 'created_at'], 'kyc_audit_logs_lookup_idx');
   });
-};
+}
 
 export const down = async (knex) => {
   await knex.schema.dropTableIfExists('kyc_audit_logs');
   await knex.schema.dropTableIfExists('kyc_documents');
   await knex.schema.dropTableIfExists('kyc_verifications');
-};
+}

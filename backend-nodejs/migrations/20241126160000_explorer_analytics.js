@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasEvents = await knex.schema.hasTable('explorer_search_events');
   if (!hasEvents) {
     await knex.schema.createTable('explorer_search_events', (table) => {
@@ -128,13 +128,13 @@ exports.up = async function up(knex) {
       table.index(['target_date']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('analytics_forecasts');
   await knex.schema.dropTableIfExists('analytics_alerts');
   await knex.schema.dropTableIfExists('explorer_search_daily_metrics');
   await knex.schema.dropTableIfExists('explorer_search_event_interactions');
   await knex.schema.dropTableIfExists('explorer_search_event_entities');
   await knex.schema.dropTableIfExists('explorer_search_events');
-};
+}

@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasChannels = await knex.schema.hasTable('community_channels');
   if (!hasChannels) {
     await knex.schema.createTable('community_channels', (table) => {
@@ -136,10 +136,10 @@ exports.up = async function up(knex) {
       table.index(['asset_id']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('community_resources');
   await knex.schema.dropTableIfExists('community_posts');
   await knex.schema.dropTableIfExists('community_channels');
-};
+}

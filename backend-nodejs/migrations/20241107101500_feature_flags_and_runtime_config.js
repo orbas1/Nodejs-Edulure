@@ -86,7 +86,7 @@ export async function up(knex) {
     });
   }
 
-  const now = new Date().toISOString();
+  const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 
   const featureFlags = [
     {
@@ -108,8 +108,8 @@ export async function up(knex) {
         { key: 'core', weight: 80 },
         { key: 'beta-insights', weight: 20 }
       ]),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     },
     {
       key: 'commerce.checkout-v2',
@@ -121,8 +121,8 @@ export async function up(knex) {
       rollout_percentage: 35,
       environments: JSON.stringify(['staging', 'production']),
       metadata: JSON.stringify({ owner: 'Commerce', jiraKey: 'PAY-872', experimentId: 'exp_checkout_v2' }),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     },
     {
       key: 'learning.live-classrooms',
@@ -140,8 +140,8 @@ export async function up(knex) {
       }),
       environments: JSON.stringify(['development', 'staging', 'production']),
       metadata: JSON.stringify({ owner: 'Learning', jiraKey: 'LIVE-304', rolloutDoc: 'https://ops.edulure.live-classrooms' }),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     }
   ];
 
@@ -178,8 +178,8 @@ export async function up(knex) {
       exposure_level: 'public',
       sensitive: false,
       metadata: JSON.stringify({ team: 'Support' }),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     },
     {
       key: 'admin.console.escalation-channel',
@@ -190,8 +190,8 @@ export async function up(knex) {
       exposure_level: 'ops',
       sensitive: false,
       metadata: JSON.stringify({ pagerDutyService: 'edulure-admin' }),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     },
     {
       key: 'live-classrooms.max-concurrent-rooms',
@@ -202,8 +202,8 @@ export async function up(knex) {
       exposure_level: 'ops',
       sensitive: false,
       metadata: JSON.stringify({ owner: 'Learning Ops' }),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     },
     {
       key: 'commerce.checkout-v2.guardrail',
@@ -214,8 +214,8 @@ export async function up(knex) {
       exposure_level: 'internal',
       sensitive: false,
       metadata: JSON.stringify({ owner: 'Commerce' }),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     },
     {
       key: 'billing.stripe.secret-key',
@@ -226,8 +226,8 @@ export async function up(knex) {
       exposure_level: 'private',
       sensitive: true,
       metadata: JSON.stringify({ rotationDate: '2024-11-30' }),
-      created_at: now,
-      updated_at: now
+      created_at: now(),
+      updated_at: now()
     }
   ];
 

@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasCoupons = await knex.schema.hasTable('payment_coupons');
   if (!hasCoupons) {
     await knex.schema.createTable('payment_coupons', (table) => {
@@ -186,12 +186,12 @@ exports.up = async function up(knex) {
       table.index(['payment_intent_id', 'entry_type']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('payment_ledger_entries');
   await knex.schema.dropTableIfExists('payment_refunds');
   await knex.schema.dropTableIfExists('payment_coupon_redemptions');
   await knex.schema.dropTableIfExists('payment_intents');
   await knex.schema.dropTableIfExists('payment_coupons');
-};
+}

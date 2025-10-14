@@ -1,7 +1,7 @@
 const PARTICIPANT_STATUSES = ['going', 'interested', 'waitlisted', 'declined', 'checked_in'];
 const REMINDER_STATUSES = ['pending', 'processing', 'sent', 'failed', 'cancelled'];
 
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasMemberPoints = await knex.schema.hasTable('community_member_points');
   if (!hasMemberPoints) {
     await knex.schema.createTable('community_member_points', (table) => {
@@ -67,9 +67,9 @@ exports.up = async function up(knex) {
       table.string('reference_id', 120);
       table.json('metadata').notNullable().defaultTo('{}');
       table.timestamp('awarded_at').defaultTo(knex.fn.now());
-      table.index(['community_id', 'user_id']);
-      table.index(['community_id', 'awarded_at']);
-      table.index(['community_id', 'source']);
+      table.index(['community_id', 'user_id'], 'community_points_user_idx');
+      table.index(['community_id', 'awarded_at'], 'community_points_awarded_idx');
+      table.index(['community_id', 'source'], 'community_points_source_idx');
     });
   }
 
@@ -213,13 +213,13 @@ exports.up = async function up(knex) {
       table.index(['status', 'remind_at']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('community_event_reminders');
   await knex.schema.dropTableIfExists('community_event_participants');
   await knex.schema.dropTableIfExists('community_events');
   await knex.schema.dropTableIfExists('community_member_streaks');
   await knex.schema.dropTableIfExists('community_member_point_transactions');
   await knex.schema.dropTableIfExists('community_member_points');
-};
+}

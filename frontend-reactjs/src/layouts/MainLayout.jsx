@@ -53,9 +53,6 @@ export default function MainLayout() {
       { name: 'Dashboard', to: baseDashboardPath },
       { name: 'Community workspace', to: communitiesPath },
       { name: 'About', to: '/about' }
-      { name: 'Dashboard', to: baseDashboardPath },
-      { name: 'About', to: '/about' },
-      { name: 'Blog', to: '/blog' }
     ];
 
     if (!items.some((item) => item.to === communitiesPath)) {

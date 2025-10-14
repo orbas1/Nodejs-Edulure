@@ -10,12 +10,13 @@ import {
   BriefcaseIcon,
   CalendarDaysIcon,
   ChartBarIcon,
+  ClipboardDocumentListIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
-  HandshakeIcon,
-  ClipboardDocumentListIcon,
+  HandRaisedIcon,
   IdentificationIcon,
   InboxStackIcon,
+  MapIcon,
   MegaphoneIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
@@ -24,11 +25,6 @@ import {
   UsersIcon,
   VideoCameraIcon,
   XMarkIcon
-  Bars3Icon,
-  XMarkIcon,
-  VideoCameraIcon,
-  MapIcon
-  BriefcaseIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 
@@ -50,7 +46,7 @@ const navigationByRole = {
     { name: 'Field services', to: `${basePath}/field-services`, icon: MapIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
-    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
+      { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandRaisedIcon },
     { name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
     { name: 'Become an instructor', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
   ],
@@ -67,7 +63,7 @@ const navigationByRole = {
     { name: 'Assessment studio', to: `${basePath}/assessments`, icon: AcademicCapIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
-    { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
+      { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandRaisedIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'Service suite', to: `${basePath}/services`, icon: BriefcaseIcon },
@@ -246,75 +242,64 @@ export default function DashboardLayout() {
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
-                <div className="relative flex-1">
-                  <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search across your dashboard data"
-                    className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                  {searchQuery ? (
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-primary"
-                      onClick={() => setSearchQuery('')}
-                    >
-                      Clear
-                    </button>
-                  ) : null}
-                  {filteredResults.length > 0 ? (
-                  )}
-                  {filteredResults.length > 0 && (
-                    <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
-                      <ul className="space-y-2">
-                        {filteredResults.map((result) => (
-                          <li key={result.id}>
-                            <NavLink
-                              to={result.url}
-                              className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                              onClick={() => setSearchQuery('')}
-                            >
-                              <span className="font-semibold text-slate-800">{result.title}</span>
-                              <span className="text-xs uppercase tracking-wide text-slate-500">{result.type}</span>
-                            </NavLink>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  )}
-                </div>
-                <div className="hidden items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm lg:flex">
-                  {roles.map((roleOption) => {
-                    const target = `/dashboard/${roleOption.id}`;
-                    const isActive = resolvedRole === roleOption.id;
-                    return (
-                      <NavLink
-                        key={roleOption.id}
-                        to={target}
-                        className={`rounded-2xl px-4 py-2 transition ${
-                          isActive ? 'bg-primary text-white shadow' : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
-                          isActive
-                            ? 'bg-primary text-white shadow'
-                            : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
-                        }`}
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
+                  <div className="relative flex-1">
+                    <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      placeholder="Search across your dashboard data"
+                      className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-primary"
+                        onClick={() => setSearchQuery('')}
                       >
-                        {roleOption.label}
-                      </NavLink>
-                    );
-                  })}
+                        Clear
+                      </button>
+                    )}
+                    {filteredResults.length > 0 && (
+                      <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
+                        <ul className="space-y-2">
+                          {filteredResults.map((result) => (
+                            <li key={result.id}>
+                              <NavLink
+                                to={result.url}
+                                className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                                onClick={() => setSearchQuery('')}
+                              >
+                                <span className="font-semibold text-slate-800">{result.title}</span>
+                                <span className="text-xs uppercase tracking-wide text-slate-500">{result.type}</span>
+                              </NavLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  <div className="hidden items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm lg:flex">
+                    {roles.map((roleOption) => {
+                      const target = `/dashboard/${roleOption.id}`;
+                      const isActive = resolvedRole === roleOption.id;
+                      return (
+                        <NavLink
+                          key={roleOption.id}
+                          to={target}
+                          className={`rounded-2xl px-4 py-2 transition ${
+                            isActive ? 'bg-primary text-white shadow' : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+                          }`}
+                        >
+                          {roleOption.label}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
                 </div>
-                      {roleOption.label}
-                    </NavLink>
-                  );
-                })}
-              </div>
               <div className="flex items-center gap-3 self-start lg:self-center">
                 <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
                 <button

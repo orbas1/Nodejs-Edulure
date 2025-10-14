@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasTable = await knex.schema.hasTable('platform_settings');
   if (!hasTable) {
     await knex.schema.createTable('platform_settings', (table) => {
@@ -11,8 +11,8 @@ exports.up = async function up(knex) {
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('platform_settings');
-};
+}

@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasCampaigns = await knex.schema.hasTable('ads_campaigns');
   if (!hasCampaigns) {
     await knex.schema.createTable('ads_campaigns', (table) => {
@@ -70,9 +70,9 @@ exports.up = async function up(knex) {
       table.index(['metric_date']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('ads_campaign_metrics_daily');
   await knex.schema.dropTableIfExists('ads_campaigns');
-};
+}

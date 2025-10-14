@@ -2,7 +2,7 @@ const FOLLOW_STATUSES = ['pending', 'accepted', 'declined'];
 const PROFILE_VISIBILITY = ['public', 'followers', 'private'];
 const MESSAGE_PERMISSIONS = ['anyone', 'followers', 'none'];
 
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasPrivacySettings = await knex.schema.hasTable('user_privacy_settings');
   if (!hasPrivacySettings) {
     await knex.schema.createTable('user_privacy_settings', (table) => {
@@ -179,13 +179,13 @@ exports.up = async function up(knex) {
       table.index(['target_user_id']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('social_audit_logs');
   await knex.schema.dropTableIfExists('user_follow_recommendations');
   await knex.schema.dropTableIfExists('user_block_list');
   await knex.schema.dropTableIfExists('user_mute_list');
   await knex.schema.dropTableIfExists('user_follows');
   await knex.schema.dropTableIfExists('user_privacy_settings');
-};
+}
