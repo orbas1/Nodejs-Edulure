@@ -6,6 +6,7 @@ import 'screens/course_management_screen.dart';
 import 'screens/course_purchase_screen.dart';
 import 'screens/feed_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/explorer_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/register_screen.dart';
@@ -45,6 +46,7 @@ class EdulureApp extends StatelessWidget {
         '/register': (_) => const RegisterScreen(),
         '/communities': (_) => const CommunitiesScreen(),
         '/feed': (_) => const FeedScreen(),
+        '/explorer': (_) => const ExplorerScreen(),
         '/inbox': (_) => const InboxScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),

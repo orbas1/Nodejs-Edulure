@@ -7,6 +7,6 @@ const router = Router();
 
 router.get('/explorer/summary', auth('instructor'), AnalyticsController.getExplorerSummary);
 router.get('/explorer/alerts', auth('instructor'), AnalyticsController.getExplorerAlerts);
-router.post('/explorer/interactions', AnalyticsController.recordExplorerInteraction);
+router.post('/explorer/interactions', auth('user'), AnalyticsController.recordExplorerInteraction);
 
 export default router;

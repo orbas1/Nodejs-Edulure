@@ -101,6 +101,13 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.travel_explore_outlined),
+                    title: const Text('Explorer intelligence'),
+                    subtitle: const Text('Search cohorts, talent, and campaigns across the network.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/explorer'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.inbox_outlined),
                     title: const Text('Messages'),
                     subtitle: const Text('Coordinate with faculty and members in threaded conversations.'),
@@ -465,12 +472,13 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
         description: 'Understand completion, assessments, and mentor feedback in one view.',
       ),
       _RoleFeature(
-        icon: Icons.forum_outlined,
-        title: 'Community pulse',
-        description: 'Join the latest discussions and collect trusted recommendations.',
+        icon: Icons.travel_explore_outlined,
+        title: 'Discovery explorer',
+        description: 'Surface communities, mentors, and resources with curated filters and saved searches.',
       ),
     ],
     actions: [
+      _RoleAction(icon: Icons.travel_explore_outlined, label: 'Launch explorer', route: '/explorer'),
       _RoleAction(icon: Icons.dynamic_feed_outlined, label: 'Browse feed', route: '/feed'),
       _RoleAction(icon: Icons.bookmark_border, label: 'Open content library', route: '/content'),
       _RoleAction(icon: Icons.calendar_today_outlined, label: 'Review timetable', route: '/profile'),
@@ -487,9 +495,9 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
         description: 'Monitor enrolment health, retention, and student sentiment in real time.',
       ),
       _RoleFeature(
-        icon: Icons.groups_outlined,
-        title: 'Community orchestration',
-        description: 'Moderate discussions, assign mentors, and celebrate learner milestones.',
+        icon: Icons.travel_explore_outlined,
+        title: 'Explorer playbooks',
+        description: 'Share discovery packs that blend cohorts, tutors, and campaigns for your learners.',
       ),
       _RoleFeature(
         icon: Icons.attach_money_outlined,
@@ -498,6 +506,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       ),
     ],
     actions: [
+      _RoleAction(icon: Icons.travel_explore_outlined, label: 'Launch explorer', route: '/explorer'),
       _RoleAction(icon: Icons.add_circle_outline, label: 'Create course', route: '/content'),
       _RoleAction(icon: Icons.message_outlined, label: 'Open inbox', route: '/feed'),
       _RoleAction(icon: Icons.schedule_outlined, label: 'Plan lesson', route: '/profile'),
@@ -525,6 +534,7 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       ),
     ],
     actions: [
+      _RoleAction(icon: Icons.travel_explore_outlined, label: 'Open explorer', route: '/explorer'),
       _RoleAction(icon: Icons.admin_panel_settings_outlined, label: 'Manage roles', route: '/profile'),
       _RoleAction(icon: Icons.insights_outlined, label: 'View analytics', route: '/content'),
       _RoleAction(icon: Icons.settings_outlined, label: 'Workspace settings', route: '/profile'),
