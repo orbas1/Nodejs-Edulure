@@ -1016,7 +1016,7 @@ export function buildInstructorDashboard({
       courseTitle: assignment.courseTitle,
       title: assignment.title,
       dueDate,
-      owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email,
+      owner: metadata.owner ?? resolveName(user.firstName, user.lastName, user.email),
       metadata
     };
   });
@@ -1066,7 +1066,7 @@ export function buildInstructorDashboard({
     .map((booking) => ({
       id: `booking-${booking.id}`,
       status: 'Requested',
-      learner: `${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner',
+      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
       topic: booking.metadata.topic ?? 'Mentorship session'
     }));
@@ -1076,7 +1076,7 @@ export function buildInstructorDashboard({
     .map((booking) => ({
       id: `booking-${booking.id}`,
       topic: booking.metadata.topic ?? 'Mentorship session',
-      learner: `${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner',
+      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
       date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
     }));
 
@@ -1089,12 +1089,28 @@ export function buildInstructorDashboard({
   upcomingTutorSlots.forEach((slot) => {
     const tutorId = Number(slot.tutorId);
     const base = tutorScheduleMap.get(tutorId) ?? {
-      mentor: slot.tutorName ?? tutorProfileMap.get(tutorId)?.displayName ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+      mentor:
+        slot.tutorName ??
+        tutorProfileMap.get(tutorId)?.displayName ??
+        `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
       slots: 0,
       learners: 0,
-      notes: new Set()
+      notes: new Set(),
+      openSlots: 0,
+      nextSlotAt: null,
+      nextOpenSlot: null,
+      nextSession: null
     };
     base.slots += 1;
+    if (slot.startAt && (!base.nextSlotAt || slot.startAt < base.nextSlotAt)) {
+      base.nextSlotAt = slot.startAt;
+    }
+    if (slot.status === 'open') {
+      base.openSlots += 1;
+      if (slot.startAt && (!base.nextOpenSlot || slot.startAt < base.nextOpenSlot)) {
+        base.nextOpenSlot = slot.startAt;
+      }
+    }
     if (slot.metadata.channel) base.notes.add(`#${slot.metadata.channel}`);
     if (slot.metadata.durationMinutes) base.notes.add(`${slot.metadata.durationMinutes} mins`);
     tutorScheduleMap.set(tutorId, base);
@@ -1105,22 +1121,192 @@ export function buildInstructorDashboard({
     .forEach((booking) => {
       const tutorId = Number(booking.tutorId);
       const base = tutorScheduleMap.get(tutorId) ?? {
-        mentor: tutorProfileMap.get(tutorId)?.displayName ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+        mentor:
+          tutorProfileMap.get(tutorId)?.displayName ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
         slots: 0,
         learners: 0,
-        notes: new Set()
+        notes: new Set(),
+        openSlots: 0,
+        nextSlotAt: null,
+        nextOpenSlot: null,
+        nextSession: null
       };
       base.learners += 1;
+      if (booking.scheduledStart && (!base.nextSession || booking.scheduledStart < base.nextSession)) {
+        base.nextSession = booking.scheduledStart;
+      }
       tutorScheduleMap.set(tutorId, base);
     });
 
-  const tutorSchedule = Array.from(tutorScheduleMap.entries()).map(([tutorId, entry]) => ({
-    id: `tutor-${tutorId}`,
-    mentor: entry.mentor,
-    slots: `${entry.slots} slot${entry.slots === 1 ? '' : 's'}`,
-    learners: `${entry.learners} learner${entry.learners === 1 ? '' : 's'}`,
-    notes: Array.from(entry.notes).join(' • ') || 'Capacity in sync'
-  }));
+  const tutorSchedule = Array.from(tutorScheduleMap.entries()).map(([tutorId, entry]) => {
+    const noteItems = Array.from(entry.notes);
+    if (entry.openSlots > 0) {
+      noteItems.push(`${entry.openSlots} open slot${entry.openSlots === 1 ? '' : 's'}`);
+    }
+    return {
+      id: `tutor-${tutorId}`,
+      mentor: entry.mentor,
+      slots: `${entry.slots} slot${entry.slots === 1 ? '' : 's'}`,
+      slotsCount: entry.slots,
+      learners: `${entry.learners} learner${entry.learners === 1 ? '' : 's'}`,
+      learnersCount: entry.learners,
+      nextAvailability: entry.nextOpenSlot
+        ? formatDateTime(entry.nextOpenSlot, { dateStyle: 'medium', timeStyle: 'short' })
+        : null,
+      nextSession: entry.nextSession
+        ? formatDateTime(entry.nextSession, { dateStyle: 'medium', timeStyle: 'short' })
+        : null,
+      notes: noteItems.length ? noteItems.join(' • ') : 'Capacity in sync',
+      noteItems
+    };
+  });
+
+  const scheduleLookup = new Map(tutorSchedule.map((entry) => [entry.id, entry]));
+
+  const tutorRoster = tutorProfiles.map((profile) => {
+    const metadata = safeJsonParse(profile.metadata, {});
+    const skills = safeJsonParse(profile.skills, []);
+    const languages = safeJsonParse(profile.languages, []);
+    const timezones = safeJsonParse(profile.timezones, []);
+    const availabilityPreferences = safeJsonParse(profile.availabilityPreferences, {});
+    const scheduleEntry = scheduleLookup.get(`tutor-${profile.id}`);
+    const openSlots = upcomingTutorSlots
+      .filter((slot) => Number(slot.tutorId) === Number(profile.id))
+      .sort((a, b) => {
+        if (!a.startAt && !b.startAt) return 0;
+        if (!a.startAt) return 1;
+        if (!b.startAt) return -1;
+        return a.startAt - b.startAt;
+      });
+    const nextOpenSlot = openSlots.find((slot) => slot.status === 'open');
+    const rateAmount = Number(profile.hourlyRateAmount ?? 0);
+    const rateCurrency = profile.hourlyRateCurrency ?? 'USD';
+    const ratingAverage = Number(profile.ratingAverage ?? 0);
+    const ratingCount = Number(profile.ratingCount ?? 0);
+    const responseMinutes = Number(profile.responseTimeMinutes ?? metadata.responseTimeMinutes ?? 0);
+    const completedSessions = Number(profile.completedSessions ?? 0);
+
+    const focusAreas = [];
+    if (Array.isArray(skills)) {
+      focusAreas.push(...skills.filter(Boolean).slice(0, 2));
+    }
+    if (Array.isArray(languages)) {
+      focusAreas.push(...languages.filter(Boolean).slice(0, 1));
+    }
+
+    const statusKey = metadata.onboardingStatus ?? (profile.isVerified ? 'active' : 'onboarding');
+    const statusLabelMap = {
+      active: 'Active',
+      complete: 'Active',
+      onboarding: 'Onboarding',
+      reviewing: 'Under review',
+      paused: 'Paused',
+      draft: 'Draft'
+    };
+    const statusToneMap = {
+      active: 'success',
+      complete: 'success',
+      onboarding: 'info',
+      reviewing: 'info',
+      paused: 'warning',
+      draft: 'neutral'
+    };
+    const statusLabel = statusLabelMap[statusKey] ?? 'Active';
+    const statusTone = statusToneMap[statusKey] ?? 'success';
+
+    const timezone = Array.isArray(timezones) && timezones.length > 0 ? timezones[0] : 'Etc/UTC';
+    const weeklyHours = Number(availabilityPreferences.weeklyHours ?? availabilityPreferences.weekly_hours ?? 0);
+
+    const availabilityLabel = scheduleEntry?.nextAvailability
+      ? scheduleEntry.nextAvailability
+      : nextOpenSlot?.startAt
+        ? formatDateTime(nextOpenSlot.startAt, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'Sync calendar';
+
+    const workloadLabel = scheduleEntry
+      ? `${scheduleEntry.learners} • ${scheduleEntry.slots}`
+      : 'No scheduled capacity';
+
+    const defaultName = resolveName(user.firstName, user.lastName, 'Tutor');
+    return {
+      id: `tutor-${profile.id}`,
+      name:
+        profile.displayName ??
+        tutorScheduleMap.get(Number(profile.id))?.mentor ??
+        defaultName,
+      headline: profile.headline ?? metadata.specialty ?? metadata.title ?? 'Mentor',
+      status: statusLabel,
+      statusTone,
+      focusAreas,
+      availability: availabilityLabel,
+      timezone,
+      weeklyHours: weeklyHours > 0 ? `${weeklyHours} hrs/week` : null,
+      rate: rateAmount > 0 ? `${formatCurrency(rateAmount, rateCurrency)}/hr` : 'Rate pending',
+      rating:
+        ratingAverage > 0
+          ? `${ratingAverage.toFixed(1)} • ${ratingCount} review${ratingCount === 1 ? '' : 's'}`
+          : 'Awaiting reviews',
+      responseTime: responseMinutes > 0 ? minutesToReadable(responseMinutes) : 'SLA pending',
+      workload: workloadLabel,
+      sessions: completedSessions > 0 ? `${completedSessions} sessions` : null,
+      notes: scheduleEntry?.noteItems ?? [],
+      nextSession: scheduleEntry?.nextSession ?? null
+    };
+  });
+
+  const tutorNotifications = [];
+  if (pipelineBookings.length > 0) {
+    tutorNotifications.push({
+      id: 'tutor-pipeline-backlog',
+      severity: 'warning',
+      title: `${pipelineBookings.length} tutor request${pipelineBookings.length === 1 ? '' : 's'} awaiting assignment`,
+      detail: 'Route learners to active mentors to maintain your SLA window.',
+      ctaLabel: 'Review queue',
+      ctaPath: '/dashboard/instructor/bookings'
+    });
+  }
+
+  tutorSchedule
+    .filter((entry) => Number(entry.slotsCount ?? 0) > 0 && Number(entry.learnersCount ?? 0) > Number(entry.slotsCount ?? 0))
+    .forEach((entry) => {
+      tutorNotifications.push({
+        id: `${entry.id}-capacity`,
+        severity: 'warning',
+        title: `${entry.mentor} is over capacity`,
+        detail: `${entry.learnersCount} learners across ${entry.slotsCount} slot${entry.slotsCount === 1 ? '' : 's'}.`,
+        ctaLabel: 'Adjust load',
+        ctaPath: '/dashboard/instructor/tutor-schedule'
+      });
+    });
+
+  tutorRoster
+    .filter((tutor) => tutor.availability === 'Sync calendar')
+    .forEach((tutor) => {
+      tutorNotifications.push({
+        id: `${tutor.id}-sync`,
+        severity: 'info',
+        title: `${tutor.name} calendar needs syncing`,
+        detail: 'Reconnect the integration so learners can self-book available slots.',
+        ctaLabel: 'Sync calendar',
+        ctaPath: '/dashboard/instructor/tutor-schedule'
+      });
+    });
+
+  tutorBookingsNormalised
+    .filter((booking) => booking.status === 'confirmed' && booking.scheduledStart && booking.scheduledStart >= now)
+    .filter((booking) => booking.scheduledStart.getTime() - now.getTime() <= 48 * 60 * 60 * 1000)
+    .slice(0, 5)
+    .forEach((booking) => {
+      const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
+      tutorNotifications.push({
+        id: `booking-${booking.id}-due`,
+        severity: 'info',
+        title: `${booking.metadata.topic ?? 'Mentor session'} with ${learnerName}`,
+        detail: `Begins ${formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })}.`,
+        ctaLabel: 'Review brief',
+        ctaPath: '/dashboard/instructor/bookings'
+      });
+    });
 
   const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
   const assetEventGroups = new Map();
@@ -1242,7 +1428,7 @@ export function buildInstructorDashboard({
         stage,
         progress,
         lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
-        owner: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor',
+        owner: resolveName(user.firstName, user.lastName, 'Instructor'),
         nextActions,
         reference,
         latestActivity
@@ -1619,7 +1805,7 @@ export function buildInstructorDashboard({
     ...upcomingLessons.map((lesson) => ({
       id: `lesson-${lesson.id}`,
       asset: `${lesson.courseTitle} · ${lesson.title}`,
-      owner: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator',
+      owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
       status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
       type: 'Lesson'
     }))
@@ -1894,7 +2080,7 @@ export function buildInstructorDashboard({
     topic: lesson.title,
     course: lesson.courseTitle,
     date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
-    facilitator: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'
+    facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
   }));
 
   const calendarEntries = [];
@@ -2029,6 +2215,14 @@ export function buildInstructorDashboard({
       role: 'instructor',
       type: 'Live session',
       title: session.title,
+      url: '/dashboard/instructor/calendar'
+    })),
+    ...tutorRoster.map((tutor) => ({
+      id: `search-instructor-tutor-${tutor.id}`,
+      role: 'instructor',
+      type: 'Tutor',
+      title: tutor.name,
+      url: '/dashboard/instructor/tutor-management'
       url: '/dashboard/instructor/live-classes'
     }))
   ];
@@ -2089,6 +2283,11 @@ export function buildInstructorDashboard({
       schedules: {
         lessons: lessonSchedule,
         tutor: tutorSchedule
+      },
+      tutors: {
+        roster: tutorRoster,
+        availability: tutorSchedule,
+        notifications: tutorNotifications
       },
       bookings: {
         pipeline: pipelineBookings,
@@ -2169,6 +2368,9 @@ function minutesToReadable(minutes) {
   return `${hours}h ${remaining}m`;
 }
 
+function resolveName(firstName, lastName, fallback) {
+  const candidate = `${firstName ?? ''} ${lastName ?? ''}`.trim();
+  return candidate.length > 0 ? candidate : fallback;
 const LIVE_JOIN_WINDOW_MINUTES = 15;
 const GROUP_SESSION_KEYWORDS = ['group', 'cohort', 'bootcamp', 'lab', 'studio', 'masterclass', 'workshop', 'breakout'];
 const WHITEBOARD_READY_STATES = new Set(['ready', 'live', 'approved', 'published']);
@@ -2977,11 +3179,18 @@ export default class DashboardService {
           'tp.id',
           'tp.display_name as displayName',
           'tp.headline',
+          'tp.bio',
+          'tp.skills',
+          'tp.languages',
+          'tp.timezones',
+          'tp.availability_preferences as availabilityPreferences',
           'tp.hourly_rate_amount as hourlyRateAmount',
           'tp.hourly_rate_currency as hourlyRateCurrency',
           'tp.rating_average as ratingAverage',
           'tp.rating_count as ratingCount',
           'tp.completed_sessions as completedSessions',
+          'tp.response_time_minutes as responseTimeMinutes',
+          'tp.is_verified as isVerified',
           'tp.metadata'
         ),
       db('tutor_availability_slots as slot')
@@ -4775,9 +4984,8 @@ export default class DashboardService {
         activity: { alerts, events },
         settings: {
           monetization: monetizationSettings
-        }
-        compliance,
-        activity: { alerts, events }
+        },
+        compliance
       },
       profileStats,
       profileBio,
