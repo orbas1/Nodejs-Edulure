@@ -16,6 +16,7 @@ import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
 import AdminTopCommunitiesSection from './admin/sections/AdminTopCommunitiesSection.jsx';
 import AdminUpcomingLaunchesSection from './admin/sections/AdminUpcomingLaunchesSection.jsx';
 import AdminActivitySection from './admin/sections/AdminActivitySection.jsx';
+import AdminBlogSection from './admin/sections/AdminBlogSection.jsx';
 import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
 const EMPTY_OBJECT = Object.freeze({});
@@ -28,6 +29,7 @@ const SECTION_NAVIGATION = Object.freeze([
   { id: 'monetization', label: 'Monetization' },
   { id: 'communities', label: 'Communities' },
   { id: 'operations', label: 'Operations' },
+  { id: 'blog', label: 'Blog' },
   { id: 'compliance', label: 'Compliance' },
   { id: 'policies', label: 'Policies' },
   { id: 'launches', label: 'Launches' },
@@ -145,6 +147,7 @@ export default function Admin() {
   const topCommunities = adminData.revenue?.topCommunities ?? EMPTY_ARRAY;
 
   const monetizationSettings = adminData.settings?.monetization ?? null;
+  const blog = adminData.blog ?? null;
 
   const operations = adminData.operations ?? EMPTY_OBJECT;
   const support = operations.support ?? EMPTY_OBJECT;
@@ -508,6 +511,8 @@ export default function Admin() {
               riskStats={riskStats}
               platformStats={platformStats}
             />
+
+            <AdminBlogSection sectionId="blog" blog={blog} token={token} onPostCreated={refresh} />
 
             <AdminComplianceSection
               sectionId="compliance"

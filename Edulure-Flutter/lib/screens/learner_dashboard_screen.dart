@@ -275,6 +275,9 @@ class _LearnerDashboardScreenState extends State<LearnerDashboardScreen> {
       content.addAll([highlightsCard, const SizedBox(height: 16), safetyCard]);
     }
 
+    content.add(const SizedBox(height: 24));
+    content.add(_buildBlogCard(context, snapshot));
+
     content.add(const SizedBox(height: 32));
     content.add(
       Text(
@@ -812,6 +815,205 @@ class _LearnerDashboardScreenState extends State<LearnerDashboardScreen> {
             label: 'Unread messages',
             value: '${snapshot.unreadMessages}',
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBlogCard(BuildContext context, LearnerDashboardSnapshot snapshot) {
+    final posts = snapshot.blogPosts;
+    if (posts.isEmpty) {
+      return _CardContainer(
+        title: 'Edulure blog',
+        subtitle: 'Enterprise insights will surface here when available.',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'No articles published yet',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Stay tuned for platform stories and product walkthroughs tailored to your learning journey.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: () => Navigator.of(context).pushNamed('/blog'),
+              child: const Text('Visit blog hub'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final featured = snapshot.featuredBlog ?? posts.first;
+    final supporting = posts.where((article) => article.slug != featured.slug).take(3).toList();
+
+    return _CardContainer(
+      title: 'Edulure blog',
+      subtitle: 'Read platform announcements with mobile-responsive design parity.',
+      trailing: TextButton(
+        onPressed: () => Navigator.of(context).pushNamed('/blog'),
+        child: const Text('Open blog'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEEF2FF), Color(0xFFE0ECFF)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (featured.heroImageUrl != null && featured.heroImageUrl!.isNotEmpty)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.network(
+                      featured.heroImageUrl!,
+                      height: 160,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                if (featured.heroImageUrl != null && featured.heroImageUrl!.isNotEmpty)
+                  const SizedBox(height: 12),
+                Text(
+                  featured.category,
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: const Color(0xFF2D62FF), fontWeight: FontWeight.w600, letterSpacing: 0.6),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  featured.title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700, color: const Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  featured.excerpt.isNotEmpty ? featured.excerpt : 'Tap to read the full announcement.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    Chip(
+                      label: Text('${featured.readingTimeMinutes} min read'),
+                      backgroundColor: Colors.white,
+                      labelStyle: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    Chip(
+                      label: Text(featured.publishedAt ?? 'Draft'),
+                      backgroundColor: Colors.white,
+                    ),
+                    if (featured.isFeatured)
+                      const Chip(
+                        label: Text('Featured'),
+                        backgroundColor: Color(0xFFFFF7E6),
+                        labelStyle: TextStyle(color: Color(0xFFB45309), fontWeight: FontWeight.w600),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () => Navigator.of(context).pushNamed('/blog'),
+                  child: const Text('Read featured article'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (supporting.isNotEmpty)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Recently published',
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w600, color: Colors.grey.shade800),
+                ),
+                const SizedBox(height: 12),
+                ...supporting.map(
+                  (article) => Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      color: Colors.white,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                article.category,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: Colors.grey.shade600, letterSpacing: 0.4),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                article.title,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600, color: Colors.grey.shade900),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                article.excerpt.isNotEmpty ? article.excerpt : 'Read more',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${article.readingTimeMinutes} min',
+                              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey.shade500),
+                            ),
+                            const SizedBox(height: 8),
+                            IconButton(
+                              tooltip: 'Open article',
+                              icon: const Icon(Icons.open_in_new, size: 20, color: Color(0xFF2D62FF)),
+                              onPressed: () => Navigator.of(context).pushNamed('/blog'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
     );

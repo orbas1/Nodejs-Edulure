@@ -19,6 +19,7 @@ export default function MainLayout() {
     if (!isAuthenticated) {
       return [
         { name: 'Home', to: '/' },
+        { name: 'Blog', to: '/blog' },
         { name: 'About', to: '/about' }
       ];
     }
@@ -28,7 +29,8 @@ export default function MainLayout() {
       { name: 'Home', to: '/' },
       { name: 'Live Feed', to: '/feed' },
       { name: 'Explorer', to: '/explorer' },
-      { name: 'Profile', to: '/profile' }
+      { name: 'Profile', to: '/profile' },
+      { name: 'Blog', to: '/blog' }
     ];
 
     if (contentLibraryEnabled && (role === 'instructor' || role === 'admin')) {
