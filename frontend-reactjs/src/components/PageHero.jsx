@@ -1,9 +1,9 @@
 import PropTypes from 'prop-types';
 
+const DEFAULT_BADGES = ['Strategists', 'Designers', 'Founders', 'Mentors'];
+
 export default function PageHero({ title, description, subtitle, cta }) {
   const heroDescription = description ?? subtitle;
-  const bodyCopy = heroDescription;
-  const roleBadges = ['Operators', 'Instructors', 'Creators'];
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
@@ -17,22 +17,13 @@ export default function PageHero({ title, description, subtitle, cta }) {
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white/80">
             Enterprise learning OS
           </span>
-          <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-            {title}
-          </h1>
-          {bodyCopy ? <p className="mt-6 text-lg leading-8 text-slate-200">{bodyCopy}</p> : null}
-          {cta ? <div className="mt-10 flex flex-wrap items-center gap-4">{cta}</div> : null}
-          <div className="mt-8 flex items-center gap-4 text-sm text-white/80">
-            {["Strategists", "Designers", "Founders", "Mentors"].map((label) => (
-              <span key={label} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
-          {heroDescription && (
-            <p className="mt-6 max-w-xl text-base leading-7 text-white/80 md:text-lg md:leading-8">
-              {heroDescription}
-            </p>
-          )}
+          <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">{title}</h1>
+          {heroDescription ? (
+            <p className="mt-6 max-w-xl text-base leading-7 text-white/80 md:text-lg md:leading-8">{heroDescription}</p>
+          ) : null}
           {cta ? <div className="mt-8 flex flex-wrap items-center gap-4">{cta}</div> : null}
           <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-white/80">
-            {roleBadges.map((label) => (
+            {DEFAULT_BADGES.map((label) => (
               <span
                 key={label}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1"
@@ -55,7 +46,9 @@ export default function PageHero({ title, description, subtitle, cta }) {
               />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 to-transparent p-6 text-sm text-white/80">
                 <p className="font-semibold text-white">Sessions that feel like a shared studio</p>
-                <p className="mt-1 text-xs text-white/70">Live workshops, async circles, and mentor huddles—captured from the community feed.</p>
+                <p className="mt-1 text-xs text-white/70">
+                  Live workshops, async circles, and mentor huddles—captured from the community feed.
+                </p>
               </div>
             </div>
           </div>

@@ -8,26 +8,32 @@ import { useLanguage } from '../context/LanguageContext.jsx';
 export default function Home() {
   const { t } = useLanguage();
 
+  const heroTitle = t('home.hero.title', 'Where ambitious builders learn, teach, and grow together');
+  const heroDescription = t(
+    'home.hero.description',
+    'Edulure unites live lessons, community spaces, and revenue tools so your team can scale without the clutter.'
+  );
+  const primaryCtaLabel = t('home.hero.ctaPrimary', 'Join the community');
+  const secondaryCtaLabel = t('home.hero.ctaSecondary', 'Peek inside live circles');
+
   return (
     <div className="bg-slate-50 text-slate-900">
       <PageHero
-        title={t('home.hero.title')}
-        description={t('home.hero.description')}
-        title="Build together. Launch faster."
-        description="Edulure unites live lessons, community spaces, and revenue tools so your team can scale without the clutter."
+        title={heroTitle}
+        description={heroDescription}
         cta={
           <>
             <Link
               to="/register"
               className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card hover:bg-primary-dark"
             >
-              {t('home.hero.ctaPrimary')}
+              {primaryCtaLabel}
             </Link>
             <Link
               to="/feed"
               className="inline-flex items-center justify-center rounded-full border border-white/40 px-6 py-3 text-sm font-semibold text-white hover:border-white hover:bg-white/10"
             >
-              {t('home.hero.ctaSecondary')}
+              {secondaryCtaLabel}
             </Link>
             <LanguageSelector size="large" variant="dark" align="start" className="hover:border-white/80" />
           </>
@@ -200,22 +206,18 @@ export default function Home() {
                     <p className="text-xs text-slate-500">Today • 18 active threads</p>
                   </div>
                 </div>
-                <div className="mt-6 space-y-4 text-left text-xs text-slate-500">
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-sm font-semibold text-slate-900">Launch win from Sara Patel</p>
-                    <p className="mt-2">Booked three dream clients after a circle hot seat. Dropping the template deck for anyone to remix.</p>
-                    <div className="mt-3 flex items-center gap-3 text-[11px] text-slate-500">
-                      <span className="rounded-full bg-teal-50 px-2 py-1 text-teal-700">52 reactions</span>
-                      <span className="rounded-full bg-teal-50 px-2 py-1 text-teal-700">14 replies</span>
-                    </div>
+                <div className="mt-6 space-y-4 text-sm text-slate-500">
+                  <div className="flex items-center justify-between rounded-2xl bg-white/80 px-4 py-3">
+                    <span className="font-semibold text-slate-900">Launch wins</span>
+                    <span className="text-xs text-emerald-500">+6 highlights</span>
                   </div>
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-sm font-semibold text-slate-900">🧠 Question from Leo Park</p>
-                    <p className="mt-2">Looking for feedback on my onboarding email. Drop examples or voice notes in the thread?</p>
-                    <div className="mt-3 flex items-center gap-3 text-[11px] text-slate-500">
-                      <span className="rounded-full bg-teal-50 px-2 py-1 text-teal-700">5 mentors replied</span>
-                      <span className="rounded-full bg-teal-50 px-2 py-1 text-teal-700">Save playbook</span>
-                    </div>
+                  <div className="flex items-center justify-between rounded-2xl bg-white/80 px-4 py-3">
+                    <span className="font-semibold text-slate-900">Feedback requests</span>
+                    <span className="text-xs text-sky-500">4 waiting</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl bg-white/80 px-4 py-3">
+                    <span className="font-semibold text-slate-900">Resource drops</span>
+                    <span className="text-xs text-fuchsia-500">New today</span>
                   </div>
                 </div>
               </div>
@@ -223,209 +225,8 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <section className="bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-24">
-          <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-wide text-primary/70">Guide toolkit</p>
-            <h2 className="mt-4 text-3xl font-semibold text-slate-900 lg:text-4xl">Give mentors and hosts everything they need to nurture the community</h2>
-            <p className="mt-4 text-base leading-7 text-slate-600">
-              From coordinating circles to sharing resources and listening to member sentiment, the backstage tools keep the human touch intact while lightening the operational lift.
-            </p>
-          </div>
-          <div className="mt-16 grid gap-10 lg:grid-cols-2">
-            <article className="flex flex-col justify-between gap-8 rounded-4xl border border-slate-200 bg-slate-50 p-8 shadow-[0_40px_80px_-40px_rgba(15,118,110,0.25)]">
-              <div className="space-y-5">
-                <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">Circle planning</span>
-                <h3 className="text-2xl font-semibold text-slate-900">Coordinate sessions with clarity</h3>
-                <p className="text-sm leading-6 text-slate-600">
-                  Hosts can see every circle at a glance—who&apos;s queued up, who needs a check-in, and which rituals are about to go live.
-                </p>
-                <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Columns mirror your flow: gathering interest, prepping, live, and celebrating</li>
-                  <li>Notes and reminders live next to each session so context never gets lost</li>
-                  <li>Ownership tags make it easy to tap co-hosts or bring in mentors</li>
-                </ul>
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-inner">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-semibold text-slate-900">Circle run sheet</span>
-                  <span>Week of Apr 15</span>
-                </div>
-                <div className="mt-5 grid gap-4 md:grid-cols-3">
-                  {["Gathering", "In session", "Wins"].map((stage, index) => (
-                    <div key={stage} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between text-[11px] text-slate-500">
-                        <span className="font-semibold text-slate-700">{stage}</span>
-                        <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">{index + 3}</span>
-                      </div>
-                      <div className="mt-3 space-y-3">
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500">
-                          <p className="text-sm font-semibold text-slate-800">Story Circle • Tuesday</p>
-                          <p>Host: Priya N.</p>
-                          <p className="text-primary">Theme: Narrative funnels</p>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500">
-                          <p className="text-sm font-semibold text-slate-800">Deep Work Cowork</p>
-                          <p>Host: Leo P.</p>
-                          <p className="text-primary">Prep: Share focus goals</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </article>
-            <article className="flex flex-col justify-between gap-8 rounded-4xl border border-slate-200 bg-slate-50 p-8 shadow-[0_40px_80px_-40px_rgba(59,130,246,0.25)]">
-              <div className="space-y-5">
-                <span className="inline-flex items-center rounded-full bg-blue-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-500">Resource studio</span>
-                <h3 className="text-2xl font-semibold text-slate-900">Build shared libraries that spark action</h3>
-                <p className="text-sm leading-6 text-slate-600">
-                  Hosts drop recaps, playbooks, and audio reflections into one living workspace so members can keep learning between sessions.
-                </p>
-                <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Organize by circle, theme, or cohort with release windows and permissions</li>
-                  <li>Attach canvases, transcripts, and async videos without juggling drives</li>
-                  <li>Pin top resources into the feed so big wins stay discoverable</li>
-                </ul>
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-inner">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-semibold text-slate-900">Shared resource hub</span>
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-500">New drops</span>
-                </div>
-                <div className="mt-5 grid gap-4">
-                  <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">Playbook • Story sprint checklist</p>
-                      <p>Shared Apr 10 • Circle: Launch Lab</p>
-                    </div>
-                    <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-600">Pinned</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-2xl border border-dashed border-blue-200 p-4 text-xs text-slate-500">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">Audio recap • Brand story AMA</p>
-                      <p>Schedule publish • Apr 17</p>
-                    </div>
-                    <button className="rounded-full bg-blue-500 px-3 py-1 text-[11px] font-semibold text-white">Upload file</button>
-                  </div>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                    <p className="text-sm font-semibold text-slate-800">Most saved resources</p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {['Circle guide', 'Voice memo', 'Miro canvas'].map((asset) => (
-                        <span key={asset} className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-medium text-blue-500">{asset}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-            <article className="flex flex-col justify-between gap-8 rounded-4xl border border-slate-200 bg-slate-50 p-8 shadow-[0_40px_80px_-40px_rgba(236,72,153,0.25)]">
-              <div className="space-y-5">
-                <span className="inline-flex items-center rounded-full bg-pink-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-pink-500">Pulse</span>
-                <h3 className="text-2xl font-semibold text-slate-900">Listen to the community&apos;s energy</h3>
-                <p className="text-sm leading-6 text-slate-600">
-                  Track connection, contributions, and wellbeing without turning people into cold numbers. Everything points to how members feel and where to focus support.
-                </p>
-                <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Quickly spot circles that are thriving or need a fresh prompt</li>
-                  <li>Celebrate top contributors with gratitude nudges and badges</li>
-                  <li>Surface member feedback themes to inspire new experiences</li>
-                </ul>
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-inner">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-semibold text-slate-900">Community pulse</span>
-                  <span>Updated 3m ago</span>
-                </div>
-                <div className="mt-5 grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-pink-500">Circle vitality</p>
-                    <p className="mt-2 text-2xl font-semibold text-slate-900">87%</p>
-                    <p className="text-xs text-slate-500">Members reporting they feel supported this week</p>
-                    <div className="mt-4 h-24 overflow-hidden rounded-xl bg-gradient-to-r from-pink-200 via-purple-200 to-blue-200">
-                      <div className="h-full w-full bg-[radial-gradient(circle_at_top,_rgba(236,72,153,0.45),_transparent_55%)]" />
-                    </div>
-                  </div>
-                  <div className="grid gap-3">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                      <p className="text-sm font-semibold text-slate-800">Moments to celebrate</p>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-center justify-between"><span>Shared wins</span><span className="text-slate-900">34</span></div>
-                        <div className="flex items-center justify-between"><span>Peer shout-outs</span><span className="text-slate-900">58</span></div>
-                        <div className="flex items-center justify-between"><span>New collaborations</span><span className="text-slate-900">21</span></div>
-                      </div>
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-                      <p className="text-sm font-semibold text-slate-800">Feedback themes</p>
-                      <div className="mt-3 space-y-2">
-                        {[
-                          { channel: 'Looking for accountability', value: '22 mentions' },
-                          { channel: 'Need async options', value: '16 mentions' },
-                          { channel: 'Requesting partner intros', value: '9 mentions' },
-                        ].map(({ channel, value }) => (
-                          <div key={channel} className="flex items-center justify-between">
-                            <span>{channel}</span>
-                            <span className="text-slate-900">{value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </article>
-            <article className="flex flex-col justify-between gap-8 rounded-4xl border border-slate-200 bg-slate-50 p-8 shadow-[0_40px_80px_-40px_rgba(45,212,191,0.25)]">
-              <div className="space-y-5">
-                <span className="inline-flex items-center rounded-full bg-teal-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal-500">Stewards</span>
-                <h3 className="text-2xl font-semibold text-slate-900">Know who&apos;s holding space</h3>
-                <p className="text-sm leading-6 text-slate-600">
-                  Quickly see which mentors are live, who&apos;s on support duty, and where an extra host might be helpful.
-                </p>
-                <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Role cards highlight responsibilities and current focus</li>
-                  <li>Check moderation health and member support load at a glance</li>
-                  <li>Spin up gentle automations without losing the personal touch</li>
-                </ul>
-              </div>
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-inner">
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span className="font-semibold text-slate-900">Community stewards</span>
-                  <span className="rounded-full bg-teal-50 px-3 py-1 text-[11px] font-semibold text-teal-600">4 active</span>
-                </div>
-                <div className="mt-5 space-y-3 text-xs text-slate-500">
-                  {[
-                    { name: 'Maya Chen', role: 'Circle host', status: 'Live circle', statusColor: 'bg-emerald-500/10 text-emerald-600' },
-                    { name: 'Jordan Brooks', role: 'Community guide', status: 'Holding office hours', statusColor: 'bg-blue-500/10 text-blue-600' },
-                    { name: 'Ravi Patel', role: 'Member success', status: 'Checking in on new joins', statusColor: 'bg-amber-500/10 text-amber-600' },
-                    { name: 'Sofia Gomez', role: 'Mentor', status: 'Next huddle in 2h', statusColor: 'bg-teal-500/10 text-teal-600' },
-                  ].map(({ name, role, status, statusColor }) => (
-                    <div key={name} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-teal-400 to-emerald-500" />
-                        <div>
-                          <p className="text-sm font-semibold text-slate-800">{name}</p>
-                          <p>{role}</p>
-                        </div>
-                      </div>
-                      <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${statusColor}`}>{status}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 grid gap-3 text-[11px] text-slate-500">
-                  <div className="flex items-center justify-between rounded-2xl border border-dashed border-slate-200 px-4 py-3">
-                    <span>Check-in queue</span>
-                    <span className="rounded-full bg-teal-500/10 px-2 py-1 text-teal-600">5 members</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-2xl border border-dashed border-slate-200 px-4 py-3">
-                    <span>Community agreements refresh</span>
-                    <span className="rounded-full bg-amber-500/10 px-2 py-1 text-amber-600">Due Friday</span>
-                  </div>
-                </div>
-              </div>
-            </article>
-          </div>
-        </div>
-      </section>
+      <FeatureGrid />
+      <Testimonials />
       <section className="bg-white">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-24 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-6">
@@ -475,8 +276,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-      <FeatureGrid />
-      <Testimonials />
       <section className="bg-slate-50/70">
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-6 py-20 lg:grid-cols-2">
           <div>

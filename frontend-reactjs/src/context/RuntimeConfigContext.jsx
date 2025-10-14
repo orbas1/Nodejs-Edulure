@@ -41,12 +41,13 @@ export function RuntimeConfigProvider({ children }) {
         token: isAuthenticated ? session?.tokens?.accessToken : undefined
       });
 
-      if (!response?.data) {
+      const payload = response?.data ? response.data : response;
+      if (!payload || typeof payload !== 'object') {
         throw new Error('Runtime configuration payload missing data field');
       }
 
-      setFeatureFlags(response.data.featureFlags ?? {});
-      setRuntimeConfig(response.data.runtimeConfig ?? {});
+      setFeatureFlags(payload.featureFlags ?? {});
+      setRuntimeConfig(payload.runtimeConfig ?? {});
     } catch (err) {
       setError(err);
     } finally {
