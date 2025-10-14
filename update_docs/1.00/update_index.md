@@ -1,11 +1,26 @@
-# Version 1.50 Documentation Index (Task 2 Refresh)
+# Version 1.00 Documentation Index
 
-- **Backend Updates:** See `backend_updates/` for Cloudflare R2 pipeline services, migrations, controllers, config changes, the new session governance suite (refresh/logout endpoints, session registry cache, and concurrency limits), feature flag/runtime configuration governance, and the ESLint/Vitest quality gates introduced for runtime automation.
-- **Frontend Updates:** See `frontend_updates/` for content library UI, authentication flows, and build verification results.
-- **Communities Updates:** Feed integration, resource drawers, and accessibility enhancements documented in `frontend_updates/pages_updates.md`, `frontend_updates/change_log.md`, and design artefacts noted in `Design_Change_log.md`.
-- **Messaging Updates:** Community chat and direct messaging migrations, services, controllers, routes, seeds, OpenAPI entries, and Vitest coverage are detailed in `backend_updates/` (change log, services, controllers, routes, module changes) and design artefacts within `Design_Change_log.md`, `Design_update_task_list.md`, and the drawings referenced for chat docks/presence/DM inboxes.
-- **Social Graph Updates:** Follow graph migrations, repositories, `SocialGraphService`, `/api/social` routes, seeds, OpenAPI schemas, README/env guidance, and Vitest service + HTTP suites are captured across `backend_updates/` (change log, services, controllers, routes, module, env, API docs) with complementary UX notes in the design trackers.
-- **API Compliance:** Nullable schema normalisation and `swagger-cli` validation steps for chat, DM, paywall, and social graph paths are recorded in `backend_updates/backend_change_log.md`, `change_log.md`, and `update_tests/backend_test_results.md`.
-- **Mobile Updates:** See `user_phone_app_updates/` for Flutter session/content services, screen/widget revisions, and dependency notes.
-- **Design Updates:** See `Design_*.md` artefacts for refreshed progress trackers, change logs, and milestone adjustments aligning with content delivery work.
-- **Testing:** `update_tests/` captures backend lint, frontend build, and pending Flutter commands with relevant logs.
+The following artefacts capture the final release state for Edulure Version 1.00. Each section links to the detailed records that were updated and signed off during the wrap-up cycle.
+
+- **Executive Summaries:**
+  - `update_brief.md` – condensed scope, objectives, and release framing.
+  - `end_of_update_report.md` – final readiness narrative, risk posture, and go-live actions.
+- **Planning & Tracking:**
+  - `update_plan.md`, `update_task_list.md`, `update_milestone_list.md`, and `update_progress_tracker.md` – authoritative status for all seven workstreams, sprint breakdowns, and cross-domain metrics.
+  - `Design_update_plan` artefacts – mirrors of the same information for design with final sign-offs.
+- **Backend Delivery:**
+  - `backend_updates/` – change logs, migrations, services, controllers, routes, configuration, and telemetry updates covering platform hardening, commerce, communities, explorer, dashboards, mobile APIs, and QA automation.
+- **Frontend Delivery:**
+  - `frontend_updates/` – React feature notes, page/component change logs, build validation outputs, and UI parity documentation for dashboards, explorer, communities, ads, and admin consoles.
+- **Mobile Delivery:**
+  - `user_phone_app_updates/` – Flutter architecture notes, module breakdowns, parity checklists, offline/telemetry validation, and store submission artefacts for both learner and instructor apps.
+- **Design & UX:**
+  - `Design_*.md`, `ui-ux_updates/`, and drawing references – finalised templates, tokens, navigation overlays, motion specs, and compliance approvals aligned to the shipped experiences.
+- **Testing & Quality:**
+  - `update_tests/` – backend/frontend/mobile test evidence (lint, unit, integration, e2e, load, security, accessibility) plus CI run summaries.
+- **Data & Infrastructure:**
+  - `database_updates/`, `dependency_updates.md`, and `build_updates.md` – executed migrations, seed packs, dependency governance, and build/runtime verification steps.
+- **Release Collateral:**
+  - `change_log.md`, `features_to_add.md`, `features_update_plan.md`, and `new_feature_brief.md` – narrative change history and downstream enablement notes.
+
+For rapid navigation, start with `end_of_update_report.md` for the executive overview, then reference the specialised folders above for domain-specific implementation detail.
