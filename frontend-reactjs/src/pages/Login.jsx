@@ -90,17 +90,8 @@ export default function Login() {
   };
 
   return (
-    <AuthCard
-      title="Welcome back to Edulure"
-      subtitle="Securely access your workspace with your email and password or continue with social sign-on."
-    >
+    <AuthCard title="Welcome back" subtitle="Please sign in with your email address or choose a social account.">
       <div className="space-y-8">
-        <SocialSignOn onSelect={handleSocialSignOn} />
-        <div className="relative flex items-center gap-3">
-          <span className="h-px flex-1 bg-slate-200" />
-          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">or continue with credentials</span>
-          <span className="h-px flex-1 bg-slate-200" />
-        </div>
         <form className="space-y-6" onSubmit={handleSubmit}>
           {error ? <p className="rounded-lg bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p> : null}
           <FormField
@@ -175,6 +166,12 @@ export default function Login() {
           >
             {isLoading ? 'Authenticating…' : 'Log in securely'}
           </button>
+          <div className="relative flex items-center gap-3">
+            <span className="h-px flex-1 bg-slate-200" />
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400">or</span>
+            <span className="h-px flex-1 bg-slate-200" />
+          </div>
+          <SocialSignOn onSelect={handleSocialSignOn} />
           <div className="text-sm text-slate-500">
             New to Edulure?{' '}
             <Link to="/register" className="font-semibold text-primary">
