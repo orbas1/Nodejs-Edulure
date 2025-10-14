@@ -12,7 +12,7 @@ export default function CourseCreationSummaryCards({ cards }) {
   }
 
   return (
-    <section className="grid gap-4 md:grid-cols-3">
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {cards.map((card) => (
         <div key={card.label} className="dashboard-section">
           <p className="dashboard-kicker">{card.label}</p>

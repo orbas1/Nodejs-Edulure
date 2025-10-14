@@ -20,6 +20,8 @@ Key environment variables are validated on boot. Ensure the following are set be
 - `JWT_REFRESH_SECRET` – 32+ character secret for refresh token HMAC hashing.
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` – database credentials. Set `DB_PROVISION_USER=true` only for local installs.
 - `TOKEN_EXPIRY_MINUTES`, `REFRESH_TOKEN_EXPIRY_DAYS` – optional overrides for token lifetimes.
+- `TWO_FACTOR_REQUIRED_ROLES` – comma-separated list of roles that must complete multi-factor authentication (e.g. `admin`).
+- `TWO_FACTOR_ISSUER`, `TWO_FACTOR_ENCRYPTION_KEY` – customise authenticator branding and secret encryption. Defaults derive from JWT refresh configuration for local environments.
 - `LOG_SERVICE_NAME`, `LOG_REDACTED_FIELDS` – customise log metadata and extend default secret/PII redaction.
 - `TRACE_HEADER_NAME`, `TRACING_SAMPLE_RATE` – tune inbound trace propagation and sampling for distributed telemetry.
 - `METRICS_ENABLED`, `METRICS_USERNAME`/`METRICS_PASSWORD` or `METRICS_BEARER_TOKEN`, `METRICS_ALLOWED_IPS` – secure Prometheus access for operations tooling.
