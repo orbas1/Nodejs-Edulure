@@ -108,64 +108,66 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
         ],
       ),
       body: !_hasInstructorAccess
-          ? _buildAccessDenied(context)
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: _loading && _dashboard == null
-                  ? ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: const [
-                        SizedBox(height: 240, child: Center(child: CircularProgressIndicator())),
-                      ],
-                    )
-                  : ListView(
-                      padding: const EdgeInsets.all(20),
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      children: [
-                        if (_error != null)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.red.shade200),
+          ? SafeArea(child: _buildAccessDenied(context))
+          : SafeArea(
+              child: RefreshIndicator(
+                onRefresh: _load,
+                child: _loading && _dashboard == null
+                    ? ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: const [
+                          SizedBox(height: 240, child: Center(child: CircularProgressIndicator())),
+                        ],
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.all(20),
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          if (_error != null)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: Colors.red.shade200),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('We could not load the latest data',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _error!,
+                                    style: TextStyle(color: Colors.red.shade700),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  FilledButton.icon(
+                                    onPressed: _load,
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('We could not load the latest data',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w600, color: Colors.red.shade700)),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _error!,
-                                  style: TextStyle(color: Colors.red.shade700),
-                                ),
-                                const SizedBox(height: 12),
-                                FilledButton.icon(
-                                  onPressed: _load,
-                                  icon: const Icon(Icons.refresh),
-                                  label: const Text('Retry'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        _buildHeroCard(context),
-                        const SizedBox(height: 20),
-                        _buildMetricHighlights(context),
-                        const SizedBox(height: 20),
-                        _buildPipelineSection(context),
-                        const SizedBox(height: 20),
-                        _buildProductionSection(context),
-                        const SizedBox(height: 20),
-                        _buildRevenueSection(context),
-                        const SizedBox(height: 20),
-                        _buildInsightsSection(context),
-                      ],
-                    ),
+                          _buildHeroCard(context),
+                          const SizedBox(height: 20),
+                          _buildMetricHighlights(context),
+                          const SizedBox(height: 20),
+                          _buildPipelineSection(context),
+                          const SizedBox(height: 20),
+                          _buildProductionSection(context),
+                          const SizedBox(height: 20),
+                          _buildRevenueSection(context),
+                          const SizedBox(height: 20),
+                          _buildInsightsSection(context),
+                        ],
+                      ),
+              ),
             ),
     );
   }
@@ -265,7 +267,7 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Monitor cohort momentum, orchestrate production, and keep monetisation levers balanced.',
+            'Command cohorts, pricing, and tutor pods with live telemetry streams built for enterprise readiness.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),
         ],
@@ -274,51 +276,20 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
   }
 
   Widget _buildMetricHighlights(BuildContext context) {
-    final pipelineCount = _dashboard?.pipeline.length ?? 0;
-    final productionCount = _dashboard?.production.length ?? 0;
-    final offersCount = _dashboard?.offers.length ?? 0;
-    final sessionCount = _dashboard?.sessions.length ?? 0;
-
-    final metrics = [
-      _MetricTile(label: 'Pipeline cohorts', value: '$pipelineCount', description: 'Awaiting launch approvals'),
-      _MetricTile(label: 'Production tasks', value: '$productionCount', description: 'In-flight deliverables'),
-      _MetricTile(label: 'Active offers', value: '$offersCount', description: 'Pricing packages live now'),
-      _MetricTile(label: 'Upcoming sessions', value: '$sessionCount', description: 'Tutor hours scheduled'),
-    ];
+    final metrics = _dashboard?.metrics ?? [];
+    if (metrics.isEmpty) {
+      return _EmptyStateCard(
+        title: 'No instructor metrics yet',
+        description: 'Connect your course analytics and tutor utilisation feeds to surface live performance signals.',
+      );
+    }
 
     return Wrap(
       spacing: 16,
       runSpacing: 16,
       children: metrics
           .map(
-            (metric) => SizedBox(
-              width: 170,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.blueGrey.shade50),
-                  color: Colors.blueGrey.shade50.withOpacity(0.4),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(metric.label,
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.blueGrey.shade700)),
-                    const SizedBox(height: 8),
-                    Text(
-                      metric.value,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      metric.description,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            (metric) => _MetricHighlightCard(metric: metric),
           )
           .toList(),
     );
@@ -439,20 +410,35 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
   }
 
   Widget _buildRevenueSection(BuildContext context) {
+    final revenueMix = _dashboard?.revenueMix ?? [];
     final offers = _dashboard?.offers ?? [];
-    if (offers.isEmpty) {
+
+    if (revenueMix.isEmpty && offers.isEmpty) {
       return _EmptyStateCard(
-        title: 'No offers configured',
-        description: 'Launch pricing packages or seat-based cohorts to start tracking revenue mix.',
+        title: 'Revenue data not connected',
+        description:
+            'Link your payments, sponsorship, and subscription sources to unlock composition tracking and offer performance.',
       );
     }
 
     return _SectionCard(
       title: 'Revenue levers',
-      subtitle: 'Offer performance across your instructor portfolio.',
+      subtitle: 'Monitor the balance between monetisation streams and the health of each pricing offer.',
       child: Column(
-        children: offers
-            .map(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (revenueMix.isNotEmpty) ...[
+            Text('Revenue composition',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ...revenueMix.map((slice) => _RevenueSliceRow(slice: slice)),
+            if (offers.isNotEmpty) const SizedBox(height: 20),
+          ],
+          if (offers.isNotEmpty) ...[
+            Text('Active offers',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            ...offers.map(
               (offer) => Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
@@ -467,14 +453,20 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(offer.name,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        Flexible(
+                          child: Text(
+                            offer.name,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Text(offer.price, style: Theme.of(context).textTheme.bodyMedium),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 12,
+                      runSpacing: 8,
                       children: [
                         Chip(label: Text(offer.status.isEmpty ? 'Draft' : offer.status)),
                         Chip(label: Text('Conversion ${offer.conversion.isEmpty ? 'N/A' : offer.conversion}')),
@@ -484,8 +476,9 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                   ],
                 ),
               ),
-            )
-            .toList(),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -517,6 +510,23 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                 leading: const Icon(Icons.calendar_month_outlined),
                 title: Text(session.name),
                 subtitle: Text('${session.date} • ${session.status.isEmpty ? 'Scheduled' : session.status}'),
+                trailing: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (session.price.isNotEmpty)
+                      Text(session.price, style: Theme.of(context).textTheme.bodySmall),
+                    if (session.seats.isNotEmpty)
+                      Text(
+                        session.seats,
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(color: Colors.blueGrey.shade600, fontWeight: FontWeight.w600),
+                      ),
+                  ],
+                ),
+                dense: true,
               ),
             ),
             const SizedBox(height: 12),
@@ -539,6 +549,133 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricHighlightCard extends StatelessWidget {
+  const _MetricHighlightCard({required this.metric});
+
+  final DashboardMetric metric;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDownward = metric.isDownward;
+    final Color changeColor = isDownward ? Colors.red.shade600 : const Color(0xFF0E9F6E);
+    final IconData trendIcon = isDownward ? Icons.south_east : Icons.north_east;
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 160, maxWidth: 220),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFE6ECFF)),
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF2D62FF).withOpacity(0.12),
+              Colors.white,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: const [
+            BoxShadow(color: Color(0x1A2D62FF), blurRadius: 18, offset: Offset(0, 12)),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              metric.label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(letterSpacing: 0.8, color: const Color(0xFF41507B), fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              metric.value,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(fontWeight: FontWeight.w700, color: const Color(0xFF0D1635)),
+            ),
+            if (metric.change != null && metric.change!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: changeColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(trendIcon, size: 16, color: changeColor),
+                        const SizedBox(width: 6),
+                        Text(
+                          metric.change!,
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: changeColor),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RevenueSliceRow extends StatelessWidget {
+  const _RevenueSliceRow({required this.slice});
+
+  final RevenueSlice slice;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.blueGrey.shade50),
+        color: Colors.white,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  slice.name,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(slice.formattedPercent, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              minHeight: 8,
+              value: slice.percent / 100,
+              backgroundColor: Colors.blueGrey.shade50,
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2D62FF)),
+            ),
+          ),
         ],
       ),
     );
@@ -603,12 +740,4 @@ class _EmptyStateCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MetricTile {
-  const _MetricTile({required this.label, required this.value, required this.description});
-
-  final String label;
-  final String value;
-  final String description;
 }
