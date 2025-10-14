@@ -4,6 +4,8 @@ import { Disclosure, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
+import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 import UserMenu from '../components/navigation/UserMenu.jsx';
 
 const DASHBOARD_PATH_BY_ROLE = {
@@ -19,6 +21,7 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const { isAuthenticated, session, logout } = useAuth();
   const { getConfigValue, isFeatureEnabled } = useRuntimeConfig();
+  const { t } = useLanguage();
   const supportEmail = getConfigValue('support.contact-email', 'support@edulure.com');
   const analyticsDashboardEnabled = isFeatureEnabled('analytics.explorer-dashboard', true);
   const adminConsoleEnabled = isFeatureEnabled('admin.operational-console', false);
@@ -115,6 +118,7 @@ export default function MainLayout() {
             </nav>
           ) : null}
           <div className="hidden items-center gap-3 lg:flex">
+            <LanguageSelector size="compact" variant="light" align="end" showLabel={false} />
             {isAuthenticated ? (
               <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
             ) : (
@@ -123,127 +127,133 @@ export default function MainLayout() {
                   to="/login"
                   className="rounded-full border border-primary/30 px-5 py-2 text-sm font-semibold text-primary transition hover:border-primary hover:text-primary-dark"
                 >
-                  Log in
+                  {t('navigation.login')}
                 </NavLink>
                 <NavLink
                   to="/register"
                   className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
                 >
-                  Join the community
+                  {t('navigation.register')}
                 </NavLink>
               </>
             )}
           </div>
-          <Disclosure as="div" className="lg:hidden">
-            {({ open }) => (
-              <>
-                <Disclosure.Button className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white/70 p-2 text-slate-600 shadow-sm transition hover:border-primary hover:text-primary">
-                  <span className="sr-only">Open main menu</span>
-                  {open ? (
-                    <XMarkIcon className="h-6 w-6" />
-                  ) : (
-                    <Bars3Icon className="h-6 w-6" />
-                  )}
-                </Disclosure.Button>
-                <Transition
-                  as={Fragment}
-                  enter="transition duration-200 ease-out"
-                  enterFrom="transform scale-95 opacity-0"
-                  enterTo="transform scale-100 opacity-100"
-                  leave="transition duration-150 ease-in"
-                  leaveFrom="transform scale-100 opacity-100"
-                  leaveTo="transform scale-95 opacity-0"
-                >
-                  <Disclosure.Panel className="absolute inset-x-4 top-20 z-50 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl backdrop-blur">
-                    <div className="flex flex-col gap-5">
-                      {isAuthenticated ? (
-                        <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                          {avatarUrl ? (
-                            <img src={avatarUrl} alt={displayName} className="h-11 w-11 rounded-full object-cover" />
-                          ) : (
-                            <span className={avatarClass}>{initials}</span>
-                          )}
-                          <div>
-                            <p className="text-sm font-semibold text-slate-900">{displayName}</p>
-                            {emailLabel ? <p className="text-xs text-slate-500">{emailLabel}</p> : null}
-                            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">Secure session</p>
+          <div className="flex items-center gap-3 lg:hidden">
+            <LanguageSelector size="compact" variant="subtle" align="end" showLabel={false} />
+            <Disclosure as="div" className="lg:hidden">
+              {({ open }) => (
+                <>
+                  <Disclosure.Button className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white/70 p-2 text-slate-600 shadow-sm transition hover:border-primary hover:text-primary">
+                    <span className="sr-only">Open main menu</span>
+                    {open ? (
+                      <XMarkIcon className="h-6 w-6" />
+                    ) : (
+                      <Bars3Icon className="h-6 w-6" />
+                    )}
+                  </Disclosure.Button>
+                  <Transition
+                    as={Fragment}
+                    enter="transition duration-200 ease-out"
+                    enterFrom="transform scale-95 opacity-0"
+                    enterTo="transform scale-100 opacity-100"
+                    leave="transition duration-150 ease-in"
+                    leaveFrom="transform scale-100 opacity-100"
+                    leaveTo="transform scale-95 opacity-0"
+                  >
+                    <Disclosure.Panel className="absolute inset-x-4 top-20 z-50 rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl backdrop-blur">
+                      <div className="flex flex-col gap-5">
+                        <div className="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+                          <LanguageSelector size="compact" variant="light" align="start" fullWidth />
+                        </div>
+                        {isAuthenticated ? (
+                          <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                            {avatarUrl ? (
+                              <img src={avatarUrl} alt={displayName} className="h-11 w-11 rounded-full object-cover" />
+                            ) : (
+                              <span className={avatarClass}>{initials}</span>
+                            )}
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">{displayName}</p>
+                              {emailLabel ? <p className="text-xs text-slate-500">{emailLabel}</p> : null}
+                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-primary">Secure session</p>
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
+                        ) : null}
 
-                      {isAuthenticated ? (
-                        <div className="space-y-3">
-                          {navigation.map((item) => (
+                        {isAuthenticated ? (
+                          <div className="space-y-3">
+                            {navigation.map((item) => (
+                              <NavLink
+                                key={item.name}
+                                to={item.to}
+                                className={({ isActive }) =>
+                                  `block rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold transition ${
+                                    isActive ? 'border-primary bg-primary/10 text-primary' : 'text-slate-600 hover:border-primary'
+                                  }`
+                                }
+                              >
+                                {item.name}
+                              </NavLink>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3">
                             <NavLink
-                              key={item.name}
-                              to={item.to}
-                              className={({ isActive }) =>
-                                `block rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold transition ${
-                                  isActive ? 'border-primary bg-primary/10 text-primary' : 'text-slate-600 hover:border-primary'
-                                }`
-                              }
+                              to="/login"
+                              className="rounded-full border border-primary/30 px-5 py-2 text-center text-sm font-semibold text-primary transition hover:border-primary hover:text-primary-dark"
                             >
-                              {item.name}
+                              {t('navigation.login')}
                             </NavLink>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-3">
-                          <NavLink
-                            to="/login"
-                            className="rounded-full border border-primary/30 px-5 py-2 text-center text-sm font-semibold text-primary transition hover:border-primary hover:text-primary-dark"
-                          >
-                            Log in
-                          </NavLink>
-                          <NavLink
-                            to="/register"
-                            className="rounded-full bg-primary px-5 py-2 text-center text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
-                          >
-                            Join the community
-                          </NavLink>
-                        </div>
-                      )}
+                            <NavLink
+                              to="/register"
+                              className="rounded-full bg-primary px-5 py-2 text-center text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+                            >
+                              {t('navigation.register')}
+                            </NavLink>
+                          </div>
+                        )}
 
-                      {isAuthenticated ? (
-                        <div className="space-y-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigate('/profile');
-                              document.activeElement?.blur();
-                            }}
-                            className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
-                          >
-                            View profile
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigate(`${dashboardPath}/settings`);
-                              document.activeElement?.blur();
-                            }}
-                            className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
-                          >
-                            Settings
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              logout();
-                              document.activeElement?.blur();
-                            }}
-                            className="w-full rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
-                          >
-                            Sign out
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </Disclosure.Panel>
-                </Transition>
-              </>
-            )}
-          </Disclosure>
+                        {isAuthenticated ? (
+                          <div className="space-y-3">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate('/profile');
+                                document.activeElement?.blur();
+                              }}
+                              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                            >
+                              View profile
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigate(`${dashboardPath}/settings`);
+                                document.activeElement?.blur();
+                              }}
+                              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                            >
+                              Settings
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                logout();
+                                document.activeElement?.blur();
+                              }}
+                              className="w-full rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                            >
+                              Sign out
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                    </Disclosure.Panel>
+                  </Transition>
+                </>
+              )}
+            </Disclosure>
+          </div>
         </div>
       </header>
       <main className="bg-white">

@@ -2,27 +2,32 @@ import { Link } from 'react-router-dom';
 import PageHero from '../components/PageHero.jsx';
 import FeatureGrid from '../components/FeatureGrid.jsx';
 import Testimonials from '../components/Testimonials.jsx';
+import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
+import { useLanguage } from '../context/LanguageContext.jsx';
 
 export default function Home() {
+  const { t } = useLanguage();
+
   return (
     <div className="bg-slate-50 text-slate-900">
       <PageHero
-        title="Where ambitious builders learn, teach, and grow together"
-        description="Edulure is a community-first home for people obsessed with sharing skills. Swap playbooks, co-host live jams, and turn knowledge into momentum with peers who cheer you on."
+        title={t('home.hero.title')}
+        description={t('home.hero.description')}
         cta={
           <>
             <Link
               to="/register"
               className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card hover:bg-primary-dark"
             >
-              Join the community
+              {t('home.hero.ctaPrimary')}
             </Link>
             <Link
               to="/feed"
               className="inline-flex items-center justify-center rounded-full border border-white/40 px-6 py-3 text-sm font-semibold text-white hover:border-white hover:bg-white/10"
             >
-              Peek inside live circles
+              {t('home.hero.ctaSecondary')}
             </Link>
+            <LanguageSelector size="large" variant="dark" align="start" className="hover:border-white/80" />
           </>
         }
       />

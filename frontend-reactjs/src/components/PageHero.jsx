@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 
 export default function PageHero({ title, description, subtitle, cta }) {
   const heroDescription = description ?? subtitle;
+  const bodyCopy = heroDescription;
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
@@ -18,9 +19,8 @@ export default function PageHero({ title, description, subtitle, cta }) {
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">
             {title}
           </h1>
-          {heroDescription && <p className="mt-6 text-lg leading-8 text-slate-600">{heroDescription}</p>}
+          {bodyCopy ? <p className="mt-6 text-lg leading-8 text-slate-200">{bodyCopy}</p> : null}
           {cta ? <div className="mt-10 flex flex-wrap items-center gap-4">{cta}</div> : null}
-          <p className="mt-6 text-lg leading-8 text-slate-200">{description}</p>
           <div className="mt-8 flex items-center gap-4 text-sm text-white/80">
             {["Strategists", "Designers", "Founders", "Mentors"].map((label) => (
               <span key={label} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
@@ -28,9 +28,6 @@ export default function PageHero({ title, description, subtitle, cta }) {
                 {label}
               </span>
             ))}
-          </div>
-          <div className="mt-10 flex flex-wrap items-center gap-4">
-            {cta}
           </div>
         </div>
         <div className="w-full lg:w-1/2">

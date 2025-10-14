@@ -47,22 +47,22 @@ export default function ProtectedRoute({ children, allowedRoles }) {
   }
 
   if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-    const userRoles = deriveRoleSet(session?.user);
-    const allowed = allowedRoles.map((role) => String(role).toLowerCase());
-    const hasRole = allowed.some((role) => userRoles.has(role));
-    if (!hasRole) {
-    const roleSet = new Set();
-    const primaryRole = session?.user?.role;
-    if (primaryRole) {
-      roleSet.add(primaryRole);
-    }
+    const normalizedAllowed = allowedRoles.map((role) => String(role).toLowerCase());
+    const derivedRoles = deriveRoleSet(session?.user);
+
+    const aggregatedRoles = new Set(derivedRoles);
     dashboardRoles.forEach((role) => {
-      if (role?.id) {
-        roleSet.add(role.id);
+      if (!role) {
+        return;
+      }
+
+      const identifier = role?.id ?? role?.code ?? role;
+      if (identifier) {
+        aggregatedRoles.add(String(identifier).toLowerCase());
       }
     });
 
-    const hasAccess = allowedRoles.some((role) => roleSet.has(role));
+    const hasAccess = normalizedAllowed.some((role) => aggregatedRoles.has(role));
     if (!hasAccess) {
       return <Navigate to="/" replace />;
     }

@@ -4,12 +4,13 @@ import {
   ArrowLeftOnRectangleIcon,
   ArrowTopRightOnSquareIcon,
   BanknotesIcon,
+  Bars3Icon,
   BookOpenIcon,
   CalendarDaysIcon,
   ChartBarIcon,
   Cog6ToothIcon,
-  IdentificationIcon,
   DocumentTextIcon,
+  IdentificationIcon,
   InboxStackIcon,
   MegaphoneIcon,
   PlayCircleIcon,
@@ -17,10 +18,8 @@ import {
   Squares2X2Icon,
   UserGroupIcon,
   UsersIcon,
-  Bars3Icon,
+  VideoCameraIcon,
   XMarkIcon
-  ShieldCheckIcon
-  VideoCameraIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -74,7 +73,7 @@ const navigationByRole = {
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Monetisation', to: `${basePath}/pricing`, icon: BanknotesIcon },
     { name: 'Platform ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
-    { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon }
+    { name: 'Governance', to: `${basePath}/settings`, icon: ShieldCheckIcon },
     { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
   ],
   community: (basePath) => [
@@ -290,25 +289,6 @@ export default function DashboardLayout() {
                     </NavLink>
                   );
                 })}
-                <div className="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm">
-                  {roles.map((roleOption) => {
-                    const target = `/dashboard/${roleOption.id}`;
-                    const isActive = resolvedRole === roleOption.id;
-                    return (
-                      <NavLink
-                        key={roleOption.id}
-                        to={target}
-                        className={`rounded-2xl px-4 py-2 transition ${
-                          isActive
-                            ? 'bg-primary text-white shadow'
-                            : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
-                        }`}
-                      >
-                        {roleOption.label}
-                      </NavLink>
-                    );
-                  })}
-                </div>
               </div>
               <div className="self-start lg:self-center">
                 <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
@@ -337,7 +317,8 @@ export default function DashboardLayout() {
               </span>
             </div>
           </div>
-        </header>
+        </div>
+      </header>
         <main className="flex-1 bg-gradient-to-b from-slate-50 via-white to-slate-100">
           <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-10">
             {mainContent}
