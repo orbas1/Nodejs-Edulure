@@ -32,6 +32,126 @@ function formatNumber(value) {
   return new Intl.NumberFormat('en-US').format(toNumber(value));
 }
 
+function normaliseStringArray(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => String(entry).trim())
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[')) {
+      const parsed = safeJsonParse(trimmed, []);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((entry) => String(entry).trim())
+          .filter((entry) => entry.length > 0);
+      }
+    }
+    return trimmed
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === 'object') {
+    return Object.values(value)
+      .map((entry) => String(entry).trim())
+      .filter((entry) => entry.length > 0);
+  }
+  return [];
+}
+
+function formatPercentage(value, digits = 2) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || Number.isNaN(numeric)) {
+    return '0.00%';
+  }
+  return `${(numeric * 100).toFixed(digits)}%`;
+}
+
+function formatRoasFromCents(revenueCents, spendCents) {
+  const spend = Number(spendCents ?? 0);
+  const revenue = Number(revenueCents ?? 0);
+  if (spend <= 0) return null;
+  const ratio = revenue / spend;
+  if (!Number.isFinite(ratio)) return null;
+  return `${ratio.toFixed(2)}x`;
+}
+
+function formatScheduleRange(startAt, endAt) {
+  if (!startAt && !endAt) {
+    return 'Schedule pending';
+  }
+  if (startAt && endAt) {
+    return `${formatDateTime(startAt, { dateStyle: 'medium' })} – ${formatDateTime(endAt, { dateStyle: 'medium' })}`;
+  }
+  if (startAt) {
+    return `Starts ${formatDateTime(startAt, { dateStyle: 'medium' })}`;
+  }
+  return `Runs until ${formatDateTime(endAt, { dateStyle: 'medium' })}`;
+}
+
+function accumulateCurrency(map, currency, cents) {
+  if (!currency) return;
+  const current = map.get(currency) ?? 0;
+  map.set(currency, current + Number(cents ?? 0));
+}
+
+function capitalise(value) {
+  if (!value) return '';
+  const stringValue = String(value);
+  if (!stringValue.length) return '';
+  return stringValue.charAt(0).toUpperCase() + stringValue.slice(1);
+}
+
+function resolvePlacementSurface(campaign) {
+  const featureFlag = campaign.metadata?.featureFlag;
+  if (typeof featureFlag === 'string' && featureFlag.includes('explorer')) {
+    return 'Explorer';
+  }
+  if (typeof featureFlag === 'string' && featureFlag.includes('feed')) {
+    return 'Learning feed';
+  }
+  if (campaign.metadata?.promotedCommunityId) {
+    return 'Community spotlight';
+  }
+  return 'Learning feed';
+}
+
+function resolvePlacementSlot(campaign) {
+  switch (campaign.objective) {
+    case 'conversions':
+      return 'Conversion spotlight';
+    case 'leads':
+      return 'Lead capture hero';
+    case 'traffic':
+      return 'Traffic accelerator';
+    case 'awareness':
+    default:
+      return 'Awareness banner';
+  }
+}
+
+function buildPlacementTags(campaign, keywords, audiences) {
+  const tags = new Set();
+  if (campaign.objective) {
+    tags.add(`Objective · ${capitalise(campaign.objective)}`);
+  }
+  const featureFlag = campaign.metadata?.featureFlag;
+  if (featureFlag) {
+    tags.add(`Flag · ${featureFlag}`);
+  }
+  const promotedCommunityId = campaign.metadata?.promotedCommunityId;
+  if (promotedCommunityId) {
+    tags.add(`Community · #${promotedCommunityId}`);
+  }
+  keywords.slice(0, 2).forEach((keyword) => tags.add(`Keyword · ${keyword}`));
+  audiences.slice(0, 2).forEach((audience) => tags.add(`Audience · ${audience}`));
+  return Array.from(tags);
+}
+
 export function buildAvatarUrl(email) {
   const hash = crypto.createHash('md5').update(String(email).trim().toLowerCase()).digest('hex');
   return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=160`;
@@ -621,34 +741,278 @@ export function buildInstructorDashboard({
       return promotedCommunityId && managedCommunityIds.has(Number(promotedCommunityId));
     });
 
-  const activeCampaigns = relevantCampaigns
-    .filter((campaign) => campaign.status === 'active')
-    .map((campaign) => ({
+  const campaignsDetailed = relevantCampaigns.map((campaign) => {
+    const metricsSeries = (metricsByCampaign.get(Number(campaign.id)) ?? [])
+      .map((metric) => ({
+        date: metric.metricDate ? new Date(metric.metricDate) : null,
+        impressions: Number(metric.impressions ?? 0),
+        clicks: Number(metric.clicks ?? 0),
+        conversions: Number(metric.conversions ?? 0),
+        spendCents: Number(metric.spendCents ?? 0),
+        revenueCents: Number(metric.revenueCents ?? 0),
+        metadata: metric.metadata
+      }))
+      .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+
+    const lifetime = metricsSeries.reduce(
+      (acc, metric) => {
+        acc.impressions += metric.impressions;
+        acc.clicks += metric.clicks;
+        acc.conversions += metric.conversions;
+        acc.spendCents += metric.spendCents;
+        acc.revenueCents += metric.revenueCents;
+        return acc;
+      },
+      { impressions: 0, clicks: 0, conversions: 0, spendCents: 0, revenueCents: 0 }
+    );
+
+    const latestMetric = metricsSeries[0] ?? null;
+    const previousMetric = metricsSeries[1] ?? null;
+    const keywords = normaliseStringArray(campaign.targetingKeywords);
+    const audiences = normaliseStringArray(campaign.targetingAudiences);
+    const locations = normaliseStringArray(campaign.targetingLocations);
+    const languages = normaliseStringArray(campaign.targetingLanguages);
+    const startAt = campaign.startAt ? new Date(campaign.startAt) : null;
+    const endAt = campaign.endAt ? new Date(campaign.endAt) : null;
+    const spendCurrency = campaign.spendCurrency ?? campaign.budgetCurrency ?? 'USD';
+    const budgetCurrency = campaign.budgetCurrency ?? spendCurrency;
+    const spendCents = Number(campaign.spendTotalCents ?? 0);
+    const budgetCents = Number(campaign.budgetDailyCents ?? 0);
+    const cpcCents = Number(campaign.cpcCents ?? 0);
+    const cpaCents = Number(campaign.cpaCents ?? 0);
+    const placementSurface = resolvePlacementSurface(campaign);
+    const placementSlot = resolvePlacementSlot(campaign);
+    const placementTags = buildPlacementTags(campaign, keywords, audiences);
+
+    return {
+      campaign,
+      metricsSeries,
+      lifetime,
+      latestMetric,
+      previousMetric,
+      keywords,
+      audiences,
+      locations,
+      languages,
+      startAt,
+      endAt,
+      spendCurrency,
+      budgetCurrency,
+      spendCents,
+      budgetCents,
+      cpcCents,
+      cpaCents,
+      placementSurface,
+      placementSlot,
+      placementTags
+    };
+  });
+
+  const activeCampaignEntries = campaignsDetailed.filter((entry) => entry.campaign.status === 'active');
+
+  const keywordSet = new Set();
+  const audienceSet = new Set();
+  const locationSet = new Set();
+  const languageSet = new Set();
+  const spendByCurrency = new Map();
+  const revenueByCurrency = new Map();
+  let totalImpressions = 0;
+  let totalClicks = 0;
+  let totalConversions = 0;
+  let latestSynced = null;
+
+  campaignsDetailed.forEach((entry) => {
+    entry.keywords.forEach((keyword) => keywordSet.add(keyword));
+    entry.audiences.forEach((audience) => audienceSet.add(audience));
+    entry.locations.forEach((location) => locationSet.add(location));
+    entry.languages.forEach((language) => languageSet.add(language));
+    if (entry.latestMetric?.date) {
+      if (!latestSynced || entry.latestMetric.date > latestSynced) {
+        latestSynced = entry.latestMetric.date;
+      }
+    }
+  });
+
+  activeCampaignEntries.forEach((entry) => {
+    totalImpressions += entry.lifetime.impressions;
+    totalClicks += entry.lifetime.clicks;
+    totalConversions += entry.lifetime.conversions;
+    accumulateCurrency(spendByCurrency, entry.spendCurrency, entry.lifetime.spendCents);
+    accumulateCurrency(revenueByCurrency, entry.spendCurrency, entry.lifetime.revenueCents);
+  });
+
+  const spendCurrencies = Array.from(spendByCurrency.keys());
+  const totalSpendCents = Array.from(spendByCurrency.values()).reduce((sum, value) => sum + value, 0);
+  const totalRevenueCents = Array.from(revenueByCurrency.values()).reduce((sum, value) => sum + value, 0);
+  const singleCurrency = spendCurrencies.length === 1 ? spendCurrencies[0] : null;
+  const averageCtr = totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(2)}%` : '0.00%';
+  const averageCpc =
+    singleCurrency && totalClicks > 0
+      ? `${formatCurrency(Math.round(totalSpendCents / totalClicks), singleCurrency)} / click`
+      : '—';
+  const averageCpa =
+    singleCurrency && totalConversions > 0
+      ? `${formatCurrency(Math.round(totalSpendCents / totalConversions), singleCurrency)} / acquisition`
+      : '—';
+  const roas = singleCurrency && totalSpendCents > 0 ? `${(totalRevenueCents / totalSpendCents).toFixed(2)}x` : '—';
+
+  const summary = {
+    activeCampaigns: activeCampaignEntries.length,
+    totalImpressions,
+    totalClicks,
+    totalConversions,
+    totalSpend: {
+      currency: singleCurrency,
+      cents: totalSpendCents,
+      formatted: singleCurrency ? formatCurrency(totalSpendCents, singleCurrency) : 'Multi-currency spend'
+    },
+    averageCtr,
+    averageCpc,
+    averageCpa,
+    roas,
+    lastSyncedAt: latestSynced ? latestSynced.toISOString() : null,
+    lastSyncedLabel: latestSynced ? formatDateTime(latestSynced, { dateStyle: 'medium', timeStyle: 'short' }) : null
+  };
+
+  const adsActive = activeCampaignEntries.map((entry) => {
+    const { campaign, latestMetric, lifetime } = entry;
+    return {
       id: `campaign-${campaign.id}`,
       name: campaign.name,
-      format: campaign.objective,
-      spend: formatCurrency(campaign.spendTotalCents ?? 0, campaign.spendCurrency ?? 'USD'),
-      performance: `${((campaign.ctr ?? 0) * 100).toFixed(2)}% CTR · Score ${Number(campaign.performanceScore ?? 0).toFixed(1)}`
-    }));
+      objective: campaign.objective,
+      status: campaign.status,
+      spend: {
+        currency: entry.spendCurrency,
+        cents: entry.spendCents,
+        formatted: formatCurrency(entry.spendCents, entry.spendCurrency),
+        label: `Lifetime ${formatCurrency(entry.spendCents, entry.spendCurrency)}`
+      },
+      dailyBudget: {
+        currency: entry.budgetCurrency,
+        cents: entry.budgetCents,
+        formatted: formatCurrency(entry.budgetCents, entry.budgetCurrency),
+        label: `Daily ${formatCurrency(entry.budgetCents, entry.budgetCurrency)}`
+      },
+      performanceScore: Number(campaign.performanceScore ?? 0),
+      ctr: formatPercentage(campaign.ctr ?? 0),
+      cpc: `${formatCurrency(entry.cpcCents, entry.spendCurrency)} CPC`,
+      cpa: `${formatCurrency(entry.cpaCents, entry.spendCurrency)} CPA`,
+      metrics: {
+        lastSyncedAt: latestMetric?.date ? latestMetric.date.toISOString() : null,
+        lastSyncedLabel: latestMetric?.date ? formatDateTime(latestMetric.date, { dateStyle: 'medium' }) : null,
+        impressions: lifetime.impressions,
+        clicks: lifetime.clicks,
+        conversions: lifetime.conversions,
+        spendFormatted: formatCurrency(lifetime.spendCents, entry.spendCurrency),
+        revenueFormatted: formatCurrency(lifetime.revenueCents, entry.spendCurrency),
+        roas: formatRoasFromCents(lifetime.revenueCents, lifetime.spendCents)
+      },
+      placement: {
+        surface: entry.placementSurface,
+        slot: entry.placementSlot,
+        tags: entry.placementTags,
+        scheduleLabel: formatScheduleRange(entry.startAt, entry.endAt)
+      },
+      targeting: {
+        keywords: entry.keywords,
+        audiences: entry.audiences,
+        locations: entry.locations,
+        languages: entry.languages.map((language) => language.toUpperCase())
+      },
+      creative: {
+        headline: campaign.creativeHeadline ?? '',
+        description: campaign.creativeDescription ?? '',
+        url: campaign.creativeUrl ?? ''
+      }
+    };
+  });
 
-  const adExperiments = relevantCampaigns
-    .map((campaign) => {
-      const series = (metricsByCampaign.get(Number(campaign.id)) ?? []).sort(
-        (a, b) => (b.metricDate?.getTime() ?? 0) - (a.metricDate?.getTime() ?? 0)
-      );
-      if (!series.length) return null;
-      const latest = series[0];
-      const previous = series[1];
-      const conversionDelta = previous ? latest.conversions - previous.conversions : latest.conversions;
-      const deltaLabel = previous ? `${conversionDelta >= 0 ? '+' : ''}${conversionDelta}` : `${latest.conversions}`;
+  const adExperiments = campaignsDetailed
+    .map((entry) => {
+      if (!entry.latestMetric) return null;
+      const { campaign, latestMetric, previousMetric } = entry;
+      const conversionsDelta = previousMetric
+        ? latestMetric.conversions - previousMetric.conversions
+        : latestMetric.conversions;
+      const deltaLabel = `${conversionsDelta >= 0 ? '+' : ''}${conversionsDelta}`;
       return {
         id: `experiment-${campaign.id}`,
         name: campaign.name,
         status: campaign.status === 'active' ? 'Live' : 'Completed',
-        hypothesis: `${deltaLabel} conversions · ${formatCurrency(latest.revenueCents ?? 0, campaign.spendCurrency ?? 'USD')} revenue`
+        hypothesis: `${deltaLabel} conversions · ${formatCurrency(latestMetric.revenueCents, entry.spendCurrency)} revenue`,
+        conversionsDeltaLabel: deltaLabel,
+        lastObservedAt: latestMetric.date ? latestMetric.date.toISOString() : null,
+        lastObservedLabel: latestMetric.date ? formatDateTime(latestMetric.date, { dateStyle: 'medium' }) : null,
+        baselineLabel: previousMetric
+          ? `${previousMetric.conversions} conversions · ${formatCurrency(previousMetric.revenueCents, entry.spendCurrency)}`
+          : null
       };
     })
     .filter(Boolean);
+
+  const adsPlacements = campaignsDetailed.map((entry) => ({
+    id: `placement-${entry.campaign.id}`,
+    name: entry.campaign.name,
+    surface: entry.placementSurface,
+    slot: entry.placementSlot,
+    status: entry.campaign.status,
+    scheduleLabel: formatScheduleRange(entry.startAt, entry.endAt),
+    budgetLabel: `Daily ${formatCurrency(entry.budgetCents, entry.budgetCurrency)}`,
+    optimisation: entry.campaign.objective ? `${capitalise(entry.campaign.objective)} objective` : 'Optimisation pending',
+    tags: entry.placementTags
+  }));
+
+  const targetingSummaryParts = [];
+  if (keywordSet.size) targetingSummaryParts.push(`${keywordSet.size} keywords`);
+  if (audienceSet.size) targetingSummaryParts.push(`${audienceSet.size} audiences`);
+  if (locationSet.size) targetingSummaryParts.push(`${locationSet.size} regions`);
+  if (languageSet.size) targetingSummaryParts.push(`${languageSet.size} languages`);
+
+  const targeting = {
+    keywords: Array.from(keywordSet),
+    audiences: Array.from(audienceSet),
+    locations: Array.from(locationSet),
+    languages: Array.from(languageSet).map((language) => language.toUpperCase()),
+    summary: targetingSummaryParts.length ? targetingSummaryParts.join(' · ') : 'No targeting configured'
+  };
+
+  const tagMap = new Map();
+  const pushTag = (category, label) => {
+    if (!label) return;
+    const key = `${category}:${label}`;
+    if (!tagMap.has(key)) {
+      tagMap.set(key, { category, label });
+    }
+  };
+
+  campaignsDetailed.forEach((entry) => {
+    entry.keywords.forEach((keyword) => pushTag('Keyword', keyword));
+    entry.audiences.forEach((audience) => pushTag('Audience', audience));
+    entry.locations.forEach((location) => pushTag('Location', location));
+    entry.languages.forEach((language) => pushTag('Language', language.toUpperCase()));
+    if (entry.campaign.objective) {
+      pushTag('Objective', capitalise(entry.campaign.objective));
+    }
+    const featureFlag = entry.campaign.metadata?.featureFlag;
+    if (featureFlag) {
+      pushTag('Feature flag', featureFlag);
+    }
+    const promotedCommunityId = entry.campaign.metadata?.promotedCommunityId;
+    if (promotedCommunityId) {
+      pushTag('Placement', `Community #${promotedCommunityId}`);
+    }
+  });
+
+  const adsTags = Array.from(tagMap.values());
+
+  const adsWorkspace = {
+    active: adsActive,
+    experiments: adExperiments,
+    placements: adsPlacements,
+    targeting,
+    tags: adsTags,
+    summary
+  };
 
   const liveRevenue = liveSessions.reduce(
     (total, session) => total + Number(session.priceAmount ?? 0) * Number(session.reservedSeats ?? 0),
@@ -1115,10 +1479,7 @@ export function buildInstructorDashboard({
         catalogue: ebookCatalogue,
         creationPipelines
       },
-      ads: {
-        active: activeCampaigns,
-        experiments: adExperiments
-      },
+      ads: adsWorkspace,
       calendar,
       pricing: {
         offers: pricingOffers,
@@ -1773,8 +2134,12 @@ export default class DashboardService {
           'campaign.targeting_keywords as targetingKeywords',
           'campaign.targeting_audiences as targetingAudiences',
           'campaign.targeting_locations as targetingLocations',
+          'campaign.targeting_languages as targetingLanguages',
           'campaign.start_at as startAt',
           'campaign.end_at as endAt',
+          'campaign.creative_headline as creativeHeadline',
+          'campaign.creative_description as creativeDescription',
+          'campaign.creative_url as creativeUrl',
           'campaign.metadata',
           'campaign.created_by as createdBy',
           'creator.first_name as creatorFirstName',
