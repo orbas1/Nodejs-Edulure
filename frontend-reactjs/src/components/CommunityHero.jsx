@@ -24,7 +24,16 @@ CommunityStat.propTypes = {
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired
 };
 
-export default function CommunityHero({ community, isLoading, error, onJoin, isJoining, joinError }) {
+export default function CommunityHero({
+  community,
+  isLoading,
+  error,
+  onJoin,
+  isJoining,
+  joinError,
+  canJoin = true,
+  joinDisabledReason
+}) {
   if (isLoading) {
     return (
       <div className="overflow-hidden rounded-4xl border border-slate-200 bg-white p-10 shadow-lg">
@@ -116,12 +125,15 @@ export default function CommunityHero({ community, isLoading, error, onJoin, isJ
           {typeof onJoin === 'function' && !isMember && (
             <button
               type="button"
-              onClick={onJoin}
-              disabled={isJoining}
+              onClick={canJoin ? onJoin : undefined}
+              disabled={isJoining || !canJoin}
               className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isJoining ? 'Joining…' : 'Join community'}
+              {isJoining ? 'Joining…' : canJoin ? 'Join community' : 'Join unavailable'}
             </button>
+          )}
+          {!canJoin && !isMember && joinDisabledReason && (
+            <span className="text-xs font-medium text-amber-200">{joinDisabledReason}</span>
           )}
           {isMember && (
             <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold text-white/90">
@@ -162,5 +174,7 @@ CommunityHero.propTypes = {
   error: PropTypes.string,
   onJoin: PropTypes.func,
   isJoining: PropTypes.bool,
-  joinError: PropTypes.string
+  joinError: PropTypes.string,
+  canJoin: PropTypes.bool,
+  joinDisabledReason: PropTypes.string
 };

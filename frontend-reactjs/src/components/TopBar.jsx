@@ -28,8 +28,8 @@ export default function TopBar({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
-      <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-3">
+    <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white px-6 py-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex w-full flex-col gap-2 sm:max-w-xs">
         <CommunitySwitcher
           communities={communities}
           selected={selectedCommunity}
@@ -43,7 +43,7 @@ export default function TopBar({
           </span>
         )}
       </div>
-      <div className="flex-1 min-w-[240px]">
+      <div className="w-full sm:flex-1">
         <SearchBar
           value={searchValue}
           onChange={handleSearchChange}
@@ -52,14 +52,22 @@ export default function TopBar({
           placeholder="Search the Edulure network"
         />
       </div>
-      <div className="flex items-center gap-3 text-slate-500">
-        <button className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary">
+      <div className="flex items-center justify-end gap-3 text-slate-500">
+        <button
+          type="button"
+          className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary"
+          aria-label="Open community messages"
+        >
           <ChatBubbleLeftEllipsisIcon className="h-5 w-5" />
           <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-white">
             3
           </span>
         </button>
-        <button className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary">
+        <button
+          type="button"
+          className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary"
+          aria-label="Open community notifications"
+        >
           <BellIcon className="h-5 w-5" />
           <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-white">
             7

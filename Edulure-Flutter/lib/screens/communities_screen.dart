@@ -2,6 +2,30 @@ import 'package:flutter/material.dart';
 
 enum LiveFeedScope { global, community }
 
+enum CommunityRole { learner, instructor, admin, moderator }
+
+class _RolePolicy {
+  const _RolePolicy({
+    required this.label,
+    required this.summary,
+    required this.canViewFeed,
+    required this.canPost,
+    required this.canJoin,
+    required this.canModerate,
+    required this.canManageSubscriptions,
+    required this.canViewLocations,
+  });
+
+  final String label;
+  final String summary;
+  final bool canViewFeed;
+  final bool canPost;
+  final bool canJoin;
+  final bool canModerate;
+  final bool canManageSubscriptions;
+  final bool canViewLocations;
+}
+
 class CommunitiesScreen extends StatefulWidget {
   const CommunitiesScreen({super.key});
 
@@ -11,6 +35,50 @@ class CommunitiesScreen extends StatefulWidget {
 
 class _CommunitiesScreenState extends State<CommunitiesScreen> {
   LiveFeedScope _selectedScope = LiveFeedScope.global;
+  CommunityRole _activeRole = CommunityRole.learner;
+
+  static const Map<CommunityRole, _RolePolicy> _rolePolicies = {
+    CommunityRole.learner: _RolePolicy(
+      label: 'Learner workspace',
+      summary: 'Members participate in programming, follow communities, and manage subscriptions.',
+      canViewFeed: true,
+      canPost: true,
+      canJoin: true,
+      canModerate: false,
+      canManageSubscriptions: true,
+      canViewLocations: true,
+    ),
+    CommunityRole.instructor: _RolePolicy(
+      label: 'Instructor workspace',
+      summary: 'Creators orchestrate cohorts, publish playbooks, and unlock monetisation.',
+      canViewFeed: true,
+      canPost: true,
+      canJoin: true,
+      canModerate: true,
+      canManageSubscriptions: true,
+      canViewLocations: true,
+    ),
+    CommunityRole.admin: _RolePolicy(
+      label: 'Platform admin',
+      summary: 'Full governance across community operations, compliance, and security.',
+      canViewFeed: true,
+      canPost: true,
+      canJoin: true,
+      canModerate: true,
+      canManageSubscriptions: true,
+      canViewLocations: true,
+    ),
+    CommunityRole.moderator: _RolePolicy(
+      label: 'Community moderator',
+      summary: 'Trusted operators keeping engagement high and safeguarding spaces.',
+      canViewFeed: true,
+      canPost: true,
+      canJoin: true,
+      canModerate: true,
+      canManageSubscriptions: false,
+      canViewLocations: true,
+    ),
+  };
 
   static const List<_Community> _communities = [
     _Community(
@@ -104,6 +172,8 @@ class _CommunitiesScreenState extends State<CommunitiesScreen> {
           children: [
             _buildCommunitiesHero(textTheme, colorScheme),
             const SizedBox(height: 24),
+            _buildRoleAccessSection(textTheme, colorScheme),
+            const SizedBox(height: 32),
             _buildManagementSection(textTheme, colorScheme),
             const SizedBox(height: 32),
             _buildDirectorySection(textTheme),
@@ -153,6 +223,137 @@ class _CommunitiesScreenState extends State<CommunitiesScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildRoleAccessSection(TextTheme textTheme, ColorScheme colorScheme) {
+    final policy = _rolePolicies[_activeRole] ?? _rolePolicies[CommunityRole.learner]!;
+    final capabilities = _roleCapabilities(policy);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.12)),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primary.withOpacity(0.06),
+            colorScheme.primary.withOpacity(0.02),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Role access governance', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(policy.label, style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text(policy.summary, style: textTheme.bodySmall),
+          const SizedBox(height: 16),
+          SegmentedButton<CommunityRole>(
+            segments: CommunityRole.values
+                .map(
+                  (role) => ButtonSegment<CommunityRole>(
+                    value: role,
+                    label: Text(_roleLabel(role)),
+                    icon: Icon(_roleIcon(role)),
+                  ),
+                )
+                .toList(),
+            selected: <CommunityRole>{_activeRole},
+            showSelectedIcon: false,
+            onSelectionChanged: (selection) {
+              if (selection.isEmpty) return;
+              setState(() {
+                _activeRole = selection.first;
+              });
+            },
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: capabilities
+                .map((capability) => _CapabilityCard(
+                      capability: capability,
+                      colorScheme: colorScheme,
+                      textTheme: textTheme,
+                    ))
+                .toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _roleLabel(CommunityRole role) {
+    switch (role) {
+      case CommunityRole.learner:
+        return 'Learner';
+      case CommunityRole.instructor:
+        return 'Instructor';
+      case CommunityRole.admin:
+        return 'Admin';
+      case CommunityRole.moderator:
+        return 'Moderator';
+    }
+  }
+
+  IconData _roleIcon(CommunityRole role) {
+    switch (role) {
+      case CommunityRole.learner:
+        return Icons.school_outlined;
+      case CommunityRole.instructor:
+        return Icons.auto_stories_outlined;
+      case CommunityRole.admin:
+        return Icons.shield_outlined;
+      case CommunityRole.moderator:
+        return Icons.verified_user_outlined;
+    }
+  }
+
+  List<_Capability> _roleCapabilities(_RolePolicy policy) {
+    return [
+      _Capability(
+        icon: Icons.dynamic_feed_outlined,
+        label: 'Live community feed',
+        description: 'Enterprise-grade feed with trust scoring and anomaly detection.',
+        enabled: policy.canViewFeed,
+      ),
+      _Capability(
+        icon: Icons.campaign_outlined,
+        label: 'Publish updates',
+        description: 'Compose posts, automate announcements, and syndicate to classrooms.',
+        enabled: policy.canPost,
+      ),
+      _Capability(
+        icon: Icons.group_add_outlined,
+        label: 'Join communities',
+        description: 'Request access to hubs, member-only classrooms, and live cohorts.',
+        enabled: policy.canJoin,
+      ),
+      _Capability(
+        icon: Icons.security_outlined,
+        label: 'Moderation controls',
+        description: 'Escalate incidents, manage trust queues, and enforce governance.',
+        enabled: policy.canModerate,
+      ),
+      _Capability(
+        icon: Icons.subscriptions_outlined,
+        label: 'Subscription management',
+        description: 'Adjust billing, follower tiers, and cross-community bundles.',
+        enabled: policy.canManageSubscriptions,
+      ),
+      _Capability(
+        icon: Icons.place_outlined,
+        label: 'Location intelligence',
+        description: 'Access community maps, check-in analytics, and campus logistics.',
+        enabled: policy.canViewLocations,
+      ),
+    ];
   }
 
   Widget _buildManagementSection(TextTheme textTheme, ColorScheme colorScheme) {
@@ -451,6 +652,93 @@ class _CommunityCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _Capability {
+  const _Capability({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.enabled,
+  });
+
+  final IconData icon;
+  final String label;
+  final String description;
+  final bool enabled;
+}
+
+class _CapabilityCard extends StatelessWidget {
+  const _CapabilityCard({required this.capability, required this.colorScheme, required this.textTheme});
+
+  final _Capability capability;
+  final ColorScheme colorScheme;
+  final TextTheme textTheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = capability.enabled
+        ? colorScheme.primary.withOpacity(0.1)
+        : colorScheme.surfaceVariant.withOpacity(0.35);
+    final borderColor = capability.enabled
+        ? colorScheme.primary.withOpacity(0.3)
+        : colorScheme.outline.withOpacity(0.2);
+    final iconColor = capability.enabled ? colorScheme.primary : colorScheme.outline;
+    final statusColor = capability.enabled ? colorScheme.primary : colorScheme.error;
+    final statusLabel = capability.enabled ? 'Enabled' : 'Restricted';
+
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: borderColor),
+          color: backgroundColor,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  height: 40,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: iconColor.withOpacity(0.15),
+                  ),
+                  child: Icon(capability.icon, color: iconColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    capability.label,
+                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              capability.description,
+              style: textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Chip(
+              label: Text(statusLabel),
+              backgroundColor: statusColor.withOpacity(0.12),
+              labelStyle: textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: statusColor,
+              ),
+              side: BorderSide.none,
+            ),
+          ],
+        ),
       ),
     );
   }
