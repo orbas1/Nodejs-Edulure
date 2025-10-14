@@ -280,7 +280,7 @@ The OpenAPI document served at `GET /api/docs` captures contracts for the follow
 - `POST /api/communities` (instructor-or-higher)
 - `POST /api/content/assets/upload-session` – instructors request Cloudflare R2 presigned uploads.
 - `POST /api/content/assets/{assetId}/ingest` – confirm uploads and queue ingestion jobs.
-- `GET /api/content/assets` – list content assets with pagination and filtering.
+- `GET /api/content/assets` – list content assets with pagination and filtering (instructor or admin roles).
 - `GET /api/content/assets/{assetId}` – fetch asset metadata, conversion outputs, and audit trail.
 - `GET /api/content/assets/{assetId}/viewer-token` – issue DRM-protected download tokens.
 - `POST /api/content/assets/{assetId}/events` – record download/view/progress analytics.

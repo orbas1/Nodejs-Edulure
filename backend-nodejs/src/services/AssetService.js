@@ -22,6 +22,58 @@ function buildViewerWatermark(asset, user) {
   return createHmac('sha256', DRM_SIGNATURE_SECRET).update(payload).digest('base64url');
 }
 
+function trimToNull(value, maxLength) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return typeof maxLength === 'number' ? trimmed.slice(0, maxLength) : trimmed;
+}
+
+function sanitiseHttpsUrl(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'https:') {
+      return null;
+    }
+    return parsed.toString();
+  } catch (error) {
+    return null;
+  }
+}
+
+function normaliseStringCollection(values, { maxItems, maxLength }) {
+  const seen = new Set();
+  const result = [];
+  for (const value of values ?? []) {
+    if (typeof value !== 'string') continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    const truncated = typeof maxLength === 'number' ? trimmed.slice(0, maxLength) : trimmed;
+    const fingerprint = truncated.toLocaleLowerCase();
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    result.push(truncated);
+    if (typeof maxItems === 'number' && result.length >= maxItems) break;
+  }
+  return result;
+}
+
+function normaliseGalleryEntries(entries) {
+  const items = [];
+  for (const entry of entries ?? []) {
+    const url = sanitiseHttpsUrl(entry?.url);
+    if (!url) continue;
+    const caption = trimToNull(entry?.caption, 160);
+    const kind = entry?.kind === 'video' ? 'video' : 'image';
+    items.push({ url, caption, kind });
+    if (items.length >= 8) break;
+  }
+  return items;
+}
+
 export default class AssetService {
   static async createUploadSession({ type, filename, mimeType, size, checksum, userId, visibility = 'workspace' }) {
     const prefix = `uploads/${type}/${userId}`;
@@ -396,6 +448,184 @@ export default class AssetService {
         visibility: asset.visibility
       }
     };
+  }
+
+  static async updateMetadata(publicId, payload, actor) {
+    return db.transaction(async (trx) => {
+      const asset = await ContentAssetModel.findByPublicId(publicId, trx);
+      if (!asset) {
+        const error = new Error('Asset not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const isOwner = asset.createdBy === actor.id;
+      if (!isOwner && actor.role !== 'admin') {
+        const error = new Error('You cannot update this material');
+        error.status = 403;
+        throw error;
+      }
+
+      const existingMetadata = typeof asset.metadata === 'object' && asset.metadata
+        ? { ...asset.metadata }
+        : {};
+      const existingCustom = typeof existingMetadata.custom === 'object' && existingMetadata.custom
+        ? { ...existingMetadata.custom }
+        : {};
+      const updatedCustom = { ...existingCustom };
+      const updatedFields = [];
+      const eventMetadata = {};
+
+      if (payload.title !== undefined) {
+        updatedCustom.title = trimToNull(payload.title, 140);
+        updatedFields.push('title');
+      }
+      if (payload.description !== undefined) {
+        updatedCustom.description = trimToNull(payload.description, 1500);
+        updatedFields.push('description');
+      }
+
+      if (payload.categories !== undefined) {
+        const categories = normaliseStringCollection(payload.categories, { maxItems: 12, maxLength: 40 });
+        updatedCustom.categories = categories;
+        eventMetadata.categories = categories;
+        updatedFields.push('categories');
+      }
+
+      if (payload.tags !== undefined) {
+        const tags = normaliseStringCollection(payload.tags, { maxItems: 24, maxLength: 32 });
+        updatedCustom.tags = tags;
+        eventMetadata.tags = tags;
+        updatedFields.push('tags');
+      }
+
+      const existingMedia = typeof existingCustom.media === 'object' && existingCustom.media
+        ? { ...existingCustom.media }
+        : {};
+
+      if (payload.coverImage !== undefined || payload.gallery !== undefined) {
+        const media = { ...existingMedia };
+        if (payload.coverImage !== undefined) {
+          const coverUrl = sanitiseHttpsUrl(payload.coverImage?.url);
+          const coverAlt = trimToNull(payload.coverImage?.alt, 120);
+          media.coverImage = coverUrl
+            ? {
+                url: coverUrl,
+                alt: coverAlt
+              }
+            : null;
+        }
+
+        if (payload.gallery !== undefined) {
+          media.gallery = normaliseGalleryEntries(payload.gallery);
+        }
+
+        updatedCustom.media = media;
+        updatedFields.push('media');
+      }
+
+      if (payload.showcase !== undefined) {
+        const existingShowcase = typeof existingCustom.showcase === 'object' && existingCustom.showcase
+          ? { ...existingCustom.showcase }
+          : {};
+        const showcase = { ...existingShowcase };
+
+        const headline = trimToNull(payload.showcase?.headline, 120);
+        if (payload.showcase?.headline !== undefined) {
+          showcase.headline = headline;
+        }
+        const subheadline = trimToNull(payload.showcase?.subheadline, 200);
+        if (payload.showcase?.subheadline !== undefined) {
+          showcase.subheadline = subheadline;
+        }
+        const videoUrl = sanitiseHttpsUrl(payload.showcase?.videoUrl);
+        if (payload.showcase?.videoUrl !== undefined) {
+          showcase.videoUrl = videoUrl;
+        }
+        const videoPosterUrl = sanitiseHttpsUrl(payload.showcase?.videoPosterUrl);
+        if (payload.showcase?.videoPosterUrl !== undefined) {
+          showcase.videoPosterUrl = videoPosterUrl;
+        }
+
+        const callToActionLabel = trimToNull(payload.showcase?.callToActionLabel, 40);
+        const callToActionUrl = sanitiseHttpsUrl(payload.showcase?.callToActionUrl);
+        if (payload.showcase?.callToActionLabel !== undefined || payload.showcase?.callToActionUrl !== undefined) {
+          if (callToActionLabel || callToActionUrl) {
+            showcase.callToAction = {
+              label: callToActionLabel,
+              url: callToActionUrl
+            };
+          } else {
+            showcase.callToAction = null;
+          }
+        }
+
+        const badge = trimToNull(payload.showcase?.badge, 32);
+        if (payload.showcase?.badge !== undefined) {
+          showcase.badge = badge;
+        }
+
+        updatedCustom.showcase = showcase;
+        updatedFields.push('showcase');
+      }
+
+      if (payload.featureFlags !== undefined) {
+        const flags = typeof existingCustom.featureFlags === 'object' && existingCustom.featureFlags
+          ? { ...existingCustom.featureFlags }
+          : {};
+        if (payload.featureFlags.showcasePinned !== undefined) {
+          flags.showcasePinned = Boolean(payload.featureFlags.showcasePinned);
+          eventMetadata.showcasePinned = flags.showcasePinned;
+        }
+        updatedCustom.featureFlags = flags;
+        updatedFields.push('featureFlags');
+      }
+
+      updatedCustom.lastUpdatedAt = new Date().toISOString();
+      updatedCustom.lastUpdatedBy = actor.id;
+
+      const newMetadata = {
+        ...existingMetadata,
+        custom: updatedCustom
+      };
+
+      const patchPayload = { metadata: newMetadata };
+      if (payload.visibility && payload.visibility !== asset.visibility) {
+        patchPayload.visibility = payload.visibility;
+        eventMetadata.visibility = payload.visibility;
+        updatedFields.push('visibility');
+      }
+
+      const updatedAsset = await ContentAssetModel.patchById(asset.id, patchPayload, trx);
+
+      await ContentAssetEventModel.record(
+        {
+          assetId: asset.id,
+          userId: actor.id,
+          eventType: 'metadata_updated',
+          metadata: {
+            updatedFields,
+            ...eventMetadata
+          }
+        },
+        trx
+      );
+
+      await ContentAuditLogModel.record(
+        {
+          assetId: asset.id,
+          event: 'asset.metadata.updated',
+          performedBy: actor.id,
+          payload: {
+            updatedFields,
+            metadata: newMetadata
+          }
+        },
+        trx
+      );
+
+      return updatedAsset;
+    });
   }
 
   static async recordEvent(publicId, eventType, metadata, actor) {
