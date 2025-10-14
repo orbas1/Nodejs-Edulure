@@ -4,6 +4,7 @@ import DashboardStateMessage from '../../components/dashboard/DashboardStateMess
 import { useDashboard } from '../../context/DashboardContext.jsx';
 import InstructorOverview from './instructor/InstructorOverview.jsx';
 import LearnerOverview from './learner/LearnerOverview.jsx';
+import CommunityOverview from './community/CommunityOverview.jsx';
 
 export default function DashboardHome() {
   const { role, dashboard, refresh } = useOutletContext();
@@ -31,9 +32,13 @@ export default function DashboardHome() {
     );
   }
 
-  return role === 'instructor' ? (
-    <InstructorOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />
-  ) : (
-    <LearnerOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />
-  );
+  if (role === 'instructor') {
+    return <InstructorOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />;
+  }
+
+  if (role === 'community') {
+    return <CommunityOverview dashboard={dashboard} onRefresh={refresh} />;
+  }
+
+  return <LearnerOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />;
 }
