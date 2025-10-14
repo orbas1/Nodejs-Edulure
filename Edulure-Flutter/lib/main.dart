@@ -13,6 +13,7 @@ import 'services/push_notification_service.dart';
 import 'screens/tutor_booking_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
+import 'screens/instructor_dashboard_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -49,6 +50,7 @@ class EdulureApp extends StatelessWidget {
         '/profile': (_) => const ProfileScreen(),
         '/content': (_) => const ContentLibraryScreen(),
         '/tutor-bookings': (_) => const TutorBookingScreen(),
+        '/instructor-dashboard': (_) => const InstructorDashboardScreen(),
         '/courses/manage': (_) => const CourseManagementScreen(),
         '/courses/purchase': (_) => const CoursePurchaseScreen(),
       },

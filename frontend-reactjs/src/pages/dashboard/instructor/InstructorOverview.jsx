@@ -8,28 +8,76 @@ import InstructorProductionSection from './sections/InstructorProductionSection.
 import InstructorProfileSection from './sections/InstructorProfileSection.jsx';
 import InstructorRevenueSection from './sections/InstructorRevenueSection.jsx';
 
-export default function InstructorOverview({ dashboard, profile, onRefresh }) {
-  const metrics = dashboard.metrics ?? [];
-  const enrollmentMetrics = useMemo(
-    () =>
-      (dashboard.analytics?.enrollment ?? []).map((metric) => ({
-        label: metric.label,
-        value: `${metric.current}`,
-        change: `${metric.current >= metric.previous ? '+' : '−'}${Math.abs(metric.current - metric.previous)}`,
-        trend: metric.current >= metric.previous ? 'up' : 'down'
-      })),
-    [dashboard.analytics?.enrollment]
-  );
+function normaliseNumber(value) {
+  const numeric = Number.parseFloat(value);
+  if (Number.isFinite(numeric)) return numeric;
+  return 0;
+}
 
-  const revenueSlices = dashboard.analytics?.revenueStreams ?? [];
-  const pipeline = dashboard.courses?.pipeline ?? [];
-  const production = dashboard.courses?.production ?? [];
+function formatChange(current, previous) {
+  const delta = current - previous;
+  const prefix = delta >= 0 ? '+' : '−';
+  return `${prefix}${Math.abs(delta)}`;
+}
+
+export default function InstructorOverview({ dashboard, profile, onRefresh }) {
+  const metrics = useMemo(() => {
+    if (!Array.isArray(dashboard.metrics)) return [];
+    return dashboard.metrics.filter((metric) => metric && metric.label && metric.value !== undefined);
+  }, [dashboard.metrics]);
+
+  const enrollmentMetrics = useMemo(() => {
+    const enrollment = Array.isArray(dashboard.analytics?.enrollment) ? dashboard.analytics.enrollment : [];
+    return enrollment.map((metric) => {
+      const current = normaliseNumber(metric.current);
+      const previous = normaliseNumber(metric.previous);
+      const displayValue = metric.current ?? current;
+      return {
+        label: metric.label ?? 'Metric',
+        value: `${displayValue}`,
+        change: formatChange(current, previous),
+        trend: current >= previous ? 'up' : 'down'
+      };
+    });
+  }, [dashboard.analytics?.enrollment]);
+
+  const revenueSlices = useMemo(() => {
+    const raw = Array.isArray(dashboard.analytics?.revenueStreams) ? dashboard.analytics.revenueStreams : [];
+    const totals = raw.reduce((sum, slice) => sum + normaliseNumber(slice.value ?? slice.percent), 0);
+    return raw
+      .filter((slice) => slice?.name)
+      .map((slice) => {
+        const amount = normaliseNumber(slice.value ?? slice.percent);
+        const percent = totals > 0 ? Math.round((amount / totals) * 100) : amount;
+        return {
+          name: slice.name,
+          value: slice.displayValue ?? slice.value ?? slice.percent ?? amount,
+          percent: Math.max(0, Math.min(100, percent))
+        };
+      });
+  }, [dashboard.analytics?.revenueStreams]);
+
+  const pipeline = useMemo(() => {
+    const raw = Array.isArray(dashboard.courses?.pipeline) ? dashboard.courses.pipeline : [];
+    return raw
+      .filter((item) => item && (item.id ?? item.name))
+      .map((item) => ({
+        ...item,
+        startDate: item.startDate ?? 'TBD',
+        learners: item.learners ?? '0'
+      }));
+  }, [dashboard.courses?.pipeline]);
+
+  const production = useMemo(() => {
+    const raw = Array.isArray(dashboard.courses?.production) ? dashboard.courses.production : [];
+    return raw.filter((item) => item && (item.id ?? item.asset));
+  }, [dashboard.courses?.production]);
 
   return (
     <div className="space-y-10">
       <InstructorMetricsSection metrics={metrics} />
 
-      <section className="grid gap-6 lg:grid-cols-5">
+      <section className="grid gap-6 xl:grid-cols-5">
         <InstructorProfileSection profile={profile} stats={enrollmentMetrics} />
         <InstructorRevenueSection revenueSlices={revenueSlices} />
       </section>
