@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasCommunityMessages = await knex.schema.hasTable('community_messages');
   if (!hasCommunityMessages) {
     await knex.schema.createTable('community_messages', (table) => {
@@ -284,9 +284,9 @@ exports.up = async function up(knex) {
       table.index(['expires_at']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('user_presence_sessions');
   await knex.schema.dropTableIfExists('direct_message_participants');
   await knex.schema.dropTableIfExists('direct_messages');
@@ -295,4 +295,4 @@ exports.down = async function down(knex) {
   await knex.schema.dropTableIfExists('community_message_reactions');
   await knex.schema.dropTableIfExists('community_channel_members');
   await knex.schema.dropTableIfExists('community_messages');
-};
+}

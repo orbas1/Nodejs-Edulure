@@ -10,6 +10,7 @@ import {
   BriefcaseIcon,
   CalendarDaysIcon,
   ChartBarIcon,
+  ClipboardDocumentListIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
   ClipboardDocumentListIcon,
@@ -303,10 +304,46 @@ export default function DashboardLayout() {
                           isActive ? 'bg-primary text-white shadow' : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
                         }`}
                       >
-                        {roleOption.label}
-                      </NavLink>
-                    );
-                  })}
+                        Clear
+                      </button>
+                    )}
+                    {filteredResults.length > 0 && (
+                      <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
+                        <ul className="space-y-2">
+                          {filteredResults.map((result) => (
+                            <li key={result.id}>
+                              <NavLink
+                                to={result.url}
+                                className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                                onClick={() => setSearchQuery('')}
+                              >
+                                <span className="font-semibold text-slate-800">{result.title}</span>
+                                <span className="text-xs uppercase tracking-wide text-slate-500">{result.type}</span>
+                              </NavLink>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  <div className="hidden items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm lg:flex">
+                    {roles.map((roleOption) => {
+                      const target = `/dashboard/${roleOption.id}`;
+                      const isActive = resolvedRole === roleOption.id;
+                      return (
+                        <NavLink
+                          key={roleOption.id}
+                          to={target}
+                          className={`rounded-2xl px-4 py-2 transition ${
+                            isActive ? 'bg-primary text-white shadow' : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+                          }`}
+                        >
+                          {roleOption.label}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-3 self-start lg:self-center">

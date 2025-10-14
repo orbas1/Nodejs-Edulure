@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasEmailVerifiedAt = await knex.schema.hasColumn('users', 'email_verified_at');
   if (!hasEmailVerifiedAt) {
     await knex.schema.alterTable('users', (table) => {
@@ -68,9 +68,9 @@ exports.up = async function up(knex) {
       table.unique(['token_hash']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   const hasVerificationTable = await knex.schema.hasTable('user_email_verification_tokens');
   if (hasVerificationTable) {
     await knex.schema.dropTable('user_email_verification_tokens');
@@ -94,4 +94,4 @@ exports.down = async function down(knex) {
       });
     }
   }
-};
+}

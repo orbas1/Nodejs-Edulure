@@ -1191,8 +1191,8 @@ export async function seed(knex) {
       })
     });
 
-    const now = new Date();
-    const nextYear = new Date(now.getTime());
+    const subscriptionTimestamp = new Date();
+    const nextYear = new Date(subscriptionTimestamp.getTime());
     nextYear.setFullYear(nextYear.getFullYear() + 1);
 
     const affiliateCommission = Math.floor(205092 * 0.2);
@@ -1203,8 +1203,8 @@ export async function seed(knex) {
       user_id: learnerId,
       tier_id: growthInsiderTierId,
       status: 'active',
-      started_at: now,
-      current_period_start: now,
+      started_at: subscriptionTimestamp,
+      current_period_start: subscriptionTimestamp,
       current_period_end: nextYear,
       cancel_at_period_end: false,
       provider: 'stripe',
@@ -1235,8 +1235,8 @@ export async function seed(knex) {
         status: 'active',
         role: 'growth-analyst',
         metadata: JSON.stringify({
-          subscriptionPublicId,
-          referralCode: affiliateReferralCode,
+        subscriptionPublicId,
+        referralCode: affiliateReferralCode,
           affiliateId: growthAffiliateId,
           roleDefinitionId: growthAnalystRoleId
         }),
@@ -2006,9 +2006,9 @@ export async function seed(knex) {
       });
     }
 
-    const now = new Date();
-    const subtractMinutes = (minutes) => new Date(now.getTime() - minutes * 60 * 1000);
-    const addMinutes = (minutes) => new Date(now.getTime() + minutes * 60 * 1000);
+    const timelineNow = new Date();
+    const subtractMinutes = (minutes) => new Date(timelineNow.getTime() - minutes * 60 * 1000);
+    const addMinutes = (minutes) => new Date(timelineNow.getTime() + minutes * 60 * 1000);
 
     const [fieldOpsUserId] = await trx('users').insert({
       first_name: 'Mira',
@@ -2260,8 +2260,8 @@ export async function seed(knex) {
       }
     ]);
 
-    const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const ninetyDaysFromNow = new Date(timelineNow.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(timelineNow.getTime() - 60 * 24 * 60 * 60 * 1000);
 
     await trx('saved_searches').insert({
       user_id: adminId,
@@ -2286,7 +2286,7 @@ export async function seed(knex) {
         user_agent: 'Chrome/120.0 (Mac OS X)',
         ip_address: '102.89.10.8',
         expires_at: ninetyDaysFromNow,
-        last_used_at: now
+        last_used_at: timelineNow
       },
       {
         user_id: instructorId,
@@ -2295,7 +2295,7 @@ export async function seed(knex) {
         ip_address: '176.23.45.100',
         expires_at: sixtyDaysAgo,
         last_used_at: sixtyDaysAgo,
-        revoked_at: now,
+        revoked_at: timelineNow,
         revoked_reason: 'credential_rotation'
       }
     ]);
@@ -2303,7 +2303,7 @@ export async function seed(knex) {
     await trx('user_email_verification_tokens').insert({
       user_id: learnerId,
       token_hash: makeHash('learner-email-token'),
-      expires_at: new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      expires_at: new Date(timelineNow.getTime() + 24 * 60 * 60 * 1000)
     });
   });
 }

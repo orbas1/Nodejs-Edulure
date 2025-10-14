@@ -96,8 +96,89 @@ export function calculateLearningStreak(completionDates = [], referenceDate = ne
     previous = day;
   }
 
-  return { current, longest };
-}
+  const projectProposals = assignments
+    .filter(isProjectAssignment)
+    .map((assignment) => {
+      const metadata = assignment.metadata ?? {};
+      const course = courseById.get(Number(assignment.courseId));
+      const dueDate = assignment.dueDate instanceof Date ? assignment.dueDate : null;
+      const dueLabel = dueDate
+        ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined })
+        : 'Schedule pending';
+      const dueIn = dueDate ? humanizeFutureTime(dueDate, now) : 'TBD';
+      const courseValue = Number(course?.priceAmount ?? 0);
+      const weightingPercent = Number(
+        metadata.weight ??
+          metadata.weightPercent ??
+          metadata.weighting ??
+          metadata.weightingPercent ??
+          metadata.contractWeight ??
+          25
+      );
+      const weighting = Number.isFinite(weightingPercent) && weightingPercent > 0 ? weightingPercent / 100 : 0.25;
+      const estimatedValueCents = Math.round(Math.max(courseValue * Math.max(weighting, 0.15), 0));
+      const stage = !dueDate
+        ? 'Scoping'
+        : dueDate.getTime() < now.getTime()
+          ? 'Delivery'
+          : dueDate.getTime() - now.getTime() <= 7 * DAY_IN_MS
+            ? 'Negotiation'
+            : 'Discovery';
+      const confidence = metadata.requiresReview ? 0.64 : 0.82;
+      const reviewers = normaliseStringArray(
+        metadata.reviewers ?? metadata.approvers ?? metadata.stakeholders ?? metadata.signatories
+      );
+      const riskLevelRaw = (metadata.risk ?? metadata.riskLevel ?? metadata.riskScore ?? '').toString().toLowerCase();
+      const riskLevel = ['low', 'medium', 'high'].includes(riskLevelRaw)
+        ? riskLevelRaw
+        : metadata.requiresReview
+          ? 'high'
+          : 'medium';
+      const riskScore = riskLevel === 'high' ? 3 : riskLevel === 'medium' ? 2 : 1;
+      const summaryNote = metadata.summary ?? (assignment.instructions ? assignment.instructions.slice(0, 140) : null);
+      const anchors = normaliseStringArray(metadata.dependencies ?? metadata.inputs ?? metadata.attachments);
+      const timezone = metadata.timezone ?? course?.metadata?.dripCampaign?.timezone ?? 'UTC';
+      const client =
+        metadata.client ??
+        course?.metadata?.catalogueListings?.[0]?.channel ??
+        course?.metadata?.workspace ??
+        course?.title ??
+        assignment.courseTitle;
+      return {
+        id: `proposal-${assignment.id}`,
+        title: assignment.title,
+        client,
+        course: assignment.courseTitle,
+        stage,
+        dueDate,
+        dueLabel,
+        dueIn,
+        owner: assignment.owner,
+        valueCents: estimatedValueCents,
+        value: formatCurrency(estimatedValueCents, course?.priceCurrency ?? 'USD'),
+        confidence,
+        confidenceLabel: `${Math.round(confidence * 100)}%`,
+        reviewers: reviewers.length ? reviewers : [assignment.owner],
+        summary: summaryNote,
+        highlights: [
+          summaryNote ?? 'Structured deliverable awaiting submission',
+          metadata.requiresReview ? 'Manual QA required' : 'Auto-approval eligible'
+        ].filter(Boolean),
+        timezone,
+        riskLevel,
+        riskScore,
+        anchors,
+        reviewWindow: metadata.reviewWindow ?? 'Deal desk review within 48h'
+      };
+    })
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) {
+        return a.dueDate - b.dueDate;
+      }
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return a.id.localeCompare(b.id);
+    });
 
 export function buildLearningPace(completions = [], referenceDate = new Date()) {
   const start = new Date(referenceDate.getTime() - 6 * DAY_IN_MS);
@@ -116,6 +197,14 @@ export function buildLearningPace(completions = [], referenceDate = new Date()) 
     const minutes = Number(entry.durationMinutes ?? 0);
     buckets.set(key, buckets.get(key) + (Number.isFinite(minutes) ? minutes : 0));
   });
+  const approvalsRequired = Math.max(reviewStakeholders.size, 2);
+  const nextReview = proposalTimeline[0]?.dueLabel ?? formatDateTime(now, { dateStyle: 'long' });
+  const nextReviewWindow = proposalTimeline[0]?.dueIn ?? 'Rolling review';
+  const averageRiskScore = projectProposals.length
+    ? projectProposals.reduce((total, proposal) => total + (proposal.riskScore ?? 1), 0) / projectProposals.length
+    : 1;
+  const riskAppetite =
+    averageRiskScore >= 2.5 ? 'High risk portfolio' : averageRiskScore >= 1.75 ? 'Balanced risk posture' : 'Low risk';
 
   const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
   return Array.from(buckets.entries()).map(([key, minutes]) => {

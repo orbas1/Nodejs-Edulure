@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasEbooks = await knex.schema.hasTable('ebooks');
   if (!hasEbooks) {
     await knex.schema.createTable('ebooks', (table) => {
@@ -180,13 +180,13 @@ exports.up = async function up(knex) {
       table.index(['ebook_id']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('ebook_watermark_events');
   await knex.schema.dropTableIfExists('ebook_reader_settings');
   await knex.schema.dropTableIfExists('ebook_bookmarks');
   await knex.schema.dropTableIfExists('ebook_highlights');
   await knex.schema.dropTableIfExists('ebook_chapters');
   await knex.schema.dropTableIfExists('ebooks');
-};
+}

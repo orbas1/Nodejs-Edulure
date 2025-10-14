@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasCourses = await knex.schema.hasTable('courses');
   if (!hasCourses) {
     await knex.schema.createTable('courses', (table) => {
@@ -206,13 +206,13 @@ exports.up = async function up(knex) {
       table.index(['lesson_id']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('course_progress');
   await knex.schema.dropTableIfExists('course_enrollments');
   await knex.schema.dropTableIfExists('course_assignments');
   await knex.schema.dropTableIfExists('course_lessons');
   await knex.schema.dropTableIfExists('course_modules');
   await knex.schema.dropTableIfExists('courses');
-};
+}

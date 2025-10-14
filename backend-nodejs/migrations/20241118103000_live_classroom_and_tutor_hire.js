@@ -1,4 +1,4 @@
-exports.up = async function up(knex) {
+export async function up(knex) {
   const hasTutorProfiles = await knex.schema.hasTable('tutor_profiles');
   if (!hasTutorProfiles) {
     await knex.schema.createTable('tutor_profiles', (table) => {
@@ -183,12 +183,12 @@ exports.up = async function up(knex) {
       table.index(['classroom_id', 'status']);
     });
   }
-};
+}
 
-exports.down = async function down(knex) {
+export async function down(knex) {
   await knex.schema.dropTableIfExists('live_classroom_registrations');
   await knex.schema.dropTableIfExists('live_classrooms');
   await knex.schema.dropTableIfExists('tutor_bookings');
   await knex.schema.dropTableIfExists('tutor_availability_slots');
   await knex.schema.dropTableIfExists('tutor_profiles');
-};
+}

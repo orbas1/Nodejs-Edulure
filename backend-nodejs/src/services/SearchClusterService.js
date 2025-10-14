@@ -436,8 +436,17 @@ export class SearchClusterService {
 
   async start() {
     this.logger.info('Initialising Meilisearch cluster');
-    await this.bootstrap();
-    await this.checkClusterHealth();
+    try {
+      await this.bootstrap();
+      await this.checkClusterHealth();
+    } catch (error) {
+      if (env.isDevelopment) {
+        this.logger.warn({ err: error }, 'Meilisearch cluster unavailable – continuing in degraded mode');
+        return;
+      }
+      throw error;
+    }
+
     if (this.healthcheckIntervalMs > 0) {
       this.interval = setInterval(() => {
         this.checkClusterHealth().catch((error) => {
