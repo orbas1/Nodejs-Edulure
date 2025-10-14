@@ -609,6 +609,8 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                             ),
                           _buildHeroCard(context),
                           const SizedBox(height: 20),
+                          _buildServiceSuiteBanner(context),
+                          const SizedBox(height: 20),
                           _buildMetricHighlights(context),
                           const SizedBox(height: 20),
                           _buildPipelineSection(context),
@@ -644,6 +646,8 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
                             ),
                           ),
                         _buildHeroCard(context),
+                        const SizedBox(height: 20),
+                        _buildServiceSuiteBanner(context),
                         const SizedBox(height: 20),
                         _buildMetricHighlights(context),
                         const SizedBox(height: 20),
@@ -762,6 +766,57 @@ class _InstructorDashboardScreenState extends State<InstructorDashboardScreen> {
             'Command cohorts, pricing, and tutor pods with live telemetry streams built for enterprise readiness.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceSuiteBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(26),
+        gradient: const LinearGradient(
+          colors: [Color(0xFFF5F7FF), Color(0xFFE9EDFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        border: Border.all(color: const Color(0xFF2D62FF).withOpacity(0.12)),
+        boxShadow: const [
+          BoxShadow(color: Color(0x14000000), blurRadius: 18, offset: Offset(0, 14))
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Services orchestration suite',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF1F2A5C),
+              )),
+          const SizedBox(height: 8),
+          Text(
+            'Coordinate service creation, mentor capacity, and enterprise booking calendars in one control plane.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blueGrey.shade600),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: () => Navigator.pushNamed(context, '/services'),
+                icon: const Icon(Icons.auto_awesome_motion_outlined),
+                label: const Text('Open service suite'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.pushNamed(context, '/tutor-management'),
+                icon: const Icon(Icons.groups_3_outlined),
+                label: const Text('Manage mentors'),
+              )
+            ],
+          )
         ],
       ),
     );
