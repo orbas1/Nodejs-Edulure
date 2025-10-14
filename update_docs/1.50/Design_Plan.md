@@ -1,0 +1,52 @@
+# Version 1.50 – Detailed Design Plan
+
+## 1. Experience Strategy
+### 1.1 Objectives
+- Harmonise learner, provider, and web surfaces around a refreshed design system featuring consolidated tokens, shared component specs, and parity across device classes.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L5-L26】
+- Improve conversion and productivity funnels through clearer navigation, refined layouts, and stronger visual hierarchy across marketing, dashboard, and cohort touchpoints.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L4-L18】
+- Embed measurable success metrics (task completion speed, accessibility audit scores, support ticket reductions) into the design backlog to ensure objective evaluation of release impact.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L54-L79】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L60-L71】
+
+### 1.2 Design Governance Principles
+- Maintain a rolling design change log and milestone review board to capture scope shifts, risk mitigations, and decision outcomes before engineering handoff.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L41-L53】
+- Operate cross-functional ceremonies (design <> engineering <> marketing <> analytics) with pre-read artefacts to accelerate feedback and alignment on theme or page additions.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L81-L92】
+- Preserve modular documentation (wireframes, component specs, logic flows, asset manifests) to enable partial-based builds, themable deployments, and quick creation of campaign-specific pages.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L27-L40】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L29-L40】
+
+## 2. Mobile Application Design Scope
+### 2.1 Foundations & Tokens
+- Finalise typography, color, spacing, elevation, and iconography tokens with JSON export for engineering to integrate into Flutter and React Native modules.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L5-L26】
+- Provide dual-mode (dark/light) palettes, gradient treatments, and high-contrast alternatives to support learner theming, emo brand campaigns, and provider-facing light mode requirements.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Colours.md†L4-L41】
+
+### 2.2 Screen Architecture & Layout
+- Refresh learner home, cohort, assignments, community, profile, and provider dashboard flows with annotated wireframes covering portrait, landscape, and tablet variations.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L12-L39】
+- Define navigational modules (bottom tab, contextual drawers, global overlays) as reusable partials to allow new page types or themed sections to be added without rework.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Screens_Update_Plan.md†L4-L42】
+- Map logic flows for onboarding, lesson consumption, assignments, scheduling, messaging, and analytics review to document branching states and error paths before engineering implementation.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Logic_Flow_update.md†L1-L28】
+
+### 2.3 Content & Accessibility
+- Specify typography and content hierarchy for screen texts, CTA labels, tooltip copy, and empty states to maintain clarity under dynamic type or translation adjustments.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Screen_text.md†L1-L31】
+- Document accessibility acceptance criteria (contrast ratios, haptic feedback, screen reader labels) with test scripts aligned to QA support milestones.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L7-L11】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L54-L70】
+- Provide dummy data, placeholder assets, and imagery guidelines to stabilise renders and avoid layout regressions during development sprints.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Dummy_Data_Requirements.md†L1-L31】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Screens_update_images_and _vectors.md†L1-L36】
+
+## 3. Web Application Design Scope
+### 3.1 Marketing & Public Pages
+- Redesign home, cohort catalog, cohort detail, pricing, and resource landing pages with emphasis on hero messaging, CTA placement, and responsive breakpoints to increase conversion.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L8-L18】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/pages.md†L1-L34】
+- Introduce modular hero, testimonial, and curriculum partials to support themed campaigns (e.g., seasonal, emo brand pushes) without duplicating layout logic.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Home page compenents.md†L1-L35】
+
+### 3.2 Authenticated Dashboard & IA
+- Rebuild overview, cohort management, analytics, resource library, and settings experiences with command palette navigation, contextual sidebars, and breadcrumbs for faster pathfinding.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L10-L27】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Dashboard Organisation.md†L1-L32】
+- Provide component library specifications (cards, tables, charts, forms, modals) that capture state logic, data bindings, and theming tokens for multi-brand delivery.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/component_types.md†L1-L32】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/component_functions.md†L1-L28】
+- Update logic flow maps for navigation, dashboards, and command palette to ensure routing parity with backend feature flags and partial rendering logic.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Logic_Flow_map.md†L1-L37】
+
+### 3.3 Content, Assets & Compliance
+- Align copy decks for marketing CTAs, tooltips, help content, and error messaging, with localised strings mapped for translation workflows.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Home page text.md†L1-L36】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/text.md.md†L1-L34】
+- Define imagery, illustration, and vector requirements with optimisation budgets to maintain performance targets (LCP <2.5s, CLS <0.1).【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L6-L18】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/images_and _vectors.md†L1-L28】
+- Document accessibility testing protocol for keyboard navigation, focus management, screen reader announcements, and high-contrast mode parity across themed variants, aligning with WCAG 2.2 AA commitments for marketing and dashboard flows.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L6-L27】
+
+## 4. Implementation & Handoff Plan
+- Follow milestone cadence: Discovery & IA → Wireframes → High Fidelity → Handoff → Implementation Support, ensuring documentation updates at each gate.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L42-L58】
+- Deliver Zeplin/Storybook-ready artefacts with asset manifests, measurement exports, and QA scripts to support engineering onboarding and regression coverage.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L27-L40】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L29-L40】
+- Schedule cross-platform walkthroughs to review component reuse, theming toggles, and partial injection logic for theme-specific or campaign pages prior to development start.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L81-L92】
+
+## 5. Post-Launch Measurement & Iteration
+- Monitor analytics for navigation usage, conversion funnels, and user productivity to validate success metrics and inform backlog grooming.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L94-L103】【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Web_Application_Design_Update/Web Application Design Update.md†L73-L80】
+- Gather qualitative feedback via surveys, interviews, and support channels, funnelling insights into v1.51 design backlog with prioritised enhancements and bug fixes.【F:update_docs/1.50/ui-ux_updates/Design_Task_Plan_Upgrade/Application_Design_Update_Plan/Application Design Update.md†L97-L103】
+- Maintain design system change log and compliance checklist to ensure ongoing adherence to accessibility, security, and brand governance standards.
