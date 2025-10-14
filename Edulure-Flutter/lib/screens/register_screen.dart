@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/auth_service.dart';
 
@@ -29,6 +30,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _termsAccepted = false;
   bool _loading = false;
   String? _error;
+  bool _twoFactorEnabled = false;
+  bool _twoFactorLocked = false;
+  Map<String, dynamic>? _twoFactorEnrollment;
+
+  static const _twoFactorEnforcedRoles = {'admin'};
 
   @override
   void dispose() {
@@ -42,6 +48,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _twoFactorLocked = _twoFactorEnforcedRoles.contains(_role);
+    _twoFactorEnabled = _twoFactorLocked;
+  }
+
   String _resolveErrorMessage(Object error) {
     if (error is DioException) {
       final response = error.response?.data;
@@ -53,6 +66,90 @@ class _RegisterScreenState extends State<RegisterScreen> {
       }
     }
     return 'We could not complete registration right now. Please try again.';
+  }
+
+  String _formatSecret(String secret) {
+    return secret.replaceAllMapped(RegExp(r'.{1,4}'), (match) => '${match.group(0)} ').trim();
+  }
+
+  Future<void> _showTwoFactorDialog(Map<String, dynamic> enrollment) async {
+    final secret = enrollment['secret']?.toString() ?? '';
+    final otpauthUrl = enrollment['otpauthUrl']?.toString();
+    final issuer = enrollment['issuer']?.toString() ?? 'Edulure';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        bool copied = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Finish securing your account'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Add this workspace to your authenticator app, then continue to login.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: SelectableText(
+                      _formatSecret(secret),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(letterSpacing: 2, fontFamily: 'monospace'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (otpauthUrl != null && otpauthUrl.isNotEmpty)
+                    SelectableText(
+                      otpauthUrl,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.blueGrey.shade700),
+                    ),
+                  const SizedBox(height: 12),
+                  FilledButton.tonal(
+                    onPressed: () async {
+                      await Clipboard.setData(ClipboardData(text: secret));
+                      setDialogState(() => copied = true);
+                    },
+                    child: Text(copied ? 'Secret copied' : 'Copy secret'),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Issuer: $issuer',
+                    style:
+                        Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Close'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                  },
+                  child: const Text('Continue to login'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _submit() async {
@@ -83,6 +180,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _twoFactorEnrollment = null;
     });
 
     try {
@@ -94,8 +192,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
         role: _role,
         age: age,
         address: _addressController.text,
+        enableTwoFactor: _twoFactorLocked ? true : _twoFactorEnabled,
       );
       if (!mounted) return;
+      final twoFactor = result['twoFactor'];
+      final requiresTwoFactor = twoFactor is Map && twoFactor['enabled'] == true;
+      setState(() {
+        _twoFactorEnrollment = twoFactor is Map<String, dynamic> ? twoFactor : null;
+        if (twoFactor is Map && twoFactor['enforced'] == true) {
+          _twoFactorLocked = true;
+        }
+        if (requiresTwoFactor) {
+          _twoFactorEnabled = true;
+        }
+      });
       final verificationStatus = result['verification'] is Map
           ? result['verification']['status']?.toString()
           : null;
@@ -103,7 +213,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ? 'Account created. Check your inbox to verify your email before signing in.'
           : 'Account created successfully.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      if (requiresTwoFactor && twoFactor is Map<String, dynamic>) {
+        await _showTwoFactorDialog(twoFactor);
+      } else {
+        if (!mounted) return;
+        Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -226,6 +341,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (value == null) return;
                       setState(() {
                         _role = value;
+                        final enforced = _twoFactorEnforcedRoles.contains(value);
+                        _twoFactorLocked = enforced;
+                        if (enforced) {
+                          _twoFactorEnabled = true;
+                        }
                       });
                     },
                   ),
@@ -287,6 +407,108 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       return null;
                     },
                   ),
+                  const SizedBox(height: 24),
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            value: _twoFactorLocked ? true : _twoFactorEnabled,
+                            onChanged: _twoFactorLocked
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      _twoFactorEnabled = value;
+                                    });
+                                  },
+                            title: const Text('Multi-factor authentication'),
+                            subtitle: Text(
+                              _twoFactorLocked
+                                  ? 'Administrators must use an authenticator app on every login.'
+                                  : 'Enable an authenticator challenge to add another layer of protection.',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _twoFactorLocked
+                                ? 'We will display your setup key immediately after registration.'
+                                : 'Turn this on to receive your authenticator setup instructions right away.',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (_twoFactorEnrollment?['enabled'] == true) ...[
+                    const SizedBox(height: 16),
+                    Card(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Authenticator setup',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                            ),
+                            const SizedBox(height: 8),
+                            SelectableText(
+                              _formatSecret(_twoFactorEnrollment?['secret']?.toString() ?? ''),
+                              style: const TextStyle(letterSpacing: 2, fontFamily: 'monospace'),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Issuer: ${_twoFactorEnrollment?['issuer'] ?? 'Edulure'}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: Colors.grey.shade600),
+                            ),
+                            if (_twoFactorEnrollment?['otpauthUrl'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: SelectableText(
+                                  _twoFactorEnrollment?['otpauthUrl']?.toString() ?? '',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: Colors.blueGrey.shade600),
+                                ),
+                              ),
+                            const SizedBox(height: 12),
+                            FilledButton.tonal(
+                              onPressed: () async {
+                                final secret = _twoFactorEnrollment?['secret']?.toString() ?? '';
+                                if (secret.isEmpty) return;
+                                await Clipboard.setData(ClipboardData(text: secret));
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Secret copied to clipboard')),
+                                );
+                              },
+                              child: const Text('Copy secret'),
+                            ),
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: () {
+                                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+                              },
+                              child: const Text('Proceed to secure login'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

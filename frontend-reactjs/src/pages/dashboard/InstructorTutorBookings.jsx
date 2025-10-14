@@ -1,4 +1,4 @@
-import { useOutletContext } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 
@@ -19,6 +19,20 @@ export default function InstructorTutorBookings() {
 
   const pipeline = bookings.pipeline ?? [];
   const confirmed = bookings.confirmed ?? [];
+  const roster = Array.isArray(dashboard?.tutors?.roster) ? dashboard.tutors.roster : [];
+  const availability = Array.isArray(dashboard?.tutors?.availability)
+    ? dashboard.tutors.availability
+    : [];
+  const notifications = Array.isArray(dashboard?.tutors?.notifications)
+    ? dashboard.tutors.notifications
+    : [];
+
+  const capacityRisks = availability.filter(
+    (entry) => Number(entry.learnersCount ?? 0) > Number(entry.slotsCount ?? 0)
+  );
+  const upcomingWithin48 = notifications.filter((notification) =>
+    notification.id?.includes('-due')
+  );
 
   return (
     <div className="space-y-8">
@@ -31,6 +45,50 @@ export default function InstructorTutorBookings() {
           Open routing rules
         </button>
       </div>
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Pending requests</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{pipeline.length}</p>
+          <p className="mt-1 text-xs text-slate-500">In the routing queue</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Confirmed sessions</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{confirmed.length}</p>
+          <p className="mt-1 text-xs text-slate-500">On the calendar</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Active mentors</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{roster.length}</p>
+          <p className="mt-1 text-xs text-slate-500">Supporting learners</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Alerts</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{capacityRisks.length + upcomingWithin48.length}</p>
+          <p className="mt-1 text-xs text-slate-500">Capacity risks &amp; upcoming SLAs</p>
+        </article>
+      </section>
+
+      {notifications.length > 0 && (
+        <section className="dashboard-section">
+          <h2 className="text-lg font-semibold text-slate-900">Alerts &amp; notifications</h2>
+          <div className="mt-4 space-y-3">
+            {notifications.map((notification) => (
+              <div key={notification.id} className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{notification.title}</p>
+                  {notification.detail && <p className="text-xs text-slate-600">{notification.detail}</p>}
+                </div>
+                {notification.ctaLabel && notification.ctaPath && (
+                  <Link to={notification.ctaPath} className="dashboard-pill px-4 py-2">
+                    {notification.ctaLabel}
+                  </Link>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Pending requests</h2>

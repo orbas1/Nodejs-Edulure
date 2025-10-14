@@ -1,10 +1,18 @@
-import { useOutletContext } from 'react-router-dom';
-
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerBookings() {
-  const { dashboard, refresh } = useOutletContext();
-  const data = dashboard?.tutorBookings;
+  const { isLearner, section: data, refresh } = useLearnerDashboardSection('tutorBookings');
+
+  if (!isLearner) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Learner workspace required"
+        description="Switch to the learner dashboard to review tutor bookings and mentorship history."
+      />
+    );
+  }
 
   if (!data) {
     return (
