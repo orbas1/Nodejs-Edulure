@@ -13,6 +13,7 @@ import {
   Cog6ToothIcon,
   DocumentTextIcon,
   HandshakeIcon,
+  ClipboardDocumentListIcon,
   IdentificationIcon,
   InboxStackIcon,
   MegaphoneIcon,
@@ -23,6 +24,11 @@ import {
   UsersIcon,
   VideoCameraIcon,
   XMarkIcon
+  Bars3Icon,
+  XMarkIcon,
+  VideoCameraIcon,
+  MapIcon
+  BriefcaseIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 
@@ -41,6 +47,7 @@ const navigationByRole = {
     { name: 'Live classrooms', to: `${basePath}/live-classes`, icon: VideoCameraIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'Field services', to: `${basePath}/field-services`, icon: MapIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
     { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
@@ -64,8 +71,10 @@ const navigationByRole = {
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'Service suite', to: `${basePath}/services`, icon: BriefcaseIcon },
+    { name: 'Project bids', to: `${basePath}/projects`, icon: ClipboardDocumentListIcon },
     { name: 'Tutor management', to: `${basePath}/tutor-management`, icon: IdentificationIcon },
     { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },
+    { name: 'Field services', to: `${basePath}/field-services`, icon: MapIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },
@@ -238,7 +247,7 @@ export default function DashboardLayout() {
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="flex flex-col gap-4 px-4 py-5 sm:px-6 lg:px-10">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-col gap-4 lg:flex-1 lg:flex-row lg:items-center lg:gap-6">
+              <div className="flex flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:gap-6">
                 <div className="relative flex-1">
                   <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                   <input
@@ -249,6 +258,7 @@ export default function DashboardLayout() {
                     className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                   {searchQuery ? (
+                  {searchQuery && (
                     <button
                       type="button"
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-primary"
@@ -258,6 +268,8 @@ export default function DashboardLayout() {
                     </button>
                   ) : null}
                   {filteredResults.length > 0 ? (
+                  )}
+                  {filteredResults.length > 0 && (
                     <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
                       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
                       <ul className="space-y-2">
@@ -276,6 +288,7 @@ export default function DashboardLayout() {
                       </ul>
                     </div>
                   ) : null}
+                  )}
                 </div>
                 <div className="hidden items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-500 shadow-sm lg:flex">
                   {roles.map((roleOption) => {
@@ -287,6 +300,9 @@ export default function DashboardLayout() {
                         to={target}
                         className={`rounded-2xl px-4 py-2 transition ${
                           isActive ? 'bg-primary text-white shadow' : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
+                          isActive
+                            ? 'bg-primary text-white shadow'
+                            : 'text-slate-600 hover:bg-primary/10 hover:text-primary'
                         }`}
                       >
                         {roleOption.label}
@@ -294,20 +310,24 @@ export default function DashboardLayout() {
                     );
                   })}
                 </div>
+                      {roleOption.label}
+                    </NavLink>
+                  );
+                })}
               </div>
-              <div className="self-start lg:self-center">
+              <div className="flex items-center gap-3 self-start lg:self-center">
                 <UserMenu session={session} onNavigate={navigate} onLogout={logout} />
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
+                  onClick={() => setMobileNavOpen((open) => !open)}
+                  aria-expanded={mobileNavOpen}
+                  aria-controls="dashboard-mobile-nav"
+                >
+                  <Bars3Icon className="h-5 w-5" />
+                  Menu
+                </button>
               </div>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 self-start rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary lg:hidden"
-                onClick={() => setMobileNavOpen((open) => !open)}
-                aria-expanded={mobileNavOpen}
-                aria-controls="dashboard-mobile-nav"
-              >
-                <Bars3Icon className="h-5 w-5" />
-                Menu
-              </button>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-slate-500">
               <span>

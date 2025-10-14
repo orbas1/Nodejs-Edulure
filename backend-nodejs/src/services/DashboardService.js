@@ -8,6 +8,7 @@ import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import IdentityVerificationService from './IdentityVerificationService.js';
 import BlogService from './BlogService.js';
+import { buildFieldServiceWorkspace } from './FieldServiceWorkspace.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -492,7 +493,10 @@ export function buildCommunityDashboard({
         severity: metadata.severity ?? 'medium',
         status: metadata.escalation?.status ?? 'triage',
         openedAt: message.deliveredAt ? new Date(message.deliveredAt) : null,
-        owner: metadata.escalation?.owner ?? metadata.moderator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator',
+        owner:
+          metadata.escalation?.owner ??
+          metadata.moderator ??
+          (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator'),
         summary: metadata.summary ?? (metadata.flaggedReason ?? message.body?.slice(0, 120) ?? 'Flagged conversation')
       };
     })
@@ -517,6 +521,498 @@ export function buildCommunityDashboard({
     const communityId = Number(message.communityId ?? 0);
     return managedCommunityIds.has(communityId);
   });
+
+  const formatCurrencySummary = (currencyMap) => {
+    const entries = Array.from(currencyMap.entries()).filter(([, cents]) => Number(cents ?? 0) !== 0);
+    if (entries.length === 0) {
+      return '—';
+    }
+    if (entries.length === 1) {
+      const [currency, cents] = entries[0];
+      return formatCurrency(cents, currency);
+    }
+    return entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' · ');
+  };
+
+  const courseById = new Map(courseSummaries.map((course) => [Number(course.id), course]));
+  const stageLabelByStatus = {
+    draft: 'Qualification',
+    discovery: 'Qualification',
+    qualification: 'Qualification',
+    pilot: 'Pilot',
+    beta: 'Pilot',
+    negotiation: 'Negotiation',
+    enterprise: 'Negotiation',
+    contract: 'Contract',
+    published: 'Contract',
+    renewal: 'Renewal'
+  };
+  const stageProbability = {
+    Qualification: 0.35,
+    Pilot: 0.55,
+    Negotiation: 0.68,
+    Contract: 0.82,
+    Renewal: 0.9
+  };
+
+  const bidPipeline = [];
+  const stageBreakdown = new Map();
+  const clientPipeline = new Map();
+  const pipelineValueByCurrency = new Map();
+  const weightedValueByCurrency = new Map();
+  const probabilityValues = [];
+  const conversionValues = [];
+
+  courseSummaries.forEach((course) => {
+    const metadata = course.metadata ?? {};
+    const listings = Array.isArray(metadata.catalogueListings) ? metadata.catalogueListings : [];
+    listings.forEach((listing, index) => {
+      const channel = listing.channel ?? listing.workspace ?? listing.id ?? 'Marketplace';
+      const rawStatus = (listing.status ?? 'Draft').toString().toLowerCase();
+      const stage = stageLabelByStatus[rawStatus] ?? 'Qualification';
+      const priceCents = Number.isFinite(Number(listing.price))
+        ? Number(listing.price)
+        : Number(course.priceAmount ?? 0);
+      const conversions = Number(listing.conversions ?? 0);
+      const impressions = Number(listing.impressions ?? 0);
+      let conversionRate = Number(listing.conversionRate ?? 0);
+      if (conversionRate > 1) {
+        conversionRate = conversionRate / 100;
+      }
+      if (!Number.isFinite(conversionRate) || conversionRate <= 0) {
+        conversionRate = impressions > 0 ? conversions / impressions : 0.12;
+      }
+      const expectedDeals = conversions > 0 ? conversions : Math.max(1, Math.round(conversionRate * 100));
+      const pipelineValueCents = Math.max(0, priceCents) * expectedDeals;
+      const probability = stageProbability[stage] ?? 0.45;
+      const updatedAt = listing.lastSyncedAt ? new Date(listing.lastSyncedAt) : course.releaseAt ?? now;
+      const currency = listing.currency ?? course.priceCurrency ?? 'USD';
+      const conversionLabel = conversions > 0 ? `${conversions} wins` : formatPercentage(conversionRate, 1);
+
+      bidPipeline.push({
+        id: `bid-${course.id}-${listing.id ?? index}`,
+        name: course.title,
+        channel,
+        status: capitalise(listing.status ?? 'Draft'),
+        stage,
+        valueCents: pipelineValueCents,
+        value: formatCurrency(pipelineValueCents, currency),
+        currency,
+        probability,
+        probabilityLabel: `${Math.round(probability * 100)}%`,
+        conversionRate,
+        conversionLabel,
+        updatedAt: updatedAt instanceof Date ? updatedAt : new Date(updatedAt),
+        updatedLabel: updatedAt
+          ? formatDateTime(updatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Not yet synced',
+        nextAction:
+          rawStatus === 'pilot'
+            ? 'Graduate pilot to enterprise tier'
+            : rawStatus === 'draft'
+              ? 'Finalise commercial terms'
+              : 'Monitor performance telemetry',
+        owner: resolveName(user.firstName, user.lastName, user.email)
+      });
+
+      const stageEntry = stageBreakdown.get(stage) ?? {
+        id: `stage-${stage.toLowerCase().replace(/\s+/g, '-')}`,
+        name: stage,
+        count: 0,
+        valueByCurrency: new Map(),
+        probabilityTotal: 0
+      };
+      stageEntry.count += 1;
+      stageEntry.probabilityTotal += probability;
+      accumulateCurrency(stageEntry.valueByCurrency, currency, pipelineValueCents);
+      stageBreakdown.set(stage, stageEntry);
+
+      const clientKey = channel.toLowerCase();
+      const clientEntry = clientPipeline.get(clientKey) ?? {
+        id: `client-${clientKey || 'channel'}`,
+        name: channel,
+        pipelineValueByCurrency: new Map(),
+        stageCounts: new Map(),
+        probabilityTotal: 0,
+        conversionTotal: 0,
+        records: 0,
+        owner: resolveName(user.firstName, user.lastName, user.email),
+        latestUpdate: null
+      };
+      clientEntry.records += 1;
+      accumulateCurrency(clientEntry.pipelineValueByCurrency, currency, pipelineValueCents);
+      clientEntry.stageCounts.set(stage, (clientEntry.stageCounts.get(stage) ?? 0) + 1);
+      clientEntry.probabilityTotal += probability;
+      clientEntry.conversionTotal += conversionRate;
+      if (!clientEntry.latestUpdate || (updatedAt && updatedAt > clientEntry.latestUpdate)) {
+        clientEntry.latestUpdate = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+      }
+      clientPipeline.set(clientKey, clientEntry);
+
+      accumulateCurrency(pipelineValueByCurrency, currency, pipelineValueCents);
+      accumulateCurrency(weightedValueByCurrency, currency, Math.round(pipelineValueCents * probability));
+      probabilityValues.push(probability);
+      conversionValues.push(conversionRate);
+    });
+  });
+
+  bidPipeline.sort((a, b) => {
+    if ((b.probability ?? 0) !== (a.probability ?? 0)) {
+      return (b.probability ?? 0) - (a.probability ?? 0);
+    }
+    return (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0);
+  });
+
+  const bidStages = Array.from(stageBreakdown.values()).map((entry) => {
+    const valueLabel = formatCurrencySummary(entry.valueByCurrency);
+    const averageProbability =
+      entry.count > 0 ? `${Math.round((entry.probabilityTotal / entry.count) * 100)}%` : '—';
+    return {
+      id: entry.id,
+      name: entry.name,
+      count: entry.count,
+      value: valueLabel,
+      averageProbability
+    };
+  });
+
+  const responseTimes = tutorBookingsNormalised
+    .filter((booking) => booking.requestedAt && booking.confirmedAt)
+    .map((booking) =>
+      Math.max(
+        0,
+        Math.round((booking.confirmedAt.getTime() - booking.requestedAt.getTime()) / (60 * 1000))
+      )
+    );
+  const averageResponseMinutes = responseTimes.length
+    ? Math.round(responseTimes.reduce((total, value) => total + value, 0) / responseTimes.length)
+    : null;
+  const responseLabel = averageResponseMinutes !== null ? minutesToReadable(averageResponseMinutes) : 'No confirmed bids';
+
+  const projectSummary = [
+    {
+      id: 'projects-active-bids',
+      label: 'Active bids',
+      value: `${bidPipeline.length}`,
+      detail: bidPipeline.length > 0 ? 'Across marketplace & enterprise channels' : 'Publish a bid to get started',
+      tone: bidPipeline.length > 0 ? 'primary' : 'neutral',
+      trend: bidPipeline.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'projects-weighted-pipeline',
+      label: 'Weighted pipeline',
+      value: formatCurrencySummary(weightedValueByCurrency),
+      detail: 'Probability-adjusted forecast for next 60 days',
+      tone: 'success',
+      trend: 'up'
+    },
+    {
+      id: 'projects-conversion',
+      label: 'Avg. conversion',
+      value: conversionValues.length
+        ? formatPercentage(
+            conversionValues.reduce((total, value) => total + value, 0) / conversionValues.length,
+            1
+          )
+        : '0.0%',
+      detail: 'Rolling 30d performance across bids',
+      tone: 'info',
+      trend: conversionValues.length ? 'up' : 'neutral'
+    },
+    {
+      id: 'projects-response-sla',
+      label: 'Bid response SLA',
+      value: responseLabel,
+      detail: `${pipelineBookings.length} inbound brief${pipelineBookings.length === 1 ? '' : 's'} awaiting triage`,
+      tone: averageResponseMinutes !== null && averageResponseMinutes <= 120 ? 'success' : 'warning',
+      trend: averageResponseMinutes !== null && averageResponseMinutes <= 180 ? 'up' : 'down'
+    }
+  ];
+
+  const isProjectAssignment = (assignment) => {
+    const metadata = assignment.metadata ?? {};
+    const tags = normaliseStringArray(metadata.tags ?? metadata.labels ?? metadata.categories);
+    const keywords = `${assignment.title ?? ''} ${assignment.instructions ?? ''}`.toLowerCase();
+    const projectKeywords = ['project', 'proposal', 'audit', 'launch', 'bid', 'playbook'];
+    const hasKeyword = projectKeywords.some((keyword) => keywords.includes(keyword));
+    const requiresReview = Boolean(
+      metadata.requiresReview || metadata.reviewRequired || metadata.requiresApproval
+    );
+    const taggedProject = tags.some((tag) => projectKeywords.includes(tag.toLowerCase()));
+    return requiresReview || hasKeyword || taggedProject;
+  };
+
+  const projectProposals = assignmentsNormalised
+    .filter(isProjectAssignment)
+    .map((assignment) => {
+      const metadata = assignment.metadata ?? {};
+      const course = courseById.get(Number(assignment.courseId));
+      const dueDate = assignment.dueDate instanceof Date ? assignment.dueDate : null;
+      const dueLabel = dueDate
+        ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined })
+        : 'Schedule pending';
+      const dueIn = dueDate ? humanizeFutureTime(dueDate, now) : 'TBD';
+      const courseValue = Number(course?.priceAmount ?? 0);
+      const weightingPercent = Number(
+        metadata.weight ??
+          metadata.weightPercent ??
+          metadata.weighting ??
+          metadata.weightingPercent ??
+          metadata.contractWeight ??
+          25
+      );
+      const weighting = Number.isFinite(weightingPercent) && weightingPercent > 0 ? weightingPercent / 100 : 0.25;
+      const estimatedValueCents = Math.round(Math.max(courseValue * Math.max(weighting, 0.15), 0));
+      const stage = !dueDate
+        ? 'Scoping'
+        : dueDate.getTime() < now.getTime()
+          ? 'Delivery'
+          : dueDate.getTime() - now.getTime() <= 7 * DAY_IN_MS
+            ? 'Negotiation'
+            : 'Discovery';
+      const confidence = metadata.requiresReview ? 0.64 : 0.82;
+      const reviewers = normaliseStringArray(
+        metadata.reviewers ?? metadata.approvers ?? metadata.stakeholders ?? metadata.signatories
+      );
+      const riskLevelRaw = (metadata.risk ?? metadata.riskLevel ?? metadata.riskScore ?? '').toString().toLowerCase();
+      const riskLevel = ['low', 'medium', 'high'].includes(riskLevelRaw)
+        ? riskLevelRaw
+        : metadata.requiresReview
+          ? 'high'
+          : 'medium';
+      const riskScore = riskLevel === 'high' ? 3 : riskLevel === 'medium' ? 2 : 1;
+      const summaryNote = metadata.summary ?? (assignment.instructions ? assignment.instructions.slice(0, 140) : null);
+      const anchors = normaliseStringArray(metadata.dependencies ?? metadata.inputs ?? metadata.attachments);
+      const timezone = metadata.timezone ?? course?.metadata?.dripCampaign?.timezone ?? 'UTC';
+      const client =
+        metadata.client ??
+        course?.metadata?.catalogueListings?.[0]?.channel ??
+        course?.metadata?.workspace ??
+        course?.title ??
+        assignment.courseTitle;
+      return {
+        id: `proposal-${assignment.id}`,
+        title: assignment.title,
+        client,
+        course: assignment.courseTitle,
+        stage,
+        dueDate,
+        dueLabel,
+        dueIn,
+        owner: assignment.owner,
+        valueCents: estimatedValueCents,
+        value: formatCurrency(estimatedValueCents, course?.priceCurrency ?? 'USD'),
+        confidence,
+        confidenceLabel: `${Math.round(confidence * 100)}%`,
+        reviewers: reviewers.length ? reviewers : [assignment.owner],
+        summary: summaryNote,
+        highlights: [
+          summaryNote ?? 'Structured deliverable awaiting submission',
+          metadata.requiresReview ? 'Manual QA required' : 'Auto-approval eligible'
+        ].filter(Boolean),
+        timezone,
+        riskLevel,
+        riskScore,
+        anchors,
+        reviewWindow: metadata.reviewWindow ?? 'Deal desk review within 48h'
+      };
+    })
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) {
+        return a.dueDate - b.dueDate;
+      }
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return a.id.localeCompare(b.id);
+    });
+
+  const proposalTimeline = projectProposals
+    .filter((proposal) => proposal.dueDate)
+    .slice(0, 8)
+    .map((proposal) => ({
+      id: `timeline-${proposal.id}`,
+      title: proposal.title,
+      stage: proposal.stage,
+      dueLabel: proposal.dueLabel,
+      dueIn: proposal.dueIn,
+      owner: proposal.owner
+    }));
+
+  const reviewStakeholders = new Set();
+  projectProposals.forEach((proposal) => {
+    proposal.reviewers.forEach((reviewer) => reviewStakeholders.add(reviewer));
+  });
+  const approvalsRequired = Math.max(reviewStakeholders.size, 2);
+  const nextReview = proposalTimeline[0]?.dueLabel ?? formatDateTime(now, { dateStyle: 'long' });
+  const nextReviewWindow = proposalTimeline[0]?.dueIn ?? 'Rolling review';
+  const averageRiskScore = projectProposals.length
+    ? projectProposals.reduce((total, proposal) => total + (proposal.riskScore ?? 1), 0) / projectProposals.length
+    : 1;
+  const riskAppetite =
+    averageRiskScore >= 2.5 ? 'High risk portfolio' : averageRiskScore >= 1.75 ? 'Balanced risk posture' : 'Low risk';
+
+  const reviewBoard = {
+    owner: resolveName(user.firstName, user.lastName, user.email),
+    approvalsRequired,
+    nextReview,
+    nextReviewWindow,
+    riskAppetite,
+    escalationContact: user.email,
+    cadence: 'Deal desk meets weekly on Tuesdays 09:00 UTC',
+    automation: 'Bid scoring automation triages new proposals in under 2 minutes.',
+    security:
+      'Proposals stored in AES-256 encrypted vault with per-approver MFA, full audit trails, and dynamic watermarks.'
+  };
+
+  const projectDeliverables = communityResources
+    .filter((resource) => resource.createdBy === user.id)
+    .map((resource) => {
+      const metadata = safeJsonParse(resource.metadata, {});
+      return {
+        id: `deliverable-${resource.id}`,
+        title: resource.title,
+        community: resource.communityName,
+        status: resource.status ?? 'Published',
+        type: resource.resourceType,
+        updatedLabel: resource.publishedAt
+          ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
+          : 'Draft',
+        tags: normaliseStringArray(resource.tags).slice(0, 5),
+        version: metadata.version ?? metadata.deckVersion ?? null
+      };
+    });
+
+  const projectArtifacts = assetsNormalised.slice(0, 8).map((asset) => ({
+    id: `artifact-${asset.id}`,
+    name: normaliseFilename(asset.originalFilename),
+    stage: asset.metadata?.stage ?? 'Asset',
+    lastUpdated: asset.updatedAt
+      ? formatDateTime(asset.updatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Not updated',
+    owner: resolveName(user.firstName, user.lastName, 'Instructor'),
+    notes: asset.metadata?.notes ?? asset.metadata?.summary ?? null
+  }));
+
+  const projectSignals = campaignsDetailed.slice(0, 6).map((entry) => {
+    const conversionsDelta = entry.previousMetric
+      ? entry.latestMetric.conversions - entry.previousMetric.conversions
+      : entry.latestMetric?.conversions ?? 0;
+    const momentum = conversionsDelta > 0 ? 'up' : conversionsDelta < 0 ? 'down' : 'neutral';
+    return {
+      id: `signal-${entry.campaign.id}`,
+      title: entry.campaign.name,
+      channel: entry.placementSurface,
+      status: capitalise(entry.campaign.status ?? 'pending'),
+      spend: formatCurrency(entry.spendCents, entry.spendCurrency),
+      roas:
+        formatRoasFromCents(entry.lifetime.revenueCents, entry.lifetime.spendCents) ?? 'Awaiting spend data',
+      delta:
+        conversionsDelta === 0
+          ? 'Stable conversions'
+          : `${conversionsDelta > 0 ? '+' : ''}${conversionsDelta} conversions vs last sync`,
+      momentum,
+      objective: entry.campaign.objective ? capitalise(entry.campaign.objective) : 'Awareness',
+      lastObserved: entry.latestMetric?.date
+        ? formatDateTime(entry.latestMetric.date, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'No telemetry',
+      tags: entry.placementTags.slice(0, 4)
+    };
+  });
+
+  const projectClients = Array.from(clientPipeline.values()).map((client) => {
+    const entries = Array.from(client.pipelineValueByCurrency.entries());
+    const valueLabel = entries.length
+      ? entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' · ')
+      : '—';
+    const averageProbability = client.records > 0 ? client.probabilityTotal / client.records : 0;
+    const averageConversion = client.records > 0 ? client.conversionTotal / client.records : 0;
+    const topStage = Array.from(client.stageCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Qualification';
+    return {
+      id: client.id,
+      name: client.name,
+      pipelineValue: valueLabel,
+      averageProbability: `${Math.round(averageProbability * 100)}%`,
+      averageConversion: formatPercentage(averageConversion || 0, 1),
+      activeProjects: client.records,
+      topStage,
+      owner: client.owner,
+      updatedLabel: client.latestUpdate
+        ? formatDateTime(client.latestUpdate, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'Not yet synced'
+    };
+  });
+
+  const projectControls = {
+    owner: resolveName(user.firstName, user.lastName, user.email),
+    approvalsRequired,
+    reviewCadence: 'Weekly deal desk with rolling 48h async approvals',
+    lastAudit: formatDateTime(now, { dateStyle: 'long' }),
+    security:
+      'RBAC enforced with MFA, TLS 1.3 in transit, AES-256 at rest, and immutable audit trails across proposals.',
+    dataResidency: 'US & EU data centres with geo-fenced storage and regional failover.',
+    retention:
+      'Executed contracts retained for 7 years with auto-expiring watermarked downloads after 48 hours.',
+    automation:
+      'Machine scoring evaluates every bid against historical win patterns and flags anomalies instantly.',
+    compliance: [
+      'Multi-party approval required above $50k contract value.',
+      'Identity verification enforced for all external stakeholders before access.',
+      'Real-time anomaly detection guards against pricing regressions and duplicated bids.'
+    ]
+  };
+
+  const projectsWorkspace = {
+    summary: projectSummary,
+    bids: {
+      pipeline: bidPipeline,
+      stages: bidStages,
+      backlog: pipelineBookings,
+      metrics: {
+        totalPipeline: formatCurrencySummary(pipelineValueByCurrency),
+        weightedPipeline: formatCurrencySummary(weightedValueByCurrency),
+        averageProbability: probabilityValues.length
+          ? `${Math.round((probabilityValues.reduce((total, value) => total + value, 0) / probabilityValues.length) * 100)}%`
+          : '—',
+        averageConversion: conversionValues.length
+          ? formatPercentage(
+              conversionValues.reduce((total, value) => total + value, 0) / conversionValues.length,
+              1
+            )
+          : '0.0%',
+        responseSla: responseLabel,
+        inboundRequests: pipelineBookings.length
+      }
+    },
+    proposals: {
+      active: projectProposals,
+      reviewBoard,
+      timeline: proposalTimeline
+    },
+    portfolio: {
+      deliverables: projectDeliverables,
+      artifacts: projectArtifacts
+    },
+    clients: projectClients,
+    signals: projectSignals,
+    controls: projectControls
+  };
+
+  const projectSearchEntries = [
+    ...projectsWorkspace.bids.pipeline.map((bid) => ({
+      id: `search-instructor-project-bid-${bid.id}`,
+      role: 'instructor',
+      type: 'Project bid',
+      title: `${bid.name} · ${bid.channel}`,
+      url: '/dashboard/instructor/projects'
+    })),
+    ...projectsWorkspace.proposals.active.map((proposal) => ({
+      id: `search-instructor-project-proposal-${proposal.id}`,
+      role: 'instructor',
+      type: 'Project proposal',
+      title: proposal.title,
+      url: '/dashboard/instructor/projects'
+    }))
+  ];
 
   const metrics = [
     {
@@ -600,7 +1096,8 @@ export function buildCommunityDashboard({
       return {
         id: `resource-${resource.id}`,
         title: resource.title ?? 'Operations playbook',
-        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team',
+        owner:
+          metadata.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team'),
         updatedAt: resource.publishedAt
           ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
           : 'Draft',
@@ -620,7 +1117,8 @@ export function buildCommunityDashboard({
       return {
         id: `assignment-${assignment.id}`,
         title: assignment.title ?? 'Operational task',
-        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team',
+        owner:
+          metadata.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team'),
         status: metadata.status ?? 'open',
         due: formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }),
         community: assignment.courseTitle ?? metadata.communityName ?? 'Community'
@@ -634,7 +1132,10 @@ export function buildCommunityDashboard({
       id: `event-${session.id}`,
       title: session.title ?? 'Live session',
       date: formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }),
-      facilitator: session.hostName ?? session.metadata?.facilitator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host',
+      facilitator:
+        session.hostName ??
+        session.metadata?.facilitator ??
+        (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host'),
       seats: `${Number(session.reservedSeats ?? 0)}/${Number(session.capacity ?? 0)} booked`,
       status: session.status ?? 'scheduled'
     }));
@@ -919,7 +1420,6 @@ export function buildInstructorDashboard({
   ebookRows = [],
   ebookProgressRows = []
 } = {}) {
-}) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   const communityStatsMap = new Map();
@@ -939,24 +1439,20 @@ export function buildInstructorDashboard({
   const managedCommunities = [];
 
   const upsertManagedCommunity = (communityId, payload) => {
-    const existing = communityLookup.get(communityId);
-    const merged = existing ? { ...existing, ...payload } : payload;
     const merged = { ...(communityLookup.get(communityId) ?? {}), ...payload };
     communityLookup.set(communityId, merged);
     if (!managedCommunityIds.has(communityId)) {
+      managedCommunityIds.add(communityId);
       managedCommunities.push(merged);
-    } else {
-      const index = managedCommunities.findIndex((entry) => Number(entry.communityId) === Number(communityId));
-      if (index !== -1) {
-        managedCommunities[index] = { ...managedCommunities[index], ...merged };
-      const index = managedCommunities.findIndex(
-        (community) => Number(community.communityId) === communityId
-      );
-      if (index !== -1) {
-        managedCommunities[index] = merged;
-      }
+      return;
     }
-    managedCommunityIds.add(communityId);
+
+    const index = managedCommunities.findIndex(
+      (community) => Number(community.communityId) === Number(communityId)
+    );
+    if (index !== -1) {
+      managedCommunities[index] = { ...managedCommunities[index], ...merged };
+    }
   };
 
   communityMemberships.forEach((membership) => {
@@ -1124,27 +1620,20 @@ export function buildInstructorDashboard({
     const resolvedMaxScore = Number(assignment.maxScore ?? metadata.maxScore ?? metadata.points ?? 0);
     const fallbackOwnerName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
     const resolvedOwner = metadata.owner ?? (fallbackOwnerName || user.email);
-    return {
-      id: Number(assignment.id),
-      courseId: Number(assignment.courseId),
-      moduleId: assignment.moduleId ? Number(assignment.moduleId) : null,
-      courseTitle: assignment.courseTitle,
-      title: assignment.title,
-      dueDate,
-      moduleTitle: assignment.moduleTitle,
-      instructions: assignment.instructions ?? metadata.instructions ?? null,
-      maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
-      owner:
-        metadata.owner ??
-        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)),
-      owner: resolvedOwner,
-      owner:
-        metadata.owner ??
-        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()) || user.email),
-      owner: metadata.owner ?? resolveName(user.firstName, user.lastName, user.email),
-      metadata
-    };
-  });
+      return {
+        id: Number(assignment.id),
+        courseId: Number(assignment.courseId),
+        moduleId: assignment.moduleId ? Number(assignment.moduleId) : null,
+        courseTitle: assignment.courseTitle,
+        title: assignment.title,
+        dueDate,
+        moduleTitle: assignment.moduleTitle,
+        instructions: assignment.instructions ?? metadata.instructions ?? null,
+        maxScore: Number.isFinite(resolvedMaxScore) && resolvedMaxScore > 0 ? resolvedMaxScore : 100,
+        owner: resolvedOwner,
+        metadata
+      };
+    });
 
   const assignmentsByModule = new Map();
   assignmentsNormalised.forEach((assignment) => {
@@ -1284,32 +1773,29 @@ export function buildInstructorDashboard({
     ...booking,
     metadata: safeJsonParse(booking.metadata, {}),
     requestedAt: booking.requestedAt ? new Date(booking.requestedAt) : null,
+    confirmedAt: booking.confirmedAt ? new Date(booking.confirmedAt) : null,
     scheduledStart: booking.scheduledStart ? new Date(booking.scheduledStart) : null,
     scheduledEnd: booking.scheduledEnd ? new Date(booking.scheduledEnd) : null
   }));
 
-  const pipelineBookings = tutorBookingsNormalised
-    .filter((booking) => booking.status === 'requested')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      status: 'Requested',
-      learner:
-        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
-      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
-      requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
-      topic: booking.metadata.topic ?? 'Mentorship session'
-    }));
+    const pipelineBookings = tutorBookingsNormalised
+      .filter((booking) => booking.status === 'requested')
+      .map((booking) => ({
+        id: `booking-${booking.id}`,
+        status: 'Requested',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        requested: booking.requestedAt ? humanizeRelativeTime(booking.requestedAt, now) : 'Awaiting review',
+        topic: booking.metadata.topic ?? 'Mentorship session'
+      }));
 
   const confirmedBookings = tutorBookingsNormalised
     .filter((booking) => booking.status === 'confirmed')
-    .map((booking) => ({
-      id: `booking-${booking.id}`,
-      topic: booking.metadata.topic ?? 'Mentorship session',
-      learner:
-        (`${booking.learnerFirstName ?? ''} ${booking.learnerLastName ?? ''}`.trim() || 'Learner'),
-      learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
-      date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
-    }));
+      .map((booking) => ({
+        id: `booking-${booking.id}`,
+        topic: booking.metadata.topic ?? 'Mentorship session',
+        learner: resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner'),
+        date: formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+      }));
 
   const tutorProfileMap = new Map();
   tutorProfiles.forEach((profile) => {
@@ -1539,6 +2025,11 @@ export function buildInstructorDashboard({
       });
     });
 
+    const normaliseFilename = (name) => {
+      if (!name) return 'Untitled asset';
+      const leaf = name.split('/').pop();
+      return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+    };
   const serviceCapacityByMonth = new Map();
   upcomingTutorSlots.forEach((slot) => {
     if (!slot.startAt) return;
@@ -1851,26 +2342,26 @@ export function buildInstructorDashboard({
     return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
   };
 
-  const assetsNormalised = assets.map((asset) => ({
-    ...asset,
-    metadata: safeJsonParse(asset.metadata, {}),
-    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
-    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
-  }));
+    const assetsNormalised = assets.map((asset) => ({
+      ...asset,
+      metadata: safeJsonParse(asset.metadata, {}),
+      createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+      updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+    }));
 
-  const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
-  const assetEventGroups = new Map();
-  assetEvents.forEach((event) => {
-    const assetId = Number(event.assetId);
-    const list = assetEventGroups.get(assetId) ?? [];
-    const occurredAt = event.occurredAt
-      ? event.occurredAt instanceof Date
-        ? event.occurredAt
-        : new Date(event.occurredAt)
-      : null;
-    list.push({ ...event, occurredAt, metadata: safeJsonParse(event.metadata, {}) });
-    assetEventGroups.set(assetId, list);
-  });
+    const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
+    const assetEventGroups = new Map();
+    assetEvents.forEach((event) => {
+      const assetId = Number(event.assetId);
+      const list = assetEventGroups.get(assetId) ?? [];
+      const occurredAt = event.occurredAt
+        ? event.occurredAt instanceof Date
+          ? event.occurredAt
+          : new Date(event.occurredAt)
+        : null;
+      list.push({ ...event, occurredAt, metadata: safeJsonParse(event.metadata, {}) });
+      assetEventGroups.set(assetId, list);
+    });
 
   const managedCommunityNames = new Set(
     managedCommunities.map((community) => community.communityName?.toLowerCase()).filter(Boolean)
@@ -1978,7 +2469,6 @@ export function buildInstructorDashboard({
         stage,
         progress,
         lastUpdated: formatDateTime(asset.updatedAt ?? asset.createdAt, { dateStyle: 'medium', timeStyle: 'short' }),
-        owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Instructor'),
         owner: resolveName(user.firstName, user.lastName, 'Instructor'),
         nextActions,
         reference,
@@ -2353,14 +2843,13 @@ export function buildInstructorDashboard({
       status: assignment.dueDate ? `Due ${formatDateTime(assignment.dueDate, { dateStyle: 'medium', timeStyle: undefined })}` : 'Scheduling',
       type: 'Assignment'
     })),
-    ...upcomingLessons.map((lesson) => ({
-      id: `lesson-${lesson.id}`,
-      asset: `${lesson.courseTitle} · ${lesson.title}`,
-      owner: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator'),
-      owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
-      status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
-      type: 'Lesson'
-    }))
+      ...upcomingLessons.map((lesson) => ({
+        id: `lesson-${lesson.id}`,
+        asset: `${lesson.courseTitle} · ${lesson.title}`,
+        owner: resolveName(user.firstName, user.lastName, 'Facilitator'),
+        status: `Releases ${formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' })}`,
+        type: 'Lesson'
+      }))
   ].slice(0, 12);
 
   const library = assetsNormalised
@@ -2528,8 +3017,8 @@ export function buildInstructorDashboard({
           title: lesson.title ?? 'Refresher session',
           format: lesson.format ?? 'Live',
           cadence: lesson.cadence ?? 'Quarterly',
-          owner:
-            lesson.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team',
+            owner:
+              lesson.owner ?? (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitation team'),
           status: lesson.status ?? 'Planned',
           nextSession: lesson.nextSessionAt
             ? formatDateTime(new Date(lesson.nextSessionAt), { dateStyle: 'medium', timeStyle: 'short' })
@@ -2769,14 +3258,13 @@ export function buildInstructorDashboard({
       callToAction: session.callToAction
     }));
 
-  const lessonSchedule = upcomingLessons.map((lesson) => ({
-    id: `lesson-${lesson.id}`,
-    topic: lesson.title,
-    course: lesson.courseTitle,
-    date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
-    facilitator: (`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Facilitator')
-    facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
-  }));
+    const lessonSchedule = upcomingLessons.map((lesson) => ({
+      id: `lesson-${lesson.id}`,
+      topic: lesson.title,
+      course: lesson.courseTitle,
+      date: formatDateTime(lesson.releaseAt, { dateStyle: 'medium', timeStyle: 'short' }),
+      facilitator: resolveName(user.firstName, user.lastName, 'Facilitator')
+    }));
 
   const calendarEntries = [];
   upcomingLiveClasses.forEach((session) => {
@@ -3177,6 +3665,21 @@ export function buildInstructorDashboard({
       title: session.title,
       url: '/dashboard/instructor/calendar'
     })),
+      {
+        id: 'search-instructor-assessments',
+        role: 'instructor',
+        type: 'Assessments',
+        title: 'Assessment studio',
+        url: '/dashboard/instructor/assessments'
+      },
+      ...tutorRoster.map((tutor) => ({
+        id: `search-instructor-tutor-${tutor.id}`,
+        role: 'instructor',
+        type: 'Tutor',
+        title: tutor.name,
+        url: '/dashboard/instructor/tutor-management'
+      }))
+    ];
     {
       id: 'search-instructor-assessments',
       role: 'instructor',
@@ -3198,6 +3701,7 @@ export function buildInstructorDashboard({
       title: service.name,
       url: '/dashboard/instructor/services'
     })),
+    ...projectSearchEntries,
     ...tutorRoster.map((tutor) => ({
       id: `search-instructor-tutor-${tutor.id}`,
       role: 'instructor',
@@ -3217,6 +3721,12 @@ export function buildInstructorDashboard({
   if (tutorProfiles.length > 0) {
     profileStats.push({ label: 'Tutor pods', value: `${tutorProfiles.length} mentors` });
   }
+  if (projectsWorkspace.bids.pipeline.length > 0) {
+    profileStats.push({ label: 'Project bids', value: `${projectsWorkspace.bids.pipeline.length} active` });
+  }
+  if (projectsWorkspace.proposals.active.length > 0) {
+    profileStats.push({ label: 'Proposals', value: `${projectsWorkspace.proposals.active.length} in review` });
+  }
 
   const bioSegments = [];
   if (courseSummaries.length > 0) {
@@ -3228,6 +3738,11 @@ export function buildInstructorDashboard({
   if (upcomingLiveClasses.length > 0) {
     const totalSeatCount = liveSessions.reduce((sum, session) => sum + Number(session.reservedSeats ?? 0), 0);
     bioSegments.push(`guiding ${totalSeatCount} learners through live simulations`);
+  }
+  if (projectsWorkspace.bids.pipeline.length > 0) {
+    bioSegments.push(
+      `orchestrating ${projectsWorkspace.bids.pipeline.length} project bid${projectsWorkspace.bids.pipeline.length === 1 ? '' : 's'}`
+    );
   }
   const profileBio = bioSegments.length ? `Currently ${bioSegments.join(', ')}.` : '';
 
@@ -3275,6 +3790,7 @@ export function buildInstructorDashboard({
         confirmed: confirmedBookings
       },
       services: serviceSuite,
+      projects: projectsWorkspace,
       ebooks: {
         catalogue: ebookCatalogue,
         creationPipelines
@@ -3697,7 +4213,7 @@ export function buildAffiliateOverview({
     }
   ];
 
-  const upcomingPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
+  const nextPayout = (Array.isArray(affiliatePayouts) ? affiliatePayouts : [])
     .filter((payout) => payout.status !== 'completed')
     .map((payout) => {
       const affiliate = (Array.isArray(affiliates) ? affiliates : []).find(
@@ -3705,14 +4221,11 @@ export function buildAffiliateOverview({
       );
       return {
         status: payout.status,
-        amount: formatCurrency(Number(payout.amountCents ?? 0), 'USD'),
+        amountCents: Number(payout.amountCents ?? 0),
         scheduledAt: payout.scheduledAt,
-        scheduledLabel: formatDateTime(payout.scheduledAt, {
-          dateStyle: 'medium',
-          timeStyle: 'short'
-        }),
-        referralCode: affiliate?.referralCode,
-        communityName: affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName
+        referralCode: affiliate?.referralCode ?? null,
+        communityName:
+          affiliate?.communityName ?? safeJsonParse(affiliate?.metadata, {}).communityName ?? null
       };
     })
     .sort((a, b) => new Date(a.scheduledAt ?? now) - new Date(b.scheduledAt ?? now))[0] ?? null;
@@ -3782,7 +4295,15 @@ export function buildAffiliateOverview({
         activePrograms,
         pendingPrograms
       },
-      nextPayout
+      nextPayout: nextPayout
+        ? {
+            status: nextPayout.status,
+            amountFormatted: formatCurrency(nextPayout.amountCents, 'USD'),
+            scheduledAt: nextPayout.scheduledAt,
+            referralCode: nextPayout.referralCode,
+            communityName: nextPayout.communityName
+          }
+        : null
     },
     programs: affiliatePrograms,
     payouts: payoutTimeline,
@@ -3841,6 +4362,8 @@ function minutesToReadable(minutes) {
 function resolveName(firstName, lastName, fallback) {
   const candidate = `${firstName ?? ''} ${lastName ?? ''}`.trim();
   return candidate.length > 0 ? candidate : fallback;
+}
+
 const LIVE_JOIN_WINDOW_MINUTES = 15;
 const GROUP_SESSION_KEYWORDS = ['group', 'cohort', 'bootcamp', 'lab', 'studio', 'masterclass', 'workshop', 'breakout'];
 const WHITEBOARD_READY_STATES = new Set(['ready', 'live', 'approved', 'published']);
@@ -4211,7 +4734,7 @@ export default class DashboardService {
 
     const [
       privacySettings,
-      courseStats,
+      _courseStats,
       enrollmentRows,
       progressRows,
       membershipRows,
@@ -4252,6 +4775,9 @@ export default class DashboardService {
       adsMetricRows,
       communityPaywallTierRows,
       communitySubscriptionRows,
+      fieldServiceOrderRows,
+      fieldServiceEventRows,
+      fieldServiceProviderRows,
       platformMonetizationSettings
     ] = await Promise.all([
       UserPrivacySettingModel.getForUser(userId),
@@ -4847,6 +5373,83 @@ export default class DashboardService {
           'community.owner_id as ownerId',
           'community.name as communityName'
         ),
+      db('field_service_orders as fso')
+        .leftJoin('field_service_providers as fsp', 'fsp.id', 'fso.provider_id')
+        .leftJoin('users as customer', 'customer.id', 'fso.customer_user_id')
+        .select(
+          'fso.id',
+          'fso.reference',
+          'fso.customer_user_id as customerUserId',
+          'fso.provider_id as providerId',
+          'fso.status',
+          'fso.priority',
+          'fso.service_type as serviceType',
+          'fso.summary',
+          'fso.requested_at as requestedAt',
+          'fso.scheduled_for as scheduledFor',
+          'fso.eta_minutes as etaMinutes',
+          'fso.sla_minutes as slaMinutes',
+          'fso.distance_km as distanceKm',
+          'fso.location_lat as locationLat',
+          'fso.location_lng as locationLng',
+          'fso.location_label as locationLabel',
+          'fso.address_line_1 as addressLine1',
+          'fso.address_line_2 as addressLine2',
+          'fso.city',
+          'fso.region',
+          'fso.postal_code as postalCode',
+          'fso.country',
+          'fso.metadata',
+          'fso.created_at as createdAt',
+          'fso.updated_at as updatedAt',
+          'fsp.user_id as providerUserId',
+          'fsp.name as providerName',
+          'fsp.email as providerEmail',
+          'fsp.phone as providerPhone',
+          'fsp.status as providerStatus',
+          'fsp.specialties as providerSpecialties',
+          'fsp.rating as providerRating',
+          'fsp.last_check_in_at as providerLastCheckInAt',
+          'fsp.location_lat as providerLocationLat',
+          'fsp.location_lng as providerLocationLng',
+          'fsp.location_label as providerLocationLabel',
+          'fsp.location_updated_at as providerLocationUpdatedAt',
+          'fsp.metadata as providerMetadata',
+          'customer.first_name as customerFirstName',
+          'customer.last_name as customerLastName',
+          'customer.email as customerEmail'
+        ),
+      db('field_service_events as fse')
+        .select(
+          'fse.id',
+          'fse.order_id as orderId',
+          'fse.event_type as eventType',
+          'fse.status',
+          'fse.notes',
+          'fse.author',
+          'fse.occurred_at as occurredAt',
+          'fse.metadata',
+          'fse.created_at as createdAt'
+        ),
+      db('field_service_providers as fsp')
+        .select(
+          'fsp.id',
+          'fsp.user_id as userId',
+          'fsp.name',
+          'fsp.email',
+          'fsp.phone',
+          'fsp.status',
+          'fsp.specialties',
+          'fsp.rating',
+          'fsp.last_check_in_at as lastCheckInAt',
+          'fsp.location_lat as locationLat',
+          'fsp.location_lng as locationLng',
+          'fsp.location_label as locationLabel',
+          'fsp.location_updated_at as locationUpdatedAt',
+          'fsp.metadata',
+          'fsp.created_at as createdAt',
+          'fsp.updated_at as updatedAt'
+        ),
       PlatformSettingsService.getMonetizationSettings()
     ]);
     const communityStatsMap = new Map();
@@ -4888,6 +5491,8 @@ export default class DashboardService {
       memberships: membershipRows,
       monetizationSettings: platformMonetizationSettings,
       now
+    });
+
     const communityDashboard = buildCommunityDashboard({
       user,
       now,
@@ -5086,10 +5691,9 @@ export default class DashboardService {
       };
       const subscription = subscriptionByCommunity.get(Number(row.communityId));
       const affiliate = affiliateByCommunity.get(Number(row.communityId));
-      const affiliatePayouts = affiliate ? affiliatePayoutByAffiliate.get(affiliate.id) ?? [] : [];
-      const upcomingSessions = liveClassRows.filter(
-        (session) => Number(session.communityId ?? 0) === Number(row.communityId)
-      );
+        const upcomingSessions = liveClassRows.filter(
+          (session) => Number(session.communityId ?? 0) === Number(row.communityId)
+        );
 
       const initiatives = [];
       if (subscription) {
@@ -6089,6 +6693,14 @@ export default class DashboardService {
       roles.push(instructorDashboard.role);
     }
 
+    const fieldServiceWorkspace = buildFieldServiceWorkspace({
+      now,
+      user,
+      orders: fieldServiceOrderRows,
+      events: fieldServiceEventRows,
+      providers: fieldServiceProviderRows
+    });
+
     const dashboards = {
       learner: {
         metrics,
@@ -6172,8 +6784,31 @@ export default class DashboardService {
       }
     };
 
-    if (instructorDashboard?.dashboard) {
-      instructorDashboard.dashboard.affiliate = affiliateOverview;
+    if (fieldServiceWorkspace?.customer) {
+      dashboards.learner.fieldServices = fieldServiceWorkspace.customer;
+    }
+
+    if (instructorDashboard) {
+      if (instructorDashboard.dashboard) {
+        instructorDashboard.dashboard.affiliate = affiliateOverview;
+        instructorDashboard.dashboard.fieldServices = fieldServiceWorkspace?.provider ?? null;
+      }
+      const providerTotals = fieldServiceWorkspace?.provider?.summary?.totals ?? null;
+      if (providerTotals && providerTotals.total > 0) {
+        instructorDashboard.profileStats.push({
+          label: 'Field services',
+          value: `${providerTotals.active} active`
+        });
+        const providerBio = `Coordinating ${providerTotals.total} field service engagement${
+          providerTotals.total === 1 ? '' : 's'
+        } with ${providerTotals.incidents} incident${providerTotals.incidents === 1 ? '' : 's'} in queue.`;
+        instructorDashboard.profileBio = [
+          instructorDashboard.profileBio,
+          providerBio
+        ]
+          .filter(Boolean)
+          .join(' ');
+      }
     }
 
     if (communityDashboard) {
@@ -6232,7 +6867,7 @@ export default class DashboardService {
         type: 'Assessments',
         title: 'Assessment schedule',
         url: '/dashboard/learner/assessments'
-      }
+      },
       ...blogSearchEntries
     ];
 
@@ -6261,9 +6896,28 @@ export default class DashboardService {
     if (instructorDashboard) {
       searchIndex.push(...instructorDashboard.searchIndex);
     }
+    if (fieldServiceWorkspace?.searchIndex?.length) {
+      searchIndex.push(...fieldServiceWorkspace.searchIndex);
+    }
     if (adminDashboard?.searchIndex?.length) {
       searchIndex.push(...adminDashboard.searchIndex);
     }
+
+    const learnerFieldTotals = fieldServiceWorkspace?.customer?.summary?.totals ?? null;
+    const learnerFieldActiveLabel =
+      learnerFieldTotals && learnerFieldTotals.total > 0 ? `${learnerFieldTotals.active} active` : null;
+    const learnerFieldTitleSegment =
+      learnerFieldTotals && learnerFieldTotals.total > 0
+        ? `${learnerFieldTotals.total} field service engagement${learnerFieldTotals.total === 1 ? '' : 's'}`
+        : null;
+    const learnerFieldBioSegment = (() => {
+      if (!learnerFieldTotals || learnerFieldTotals.total === 0) return null;
+      const incidentDescriptor =
+        learnerFieldTotals.incidents > 0
+          ? `${learnerFieldTotals.incidents} incident${learnerFieldTotals.incidents === 1 ? '' : 's'} monitored`
+          : 'Maintaining service coverage';
+      return `Supporting ${learnerFieldActiveLabel} with ${incidentDescriptor}.`;
+    })();
 
     const communityNames = memberships.map((membership) => membership.name).filter(Boolean);
     const primaryProgram = learnerCourseSummaries[0]?.title ?? 'Edulure programs';
@@ -6271,6 +6925,9 @@ export default class DashboardService {
       ? `Currently collaborating across ${communityNames.join(', ')} while progressing through ${primaryProgram}.`
       : `Progressing through ${primaryProgram}.`;
     const profileBioSegments = [learnerProfileBio];
+    if (learnerFieldBioSegment) {
+      profileBioSegments.push(learnerFieldBioSegment);
+    }
     if (communityDashboard?.profileBio) {
       profileBioSegments.push(communityDashboard.profileBio);
     }
@@ -6292,6 +6949,11 @@ export default class DashboardService {
         label: 'Affiliate earned',
         value: affiliateOverview.summary.totals.earnedFormatted
       });
+    }
+    if (learnerFieldActiveLabel) {
+      profileStats.push({ label: 'Field services', value: learnerFieldActiveLabel });
+    }
+
     if (communityDashboard) {
       profileStats.push(...communityDashboard.profileStats);
     }
@@ -6306,6 +6968,9 @@ export default class DashboardService {
       `${memberships.length} communities`,
       `${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`
     ];
+    if (learnerFieldTitleSegment) {
+      profileTitleSegments.push(learnerFieldTitleSegment);
+    }
     if (affiliateOverview?.summary?.totals?.programCount) {
       const programmeCount = affiliateOverview.summary.totals.programCount;
       if (programmeCount > 0) {
@@ -6314,7 +6979,6 @@ export default class DashboardService {
         );
       }
     }
-    if (instructorDashboard) {
     if (communityDashboard) {
       const managedCommunitiesCount =
         communityDashboard.dashboard?.health?.overview?.length ?? 0;
@@ -7461,6 +8125,23 @@ export default class DashboardService {
       { id: 'admin-blog', role: 'admin', type: 'Content', title: 'Blog management', url: '/admin#blog' }
     ];
 
+      return {
+        role: { id: 'admin', label: 'Admin' },
+        dashboard: {
+          metrics,
+          approvals,
+          revenue,
+          operations,
+          blog: blogOperations,
+          compliance,
+          activity: { alerts, events },
+          settings: {
+            monetization: monetizationSettings
+          }
+        },
+        profileStats,
+        profileBio,
+        profileTitleSegment: 'Platform operations oversight',
     return {
       role: { id: 'admin', label: 'Admin' },
       dashboard: {

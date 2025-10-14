@@ -1,22 +1,25 @@
-import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter/services.dart';
+import 'dart:async';
 
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../core/feature_flags/feature_flag_notifier.dart';
 import '../services/auth_service.dart';
 import '../services/session_manager.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _twoFactorController = TextEditingController();
-  final _authService = AuthService();
   bool _loading = false;
   String? _error;
   bool _twoFactorRequired = false;
@@ -51,7 +54,8 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      final session = await _authService.login(
+      final authService = ref.read(authServiceProvider);
+      final session = await authService.login(
         _emailController.text.trim(),
         _passwordController.text,
         twoFactorCode: _showTwoFactorField ? _twoFactorController.text.trim() : null,
@@ -65,6 +69,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _twoFactorRequired = false;
         _showTwoFactorField = false;
       });
+      // refresh feature flags in case role-based experiments toggled after sign-in
+      unawaited(ref.read(featureFlagControllerProvider.notifier).refresh(force: true));
       Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
     } catch (error) {
       if (!mounted) return;

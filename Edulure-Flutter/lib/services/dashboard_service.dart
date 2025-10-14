@@ -1174,6 +1174,937 @@ class DashboardProfile {
   }
 }
 
+int? _asInt(dynamic value) {
+  if (value is int) return value;
+  if (value is double) return value.round();
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+double? _asDouble(dynamic value) {
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
+bool _asBool(dynamic value, [bool fallback = false]) {
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final lower = value.toLowerCase();
+    if (lower == 'true' || lower == 'yes' || lower == '1') return true;
+    if (lower == 'false' || lower == 'no' || lower == '0') return false;
+  }
+  return fallback;
+}
+
+class FieldServiceSummaryCard {
+  FieldServiceSummaryCard({
+    required this.key,
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.tone,
+  });
+
+  final String key;
+  final String label;
+  final String value;
+  final String hint;
+  final String tone;
+
+  factory FieldServiceSummaryCard.fromJson(Map<String, dynamic> json) {
+    return FieldServiceSummaryCard(
+      key: json['key']?.toString() ?? json['label']?.toString() ?? 'card',
+      label: json['label']?.toString() ?? 'Metric',
+      value: json['value']?.toString() ?? '—',
+      hint: json['hint']?.toString() ?? '',
+      tone: json['tone']?.toString() ?? 'muted',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'key': key,
+      'label': label,
+      'value': value,
+      'hint': hint,
+      'tone': tone,
+    };
+  }
+}
+
+class FieldServiceSummary {
+  FieldServiceSummary({
+    required this.total,
+    required this.active,
+    required this.completed,
+    required this.incidents,
+    required this.slaBreaches,
+    this.averageEtaMinutes,
+    this.averageResolutionMinutes,
+    this.onTimeRate,
+    required this.cards,
+    this.updatedAt,
+  });
+
+  final int total;
+  final int active;
+  final int completed;
+  final int incidents;
+  final int slaBreaches;
+  final int? averageEtaMinutes;
+  final int? averageResolutionMinutes;
+  final int? onTimeRate;
+  final List<FieldServiceSummaryCard> cards;
+  final DateTime? updatedAt;
+
+  factory FieldServiceSummary.fromJson(Map<String, dynamic> json) {
+    final totals = json['totals'] is Map
+        ? Map<String, dynamic>.from(json['totals'] as Map)
+        : <String, dynamic>{};
+    final averages = json['averages'] is Map
+        ? Map<String, dynamic>.from(json['averages'] as Map)
+        : <String, dynamic>{};
+    final performance = json['performance'] is Map
+        ? Map<String, dynamic>.from(json['performance'] as Map)
+        : <String, dynamic>{};
+
+    return FieldServiceSummary(
+      total: _asInt(totals['total']) ?? 0,
+      active: _asInt(totals['active']) ?? 0,
+      completed: _asInt(totals['completed']) ?? 0,
+      incidents: _asInt(totals['incidents']) ?? 0,
+      slaBreaches: _asInt(totals['slaBreaches']) ?? 0,
+      averageEtaMinutes: _asInt(averages['etaMinutes']),
+      averageResolutionMinutes: _asInt(averages['resolutionMinutes']),
+      onTimeRate: _asInt(performance['onTimeRate']),
+      cards: json['cards'] is List
+          ? (json['cards'] as List)
+              .map((item) => FieldServiceSummaryCard.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceSummaryCard>[],
+      updatedAt:
+          json['updatedAt'] is String ? DateTime.tryParse(json['updatedAt'] as String) : DateTime.tryParse('${json['updated_at']}'),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'totals': {
+        'total': total,
+        'active': active,
+        'completed': completed,
+        'incidents': incidents,
+        'slaBreaches': slaBreaches,
+      },
+      'averages': {
+        'etaMinutes': averageEtaMinutes,
+        'resolutionMinutes': averageResolutionMinutes,
+      },
+      'performance': {
+        'onTimeRate': onTimeRate,
+      },
+      'cards': cards.map((card) => card.toJson()).toList(),
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+    };
+  }
+}
+
+class FieldServiceAddress {
+  FieldServiceAddress({
+    this.line1,
+    this.line2,
+    this.city,
+    this.region,
+    this.postalCode,
+    this.country,
+  });
+
+  final String? line1;
+  final String? line2;
+  final String? city;
+  final String? region;
+  final String? postalCode;
+  final String? country;
+
+  factory FieldServiceAddress.fromJson(Map<String, dynamic> json) {
+    return FieldServiceAddress(
+      line1: json['line1']?.toString(),
+      line2: json['line2']?.toString(),
+      city: json['city']?.toString(),
+      region: json['region']?.toString(),
+      postalCode: json['postalCode']?.toString() ?? json['postal_code']?.toString(),
+      country: json['country']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (line1 != null) 'line1': line1,
+      if (line2 != null) 'line2': line2,
+      if (city != null) 'city': city,
+      if (region != null) 'region': region,
+      if (postalCode != null) 'postalCode': postalCode,
+      if (country != null) 'country': country,
+    };
+  }
+}
+
+class FieldServiceLocation {
+  FieldServiceLocation({
+    this.label,
+    this.lat,
+    this.lng,
+    this.address,
+  });
+
+  final String? label;
+  final double? lat;
+  final double? lng;
+  final FieldServiceAddress? address;
+
+  factory FieldServiceLocation.fromJson(Map<String, dynamic> json) {
+    return FieldServiceLocation(
+      label: json['label']?.toString(),
+      lat: _asDouble(json['lat']),
+      lng: _asDouble(json['lng']),
+      address: json['address'] is Map
+          ? FieldServiceAddress.fromJson(Map<String, dynamic>.from(json['address'] as Map))
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (label != null) 'label': label,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+      if (address != null) 'address': address!.toJson(),
+    };
+  }
+}
+
+class FieldServiceParty {
+  FieldServiceParty({
+    this.id,
+    this.name,
+    this.email,
+  });
+
+  final int? id;
+  final String? name;
+  final String? email;
+
+  factory FieldServiceParty.fromJson(Map<String, dynamic> json) {
+    return FieldServiceParty(
+      id: _asInt(json['id']),
+      name: json['name']?.toString(),
+      email: json['email']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (email != null) 'email': email,
+    };
+  }
+}
+
+class FieldServiceAssignmentMetrics {
+  FieldServiceAssignmentMetrics({
+    this.elapsedMinutes,
+    this.resolutionMinutes,
+    this.onTime,
+  });
+
+  final int? elapsedMinutes;
+  final int? resolutionMinutes;
+  final bool? onTime;
+
+  factory FieldServiceAssignmentMetrics.fromJson(Map<String, dynamic> json) {
+    return FieldServiceAssignmentMetrics(
+      elapsedMinutes: _asInt(json['elapsedMinutes']),
+      resolutionMinutes: _asInt(json['resolutionMinutes']),
+      onTime: json['onTime'] is bool ? json['onTime'] as bool : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'elapsedMinutes': elapsedMinutes,
+      'resolutionMinutes': resolutionMinutes,
+      'onTime': onTime,
+    };
+  }
+}
+
+class FieldServiceTimelineEvent {
+  FieldServiceTimelineEvent({
+    required this.id,
+    required this.orderId,
+    required this.label,
+    this.status,
+    this.timestamp,
+    this.occurredAt,
+    this.relativeTime,
+    this.notes,
+    this.author,
+    this.isIncident = false,
+    this.severity,
+    this.metadata = const {},
+  });
+
+  final String id;
+  final int orderId;
+  final String label;
+  final String? status;
+  final String? timestamp;
+  final DateTime? occurredAt;
+  final String? relativeTime;
+  final String? notes;
+  final String? author;
+  final bool isIncident;
+  final String? severity;
+  final Map<String, dynamic> metadata;
+
+  factory FieldServiceTimelineEvent.fromJson(Map<String, dynamic> json) {
+    return FieldServiceTimelineEvent(
+      id: json['id']?.toString() ?? '${json['orderId'] ?? DateTime.now().millisecondsSinceEpoch}-event',
+      orderId: _asInt(json['orderId']) ?? 0,
+      label: json['label']?.toString() ?? 'Update',
+      status: json['status']?.toString(),
+      timestamp: json['timestamp']?.toString(),
+      occurredAt: json['occurredAt'] is String
+          ? DateTime.tryParse(json['occurredAt'] as String)
+          : DateTime.tryParse('${json['occurred_at']}'),
+      relativeTime: json['relativeTime']?.toString(),
+      notes: json['notes']?.toString(),
+      author: json['author']?.toString(),
+      isIncident: _asBool(json['isIncident']),
+      severity: json['severity']?.toString(),
+      metadata: json['metadata'] is Map
+          ? Map<String, dynamic>.from(json['metadata'] as Map)
+          : <String, dynamic>{},
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'orderId': orderId,
+      'label': label,
+      if (status != null) 'status': status,
+      if (timestamp != null) 'timestamp': timestamp,
+      if (occurredAt != null) 'occurredAt': occurredAt!.toIso8601String(),
+      if (relativeTime != null) 'relativeTime': relativeTime,
+      if (notes != null) 'notes': notes,
+      if (author != null) 'author': author,
+      'isIncident': isIncident,
+      if (severity != null) 'severity': severity,
+      'metadata': metadata,
+    };
+  }
+}
+
+class FieldServiceIncident {
+  FieldServiceIncident({
+    required this.id,
+    required this.orderId,
+    required this.orderReference,
+    this.serviceType,
+    this.severity,
+    this.occurredAt,
+    this.timestamp,
+    this.relativeTime,
+    this.notes,
+    this.status,
+    this.owner,
+    this.nextAction,
+  });
+
+  final String id;
+  final int orderId;
+  final String orderReference;
+  final String? serviceType;
+  final String? severity;
+  final DateTime? occurredAt;
+  final String? timestamp;
+  final String? relativeTime;
+  final String? notes;
+  final String? status;
+  final String? owner;
+  final String? nextAction;
+
+  factory FieldServiceIncident.fromJson(Map<String, dynamic> json) {
+    return FieldServiceIncident(
+      id: json['id']?.toString() ?? '${json['orderId'] ?? ''}-incident',
+      orderId: _asInt(json['orderId']) ?? 0,
+      orderReference: json['orderReference']?.toString() ?? 'Service order',
+      serviceType: json['serviceType']?.toString(),
+      severity: json['severity']?.toString(),
+      occurredAt: json['occurredAt'] is String
+          ? DateTime.tryParse(json['occurredAt'] as String)
+          : DateTime.tryParse('${json['occurred_at']}'),
+      timestamp: json['timestamp']?.toString(),
+      relativeTime: json['relativeTime']?.toString(),
+      notes: json['notes']?.toString(),
+      status: json['status']?.toString(),
+      owner: json['owner']?.toString(),
+      nextAction: json['nextAction']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'orderId': orderId,
+      'orderReference': orderReference,
+      if (serviceType != null) 'serviceType': serviceType,
+      if (severity != null) 'severity': severity,
+      if (occurredAt != null) 'occurredAt': occurredAt!.toIso8601String(),
+      if (timestamp != null) 'timestamp': timestamp,
+      if (relativeTime != null) 'relativeTime': relativeTime,
+      if (notes != null) 'notes': notes,
+      if (status != null) 'status': status,
+      if (owner != null) 'owner': owner,
+      if (nextAction != null) 'nextAction': nextAction,
+    };
+  }
+}
+
+class FieldServiceProviderMetrics {
+  FieldServiceProviderMetrics({
+    required this.totalAssignments,
+    required this.activeAssignments,
+    required this.completedAssignments,
+    required this.assignments30d,
+    required this.incidentCount,
+    this.averageEtaMinutes,
+    this.averageResolutionMinutes,
+    this.onTimeRate,
+  });
+
+  final int totalAssignments;
+  final int activeAssignments;
+  final int completedAssignments;
+  final int assignments30d;
+  final int incidentCount;
+  final int? averageEtaMinutes;
+  final int? averageResolutionMinutes;
+  final int? onTimeRate;
+
+  factory FieldServiceProviderMetrics.fromJson(Map<String, dynamic> json) {
+    return FieldServiceProviderMetrics(
+      totalAssignments: _asInt(json['totalAssignments']) ?? 0,
+      activeAssignments: _asInt(json['activeAssignments']) ?? 0,
+      completedAssignments: _asInt(json['completedAssignments']) ?? 0,
+      assignments30d: _asInt(json['assignments30d']) ?? 0,
+      incidentCount: _asInt(json['incidentCount']) ?? 0,
+      averageEtaMinutes: _asInt(json['averageEtaMinutes']),
+      averageResolutionMinutes: _asInt(json['averageResolutionMinutes']),
+      onTimeRate: _asInt(json['onTimeRate']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'totalAssignments': totalAssignments,
+      'activeAssignments': activeAssignments,
+      'completedAssignments': completedAssignments,
+      'assignments30d': assignments30d,
+      'incidentCount': incidentCount,
+      'averageEtaMinutes': averageEtaMinutes,
+      'averageResolutionMinutes': averageResolutionMinutes,
+      'onTimeRate': onTimeRate,
+    };
+  }
+}
+
+class FieldServiceProviderLocation {
+  FieldServiceProviderLocation({
+    this.label,
+    this.lat,
+    this.lng,
+    this.updatedAt,
+    this.relative,
+  });
+
+  final String? label;
+  final double? lat;
+  final double? lng;
+  final DateTime? updatedAt;
+  final String? relative;
+
+  factory FieldServiceProviderLocation.fromJson(Map<String, dynamic> json) {
+    return FieldServiceProviderLocation(
+      label: json['label']?.toString(),
+      lat: _asDouble(json['lat']),
+      lng: _asDouble(json['lng']),
+      updatedAt: json['updatedAt'] is String
+          ? DateTime.tryParse(json['updatedAt'] as String)
+          : DateTime.tryParse('${json['updated_at']}'),
+      relative: json['relative']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (label != null) 'label': label,
+      if (lat != null) 'lat': lat,
+      if (lng != null) 'lng': lng,
+      if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+      if (relative != null) 'relative': relative,
+    };
+  }
+}
+
+class FieldServiceProviderSummary {
+  FieldServiceProviderSummary({
+    required this.id,
+    this.userId,
+    required this.name,
+    this.email,
+    this.phone,
+    this.status,
+    this.rating,
+    this.specialties = const [],
+    this.avatar,
+    this.location,
+    this.lastCheckInAt,
+    this.lastCheckInRelative,
+    this.metrics,
+  });
+
+  final int id;
+  final int? userId;
+  final String name;
+  final String? email;
+  final String? phone;
+  final String? status;
+  final double? rating;
+  final List<String> specialties;
+  final String? avatar;
+  final FieldServiceProviderLocation? location;
+  final DateTime? lastCheckInAt;
+  final String? lastCheckInRelative;
+  final FieldServiceProviderMetrics? metrics;
+
+  factory FieldServiceProviderSummary.fromJson(Map<String, dynamic> json) {
+    return FieldServiceProviderSummary(
+      id: _asInt(json['id']) ?? 0,
+      userId: _asInt(json['userId']),
+      name: json['name']?.toString() ?? 'Provider',
+      email: json['email']?.toString(),
+      phone: json['phone']?.toString(),
+      status: json['status']?.toString(),
+      rating: _asDouble(json['rating']),
+      specialties: json['specialties'] is List
+          ? (json['specialties'] as List).map((item) => item?.toString() ?? '').where((item) => item.isNotEmpty).toList()
+          : <String>[],
+      avatar: json['avatar']?.toString(),
+      location: json['location'] is Map
+          ? FieldServiceProviderLocation.fromJson(Map<String, dynamic>.from(json['location'] as Map))
+          : null,
+      lastCheckInAt: json['lastCheckInAt'] is String
+          ? DateTime.tryParse(json['lastCheckInAt'] as String)
+          : DateTime.tryParse('${json['lastCheckIn'] ?? json['last_check_in_at']}'),
+      lastCheckInRelative: json['lastCheckInRelative']?.toString(),
+      metrics: json['metrics'] is Map
+          ? FieldServiceProviderMetrics.fromJson(Map<String, dynamic>.from(json['metrics'] as Map))
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'name': name,
+      'email': email,
+      'phone': phone,
+      'status': status,
+      'rating': rating,
+      'specialties': specialties,
+      'avatar': avatar,
+      if (location != null) 'location': location!.toJson(),
+      if (lastCheckInAt != null) 'lastCheckInAt': lastCheckInAt!.toIso8601String(),
+      if (lastCheckInRelative != null) 'lastCheckInRelative': lastCheckInRelative,
+      if (metrics != null) 'metrics': metrics!.toJson(),
+    };
+  }
+}
+
+class FieldServiceAssignment {
+  FieldServiceAssignment({
+    required this.id,
+    required this.reference,
+    required this.status,
+    this.statusLabel,
+    this.priority,
+    this.serviceType,
+    this.summary,
+    this.requestedAt,
+    this.requestedAtLabel,
+    this.scheduledFor,
+    this.scheduledForLabel,
+    this.etaMinutes,
+    this.slaMinutes,
+    this.distanceKm,
+    this.riskLevel,
+    this.slaBreached = false,
+    this.nextAction,
+    this.lastUpdate,
+    this.lastUpdateLabel,
+    this.metrics,
+    this.location,
+    this.customer,
+    this.provider,
+    this.timeline = const [],
+    this.incidents = const [],
+  });
+
+  final int id;
+  final String reference;
+  final String status;
+  final String? statusLabel;
+  final String? priority;
+  final String? serviceType;
+  final String? summary;
+  final DateTime? requestedAt;
+  final String? requestedAtLabel;
+  final DateTime? scheduledFor;
+  final String? scheduledForLabel;
+  final int? etaMinutes;
+  final int? slaMinutes;
+  final double? distanceKm;
+  final String? riskLevel;
+  final bool slaBreached;
+  final String? nextAction;
+  final DateTime? lastUpdate;
+  final String? lastUpdateLabel;
+  final FieldServiceAssignmentMetrics? metrics;
+  final FieldServiceLocation? location;
+  final FieldServiceParty? customer;
+  final FieldServiceProviderSummary? provider;
+  final List<FieldServiceTimelineEvent> timeline;
+  final List<FieldServiceIncident> incidents;
+
+  factory FieldServiceAssignment.fromJson(Map<String, dynamic> json) {
+    return FieldServiceAssignment(
+      id: _asInt(json['id']) ?? 0,
+      reference: json['reference']?.toString() ?? 'Assignment',
+      status: json['status']?.toString() ?? 'pending',
+      statusLabel: json['statusLabel']?.toString(),
+      priority: json['priority']?.toString(),
+      serviceType: json['serviceType']?.toString(),
+      summary: json['summary']?.toString(),
+      requestedAt: json['requestedAt'] is String
+          ? DateTime.tryParse(json['requestedAt'] as String)
+          : DateTime.tryParse('${json['requested_at']}'),
+      requestedAtLabel: json['requestedAtLabel']?.toString(),
+      scheduledFor: json['scheduledFor'] is String
+          ? DateTime.tryParse(json['scheduledFor'] as String)
+          : DateTime.tryParse('${json['scheduled_for']}'),
+      scheduledForLabel: json['scheduledForLabel']?.toString(),
+      etaMinutes: _asInt(json['etaMinutes']),
+      slaMinutes: _asInt(json['slaMinutes']),
+      distanceKm: _asDouble(json['distanceKm']),
+      riskLevel: json['riskLevel']?.toString(),
+      slaBreached: _asBool(json['slaBreached']),
+      nextAction: json['nextAction']?.toString(),
+      lastUpdate: json['lastUpdate'] is String
+          ? DateTime.tryParse(json['lastUpdate'] as String)
+          : DateTime.tryParse('${json['last_update']}'),
+      lastUpdateLabel: json['lastUpdateLabel']?.toString(),
+      metrics: json['metrics'] is Map
+          ? FieldServiceAssignmentMetrics.fromJson(Map<String, dynamic>.from(json['metrics'] as Map))
+          : null,
+      location: json['location'] is Map
+          ? FieldServiceLocation.fromJson(Map<String, dynamic>.from(json['location'] as Map))
+          : null,
+      customer: json['customer'] is Map
+          ? FieldServiceParty.fromJson(Map<String, dynamic>.from(json['customer'] as Map))
+          : null,
+      provider: json['provider'] is Map
+          ? FieldServiceProviderSummary.fromJson(Map<String, dynamic>.from(json['provider'] as Map))
+          : null,
+      timeline: json['timeline'] is List
+          ? (json['timeline'] as List)
+              .map((item) => FieldServiceTimelineEvent.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceTimelineEvent>[],
+      incidents: json['incidents'] is List
+          ? (json['incidents'] as List)
+              .map((item) => FieldServiceIncident.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceIncident>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'reference': reference,
+      'status': status,
+      if (statusLabel != null) 'statusLabel': statusLabel,
+      if (priority != null) 'priority': priority,
+      if (serviceType != null) 'serviceType': serviceType,
+      if (summary != null) 'summary': summary,
+      if (requestedAt != null) 'requestedAt': requestedAt!.toIso8601String(),
+      if (requestedAtLabel != null) 'requestedAtLabel': requestedAtLabel,
+      if (scheduledFor != null) 'scheduledFor': scheduledFor!.toIso8601String(),
+      if (scheduledForLabel != null) 'scheduledForLabel': scheduledForLabel,
+      'etaMinutes': etaMinutes,
+      'slaMinutes': slaMinutes,
+      'distanceKm': distanceKm,
+      if (riskLevel != null) 'riskLevel': riskLevel,
+      'slaBreached': slaBreached,
+      if (nextAction != null) 'nextAction': nextAction,
+      if (lastUpdate != null) 'lastUpdate': lastUpdate!.toIso8601String(),
+      if (lastUpdateLabel != null) 'lastUpdateLabel': lastUpdateLabel,
+      if (metrics != null) 'metrics': metrics!.toJson(),
+      if (location != null) 'location': location!.toJson(),
+      if (customer != null) 'customer': customer!.toJson(),
+      if (provider != null) 'provider': provider!.toJson(),
+      'timeline': timeline.map((event) => event.toJson()).toList(),
+      'incidents': incidents.map((incident) => incident.toJson()).toList(),
+    };
+  }
+}
+
+class FieldServiceMapPoint {
+  FieldServiceMapPoint({
+    this.lat,
+    this.lng,
+    this.label,
+  });
+
+  final double? lat;
+  final double? lng;
+  final String? label;
+
+  factory FieldServiceMapPoint.fromJson(Map<String, dynamic> json) {
+    return FieldServiceMapPoint(
+      lat: _asDouble(json['lat']),
+      lng: _asDouble(json['lng']),
+      label: json['label']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'lat': lat,
+      'lng': lng,
+      if (label != null) 'label': label,
+    };
+  }
+}
+
+class FieldServiceMapBounds {
+  FieldServiceMapBounds({
+    this.minLat,
+    this.maxLat,
+    this.minLng,
+    this.maxLng,
+  });
+
+  final double? minLat;
+  final double? maxLat;
+  final double? minLng;
+  final double? maxLng;
+
+  factory FieldServiceMapBounds.fromJson(Map<String, dynamic> json) {
+    return FieldServiceMapBounds(
+      minLat: _asDouble(json['minLat']),
+      maxLat: _asDouble(json['maxLat']),
+      minLng: _asDouble(json['minLng']),
+      maxLng: _asDouble(json['maxLng']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'minLat': minLat,
+      'maxLat': maxLat,
+      'minLng': minLng,
+      'maxLng': maxLng,
+    };
+  }
+}
+
+class FieldServiceMapAssignment {
+  FieldServiceMapAssignment({
+    required this.orderId,
+    required this.reference,
+    required this.status,
+    this.priority,
+    this.etaMinutes,
+    this.riskLevel,
+    this.customer,
+    this.provider,
+    this.path = const [],
+  });
+
+  final int orderId;
+  final String reference;
+  final String status;
+  final String? priority;
+  final int? etaMinutes;
+  final String? riskLevel;
+  final FieldServiceMapPoint? customer;
+  final FieldServiceMapPoint? provider;
+  final List<List<double>> path;
+
+  factory FieldServiceMapAssignment.fromJson(Map<String, dynamic> json) {
+    final rawPath = json['path'];
+    return FieldServiceMapAssignment(
+      orderId: _asInt(json['orderId']) ?? 0,
+      reference: json['reference']?.toString() ?? 'Order',
+      status: json['status']?.toString() ?? 'pending',
+      priority: json['priority']?.toString(),
+      etaMinutes: _asInt(json['etaMinutes']),
+      riskLevel: json['riskLevel']?.toString(),
+      customer: json['customer'] is Map
+          ? FieldServiceMapPoint.fromJson(Map<String, dynamic>.from(json['customer'] as Map))
+          : null,
+      provider: json['provider'] is Map
+          ? FieldServiceMapPoint.fromJson(Map<String, dynamic>.from(json['provider'] as Map))
+          : null,
+      path: rawPath is List
+          ? rawPath
+              .map((segment) =>
+                  segment is List ? segment.map((point) => _asDouble(point) ?? 0).toList() : <double>[])
+              .where((segment) => segment.isNotEmpty)
+              .toList()
+          : <List<double>>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'orderId': orderId,
+      'reference': reference,
+      'status': status,
+      if (priority != null) 'priority': priority,
+      'etaMinutes': etaMinutes,
+      if (riskLevel != null) 'riskLevel': riskLevel,
+      if (customer != null) 'customer': customer!.toJson(),
+      if (provider != null) 'provider': provider!.toJson(),
+      'path': path,
+    };
+  }
+}
+
+class FieldServiceMap {
+  FieldServiceMap({
+    this.center,
+    this.bounds,
+    this.assignments = const [],
+  });
+
+  final FieldServiceMapPoint? center;
+  final FieldServiceMapBounds? bounds;
+  final List<FieldServiceMapAssignment> assignments;
+
+  factory FieldServiceMap.fromJson(Map<String, dynamic> json) {
+    return FieldServiceMap(
+      center: json['center'] is Map
+          ? FieldServiceMapPoint.fromJson(Map<String, dynamic>.from(json['center'] as Map))
+          : null,
+      bounds: json['bounds'] is Map
+          ? FieldServiceMapBounds.fromJson(Map<String, dynamic>.from(json['bounds'] as Map))
+          : null,
+      assignments: json['assignments'] is List
+          ? (json['assignments'] as List)
+              .map((item) => FieldServiceMapAssignment.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceMapAssignment>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (center != null) 'center': center!.toJson(),
+      if (bounds != null) 'bounds': bounds!.toJson(),
+      'assignments': assignments.map((assignment) => assignment.toJson()).toList(),
+    };
+  }
+}
+
+class FieldServiceWorkspace {
+  FieldServiceWorkspace({
+    required this.scope,
+    required this.summary,
+    required this.assignments,
+    required this.timeline,
+    required this.incidents,
+    required this.providers,
+    this.map,
+    this.lastUpdated,
+  });
+
+  final String scope;
+  final FieldServiceSummary summary;
+  final List<FieldServiceAssignment> assignments;
+  final List<FieldServiceTimelineEvent> timeline;
+  final List<FieldServiceIncident> incidents;
+  final List<FieldServiceProviderSummary> providers;
+  final FieldServiceMap? map;
+  final DateTime? lastUpdated;
+
+  factory FieldServiceWorkspace.fromJson(Map<String, dynamic> json) {
+    return FieldServiceWorkspace(
+      scope: json['scope']?.toString() ?? 'customer',
+      summary: FieldServiceSummary.fromJson(
+        json['summary'] is Map ? Map<String, dynamic>.from(json['summary'] as Map) : <String, dynamic>{},
+      ),
+      assignments: json['assignments'] is List
+          ? (json['assignments'] as List)
+              .map((item) => FieldServiceAssignment.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceAssignment>[],
+      timeline: json['timeline'] is List
+          ? (json['timeline'] as List)
+              .map((item) => FieldServiceTimelineEvent.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceTimelineEvent>[],
+      incidents: json['incidents'] is List
+          ? (json['incidents'] as List)
+              .map((item) => FieldServiceIncident.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceIncident>[],
+      providers: json['providers'] is List
+          ? (json['providers'] as List)
+              .map((item) => FieldServiceProviderSummary.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <FieldServiceProviderSummary>[],
+      map: json['map'] is Map ? FieldServiceMap.fromJson(Map<String, dynamic>.from(json['map'] as Map)) : null,
+      lastUpdated: json['lastUpdated'] is String
+          ? DateTime.tryParse(json['lastUpdated'] as String)
+          : DateTime.tryParse('${json['last_updated']}'),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'scope': scope,
+      'summary': summary.toJson(),
+      'assignments': assignments.map((assignment) => assignment.toJson()).toList(),
+      'timeline': timeline.map((event) => event.toJson()).toList(),
+      'incidents': incidents.map((incident) => incident.toJson()).toList(),
+      'providers': providers.map((provider) => provider.toJson()).toList(),
+      if (map != null) 'map': map!.toJson(),
+      if (lastUpdated != null) 'lastUpdated': lastUpdated!.toIso8601String(),
+    };
+  }
+}
+
 class LearnerDashboardSnapshot {
   LearnerDashboardSnapshot({
     required this.profile,
@@ -1192,6 +2123,7 @@ class LearnerDashboardSnapshot {
     this.assessments,
     required this.blogPosts,
     this.featuredBlog,
+    this.fieldServices,
     this.liveClassrooms,
     this.isFromCache = false,
   });
@@ -1212,6 +2144,7 @@ class LearnerDashboardSnapshot {
   final LearnerAssessmentsData? assessments;
   final List<BlogArticle> blogPosts;
   final BlogArticle? featuredBlog;
+  final FieldServiceWorkspace? fieldServices;
   final LiveClassroomsSnapshot? liveClassrooms;
   final bool isFromCache;
 
@@ -1232,6 +2165,7 @@ class LearnerDashboardSnapshot {
       syncedAt: syncedAt,
       blogPosts: blogPosts,
       featuredBlog: featuredBlog,
+      fieldServices: fieldServices,
       liveClassrooms: liveClassrooms,
       isFromCache: isFromCache ?? this.isFromCache,
     );
@@ -1263,6 +2197,9 @@ class LearnerDashboardSnapshot {
     final liveClassroomsJson = learnerJson['liveClassrooms'] is Map
         ? Map<String, dynamic>.from(learnerJson['liveClassrooms'] as Map)
         : <String, dynamic>{};
+    final fieldServicesJson = learnerJson['fieldServices'] is Map
+        ? Map<String, dynamic>.from(learnerJson['fieldServices'] as Map)
+        : null;
 
     return LearnerDashboardSnapshot(
       profile: DashboardProfile.fromJson(profileJson),
@@ -1322,6 +2259,8 @@ class LearnerDashboardSnapshot {
       featuredBlog: (learnerJson['blog'] is Map && (learnerJson['blog'] as Map)['featured'] is Map)
           ? BlogArticle.fromJson(Map<String, dynamic>.from((learnerJson['blog'] as Map)['featured'] as Map))
           : null,
+      fieldServices:
+          fieldServicesJson != null ? FieldServiceWorkspace.fromJson(fieldServicesJson) : null,
     );
   }
 
@@ -1329,6 +2268,9 @@ class LearnerDashboardSnapshot {
     final profileJson = json['profile'] is Map ? Map<String, dynamic>.from(json['profile'] as Map) : <String, dynamic>{};
     final assessmentsJson = json['assessments'] is Map
         ? Map<String, dynamic>.from(json['assessments'] as Map)
+        : null;
+    final fieldServicesJson = json['fieldServices'] is Map
+        ? Map<String, dynamic>.from(json['fieldServices'] as Map)
         : null;
     return LearnerDashboardSnapshot(
       profile: DashboardProfile.fromJson(profileJson),
@@ -1390,6 +2332,8 @@ class LearnerDashboardSnapshot {
       featuredBlog: json['featuredBlog'] is Map
           ? BlogArticle.fromJson(Map<String, dynamic>.from(json['featuredBlog'] as Map))
           : null,
+      fieldServices:
+          fieldServicesJson != null ? FieldServiceWorkspace.fromJson(fieldServicesJson) : null,
       isFromCache: true,
     );
   }
@@ -1407,6 +2351,7 @@ class LearnerDashboardSnapshot {
       'messaging': messagingSettings.toJson(),
       'followers': followers.toJson(),
       if (liveClassrooms != null) 'liveClassrooms': liveClassrooms!.toJson(),
+      if (fieldServices != null) 'fieldServices': fieldServices!.toJson(),
       'unreadMessages': unreadMessages,
       'totalNotifications': totalNotifications,
       'syncedAt': syncedAt.toIso8601String(),

@@ -1,19 +1,22 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/feature_flags/feature_flag_notifier.dart';
 import '../services/auth_service.dart';
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _authService = AuthService();
 
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -37,6 +40,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   static const _twoFactorEnforcedRoles = {'admin'};
 
   @override
+  void initState() {
+    super.initState();
+    _twoFactorLocked = _twoFactorEnforcedRoles.contains(_role);
+    _twoFactorEnabled = _twoFactorLocked;
+  }
+
+  @override
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
@@ -48,11 +58,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _twoFactorLocked = _twoFactorEnforcedRoles.contains(_role);
-    _twoFactorEnabled = _twoFactorLocked;
+  bool _isTwoFactorLocked(Map<String, bool> flags, String role) {
+    if (_twoFactorEnforcedRoles.contains(role)) {
+      return true;
+    }
+    if (flags['mobile.forceMfa.all'] == true) {
+      return true;
+    }
+    final roleKey = 'mobile.forceMfa.$role';
+    return flags[roleKey] == true;
+  }
+
+  void _applyTwoFactorPolicy(Map<String, bool> flags) {
+    final shouldLock = _isTwoFactorLocked(flags, _role);
+    if (shouldLock != _twoFactorLocked) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _twoFactorLocked = shouldLock;
+          if (_twoFactorLocked) {
+            _twoFactorEnabled = true;
+          }
+        });
+      });
+    }
   }
 
   String _resolveErrorMessage(Object error) {
@@ -127,8 +156,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 8),
                   Text(
                     'Issuer: $issuer',
-                    style:
-                        Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
                   ),
                 ],
               ),
@@ -184,7 +212,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     });
 
     try {
-      final result = await _authService.register(
+      final authService = ref.read(authServiceProvider);
+      final result = await authService.register(
         firstName: _firstNameController.text.trim(),
         lastName: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
@@ -198,7 +227,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final twoFactor = result['twoFactor'];
       final requiresTwoFactor = twoFactor is Map && twoFactor['enabled'] == true;
       setState(() {
-        _twoFactorEnrollment = twoFactor is Map<String, dynamic> ? twoFactor : null;
+        _twoFactorEnrollment = twoFactor is Map<String, dynamic> ? Map<String, dynamic>.from(twoFactor as Map) : null;
         if (twoFactor is Map && twoFactor['enforced'] == true) {
           _twoFactorLocked = true;
         }
@@ -219,6 +248,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (!mounted) return;
         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
       }
+      unawaited(ref.read(featureFlagControllerProvider.notifier).refresh(force: true));
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -235,6 +265,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final flagState = ref.watch(featureFlagControllerProvider);
+    final flags = flagState.maybeWhen(
+      data: (value) => value,
+      orElse: () => const <String, bool>{},
+    );
+    _applyTwoFactorPolicy(flags);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Create workspace')),
       body: Center(
@@ -341,7 +378,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (value == null) return;
                       setState(() {
                         _role = value;
-                        final enforced = _twoFactorEnforcedRoles.contains(value);
+                        final enforced = _isTwoFactorLocked(flags, value);
                         _twoFactorLocked = enforced;
                         if (enforced) {
                           _twoFactorEnabled = true;
@@ -407,133 +444,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 24),
-                  Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
-                            value: _twoFactorLocked ? true : _twoFactorEnabled,
-                            onChanged: _twoFactorLocked
-                                ? null
-                                : (value) {
-                                    setState(() {
-                                      _twoFactorEnabled = value;
-                                    });
-                                  },
-                            title: const Text('Multi-factor authentication'),
-                            subtitle: Text(
-                              _twoFactorLocked
-                                  ? 'Administrators must use an authenticator app on every login.'
-                                  : 'Enable an authenticator challenge to add another layer of protection.',
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _twoFactorLocked
-                                ? 'We will display your setup key immediately after registration.'
-                                : 'Turn this on to receive your authenticator setup instructions right away.',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
+                  const SizedBox(height: 16),
+                  SwitchListTile.adaptive(
+                    title: const Text('Enable multi-factor authentication'),
+                    subtitle: Text(
+                      _twoFactorLocked
+                          ? 'Required for this role to protect sensitive operations.'
+                          : 'Add a security layer with an authenticator app.',
                     ),
+                    value: _twoFactorEnabled || _twoFactorLocked,
+                    onChanged: _twoFactorLocked
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _twoFactorEnabled = value;
+                            });
+                          },
                   ),
-                  if (_twoFactorEnrollment?['enabled'] == true) ...[
-                    const SizedBox(height: 16),
-                    Card(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Authenticator setup',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
-                                  ?.copyWith(color: Theme.of(context).colorScheme.primary),
-                            ),
-                            const SizedBox(height: 8),
-                            SelectableText(
-                              _formatSecret(_twoFactorEnrollment?['secret']?.toString() ?? ''),
-                              style: const TextStyle(letterSpacing: 2, fontFamily: 'monospace'),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Issuer: ${_twoFactorEnrollment?['issuer'] ?? 'Edulure'}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: Colors.grey.shade600),
-                            ),
-                            if (_twoFactorEnrollment?['otpauthUrl'] != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: SelectableText(
-                                  _twoFactorEnrollment?['otpauthUrl']?.toString() ?? '',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(color: Colors.blueGrey.shade600),
-                                ),
-                              ),
-                            const SizedBox(height: 12),
-                            FilledButton.tonal(
-                              onPressed: () async {
-                                final secret = _twoFactorEnrollment?['secret']?.toString() ?? '';
-                                if (secret.isEmpty) return;
-                                await Clipboard.setData(ClipboardData(text: secret));
-                                if (!mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Secret copied to clipboard')),
-                                );
-                              },
-                              child: const Text('Copy secret'),
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                              onPressed: () {
-                                Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-                              },
-                              child: const Text('Proceed to secure login'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Checkbox(
-                        value: _termsAccepted,
-                        onChanged: (value) {
-                          setState(() {
-                            _termsAccepted = value ?? false;
-                          });
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'I agree to the Edulure terms of use and privacy policy.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    ],
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    value: _termsAccepted,
+                    onChanged: (value) {
+                      setState(() {
+                        _termsAccepted = value ?? false;
+                      });
+                    },
+                    title: const Text('I agree to the Terms of Service and Privacy Policy'),
+                    controlAffinity: ListTileControlAffinity.leading,
                   ),
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _loading ? null : _submit,
-                    child: Text(_loading ? 'Creating account…' : 'Create account'),
+                    child: _loading
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Create account'),
                   ),
                 ],
               ),

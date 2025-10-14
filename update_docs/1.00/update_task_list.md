@@ -118,7 +118,7 @@ Each task below aligns with the numbered plan, includes integration coverage acr
   - Automate verification status notifications across channels (100%).
   - Publish policy hub + support SOP documentation updates (100%).
 
-## Task 6 – Mobile Parity & Store Readiness (0% complete)
+## Task 6 – Mobile Parity & Store Readiness (20% complete)
 ### Integration Coverage
 - **Backend:** Mobile-optimised endpoints, push notifications, sync APIs, download services.
 - **Front-end:** Shared design tokens, localisation, responsive rules, component parity documentation.
@@ -130,16 +130,16 @@ Each task below aligns with the numbered plan, includes integration coverage acr
 - **Design:** Mobile UX flows, gestures, accessibility, store assets, localisation packs.
 
 ### Subtasks
-1. **Flutter Architecture Foundations (0%)** – dio networking, Riverpod/Bloc state, secure storage, telemetry, feature flags.
+1. **Flutter Architecture Foundations (100%)** – dio networking, Riverpod/Bloc state, secure storage, telemetry, feature flags. _Progress update:_ Introduced a production bootstrap pipeline that wires Riverpod into the Flutter shell, centralised Dio client provisioning with auth + telemetry interceptors, Sentry-backed telemetry service, secure token storage, feature-flag repository/notifier, and migrated the authentication flows to the new architecture.
 2. **Learner Feature Modules (0%)** – Communities, explorer, courses, ebooks, live classrooms, chat, notifications.
 3. **Instructor Feature Modules (0%)** – Community management, course/eBook creation, pricing, analytics, inbox.
 4. **Performance & Offline (0%)** – Caching, background sync, low-bandwidth modes, crash analytics.
 5. **Store Submission & Compliance (0%)** – Listings, privacy disclosures, review workflows, phased rollout plan.
 
 ### Sprint Breakdown
-- **Sprint 6A – Core Shell & Networking (0%)**
-  - Stand up Flutter navigation shell with auth guard stubs (0%).
-  - Integrate dio client, interceptors, and secure storage bootstrap (0%).
+- **Sprint 6A – Core Shell & Networking (45%)**
+  - Stand up Flutter navigation shell with auth guard stubs (40%).
+  - Integrate dio client, interceptors, and secure storage bootstrap (100%).
   - Land shared design tokens from React for typography/colour (0%).
 - **Sprint 6B – Learner Modules (0%)**
   - Ship communities/explorer readers with cached pagination (0%).

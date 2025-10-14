@@ -2007,6 +2007,259 @@ export async function seed(knex) {
     }
 
     const now = new Date();
+    const subtractMinutes = (minutes) => new Date(now.getTime() - minutes * 60 * 1000);
+    const addMinutes = (minutes) => new Date(now.getTime() + minutes * 60 * 1000);
+
+    const [fieldOpsUserId] = await trx('users').insert({
+      first_name: 'Mira',
+      last_name: 'Patel',
+      email: 'mira.patel@edulure.test',
+      password_hash: passwordHash,
+      role: 'instructor',
+      email_verified_at: trx.fn.now(),
+      failed_login_attempts: 0,
+      last_login_at: trx.fn.now(),
+      password_changed_at: trx.fn.now()
+    });
+
+    const [emergencyOpsUserId] = await trx('users').insert({
+      first_name: 'Jonah',
+      last_name: 'Adeyemi',
+      email: 'jonah.adeyemi@edulure.test',
+      password_hash: passwordHash,
+      role: 'instructor',
+      email_verified_at: trx.fn.now(),
+      failed_login_attempts: 0,
+      last_login_at: trx.fn.now(),
+      password_changed_at: trx.fn.now()
+    });
+
+    const [kaiProviderId] = await trx('field_service_providers').insert({
+      user_id: instructorId,
+      name: 'Kai Watanabe',
+      email: 'kai.watanabe@edulure.test',
+      phone: '+44 20 7946 0045',
+      status: 'active',
+      specialties: JSON.stringify(['AV engineering', 'Smart classrooms', 'Diagnostics']),
+      rating: 4.92,
+      last_check_in_at: subtractMinutes(12),
+      location_lat: 51.50745,
+      location_lng: -0.12775,
+      location_label: 'Westminster hub',
+      location_updated_at: subtractMinutes(12),
+      metadata: JSON.stringify({
+        serviceArea: ['Central London'],
+        certifications: ['Crestron LV2', 'Cisco Meraki'],
+        shift: 'day'
+      })
+    });
+
+    const [miraProviderId] = await trx('field_service_providers').insert({
+      user_id: fieldOpsUserId,
+      name: 'Mira Patel',
+      email: 'mira.patel@edulure.test',
+      phone: '+44 161 555 0912',
+      status: 'active',
+      specialties: JSON.stringify(['Network resilience', 'Power redundancy', 'IoT calibration']),
+      rating: 4.87,
+      last_check_in_at: subtractMinutes(5),
+      location_lat: 51.52068,
+      location_lng: -0.08715,
+      location_label: 'Shoreditch operations pod',
+      location_updated_at: subtractMinutes(5),
+      metadata: JSON.stringify({
+        serviceArea: ['East London', 'Docklands'],
+        certifications: ['AWS Networking', 'CompTIA Security+'],
+        shift: 'swing'
+      })
+    });
+
+    const [jonahProviderId] = await trx('field_service_providers').insert({
+      user_id: emergencyOpsUserId,
+      name: 'Jonah Adeyemi',
+      email: 'jonah.adeyemi@edulure.test',
+      phone: '+44 113 555 4402',
+      status: 'active',
+      specialties: JSON.stringify(['Emergency response', 'Access control', 'HVAC optimisation']),
+      rating: 4.95,
+      last_check_in_at: subtractMinutes(2),
+      location_lat: 51.49858,
+      location_lng: -0.09045,
+      location_label: 'South Bank mobile unit',
+      location_updated_at: subtractMinutes(2),
+      metadata: JSON.stringify({
+        serviceArea: ['Central London', 'South London'],
+        certifications: ['Prince2 Practitioner', 'NEBOSH'],
+        shift: 'night'
+      })
+    });
+
+    const [orderAlphaId] = await trx('field_service_orders').insert({
+      reference: 'FS-240531-A1',
+      customer_user_id: learnerId,
+      provider_id: kaiProviderId,
+      status: 'en_route',
+      priority: 'urgent',
+      service_type: 'Smart classroom projector calibration',
+      summary: 'Stabilise auto-tracking, recalibrate lens, confirm diagnostics.',
+      requested_at: subtractMinutes(95),
+      scheduled_for: subtractMinutes(15),
+      eta_minutes: 18,
+      sla_minutes: 120,
+      distance_km: 4.2,
+      location_lat: 51.51532,
+      location_lng: -0.09821,
+      location_label: 'Edulure Farringdon campus',
+      address_line_1: '22 Charterhouse Street',
+      city: 'London',
+      region: 'Greater London',
+      postal_code: 'EC1M 6AX',
+      metadata: JSON.stringify({
+        customerContact: '+44 20 7456 8800',
+        accessNotes: 'Security badge at reception. Use loading bay B.',
+        riskLevel: 'warning'
+      })
+    });
+
+    const [orderBravoId] = await trx('field_service_orders').insert({
+      reference: 'FS-240531-B7',
+      customer_user_id: learnerId,
+      provider_id: miraProviderId,
+      status: 'on_site',
+      priority: 'standard',
+      service_type: 'Learning lab network optimisation',
+      summary: 'Deploy redundant uplink, verify Wi-Fi 6 telemetry, confirm QoS policies.',
+      requested_at: subtractMinutes(240),
+      scheduled_for: subtractMinutes(45),
+      eta_minutes: 0,
+      sla_minutes: 180,
+      distance_km: 3.1,
+      location_lat: 51.52412,
+      location_lng: -0.10245,
+      location_label: 'Old Street innovation loft',
+      address_line_1: '81 City Road',
+      city: 'London',
+      region: 'Greater London',
+      postal_code: 'EC1Y 1BD',
+      metadata: JSON.stringify({
+        customerContact: '+44 20 7568 2200',
+        escalated: false,
+        changeWindow: '08:00-12:00',
+        riskLevel: 'on_track'
+      })
+    });
+
+    const [orderCharlieId] = await trx('field_service_orders').insert({
+      reference: 'FS-240531-C3',
+      customer_user_id: learnerId,
+      provider_id: jonahProviderId,
+      status: 'scheduled',
+      priority: 'high',
+      service_type: 'Emergency access control remediation',
+      summary: 'Restore biometric readers, rotate credentials, validate audit logs.',
+      requested_at: subtractMinutes(30),
+      scheduled_for: addMinutes(25),
+      eta_minutes: 32,
+      sla_minutes: 90,
+      distance_km: 6.4,
+      location_lat: 51.50083,
+      location_lng: -0.11892,
+      location_label: 'Riverfront leadership suite',
+      address_line_1: '1 Lambeth Palace Road',
+      city: 'London',
+      region: 'Greater London',
+      postal_code: 'SE1 7EU',
+      metadata: JSON.stringify({
+        customerContact: '+44 20 7990 4000',
+        accessNotes: 'Out-of-hours clearance required. Control room to escort.',
+        riskLevel: 'critical',
+        contingency: 'Switch to mechanical override if biometric reset fails.'
+      })
+    });
+
+    await trx('field_service_events').insert([
+      {
+        order_id: orderAlphaId,
+        event_type: 'dispatch_created',
+        status: 'accepted',
+        notes: 'Request triaged by Fixnado desk. Dispatch approved.',
+        author: 'Ops automation',
+        occurred_at: subtractMinutes(92),
+        metadata: JSON.stringify({ channel: 'slack', slaRemainingMinutes: 148 })
+      },
+      {
+        order_id: orderAlphaId,
+        event_type: 'technician_en_route',
+        status: 'in_transit',
+        notes: 'Technician departed Westminster hub. Live telemetry locked.',
+        author: 'Kai Watanabe',
+        occurred_at: subtractMinutes(28),
+        metadata: JSON.stringify({ vehicle: 'EV Van 12', etaMinutes: 18, distanceKm: 4.2 })
+      },
+      {
+        order_id: orderAlphaId,
+        event_type: 'incident_flagged',
+        status: 'investigating',
+        notes: 'Customer reported intermittent HDMI sync drops during lecture capture.',
+        author: 'Customer success',
+        occurred_at: subtractMinutes(18),
+        metadata: JSON.stringify({
+          severity: 'medium',
+          impactedRooms: 2,
+          mitigation: 'Switch to fallback encoder if failure reoccurs',
+          isIncident: true
+        })
+      },
+      {
+        order_id: orderBravoId,
+        event_type: 'technician_on_site',
+        status: 'on_site',
+        notes: 'Arrived on site. Conducting baseline throughput tests.',
+        author: 'Mira Patel',
+        occurred_at: subtractMinutes(38),
+        metadata: JSON.stringify({ baselineMbps: 940, packetLoss: 0.1 })
+      },
+      {
+        order_id: orderBravoId,
+        event_type: 'change_control',
+        status: 'executing',
+        notes: 'Applied redundant uplink config. Monitoring for drift.',
+        author: 'Network automation',
+        occurred_at: subtractMinutes(22),
+        metadata: JSON.stringify({ approvalCode: 'CAB-7721', changeType: 'standard' })
+      },
+      {
+        order_id: orderBravoId,
+        event_type: 'quality_assurance',
+        status: 'validating',
+        notes: 'Live telemetry steady. Preparing to handover to customer.',
+        author: 'Quality operations',
+        occurred_at: subtractMinutes(8),
+        metadata: JSON.stringify({ jitterMs: 3, slaRemainingMinutes: 122 })
+      },
+      {
+        order_id: orderCharlieId,
+        event_type: 'dispatch_created',
+        status: 'pending_assignment',
+        notes: 'Emergency badge failures flagged by monitoring. High priority queue.',
+        author: 'Ops automation',
+        occurred_at: subtractMinutes(28),
+        metadata: JSON.stringify({ severity: 'high', impactedDoors: 4 })
+      },
+      {
+        order_id: orderCharlieId,
+        event_type: 'provider_assigned',
+        status: 'scheduled',
+        notes: 'Jonah Adeyemi assigned by duty manager. Confirmed equipment loadout.',
+        author: 'Duty manager',
+        occurred_at: subtractMinutes(12),
+        metadata: JSON.stringify({
+          equipment: ['Biometric toolkit', 'Credential issuer'],
+          etaMinutes: 32
+        })
+      }
+    ]);
+
     const ninetyDaysFromNow = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 

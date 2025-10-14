@@ -2,3 +2,74 @@
 -- Database provisioning is now handled via scripts/install-db.js, which
 -- creates the target schema using environment-specific credentials and
 -- runs Knex migrations. This file intentionally contains no executable SQL.
+
+-- Field service tables
+CREATE TABLE IF NOT EXISTS field_service_providers (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id BIGINT UNSIGNED NULL,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(255) NULL,
+  phone VARCHAR(64) NULL,
+  status ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
+  specialties JSON NULL,
+  rating DECIMAL(3,2) DEFAULT 0,
+  last_check_in_at DATETIME NULL,
+  location_lat DECIMAL(10,7) NULL,
+  location_lng DECIMAL(10,7) NULL,
+  location_label VARCHAR(255) NULL,
+  location_updated_at DATETIME NULL,
+  metadata JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_field_service_providers_status (status),
+  INDEX idx_field_service_providers_user (user_id),
+  CONSTRAINT fk_field_service_providers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS field_service_orders (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  reference VARCHAR(40) NOT NULL UNIQUE,
+  customer_user_id BIGINT UNSIGNED NOT NULL,
+  provider_id BIGINT UNSIGNED NULL,
+  status VARCHAR(32) NOT NULL,
+  priority VARCHAR(24) NOT NULL DEFAULT 'standard',
+  service_type VARCHAR(160) NOT NULL,
+  summary VARCHAR(255) NULL,
+  requested_at DATETIME NOT NULL,
+  scheduled_for DATETIME NULL,
+  eta_minutes INT NULL,
+  sla_minutes INT NULL,
+  distance_km DECIMAL(6,2) NULL,
+  location_lat DECIMAL(10,7) NOT NULL,
+  location_lng DECIMAL(10,7) NOT NULL,
+  location_label VARCHAR(255) NULL,
+  address_line_1 VARCHAR(255) NULL,
+  address_line_2 VARCHAR(255) NULL,
+  city VARCHAR(120) NULL,
+  region VARCHAR(120) NULL,
+  postal_code VARCHAR(24) NULL,
+  country VARCHAR(2) NOT NULL DEFAULT 'GB',
+  metadata JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_field_service_orders_status (status),
+  INDEX idx_field_service_orders_customer (customer_user_id),
+  INDEX idx_field_service_orders_provider (provider_id),
+  CONSTRAINT fk_field_service_orders_customer FOREIGN KEY (customer_user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_field_service_orders_provider FOREIGN KEY (provider_id) REFERENCES field_service_providers(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS field_service_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT UNSIGNED NOT NULL,
+  event_type VARCHAR(64) NOT NULL,
+  status VARCHAR(32) NULL,
+  notes TEXT NULL,
+  author VARCHAR(160) NULL,
+  occurred_at DATETIME NOT NULL,
+  metadata JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_field_service_events_order (order_id),
+  INDEX idx_field_service_events_occurred_at (occurred_at),
+  CONSTRAINT fk_field_service_events_order FOREIGN KEY (order_id) REFERENCES field_service_orders(id) ON DELETE CASCADE
+);

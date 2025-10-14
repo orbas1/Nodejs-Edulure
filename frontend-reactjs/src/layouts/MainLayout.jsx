@@ -49,6 +49,10 @@ export default function MainLayout() {
       { name: 'Communities', to: '/communities' },
       { name: 'Explorer', to: '/explorer' },
       { name: 'Profile', to: '/profile' },
+      { name: 'Blog', to: '/blog' },
+      { name: 'Dashboard', to: baseDashboardPath },
+      { name: 'Community workspace', to: communitiesPath },
+      { name: 'About', to: '/about' }
       { name: 'Dashboard', to: baseDashboardPath },
       { name: 'About', to: '/about' },
       { name: 'Blog', to: '/blog' }

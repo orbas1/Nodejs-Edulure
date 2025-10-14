@@ -372,28 +372,7 @@ GradingQueue.defaultProps = {
 export default function DashboardAssessments() {
   const { role, dashboard, refresh } = useOutletContext();
   const assessments = dashboard?.assessments;
-
-  if (!assessments) {
-    return (
-      <DashboardStateMessage
-        title="Assessment data unavailable"
-        description="We could not load your assessment data yet. Refresh to sync the latest deadlines and grading queues."
-        actionLabel="Refresh"
-        onAction={() => refresh?.()}
-      />
-    );
-  }
-
   const isLearner = role === 'learner';
-  const overview = assessments.overview ?? [];
-  const timeline = assessments.timeline ?? { upcoming: [], overdue: [], completed: [] };
-  const courses = assessments.courses ?? [];
-  const schedule = assessments.schedule ?? {};
-  const analytics = assessments.analytics ?? {};
-  const resources = assessments.resources ?? [];
-  const grading = assessments.grading ?? {};
-  const events = Array.isArray(schedule.events) ? schedule.events : [];
-  const studyPlan = Array.isArray(schedule.studyPlan) ? schedule.studyPlan : [];
 
   const headerCopy = useMemo(() => {
     if (isLearner) {
@@ -409,6 +388,27 @@ export default function DashboardAssessments() {
         'Coordinate grading velocity, orchestrate assessment releases, and surface at-risk cohorts before escalation.'
     };
   }, [isLearner]);
+
+  if (!assessments) {
+    return (
+      <DashboardStateMessage
+        title="Assessment data unavailable"
+        description="We could not load your assessment data yet. Refresh to sync the latest deadlines and grading queues."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
+
+  const overview = assessments.overview ?? [];
+  const timeline = assessments.timeline ?? { upcoming: [], overdue: [], completed: [] };
+  const courses = assessments.courses ?? [];
+  const schedule = assessments.schedule ?? {};
+  const analytics = assessments.analytics ?? {};
+  const resources = assessments.resources ?? [];
+  const grading = assessments.grading ?? {};
+  const events = Array.isArray(schedule.events) ? schedule.events : [];
+  const studyPlan = Array.isArray(schedule.studyPlan) ? schedule.studyPlan : [];
 
   const timelineColumns = isLearner
     ? [

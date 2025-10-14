@@ -16,18 +16,17 @@ async function ensureUniqueSlug(title, connection = db) {
     .replace(/(^-|-$)+/g, '')
     .slice(0, 200);
 
-  let candidate = slugBase || randomUUID();
-  let suffix = 1;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    // eslint-disable-next-line no-await-in-loop
+  let suffix = 0;
+  while (suffix < Number.MAX_SAFE_INTEGER) {
+    const candidate = suffix === 0 ? slugBase || randomUUID() : `${slugBase}-${suffix}`.slice(0, 220);
     const existing = await connection('ebooks').select('id').where({ slug: candidate }).first();
     if (!existing) {
       return candidate;
     }
     suffix += 1;
-    candidate = `${slugBase}-${suffix}`.slice(0, 220);
   }
+
+  throw new Error('Unable to generate a unique ebook slug');
 }
 
 function normaliseArray(value) {

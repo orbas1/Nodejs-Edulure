@@ -41,13 +41,14 @@ import InstructorLessonSchedule from './pages/dashboard/InstructorLessonSchedule
 import InstructorTutorSchedule from './pages/dashboard/InstructorTutorSchedule.jsx';
 import InstructorTutorManagement from './pages/dashboard/InstructorTutorManagement.jsx';
 import InstructorServiceSuite from './pages/dashboard/InstructorServiceSuite.jsx';
+import InstructorProjects from './pages/dashboard/InstructorProjects.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
 import FixnadoAds from './pages/dashboard/FixnadoAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
 import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
 import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
-import CommunityOverview from './pages/dashboard/community/CommunityOverview.jsx';
+import FieldServices from './pages/dashboard/FieldServices.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
@@ -145,6 +146,7 @@ function App() {
         <Route path="financial" element={<LearnerFinancial />} />
         <Route path="affiliate" element={<DashboardAffiliate />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
+        <Route path="field-services" element={<FieldServices />} />
         <Route
           path="operations"
           element={(
@@ -202,6 +204,14 @@ function App() {
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
               <InstructorServiceSuite />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="projects"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <InstructorProjects />
             </ProtectedRoute>
           )}
         />
