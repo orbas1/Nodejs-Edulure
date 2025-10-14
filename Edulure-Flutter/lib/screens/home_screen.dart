@@ -119,6 +119,11 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.library_books_outlined),
+                    title: const Text('Edulure blog'),
+                    subtitle: const Text('Read enterprise updates and best practices.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/blog'),
                     leading: const Icon(Icons.videocam_outlined),
                     title: const Text('Live classrooms'),
                     subtitle: const Text('Preview upcoming rooms, whiteboards, and facilitator readiness.'),

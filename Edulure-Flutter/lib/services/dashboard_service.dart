@@ -211,6 +211,57 @@ class DashboardNotification {
   }
 }
 
+class BlogArticle {
+  BlogArticle({
+    required this.slug,
+    required this.title,
+    required this.excerpt,
+    required this.category,
+    required this.readingTimeMinutes,
+    required this.publishedAt,
+    required this.heroImageUrl,
+    required this.isFeatured,
+  });
+
+  final String slug;
+  final String title;
+  final String excerpt;
+  final String category;
+  final int readingTimeMinutes;
+  final String? publishedAt;
+  final String? heroImageUrl;
+  final bool isFeatured;
+
+  factory BlogArticle.fromJson(Map<String, dynamic> json) {
+    return BlogArticle(
+      slug: json['slug']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Article',
+      excerpt: json['excerpt']?.toString() ?? '',
+      category: json['category'] is Map
+          ? (json['category']['name']?.toString() ?? 'Insight')
+          : json['category']?.toString() ?? 'Insight',
+      readingTimeMinutes: (json['readingTimeMinutes'] is num)
+          ? (json['readingTimeMinutes'] as num).round()
+          : int.tryParse('${json['readingTimeMinutes'] ?? 0}') ?? 0,
+      publishedAt: json['publishedAt']?.toString(),
+      heroImageUrl: json['heroImage']?.toString() ??
+          (json['media'] is List && (json['media'] as List).isNotEmpty && (json['media'] as List).first is Map
+              ? Map<String, dynamic>.from((json['media'] as List).first as Map)['mediaUrl']?.toString()
+              : null),
+      isFeatured: json['featured'] == true || json['isFeatured'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'slug': slug,
+      'title': title,
+      'excerpt': excerpt,
+      'category': category,
+      'readingTimeMinutes': readingTimeMinutes,
+      'publishedAt': publishedAt,
+      'heroImageUrl': heroImageUrl,
+      'isFeatured': isFeatured,
 class LiveClassOccupancy {
   LiveClassOccupancy({
     required this.reserved,
@@ -782,6 +833,8 @@ class LearnerDashboardSnapshot {
     required this.unreadMessages,
     required this.totalNotifications,
     required this.syncedAt,
+    required this.blogPosts,
+    this.featuredBlog,
     this.liveClassrooms,
     this.isFromCache = false,
   });
@@ -799,6 +852,8 @@ class LearnerDashboardSnapshot {
   final int unreadMessages;
   final int totalNotifications;
   final DateTime syncedAt;
+  final List<BlogArticle> blogPosts;
+  final BlogArticle? featuredBlog;
   final LiveClassroomsSnapshot? liveClassrooms;
   final bool isFromCache;
 
@@ -817,6 +872,8 @@ class LearnerDashboardSnapshot {
       unreadMessages: unreadMessages,
       totalNotifications: totalNotifications,
       syncedAt: syncedAt,
+      blogPosts: blogPosts,
+      featuredBlog: featuredBlog,
       liveClassrooms: liveClassrooms,
       isFromCache: isFromCache ?? this.isFromCache,
     );
@@ -894,6 +951,14 @@ class LearnerDashboardSnapshot {
           ? (notificationsJson['total'] as num).round()
           : int.tryParse('${notificationsJson['total'] ?? 0}') ?? 0,
       syncedAt: syncedAt ?? DateTime.now(),
+      blogPosts: (learnerJson['blog'] is Map && (learnerJson['blog'] as Map)['highlights'] is List)
+          ? ((learnerJson['blog'] as Map)['highlights'] as List)
+              .map((item) => BlogArticle.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <BlogArticle>[],
+      featuredBlog: (learnerJson['blog'] is Map && (learnerJson['blog'] as Map)['featured'] is Map)
+          ? BlogArticle.fromJson(Map<String, dynamic>.from((learnerJson['blog'] as Map)['featured'] as Map))
+          : null,
     );
   }
 
@@ -950,6 +1015,14 @@ class LearnerDashboardSnapshot {
           ? (json['totalNotifications'] as num).round()
           : int.tryParse('${json['totalNotifications'] ?? 0}') ?? 0,
       syncedAt: json['syncedAt'] is String ? DateTime.tryParse(json['syncedAt'] as String) ?? DateTime.now() : DateTime.now(),
+      blogPosts: json['blogPosts'] is List
+          ? (json['blogPosts'] as List)
+              .map((item) => BlogArticle.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <BlogArticle>[],
+      featuredBlog: json['featuredBlog'] is Map
+          ? BlogArticle.fromJson(Map<String, dynamic>.from(json['featuredBlog'] as Map))
+          : null,
       isFromCache: true,
     );
   }
@@ -970,6 +1043,8 @@ class LearnerDashboardSnapshot {
       'unreadMessages': unreadMessages,
       'totalNotifications': totalNotifications,
       'syncedAt': syncedAt.toIso8601String(),
+      'blogPosts': blogPosts.map((article) => article.toJson()).toList(),
+      if (featuredBlog != null) 'featuredBlog': featuredBlog!.toJson(),
     };
   }
 }

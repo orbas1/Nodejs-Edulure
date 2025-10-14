@@ -7,6 +7,7 @@ import UserFollowModel from '../models/UserFollowModel.js';
 import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import IdentityVerificationService from './IdentityVerificationService.js';
+import BlogService from './BlogService.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -798,27 +799,27 @@ export function buildCommunityDashboard({
 export function buildInstructorDashboard({
   user,
   now,
-  courses,
-  courseEnrollments,
-  modules,
-  lessons,
-  assignments,
-  tutorProfiles,
-  tutorAvailability,
-  tutorBookings,
-  liveClassrooms,
-  assets,
-  assetEvents,
-  communityMemberships,
-  communityStats,
-  communityResources,
-  communityPosts,
-  adsCampaigns,
-  adsMetrics,
-  paywallTiers,
-  communitySubscriptions,
-  ebookRows,
-  ebookProgressRows
+  courses = [],
+  courseEnrollments = [],
+  modules = [],
+  lessons = [],
+  assignments = [],
+  tutorProfiles = [],
+  tutorAvailability = [],
+  tutorBookings = [],
+  liveClassrooms = [],
+  assets = [],
+  assetEvents = [],
+  communityMemberships = [],
+  communityStats = [],
+  communityResources = [],
+  communityPosts = [],
+  adsCampaigns = [],
+  adsMetrics = [],
+  paywallTiers = [],
+  communitySubscriptions = [],
+  ebookRows = [],
+  ebookProgressRows = []
 }) {
   const lastThirtyWindow = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -839,9 +840,17 @@ export function buildInstructorDashboard({
   const managedCommunities = [];
 
   const upsertManagedCommunity = (communityId, payload) => {
-    if (!communityLookup.has(communityId)) {
-      communityLookup.set(communityId, payload);
-      managedCommunities.push(payload);
+    const merged = { ...(communityLookup.get(communityId) ?? {}), ...payload };
+    communityLookup.set(communityId, merged);
+    if (!managedCommunityIds.has(communityId)) {
+      managedCommunities.push(merged);
+    } else {
+      const index = managedCommunities.findIndex(
+        (community) => Number(community.communityId) === communityId
+      );
+      if (index !== -1) {
+        managedCommunities[index] = merged;
+      }
     }
     managedCommunityIds.add(communityId);
   };
@@ -892,7 +901,6 @@ export function buildInstructorDashboard({
   });
 
   const hasInstructorSignals =
-    user.role === 'instructor' ||
     courses.length > 0 ||
     tutorProfiles.length > 0 ||
     managedCommunityIds.size > 0 ||
@@ -1016,6 +1024,9 @@ export function buildInstructorDashboard({
       courseTitle: assignment.courseTitle,
       title: assignment.title,
       dueDate,
+      owner:
+        metadata.owner ??
+        ((`${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()) || user.email),
       owner: metadata.owner ?? resolveName(user.firstName, user.lastName, user.email),
       metadata
     };
@@ -1307,6 +1318,19 @@ export function buildInstructorDashboard({
         ctaPath: '/dashboard/instructor/bookings'
       });
     });
+
+  const normaliseFilename = (name) => {
+    if (!name) return 'Untitled asset';
+    const leaf = name.split('/').pop();
+    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+  };
+
+  const assetsNormalised = assets.map((asset) => ({
+    ...asset,
+    metadata: safeJsonParse(asset.metadata, {}),
+    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
+    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
+  }));
 
   const assetIds = new Set(assetsNormalised.map((asset) => Number(asset.id)));
   const assetEventGroups = new Map();
@@ -1810,19 +1834,6 @@ export function buildInstructorDashboard({
       type: 'Lesson'
     }))
   ].slice(0, 12);
-
-  const normaliseFilename = (name) => {
-    if (!name) return 'Untitled asset';
-    const leaf = name.split('/').pop();
-    return leaf.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
-  };
-
-  const assetsNormalised = assets.map((asset) => ({
-    ...asset,
-    metadata: safeJsonParse(asset.metadata, {}),
-    createdAt: asset.createdAt ? new Date(asset.createdAt) : null,
-    updatedAt: asset.updatedAt ? new Date(asset.updatedAt) : null
-  }));
 
   const library = assetsNormalised
     .filter((asset) => asset.status === 'ready')
@@ -4357,6 +4368,8 @@ export default class DashboardService {
       email: entry.user.email
     }));
 
+    const blogHighlights = await BlogService.getDashboardHighlights({ limit: 6 });
+
     const feedHighlights = communityMessageRows.map((row) => {
       const metadata = safeJsonParse(row.metadata, {});
       const tags = Array.isArray(metadata.tags) ? metadata.tags : [];
@@ -4491,6 +4504,10 @@ export default class DashboardService {
           unreadMessages: unreadThreads,
           items: notifications
         },
+        blog: {
+          highlights: blogHighlights,
+          featured: blogHighlights.find((entry) => entry.heroImage) ?? blogHighlights[0] ?? null
+        },
         followers: {
           followers: followersCount,
           following: followingCount,
@@ -4538,6 +4555,14 @@ export default class DashboardService {
       dashboards.admin = adminDashboard.dashboard;
     }
 
+    const blogSearchEntries = blogHighlights.map((post) => ({
+      id: `search-blog-${post.slug}`,
+      role: 'learner',
+      type: 'Blog',
+      title: post.title,
+      url: `/blog/${post.slug}`
+    }));
+
     const searchIndex = [
       ...learnerCourseSummaries.map((course) => ({
         id: `search-course-${course.id}`,
@@ -4566,7 +4591,8 @@ export default class DashboardService {
         type: event.type,
         title: event.title,
         url: '/dashboard/learner/calendar'
-      }))
+      })),
+      ...blogSearchEntries
     ];
 
     if (communityDashboard) {
@@ -4714,7 +4740,12 @@ export default class DashboardService {
       topCommunitiesRows,
       tutorResponseRow,
       refundsPendingRow,
-      upcomingLiveClassRows
+      upcomingLiveClassRows,
+      blogPublishedRow,
+      blogDraftRow,
+      blogScheduledRow,
+      blogViewRow,
+      blogRecentResult
     ] = await Promise.all([
       db('users').count('id as count').first(),
       db('users').where('created_at', '>=', thirtyDaysAgo).count('id as count').first(),
@@ -4855,7 +4886,12 @@ export default class DashboardService {
           'c.name as communityName'
         ])
         .orderBy('lc.start_at', 'asc')
-        .limit(5)
+        .limit(5),
+      db('blog_posts').where('status', 'published').count('id as count').first(),
+      db('blog_posts').where('status', 'draft').count('id as count').first(),
+      db('blog_posts').where('status', 'scheduled').count('id as count').first(),
+      db('blog_posts').sum({ total: 'view_count' }).first(),
+      BlogService.listAdminPosts({ page: 1, pageSize: 5, status: 'published' })
     ]);
 
     const totalUsers = toNumber(totalUsersRow?.count);
@@ -4886,6 +4922,12 @@ export default class DashboardService {
         : new Date(subscription.startedAt);
       return startedAt >= sixtyDaysAgo && startedAt < thirtyDaysAgo;
     }).length;
+
+    const blogPublishedCount = toNumber(blogPublishedRow?.count);
+    const blogDraftCount = toNumber(blogDraftRow?.count);
+    const blogScheduledCount = toNumber(blogScheduledRow?.count);
+    const blogTotalViews = toNumber(blogViewRow?.total);
+    const blogRecentPosts = Array.isArray(blogRecentResult?.data) ? blogRecentResult.data : [];
 
     const computeAnnualised = (priceCents, interval) => {
       switch (interval) {
@@ -5165,6 +5207,29 @@ export default class DashboardService {
       };
     });
 
+    const blogOperations = {
+      summary: {
+        published: blogPublishedCount,
+        drafts: blogDraftCount,
+        scheduled: blogScheduledCount,
+        totalViews: blogTotalViews
+      },
+      recent: blogRecentPosts.map((post) => ({
+        id: post.id,
+        title: post.title,
+        slug: post.slug,
+        status: post.status,
+        publishedAt: post.publishedAt,
+        readingTimeMinutes: post.readingTimeMinutes,
+        category: post.category,
+        tags: post.tags,
+        featured: post.isFeatured,
+        heroImage: post.media?.[0]?.mediaUrl ?? null,
+        views: Number(post.viewCount ?? 0)
+      })),
+      featured: blogRecentPosts.find((post) => post.isFeatured) ?? blogRecentPosts[0] ?? null
+    };
+
     const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
     const compliance = await IdentityVerificationService.getAdminOverview({ now: reference });
 
@@ -5193,7 +5258,8 @@ export default class DashboardService {
         communitiesLive: formatNumber(communityTotal),
         instructors: formatNumber(instructorCount)
       },
-      upcomingLaunches
+      upcomingLaunches,
+      blog: blogOperations.summary
     };
 
     const profileStats = [
@@ -5215,7 +5281,8 @@ export default class DashboardService {
       { id: 'admin-approvals', role: 'admin', type: 'Operations', title: 'Approvals queue', url: '/admin#approvals' },
       { id: 'admin-revenue', role: 'admin', type: 'Revenue', title: 'Revenue performance', url: '/admin#revenue' },
       { id: 'admin-activity', role: 'admin', type: 'Signals', title: 'Operational alerts', url: '/admin#activity' },
-      { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' }
+      { id: 'admin-compliance', role: 'admin', type: 'Compliance', title: 'KYC queue', url: '/admin#compliance' },
+      { id: 'admin-blog', role: 'admin', type: 'Content', title: 'Blog management', url: '/admin#blog' }
     ];
 
     return {
@@ -5225,9 +5292,12 @@ export default class DashboardService {
         approvals,
         revenue,
         operations,
+        blog: blogOperations,
+        compliance,
         activity: { alerts, events },
         settings: {
           monetization: monetizationSettings
+        }
         },
         compliance
       },

@@ -30,6 +30,7 @@ import courseRoutes from './routes/course.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import verificationRoutes from './routes/verification.routes.js';
 import ebookRoutes from './routes/ebook.routes.js';
+import blogRoutes from './routes/blog.routes.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
 import requestContextMiddleware from './middleware/requestContext.js';
@@ -150,6 +151,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
 app.use('/api/ebooks', ebookRoutes);
+app.use('/api/blog', blogRoutes);
 
 app.use(errorHandler);
 
