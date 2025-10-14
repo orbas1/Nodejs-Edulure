@@ -166,3 +166,14 @@ All milestones begin at **0%** completion. Task ownership aligns with the detail
      - Draft end-of-update report summarising lessons, risks, and customer enablement.
      - Deliver release notes package to marketing and customer success.【F:update_docs/1.50/new_feature_brief.md†L202-L221】
 
+
+---
+
+## Design Milestones Addendum
+The following design-focused milestones complement M1–M6 by ensuring UI/UX outputs progress in lockstep with engineering.
+
+1. **D1 – Foundation Token Consolidation (Week 1)** – Freeze cross-platform tokens, palettes, and accessibility guardrails to provide a single source of truth before feature squads begin implementation.【F:update_docs/1.50/Design_update_milestone_list.md†L5-L16】
+2. **D2 – Mobile Experience Architecture (Weeks 1–3)** – Deliver annotated wireframes, navigation partials, and flow diagrams for learner/provider apps across breakpoints, enabling theming and parity decisions early.【F:update_docs/1.50/Design_update_milestone_list.md†L18-L29】
+3. **D3 – Web Experience & Navigation Overhaul (Weeks 2–4)** – Complete marketing funnel redesign, dashboard templates, and component specs ready for Storybook ingestion without disrupting platform milestones.【F:update_docs/1.50/Design_update_milestone_list.md†L31-L40】
+4. **D4 – Asset, Copy, and Compliance Delivery (Weeks 3–5)** – Finalise copy decks, asset manifests, and accessibility test scripts that unlock engineering/QA readiness for new pages and theme variants.【F:update_docs/1.50/Design_update_milestone_list.md†L42-L54】
+5. **D5 – Handoff & Measurement Enablement (Weeks 4–6)** – Package artefacts, run walkthroughs, and define measurement cadences so experience KPIs can be tracked alongside release readiness gates.【F:update_docs/1.50/Design_update_milestone_list.md†L56-L66】

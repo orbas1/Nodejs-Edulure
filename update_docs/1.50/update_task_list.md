@@ -165,3 +165,28 @@ All tasks start at **0%** completion. Percentages will be updated during executi
     11. Deliver updated documentation site, release notes, changelog entries, and training kits with visual assets.
     12. Compile end-of-update report summarising KPIs, risk outcomes, and QA evidence for leadership sign-off.【F:update_docs/1.50/new_feature_brief.md†L202-L221】
 
+
+---
+
+## Design Execution Addendum
+Design workstreams below operate alongside existing platform tasks. Ownership aligns with the design systems, mobile UX, web UX, and design ops squads.
+
+### D1. Cross-Platform Design System Consolidation (0%)
+- **Objective:** Provide unified tokens, accessibility baselines, and governance for learner, provider, and web stacks.【F:update_docs/1.50/Design_update_task_list.md†L5-L28】
+- **Subtasks:** Mirror the detailed checklist in `Design_update_task_list.md` (items 1.1–1.10) and report progress during M1/M2 readiness reviews.【F:update_docs/1.50/Design_update_task_list.md†L9-L41】
+
+### D2. Mobile Application Experience Overhaul (0%)
+- **Objective:** Produce annotated wireframes, logic flows, and content specs across mobile breakpoints to preserve parity and prepare for theming variants.【F:update_docs/1.50/Design_update_task_list.md†L43-L87】
+- **Subtasks:** Adopt the 12-step plan captured in `Design_update_task_list.md` (items 2.1–2.12), ensuring parity with creation studio and compliance milestones.【F:update_docs/1.50/Design_update_task_list.md†L45-L87】
+
+### D3. Web Navigation & Funnel Redesign (0%)
+- **Objective:** Rebuild marketing funnels and authenticated dashboards with modular partials, Storybook-ready components, and performance guardrails.【F:update_docs/1.50/Design_update_task_list.md†L89-L132】
+- **Subtasks:** Execute tasks 3.1–3.11 from the dedicated design task list, coordinating with web platform squads to phase rollouts without blocking integrations.【F:update_docs/1.50/Design_update_task_list.md†L91-L132】
+
+### D4. Asset, Copy, and Compliance Enablement (0%)
+- **Objective:** Finalise copy decks, asset manifests, dummy data, and accessibility scripts so implementation teams have production-grade references.【F:update_docs/1.50/Design_update_task_list.md†L134-L172】
+- **Subtasks:** Follow tasks 4.1–4.9 from the design task list and include compliance/security leads in reviews for new theme/page variants.【F:update_docs/1.50/Design_update_task_list.md†L136-L172】
+
+### D5. Handoff, Measurement, and Iteration Framework (0%)
+- **Objective:** Conduct walkthroughs, deliver QA enablement packages, and codify measurement/feedback loops for post-launch optimisation.【F:update_docs/1.50/Design_update_task_list.md†L174-L206】
+- **Subtasks:** Execute tasks 5.1–5.8 from the design task list, syncing outcomes with programme release notes and steering retrospectives.【F:update_docs/1.50/Design_update_task_list.md†L176-L206】

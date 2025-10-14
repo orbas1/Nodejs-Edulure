@@ -49,3 +49,12 @@ Version 1.50 positions Edulure for enterprise launch by combining large-scale fe
   - Documentation & change logs – Technical Writer with product oversight.
 - **Exit criteria:** All milestone acceptance tests pass, tracker ≥95% overall, zero critical defects outstanding, documentation and change log approved by compliance, and end-of-update report signed off.
 
+
+## Design Experience Addendum
+To support the Version 1.50 UI/UX refresh, the design organisation has produced a dedicated plan, change log, milestone set, and task tracker. These assets ensure that learner, provider, and web journeys receive the same governance rigor as the broader engineering programme.
+
+- **Design Plan Alignment:** `Design_Plan.md` outlines cross-platform objectives, governance principles, and implementation guidance required to harmonise the refreshed design system with existing milestones.【F:update_docs/1.50/Design_Plan.md†L1-L138】
+- **Change Tracking:** `Design_Change_log.md` captures key deltas spanning mobile, web, theming, and asset readiness, enabling product leadership to audit late-stage adjustments without disrupting engineering scope.【F:update_docs/1.50/Design_Change_log.md†L4-L43】
+- **Execution Support:** New design-specific milestone, task, and progress trackers align with programme cadences so that design handoffs, QA support, and measurement enablement dovetail with existing release readiness activities.【F:update_docs/1.50/Design_update_milestone_list.md†L1-L58】【F:update_docs/1.50/Design_update_task_list.md†L1-L118】【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L41】
+
+Design deliverables should be reviewed alongside engineering status checkpoints to maintain parity, especially when introducing campaign themes, partial-based templates, or new page types required by marketing and compliance stakeholders.【F:update_docs/1.50/Design_Plan.md†L39-L117】【F:update_docs/1.50/Design_Change_log.md†L24-L43】
