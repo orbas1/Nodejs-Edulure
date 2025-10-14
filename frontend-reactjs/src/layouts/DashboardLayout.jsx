@@ -21,7 +21,8 @@ import {
   UsersIcon,
   Bars3Icon,
   XMarkIcon,
-  VideoCameraIcon
+  VideoCameraIcon,
+  MapIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -39,6 +40,7 @@ const navigationByRole = {
     { name: 'Live classrooms', to: `${basePath}/live-classes`, icon: VideoCameraIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'Field services', to: `${basePath}/field-services`, icon: MapIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Financial', to: `${basePath}/financial`, icon: ChartBarIcon },
     { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
@@ -63,6 +65,7 @@ const navigationByRole = {
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
     { name: 'Tutor management', to: `${basePath}/tutor-management`, icon: IdentificationIcon },
     { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },
+    { name: 'Field services', to: `${basePath}/field-services`, icon: MapIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },

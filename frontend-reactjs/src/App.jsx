@@ -46,6 +46,7 @@ import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
 import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
 import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
+import FieldServices from './pages/dashboard/FieldServices.jsx';
 import CommunityOverview from './pages/dashboard/community/CommunityOverview.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
@@ -144,6 +145,7 @@ function App() {
         <Route path="financial" element={<LearnerFinancial />} />
         <Route path="affiliate" element={<DashboardAffiliate />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
+        <Route path="field-services" element={<FieldServices />} />
         <Route
           path="operations"
           element={(

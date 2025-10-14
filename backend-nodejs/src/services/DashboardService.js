@@ -8,6 +8,7 @@ import FollowRecommendationModel from '../models/FollowRecommendationModel.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import IdentityVerificationService from './IdentityVerificationService.js';
 import BlogService from './BlogService.js';
+import { buildFieldServiceWorkspace } from './FieldServiceWorkspace.js';
 
 function safeJsonParse(value, fallback = {}) {
   if (!value) return fallback;
@@ -3751,6 +3752,9 @@ export default class DashboardService {
       adsMetricRows,
       communityPaywallTierRows,
       communitySubscriptionRows,
+      fieldServiceOrderRows,
+      fieldServiceEventRows,
+      fieldServiceProviderRows,
       platformMonetizationSettings
     ] = await Promise.all([
       UserPrivacySettingModel.getForUser(userId),
@@ -4345,6 +4349,83 @@ export default class DashboardService {
           'tier.billing_interval as billingInterval',
           'community.owner_id as ownerId',
           'community.name as communityName'
+        ),
+      db('field_service_orders as fso')
+        .leftJoin('field_service_providers as fsp', 'fsp.id', 'fso.provider_id')
+        .leftJoin('users as customer', 'customer.id', 'fso.customer_user_id')
+        .select(
+          'fso.id',
+          'fso.reference',
+          'fso.customer_user_id as customerUserId',
+          'fso.provider_id as providerId',
+          'fso.status',
+          'fso.priority',
+          'fso.service_type as serviceType',
+          'fso.summary',
+          'fso.requested_at as requestedAt',
+          'fso.scheduled_for as scheduledFor',
+          'fso.eta_minutes as etaMinutes',
+          'fso.sla_minutes as slaMinutes',
+          'fso.distance_km as distanceKm',
+          'fso.location_lat as locationLat',
+          'fso.location_lng as locationLng',
+          'fso.location_label as locationLabel',
+          'fso.address_line_1 as addressLine1',
+          'fso.address_line_2 as addressLine2',
+          'fso.city',
+          'fso.region',
+          'fso.postal_code as postalCode',
+          'fso.country',
+          'fso.metadata',
+          'fso.created_at as createdAt',
+          'fso.updated_at as updatedAt',
+          'fsp.user_id as providerUserId',
+          'fsp.name as providerName',
+          'fsp.email as providerEmail',
+          'fsp.phone as providerPhone',
+          'fsp.status as providerStatus',
+          'fsp.specialties as providerSpecialties',
+          'fsp.rating as providerRating',
+          'fsp.last_check_in_at as providerLastCheckInAt',
+          'fsp.location_lat as providerLocationLat',
+          'fsp.location_lng as providerLocationLng',
+          'fsp.location_label as providerLocationLabel',
+          'fsp.location_updated_at as providerLocationUpdatedAt',
+          'fsp.metadata as providerMetadata',
+          'customer.first_name as customerFirstName',
+          'customer.last_name as customerLastName',
+          'customer.email as customerEmail'
+        ),
+      db('field_service_events as fse')
+        .select(
+          'fse.id',
+          'fse.order_id as orderId',
+          'fse.event_type as eventType',
+          'fse.status',
+          'fse.notes',
+          'fse.author',
+          'fse.occurred_at as occurredAt',
+          'fse.metadata',
+          'fse.created_at as createdAt'
+        ),
+      db('field_service_providers as fsp')
+        .select(
+          'fsp.id',
+          'fsp.user_id as userId',
+          'fsp.name',
+          'fsp.email',
+          'fsp.phone',
+          'fsp.status',
+          'fsp.specialties',
+          'fsp.rating',
+          'fsp.last_check_in_at as lastCheckInAt',
+          'fsp.location_lat as locationLat',
+          'fsp.location_lng as locationLng',
+          'fsp.location_label as locationLabel',
+          'fsp.location_updated_at as locationUpdatedAt',
+          'fsp.metadata',
+          'fsp.created_at as createdAt',
+          'fsp.updated_at as updatedAt'
         ),
       PlatformSettingsService.getMonetizationSettings()
     ]);
@@ -5588,6 +5669,14 @@ export default class DashboardService {
       roles.push(instructorDashboard.role);
     }
 
+    const fieldServiceWorkspace = buildFieldServiceWorkspace({
+      now,
+      user,
+      orders: fieldServiceOrderRows,
+      events: fieldServiceEventRows,
+      providers: fieldServiceProviderRows
+    });
+
     const dashboards = {
       learner: {
         metrics,
@@ -5671,8 +5760,31 @@ export default class DashboardService {
       }
     };
 
-    if (instructorDashboard?.dashboard) {
-      instructorDashboard.dashboard.affiliate = affiliateOverview;
+    if (fieldServiceWorkspace?.customer) {
+      dashboards.learner.fieldServices = fieldServiceWorkspace.customer;
+    }
+
+    if (instructorDashboard) {
+      if (instructorDashboard.dashboard) {
+        instructorDashboard.dashboard.affiliate = affiliateOverview;
+        instructorDashboard.dashboard.fieldServices = fieldServiceWorkspace?.provider ?? null;
+      }
+      const providerTotals = fieldServiceWorkspace?.provider?.summary?.totals ?? null;
+      if (providerTotals && providerTotals.total > 0) {
+        instructorDashboard.profileStats.push({
+          label: 'Field services',
+          value: `${providerTotals.active} active`
+        });
+        const providerBio = `Coordinating ${providerTotals.total} field service engagement${
+          providerTotals.total === 1 ? '' : 's'
+        } with ${providerTotals.incidents} incident${providerTotals.incidents === 1 ? '' : 's'} in queue.`;
+        instructorDashboard.profileBio = [
+          instructorDashboard.profileBio,
+          providerBio
+        ]
+          .filter(Boolean)
+          .join(' ');
+      }
     }
 
     if (communityDashboard) {
@@ -5731,7 +5843,7 @@ export default class DashboardService {
         type: 'Assessments',
         title: 'Assessment schedule',
         url: '/dashboard/learner/assessments'
-      }
+      },
       ...blogSearchEntries
     ];
 
@@ -5760,9 +5872,28 @@ export default class DashboardService {
     if (instructorDashboard) {
       searchIndex.push(...instructorDashboard.searchIndex);
     }
+    if (fieldServiceWorkspace?.searchIndex?.length) {
+      searchIndex.push(...fieldServiceWorkspace.searchIndex);
+    }
     if (adminDashboard?.searchIndex?.length) {
       searchIndex.push(...adminDashboard.searchIndex);
     }
+
+    const learnerFieldTotals = fieldServiceWorkspace?.customer?.summary?.totals ?? null;
+    const learnerFieldActiveLabel =
+      learnerFieldTotals && learnerFieldTotals.total > 0 ? `${learnerFieldTotals.active} active` : null;
+    const learnerFieldTitleSegment =
+      learnerFieldTotals && learnerFieldTotals.total > 0
+        ? `${learnerFieldTotals.total} field service engagement${learnerFieldTotals.total === 1 ? '' : 's'}`
+        : null;
+    const learnerFieldBioSegment = (() => {
+      if (!learnerFieldTotals || learnerFieldTotals.total === 0) return null;
+      const incidentDescriptor =
+        learnerFieldTotals.incidents > 0
+          ? `${learnerFieldTotals.incidents} incident${learnerFieldTotals.incidents === 1 ? '' : 's'} monitored`
+          : 'Maintaining service coverage';
+      return `Supporting ${learnerFieldActiveLabel} with ${incidentDescriptor}.`;
+    })();
 
     const communityNames = memberships.map((membership) => membership.name).filter(Boolean);
     const primaryProgram = learnerCourseSummaries[0]?.title ?? 'Edulure programs';
@@ -5770,6 +5901,9 @@ export default class DashboardService {
       ? `Currently collaborating across ${communityNames.join(', ')} while progressing through ${primaryProgram}.`
       : `Progressing through ${primaryProgram}.`;
     const profileBioSegments = [learnerProfileBio];
+    if (learnerFieldBioSegment) {
+      profileBioSegments.push(learnerFieldBioSegment);
+    }
     if (communityDashboard?.profileBio) {
       profileBioSegments.push(communityDashboard.profileBio);
     }
@@ -5791,6 +5925,11 @@ export default class DashboardService {
         label: 'Affiliate earned',
         value: affiliateOverview.summary.totals.earnedFormatted
       });
+    }
+    if (learnerFieldActiveLabel) {
+      profileStats.push({ label: 'Field services', value: learnerFieldActiveLabel });
+    }
+
     if (communityDashboard) {
       profileStats.push(...communityDashboard.profileStats);
     }
@@ -5805,6 +5944,9 @@ export default class DashboardService {
       `${memberships.length} communities`,
       `${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`
     ];
+    if (learnerFieldTitleSegment) {
+      profileTitleSegments.push(learnerFieldTitleSegment);
+    }
     if (affiliateOverview?.summary?.totals?.programCount) {
       const programmeCount = affiliateOverview.summary.totals.programCount;
       if (programmeCount > 0) {
@@ -5813,7 +5955,6 @@ export default class DashboardService {
         );
       }
     }
-    if (instructorDashboard) {
     if (communityDashboard) {
       const managedCommunitiesCount =
         communityDashboard.dashboard?.health?.overview?.length ?? 0;

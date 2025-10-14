@@ -1,9 +1,3 @@
--- Legacy placeholder retained for historical reference.
--- Database provisioning is now handled via scripts/install-db.js, which
--- creates the target schema using environment-specific credentials and
--- runs Knex migrations. This file intentionally contains no executable SQL.
-
--- Field service tables
 CREATE TABLE IF NOT EXISTS field_service_providers (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id BIGINT UNSIGNED NULL,
