@@ -16,7 +16,7 @@
     "audit:dependencies": "npm audit --audit-level=moderate"
   },
   "dependencies": {
-    "@headlessui/react": "^1.7.17",
+    "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.1.3",
     "axios": "^1.6.8",
     "clsx": "^2.1.0",
