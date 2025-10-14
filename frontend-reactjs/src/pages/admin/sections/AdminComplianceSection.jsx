@@ -749,7 +749,7 @@ export default function AdminComplianceSection({
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 lg:grid-cols-3">
           <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h4 className="text-lg font-semibold text-slate-900">Operational controls</h4>
             <p className="mt-2 text-sm text-slate-600">
@@ -782,6 +782,44 @@ export default function AdminComplianceSection({
                 <p className="text-sm text-slate-500">No control metadata supplied.</p>
               ) : null}
             </dl>
+          </article>
+
+          <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h4 className="text-lg font-semibold text-slate-900">Payments &amp; wallet guardrails</h4>
+            <p className="mt-2 text-sm text-slate-600">
+              Keep the non-custodial ledger healthy, document provider-led compensation, and align with
+              Apple platform guidance.
+            </p>
+            <ul className="mt-6 space-y-3 text-sm text-slate-600">
+              <li className="flex items-start gap-3">
+                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+                <span>
+                  Daily double-entry reconciliation confirms provider debits equal serviceman credits;
+                  flag any imbalance above £10 immediately.
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+                <span>
+                  Wallets remain non-custodial so Blackwellen Ltd avoids holding client money and stays
+                  outside FCA authorisation—document settlement routing for every provider.
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+                <span>
+                  Providers must disclose serviceman pay before acceptance and retain evidence of local
+                  wage compliance.
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="mt-1 inline-block h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+                <span>
+                  Apple App Store submissions should note that checkout completes on the web under
+                  Guideline 3.1.3 and that no digital goods unlock in-app without IAP.
+                </span>
+              </li>
+            </ul>
           </article>
 
           {ico ? (

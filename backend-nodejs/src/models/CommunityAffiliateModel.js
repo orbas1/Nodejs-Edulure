@@ -37,7 +37,7 @@ export default class CommunityAffiliateModel {
       user_id: affiliate.userId,
       status: affiliate.status ?? 'pending',
       referral_code: affiliate.referralCode,
-      commission_rate_bps: affiliate.commissionRateBasisPoints ?? 1500,
+      commission_rate_bps: affiliate.commissionRateBasisPoints ?? 250,
       total_earned_cents: affiliate.totalEarnedCents ?? 0,
       total_paid_cents: affiliate.totalPaidCents ?? 0,
       metadata: JSON.stringify(affiliate.metadata ?? {}),

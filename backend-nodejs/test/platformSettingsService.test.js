@@ -50,6 +50,13 @@ describe('PlatformSettingsService affiliate normalisation', () => {
         security: {
           blockSelfReferral: undefined
         }
+      },
+      workforce: {
+        providerControlsCompensation: 'invalid',
+        minimumServicemanShareBps: -200,
+        recommendedServicemanShareBps: 'invalid',
+        nonCustodialWallets: 'no',
+        complianceNarrative: ''.padEnd(2501, 'x')
       }
     });
 
@@ -65,5 +72,34 @@ describe('PlatformSettingsService affiliate normalisation', () => {
     expect(normalised.affiliate.security.blockSelfReferral).toBe(
       defaults.affiliate.security.blockSelfReferral
     );
+    expect(normalised.workforce.providerControlsCompensation).toBe(
+      defaults.workforce.providerControlsCompensation
+    );
+    expect(normalised.workforce.minimumServicemanShareBps).toBe(
+      defaults.workforce.minimumServicemanShareBps
+    );
+    expect(normalised.workforce.recommendedServicemanShareBps).toBe(
+      defaults.workforce.recommendedServicemanShareBps
+    );
+    expect(normalised.workforce.nonCustodialWallets).toBe(true);
+    expect(normalised.workforce.complianceNarrative.length).toBeLessThanOrEqual(2000);
+  });
+
+  it('normalises workforce overrides within allowed bounds', () => {
+    const normalised = normaliseMonetization({
+      workforce: {
+        providerControlsCompensation: false,
+        minimumServicemanShareBps: 3500,
+        recommendedServicemanShareBps: 9000,
+        nonCustodialWallets: false,
+        complianceNarrative: 'Providers handle payouts; platform ledger is double-entry reconciled.'
+      }
+    });
+
+    expect(normalised.workforce.providerControlsCompensation).toBe(false);
+    expect(normalised.workforce.minimumServicemanShareBps).toBe(3500);
+    expect(normalised.workforce.recommendedServicemanShareBps).toBe(9000);
+    expect(normalised.workforce.nonCustodialWallets).toBe(false);
+    expect(normalised.workforce.complianceNarrative).toContain('double-entry');
   });
 });

@@ -37,14 +37,65 @@ function coerceAmount(value) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function normaliseAmount(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.round(numeric);
+}
+
+function normaliseCurrency(value) {
+  if (!value) {
+    return 'GBP';
+  }
+  const trimmed = String(value).trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(trimmed)) {
+    return trimmed;
+  }
+  const letters = trimmed.replace(/[^A-Z]/g, '').slice(0, 3);
+  return letters.length === 3 ? letters : 'GBP';
+}
+
+function normaliseEntryType(value) {
+  if (!value) {
+    return 'adjustment';
+  }
+  const normalised = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '-');
+  return normalised ? normalised.slice(0, 64) : 'adjustment';
+}
+
+function ensurePlainObject(value) {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (_error) {
+    return {};
+  }
+}
+
 export default class PaymentLedgerEntryModel {
   static async record(entry, connection = db) {
+    if (!entry || !entry.paymentIntentId) {
+      throw new Error('paymentIntentId is required to record a ledger entry');
+    }
+
+    const amount = normaliseAmount(entry.amount);
+    const currency = normaliseCurrency(entry.currency);
+    const entryType = normaliseEntryType(entry.entryType);
+    const details = ensurePlainObject(entry.details);
+
     const payload = {
       payment_intent_id: entry.paymentIntentId,
-      entry_type: entry.entryType,
-      amount: entry.amount,
-      currency: entry.currency,
-      details: JSON.stringify(entry.details ?? {}),
+      entry_type: entryType,
+      amount,
+      currency,
+      details: JSON.stringify({ ...details, currency, entryType }),
       recorded_at: entry.recordedAt ?? connection.fn.now()
     };
 
@@ -69,6 +120,8 @@ export default class PaymentLedgerEntryModel {
     return {
       ...record,
       amount: coerceAmount(record.amount),
+      currency: normaliseCurrency(record.currency),
+      entryType: normaliseEntryType(record.entryType),
       details: parseJson(record.details)
     };
   }

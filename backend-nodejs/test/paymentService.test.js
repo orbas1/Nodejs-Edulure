@@ -7,7 +7,7 @@ const platformSettingsServiceMock = vi.hoisted(() => ({
   getMonetizationSettings: vi.fn(async () => ({
     commissions: {
       enabled: true,
-      rateBps: 1500,
+      rateBps: 250,
       minimumFeeCents: 0
     }
   })),
@@ -115,7 +115,7 @@ describe('PaymentService', () => {
     platformSettingsServiceMock.getMonetizationSettings.mockResolvedValue({
       commissions: {
         enabled: true,
-        rateBps: 1500,
+        rateBps: 250,
         minimumFeeCents: 0
       },
       subscriptions: {
@@ -139,6 +139,13 @@ describe('PaymentService', () => {
           blockSelfReferral: true,
           enforceTwoFactorForPayouts: true
         }
+      },
+      workforce: {
+        providerControlsCompensation: true,
+        minimumServicemanShareBps: 0,
+        recommendedServicemanShareBps: 7500,
+        nonCustodialWallets: true,
+        complianceNarrative: 'Platform commission remains at 2.5%'
       }
     });
     platformSettingsServiceMock.calculateCommission.mockReturnValue(0);

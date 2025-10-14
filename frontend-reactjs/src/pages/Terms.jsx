@@ -17,7 +17,7 @@ const supportChannels = [
   { label: 'Enterprise contracts', value: 'enterprise@edulure.com' }
 ];
 
-const lastUpdatedDate = '12 April 2024';
+const lastUpdatedDate = '14 January 2025';
 
 const termsSections = [
   {
@@ -110,12 +110,16 @@ const termsSections = [
     paragraphs: [
       'All fees are payable in pounds sterling (GBP) unless explicitly agreed otherwise. Prices are exclusive of VAT, which will be charged at the prevailing UK rate. Payment must be made by the methods indicated at checkout or in the applicable order form. You authorise us and our payment processors to collect charges using your selected payment method.',
       'Consumers located in the United Kingdom benefit from statutory rights under the Consumer Rights Act 2015 and the Consumer Contracts (Information, Cancellation and Additional Charges) Regulations 2013. You may cancel a consumer subscription purchased online within 14 days of the order date, provided that digital content has not been fully accessed or downloaded. Where access has begun with your express consent, any statutory cooling-off right ends once content is delivered.',
-      'Refund requests outside statutory rights are evaluated against our Fair Refunds Policy. We may suspend or terminate access if payment is late or chargebacks are initiated without legitimate cause.'
+      'Refund requests outside statutory rights are evaluated against our Fair Refunds Policy. We may suspend or terminate access if payment is late or chargebacks are initiated without legitimate cause.',
+      'Marketplace transactions attract a fixed 2.5% commission retained by Blackwellen Ltd. Providers are free to determine how much of the remaining consideration is paid to their contracted service professionals, provided they comply with applicable employment and wage legislation. The Platform operates on a non-custodial basis—funds settle directly between customers and providers through approved processors so that Blackwellen Ltd does not hold client money and does not conduct regulated activities requiring FCA authorisation. For App Store distribution, pricing is displayed in-app and checkout is completed on the web in line with Apple App Store Review Guideline 3.1.3.'
     ],
     bullets: [
       'Invoices for enterprise agreements are due within 30 days of issue unless stated otherwise.',
       'Late payments accrue interest at 4% per annum above the Bank of England base rate.',
-      'We may adjust subscription fees on renewal, giving not less than 30 days’ written notice.'
+      'We may adjust subscription fees on renewal, giving not less than 30 days’ written notice.',
+      'A 2.5% platform commission applies to all marketplace payments; providers remain responsible for communicating serviceman remuneration prior to engagement.',
+      'External processors (for example Stripe or Escrow.com) collect funds directly—Edulure wallets remain non-custodial to avoid FCA client-money permissions.',
+      'iOS apps surface pricing information but link learners to the secure web checkout when payment is required, satisfying Apple’s rules where in-app purchase APIs are not mandated.'
     ]
   },
   {

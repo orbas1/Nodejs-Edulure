@@ -50,6 +50,13 @@ const monetizationUpdateSchema = Joi.object({
       blockSelfReferral: Joi.boolean(),
       enforceTwoFactorForPayouts: Joi.boolean()
     }).optional()
+  }).optional(),
+  workforce: Joi.object({
+    providerControlsCompensation: Joi.boolean(),
+    minimumServicemanShareBps: Joi.number().integer().min(0).max(10_000),
+    recommendedServicemanShareBps: Joi.number().integer().min(0).max(10_000),
+    nonCustodialWallets: Joi.boolean(),
+    complianceNarrative: Joi.string().max(2000)
   }).optional()
 })
   .min(1)

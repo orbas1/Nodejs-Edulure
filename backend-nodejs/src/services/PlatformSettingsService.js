@@ -9,7 +9,7 @@ const SETTINGS_KEYS = Object.freeze({
 const DEFAULT_MONETIZATION = Object.freeze({
   commissions: {
     enabled: true,
-    rateBps: 1500,
+    rateBps: 250,
     minimumFeeCents: 0,
     allowCommunityOverride: true
   },
@@ -42,6 +42,14 @@ const DEFAULT_MONETIZATION = Object.freeze({
       blockSelfReferral: true,
       enforceTwoFactorForPayouts: true
     }
+  },
+  workforce: {
+    providerControlsCompensation: true,
+    minimumServicemanShareBps: 0,
+    recommendedServicemanShareBps: 7500,
+    nonCustodialWallets: true,
+    complianceNarrative:
+      'Platform commission remains at 2.5% and funds are routed directly between customers and providers; the platform operates a non-custodial ledger to avoid FCA regulated activity.'
   }
 });
 
@@ -191,7 +199,7 @@ function sanitizeMonetizationPayload(payload = {}) {
       commission.enabled = Boolean(payload.commissions.enabled);
     }
     if (payload.commissions.rateBps !== undefined) {
-      commission.rateBps = clampInt(payload.commissions.rateBps, { min: 0, max: 5000, fallback: 1500 });
+      commission.rateBps = clampInt(payload.commissions.rateBps, { min: 0, max: 5000, fallback: 250 });
     }
     if (payload.commissions.minimumFeeCents !== undefined) {
       commission.minimumFeeCents = clampInt(payload.commissions.minimumFeeCents, { min: 0, max: 10_000_000, fallback: 0 });
@@ -309,6 +317,37 @@ function sanitizeMonetizationPayload(payload = {}) {
     }
   }
 
+  if (payload.workforce && typeof payload.workforce === 'object') {
+    const workforce = {};
+    if (payload.workforce.providerControlsCompensation !== undefined) {
+      workforce.providerControlsCompensation = Boolean(
+        payload.workforce.providerControlsCompensation
+      );
+    }
+    if (payload.workforce.minimumServicemanShareBps !== undefined) {
+      workforce.minimumServicemanShareBps = clampInt(
+        payload.workforce.minimumServicemanShareBps,
+        { min: 0, max: 10_000, fallback: 0 }
+      );
+    }
+    if (payload.workforce.recommendedServicemanShareBps !== undefined) {
+      workforce.recommendedServicemanShareBps = clampInt(
+        payload.workforce.recommendedServicemanShareBps,
+        { min: 0, max: 10_000, fallback: 7500 }
+      );
+    }
+    if (payload.workforce.nonCustodialWallets !== undefined) {
+      workforce.nonCustodialWallets = Boolean(payload.workforce.nonCustodialWallets);
+    }
+    if (payload.workforce.complianceNarrative !== undefined) {
+      const narrative = String(payload.workforce.complianceNarrative ?? '').trim();
+      workforce.complianceNarrative = narrative.slice(0, 2000);
+    }
+    if (Object.keys(workforce).length) {
+      sanitized.workforce = workforce;
+    }
+  }
+
   return sanitized;
 }
 
@@ -394,6 +433,35 @@ function normaliseMonetization(rawSettings = {}) {
     )
   };
 
+  merged.workforce = merged.workforce ?? {};
+  merged.workforce.providerControlsCompensation = Boolean(
+    merged.workforce.providerControlsCompensation ?? defaults.workforce.providerControlsCompensation
+  );
+  merged.workforce.minimumServicemanShareBps = clampInt(
+    merged.workforce.minimumServicemanShareBps,
+    {
+      min: 0,
+      max: 10_000,
+      fallback: defaults.workforce.minimumServicemanShareBps
+    }
+  );
+  merged.workforce.recommendedServicemanShareBps = clampInt(
+    merged.workforce.recommendedServicemanShareBps,
+    {
+      min: 0,
+      max: 10_000,
+      fallback: defaults.workforce.recommendedServicemanShareBps
+    }
+  );
+  merged.workforce.nonCustodialWallets = Boolean(
+    merged.workforce.nonCustodialWallets ?? defaults.workforce.nonCustodialWallets
+  );
+  merged.workforce.complianceNarrative = String(
+    merged.workforce.complianceNarrative ?? defaults.workforce.complianceNarrative
+  )
+    .trim()
+    .slice(0, 2000);
+
   return merged;
 }
 
@@ -434,6 +502,13 @@ export default class PlatformSettingsService {
         requireTaxInformation: merged.affiliate.requireTaxInformation,
         defaultCommission: merged.affiliate.defaultCommission,
         security: merged.affiliate.security
+      },
+      workforce: {
+        providerControlsCompensation: merged.workforce.providerControlsCompensation,
+        minimumServicemanShareBps: merged.workforce.minimumServicemanShareBps,
+        recommendedServicemanShareBps: merged.workforce.recommendedServicemanShareBps,
+        nonCustodialWallets: merged.workforce.nonCustodialWallets,
+        complianceNarrative: merged.workforce.complianceNarrative
       }
     }, connection);
 
