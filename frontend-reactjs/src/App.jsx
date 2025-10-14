@@ -38,7 +38,7 @@ import InstructorLessonSchedule from './pages/dashboard/InstructorLessonSchedule
 import InstructorTutorSchedule from './pages/dashboard/InstructorTutorSchedule.jsx';
 import InstructorTutorManagement from './pages/dashboard/InstructorTutorManagement.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
-import InstructorAds from './pages/dashboard/InstructorAds.jsx';
+import FixnadoAds from './pages/dashboard/FixnadoAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
 import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
@@ -196,13 +196,13 @@ function App() {
             </ProtectedRoute>
           )}
         />
-        <Route path="ads" element={<InstructorAds />} />
+        <Route path="ads" element={<FixnadoAds />} />
         <Route path="settings" element={<DashboardSettings />} />
         <Route
           path="ads"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorAds />
+              <FixnadoAds />
             </ProtectedRoute>
           )}
         />
