@@ -4,7 +4,7 @@ Progress is recorded per major task. Percentages represent completion of require
 
 | Task | Security Level | Completion Level | Integration Level | Functionality Level | Error Free Level | Production Level | Overall Level |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Platform Hardening & Modularisation | 66% | 82% | 84% | 86% | 70% | 82% | 78% |
+| Platform Hardening & Modularisation | 72% | 88% | 90% | 90% | 74% | 86% | 83% |
 | Data Governance & Compliance Reinforcement | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Creation Studio & Content Ecosystem Delivery | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Integrations, Automation & Notifications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |

@@ -31,6 +31,7 @@ All design milestones start at **0%** completion and must produce artefacts refe
   - Marketing and dashboard copy decks approved with localisation mapping and support scripts.【F:update_docs/1.50/Design_Plan.md†L107-L114】
   - Asset manifests (illustrations, vectors, icons, dummy data sets) optimised for performance budgets and themed variations.【F:update_docs/1.50/Design_Plan.md†L45-L47】【F:update_docs/1.50/Design_Plan.md†L115-L123】
   - Accessibility test scripts covering keyboard navigation, screen readers, focus management, and contrast toggles baselined.【F:update_docs/1.50/Design_Plan.md†L71-L74】【F:update_docs/1.50/Design_Plan.md†L115-L123】
+  - Compliance dashboard wireframes integrate audit, consent, and incident ledgers with encryption indicators, SLA countdown timers, and escalation ownership cues sourced from the new backend tables.【F:backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js†L1-L180】
 
 ## Milestone D5 – Handoff & Measurement Enablement (Weeks 4–6, 0%)
 - **Goal:** Package artefacts for development and QA, conduct walkthroughs, and establish post-launch measurement dashboards and feedback loops.【F:update_docs/1.50/Design_Plan.md†L128-L153】

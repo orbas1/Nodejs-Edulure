@@ -62,6 +62,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   7. Prepare QA regression notes linking design artefacts to automated/manual test coverage expectations.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   8. Publish documentation updates in central repository and notify stakeholders of version changes.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   9. Capture outstanding compliance or localisation gaps and present to steering committee for mitigation.【F:update_docs/1.50/Design_Plan.md†L23-L34】
+  - _Progress note:_ Compliance dashboard briefs now tap encrypted audit, consent, and incident ledgers so UI states can surface SLA countdowns, encryption badges, and escalation ownership without exposing sensitive payloads in design artefacts.【F:backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js†L1-L180】
 
 ## 5. Handoff, Measurement, and Iteration Framework (0%)
 - **Objective:** Enable smooth transition to development and ensure post-launch measurement and feedback loops are in place.【F:update_docs/1.50/Design_Plan.md†L128-L153】

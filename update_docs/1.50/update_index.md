@@ -8,3 +8,7 @@
 - Code: `Edulure-Flutter/lib/core/security/*`, `lib/provider/bootstrap/provider_app_bootstrap.dart`, `lib/provider/runtime/provider_capability_bridge.dart`
 - Documentation: `provider_phone_app_updates/*`, `change_log.md`, `Design_*` progress trackers, `update_task_list.md`
 
+## Compliance Audit & Consent Ledger Hardening
+- Code: `backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js`
+- Documentation: `update_task_list.md`, `change_log.md`, `update_progress_tracker.md`, `Design_*` artefacts covering compliance dashboards
+
