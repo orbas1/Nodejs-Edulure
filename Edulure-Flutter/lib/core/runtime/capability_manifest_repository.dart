@@ -16,14 +16,29 @@ class CapabilityManifestLoadResult {
 }
 
 class CapabilityManifestRepository {
-  CapabilityManifestRepository(this._dio);
+  CapabilityManifestRepository(this._dio, {this.audience});
 
   final Dio _dio;
+  final String? audience;
 
-  static const _boxName = 'capability_manifest';
   static const _manifestKey = 'manifest';
   static const _timestampKey = 'timestamp';
   static const Duration _cacheTtl = Duration(minutes: 5);
+
+  String get _boxName {
+    if (audience == null || audience!.isEmpty) {
+      return 'capability_manifest';
+    }
+    final normalised = audience!
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+$'), '')
+        .replaceAll(RegExp(r'^_+'), '');
+    if (normalised.isEmpty) {
+      return 'capability_manifest';
+    }
+    return 'capability_manifest_$normalised';
+  }
 
   Future<Box> _ensureBox() async {
     if (!Hive.isBoxOpen(_boxName)) {
@@ -75,6 +90,7 @@ class CapabilityManifestRepository {
   Future<CapabilityManifestLoadResult> _fetchManifest() async {
     final response = await _dio.get(
       '/runtime/manifest',
+      queryParameters: audience == null ? null : {'audience': audience},
       options: Options(
         extra: const {'requiresAuth': false},
       ),

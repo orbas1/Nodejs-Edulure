@@ -14,7 +14,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **User Phone App:**
     5. Adjust environment bootstrap to handle new capability manifest, including fallback messaging when services degrade.【F:update_docs/1.50/features_to_add.md†L237-L286】 ✅ Completed – Flutter bootstrap now warms the manifest provider, caches responses, and renders a persistent capability banner that communicates degraded or unavailable services across the mobile shell.【F:Edulure-Flutter/lib/bootstrap/app_bootstrap.dart†L1-L58】【F:Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart†L1-L112】【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】
   - **Provider Phone App:**
-    6. Define parity hooks and stubs for future provider app to consume capability manifest and RBAC matrix (documentation + interface contracts).
+    6. Define parity hooks and stubs for future provider app to consume capability manifest and RBAC matrix (documentation + interface contracts). ✅ Completed – provider bootstrap, RBAC matrix models, and parity documentation ready for provider squads to integrate manifest/RBAC flows without rewrites.【F:Edulure-Flutter/lib/provider/bootstrap/provider_app_bootstrap.dart†L1-L94】【F:Edulure-Flutter/lib/provider/runtime/provider_capability_bridge.dart†L1-L182】【F:Edulure-Flutter/lib/core/security/rbac_matrix_models.dart†L1-L214】【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L51】
   - **Database:**
     7. Create migration scripts for audit, consent, and incident tables with encrypted columns and index policies.【F:update_docs/1.50/features_to_add.md†L12-L70】
   - **API:**

@@ -4,7 +4,7 @@ Progress is recorded per major task. Percentages represent completion of require
 
 | Task | Security Level | Completion Level | Integration Level | Functionality Level | Error Free Level | Production Level | Overall Level |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Platform Hardening & Modularisation | 58% | 75% | 78% | 80% | 62% | 75% | 71% |
+| Platform Hardening & Modularisation | 66% | 82% | 84% | 86% | 70% | 82% | 78% |
 | Data Governance & Compliance Reinforcement | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Creation Studio & Content Ecosystem Delivery | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Integrations, Automation & Notifications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -31,14 +31,14 @@ The design programme is tracked separately using the metrics below. Scores mirro
 | Design Position | 46 | Layout guidance exists, awaiting usability findings for optimisation.【F:update_docs/1.50/Design_update_progress_tracker.md†L11-L13】 |
 | Design Text Grade | 50 | Copy hierarchy drafted, localisation workflows awaiting approval.【F:update_docs/1.50/Design_update_progress_tracker.md†L13-L14】 |
 | Design Colour Grade | 62 | Palette and theme guidance baselined for dark/emo variants.【F:update_docs/1.50/Design_update_progress_tracker.md†L14-L15】 |
-| Design Render Grade | 49 | Mobile outage banner prototypes captured in Flutter alongside web references, expanding coverage for incident states.【F:update_docs/1.50/Design_update_progress_tracker.md†L13-L21】【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】 |
+| Design Render Grade | 58 | Provider parity diagrams now accompany Flutter outage mocks, documenting RBAC lock states for operator shells alongside learner visuals.【F:update_docs/1.50/Design_update_progress_tracker.md†L12-L22】【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L40】 |
 | Compliance Grade | 55 | Accessibility/compliance scripts scoped; execution evidence pending.【F:update_docs/1.50/Design_update_progress_tracker.md†L16-L17】 |
-| Security Grade | 38 | Security reviews outstanding beyond planning notes.【F:update_docs/1.50/Design_update_progress_tracker.md†L17-L18】 |
-| Design Functionality Grade | 64 | Cross-platform manifest warm-up and banner logic now implemented, aligning design flows with production telemetry states.【F:update_docs/1.50/Design_update_progress_tracker.md†L9-L19】【F:Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart†L1-L112】 |
+| Security Grade | 52 | RBAC matrix artefacts, guardrail documentation, and bootstrap flows capture secure defaults and two-person thresholds for provider tooling.【F:update_docs/1.50/Design_update_progress_tracker.md†L14-L15】 |
+| Design Functionality Grade | 72 | Shared manifest/RBAC repositories power consumer and provider shells, ensuring parity telemetry and permission handling in documented flows.【F:update_docs/1.50/Design_update_progress_tracker.md†L15-L16】【F:Edulure-Flutter/lib/core/security/rbac_matrix_repository.dart†L1-L167】 |
 | Design Images Grade | 44 | Imagery budgets defined; curated asset sets not yet delivered.【F:update_docs/1.50/Design_update_progress_tracker.md†L19-L20】 |
-| Design Usability Grade | 58 | KPI targets set, and Flutter shell now mirrors outage messaging to support parity usability tests.【F:update_docs/1.50/Design_update_progress_tracker.md†L11-L21】【F:Edulure-Flutter/lib/main.dart†L1-L140】 |
+| Design Usability Grade | 62 | Provider personas are now included in parity plans, aligning manifest banners and permission messaging across operator journeys.【F:update_docs/1.50/Design_update_progress_tracker.md†L17-L18】【F:update_docs/1.50/provider_phone_app_updates/provider_app_change_log.md†L1-L7】 |
 | Bugs-less Grade | 42 | Risk tracking active, QA dashboards still future work.【F:update_docs/1.50/Design_update_progress_tracker.md†L21-L22】 |
-| Test Grade | 35 | Accessibility/visual regression automation not yet executed.【F:update_docs/1.50/Design_update_progress_tracker.md†L22-L23】 |
-| QA Grade | 40 | QA collaboration defined; evidence to be captured closer to release.【F:update_docs/1.50/Design_update_progress_tracker.md†L23-L24】 |
-| Design Accuracy Grade | 48 | Documentation depth supports accuracy but lacks measurement backing.【F:update_docs/1.50/Design_update_progress_tracker.md†L24-L25】 |
-| Overall Grade | 47 | Aggregate readiness; indicates planning maturity with limited execution evidence.【F:update_docs/1.50/Design_update_progress_tracker.md†L25-L26】 |
+| Test Grade | 35 | Accessibility/visual regression automation not yet executed.【F:update_docs/1.50/Design_update_progress_tracker.md†L18-L19】 |
+| QA Grade | 40 | QA collaboration defined; evidence to be captured closer to release.【F:update_docs/1.50/Design_update_progress_tracker.md†L19-L20】 |
+| Design Accuracy Grade | 48 | Documentation depth supports accuracy but lacks measurement backing.【F:update_docs/1.50/Design_update_progress_tracker.md†L20-L21】 |
+| Overall Grade | 52 | Parity artefacts for provider RBAC and capability health lift readiness across incident response tooling.【F:update_docs/1.50/Design_update_progress_tracker.md†L22-L22】 |
