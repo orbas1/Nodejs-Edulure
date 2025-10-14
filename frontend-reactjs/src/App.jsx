@@ -38,6 +38,12 @@ import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
 import InstructorAds from './pages/dashboard/InstructorAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
+import CommunityOverview from './pages/dashboard/community/CommunityOverview.jsx';
+import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
+import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
+import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
+import CommunitySafety from './pages/dashboard/community/CommunitySafety.jsx';
+import CommunityCommunications from './pages/dashboard/community/CommunityCommunications.jsx';
 
 function App() {
   return (
@@ -118,6 +124,46 @@ function App() {
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
+        <Route
+          path="operations"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityOperations />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="programming"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityProgramming />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="monetisation"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityMonetisation />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="safety"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunitySafety />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="communications"
+          element={(
+            <ProtectedRoute allowedRoles={['community']}>
+              <CommunityCommunications />
+            </ProtectedRoute>
+          )}
+        />
         <Route path="communities/create" element={<InstructorCommunityCreate />} />
         <Route path="communities/manage" element={<InstructorCommunityManage />} />
         <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />

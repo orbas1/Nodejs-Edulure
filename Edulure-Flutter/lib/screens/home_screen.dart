@@ -496,6 +496,34 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
       _RoleAction(icon: Icons.calendar_today_outlined, label: 'Review timetable', route: '/profile'),
     ],
   ),
+  'community': _RoleHomeDetails(
+    heroTitle: 'Steward thriving communities',
+    heroSubtitle: 'Monitor rituals, incidents, and monetisation signals from your command deck.',
+    heroGradient: [Color(0xFF312E81), Color(0xFF6366F1)],
+    features: [
+      _RoleFeature(
+        icon: Icons.groups_3_outlined,
+        title: 'Community health',
+        description: 'Track member activity, pending approvals, and moderator coverage.',
+      ),
+      _RoleFeature(
+        icon: Icons.auto_mode_outlined,
+        title: 'Operations runbooks',
+        description: 'Activate escalation playbooks and measure automation readiness.',
+      ),
+      _RoleFeature(
+        icon: Icons.campaign_outlined,
+        title: 'Growth telemetry',
+        description: 'Review premium tiers, experiments, and communications insights.',
+      ),
+    ],
+    actions: [
+      _RoleAction(icon: Icons.dashboard_outlined, label: 'Open community dashboard', route: '/dashboard/community'),
+      _RoleAction(icon: Icons.calendar_month_outlined, label: 'Review programming', route: '/dashboard/community'),
+      _RoleAction(icon: Icons.campaign_outlined, label: 'Plan broadcasts', route: '/inbox'),
+      _RoleAction(icon: Icons.assignment_turned_in_outlined, label: 'Manage runbooks', route: '/content'),
+    ],
+  ),
   'instructor': _RoleHomeDetails(
     heroTitle: 'Guide every cohort with confidence',
     heroSubtitle: 'Launch community updates, manage bookings, and iterate your curriculum.',
@@ -566,6 +594,8 @@ String _roleLabel(String role) {
       return 'Instructor';
     case 'admin':
       return 'Administrator';
+    case 'community':
+      return 'Community';
     default:
       return 'Learner';
   }
@@ -574,9 +604,9 @@ String _roleLabel(String role) {
 List<String> _resolveRolesForUser(String role) {
   switch (role) {
     case 'admin':
-      return const ['admin', 'instructor', 'user'];
+      return const ['admin', 'community', 'instructor', 'user'];
     case 'instructor':
-      return const ['instructor', 'user'];
+      return const ['community', 'instructor', 'user'];
     default:
       return const ['user'];
   }
