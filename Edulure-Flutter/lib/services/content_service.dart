@@ -23,14 +23,28 @@ class ContentService {
   Future<List<ContentAsset>> fetchAssets() async {
     final token = SessionManager.getAccessToken();
     if (token == null) return loadCachedAssets();
-    final response = await _dio.get(
-      '/content/assets',
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
-    );
-    final data = response.data['data'] as List<dynamic>? ?? [];
-    final assets = data.map((json) => ContentAsset.fromJson(json as Map<String, dynamic>)).toList();
-    await SessionManager.assetsCache.put('items', assets.map((asset) => asset.toJson()).toList());
-    return assets;
+    try {
+      final response = await _dio.get(
+        '/content/assets',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      final data = response.data['data'] as List<dynamic>? ?? [];
+      final assets = data.map((json) => ContentAsset.fromJson(json as Map<String, dynamic>)).toList();
+      await SessionManager.assetsCache.put('items', assets.map((asset) => asset.toJson()).toList());
+      return assets;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 403) {
+        await SessionManager.assetsCache.delete('items');
+        throw const ContentAccessDeniedException(
+          'Instructor or admin workspace required to manage the content library.',
+        );
+      }
+      final data = error.response?.data;
+      final message = data is Map && data['message'] is String
+          ? data['message'] as String
+          : error.message ?? 'Unable to fetch content assets';
+      throw Exception(message);
+    }
   }
 
   Future<List<EbookMarketplaceItem>> fetchMarketplaceEbooks() async {
@@ -162,6 +176,53 @@ class ContentService {
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );
   }
+
+  Future<ContentAsset> updateMaterialMetadata(
+    String assetId,
+    MaterialMetadataUpdate metadata,
+  ) async {
+    final token = SessionManager.getAccessToken();
+    if (token == null) {
+      throw Exception('Authentication required');
+    }
+    try {
+      final response = await _dio.patch(
+        '/content/assets/$assetId/metadata',
+        data: metadata.toJson(),
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      final updated = ContentAsset.fromJson(
+        Map<String, dynamic>.from(response.data['data'] as Map<String, dynamic>),
+      );
+      final cache = loadCachedAssets();
+      final next = cache
+          .map((asset) => asset.publicId == updated.publicId ? updated : asset)
+          .toList();
+      await SessionManager.assetsCache
+          .put('items', next.map((asset) => asset.toJson()).toList());
+      return updated;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 403) {
+        throw const ContentAccessDeniedException(
+          'Instructor or admin workspace required to update material metadata.',
+        );
+      }
+      final data = error.response?.data;
+      final message = data is Map && data['message'] is String
+          ? data['message'] as String
+          : error.message ?? 'Unable to update material metadata';
+      throw Exception(message);
+    }
+  }
+}
+
+class ContentAccessDeniedException implements Exception {
+  const ContentAccessDeniedException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }
 
 class ContentAsset {
@@ -172,6 +233,7 @@ class ContentAsset {
     required this.status,
     required this.updatedAt,
     this.metadata,
+    this.visibility,
   });
 
   final String publicId;
@@ -180,6 +242,7 @@ class ContentAsset {
   final String status;
   final String? updatedAt;
   final Map<String, dynamic>? metadata;
+  final String? visibility;
 
   factory ContentAsset.fromJson(Map<String, dynamic> json) {
     return ContentAsset(
@@ -191,6 +254,7 @@ class ContentAsset {
       metadata: json['metadata'] != null
           ? Map<String, dynamic>.from(json['metadata'] as Map)
           : null,
+      visibility: json['visibility'] as String?,
     );
   }
 
@@ -201,9 +265,281 @@ class ContentAsset {
       'type': type,
       'status': status,
       'updatedAt': updatedAt,
-      'metadata': metadata
+      'metadata': metadata,
+      'visibility': visibility,
     };
   }
+
+  Map<String, dynamic> get customMetadata {
+    final custom = metadata?['custom'];
+    if (custom is Map) {
+      return Map<String, dynamic>.from(custom as Map);
+    }
+    return {};
+  }
+
+  List<String> get categories {
+    final data = customMetadata['categories'];
+    if (data is List) {
+      return data.map((item) => item.toString()).toList();
+    }
+    return const [];
+  }
+
+  List<String> get tags {
+    final data = customMetadata['tags'];
+    if (data is List) {
+      return data.map((item) => item.toString()).toList();
+    }
+    return const [];
+  }
+
+  String? get coverImageUrl {
+    final media = customMetadata['media'];
+    if (media is Map && media['coverImage'] is Map) {
+      final cover = Map<String, dynamic>.from(media['coverImage'] as Map);
+      final url = cover['url'];
+      if (url is String && url.isNotEmpty) {
+        return url;
+      }
+    }
+    return null;
+  }
+
+  String? get coverImageAlt {
+    final media = customMetadata['media'];
+    if (media is Map && media['coverImage'] is Map) {
+      final cover = Map<String, dynamic>.from(media['coverImage'] as Map);
+      final alt = cover['alt'];
+      if (alt is String && alt.isNotEmpty) {
+        return alt;
+      }
+    }
+    return null;
+  }
+}
+
+enum MaterialMediaKind { image, video }
+
+class MaterialMediaItem {
+  MaterialMediaItem({
+    required this.url,
+    this.caption,
+    this.kind = MaterialMediaKind.image,
+  });
+
+  final String url;
+  final String? caption;
+  final MaterialMediaKind kind;
+
+  MaterialMediaItem copyWith({String? url, String? caption, MaterialMediaKind? kind}) {
+    return MaterialMediaItem(
+      url: url ?? this.url,
+      caption: caption ?? this.caption,
+      kind: kind ?? this.kind,
+    );
+  }
+
+  factory MaterialMediaItem.fromJson(Map<String, dynamic> json) {
+    final kindValue = json['kind'] as String?;
+    final kind = MaterialMediaKind.values.firstWhere(
+      (element) => element.name == kindValue,
+      orElse: () => MaterialMediaKind.image,
+    );
+    return MaterialMediaItem(
+      url: json['url'] as String? ?? '',
+      caption: json['caption'] as String?,
+      kind: kind,
+    );
+  }
+}
+
+class MaterialMetadataUpdate {
+  MaterialMetadataUpdate({
+    this.title,
+    this.description,
+    List<String>? categories,
+    List<String>? tags,
+    this.coverImageUrl,
+    this.coverImageAlt,
+    List<MaterialMediaItem>? gallery,
+    this.videoUrl,
+    this.videoPosterUrl,
+    this.headline,
+    this.subheadline,
+    this.callToActionLabel,
+    this.callToActionUrl,
+    this.badge,
+    this.visibility,
+    this.showcasePinned = false,
+  })  : categories = categories ?? <String>[],
+        tags = tags ?? <String>[],
+        gallery = gallery ?? <MaterialMediaItem>[];
+
+  final String? title;
+  final String? description;
+  final List<String> categories;
+  final List<String> tags;
+  final String? coverImageUrl;
+  final String? coverImageAlt;
+  final List<MaterialMediaItem> gallery;
+  final String? videoUrl;
+  final String? videoPosterUrl;
+  final String? headline;
+  final String? subheadline;
+  final String? callToActionLabel;
+  final String? callToActionUrl;
+  final String? badge;
+  final String? visibility;
+  final bool showcasePinned;
+
+  factory MaterialMetadataUpdate.fromAsset(ContentAsset asset) {
+    final custom = asset.customMetadata;
+    final media = custom['media'];
+    final showcase = custom['showcase'];
+    final callToAction = showcase is Map ? showcase['callToAction'] : null;
+    final galleryItems = <MaterialMediaItem>[];
+    if (media is Map && media['gallery'] is List) {
+      for (final item in media['gallery'] as List<dynamic>) {
+        if (item is Map) {
+          galleryItems.add(MaterialMediaItem.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    }
+    return MaterialMetadataUpdate(
+      title: custom['title'] as String?,
+      description: custom['description'] as String?,
+      categories: asset.categories,
+      tags: asset.tags,
+      coverImageUrl: asset.coverImageUrl,
+      coverImageAlt: asset.coverImageAlt,
+      gallery: galleryItems,
+      videoUrl: showcase is Map ? showcase['videoUrl'] as String? : null,
+      videoPosterUrl: showcase is Map ? showcase['videoPosterUrl'] as String? : null,
+      headline: showcase is Map ? showcase['headline'] as String? : null,
+      subheadline: showcase is Map ? showcase['subheadline'] as String? : null,
+      callToActionLabel: callToAction is Map ? callToAction['label'] as String? : null,
+      callToActionUrl: callToAction is Map ? callToAction['url'] as String? : null,
+      badge: showcase is Map ? showcase['badge'] as String? : null,
+      visibility: asset.visibility,
+      showcasePinned: custom['featureFlags'] is Map
+          ? (custom['featureFlags'] as Map)['showcasePinned'] == true
+          : false,
+    );
+  }
+
+  MaterialMetadataUpdate copyWith({
+    String? title,
+    String? description,
+    List<String>? categories,
+    List<String>? tags,
+    String? coverImageUrl,
+    String? coverImageAlt,
+    List<MaterialMediaItem>? gallery,
+    String? videoUrl,
+    String? videoPosterUrl,
+    String? headline,
+    String? subheadline,
+    String? callToActionLabel,
+    String? callToActionUrl,
+    String? badge,
+    String? visibility,
+    bool? showcasePinned,
+  }) {
+    return MaterialMetadataUpdate(
+      title: title ?? this.title,
+      description: description ?? this.description,
+      categories: categories ?? this.categories,
+      tags: tags ?? this.tags,
+      coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      coverImageAlt: coverImageAlt ?? this.coverImageAlt,
+      gallery: gallery ?? this.gallery,
+      videoUrl: videoUrl ?? this.videoUrl,
+      videoPosterUrl: videoPosterUrl ?? this.videoPosterUrl,
+      headline: headline ?? this.headline,
+      subheadline: subheadline ?? this.subheadline,
+      callToActionLabel: callToActionLabel ?? this.callToActionLabel,
+      callToActionUrl: callToActionUrl ?? this.callToActionUrl,
+      badge: badge ?? this.badge,
+      visibility: visibility ?? this.visibility,
+      showcasePinned: showcasePinned ?? this.showcasePinned,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final normalisedCategories = _normaliseList(categories, maxItems: 12, maxLength: 40);
+    final normalisedTags = _normaliseList(tags, maxItems: 24, maxLength: 32);
+    final sanitisedGallery = <Map<String, dynamic>>[];
+    for (final item in gallery) {
+      final url = _sanitiseHttps(item.url);
+      if (url == null) continue;
+      sanitisedGallery.add({
+        'url': url,
+        'caption': _trimOrNull(item.caption, maxLength: 160),
+        'kind': item.kind.name,
+      });
+      if (sanitisedGallery.length >= 8) break;
+    }
+    return {
+      'title': _trimOrNull(title, maxLength: 140),
+      'description': _trimOrNull(description, maxLength: 1500),
+      'categories': normalisedCategories,
+      'tags': normalisedTags,
+      'coverImage': {
+        'url': _sanitiseHttps(coverImageUrl),
+        'alt': _trimOrNull(coverImageAlt, maxLength: 120),
+      },
+      'gallery': sanitisedGallery,
+      'showcase': {
+        'headline': _trimOrNull(headline, maxLength: 120),
+        'subheadline': _trimOrNull(subheadline, maxLength: 200),
+        'videoUrl': _sanitiseHttps(videoUrl),
+        'videoPosterUrl': _sanitiseHttps(videoPosterUrl),
+        'callToActionLabel': _trimOrNull(callToActionLabel, maxLength: 40),
+        'callToActionUrl': _sanitiseHttps(callToActionUrl),
+        'badge': _trimOrNull(badge, maxLength: 32),
+      },
+      if (visibility != null) 'visibility': visibility,
+      'featureFlags': {
+        'showcasePinned': showcasePinned,
+      },
+    };
+  }
+}
+
+String? _trimOrNull(String? value, {int? maxLength}) {
+  if (value == null) return null;
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return null;
+  if (maxLength != null && trimmed.length > maxLength) {
+    return trimmed.substring(0, maxLength);
+  }
+  return trimmed;
+}
+
+String? _sanitiseHttps(String? value) {
+  if (value == null) return null;
+  final trimmed = value.trim();
+  if (trimmed.isEmpty || !trimmed.toLowerCase().startsWith('https://')) {
+    return null;
+  }
+  return trimmed;
+}
+
+List<String> _normaliseList(List<String> values, {required int maxItems, required int maxLength}) {
+  final seen = <String>{};
+  final result = <String>[];
+  for (final entry in values) {
+    final trimmed = entry.trim();
+    if (trimmed.isEmpty) continue;
+    final truncated = trimmed.length > maxLength ? trimmed.substring(0, maxLength) : trimmed;
+    final fingerprint = truncated.toLowerCase();
+    if (seen.contains(fingerprint)) continue;
+    seen.add(fingerprint);
+    result.add(truncated);
+    if (result.length >= maxItems) break;
+  }
+  return result;
 }
 
 class EbookMarketplaceItem {
