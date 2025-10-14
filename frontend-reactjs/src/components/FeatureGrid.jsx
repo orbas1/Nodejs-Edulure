@@ -1,19 +1,17 @@
 const features = [
   {
-    title: 'Community operating system',
-    description:
-      'Run cohorts, memberships, and masterminds with modular spaces for lessons, calls, and challenges.',
-    bullets: ['Dynamic classroom builder', 'Member onboarding journeys', 'Automated nudges']
+    title: 'Community OS',
+    description: 'Design and run cohorts with structured spaces that scale cleanly.',
+    bullets: ['Modular classrooms', 'Guided onboarding', 'Automated nudges']
   },
   {
-    title: 'Commerce that converts',
-    description: 'Launch high-performing funnels with built-in analytics, upsells, and subscription billing.',
-    bullets: ['Adaptive landing pages', 'Stripe & Paddle support', 'Behavioral segmentation']
+    title: 'Commerce engine',
+    description: 'Launch offers, bundles, and subscriptions with analytics that close the loop.',
+    bullets: ['Adaptive landing pages', 'Stripe & Paddle ready', 'Behavior-based segments']
   },
   {
     title: 'Live learning intelligence',
-    description:
-      'Track engagement across live sessions, resources, and community threads to scale what works.',
+    description: 'Watch engagement trends across sessions, resources, and conversations in real time.',
     bullets: ['Unified engagement graph', 'Session quality scoring', 'AI-powered insights']
   }
 ];
@@ -23,9 +21,9 @@ export default function FeatureGrid() {
     <section className="bg-slate-50/70">
       <div className="mx-auto max-w-6xl px-6 py-20">
         <div className="md:text-center">
-          <h2 className="text-3xl font-semibold text-slate-900">Operate your learning empire from a single dashboard</h2>
+          <h2 className="text-3xl font-semibold text-slate-900">Run every learning stream from one secure hub</h2>
           <p className="mt-4 text-base text-slate-600">
-            Everything from discovery to delivery to community growth, wired for scale and obsession-worthy experiences.
+            Launch, grow, and monetize programs with tooling that keeps teams aligned and data protected.
           </p>
         </div>
         <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">

@@ -7,8 +7,8 @@ export default function Home() {
   return (
     <div className="bg-slate-50 text-slate-900">
       <PageHero
-        title="Where ambitious builders learn, teach, and grow together"
-        description="Edulure is a community-first home for people obsessed with sharing skills. Swap playbooks, co-host live jams, and turn knowledge into momentum with peers who cheer you on."
+        title="Build together. Launch faster."
+        description="Edulure unites live lessons, community spaces, and revenue tools so your team can scale without the clutter."
         cta={
           <>
             <Link
@@ -33,23 +33,23 @@ export default function Home() {
         <div className="relative mx-auto max-w-6xl px-6 py-24">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-wide text-primary">Community heartbeat</p>
-            <h2 className="mt-4 text-3xl font-semibold text-slate-900 lg:text-4xl">See how members connect in real time</h2>
+            <h2 className="mt-4 text-3xl font-semibold text-slate-900 lg:text-4xl">Keep your operators, mentors, and learners in sync</h2>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              Every surface inside Edulure is designed to feel like a shared studio: search to find collaborators, circles to gather, rituals to stay accountable, and a lively feed that keeps everyone inspired.
+              Search, gather, and stay accountable without juggling tools. Edulure keeps collaboration, communication, and follow-through in one secure place.
             </p>
           </div>
           <div className="mt-16 grid gap-10 lg:grid-cols-2">
             <article className="flex flex-col justify-between gap-8 rounded-4xl border border-slate-200 bg-white p-8 shadow-[0_45px_90px_-50px_rgba(99,102,241,0.4)]">
               <div className="space-y-5">
                 <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">Discovery</span>
-                <h3 className="text-2xl font-semibold text-slate-900">Find circles that match your vibe</h3>
+                <h3 className="text-2xl font-semibold text-slate-900">Find circles without the guesswork</h3>
                 <p className="text-sm leading-6 text-slate-600">
-                  Explore a living directory of members, topics, and micro-communities. Follow interests, sync on schedules, and dive straight into the rooms where conversations are already happening.
+                  Use precision filters to spot the right collaborators in seconds and join rooms that are already moving.
                 </p>
                 <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Profiles spotlight skills, availability, and what each member is excited to share</li>
-                  <li>Adaptive filters for goals, time zones, and preferred collaboration styles</li>
-                  <li>Clips and notes from past sessions so you know the energy before you join</li>
+                  <li>Profiles surface focus areas, availability, and current priorities</li>
+                  <li>Filters lock to goals, time zones, and collaboration styles</li>
+                  <li>Session notes and clips preview the energy before you join</li>
                 </ul>
               </div>
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-inner">
@@ -81,14 +81,14 @@ export default function Home() {
             <article className="flex flex-col justify-between gap-8 rounded-4xl border border-blue-100 bg-white p-8 shadow-[0_45px_90px_-50px_rgba(59,130,246,0.45)]">
               <div className="space-y-5">
                 <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-600">Gatherings</span>
-                <h3 className="text-2xl font-semibold text-slate-900">Plan intimate and large-scale sessions with ease</h3>
+                <h3 className="text-2xl font-semibold text-slate-900">Run sessions with clarity</h3>
                 <p className="text-sm leading-6 text-slate-600">
-                  Whether it&apos;s a quick accountability stand-up or a deep-dive workshop, the flow keeps the human connection front and center—clear expectations, shared notes, and space to reflect afterward.
+                  Handle signups, reminders, and follow-ups in one flow so every meeting feels intentional.
                 </p>
                 <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Session formats built for co-creation, from co-working to hot seats</li>
-                  <li>Timezones, reminders, and access links automatically handled for the group</li>
-                  <li>Optional recordings and recaps ready for those who couldn&apos;t make it live</li>
+                  <li>Pre-built formats cover co-working, hot seats, and workshops</li>
+                  <li>Scheduling handles time zones, reminders, and secure entry links</li>
+                  <li>Recordings and recaps publish automatically for anyone who couldn&apos;t make it live</li>
                 </ul>
               </div>
               <div className="rounded-3xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-white p-6 shadow-inner">
@@ -119,7 +119,7 @@ export default function Home() {
                       <span>Time</span>
                       <span className="text-slate-900">11:30 AM GMT</span>
                     </div>
-                    <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[11px] text-blue-700">Share a note about what you&apos;re working on so the room can support you.</div>
+                    <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2 text-[11px] text-blue-700">Share a quick update so the room is ready.</div>
                   </div>
                   <button className="rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white shadow-lg shadow-primary/40">Confirm your spot</button>
                 </div>
@@ -128,14 +128,14 @@ export default function Home() {
             <article className="flex flex-col justify-between gap-8 rounded-4xl border border-pink-100 bg-white p-8 shadow-[0_45px_90px_-50px_rgba(236,72,153,0.45)]">
               <div className="space-y-5">
                 <span className="inline-flex items-center rounded-full bg-pink-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-pink-600">Rhythms</span>
-                <h3 className="text-2xl font-semibold text-slate-900">Keep momentum with shared rituals</h3>
+                <h3 className="text-2xl font-semibold text-slate-900">Keep rituals moving</h3>
                 <p className="text-sm leading-6 text-slate-600">
-                  Streaks feel celebratory, prompts encourage reflection, and members cheer each other on. The dashboard celebrates progress without feeling transactional.
+                  Progress tracking, prompts, and shout-outs keep every cohort energized without extra admin.
                 </p>
                 <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Celebrate milestones with community badges and shout-outs</li>
-                  <li>Surface resources, replays, and shared notes from the crew</li>
-                  <li>Gentle nudges to help you take the next meaningful action</li>
+                  <li>Celebrate milestones with lightweight badges and notes</li>
+                  <li>Surface resources, replays, and shared wins automatically</li>
+                  <li>Smart nudges spotlight the next best action for each member</li>
                 </ul>
               </div>
               <div className="rounded-3xl border border-pink-100 bg-gradient-to-br from-pink-50 via-white to-white p-6 shadow-inner">
@@ -166,7 +166,7 @@ export default function Home() {
                   </div>
                   <div className="grid gap-3 rounded-2xl border border-pink-100 bg-white p-4 text-xs text-slate-500">
                     <p className="text-sm font-semibold text-slate-900">Next ritual</p>
-                    <p>Drop your three biggest learnings in the reflection thread before Friday&apos;s jam.</p>
+                    <p>Post a takeaway before Friday&apos;s jam to keep momentum high.</p>
                     <button className="self-start rounded-full bg-pink-100 px-3 py-1 text-[11px] text-pink-700">Share update</button>
                   </div>
                 </div>
@@ -175,14 +175,14 @@ export default function Home() {
             <article className="flex flex-col justify-between gap-8 rounded-4xl border border-teal-100 bg-white p-8 shadow-[0_45px_90px_-50px_rgba(45,212,191,0.4)]">
               <div className="space-y-5">
                 <span className="inline-flex items-center rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-teal-600">Community</span>
-                <h3 className="text-2xl font-semibold text-slate-900">A feed that feels like family</h3>
+                <h3 className="text-2xl font-semibold text-slate-900">A feed designed for action</h3>
                 <p className="text-sm leading-6 text-slate-600">
-                  Celebrations, support requests, and open questions blend together so every login feels like stepping into a buzzing studio with friends who get it.
+                  Wins, asks, and resources live together so every check-in sparks the next move.
                 </p>
                 <ul className="space-y-2 text-sm text-slate-500">
-                  <li>Announcements with rich media, templates, and shout-outs</li>
-                  <li>Peer-led celebrations, feedback asks, and resource swaps</li>
-                  <li>Light-touch moderation that keeps the space welcoming</li>
+                  <li>Announcements highlight launches, updates, and templates</li>
+                  <li>Members celebrate wins, request feedback, and swap resources</li>
+                  <li>Smart moderation keeps focus without slowing the energy</li>
                 </ul>
               </div>
               <div className="rounded-3xl border border-teal-100 bg-gradient-to-br from-teal-50 via-white to-white p-6 shadow-inner">
