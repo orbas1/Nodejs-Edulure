@@ -1472,6 +1472,299 @@ export function buildInstructorDashboard({
       });
     });
 
+  const serviceCapacityByMonth = new Map();
+  upcomingTutorSlots.forEach((slot) => {
+    if (!slot.startAt) return;
+    const key = toUtcMonthKey(slot.startAt);
+    if (!key) return;
+    serviceCapacityByMonth.set(key, (serviceCapacityByMonth.get(key) ?? 0) + 1);
+  });
+
+  const rosterLookup = new Map();
+  tutorRoster.forEach((entry) => {
+    const tutorId = Number(String(entry.id ?? '').replace('tutor-', ''));
+    if (Number.isNaN(tutorId)) return;
+    rosterLookup.set(tutorId, entry);
+  });
+
+  const serviceOfferings = tutorProfiles
+    .map((profile) => {
+      const metadata = safeJsonParse(profile.metadata, {});
+      const serviceMetadata =
+        (metadata.service && typeof metadata.service === 'object')
+          ? metadata.service
+          : (metadata.services && typeof metadata.services === 'object')
+            ? metadata.services.primary ?? metadata.services.default ?? metadata.services
+            : {};
+      const rosterEntry = rosterLookup.get(Number(profile.id));
+      const baseName =
+        serviceMetadata.name ??
+        profile.displayName ??
+        rosterEntry?.name ??
+        resolveName(user.firstName, user.lastName, 'Service');
+      const category = serviceMetadata.category ?? metadata.specialty ?? 'Mentorship service';
+      const priceLabel =
+        serviceMetadata.priceLabel ??
+        (serviceMetadata.priceCents
+          ? formatCurrency(serviceMetadata.priceCents, serviceMetadata.priceCurrency ?? 'USD')
+          : rosterEntry?.rate ?? 'Custom pricing');
+      const durationMinutes = Number(
+        serviceMetadata.durationMinutes ??
+          serviceMetadata.duration ??
+          metadata.defaultDuration ??
+          metadata.durationMinutes ??
+          0
+      );
+      const durationLabel =
+        serviceMetadata.durationLabel ??
+        (durationMinutes > 0 ? minutesToReadable(durationMinutes) : rosterEntry?.weeklyHours ?? '45 mins standard');
+      const tags = new Set([
+        ...(Array.isArray(rosterEntry?.focusAreas) ? rosterEntry.focusAreas : []),
+        ...normaliseStringArray(serviceMetadata.tags),
+        ...normaliseStringArray(metadata.expertise)
+      ]);
+      const csatScore = Number(profile.ratingAverage ?? serviceMetadata.csat ?? 0);
+      const clientsServed = Number(
+        profile.completedSessions ??
+          serviceMetadata.clientsServed ??
+          serviceMetadata.clients ??
+          0
+      );
+      const automationRate = Number(serviceMetadata.automationRate ?? 0);
+      const slaMinutes = Number(
+        serviceMetadata.slaMinutes ??
+          metadata.responseTimeMinutes ??
+          profile.responseTimeMinutes ??
+          0
+      );
+      const statusTone = serviceMetadata.statusTone ?? rosterEntry?.statusTone ?? 'success';
+      const statusLabel = serviceMetadata.statusLabel ?? rosterEntry?.status ?? 'Active';
+
+      const description =
+        serviceMetadata.description ??
+        metadata.bio ??
+        'High-touch advisory service with enterprise-grade playbooks and reporting.';
+
+      return {
+        id: `service-${profile.id}`,
+        name: baseName,
+        category,
+        status: serviceMetadata.status ?? statusLabel.toLowerCase(),
+        statusLabel,
+        statusTone,
+        description,
+        priceLabel,
+        durationLabel,
+        deliveryLabel: serviceMetadata.delivery ?? 'Virtual session',
+        tags: Array.from(tags).slice(0, 6),
+        csatLabel:
+          csatScore > 0 ? `${csatScore.toFixed(1)} / 5 (${Number(profile.ratingCount ?? 0)} reviews)` : 'Awaiting feedback',
+        clientsServedLabel:
+          clientsServed > 0 ? `${clientsServed} client${clientsServed === 1 ? '' : 's'} served` : 'First client onboarding',
+        automationLabel:
+          automationRate > 0 ? `${Math.round(automationRate)}% automated flow` : 'Manual qualification',
+        slaLabel: slaMinutes > 0 ? `${minutesToReadable(slaMinutes)} response SLA` : 'SLA pending',
+        utilisationLabel: rosterEntry?.workload ?? 'Capacity aligned'
+      };
+    })
+    .filter(Boolean);
+
+  const serviceEvents = tutorBookingsNormalised
+    .filter((booking) => booking.status === 'confirmed' || booking.status === 'requested' || booking.status === 'in_review')
+    .map((booking) => {
+      const scheduledStart = booking.scheduledStart ?? booking.requestedAt ?? null;
+      if (!scheduledStart) {
+        return null;
+      }
+      const learnerName = resolveName(booking.learnerFirstName, booking.learnerLastName, 'Learner');
+      const statusLabelMap = {
+        confirmed: 'Confirmed',
+        requested: 'Awaiting confirmation',
+        in_review: 'Under review'
+      };
+      const stageMap = {
+        confirmed: 'Delivery',
+        requested: 'Intake',
+        in_review: 'QA'
+      };
+      return {
+        id: `service-booking-${booking.id}`,
+        topic: booking.metadata.topic ?? 'Strategy session',
+        status: booking.status,
+        statusLabel: statusLabelMap[booking.status] ?? capitalise(booking.status ?? 'Pipeline'),
+        learner: learnerName,
+        stage: stageMap[booking.status] ?? 'Pipeline',
+        startAt: scheduledStart,
+        timeLabel: formatDateTime(scheduledStart, { timeStyle: 'short' }),
+        scheduledLabel: formatDateTime(scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+      };
+    })
+    .filter(Boolean);
+
+  const serviceCalendarMonths = buildServiceCalendarMonths(serviceEvents, {
+    now,
+    months: 12,
+    capacityByMonth: serviceCapacityByMonth
+  });
+
+  const confirmedServiceBookings = serviceEvents.filter((event) => event.status === 'confirmed');
+  const pendingServiceBookings = serviceEvents.filter((event) => event.status !== 'confirmed');
+  const utilisationRate = upcomingTutorSlots.length > 0
+    ? Math.round((confirmedServiceBookings.length / upcomingTutorSlots.length) * 100)
+    : null;
+
+  const serviceSummary = [
+    {
+      id: 'services-active',
+      label: 'Active services',
+      value: `${serviceOfferings.length}`,
+      detail:
+        serviceOfferings.length > 0
+          ? `${serviceOfferings.filter((entry) => entry.statusTone === 'success').length} live for booking`
+          : 'Configure at least one service to go live',
+      tone: serviceOfferings.length > 0 ? 'primary' : 'neutral',
+      trend: serviceOfferings.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'services-confirmed',
+      label: 'Confirmed bookings (90d)',
+      value: `${confirmedServiceBookings.filter((event) => event.startAt >= new Date(now.getTime() - 90 * DAY_IN_MS)).length}`,
+      detail: `${confirmedServiceBookings.length} upcoming across calendar`,
+      tone: 'success',
+      trend: confirmedServiceBookings.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'services-pending',
+      label: 'Pending intake',
+      value: `${pendingServiceBookings.length}`,
+      detail: pendingServiceBookings.length > 0 ? 'Route requests within 4h SLA' : 'Queue clear',
+      tone: pendingServiceBookings.length > 0 ? 'warning' : 'success',
+      trend: pendingServiceBookings.length > 0 ? 'up' : 'down'
+    },
+    {
+      id: 'services-utilisation',
+      label: 'Forward utilisation',
+      value: utilisationRate !== null ? `${utilisationRate}%` : 'No capacity',
+      detail: `${upcomingTutorSlots.length} published slot${upcomingTutorSlots.length === 1 ? '' : 's'}`,
+      tone: utilisationRate !== null && utilisationRate >= 80 ? 'warning' : 'info',
+      trend: utilisationRate !== null && utilisationRate >= 65 ? 'up' : 'neutral'
+    }
+  ];
+
+  const upcomingServiceBookings = serviceEvents
+    .filter((event) => event.startAt && event.startAt >= now)
+    .sort((a, b) => a.startAt - b.startAt)
+    .slice(0, 12)
+    .map((event) => ({
+      id: event.id,
+      label: event.topic,
+      status: event.status,
+      statusLabel: event.statusLabel,
+      learner: event.learner,
+      scheduledFor: event.scheduledLabel,
+      stage: event.stage,
+      timeLabel: event.timeLabel
+    }));
+
+  const monthlySummaries = serviceCalendarMonths.map((month) => ({
+    id: month.id,
+    label: month.label,
+    confirmed: month.confirmed,
+    pending: month.pending,
+    capacity: month.capacity,
+    utilisationRate: month.utilisationRate,
+    note:
+      month.capacity > 0
+        ? `${month.capacity} slot${month.capacity === 1 ? '' : 's'} published`
+        : 'No capacity published'
+  }));
+
+  const serviceAlerts = tutorNotifications.map((notification) => ({
+    id: notification.id,
+    severity: notification.severity ?? 'info',
+    title: notification.title,
+    detail: notification.detail,
+    ctaLabel: notification.ctaLabel,
+    ctaPath: notification.ctaPath
+  }));
+
+  const serviceWorkflow = {
+    owner: 'Service operations desk',
+    automationRate: serviceOfferings.length > 0 ? 78 : 42,
+    breachCount: serviceAlerts.filter((alert) => alert.severity === 'warning').length,
+    stages: [
+      {
+        id: 'intake',
+        title: 'Intake & qualification',
+        tone: pendingServiceBookings.length > 0 ? 'warning' : 'success',
+        status: pendingServiceBookings.length > 0 ? 'Action required' : 'On track',
+        description:
+          pendingServiceBookings.length > 0
+            ? `${pendingServiceBookings.length} request${pendingServiceBookings.length === 1 ? '' : 's'} awaiting routing.`
+            : 'All inbound requests triaged within SLA.',
+        kpis: ['4h intake SLA', `${pipelineBookings.length} queued`]
+      },
+      {
+        id: 'delivery',
+        title: 'Delivery orchestration',
+        tone: utilisationRate !== null && utilisationRate >= 85 ? 'warning' : 'info',
+        status: utilisationRate !== null && utilisationRate >= 85 ? 'Monitor' : 'Healthy',
+        description:
+          utilisationRate !== null
+            ? `Forward utilisation at ${utilisationRate}% across mentor pods.`
+            : 'Publish mentor availability to unlock utilisation telemetry.',
+        kpis: [`${upcomingTutorSlots.length} future slots`, `${serviceOfferings.length} offerings`] 
+      },
+      {
+        id: 'feedback',
+        title: 'Feedback & QA',
+        tone: confirmedServiceBookings.length > 0 ? 'info' : 'neutral',
+        status: confirmedServiceBookings.length > 0 ? 'Running' : 'Awaiting sessions',
+        description: confirmedServiceBookings.length > 0
+          ? 'Capture CSAT immediately after each engagement and feed automation rules.'
+          : 'No confirmed sessions to score yet.',
+        kpis: [
+          serviceOfferings.length > 0
+            ? `${serviceOfferings.filter((entry) => (entry.csatLabel ?? '').includes('/')).length} services with CSAT`
+            : 'Enable CSAT collection'
+        ]
+      }
+    ],
+    notes: [
+      `${confirmedServiceBookings.length} confirmed booking${confirmedServiceBookings.length === 1 ? '' : 's'} in-flight`,
+      utilisationRate !== null ? `Utilisation projected at ${utilisationRate}% over next 12 months` : 'Utilisation pending capacity publish'
+    ]
+  };
+
+  const serviceControls = {
+    owner: 'Service operations desk',
+    lastAudit: formatDateTime(now, { dateStyle: 'long' }),
+    restrictedRoles: ['instructor'],
+    encryption: 'TLS 1.3 in transit, AES-256 at rest',
+    automationRate: serviceWorkflow.automationRate,
+    retentionDays: 1095,
+    monitoring: '24/7 monitoring with anomaly detection and auto-escalation to operations.',
+    policies: [
+      'Dual approval required for service launch or pricing change.',
+      'SAML enforced for staff and instructors managing services.',
+      'PII is masked in exports and redacted after 36 months.'
+    ],
+    auditLog: 'Comprehensive audit trails retained for 36 months and exportable on request.'
+  };
+
+  const serviceSuite = {
+    summary: serviceSummary,
+    workflow: serviceWorkflow,
+    catalogue: serviceOfferings,
+    bookings: {
+      monthly: monthlySummaries,
+      upcoming: upcomingServiceBookings,
+      calendar: serviceCalendarMonths
+    },
+    alerts: serviceAlerts,
+    controls: serviceControls
+  };
+
   const normaliseFilename = (name) => {
     if (!name) return 'Untitled asset';
     const leaf = name.split('/').pop();
@@ -2823,14 +3116,27 @@ export function buildInstructorDashboard({
       type: 'Assessments',
       title: 'Assessment studio',
       url: '/dashboard/instructor/assessments'
-    }
+    },
+    {
+      id: 'search-instructor-services',
+      role: 'instructor',
+      type: 'Services',
+      title: 'Service suite',
+      url: '/dashboard/instructor/services'
+    },
+    ...serviceOfferings.map((service) => ({
+      id: `search-instructor-service-${service.id}`,
+      role: 'instructor',
+      type: 'Service',
+      title: service.name,
+      url: '/dashboard/instructor/services'
+    })),
     ...tutorRoster.map((tutor) => ({
       id: `search-instructor-tutor-${tutor.id}`,
       role: 'instructor',
       type: 'Tutor',
       title: tutor.name,
       url: '/dashboard/instructor/tutor-management'
-      url: '/dashboard/instructor/live-classes'
     }))
   ];
 
@@ -2901,6 +3207,7 @@ export function buildInstructorDashboard({
         pipeline: pipelineBookings,
         confirmed: confirmedBookings
       },
+      services: serviceSuite,
       ebooks: {
         catalogue: ebookCatalogue,
         creationPipelines
@@ -2946,6 +3253,133 @@ function buildCalendarEntries(entries) {
     day,
     items
   }));
+}
+
+function toUtcDateKey(date) {
+  if (!date) return null;
+  const value = typeof date === 'string' ? new Date(date) : date;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return null;
+  }
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(value.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function toUtcMonthKey(date) {
+  if (!date) return null;
+  const value = typeof date === 'string' ? new Date(date) : date;
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return null;
+  }
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
+function startOfIsoWeek(date) {
+  const value = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const weekday = (value.getUTCDay() + 6) % 7; // Monday as first day
+  value.setUTCDate(value.getUTCDate() - weekday);
+  return value;
+}
+
+function addUtcDays(date, days) {
+  const value = new Date(date.getTime());
+  value.setUTCDate(value.getUTCDate() + days);
+  return value;
+}
+
+function formatMonthLabel(date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(date);
+}
+
+function buildServiceCalendarMonths(events = [], { now = new Date(), months = 12, capacityByMonth = new Map() } = {}) {
+  const validEvents = events
+    .map((event) => {
+      const startAt = event.startAt ? new Date(event.startAt) : null;
+      if (!startAt || Number.isNaN(startAt.getTime())) {
+        return null;
+      }
+      return {
+        ...event,
+        startAt,
+        dateKey: toUtcDateKey(startAt),
+        monthKey: toUtcMonthKey(startAt)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.startAt - b.startAt);
+
+  const eventsByDate = new Map();
+  validEvents.forEach((event) => {
+    const key = event.dateKey;
+    if (!key) return;
+    const list = eventsByDate.get(key) ?? [];
+    list.push(event);
+    eventsByDate.set(key, list);
+  });
+
+  const calendarMonths = [];
+  for (let offset = 0; offset < months; offset += 1) {
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+    const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+    const gridStart = startOfIsoWeek(monthStart);
+    const totalDays = Math.ceil(((monthEnd.getTime() - gridStart.getTime()) / DAY_IN_MS + 1) / 7) * 7;
+    const weeks = [];
+    let cursor = gridStart;
+    const weekCount = totalDays / 7;
+    for (let weekIndex = 0; weekIndex < weekCount; weekIndex += 1) {
+      const days = [];
+      for (let dayIndex = 0; dayIndex < 7; dayIndex += 1) {
+        const key = toUtcDateKey(cursor);
+        const bookings = key ? eventsByDate.get(key) ?? [] : [];
+        days.push({
+          id: key ?? `placeholder-${offset}-${weekIndex}-${dayIndex}`,
+          date: cursor.toISOString(),
+          day: cursor.getUTCDate(),
+          isCurrentMonth: cursor.getUTCMonth() === monthStart.getUTCMonth(),
+          bookings: bookings.map((booking) => ({
+            id: booking.id,
+            label: booking.topic,
+            status: booking.status,
+            timeLabel: booking.timeLabel,
+            learner: booking.learner
+          }))
+        });
+        cursor = addUtcDays(cursor, 1);
+      }
+      weeks.push({ id: `week-${weekIndex}`, days });
+    }
+
+    const monthEvents = validEvents.filter(
+      (event) => event.startAt >= monthStart && event.startAt <= monthEnd
+    );
+    const confirmed = monthEvents.filter((event) => event.status === 'confirmed').length;
+    const pending = monthEvents.filter((event) => event.status !== 'confirmed').length;
+    const monthKey = toUtcMonthKey(monthStart);
+    const capacity = monthKey ? capacityByMonth.get(monthKey) ?? 0 : 0;
+    const utilisationRate = capacity > 0 ? Math.round((confirmed / capacity) * 100) : null;
+
+    calendarMonths.push({
+      id: `service-month-${monthStart.getUTCFullYear()}-${monthStart.getUTCMonth() + 1}`,
+      label: formatMonthLabel(monthStart),
+      year: monthStart.getUTCFullYear(),
+      month: monthStart.getUTCMonth() + 1,
+      confirmed,
+      pending,
+      capacity,
+      utilisationRate,
+      weeks
+    });
+  }
+
+  return calendarMonths;
 }
 
 function formatBasisPoints(rateBps) {

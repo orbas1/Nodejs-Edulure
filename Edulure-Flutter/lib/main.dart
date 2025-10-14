@@ -20,6 +20,7 @@ import 'screens/assessments_screen.dart';
 import 'screens/blog_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/community_dashboard_screen.dart';
+import 'screens/service_suite_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,6 +66,7 @@ class EdulureApp extends StatelessWidget {
         '/courses/purchase': (_) => const CoursePurchaseScreen(),
         '/blog': (_) => const BlogScreen(),
         '/settings': (_) => const SettingsScreen(),
+        '/services': (_) => const ServiceSuiteScreen(),
       },
     );
   }

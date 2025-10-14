@@ -21,7 +21,8 @@ import {
   UsersIcon,
   Bars3Icon,
   XMarkIcon,
-  VideoCameraIcon
+  VideoCameraIcon,
+  BriefcaseIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -61,6 +62,7 @@ const navigationByRole = {
     { name: 'Affiliate', to: `${basePath}/affiliate`, icon: HandshakeIcon },
     { name: 'Lesson schedule', to: `${basePath}/lesson-schedule`, icon: CalendarDaysIcon },
     { name: 'Tutor bookings', to: `${basePath}/bookings`, icon: UsersIcon },
+    { name: 'Service suite', to: `${basePath}/services`, icon: BriefcaseIcon },
     { name: 'Tutor management', to: `${basePath}/tutor-management`, icon: IdentificationIcon },
     { name: 'Tutor schedule', to: `${basePath}/tutor-schedule`, icon: CalendarDaysIcon },
     { name: 'Calendar', to: `${basePath}/calendar`, icon: CalendarDaysIcon },

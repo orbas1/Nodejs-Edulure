@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import 'api_config.dart';
 import 'dashboard_service.dart';
+import 'service_suite_models.dart';
 import 'session_manager.dart';
 
 class CourseService {
@@ -62,6 +63,45 @@ class CourseService {
     }
 
     return CourseDashboard.fromJson(instructorJson);
+  }
+
+  Future<ServiceSuite> fetchServiceSuite() async {
+    final token = SessionManager.getAccessToken();
+    if (token == null) {
+      throw Exception('Authentication required');
+    }
+
+    final response = await _dio.get(
+      '/dashboard/me',
+      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    );
+
+    final payload = response.data;
+    if (payload is! Map<String, dynamic>) {
+      throw Exception('Unexpected dashboard payload');
+    }
+
+    final data = payload['data'];
+    if (data is! Map<String, dynamic>) {
+      throw Exception('Malformed dashboard response');
+    }
+
+    final dashboards = data['dashboards'];
+    if (dashboards is! Map<String, dynamic>) {
+      throw Exception('Dashboards not available for this account');
+    }
+
+    final instructor = dashboards['instructor'];
+    if (instructor is! Map<String, dynamic>) {
+      throw Exception('Instructor workspace is not configured for this account');
+    }
+
+    final services = instructor['services'];
+    if (services is! Map<String, dynamic>) {
+      throw Exception('Service suite is not configured for this workspace');
+    }
+
+    return ServiceSuite.fromJson(Map<String, dynamic>.from(services));
   }
 }
 
