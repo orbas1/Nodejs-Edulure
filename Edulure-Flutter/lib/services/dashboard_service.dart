@@ -601,6 +601,616 @@ class LearnerDashboardSnapshot {
   }
 }
 
+class CommunityHealthEntry {
+  CommunityHealthEntry({
+    required this.id,
+    required this.name,
+    required this.members,
+    required this.health,
+    required this.trend,
+    required this.incidentsOpen,
+    required this.escalationsOpen,
+  });
+
+  final String id;
+  final String name;
+  final String members;
+  final String health;
+  final String trend;
+  final int incidentsOpen;
+  final int escalationsOpen;
+
+  factory CommunityHealthEntry.fromJson(Map<String, dynamic> json) {
+    return CommunityHealthEntry(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      name: json['name']?.toString() ?? 'Community',
+      members: json['members']?.toString() ?? '0 members',
+      health: json['health']?.toString() ?? 'Stable',
+      trend: json['trend']?.toString() ?? 'Steady',
+      incidentsOpen: (json['incidentsOpen'] is num)
+          ? (json['incidentsOpen'] as num).round()
+          : int.tryParse('${json['incidentsOpen'] ?? 0}') ?? 0,
+      escalationsOpen: (json['escalationsOpen'] is num)
+          ? (json['escalationsOpen'] as num).round()
+          : int.tryParse('${json['escalationsOpen'] ?? 0}') ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'members': members,
+      'health': health,
+      'trend': trend,
+      'incidentsOpen': incidentsOpen,
+      'escalationsOpen': escalationsOpen,
+    };
+  }
+}
+
+class CommunityRunbook {
+  CommunityRunbook({
+    required this.id,
+    required this.title,
+    required this.owner,
+    required this.updatedAt,
+    required this.tags,
+    required this.automationReady,
+  });
+
+  final String id;
+  final String title;
+  final String owner;
+  final String updatedAt;
+  final List<String> tags;
+  final bool automationReady;
+
+  factory CommunityRunbook.fromJson(Map<String, dynamic> json) {
+    final rawTags = json['tags'];
+    return CommunityRunbook(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? json['name']?.toString() ?? 'Runbook',
+      owner: json['owner']?.toString() ?? 'Community team',
+      updatedAt: json['updatedAt']?.toString() ?? json['duration']?.toString() ?? 'Draft',
+      tags: rawTags is List
+          ? rawTags.map((tag) => tag?.toString() ?? '').where((tag) => tag.isNotEmpty).toList()
+          : <String>[],
+      automationReady: json['automationReady'] == true || json['automation_ready'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'owner': owner,
+      'updatedAt': updatedAt,
+      'tags': tags,
+      'automationReady': automationReady,
+    };
+  }
+}
+
+class CommunityEscalation {
+  CommunityEscalation({
+    required this.id,
+    required this.title,
+    required this.owner,
+    required this.status,
+    required this.due,
+    required this.community,
+  });
+
+  final String id;
+  final String title;
+  final String owner;
+  final String status;
+  final String due;
+  final String community;
+
+  factory CommunityEscalation.fromJson(Map<String, dynamic> json) {
+    return CommunityEscalation(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? 'Escalation',
+      owner: json['owner']?.toString() ?? 'Operations',
+      status: json['status']?.toString() ?? 'open',
+      due: json['due']?.toString() ?? 'TBC',
+      community: json['community']?.toString() ?? 'Community',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'owner': owner,
+      'status': status,
+      'due': due,
+      'community': community,
+    };
+  }
+}
+
+class CommunityEventCard {
+  CommunityEventCard({
+    required this.id,
+    required this.title,
+    required this.date,
+    required this.facilitator,
+    required this.seats,
+    required this.status,
+  });
+
+  final String id;
+  final String title;
+  final String date;
+  final String facilitator;
+  final String seats;
+  final String status;
+
+  factory CommunityEventCard.fromJson(Map<String, dynamic> json) {
+    return CommunityEventCard(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? 'Event',
+      date: json['date']?.toString() ?? 'TBC',
+      facilitator: json['facilitator']?.toString() ?? 'Host',
+      seats: json['seats']?.toString() ?? '0/0 booked',
+      status: json['status']?.toString() ?? 'scheduled',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'date': date,
+      'facilitator': facilitator,
+      'seats': seats,
+      'status': status,
+    };
+  }
+}
+
+class CommunityTutorPod {
+  CommunityTutorPod({
+    required this.id,
+    required this.mentor,
+    required this.focus,
+    required this.scheduled,
+    required this.status,
+  });
+
+  final String id;
+  final String mentor;
+  final String focus;
+  final String scheduled;
+  final String status;
+
+  factory CommunityTutorPod.fromJson(Map<String, dynamic> json) {
+    return CommunityTutorPod(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      mentor: json['mentor']?.toString() ?? 'Mentor',
+      focus: json['focus']?.toString() ?? 'Session',
+      scheduled: json['scheduled']?.toString() ?? 'Unscheduled',
+      status: json['status']?.toString() ?? 'pending',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'mentor': mentor,
+      'focus': focus,
+      'scheduled': scheduled,
+      'status': status,
+    };
+  }
+}
+
+class CommunityTier {
+  CommunityTier({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.members,
+    required this.churn,
+    required this.renewal,
+  });
+
+  final String id;
+  final String name;
+  final String price;
+  final String members;
+  final String churn;
+  final String renewal;
+
+  factory CommunityTier.fromJson(Map<String, dynamic> json) {
+    return CommunityTier(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      name: json['name']?.toString() ?? 'Premium tier',
+      price: json['price']?.toString() ?? '0',
+      members: json['members']?.toString() ?? '0 active',
+      churn: json['churn']?.toString() ?? 'Retention steady',
+      renewal: json['renewal']?.toString() ?? 'Auto-renewal',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'price': price,
+      'members': members,
+      'churn': churn,
+      'renewal': renewal,
+    };
+  }
+}
+
+class CommunityExperiment {
+  CommunityExperiment({
+    required this.id,
+    required this.name,
+    required this.community,
+    required this.status,
+    required this.hypothesis,
+  });
+
+  final String id;
+  final String name;
+  final String community;
+  final String status;
+  final String hypothesis;
+
+  factory CommunityExperiment.fromJson(Map<String, dynamic> json) {
+    return CommunityExperiment(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      name: json['name']?.toString() ?? 'Experiment',
+      community: json['community']?.toString() ?? 'Community',
+      status: json['status']?.toString() ?? 'draft',
+      hypothesis: json['hypothesis']?.toString() ?? 'Awaiting telemetry',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'community': community,
+      'status': status,
+      'hypothesis': hypothesis,
+    };
+  }
+}
+
+class CommunityIncident {
+  CommunityIncident({
+    required this.id,
+    required this.communityName,
+    required this.summary,
+    required this.severity,
+    required this.owner,
+    required this.openedAt,
+  });
+
+  final String id;
+  final String communityName;
+  final String summary;
+  final String severity;
+  final String owner;
+  final String openedAt;
+
+  factory CommunityIncident.fromJson(Map<String, dynamic> json) {
+    return CommunityIncident(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      communityName: json['communityName']?.toString() ?? 'Community',
+      summary: json['summary']?.toString() ?? 'Incident',
+      severity: json['severity']?.toString() ?? 'medium',
+      owner: json['owner']?.toString() ?? 'Moderator',
+      openedAt: json['openedAt']?.toString() ?? 'Recently',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'communityName': communityName,
+      'summary': summary,
+      'severity': severity,
+      'owner': owner,
+      'openedAt': openedAt,
+    };
+  }
+}
+
+class CommunityHighlight {
+  CommunityHighlight({
+    required this.id,
+    required this.community,
+    required this.preview,
+    required this.postedAt,
+    required this.reactions,
+    required this.tags,
+  });
+
+  final String id;
+  final String community;
+  final String preview;
+  final String postedAt;
+  final int reactions;
+  final List<String> tags;
+
+  factory CommunityHighlight.fromJson(Map<String, dynamic> json) {
+    final rawTags = json['tags'];
+    return CommunityHighlight(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      community: json['community']?.toString() ?? 'Community',
+      preview: json['preview']?.toString() ?? json['message']?.toString() ?? 'Highlight',
+      postedAt: json['postedAt']?.toString() ?? 'Recently',
+      reactions: (json['reactions'] is num)
+          ? (json['reactions'] as num).round()
+          : int.tryParse('${json['reactions'] ?? 0}') ?? 0,
+      tags: rawTags is List
+          ? rawTags.map((tag) => tag?.toString() ?? '').where((tag) => tag.isNotEmpty).toList()
+          : <String>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'community': community,
+      'preview': preview,
+      'postedAt': postedAt,
+      'reactions': reactions,
+      'tags': tags,
+    };
+  }
+}
+
+class CommunityTrend {
+  CommunityTrend({
+    required this.id,
+    required this.metric,
+    required this.current,
+    required this.previous,
+  });
+
+  final String id;
+  final String metric;
+  final String current;
+  final String previous;
+
+  factory CommunityTrend.fromJson(Map<String, dynamic> json) {
+    return CommunityTrend(
+      id: json['id']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      metric: json['metric']?.toString() ?? 'Metric',
+      current: json['current']?.toString() ?? '0',
+      previous: json['previous']?.toString() ?? '0',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'metric': metric,
+      'current': current,
+      'previous': previous,
+    };
+  }
+}
+
+class CommunityDashboardSnapshot {
+  CommunityDashboardSnapshot({
+    required this.metrics,
+    required this.health,
+    required this.runbooks,
+    required this.escalations,
+    required this.events,
+    required this.tutorPods,
+    required this.tiers,
+    required this.experiments,
+    required this.insights,
+    required this.incidents,
+    required this.highlights,
+    required this.trends,
+    required this.syncedAt,
+    this.isFromCache = false,
+  });
+
+  final List<DashboardMetric> metrics;
+  final List<CommunityHealthEntry> health;
+  final List<CommunityRunbook> runbooks;
+  final List<CommunityEscalation> escalations;
+  final List<CommunityEventCard> events;
+  final List<CommunityTutorPod> tutorPods;
+  final List<CommunityTier> tiers;
+  final List<CommunityExperiment> experiments;
+  final List<String> insights;
+  final List<CommunityIncident> incidents;
+  final List<CommunityHighlight> highlights;
+  final List<CommunityTrend> trends;
+  final DateTime syncedAt;
+  final bool isFromCache;
+
+  CommunityDashboardSnapshot copyWith({bool? isFromCache}) {
+    return CommunityDashboardSnapshot(
+      metrics: metrics,
+      health: health,
+      runbooks: runbooks,
+      escalations: escalations,
+      events: events,
+      tutorPods: tutorPods,
+      tiers: tiers,
+      experiments: experiments,
+      insights: insights,
+      incidents: incidents,
+      highlights: highlights,
+      trends: trends,
+      syncedAt: syncedAt,
+      isFromCache: isFromCache ?? this.isFromCache,
+    );
+  }
+
+  factory CommunityDashboardSnapshot.fromApi(Map<String, dynamic> json, {DateTime? syncedAt}) {
+    final dashboardsJson = json['dashboards'] is Map
+        ? Map<String, dynamic>.from(json['dashboards'] as Map)
+        : <String, dynamic>{};
+    final communityJson = dashboardsJson['community'] is Map
+        ? Map<String, dynamic>.from(dashboardsJson['community'] as Map)
+        : <String, dynamic>{};
+
+    return CommunityDashboardSnapshot(
+      metrics: (communityJson['metrics'] is List)
+          ? (communityJson['metrics'] as List)
+              .map((item) => DashboardMetric.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <DashboardMetric>[],
+      health: (communityJson['health'] is Map && (communityJson['health'] as Map)['overview'] is List)
+          ? ((communityJson['health'] as Map)['overview'] as List)
+              .map((item) => CommunityHealthEntry.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityHealthEntry>[],
+      runbooks: (communityJson['operations'] is Map && (communityJson['operations'] as Map)['runbooks'] is List)
+          ? ((communityJson['operations'] as Map)['runbooks'] as List)
+              .map((item) => CommunityRunbook.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityRunbook>[],
+      escalations: (communityJson['operations'] is Map && (communityJson['operations'] as Map)['escalations'] is List)
+          ? ((communityJson['operations'] as Map)['escalations'] as List)
+              .map((item) => CommunityEscalation.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityEscalation>[],
+      events: (communityJson['programming'] is Map && (communityJson['programming'] as Map)['upcomingEvents'] is List)
+          ? ((communityJson['programming'] as Map)['upcomingEvents'] as List)
+              .map((item) => CommunityEventCard.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityEventCard>[],
+      tutorPods: (communityJson['programming'] is Map && (communityJson['programming'] as Map)['tutorPods'] is List)
+          ? ((communityJson['programming'] as Map)['tutorPods'] as List)
+              .map((item) => CommunityTutorPod.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityTutorPod>[],
+      tiers: (communityJson['monetisation'] is Map && (communityJson['monetisation'] as Map)['tiers'] is List)
+          ? ((communityJson['monetisation'] as Map)['tiers'] as List)
+              .map((item) => CommunityTier.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityTier>[],
+      experiments: (communityJson['monetisation'] is Map && (communityJson['monetisation'] as Map)['experiments'] is List)
+          ? ((communityJson['monetisation'] as Map)['experiments'] as List)
+              .map((item) => CommunityExperiment.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityExperiment>[],
+      insights: (communityJson['monetisation'] is Map && (communityJson['monetisation'] as Map)['insights'] is List)
+          ? ((communityJson['monetisation'] as Map)['insights'] as List)
+              .map((item) => item?.toString() ?? '')
+              .where((item) => item.isNotEmpty)
+              .toList()
+          : <String>[],
+      incidents: (communityJson['safety'] is Map && (communityJson['safety'] as Map)['incidents'] is List)
+          ? ((communityJson['safety'] as Map)['incidents'] as List)
+              .map((item) => CommunityIncident.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityIncident>[],
+      highlights: (communityJson['communications'] is Map && (communityJson['communications'] as Map)['highlights'] is List)
+          ? ((communityJson['communications'] as Map)['highlights'] as List)
+              .map((item) => CommunityHighlight.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityHighlight>[],
+      trends: (communityJson['communications'] is Map && (communityJson['communications'] as Map)['trends'] is List)
+          ? ((communityJson['communications'] as Map)['trends'] as List)
+              .map((item) => CommunityTrend.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityTrend>[],
+      syncedAt: syncedAt ?? DateTime.now(),
+    );
+  }
+
+  factory CommunityDashboardSnapshot.fromCache(Map<String, dynamic> json) {
+    return CommunityDashboardSnapshot(
+      metrics: json['metrics'] is List
+          ? (json['metrics'] as List)
+              .map((item) => DashboardMetric.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <DashboardMetric>[],
+      health: json['health'] is List
+          ? (json['health'] as List)
+              .map((item) => CommunityHealthEntry.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityHealthEntry>[],
+      runbooks: json['runbooks'] is List
+          ? (json['runbooks'] as List)
+              .map((item) => CommunityRunbook.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityRunbook>[],
+      escalations: json['escalations'] is List
+          ? (json['escalations'] as List)
+              .map((item) => CommunityEscalation.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityEscalation>[],
+      events: json['events'] is List
+          ? (json['events'] as List)
+              .map((item) => CommunityEventCard.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityEventCard>[],
+      tutorPods: json['tutorPods'] is List
+          ? (json['tutorPods'] as List)
+              .map((item) => CommunityTutorPod.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityTutorPod>[],
+      tiers: json['tiers'] is List
+          ? (json['tiers'] as List)
+              .map((item) => CommunityTier.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityTier>[],
+      experiments: json['experiments'] is List
+          ? (json['experiments'] as List)
+              .map((item) => CommunityExperiment.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityExperiment>[],
+      insights: json['insights'] is List
+          ? (json['insights'] as List).map((item) => item?.toString() ?? '').where((item) => item.isNotEmpty).toList()
+          : <String>[],
+      incidents: json['incidents'] is List
+          ? (json['incidents'] as List)
+              .map((item) => CommunityIncident.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityIncident>[],
+      highlights: json['highlights'] is List
+          ? (json['highlights'] as List)
+              .map((item) => CommunityHighlight.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityHighlight>[],
+      trends: json['trends'] is List
+          ? (json['trends'] as List)
+              .map((item) => CommunityTrend.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList()
+          : <CommunityTrend>[],
+      syncedAt: json['syncedAt'] is String ? DateTime.tryParse(json['syncedAt'] as String) ?? DateTime.now() : DateTime.now(),
+      isFromCache: true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'metrics': metrics.map((metric) => metric.toJson()).toList(),
+      'health': health.map((item) => item.toJson()).toList(),
+      'runbooks': runbooks.map((item) => item.toJson()).toList(),
+      'escalations': escalations.map((item) => item.toJson()).toList(),
+      'events': events.map((item) => item.toJson()).toList(),
+      'tutorPods': tutorPods.map((item) => item.toJson()).toList(),
+      'tiers': tiers.map((item) => item.toJson()).toList(),
+      'experiments': experiments.map((item) => item.toJson()).toList(),
+      'insights': insights,
+      'incidents': incidents.map((item) => item.toJson()).toList(),
+      'highlights': highlights.map((item) => item.toJson()).toList(),
+      'trends': trends.map((item) => item.toJson()).toList(),
+      'syncedAt': syncedAt.toIso8601String(),
+    };
+  }
+}
+
 class DashboardService {
   DashboardService()
       : _dio = Dio(
@@ -652,6 +1262,48 @@ class DashboardService {
         return cached.copyWith(isFromCache: true);
       }
       throw DashboardException('Unable to load dashboard data.');
+    }
+  }
+
+  CommunityDashboardSnapshot? loadCachedCommunitySnapshot() {
+    final cached = SessionManager.loadCachedDashboardSnapshot('community');
+    if (cached == null) return null;
+    return CommunityDashboardSnapshot.fromCache(cached);
+  }
+
+  Future<CommunityDashboardSnapshot> fetchCommunityDashboard() async {
+    final token = SessionManager.getAccessToken();
+    if (token == null) {
+      throw DashboardException('Authentication required to load dashboard data.');
+    }
+
+    try {
+      final response = await _dio.get(
+        '/dashboard/me',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      );
+      final data = response.data['data'];
+      if (data is! Map<String, dynamic>) {
+        throw DashboardException('Unexpected dashboard response.');
+      }
+      final snapshot = CommunityDashboardSnapshot.fromApi(data, syncedAt: DateTime.now());
+      await SessionManager.cacheDashboardSnapshot('community', snapshot.toJson());
+      return snapshot;
+    } on DioException catch (error) {
+      final cached = loadCachedCommunitySnapshot();
+      if (cached != null) {
+        return cached.copyWith(isFromCache: true);
+      }
+      final message = error.response?.statusCode == 401
+          ? 'Your session has expired. Please sign in again.'
+          : error.message ?? 'Unable to load community dashboard data.';
+      throw DashboardException(message);
+    } catch (error) {
+      final cached = loadCachedCommunitySnapshot();
+      if (cached != null) {
+        return cached.copyWith(isFromCache: true);
+      }
+      throw DashboardException('Unable to load community dashboard data.');
     }
   }
 }

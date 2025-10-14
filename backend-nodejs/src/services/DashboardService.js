@@ -147,6 +147,534 @@ export function buildLearningPace(completions, referenceDate = new Date()) {
   return days.map((entry) => ({ day: entry.key, minutes: entry.minutes }));
 }
 
+export function buildCommunityDashboard({
+  user,
+  now,
+  communityMemberships,
+  communityStats,
+  communityResources,
+  communityPosts,
+  communityMessages,
+  communityMessageContributions,
+  communityAssignments,
+  liveClassrooms,
+  tutorBookings,
+  adsCampaigns,
+  adsMetrics,
+  communityPaywallTiers,
+  communitySubscriptions
+}) {
+  const managedCommunityIds = new Set();
+  const communityLookup = new Map();
+
+  communityMemberships.forEach((membership) => {
+    const communityId = Number(membership.communityId);
+    if (!Number.isFinite(communityId)) return;
+    const normalised = {
+      communityId,
+      communityName: membership.communityName ?? `Community ${communityId}`,
+      role: membership.role ?? 'member',
+      status: membership.status ?? 'pending',
+      ownerId: Number(membership.ownerId ?? membership.userId ?? 0),
+      joinedAt: membership.joinedAt ? new Date(membership.joinedAt) : null,
+      metadata: safeJsonParse(membership.membershipMetadata, {})
+    };
+    communityLookup.set(communityId, normalised);
+    if (normalised.ownerId === user.id || normalised.role !== 'member') {
+      managedCommunityIds.add(communityId);
+    }
+  });
+
+  communityPaywallTiers.forEach((tier) => {
+    const communityId = Number(tier.communityId);
+    if (!Number.isFinite(communityId)) return;
+    const ownerId = Number(tier.ownerId);
+    if (ownerId && ownerId === user.id) {
+      managedCommunityIds.add(communityId);
+      if (!communityLookup.has(communityId)) {
+        communityLookup.set(communityId, {
+          communityId,
+          communityName: tier.communityName ?? `Community ${communityId}`,
+          role: 'owner',
+          status: 'active',
+          ownerId,
+          joinedAt: null,
+          metadata: {}
+        });
+      }
+    }
+  });
+
+  liveClassrooms.forEach((session) => {
+    const communityId = Number(session.communityId);
+    if (!Number.isFinite(communityId)) return;
+    if (managedCommunityIds.has(communityId)) return;
+    if (session.instructorId && Number(session.instructorId) === user.id) {
+      managedCommunityIds.add(communityId);
+      communityLookup.set(communityId, {
+        communityId,
+        communityName: session.communityName ?? `Community ${communityId}`,
+        role: 'host',
+        status: session.status ?? 'scheduled',
+        ownerId: Number(session.instructorId),
+        joinedAt: session.startAt ? new Date(session.startAt) : null,
+        metadata: safeJsonParse(session.metadata, {})
+      });
+    }
+  });
+
+  if (managedCommunityIds.size === 0) {
+    return null;
+  }
+
+  const statsByCommunity = new Map();
+  communityStats.forEach((stat) => {
+    const communityId = Number(stat.community_id ?? stat.communityId);
+    if (!Number.isFinite(communityId)) return;
+    statsByCommunity.set(communityId, {
+      activeMembers: Number(stat.active_members ?? stat.activeMembers ?? 0),
+      pendingMembers: Number(stat.pending_members ?? stat.pendingMembers ?? 0),
+      moderators: Number(stat.moderators ?? stat.moderatorCount ?? stat.moderator_count ?? 0),
+      escalationsOpen: Number(stat.escalations_open ?? stat.escalationsOpen ?? 0),
+      incidentsOpen: Number(stat.incidents_open ?? stat.incidentsOpen ?? 0)
+    });
+  });
+
+  const liveSessions = liveClassrooms.map((session) => ({
+    ...session,
+    startAt: session.startAt ? new Date(session.startAt) : null,
+    endAt: session.endAt ? new Date(session.endAt) : null,
+    metadata: safeJsonParse(session.metadata, {})
+  }));
+
+  const tutorBookingsNormalised = tutorBookings.map((booking) => ({
+    ...booking,
+    scheduledStart: booking.scheduledStart ? new Date(booking.scheduledStart) : null,
+    metadata: safeJsonParse(booking.metadata, {})
+  }));
+
+  const contributionByCommunity = new Map();
+  communityMessageContributions.forEach((row) => {
+    const communityId = Number(row.communityId ?? row.community_id);
+    if (!Number.isFinite(communityId)) return;
+    contributionByCommunity.set(communityId, Number(row.contribution_count ?? 0));
+  });
+
+  const incidentsFromMessages = communityMessages
+    .map((message) => {
+      const metadata = safeJsonParse(message.metadata, {});
+      if (!metadata.flagged && !metadata.escalation) return null;
+      const communityId = Number(message.communityId ?? metadata.communityId ?? 0);
+      if (!managedCommunityIds.has(communityId)) return null;
+      return {
+        id: `incident-${message.id}`,
+        communityId,
+        communityName: message.communityName ?? communityLookup.get(communityId)?.communityName ?? 'Community',
+        severity: metadata.severity ?? 'medium',
+        status: metadata.escalation?.status ?? 'triage',
+        openedAt: message.deliveredAt ? new Date(message.deliveredAt) : null,
+        owner: metadata.escalation?.owner ?? metadata.moderator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Moderator',
+        summary: metadata.summary ?? (metadata.flaggedReason ?? message.body?.slice(0, 120) ?? 'Flagged conversation')
+      };
+    })
+    .filter(Boolean);
+
+  const totalActiveMembers = Array.from(managedCommunityIds).reduce((total, communityId) => {
+    const stats = statsByCommunity.get(communityId);
+    return total + Number(stats?.activeMembers ?? 0);
+  }, 0);
+
+  const totalPendingMembers = Array.from(managedCommunityIds).reduce((total, communityId) => {
+    const stats = statsByCommunity.get(communityId);
+    return total + Number(stats?.pendingMembers ?? 0);
+  }, 0);
+
+  const totalModerators = Array.from(managedCommunityIds).reduce((total, communityId) => {
+    const stats = statsByCommunity.get(communityId);
+    return total + Number(stats?.moderators ?? 0);
+  }, 0);
+
+  const engagementMessages = communityMessages.filter((message) => {
+    const communityId = Number(message.communityId ?? 0);
+    return managedCommunityIds.has(communityId);
+  });
+
+  const metrics = [
+    {
+      label: 'Active members',
+      value: formatNumber(totalActiveMembers),
+      change:
+        totalPendingMembers > 0
+          ? `+${formatNumber(totalPendingMembers)} awaiting approval`
+          : totalActiveMembers > 0
+            ? 'Roster steady'
+            : 'Invite members',
+      trend: totalPendingMembers > 0 ? 'up' : 'steady'
+    },
+    {
+      label: 'Moderator coverage',
+      value: `${formatNumber(totalModerators)} leaders`,
+      change:
+        totalModerators > 0
+          ? `${Math.max(1, Math.round(totalActiveMembers / Math.max(totalModerators, 1)))} members per lead`
+          : 'Assign moderators',
+      trend: totalModerators > 0 ? 'up' : 'down'
+    },
+    {
+      label: 'Weekly contributions',
+      value: `${formatNumber(engagementMessages.length)}`,
+      change:
+        engagementMessages.length > 0
+          ? `${formatNumber(incidentsFromMessages.length)} escalations`
+          : 'No logged activity',
+      trend: engagementMessages.length > incidentsFromMessages.length ? 'up' : 'steady'
+    },
+    {
+      label: 'Automation readiness',
+      value: `${communityResources.filter((resource) => safeJsonParse(resource.metadata, {}).automation === true).length} playbooks`,
+      change: `${communityAssignments.length} open assignments`,
+      trend: communityAssignments.length > 0 ? 'up' : 'steady'
+    }
+  ];
+
+  const healthDeck = Array.from(managedCommunityIds).map((communityId) => {
+    const lookup = communityLookup.get(communityId);
+    const stats = statsByCommunity.get(communityId) ?? {
+      activeMembers: 0,
+      pendingMembers: 0,
+      moderators: 0,
+      incidentsOpen: 0,
+      escalationsOpen: 0
+    };
+    const contributions = contributionByCommunity.get(communityId) ?? 0;
+    const activityScore = stats.activeMembers + stats.pendingMembers > 0
+      ? stats.activeMembers / (stats.activeMembers + stats.pendingMembers)
+      : 0;
+    let healthLabel = 'Stable';
+    if (activityScore >= 0.85) healthLabel = 'Excellent';
+    else if (activityScore >= 0.7) healthLabel = 'Healthy';
+    else if (activityScore > 0) healthLabel = 'Needs attention';
+    const backlog = stats.escalationsOpen + stats.incidentsOpen;
+    const trend = backlog > 0
+      ? `${backlog} open escalation${backlog === 1 ? '' : 's'}`
+      : contributions > 0
+        ? `${formatNumber(contributions)} posts`
+        : 'Recruit momentum';
+    return {
+      id: `community-${communityId}`,
+      name: lookup?.communityName ?? `Community ${communityId}`,
+      members: `${formatNumber(stats.activeMembers)} active`,
+      moderators: `${formatNumber(stats.moderators)} moderators`,
+      health: healthLabel,
+      trend,
+      approvalsPending: stats.pendingMembers,
+      incidentsOpen: stats.incidentsOpen,
+      escalationsOpen: stats.escalationsOpen
+    };
+  });
+
+  const runbooks = communityResources
+    .filter((resource) => managedCommunityIds.has(Number(resource.communityId ?? resource.community_id ?? 0)))
+    .map((resource) => {
+      const tags = safeJsonParse(resource.tags, []);
+      const metadata = safeJsonParse(resource.metadata, {});
+      return {
+        id: `resource-${resource.id}`,
+        title: resource.title ?? 'Operations playbook',
+        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Ops team',
+        updatedAt: resource.publishedAt
+          ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
+          : 'Draft',
+        tags: Array.isArray(tags) && tags.length ? tags.slice(0, 4) : ['Runbook'],
+        automationReady: metadata.automation === true
+      };
+    });
+
+  const escalations = communityAssignments
+    .filter((assignment) => managedCommunityIds.has(Number(assignment.communityId ?? assignment.courseId ?? 0)))
+    .map((assignment) => {
+      const metadata = safeJsonParse(assignment.metadata, {});
+      const dueOffsetDays = Number(assignment.dueOffsetDays ?? metadata.dueOffsetDays ?? 0);
+      const dueDate = assignment.enrollmentStartedAt
+        ? new Date(new Date(assignment.enrollmentStartedAt).getTime() + dueOffsetDays * DAY_IN_MS)
+        : now;
+      return {
+        id: `assignment-${assignment.id}`,
+        title: assignment.title ?? 'Operational task',
+        owner: metadata.owner ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Community team',
+        status: metadata.status ?? 'open',
+        due: formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }),
+        community: assignment.courseTitle ?? metadata.communityName ?? 'Community'
+      };
+    });
+
+  const upcomingEvents = liveSessions
+    .filter((session) => session.startAt && managedCommunityIds.has(Number(session.communityId ?? 0)))
+    .sort((a, b) => a.startAt - b.startAt)
+    .map((session) => ({
+      id: `event-${session.id}`,
+      title: session.title ?? 'Live session',
+      date: formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }),
+      facilitator: session.hostName ?? session.metadata?.facilitator ?? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || 'Host',
+      seats: `${Number(session.reservedSeats ?? 0)}/${Number(session.capacity ?? 0)} booked`,
+      status: session.status ?? 'scheduled'
+    }));
+
+  const tutorPods = tutorBookingsNormalised
+    .filter((booking) => managedCommunityIds.has(Number(booking.communityId ?? 0)))
+    .map((booking) => ({
+      id: `tutor-${booking.id}`,
+      mentor: booking.tutorName ?? booking.metadata.tutor ?? 'Mentor',
+      focus: booking.metadata.topic ?? 'Mentorship session',
+      scheduled:
+        booking.scheduledStart && booking.scheduledStart >= now
+          ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Awaiting scheduling',
+      status: booking.status ?? 'pending'
+    }));
+
+  const broadcasts = communityPosts
+    .filter((post) => managedCommunityIds.has(Number(post.communityId ?? post.community_id ?? 0)))
+    .map((post) => ({
+      id: `broadcast-${post.id}`,
+      title: post.title ?? 'Announcement',
+      stage: post.status === 'published' ? 'Published' : 'Draft',
+      release: post.publishedAt
+        ? formatDateTime(post.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
+        : 'Unscheduled',
+      channel: post.channel ?? 'Feed'
+    }));
+
+  const experimentsMetrics = new Map();
+  adsMetrics.forEach((metric) => {
+    const campaignId = Number(metric.campaignId ?? metric.campaign_id);
+    if (!Number.isFinite(campaignId)) return;
+    const list = experimentsMetrics.get(campaignId) ?? [];
+    list.push({
+      ...metric,
+      metricDate: metric.metricDate ? new Date(metric.metricDate) : null,
+      conversions: Number(metric.conversions ?? 0),
+      revenueCents: Number(metric.revenueCents ?? metric.revenue_cents ?? 0)
+    });
+    experimentsMetrics.set(campaignId, list);
+  });
+
+  const experiments = adsCampaigns
+    .map((campaign) => {
+      const metadata = safeJsonParse(campaign.metadata, {});
+      const communityId = Number(metadata.promotedCommunityId ?? metadata.communityId ?? 0);
+      if (communityId && !managedCommunityIds.has(communityId)) return null;
+      const series = (experimentsMetrics.get(Number(campaign.id)) ?? []).sort(
+        (a, b) => (b.metricDate?.getTime() ?? 0) - (a.metricDate?.getTime() ?? 0)
+      );
+      const latest = series[0];
+      const previous = series[1];
+      const conversionDelta = latest && previous ? latest.conversions - previous.conversions : latest?.conversions ?? 0;
+      const hypothesis = latest
+        ? `${conversionDelta >= 0 ? '+' : '−'}${Math.abs(conversionDelta)} conversions · ${formatCurrency(
+            latest.revenueCents,
+            campaign.spendCurrency ?? 'USD'
+          )}`
+        : 'Awaiting telemetry';
+      return {
+        id: `experiment-${campaign.id}`,
+        name: campaign.name ?? 'Growth experiment',
+        status: campaign.status ?? 'draft',
+        community: communityId ? communityLookup.get(communityId)?.communityName ?? `Community ${communityId}` : 'Cross-community',
+        hypothesis
+      };
+    })
+    .filter(Boolean);
+
+  const tierStats = new Map();
+  communitySubscriptions.forEach((subscription) => {
+    const communityId = Number(subscription.communityId ?? subscription.community_id ?? 0);
+    if (!managedCommunityIds.has(communityId)) return;
+    const tierName = subscription.tierName ?? subscription.tier_name ?? 'Tier';
+    const key = `${communityId}-${tierName}`;
+    const stats = tierStats.get(key) ?? {
+      communityId,
+      communityName: subscription.communityName ?? communityLookup.get(communityId)?.communityName ?? `Community ${communityId}`,
+      tierName,
+      currency: subscription.currency ?? subscription.currency_code ?? 'USD',
+      priceCents: Number(subscription.priceCents ?? subscription.price_cents ?? 0),
+      active: 0,
+      cancelled: 0,
+      renewals: []
+    };
+    if (subscription.status === 'active') {
+      stats.active += 1;
+      if (subscription.currentPeriodEnd) {
+        stats.renewals.push(new Date(subscription.currentPeriodEnd));
+      }
+    } else if (subscription.status === 'cancelled') {
+      stats.cancelled += 1;
+    }
+    tierStats.set(key, stats);
+  });
+
+  const tiers = Array.from(tierStats.values()).map((tier, index) => {
+    const nextRenewal = tier.renewals.sort((a, b) => (a?.getTime() ?? 0) - (b?.getTime() ?? 0))[0] ?? null;
+    return {
+      id: `tier-${index}`,
+      name: `${tier.communityName} · ${tier.tierName}`,
+      price: formatCurrency(tier.priceCents, tier.currency),
+      members: `${formatNumber(tier.active)} active`,
+      churn: tier.cancelled > 0 ? `${formatNumber(tier.cancelled)} cancellations` : 'Retention steady',
+      renewal: nextRenewal ? formatDateTime(nextRenewal, { dateStyle: 'medium', timeStyle: undefined }) : 'Auto-renewal'
+    };
+  });
+
+  const totalSubscriptionRevenue = Array.from(tierStats.values()).reduce(
+    (total, tier) => total + tier.priceCents * tier.active,
+    0
+  );
+
+  const monetisationInsights = [];
+  if (tiers.length > 0) {
+    const topTier = tiers.reduce((current, candidate) => {
+      const currentMembers = Number(current.members.replace(/\D/g, '')) || 0;
+      const candidateMembers = Number(candidate.members.replace(/\D/g, '')) || 0;
+      return candidateMembers > currentMembers ? candidate : current;
+    }, tiers[0]);
+    monetisationInsights.push(`${topTier.name} leads premium adoption.`);
+  }
+  if (totalSubscriptionRevenue > 0) {
+    monetisationInsights.push(
+      `${formatCurrency(totalSubscriptionRevenue, tiers[0]?.currency ?? 'USD')} in recurring revenue across communities.`
+    );
+  }
+  if (experiments.length > 0) {
+    monetisationInsights.push('Active growth experiments are feeding new membership cohorts.');
+  }
+
+  const communicationsHighlights = engagementMessages.slice(0, 12).map((message) => {
+    const metadata = safeJsonParse(message.metadata, {});
+    const communityId = Number(message.communityId ?? 0);
+    return {
+      id: `highlight-${message.id}`,
+      community: message.communityName ?? communityLookup.get(communityId)?.communityName ?? 'Community',
+      preview: message.body?.slice(0, 140) ?? 'New update shared',
+      tags: Array.isArray(metadata.tags) && metadata.tags.length ? metadata.tags.slice(0, 3) : ['Update'],
+      postedAt: message.deliveredAt ? humanizeRelativeTime(message.deliveredAt, now) : 'Recently',
+      reactions: metadata.reactions ?? 0
+    };
+  });
+
+  const moderators = communityMemberships
+    .filter((membership) => managedCommunityIds.has(Number(membership.communityId)) && membership.role && membership.role !== 'member')
+    .map((membership) => {
+      const metadata = safeJsonParse(membership.membershipMetadata, {});
+      return {
+        id: `moderator-${membership.membershipId ?? membership.id ?? `${membership.communityId}-${membership.userId}`}`,
+        community: membership.communityName ?? `Community ${membership.communityId}`,
+        role: membership.role ?? 'Moderator',
+        timezone: metadata.timezone ?? 'UTC',
+        coverage: metadata.coverage ?? 'Full-time'
+      };
+    });
+
+  const communicationsTrends = Array.from(managedCommunityIds).map((communityId) => {
+    const contributions = contributionByCommunity.get(communityId) ?? 0;
+    const stats = statsByCommunity.get(communityId) ?? { activeMembers: 0, pendingMembers: 0 };
+    const contributionRate = stats.activeMembers > 0 ? Math.round((contributions / stats.activeMembers) * 100) : 0;
+    return {
+      id: `trend-${communityId}`,
+      metric: communityLookup.get(communityId)?.communityName ?? `Community ${communityId}`,
+      current: `${contributionRate}% active`,
+      previous: stats.pendingMembers > 0 ? `${stats.pendingMembers} pending approvals` : 'All members onboarded'
+    };
+  });
+
+  const searchIndex = [
+    ...healthDeck.map((entry) => ({
+      id: `search-community-overview-${entry.id}`,
+      role: 'community',
+      type: 'Community',
+      title: entry.name,
+      url: '/dashboard/community/operations'
+    })),
+    ...runbooks.map((runbook) => ({
+      id: `search-community-runbook-${runbook.id}`,
+      role: 'community',
+      type: 'Runbook',
+      title: runbook.title,
+      url: '/dashboard/community/operations'
+    })),
+    ...upcomingEvents.map((event) => ({
+      id: `search-community-event-${event.id}`,
+      role: 'community',
+      type: 'Event',
+      title: event.title,
+      url: '/dashboard/community/programming'
+    })),
+    ...tiers.map((tier) => ({
+      id: `search-community-tier-${tier.id}`,
+      role: 'community',
+      type: 'Tier',
+      title: tier.name,
+      url: '/dashboard/community/monetisation'
+    }))
+  ];
+
+  const profileStats = [
+    { label: 'Communities', value: `${managedCommunityIds.size} stewarded` },
+    { label: 'Moderators', value: `${formatNumber(moderators.length)} leads` },
+    { label: 'Recurring revenue', value: formatCurrency(totalSubscriptionRevenue, tiers[0]?.currency ?? 'USD') }
+  ];
+
+  const bioSegments = [];
+  if (managedCommunityIds.size > 0) {
+    bioSegments.push(`stewarding ${managedCommunityIds.size} community${managedCommunityIds.size === 1 ? '' : 'ies'}`);
+  }
+  if (totalActiveMembers > 0) {
+    bioSegments.push(`supporting ${formatNumber(totalActiveMembers)} active members`);
+  }
+  if (tiers.length > 0) {
+    bioSegments.push(`shipping ${tiers.length} premium tier${tiers.length === 1 ? '' : 's'}`);
+  }
+  const profileBio = bioSegments.length ? `Currently ${bioSegments.join(', ')}.` : '';
+
+  return {
+    role: { id: 'community', label: 'Community' },
+    dashboard: {
+      metrics,
+      health: {
+        overview: healthDeck,
+        moderators,
+        communicationsTrends
+      },
+      operations: {
+        runbooks,
+        escalations
+      },
+      programming: {
+        upcomingEvents,
+        tutorPods,
+        broadcasts
+      },
+      monetisation: {
+        tiers,
+        experiments,
+        insights: monetisationInsights
+      },
+      safety: {
+        incidents: incidentsFromMessages,
+        backlog: escalations,
+        moderators
+      },
+      communications: {
+        highlights: communicationsHighlights,
+        broadcasts,
+        trends: communicationsTrends
+      }
+    },
+    searchIndex,
+    profileStats,
+    profileBio
+  };
+}
+
 export function buildInstructorDashboard({
   user,
   now,
@@ -1859,6 +2387,24 @@ export default class DashboardService {
       affiliatePayoutByAffiliate.set(row.affiliateId, entry);
     });
 
+    const communityDashboard = buildCommunityDashboard({
+      user,
+      now,
+      communityMemberships: membershipRows,
+      communityStats: communityStatRows,
+      communityResources: communityResourceRows,
+      communityPosts: communityPostRows,
+      communityMessages: communityMessageRows,
+      communityMessageContributions: communityMessageContributionRows,
+      communityAssignments,
+      liveClassrooms: instructorLiveClassRows,
+      tutorBookings: instructorBookingRows,
+      adsCampaigns: adsCampaignRows,
+      adsMetrics: adsMetricRows,
+      communityPaywallTiers: communityPaywallTierRows,
+      communitySubscriptions: communitySubscriptionRows
+    });
+
     const instructorDashboard = buildInstructorDashboard({
       user,
       now,
@@ -2551,6 +3097,9 @@ export default class DashboardService {
     }
 
     const roles = [{ id: 'learner', label: 'Learner' }];
+    if (communityDashboard) {
+      roles.push(communityDashboard.role);
+    }
     if (instructorDashboard) {
       roles.push(instructorDashboard.role);
     }
@@ -2620,6 +3169,9 @@ export default class DashboardService {
       }
     };
 
+    if (communityDashboard) {
+      dashboards.community = communityDashboard.dashboard;
+    }
     if (instructorDashboard) {
       dashboards.instructor = instructorDashboard.dashboard;
     }
@@ -2654,6 +3206,9 @@ export default class DashboardService {
       }))
     ];
 
+    if (communityDashboard) {
+      searchIndex.push(...communityDashboard.searchIndex);
+    }
     if (instructorDashboard) {
       searchIndex.push(...instructorDashboard.searchIndex);
     }
@@ -2667,6 +3222,9 @@ export default class DashboardService {
       ? `Currently collaborating across ${communityNames.join(', ')} while progressing through ${primaryProgram}.`
       : `Progressing through ${primaryProgram}.`;
     const profileBioSegments = [learnerProfileBio];
+    if (communityDashboard?.profileBio) {
+      profileBioSegments.push(communityDashboard.profileBio);
+    }
     if (instructorDashboard?.profileBio) {
       profileBioSegments.push(instructorDashboard.profileBio);
     }
@@ -2680,6 +3238,9 @@ export default class DashboardService {
       { label: 'Courses', value: `${activeEnrollments.length} active` },
       { label: 'Badges', value: `${learningCompletions.length} milestones` }
     ];
+    if (communityDashboard) {
+      profileStats.push(...communityDashboard.profileStats);
+    }
     if (instructorDashboard) {
       profileStats.push(...instructorDashboard.profileStats);
     }
@@ -2691,7 +3252,16 @@ export default class DashboardService {
       `${memberships.length} communities`,
       `${activeEnrollments.length} active program${activeEnrollments.length === 1 ? '' : 's'}`
     ];
-    if (instructorDashboard) {
+    if (communityDashboard) {
+      const managedCommunitiesCount =
+        communityDashboard.dashboard?.health?.overview?.length ?? 0;
+      if (managedCommunitiesCount > 0) {
+        profileTitleSegments.push(
+          `${managedCommunitiesCount} community${managedCommunitiesCount === 1 ? '' : 'ies'} stewarded`
+        );
+      }
+    }
+    if (instructorDashboard && (!communityDashboard || !communityDashboard.dashboard?.health?.overview?.length)) {
       const managedCommunitiesCount =
         instructorDashboard.dashboard?.communities?.manageDeck?.length ?? 0;
       if (managedCommunitiesCount > 0) {

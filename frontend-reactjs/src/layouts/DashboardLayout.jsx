@@ -14,7 +14,8 @@ import {
   PlayCircleIcon,
   Squares2X2Icon,
   UserGroupIcon,
-  UsersIcon
+  UsersIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
 import { useDashboard } from '../context/DashboardContext.jsx';
@@ -50,6 +51,14 @@ const navigationByRole = {
     { name: 'E-books', to: `${basePath}/ebooks`, icon: BookOpenIcon },
     { name: 'Create e-books', to: `${basePath}/ebooks/create`, icon: DocumentTextIcon },
     { name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
+  ],
+  community: (basePath) => [
+    { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
+    { name: 'Operations', to: `${basePath}/operations`, icon: Cog6ToothIcon },
+    { name: 'Programming', to: `${basePath}/programming`, icon: CalendarDaysIcon },
+    { name: 'Monetisation', to: `${basePath}/monetisation`, icon: BanknotesIcon },
+    { name: 'Safety', to: `${basePath}/safety`, icon: ShieldCheckIcon },
+    { name: 'Communications', to: `${basePath}/communications`, icon: MegaphoneIcon }
   ]
 };
 
