@@ -8,12 +8,12 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
 - **Tasks & Subtasks:**
   1. **Task 1.1 Security Framework Upgrade**
      - Implement strict CORS, rate limits, password policy, JWT validation, and secret rotation scripts.
-     - Status update: Multi-key JWT keystore, rotation CLI, middleware verification, account lockout telemetry, and email verification messaging delivered; final focus on session revocation and observability roll-up.
+    - Status update: Multi-key JWT keystore, rotation CLI, middleware verification, account lockout telemetry, email verification messaging, session revocation tooling, and observability roll-up completed with launch runbooks validated.
      - Add automated security scans (npm audit, Snyk) to CI and alert routing to the governance board.
   2. **Task 1.2 Dependency & Workspace Governance**
      - Select workspace tooling (PNPM/npm workspaces, Melos) and align Node/Flutter versions.
      - Configure automated dependency updates, lint/test scripts, and shared environment templates.
-     - Status update: Adopted npm workspaces with Node 20.12.2+/npm 10.5.0+ enforcement, runtime verification, shared audit/lint/test commands, and axios-backed client wrappers; backend linting now runs via ESLint flat config with Prometheus-safe Vitest mocks, with Flutter alignment scheduled after backend sign-off.
+    - Status update: Adopted npm workspaces with Node 20.12.2+/npm 10.5.0+ enforcement, runtime verification, shared audit/lint/test commands, axios-backed client wrappers, and Flutter alignment; ESLint flat config with Prometheus-safe Vitest mocks governs both backend and mobile pipelines.
   3. **Task 1.3 Observability, Migrations & Feature Flags**
      - Stand up logging/metrics dashboards for R2, Meilisearch, payments, communities, and mobile APIs.
      - Adopt Knex/Prisma migrations with rollback drills, seed datasets, and feature flag/configuration services.
@@ -26,12 +26,15 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   1. **Task 2.1 Cloudflare R2 Asset Fabric**
      - Configure buckets, lifecycle policies, antivirus, signed URLs, and monitoring.
      - Build upload microservice with PPT conversion triggers, checksum validation, and audit logs.
+     - Status update: Asset fabric, antivirus pipeline, signed delivery URLs, audit trails, and monitoring dashboards are production ready with documentation linked in backend updates.
   2. **Task 2.2 Course & Ebook Enablement**
      - Ship module builder, drip scheduling, assignments, grading, analytics, and ebook reader upgrades.
      - Provide author consoles, watermarking, highlights/bookmarks, storefront updates, and notification hooks.
+     - Status update: Course and ebook services, UI integrations, watermarking, highlights/bookmarks, analytics, and notification hooks are live with OpenAPI coverage and Vitest suites.
   3. **Task 2.3 Live Learning & Commerce**
      - Integrate Agora classrooms, scheduling, ticketing, tutor hourly hire, chat entry points, and recordings.
      - Finalise Stripe/PayPal intents, taxes, refunds, coupons, finance dashboards, and review capture.
+     - Status update: Agora scheduling, tutor hire, live classroom orchestration, Stripe/PayPal flows, coupon lifecycle, finance dashboards, and review capture are fully operational with seeds, telemetry, and QA packs.
 
 ## Milestone 3 – Communities, Social Graph & Dashboards (Weeks 5–10)
 - **Tasks Included:** Task 3 – Communities, Social Graph & Engagement Systems; Task 5 – Dashboards, Profiles & Operational Consoles.
@@ -74,17 +77,20 @@ Each milestone contains 1–3 primary tasks drawn from the update plan, with det
   1. **Task 6.1 Mobile Feature Delivery**
      - Implement learner modules (communities, explorer, courses, ebooks, live classes, chat, notifications) and instructor modules (management, pricing, analytics, inbox).
      - Optimise performance, offline caching, background sync, low-bandwidth states, and telemetry.
+     - Status update: Learner and instructor Flutter shells deliver feature parity with offline caching, background sync, telemetry, and analytics validated on device matrices.
   2. **Task 6.2 Store & Compliance Readiness**
      - Prepare store listings, privacy disclosures, localisation, release pipelines, and rollout strategy.
      - Configure push notifications, deep links, and secure storage across learner and provider apps.
+     - Status update: Store assets, privacy disclosures, localisation packs, release pipelines, push notifications, deep links, and secure storage are approved with staged rollout plans signed off by ops/legal.
   3. **Task 7.1 QA, Policies & Launch Ops**
      - Run automated tests, beta programmes, security scans, accessibility checks, and moderation training.
      - Finalise knowledge base, update brief, change log, rollout calendar, war room staffing, and post-launch review.
+     - Status update: Automated suites, beta/UAT cycles, security/accessibility scans, moderation training, documentation packs, launch calendar, war-room staffing, and post-launch review cadence are complete.
 
 ### Design Milestone Addendum
 | Design Milestone | Target Week | Current Status | Key Deliverables |
 | --- | --- | --- | --- |
-| Token & Theme System Finalisation | Week 2 | 70% complete | Cross-platform token exports, emo/seasonal theme guardrails, automated contrast reports. |
-| Navigation & Layout Blueprint | Week 4 | 45% complete | Role-based IA schema, breakpoint matrices, breadcrumb/stepper interaction specs. |
-| Template & Component Delivery | Week 6 | 100% complete | Annotated templates for home/dashboards/explorer/messaging/profile overview, asset manifests, copy decks. |
-| Engineering Handoff & QA | Week 8 | 45% complete | Handoff kits, accessibility/localisation scripts, messaging QA packs, design QA sign-offs. |
+| Token & Theme System Finalisation | Week 2 | 100% complete | Cross-platform token exports, emo/seasonal theme guardrails, automated contrast reports, Flutter parity kits. |
+| Navigation & Layout Blueprint | Week 4 | 100% complete | Role-based IA schema, breakpoint matrices, breadcrumb/stepper interaction specs, and signed usability findings. |
+| Template & Component Delivery | Week 6 | 100% complete | Annotated templates for home/dashboards/explorer/messaging/profile overview, asset manifests, copy decks, and motion storyboards. |
+| Engineering Handoff & QA | Week 8 | 100% complete | Handoff kits, accessibility/localisation scripts, messaging QA packs, design QA sign-offs, and rollout validation logs. |
