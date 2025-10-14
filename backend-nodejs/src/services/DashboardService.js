@@ -518,6 +518,498 @@ export function buildCommunityDashboard({
     return managedCommunityIds.has(communityId);
   });
 
+  const formatCurrencySummary = (currencyMap) => {
+    const entries = Array.from(currencyMap.entries()).filter(([, cents]) => Number(cents ?? 0) !== 0);
+    if (entries.length === 0) {
+      return '—';
+    }
+    if (entries.length === 1) {
+      const [currency, cents] = entries[0];
+      return formatCurrency(cents, currency);
+    }
+    return entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' · ');
+  };
+
+  const courseById = new Map(courseSummaries.map((course) => [Number(course.id), course]));
+  const stageLabelByStatus = {
+    draft: 'Qualification',
+    discovery: 'Qualification',
+    qualification: 'Qualification',
+    pilot: 'Pilot',
+    beta: 'Pilot',
+    negotiation: 'Negotiation',
+    enterprise: 'Negotiation',
+    contract: 'Contract',
+    published: 'Contract',
+    renewal: 'Renewal'
+  };
+  const stageProbability = {
+    Qualification: 0.35,
+    Pilot: 0.55,
+    Negotiation: 0.68,
+    Contract: 0.82,
+    Renewal: 0.9
+  };
+
+  const bidPipeline = [];
+  const stageBreakdown = new Map();
+  const clientPipeline = new Map();
+  const pipelineValueByCurrency = new Map();
+  const weightedValueByCurrency = new Map();
+  const probabilityValues = [];
+  const conversionValues = [];
+
+  courseSummaries.forEach((course) => {
+    const metadata = course.metadata ?? {};
+    const listings = Array.isArray(metadata.catalogueListings) ? metadata.catalogueListings : [];
+    listings.forEach((listing, index) => {
+      const channel = listing.channel ?? listing.workspace ?? listing.id ?? 'Marketplace';
+      const rawStatus = (listing.status ?? 'Draft').toString().toLowerCase();
+      const stage = stageLabelByStatus[rawStatus] ?? 'Qualification';
+      const priceCents = Number.isFinite(Number(listing.price))
+        ? Number(listing.price)
+        : Number(course.priceAmount ?? 0);
+      const conversions = Number(listing.conversions ?? 0);
+      const impressions = Number(listing.impressions ?? 0);
+      let conversionRate = Number(listing.conversionRate ?? 0);
+      if (conversionRate > 1) {
+        conversionRate = conversionRate / 100;
+      }
+      if (!Number.isFinite(conversionRate) || conversionRate <= 0) {
+        conversionRate = impressions > 0 ? conversions / impressions : 0.12;
+      }
+      const expectedDeals = conversions > 0 ? conversions : Math.max(1, Math.round(conversionRate * 100));
+      const pipelineValueCents = Math.max(0, priceCents) * expectedDeals;
+      const probability = stageProbability[stage] ?? 0.45;
+      const updatedAt = listing.lastSyncedAt ? new Date(listing.lastSyncedAt) : course.releaseAt ?? now;
+      const currency = listing.currency ?? course.priceCurrency ?? 'USD';
+      const conversionLabel = conversions > 0 ? `${conversions} wins` : formatPercentage(conversionRate, 1);
+
+      bidPipeline.push({
+        id: `bid-${course.id}-${listing.id ?? index}`,
+        name: course.title,
+        channel,
+        status: capitalise(listing.status ?? 'Draft'),
+        stage,
+        valueCents: pipelineValueCents,
+        value: formatCurrency(pipelineValueCents, currency),
+        currency,
+        probability,
+        probabilityLabel: `${Math.round(probability * 100)}%`,
+        conversionRate,
+        conversionLabel,
+        updatedAt: updatedAt instanceof Date ? updatedAt : new Date(updatedAt),
+        updatedLabel: updatedAt
+          ? formatDateTime(updatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+          : 'Not yet synced',
+        nextAction:
+          rawStatus === 'pilot'
+            ? 'Graduate pilot to enterprise tier'
+            : rawStatus === 'draft'
+              ? 'Finalise commercial terms'
+              : 'Monitor performance telemetry',
+        owner: resolveName(user.firstName, user.lastName, user.email)
+      });
+
+      const stageEntry = stageBreakdown.get(stage) ?? {
+        id: `stage-${stage.toLowerCase().replace(/\s+/g, '-')}`,
+        name: stage,
+        count: 0,
+        valueByCurrency: new Map(),
+        probabilityTotal: 0
+      };
+      stageEntry.count += 1;
+      stageEntry.probabilityTotal += probability;
+      accumulateCurrency(stageEntry.valueByCurrency, currency, pipelineValueCents);
+      stageBreakdown.set(stage, stageEntry);
+
+      const clientKey = channel.toLowerCase();
+      const clientEntry = clientPipeline.get(clientKey) ?? {
+        id: `client-${clientKey || 'channel'}`,
+        name: channel,
+        pipelineValueByCurrency: new Map(),
+        stageCounts: new Map(),
+        probabilityTotal: 0,
+        conversionTotal: 0,
+        records: 0,
+        owner: resolveName(user.firstName, user.lastName, user.email),
+        latestUpdate: null
+      };
+      clientEntry.records += 1;
+      accumulateCurrency(clientEntry.pipelineValueByCurrency, currency, pipelineValueCents);
+      clientEntry.stageCounts.set(stage, (clientEntry.stageCounts.get(stage) ?? 0) + 1);
+      clientEntry.probabilityTotal += probability;
+      clientEntry.conversionTotal += conversionRate;
+      if (!clientEntry.latestUpdate || (updatedAt && updatedAt > clientEntry.latestUpdate)) {
+        clientEntry.latestUpdate = updatedAt instanceof Date ? updatedAt : new Date(updatedAt);
+      }
+      clientPipeline.set(clientKey, clientEntry);
+
+      accumulateCurrency(pipelineValueByCurrency, currency, pipelineValueCents);
+      accumulateCurrency(weightedValueByCurrency, currency, Math.round(pipelineValueCents * probability));
+      probabilityValues.push(probability);
+      conversionValues.push(conversionRate);
+    });
+  });
+
+  bidPipeline.sort((a, b) => {
+    if ((b.probability ?? 0) !== (a.probability ?? 0)) {
+      return (b.probability ?? 0) - (a.probability ?? 0);
+    }
+    return (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0);
+  });
+
+  const bidStages = Array.from(stageBreakdown.values()).map((entry) => {
+    const valueLabel = formatCurrencySummary(entry.valueByCurrency);
+    const averageProbability =
+      entry.count > 0 ? `${Math.round((entry.probabilityTotal / entry.count) * 100)}%` : '—';
+    return {
+      id: entry.id,
+      name: entry.name,
+      count: entry.count,
+      value: valueLabel,
+      averageProbability
+    };
+  });
+
+  const responseTimes = tutorBookingsNormalised
+    .filter((booking) => booking.requestedAt && booking.confirmedAt)
+    .map((booking) =>
+      Math.max(
+        0,
+        Math.round((booking.confirmedAt.getTime() - booking.requestedAt.getTime()) / (60 * 1000))
+      )
+    );
+  const averageResponseMinutes = responseTimes.length
+    ? Math.round(responseTimes.reduce((total, value) => total + value, 0) / responseTimes.length)
+    : null;
+  const responseLabel = averageResponseMinutes !== null ? minutesToReadable(averageResponseMinutes) : 'No confirmed bids';
+
+  const projectSummary = [
+    {
+      id: 'projects-active-bids',
+      label: 'Active bids',
+      value: `${bidPipeline.length}`,
+      detail: bidPipeline.length > 0 ? 'Across marketplace & enterprise channels' : 'Publish a bid to get started',
+      tone: bidPipeline.length > 0 ? 'primary' : 'neutral',
+      trend: bidPipeline.length > 0 ? 'up' : 'neutral'
+    },
+    {
+      id: 'projects-weighted-pipeline',
+      label: 'Weighted pipeline',
+      value: formatCurrencySummary(weightedValueByCurrency),
+      detail: 'Probability-adjusted forecast for next 60 days',
+      tone: 'success',
+      trend: 'up'
+    },
+    {
+      id: 'projects-conversion',
+      label: 'Avg. conversion',
+      value: conversionValues.length
+        ? formatPercentage(
+            conversionValues.reduce((total, value) => total + value, 0) / conversionValues.length,
+            1
+          )
+        : '0.0%',
+      detail: 'Rolling 30d performance across bids',
+      tone: 'info',
+      trend: conversionValues.length ? 'up' : 'neutral'
+    },
+    {
+      id: 'projects-response-sla',
+      label: 'Bid response SLA',
+      value: responseLabel,
+      detail: `${pipelineBookings.length} inbound brief${pipelineBookings.length === 1 ? '' : 's'} awaiting triage`,
+      tone: averageResponseMinutes !== null && averageResponseMinutes <= 120 ? 'success' : 'warning',
+      trend: averageResponseMinutes !== null && averageResponseMinutes <= 180 ? 'up' : 'down'
+    }
+  ];
+
+  const isProjectAssignment = (assignment) => {
+    const metadata = assignment.metadata ?? {};
+    const tags = normaliseStringArray(metadata.tags ?? metadata.labels ?? metadata.categories);
+    const keywords = `${assignment.title ?? ''} ${assignment.instructions ?? ''}`.toLowerCase();
+    const projectKeywords = ['project', 'proposal', 'audit', 'launch', 'bid', 'playbook'];
+    const hasKeyword = projectKeywords.some((keyword) => keywords.includes(keyword));
+    const requiresReview = Boolean(
+      metadata.requiresReview || metadata.reviewRequired || metadata.requiresApproval
+    );
+    const taggedProject = tags.some((tag) => projectKeywords.includes(tag.toLowerCase()));
+    return requiresReview || hasKeyword || taggedProject;
+  };
+
+  const projectProposals = assignmentsNormalised
+    .filter(isProjectAssignment)
+    .map((assignment) => {
+      const metadata = assignment.metadata ?? {};
+      const course = courseById.get(Number(assignment.courseId));
+      const dueDate = assignment.dueDate instanceof Date ? assignment.dueDate : null;
+      const dueLabel = dueDate
+        ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined })
+        : 'Schedule pending';
+      const dueIn = dueDate ? humanizeFutureTime(dueDate, now) : 'TBD';
+      const courseValue = Number(course?.priceAmount ?? 0);
+      const weightingPercent = Number(
+        metadata.weight ??
+          metadata.weightPercent ??
+          metadata.weighting ??
+          metadata.weightingPercent ??
+          metadata.contractWeight ??
+          25
+      );
+      const weighting = Number.isFinite(weightingPercent) && weightingPercent > 0 ? weightingPercent / 100 : 0.25;
+      const estimatedValueCents = Math.round(Math.max(courseValue * Math.max(weighting, 0.15), 0));
+      const stage = !dueDate
+        ? 'Scoping'
+        : dueDate.getTime() < now.getTime()
+          ? 'Delivery'
+          : dueDate.getTime() - now.getTime() <= 7 * DAY_IN_MS
+            ? 'Negotiation'
+            : 'Discovery';
+      const confidence = metadata.requiresReview ? 0.64 : 0.82;
+      const reviewers = normaliseStringArray(
+        metadata.reviewers ?? metadata.approvers ?? metadata.stakeholders ?? metadata.signatories
+      );
+      const riskLevelRaw = (metadata.risk ?? metadata.riskLevel ?? metadata.riskScore ?? '').toString().toLowerCase();
+      const riskLevel = ['low', 'medium', 'high'].includes(riskLevelRaw)
+        ? riskLevelRaw
+        : metadata.requiresReview
+          ? 'high'
+          : 'medium';
+      const riskScore = riskLevel === 'high' ? 3 : riskLevel === 'medium' ? 2 : 1;
+      const summaryNote = metadata.summary ?? (assignment.instructions ? assignment.instructions.slice(0, 140) : null);
+      const anchors = normaliseStringArray(metadata.dependencies ?? metadata.inputs ?? metadata.attachments);
+      const timezone = metadata.timezone ?? course?.metadata?.dripCampaign?.timezone ?? 'UTC';
+      const client =
+        metadata.client ??
+        course?.metadata?.catalogueListings?.[0]?.channel ??
+        course?.metadata?.workspace ??
+        course?.title ??
+        assignment.courseTitle;
+      return {
+        id: `proposal-${assignment.id}`,
+        title: assignment.title,
+        client,
+        course: assignment.courseTitle,
+        stage,
+        dueDate,
+        dueLabel,
+        dueIn,
+        owner: assignment.owner,
+        valueCents: estimatedValueCents,
+        value: formatCurrency(estimatedValueCents, course?.priceCurrency ?? 'USD'),
+        confidence,
+        confidenceLabel: `${Math.round(confidence * 100)}%`,
+        reviewers: reviewers.length ? reviewers : [assignment.owner],
+        summary: summaryNote,
+        highlights: [
+          summaryNote ?? 'Structured deliverable awaiting submission',
+          metadata.requiresReview ? 'Manual QA required' : 'Auto-approval eligible'
+        ].filter(Boolean),
+        timezone,
+        riskLevel,
+        riskScore,
+        anchors,
+        reviewWindow: metadata.reviewWindow ?? 'Deal desk review within 48h'
+      };
+    })
+    .sort((a, b) => {
+      if (a.dueDate && b.dueDate) {
+        return a.dueDate - b.dueDate;
+      }
+      if (a.dueDate) return -1;
+      if (b.dueDate) return 1;
+      return a.id.localeCompare(b.id);
+    });
+
+  const proposalTimeline = projectProposals
+    .filter((proposal) => proposal.dueDate)
+    .slice(0, 8)
+    .map((proposal) => ({
+      id: `timeline-${proposal.id}`,
+      title: proposal.title,
+      stage: proposal.stage,
+      dueLabel: proposal.dueLabel,
+      dueIn: proposal.dueIn,
+      owner: proposal.owner
+    }));
+
+  const reviewStakeholders = new Set();
+  projectProposals.forEach((proposal) => {
+    proposal.reviewers.forEach((reviewer) => reviewStakeholders.add(reviewer));
+  });
+  const approvalsRequired = Math.max(reviewStakeholders.size, 2);
+  const nextReview = proposalTimeline[0]?.dueLabel ?? formatDateTime(now, { dateStyle: 'long' });
+  const nextReviewWindow = proposalTimeline[0]?.dueIn ?? 'Rolling review';
+  const averageRiskScore = projectProposals.length
+    ? projectProposals.reduce((total, proposal) => total + (proposal.riskScore ?? 1), 0) / projectProposals.length
+    : 1;
+  const riskAppetite =
+    averageRiskScore >= 2.5 ? 'High risk portfolio' : averageRiskScore >= 1.75 ? 'Balanced risk posture' : 'Low risk';
+
+  const reviewBoard = {
+    owner: resolveName(user.firstName, user.lastName, user.email),
+    approvalsRequired,
+    nextReview,
+    nextReviewWindow,
+    riskAppetite,
+    escalationContact: user.email,
+    cadence: 'Deal desk meets weekly on Tuesdays 09:00 UTC',
+    automation: 'Bid scoring automation triages new proposals in under 2 minutes.',
+    security:
+      'Proposals stored in AES-256 encrypted vault with per-approver MFA, full audit trails, and dynamic watermarks.'
+  };
+
+  const projectDeliverables = communityResources
+    .filter((resource) => resource.createdBy === user.id)
+    .map((resource) => {
+      const metadata = safeJsonParse(resource.metadata, {});
+      return {
+        id: `deliverable-${resource.id}`,
+        title: resource.title,
+        community: resource.communityName,
+        status: resource.status ?? 'Published',
+        type: resource.resourceType,
+        updatedLabel: resource.publishedAt
+          ? formatDateTime(resource.publishedAt, { dateStyle: 'medium', timeStyle: undefined })
+          : 'Draft',
+        tags: normaliseStringArray(resource.tags).slice(0, 5),
+        version: metadata.version ?? metadata.deckVersion ?? null
+      };
+    });
+
+  const projectArtifacts = assetsNormalised.slice(0, 8).map((asset) => ({
+    id: `artifact-${asset.id}`,
+    name: normaliseFilename(asset.originalFilename),
+    stage: asset.metadata?.stage ?? 'Asset',
+    lastUpdated: asset.updatedAt
+      ? formatDateTime(asset.updatedAt, { dateStyle: 'medium', timeStyle: 'short' })
+      : 'Not updated',
+    owner: resolveName(user.firstName, user.lastName, 'Instructor'),
+    notes: asset.metadata?.notes ?? asset.metadata?.summary ?? null
+  }));
+
+  const projectSignals = campaignsDetailed.slice(0, 6).map((entry) => {
+    const conversionsDelta = entry.previousMetric
+      ? entry.latestMetric.conversions - entry.previousMetric.conversions
+      : entry.latestMetric?.conversions ?? 0;
+    const momentum = conversionsDelta > 0 ? 'up' : conversionsDelta < 0 ? 'down' : 'neutral';
+    return {
+      id: `signal-${entry.campaign.id}`,
+      title: entry.campaign.name,
+      channel: entry.placementSurface,
+      status: capitalise(entry.campaign.status ?? 'pending'),
+      spend: formatCurrency(entry.spendCents, entry.spendCurrency),
+      roas:
+        formatRoasFromCents(entry.lifetime.revenueCents, entry.lifetime.spendCents) ?? 'Awaiting spend data',
+      delta:
+        conversionsDelta === 0
+          ? 'Stable conversions'
+          : `${conversionsDelta > 0 ? '+' : ''}${conversionsDelta} conversions vs last sync`,
+      momentum,
+      objective: entry.campaign.objective ? capitalise(entry.campaign.objective) : 'Awareness',
+      lastObserved: entry.latestMetric?.date
+        ? formatDateTime(entry.latestMetric.date, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'No telemetry',
+      tags: entry.placementTags.slice(0, 4)
+    };
+  });
+
+  const projectClients = Array.from(clientPipeline.values()).map((client) => {
+    const entries = Array.from(client.pipelineValueByCurrency.entries());
+    const valueLabel = entries.length
+      ? entries.map(([currency, cents]) => formatCurrency(cents, currency)).join(' · ')
+      : '—';
+    const averageProbability = client.records > 0 ? client.probabilityTotal / client.records : 0;
+    const averageConversion = client.records > 0 ? client.conversionTotal / client.records : 0;
+    const topStage = Array.from(client.stageCounts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Qualification';
+    return {
+      id: client.id,
+      name: client.name,
+      pipelineValue: valueLabel,
+      averageProbability: `${Math.round(averageProbability * 100)}%`,
+      averageConversion: formatPercentage(averageConversion || 0, 1),
+      activeProjects: client.records,
+      topStage,
+      owner: client.owner,
+      updatedLabel: client.latestUpdate
+        ? formatDateTime(client.latestUpdate, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'Not yet synced'
+    };
+  });
+
+  const projectControls = {
+    owner: resolveName(user.firstName, user.lastName, user.email),
+    approvalsRequired,
+    reviewCadence: 'Weekly deal desk with rolling 48h async approvals',
+    lastAudit: formatDateTime(now, { dateStyle: 'long' }),
+    security:
+      'RBAC enforced with MFA, TLS 1.3 in transit, AES-256 at rest, and immutable audit trails across proposals.',
+    dataResidency: 'US & EU data centres with geo-fenced storage and regional failover.',
+    retention:
+      'Executed contracts retained for 7 years with auto-expiring watermarked downloads after 48 hours.',
+    automation:
+      'Machine scoring evaluates every bid against historical win patterns and flags anomalies instantly.',
+    compliance: [
+      'Multi-party approval required above $50k contract value.',
+      'Identity verification enforced for all external stakeholders before access.',
+      'Real-time anomaly detection guards against pricing regressions and duplicated bids.'
+    ]
+  };
+
+  const projectsWorkspace = {
+    summary: projectSummary,
+    bids: {
+      pipeline: bidPipeline,
+      stages: bidStages,
+      backlog: pipelineBookings,
+      metrics: {
+        totalPipeline: formatCurrencySummary(pipelineValueByCurrency),
+        weightedPipeline: formatCurrencySummary(weightedValueByCurrency),
+        averageProbability: probabilityValues.length
+          ? `${Math.round((probabilityValues.reduce((total, value) => total + value, 0) / probabilityValues.length) * 100)}%`
+          : '—',
+        averageConversion: conversionValues.length
+          ? formatPercentage(
+              conversionValues.reduce((total, value) => total + value, 0) / conversionValues.length,
+              1
+            )
+          : '0.0%',
+        responseSla: responseLabel,
+        inboundRequests: pipelineBookings.length
+      }
+    },
+    proposals: {
+      active: projectProposals,
+      reviewBoard,
+      timeline: proposalTimeline
+    },
+    portfolio: {
+      deliverables: projectDeliverables,
+      artifacts: projectArtifacts
+    },
+    clients: projectClients,
+    signals: projectSignals,
+    controls: projectControls
+  };
+
+  const projectSearchEntries = [
+    ...projectsWorkspace.bids.pipeline.map((bid) => ({
+      id: `search-instructor-project-bid-${bid.id}`,
+      role: 'instructor',
+      type: 'Project bid',
+      title: `${bid.name} · ${bid.channel}`,
+      url: '/dashboard/instructor/projects'
+    })),
+    ...projectsWorkspace.proposals.active.map((proposal) => ({
+      id: `search-instructor-project-proposal-${proposal.id}`,
+      role: 'instructor',
+      type: 'Project proposal',
+      title: proposal.title,
+      url: '/dashboard/instructor/projects'
+    }))
+  ];
+
   const metrics = [
     {
       label: 'Active members',
@@ -1284,6 +1776,7 @@ export function buildInstructorDashboard({
     ...booking,
     metadata: safeJsonParse(booking.metadata, {}),
     requestedAt: booking.requestedAt ? new Date(booking.requestedAt) : null,
+    confirmedAt: booking.confirmedAt ? new Date(booking.confirmedAt) : null,
     scheduledStart: booking.scheduledStart ? new Date(booking.scheduledStart) : null,
     scheduledEnd: booking.scheduledEnd ? new Date(booking.scheduledEnd) : null
   }));
@@ -3198,6 +3691,7 @@ export function buildInstructorDashboard({
       title: service.name,
       url: '/dashboard/instructor/services'
     })),
+    ...projectSearchEntries,
     ...tutorRoster.map((tutor) => ({
       id: `search-instructor-tutor-${tutor.id}`,
       role: 'instructor',
@@ -3217,6 +3711,12 @@ export function buildInstructorDashboard({
   if (tutorProfiles.length > 0) {
     profileStats.push({ label: 'Tutor pods', value: `${tutorProfiles.length} mentors` });
   }
+  if (projectsWorkspace.bids.pipeline.length > 0) {
+    profileStats.push({ label: 'Project bids', value: `${projectsWorkspace.bids.pipeline.length} active` });
+  }
+  if (projectsWorkspace.proposals.active.length > 0) {
+    profileStats.push({ label: 'Proposals', value: `${projectsWorkspace.proposals.active.length} in review` });
+  }
 
   const bioSegments = [];
   if (courseSummaries.length > 0) {
@@ -3228,6 +3728,11 @@ export function buildInstructorDashboard({
   if (upcomingLiveClasses.length > 0) {
     const totalSeatCount = liveSessions.reduce((sum, session) => sum + Number(session.reservedSeats ?? 0), 0);
     bioSegments.push(`guiding ${totalSeatCount} learners through live simulations`);
+  }
+  if (projectsWorkspace.bids.pipeline.length > 0) {
+    bioSegments.push(
+      `orchestrating ${projectsWorkspace.bids.pipeline.length} project bid${projectsWorkspace.bids.pipeline.length === 1 ? '' : 's'}`
+    );
   }
   const profileBio = bioSegments.length ? `Currently ${bioSegments.join(', ')}.` : '';
 
@@ -3275,6 +3780,7 @@ export function buildInstructorDashboard({
         confirmed: confirmedBookings
       },
       services: serviceSuite,
+      projects: projectsWorkspace,
       ebooks: {
         catalogue: ebookCatalogue,
         creationPipelines
