@@ -8,6 +8,9 @@ const BASE_COLUMNS = [
   'role',
   'age',
   'address',
+  'two_factor_enabled as twoFactorEnabled',
+  'two_factor_enrolled_at as twoFactorEnrolledAt',
+  'two_factor_last_verified_at as twoFactorLastVerifiedAt',
   'email_verified_at as emailVerifiedAt',
   'last_login_at as lastLoginAt',
   'created_at as createdAt',
@@ -31,7 +34,11 @@ export default class UserModel {
       password_hash: user.passwordHash,
       role: user.role ?? 'user',
       age: user.age ?? null,
-      address: user.address ?? null
+      address: user.address ?? null,
+      two_factor_enabled: user.twoFactorEnabled ? 1 : 0,
+      two_factor_secret: user.twoFactorSecret ?? null,
+      two_factor_enrolled_at: user.twoFactorEnrolledAt ?? null,
+      two_factor_last_verified_at: user.twoFactorLastVerifiedAt ?? null
     };
     const [id] = await connection('users').insert(payload);
     return this.findById(id, connection);
@@ -97,6 +104,12 @@ export default class UserModel {
         locked_until: null,
         last_login_at: connection.fn.now()
       });
+  }
+
+  static async markTwoFactorVerified(userId, connection = db) {
+    await connection('users')
+      .where({ id: userId })
+      .update({ two_factor_last_verified_at: connection.fn.now() });
   }
 
   static async markEmailVerified(userId, connection = db) {

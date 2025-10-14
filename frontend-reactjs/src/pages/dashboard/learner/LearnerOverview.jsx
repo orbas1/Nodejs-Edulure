@@ -10,6 +10,7 @@ import LearnerPaceSection from './sections/LearnerPaceSection.jsx';
 import LearnerProfileSection from './sections/LearnerProfileSection.jsx';
 import LearnerSafetySection from './sections/LearnerSafetySection.jsx';
 import LearnerUpcomingSection from './sections/LearnerUpcomingSection.jsx';
+import LearnerBlogSection from './sections/LearnerBlogSection.jsx';
 
 function normaliseMetrics(metrics) {
   if (!Array.isArray(metrics)) return [];
@@ -86,6 +87,23 @@ function normaliseNotifications(notifications) {
     }));
 }
 
+function normaliseBlog(blog) {
+  if (!blog) {
+    return { posts: [], featured: null };
+  }
+  const posts = Array.isArray(blog.highlights)
+    ? blog.highlights.map((post) => ({
+        ...post,
+        readingTimeMinutes: Number(post.readingTimeMinutes ?? post.reading_time_minutes ?? 0),
+        viewCount: Number(post.viewCount ?? post.view_count ?? 0)
+      }))
+    : [];
+  return {
+    posts,
+    featured: blog.featured ?? null
+  };
+}
+
 export default function LearnerOverview({ dashboard, profile, onRefresh }) {
   const metrics = useMemo(() => normaliseMetrics(dashboard.metrics), [dashboard.metrics]);
   const learningPace = useMemo(
@@ -107,6 +125,7 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
     [dashboard.notifications?.items]
   );
   const notificationsTotal = dashboard.notifications?.total ?? notifications.length;
+  const blog = useMemo(() => normaliseBlog(dashboard.blog), [dashboard.blog]);
   const privacySettings = dashboard.settings?.privacy ?? null;
   const messagingSettings = dashboard.settings?.messaging ?? null;
   const followerSummary = dashboard.followers ?? null;
@@ -144,6 +163,8 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
           unreadMessages={unreadMessages}
         />
       </section>
+
+      <LearnerBlogSection posts={blog.posts} featured={blog.featured} />
     </div>
   );
 }

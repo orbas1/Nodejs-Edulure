@@ -18,17 +18,20 @@ const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrator' }
 ];
 
+const ENFORCED_TWO_FACTOR_ROLES = new Set(['admin']);
+
 const passwordHint = 'Use at least 12 characters with upper, lower, number, and symbol.';
 
 export default function Register() {
   const navigate = useNavigate();
+  const defaultRole = ROLE_OPTIONS[0]?.value ?? 'instructor';
   const [formState, setFormState] = useState({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'instructor',
+    role: defaultRole,
     age: '',
     address: ''
   });
@@ -36,6 +39,18 @@ export default function Register() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
+  const [twoFactorLocked, setTwoFactorLocked] = useState(ENFORCED_TWO_FACTOR_ROLES.has(defaultRole));
+  const [twoFactorEnrollment, setTwoFactorEnrollment] = useState(null);
+  const [copiedSecret, setCopiedSecret] = useState(false);
+  const isClipboardSupported =
+    typeof navigator !== 'undefined' && Boolean(navigator?.clipboard?.writeText);
+  const formattedTwoFactorSecret = useMemo(() => {
+    if (!twoFactorEnrollment?.secret) {
+      return '';
+    }
+    return twoFactorEnrollment.secret.replace(/(.{4})/g, '$1 ').trim();
+  }, [twoFactorEnrollment]);
 
   const oauthBase = useMemo(() => {
     if (!API_BASE_URL) return '';
@@ -57,12 +72,38 @@ export default function Register() {
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormState((prev) => ({ ...prev, [name]: value }));
+    if (name === 'role') {
+      const enforced = ENFORCED_TWO_FACTOR_ROLES.has(value);
+      setTwoFactorLocked(enforced);
+      setTwoFactorEnabled((prev) => (enforced ? true : prev));
+      setTwoFactorEnrollment(null);
+      setCopiedSecret(false);
+    }
   };
+
+  const handleCopySecret = useCallback(async () => {
+    if (!twoFactorEnrollment?.secret) {
+      return;
+    }
+    if (typeof navigator === 'undefined' || !navigator?.clipboard?.writeText) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(twoFactorEnrollment.secret);
+      setCopiedSecret(true);
+      setTimeout(() => setCopiedSecret(false), 2000);
+    } catch (copyError) {
+      console.error('Failed to copy 2FA secret', copyError);
+      setCopiedSecret(false);
+    }
+  }, [twoFactorEnrollment]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
     setSuccess(null);
+    setTwoFactorEnrollment(null);
+    setCopiedSecret(false);
 
     if (formState.password !== formState.confirmPassword) {
       setError('Passwords do not match.');
@@ -83,19 +124,38 @@ export default function Register() {
 
     setIsSubmitting(true);
     try {
-      await httpClient.post('/auth/register', {
+      const requestBody = {
         firstName: formState.firstName,
         lastName: formState.lastName,
         email: formState.email,
         password: formState.password,
         role: formState.role,
         ...(age ? { age } : {}),
-        ...(formState.address.trim() ? { address: formState.address.trim() } : {})
-      });
-      setSuccess('Account created. Check your inbox to verify your email before signing in.');
-      setTimeout(() => navigate('/login'), 1600);
+        ...(formState.address.trim() ? { address: formState.address.trim() } : {}),
+        twoFactor: { enabled: twoFactorLocked ? true : twoFactorEnabled }
+      };
+      const response = await httpClient.post('/auth/register', requestBody);
+      const result = response?.data ?? {};
+      setTwoFactorEnrollment(result.twoFactor ?? null);
+      if (result.twoFactor?.enabled) {
+        setTwoFactorEnabled(true);
+        setTwoFactorLocked(Boolean(result.twoFactor.enforced));
+      }
+      const verificationStatus = result.verification?.status ?? null;
+      const baseMessage =
+        verificationStatus === 'pending'
+          ? 'Account created. Check your inbox to verify your email before signing in.'
+          : 'Account created successfully.';
+      const securityMessage = result.twoFactor?.enabled
+        ? ' Finish setting up multi-factor authentication below to complete your first login.'
+        : '';
+      setSuccess(`${baseMessage}${securityMessage}`.trim());
+      if (!result.twoFactor?.enabled) {
+        setTimeout(() => navigate('/login'), 1600);
+      }
     } catch (err) {
-      const message = err?.response?.data?.message ?? err?.message ?? 'Unable to create your account right now.';
+      const message =
+        err?.original?.response?.data?.message ?? err?.message ?? 'Unable to create your account right now.';
       setError(message);
     } finally {
       setIsSubmitting(false);
@@ -198,6 +258,101 @@ export default function Register() {
             placeholder="Re-enter your password"
             required
           />
+          <div className="space-y-3 rounded-3xl border border-slate-200/80 bg-white/90 px-5 py-5 shadow-inner">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-700">Multi-factor authentication</p>
+                <p className="text-xs text-slate-500">
+                  Secure your account with an authenticator challenge.{" "}
+                  {twoFactorLocked
+                    ? ' This role requires multi-factor authentication on every sign in.'
+                    : ' You can opt in now and receive your setup key immediately.'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={twoFactorLocked ? true : twoFactorEnabled}
+                  aria-disabled={twoFactorLocked}
+                  onClick={() => {
+                    if (twoFactorLocked) return;
+                    setTwoFactorEnabled((prev) => !prev);
+                  }}
+                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/60 ${
+                    (twoFactorLocked ? true : twoFactorEnabled) ? 'bg-primary' : 'bg-slate-300'
+                  } ${twoFactorLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition ${
+                      (twoFactorLocked ? true : twoFactorEnabled) ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs font-semibold text-slate-600">
+                  {twoFactorLocked ? 'Required' : twoFactorEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </div>
+            {!twoFactorLocked && !twoFactorEnabled ? (
+              <p className="text-xs text-slate-400">
+                Turn this on to receive your authenticator setup instructions immediately after registration.
+              </p>
+            ) : null}
+          </div>
+          {twoFactorEnrollment?.enabled ? (
+            <div className="space-y-4 rounded-3xl border border-primary/30 bg-white/90 px-6 py-6 shadow-card ring-1 ring-primary/10">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-primary">Finish securing your workspace</p>
+                <p className="text-xs text-slate-500">
+                  Add Edulure to your authenticator app using this secret, then return to sign in with your new security code.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <div className="rounded-2xl border border-dashed border-primary/30 bg-primary/5 px-4 py-3 font-mono text-sm tracking-[0.3em] text-primary">
+                  {formattedTwoFactorSecret}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopySecret}
+                  disabled={!isClipboardSupported}
+                  className="rounded-full border border-primary px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                >
+                  {copiedSecret ? 'Secret copied' : 'Copy secret'}
+                </button>
+              </div>
+              {!isClipboardSupported ? (
+                <p className="text-xs text-amber-500">
+                  Clipboard access is unavailable in this browser. Enter the code manually in your authenticator app.
+                </p>
+              ) : null}
+              <div className="flex flex-col gap-2 text-xs text-slate-500 md:flex-row md:items-center md:justify-between">
+                {twoFactorEnrollment.otpauthUrl ? (
+                  <a
+                    href={twoFactorEnrollment.otpauthUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 text-primary transition hover:text-primary-dark"
+                  >
+                    Open authenticator setup
+                    <span aria-hidden="true">↗</span>
+                  </a>
+                ) : (
+                  <span className="text-slate-400">Use the secret above in your authenticator app.</span>
+                )}
+                <span className="text-[11px] uppercase tracking-[0.2em] text-slate-400">
+                  Issuer: {twoFactorEnrollment.issuer ?? 'Edulure'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
+              >
+                Proceed to secure login
+              </button>
+            </div>
+          ) : null}
           <label className="flex items-start gap-3 text-sm text-slate-600">
             <input
               type="checkbox"
@@ -219,10 +374,14 @@ export default function Register() {
           </label>
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/50"
+            disabled={isSubmitting || Boolean(twoFactorEnrollment?.enabled)}
+            className="w-full rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/40"
           >
-            {isSubmitting ? 'Creating account…' : 'Launch workspace'}
+            {twoFactorEnrollment?.enabled
+              ? 'Workspace secured'
+              : isSubmitting
+              ? 'Creating account…'
+              : 'Launch workspace'}
           </button>
           <p className="text-sm text-slate-500">
             Already have an account?{' '}

@@ -16,6 +16,9 @@ import 'screens/tutor_booking_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'services/session_manager.dart';
 import 'screens/instructor_dashboard_screen.dart';
+import 'screens/blog_screen.dart';
+import 'screens/settings_screen.dart';
+import 'screens/community_dashboard_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,11 +55,14 @@ class EdulureApp extends StatelessWidget {
         '/inbox': (_) => const InboxScreen(),
         '/profile': (_) => const ProfileScreen(),
         '/dashboard/learner': (_) => const LearnerDashboardScreen(),
+        '/dashboard/community': (_) => const CommunityDashboardScreen(),
         '/content': (_) => const ContentLibraryScreen(),
         '/tutor-bookings': (_) => const TutorBookingScreen(),
         '/instructor-dashboard': (_) => const InstructorDashboardScreen(),
         '/courses/manage': (_) => const CourseManagementScreen(),
         '/courses/purchase': (_) => const CoursePurchaseScreen(),
+        '/blog': (_) => const BlogScreen(),
+        '/settings': (_) => const SettingsScreen(),
       },
     );
   }
