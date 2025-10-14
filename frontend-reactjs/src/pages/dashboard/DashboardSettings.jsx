@@ -54,11 +54,11 @@ export default function DashboardSettings() {
   const roleLabel = useMemo(() => {
     switch (role) {
       case 'instructor':
-        return 'Instructor workspace';
+        return 'Instructor Learnspace';
       case 'admin':
-        return 'Administrator workspace';
+        return 'Administrator Learnspace';
       default:
-        return 'Learner workspace';
+        return 'Learner Learnspace';
     }
   }, [role]);
 
@@ -66,7 +66,7 @@ export default function DashboardSettings() {
     <div className="space-y-10">
       <DashboardSectionHeader
         eyebrow="Settings"
-        title="Keep your workspace secure"
+        title="Keep your Learnspace secure"
         description={`Manage how ${roleLabel.toLowerCase()} notifications, devices, and security safeguards operate.`}
         actions={
           <button type="button" className="dashboard-primary-pill">
@@ -163,7 +163,7 @@ export default function DashboardSettings() {
           <DevicePhoneMobileIcon className="h-6 w-6 text-primary" />
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Trusted devices</h2>
-            <p className="text-sm text-slate-600">Review which laptops and mobile devices currently have workspace access.</p>
+            <p className="text-sm text-slate-600">Review which laptops and mobile devices currently have Learnspace access.</p>
           </div>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

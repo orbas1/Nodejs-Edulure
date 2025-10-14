@@ -5,6 +5,14 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     setupFiles: ['./test/setupEnv.js', './test/setupMocks.js'],
-    include: ['test/**/*.test.js']
+    include: ['test/**/*.test.js'],
+    deps: {
+      esbuildOptions: {
+        target: 'esnext'
+      }
+    }
+  },
+  esbuild: {
+    target: 'esnext'
   }
 });

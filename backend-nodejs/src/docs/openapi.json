@@ -1906,8 +1906,34 @@
             "nullable": true
           },
           "address": {
-            "type": "string",
-            "nullable": true
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "streetAddress": {
+                "type": "string",
+                "description": "Primary street address line"
+              },
+              "addressLine2": {
+                "type": "string",
+                "description": "Additional street or unit information"
+              },
+              "town": {
+                "type": "string",
+                "description": "Town or village"
+              },
+              "city": {
+                "type": "string",
+                "description": "City or municipality"
+              },
+              "country": {
+                "type": "string",
+                "description": "Country or territory"
+              },
+              "postcode": {
+                "type": "string",
+                "description": "Postal or ZIP code"
+              }
+            }
           },
           "twoFactorEnabled": {
             "type": "boolean",
@@ -7087,7 +7113,33 @@
                     "maximum": 120
                   },
                   "address": {
-                    "type": "string"
+                    "type": "object",
+                    "properties": {
+                      "streetAddress": {
+                        "type": "string",
+                        "description": "Primary street address line"
+                      },
+                      "addressLine2": {
+                        "type": "string",
+                        "description": "Additional street or unit information"
+                      },
+                      "town": {
+                        "type": "string",
+                        "description": "Town or village"
+                      },
+                      "city": {
+                        "type": "string",
+                        "description": "City or municipality"
+                      },
+                      "country": {
+                        "type": "string",
+                        "description": "Country or territory"
+                      },
+                      "postcode": {
+                        "type": "string",
+                        "description": "Postal or ZIP code"
+                      }
+                    }
                   },
                   "twoFactor": {
                     "type": "object",
@@ -9834,7 +9886,7 @@
     "/api/content/assets": {
       "get": {
         "summary": "List content assets",
-        "description": "Requires instructor or admin workspace access.",
+        "description": "Requires instructor or admin Learnspace access.",
         "security": [
           {
             "bearerAuth": []

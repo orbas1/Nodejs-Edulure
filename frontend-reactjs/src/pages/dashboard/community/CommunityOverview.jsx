@@ -31,7 +31,7 @@ export default function CommunityOverview({ dashboard, onRefresh }) {
     return (
       <DashboardStateMessage
         title="Community intelligence unavailable"
-        description="We could not resolve any community operations signals for this workspace yet. Refresh after syncing sources."
+        description="We could not resolve any community operations signals for this Learnspace yet. Refresh after syncing sources."
         actionLabel="Refresh"
         onAction={onRefresh}
       />
@@ -72,7 +72,7 @@ export default function CommunityOverview({ dashboard, onRefresh }) {
           <div className="flex items-center justify-between">
             <div>
               <p className="dashboard-kicker">Community health</p>
-              <h2 className="text-lg font-semibold text-slate-900">Active workspaces</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Active Learnspaces</h2>
             </div>
             <a href="/dashboard/community/safety" className="dashboard-pill px-3 py-1">
               Escalation queue

@@ -654,7 +654,7 @@ export default function Communities() {
           <div className="rounded-4xl border border-rose-200 bg-rose-50/80 p-8 text-center shadow-xl">
             <h1 className="text-2xl font-semibold text-rose-700">Community access restricted</h1>
             <p className="mt-4 text-sm leading-6 text-rose-600">
-              Your current role does not provide access to the enterprise community workspace. Contact an administrator to
+              Your current role does not provide access to the enterprise community Learnspace. Contact an administrator to
               upgrade your permissions.
             </p>
           </div>

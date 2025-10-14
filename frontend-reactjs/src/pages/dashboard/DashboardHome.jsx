@@ -14,7 +14,7 @@ export default function DashboardHome() {
     return (
       <DashboardStateMessage
         title="Dashboard data unavailable"
-        description="We don't have any overview data for this workspace yet. Refresh once data sources are connected."
+        description="We don't have any overview data for this Learnspace yet. Refresh once data sources are connected."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />

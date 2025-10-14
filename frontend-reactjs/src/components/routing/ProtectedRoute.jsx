@@ -51,7 +51,9 @@ export default function ProtectedRoute({ children, allowedRoles }) {
     const aggregatedRoles = new Set(deriveRoleSet(session?.user));
 
     dashboardRoles.forEach((role) => {
-      const identifier = role?.id ?? role?.code ?? role;
+      if (!role) return;
+
+      const identifier = role?.id ?? role?.code ?? role?.name ?? role;
       if (identifier) {
         aggregatedRoles.add(String(identifier).toLowerCase());
       }

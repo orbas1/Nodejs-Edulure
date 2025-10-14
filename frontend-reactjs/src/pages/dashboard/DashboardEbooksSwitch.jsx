@@ -17,8 +17,8 @@ export default function DashboardEbooksSwitch() {
 
   return (
     <DashboardStateMessage
-      title="E-book workspace unavailable"
-      description="Only learner and instructor dashboards can access the e-book experiences. Switch to an eligible workspace to continue."
+      title="E-book Learnspace unavailable"
+      description="Only learner and instructor dashboards can access the e-book experiences. Switch to an eligible Learnspace to continue."
       actionLabel="Refresh dashboards"
       onAction={() => refresh?.()}
     />

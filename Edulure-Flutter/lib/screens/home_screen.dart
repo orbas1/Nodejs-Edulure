@@ -129,7 +129,7 @@ class _PublicHomeView extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.dashboard_customize_outlined),
                     title: const Text('Live feed'),
-                    subtitle: const Text('Monitor updates across workspaces.'),
+                    subtitle: const Text('Monitor updates across Learnspaces.'),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/feed'),
                   ),
@@ -453,7 +453,7 @@ class _AuthenticatedHomeViewState extends State<_AuthenticatedHomeView> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Switch workspace role',
+                'Switch Learnspace role',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 12),

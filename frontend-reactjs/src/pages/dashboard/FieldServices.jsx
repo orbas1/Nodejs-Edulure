@@ -80,7 +80,7 @@ function FieldServices() {
     return (
       <DashboardStateMessage
         variant="error"
-        title="Restricted workspace"
+        title="Restricted Learnspace"
         description="Field service operations are available from the learner and instructor dashboards only."
       />
     );
@@ -90,7 +90,7 @@ function FieldServices() {
     return (
       <DashboardStateMessage
         title="Field service data not yet available"
-        description="We couldn't find any service assignments linked to your workspace. Refresh the dashboard once operations syncs complete."
+        description="We couldn't find any service assignments linked to your Learnspace. Refresh the dashboard once operations syncs complete."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />

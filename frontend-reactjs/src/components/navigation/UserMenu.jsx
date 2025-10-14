@@ -31,7 +31,7 @@ export default function UserMenu({ session, onNavigate, onLogout }) {
     if (firstName || lastName) {
       return [firstName, lastName].filter(Boolean).join(' ');
     }
-    return user?.email ?? 'Your workspace';
+    return user?.email ?? 'Your Learnspace';
   }, [user]);
 
   const email = user?.email ?? null;

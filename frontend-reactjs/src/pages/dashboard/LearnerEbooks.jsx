@@ -171,7 +171,7 @@ export default function LearnerEbooks() {
     return (
       <DashboardStateMessage
         variant="error"
-        title="Learner workspace required"
+        title="Learner Learnspace required"
         description="Switch to your learner dashboard to review your e-book library and curated marketplace."
       />
     );
@@ -180,7 +180,7 @@ export default function LearnerEbooks() {
   if (!ebooks) {
     return (
       <DashboardStateMessage
-        title="E-book workspace unavailable"
+        title="E-book Learnspace unavailable"
         description="We could not load your library insights. Refresh to try pulling the latest progress and highlights."
         actionLabel="Refresh"
         onAction={() => refresh?.()}

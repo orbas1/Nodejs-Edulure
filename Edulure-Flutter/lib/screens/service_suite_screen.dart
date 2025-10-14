@@ -147,7 +147,7 @@ class _ServiceSuiteScreenState extends State<ServiceSuiteScreen> {
                             Text('Service data unavailable',
                                 style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
                             const SizedBox(height: 8),
-                            Text('Connect your instructor workspace to populate services, bookings, and telemetry.',
+                            Text('Connect your instructor Learnspace to populate services, bookings, and telemetry.',
                                 style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blueGrey.shade600)),
                             const SizedBox(height: 12),
                             FilledButton.icon(

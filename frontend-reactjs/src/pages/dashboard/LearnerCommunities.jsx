@@ -9,7 +9,7 @@ export default function LearnerCommunities() {
     return (
       <DashboardStateMessage
         variant="error"
-        title="Learner workspace required"
+        title="Learner Learnspace required"
         description="Switch to the learner dashboard to access community operations and engagement pipelines."
       />
     );
@@ -52,7 +52,7 @@ export default function LearnerCommunities() {
           <div className="dashboard-section">
             <p className="text-sm font-semibold text-slate-900">No communities assigned yet</p>
             <p className="mt-2 text-sm text-slate-600">
-              Invite your team or switch roles to start curating learning communities for this workspace.
+              Invite your team or switch roles to start curating learning communities for this Learnspace.
             </p>
           </div>
         ) : null}

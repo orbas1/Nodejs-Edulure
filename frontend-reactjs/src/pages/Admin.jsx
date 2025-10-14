@@ -458,7 +458,7 @@ export default function Admin() {
                   <div className="space-y-2">
                     <h1 className="text-3xl font-semibold text-slate-900">Admin control center</h1>
                     <p className="text-sm text-slate-600">
-                      Monitor revenue, approvals, policy cadences, and platform health in one workspace. Escalate
+                      Monitor revenue, approvals, policy cadences, and platform health in one Learnspace. Escalate
                       incidents via
                       <span className="font-semibold text-primary"> {escalationChannel}</span>.
                     </p>

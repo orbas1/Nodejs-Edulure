@@ -234,7 +234,7 @@ export default function MaterialMetadataEditor({
               onChange={(event) => onFieldChange('visibility', event.target.value)}
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
-              <option value="workspace">Workspace</option>
+              <option value="workspace">Learnspace</option>
               <option value="private">Private</option>
               <option value="public">Public</option>
             </select>
@@ -517,7 +517,7 @@ export default function MaterialMetadataEditor({
           </div>
           <div>
             <h4 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Visibility</h4>
-            <p className="mt-1 text-xs font-semibold text-slate-600">{draft.visibility === 'public' ? 'Public – discoverable across the marketplace' : draft.visibility === 'private' ? 'Private – restricted to your team' : 'Workspace – available to authenticated workspace members'}</p>
+            <p className="mt-1 text-xs font-semibold text-slate-600">{draft.visibility === 'public' ? 'Public – discoverable across the marketplace' : draft.visibility === 'private' ? 'Private – restricted to your team' : 'Learnspace – available to authenticated Learnspace members'}</p>
           </div>
         </div>
       </aside>

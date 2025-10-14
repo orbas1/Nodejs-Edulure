@@ -476,9 +476,9 @@ export default function ContentLibrary() {
     return (
       <section className="mx-auto max-w-3xl px-6 py-24 text-center">
         <div className="rounded-4xl border border-amber-200 bg-amber-50 px-8 py-12 shadow-sm">
-          <h1 className="text-3xl font-semibold text-slate-900">Instructor workspace required</h1>
+          <h1 className="text-3xl font-semibold text-slate-900">Instructor Learnspace required</h1>
           <p className="mt-4 text-sm text-slate-600">
-            Switch to an instructor or admin workspace to curate materials, manage showcases, and govern media metadata.
+            Switch to an instructor or admin Learnspace to curate materials, manage showcases, and govern media metadata.
           </p>
         </div>
       </section>

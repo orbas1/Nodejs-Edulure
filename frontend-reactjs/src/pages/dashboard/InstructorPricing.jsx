@@ -95,7 +95,7 @@ export default function InstructorPricing({
     return (
       <DashboardStateMessage
         title="Pricing data unavailable"
-        description="We couldn't load monetisation telemetry for your workspace. Refresh once data sources are connected."
+        description="We couldn't load monetisation telemetry for your Learnspace. Refresh once data sources are connected."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />

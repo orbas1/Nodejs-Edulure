@@ -36,7 +36,7 @@ class ContentService {
       if (error.response?.statusCode == 403) {
         await SessionManager.assetsCache.delete('items');
         throw const ContentAccessDeniedException(
-          'Instructor or admin workspace required to manage the content library.',
+          'Instructor or admin Learnspace required to manage the content library.',
         );
       }
       final data = error.response?.data;
@@ -204,7 +204,7 @@ class ContentService {
     } on DioException catch (error) {
       if (error.response?.statusCode == 403) {
         throw const ContentAccessDeniedException(
-          'Instructor or admin workspace required to update material metadata.',
+          'Instructor or admin Learnspace required to update material metadata.',
         );
       }
       final data = error.response?.data;

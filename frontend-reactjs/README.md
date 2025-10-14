@@ -15,7 +15,7 @@ The development server runs on http://localhost:5173. Use Node.js 20.12.2+ and n
 
 - `/` – Enterprise-grade marketing homepage with CTAs and feature highlights
 - `/login` – MFA-ready login form with email + Google Authenticator fields
-- `/register` – Workspace registration capturing personal details and intent
+- `/register` – Learnspace registration capturing personal details and intent
 - `/instructor` – Become an instructor onboarding
 - `/feed` – Live community feed with menu states, composer, and community profile sidebar
 - `/profile` – User profile overview for members & instructors

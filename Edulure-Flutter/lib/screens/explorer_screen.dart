@@ -49,7 +49,7 @@ class _ExplorerScreenState extends State<ExplorerScreen> {
     if (role == null || !_allowedExplorerRoles.contains(role)) {
       setState(() {
         _roleError =
-            'Your current workspace role does not have explorer permissions. Switch to a learner, instructor, or admin role to continue.';
+            'Your current Learnspace role does not have explorer permissions. Switch to a learner, instructor, or admin role to continue.';
       });
       return;
     }

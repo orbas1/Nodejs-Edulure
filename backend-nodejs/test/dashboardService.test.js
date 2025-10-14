@@ -226,7 +226,7 @@ describe('buildInstructorDashboard', () => {
           title: 'Design Ops Mastery',
           status: 'published',
           releaseAt: '2024-10-01T00:00:00Z',
-          priceAmount: 45000,
+          priceAmount: 45_000,
           priceCurrency: 'USD',
           summary: 'Advance your operating rituals.',
           metadata: JSON.stringify({ format: 'cohort' })
@@ -288,7 +288,7 @@ describe('buildInstructorDashboard', () => {
           id: 31,
           displayName: 'Ivy Instructor',
           headline: 'DesignOps Coach',
-          hourlyRateAmount: 25000,
+          hourlyRateAmount: 25_000,
           hourlyRateCurrency: 'USD',
           ratingAverage: 4.9,
           ratingCount: 48,
@@ -333,7 +333,7 @@ describe('buildInstructorDashboard', () => {
           title: 'DesignOps Simulation',
           status: 'scheduled',
           type: 'webinar',
-          priceAmount: 1200,
+          priceAmount: 1_200,
           priceCurrency: 'USD',
           capacity: 25,
           reservedSeats: 18,
@@ -407,9 +407,9 @@ describe('buildInstructorDashboard', () => {
           objective: 'leads',
           status: 'active',
           budgetCurrency: 'USD',
-          budgetDailyCents: 35000,
+          budgetDailyCents: 35_000,
           spendCurrency: 'USD',
-          spendTotalCents: 12500,
+          spendTotalCents: 12_500,
           performanceScore: 4.2,
           ctr: 0.054,
           cpcCents: 145,
@@ -432,22 +432,22 @@ describe('buildInstructorDashboard', () => {
           id: 971,
           campaignId: 77,
           metricDate: '2024-11-06',
-          impressions: 1800,
+          impressions: 1_800,
           clicks: 110,
           conversions: 12,
-          spendCents: 28000,
-          revenueCents: 72000,
+          spendCents: 28_000,
+          revenueCents: 72_000,
           metadata: '{}'
         },
         {
           id: 972,
           campaignId: 77,
           metricDate: '2024-11-05',
-          impressions: 1500,
+          impressions: 1_500,
           clicks: 90,
           conversions: 8,
-          spendCents: 22000,
-          revenueCents: 48000,
+          spendCents: 22_000,
+          revenueCents: 48_000,
           metadata: '{}'
         }
       ],
@@ -456,7 +456,7 @@ describe('buildInstructorDashboard', () => {
           id: 960,
           communityId: 55,
           name: 'Pro Circle',
-          priceCents: 2900,
+          priceCents: 2_900,
           currency: 'USD',
           billingInterval: 'monthly',
           isActive: true,
@@ -474,7 +474,7 @@ describe('buildInstructorDashboard', () => {
           currentPeriodEnd: '2024-11-30T00:00:00Z',
           metadata: '{}',
           tierName: 'Pro Circle',
-          priceCents: 2900,
+          priceCents: 2_900,
           currency: 'USD',
           billingInterval: 'monthly'
         },
@@ -486,7 +486,7 @@ describe('buildInstructorDashboard', () => {
           currentPeriodEnd: '2024-11-05T00:00:00Z',
           metadata: '{}',
           tierName: 'Pro Circle',
-          priceCents: 2900,
+          priceCents: 2_900,
           currency: 'USD',
           billingInterval: 'monthly'
         }
@@ -497,7 +497,7 @@ describe('buildInstructorDashboard', () => {
           assetId: 900,
           title: 'Ops Manual',
           authors: JSON.stringify(['Ivy Instructor']),
-          priceAmount: 1500,
+          priceAmount: 1_500,
           currency: 'USD',
           metadata: JSON.stringify({ status: 'Published', cohort: 'DesignOps Collective' })
         }
@@ -567,6 +567,8 @@ describe('buildInstructorDashboard', () => {
     expect(snapshot.dashboard.assessments.timeline.upcoming).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ course: 'Design Ops Mastery', type: 'Assignment' })
+      ])
+    );
     expect(snapshot.searchIndex).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ role: 'instructor', type: 'Tutor', title: 'Ivy Instructor' })

@@ -50,7 +50,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
       _loading = false;
       _accessDenied = token != null && !canManage;
       _accessDeniedMessage = _accessDenied
-          ? 'Switch to an instructor or admin workspace to manage the content library.'
+          ? 'Switch to an instructor or admin Learnspace to manage the content library.'
           : null;
     });
     await _refresh();
@@ -66,7 +66,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
         setState(() {
           _accessDenied = token != null;
           _accessDeniedMessage = _accessDenied
-              ? 'Switch to an instructor or admin workspace to manage the content library.'
+              ? 'Switch to an instructor or admin Learnspace to manage the content library.'
               : null;
           _assets = <ContentAsset>[];
           _downloads = <String, String>{};
@@ -484,7 +484,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Instructor workspace required',
+                                      'Instructor Learnspace required',
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleMedium
@@ -493,7 +493,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                     const SizedBox(height: 12),
                                     Text(
                                       _accessDeniedMessage ??
-                                          'Switch to an instructor or admin workspace to manage metadata, galleries, and showcase settings.',
+                                          'Switch to an instructor or admin Learnspace to manage metadata, galleries, and showcase settings.',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
@@ -580,7 +580,9 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                         runSpacing: 8,
                                         children: [
                                           Chip(
-                                            label: Text((asset.visibility ?? 'workspace').toUpperCase()),
+                                            label: Text((asset.visibility ?? 'workspace') == 'workspace'
+                                                ? 'LEARNSPACE'
+                                                : (asset.visibility ?? 'workspace').toUpperCase()),
                                             backgroundColor: _brandPrimary.withOpacity(0.12),
                                             labelStyle: const TextStyle(
                                               color: _brandPrimaryDark,

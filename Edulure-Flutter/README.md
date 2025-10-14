@@ -13,7 +13,7 @@ Routes available:
 
 - `/` home marketing view
 - `/login` secure login form
-- `/register` workspace onboarding
+- `/register` Learnspace onboarding
 - `/feed` live community feed mock
 - `/profile` member profile overview
 

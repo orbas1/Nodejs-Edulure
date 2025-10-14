@@ -11,7 +11,7 @@ export default function LearnerCourses() {
     return (
       <DashboardStateMessage
         variant="error"
-        title="Learner workspace required"
+        title="Learner Learnspace required"
         description="Switch to your learner dashboard to manage active programs and personalised course recommendations."
       />
     );

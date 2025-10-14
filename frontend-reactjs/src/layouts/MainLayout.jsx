@@ -2,6 +2,7 @@ import { Fragment, useMemo } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Disclosure, Transition } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+
 import { useAuth } from '../context/AuthContext.jsx';
 import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import LanguageSelector from '../components/navigation/LanguageSelector.jsx';
@@ -51,7 +52,7 @@ export default function MainLayout() {
       { name: 'Profile', to: '/profile' },
       { name: 'Blog', to: '/blog' },
       { name: 'Dashboard', to: baseDashboardPath },
-      { name: 'Community workspace', to: communitiesPath },
+      { name: 'Community Learnspace', to: communitiesPath },
       { name: 'About', to: '/about' }
     ];
 

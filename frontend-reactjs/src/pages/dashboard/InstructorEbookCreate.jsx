@@ -316,7 +316,7 @@ export default function InstructorEbookCreate() {
           {pipelines.length === 0 ? (
             <DashboardStateMessage
               title="No production pipelines"
-              description="Spin up a new manuscript workspace to orchestrate editing, design, and approvals."
+              description="Spin up a new manuscript Learnspace to orchestrate editing, design, and approvals."
               actionLabel="Refresh"
               onAction={() => refresh?.()}
             />

@@ -124,7 +124,7 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                   child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
-                      'Switch to your instructor workspace to access course management insights.',
+                      'Switch to your instructor Learnspace to access course management insights.',
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -325,7 +325,7 @@ class _CourseManagementScreenState extends State<CourseManagementScreen> {
                             icon: const Icon(Icons.open_in_new),
                             onPressed: () {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Opening ${task.asset} workspace...')),
+                                SnackBar(content: Text('Opening ${task.asset} Learnspace...')),
                               );
                             },
                             label: const Text('Open task'),
