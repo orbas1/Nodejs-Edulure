@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
 import CreationStudioService from '../services/CreationStudioService.js';
+import CreationAnalyticsService from '../services/CreationAnalyticsService.js';
 import { paginated, success } from '../utils/httpResponse.js';
 
 const typeEnum = ['course', 'ebook', 'community', 'ads_asset'];
@@ -100,11 +101,6 @@ const templateUpdateSchema = Joi.object({
   publishedAt: Joi.date().iso().optional()
 });
 
-const sessionStartSchema = Joi.object({
-  entryPoint: Joi.string().max(120).default('studio'),
-  clientVersion: Joi.string().max(32).allow(null, '')
-});
-
 const promotionSchema = Joi.object({
   name: Joi.string().max(200).optional(),
   objective: Joi.string().valid('awareness', 'traffic', 'leads', 'conversions').optional(),
@@ -123,6 +119,16 @@ const promotionSchema = Joi.object({
     description: Joi.string().allow('', null).max(500).optional(),
     url: Joi.string().uri().required()
   }).optional()
+});
+
+const sessionStartSchema = Joi.object({
+  entryPoint: Joi.string().max(120).default('studio'),
+  clientVersion: Joi.string().max(32).allow(null, '')
+});
+
+const analyticsQuerySchema = Joi.object({
+  range: Joi.string().valid('7d', '30d', '90d', '365d').default('30d'),
+  ownerId: Joi.number().integer().positive().optional()
 });
 
 function parseCommaSeparated(value) {
@@ -158,6 +164,29 @@ export default class CreationStudioController {
         data: result.data,
         pagination: result.pagination,
         message: 'Projects retrieved'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async analyticsSummary(req, res, next) {
+    try {
+      const query = await analyticsQuerySchema.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const actor = { id: req.user.id, role: req.user.role };
+      const summary = await CreationAnalyticsService.getSummary(actor, query);
+
+      return success(res, {
+        data: summary,
+        message: 'Creation analytics summary generated'
       });
     } catch (error) {
       if (error.isJoi) {

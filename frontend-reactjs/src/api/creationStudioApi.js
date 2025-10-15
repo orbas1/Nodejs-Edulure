@@ -267,13 +267,30 @@ export async function endCollaborationSession(publicId, sessionId, { token, term
   return normaliseSession(response.data);
 }
 
+export async function fetchAnalyticsSummary({ token, range = '30d', ownerId, signal } = {}) {
+  if (!token) throw new Error('Authentication token is required to load analytics');
+  const params = { range };
+  if (ownerId) params.ownerId = ownerId;
+  const response = await httpClient.get('/creation/analytics/summary', {
+    token,
+    params,
+    signal,
+    cache: {
+      ttl: 1000 * 60,
+      tags: [`creation:analytics:${range}:${ownerId ?? 'self'}`]
+    }
+  });
+  return response.data;
+}
+
 export const creationStudioApi = {
   listProjects,
   getProject,
   createProject,
   listTemplates,
   startCollaborationSession,
-  endCollaborationSession
+  endCollaborationSession,
+  fetchAnalyticsSummary
 };
 
 export default creationStudioApi;

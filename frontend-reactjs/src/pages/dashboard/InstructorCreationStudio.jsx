@@ -9,6 +9,7 @@ import CreationProjectList from './instructor/creationStudio/CreationProjectList
 import CreationWizardStepper from './instructor/creationStudio/CreationWizardStepper.jsx';
 import CreationAssetLibrary from './instructor/creationStudio/CreationAssetLibrary.jsx';
 import CreationCollaboratorsPanel from './instructor/creationStudio/CreationCollaboratorsPanel.jsx';
+import CreationAnalyticsDashboard from './instructor/creationStudio/CreationAnalyticsDashboard.jsx';
 import {
   calculateProjectSummary,
   determineStepStates,
@@ -241,6 +242,8 @@ export default function InstructorCreationStudio() {
   return (
     <div className="space-y-10">
       <CreationStudioSummary summary={summary} />
+
+      <CreationAnalyticsDashboard token={token} />
 
       <CreationProjectList
         projects={projects}

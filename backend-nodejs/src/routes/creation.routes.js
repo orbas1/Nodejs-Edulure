@@ -6,6 +6,7 @@ import auth from '../middleware/auth.js';
 const router = Router();
 
 router.get('/projects', auth('user'), CreationStudioController.listProjects);
+router.get('/analytics/summary', auth('user'), CreationStudioController.analyticsSummary);
 router.post('/projects', auth('instructor'), CreationStudioController.createProject);
 router.get('/projects/:projectId', auth('user'), CreationStudioController.getProject);
 router.patch('/projects/:projectId', auth('instructor'), CreationStudioController.updateProject);

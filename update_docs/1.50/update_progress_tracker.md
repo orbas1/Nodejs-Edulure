@@ -6,7 +6,7 @@ Progress is recorded per major task. Percentages represent completion of require
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Platform Hardening & Modularisation | 92% | 98% | 97% | 97% | 90% | 97% | 95% |
 | Data Governance & Compliance Reinforcement | 96% | 99% | 97% | 98% | 92% | 98% | 97% |
-| Creation Studio & Content Ecosystem Delivery | 58% | 72% | 68% | 70% | 55% | 69% | 65% |
+| Creation Studio & Content Ecosystem Delivery | 66% | 80% | 78% | 82% | 64% | 78% | 75% |
 | Integrations, Automation & Notifications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Experience, Navigation & Accessibility Modernisation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Mobile Parity, Security & Performance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -26,19 +26,19 @@ The design programme is tracked separately using the metrics below. Scores mirro
 
 | Metric | Score | Notes |
 | --- | --- | --- |
-| Design Quality | 74 | Operator, compliance, and provider retention blueprints align telemetry, dual-signoff cues, and SLA treatments across surfaces, awaiting moderated testing sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Organisation | 75 | Milestones and task trackers now integrate provider retention checklists alongside existing operator/compliance deliverables for cross-squad coordination.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Position | 68 | Navigation guidance covers admin governance, provider retention, and consent placements; mobile usability validation remains scheduled.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Text Grade | 64 | Privacy, consent, and scam-education copy updated across learner and web hubs with jurisdiction badges and escalation CTAs.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Colour Grade | 65 | Severity palette coverage extends to consent badges and privacy alerts per shared design system guidance.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Render Grade | 74 | High-fidelity governance renders span DSR tables, policy timelines, and privacy dashboards with evidence prompts.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Compliance Grade | 84 | Privacy dashboards, consent drawers, and scam-education flows expose retention windows, receipts, and CDC hooks tied to compliance services.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Security Grade | 76 | Incident escalation strips, MFA-confirmed consent toggles, and fraud report workflows capture actor attribution and SLA timers required by compliance routes.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Functionality Grade | 82 | Manifest, compliance, consent, and retention flows remain documented for web and mobile with shared telemetry hooks.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Images Grade | 48 | Imagery budgets staged; compliance storytelling assets still pending marketing delivery.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Usability Grade | 75 | Learner privacy hub flows stage guided disclosures, biometric confirmations, and playlist-driven safety education ready for moderated testing.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Bugs-less Grade | 54 | Privacy dashboard specs codify fallback banners, SLA breach indicators, and offline evidence handling to reduce regression risk.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Test Grade | 50 | Privacy hub workflows now include scripted acceptance criteria for consent toggles, export timers, and scam-education certifications while accessibility runs remain outstanding.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| QA Grade | 52 | Privacy & trust center deliverables enumerate evidence download points, fraud reporting scripts, and measurement hooks informing QA sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Design Accuracy Grade | 76 | Compliance, consent, and provider retention journeys trace to backend contracts and Flutter models for improved traceability.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L22】 |
-| Overall Grade | 68 | Updated scores reflect privacy hub and scam-education coverage aligning learner/web surfaces with compliance automation while localisation and accessibility tooling remain outstanding.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L22】 |
+| Design Quality | 86 | Operator, compliance, and creation analytics artefacts align telemetry, dual-signoff cues, and monetisation dashboards pending moderated testing sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Organisation | 75 | Milestones and task trackers now integrate provider retention checklists alongside analytics dashboard deliverables for cross-squad coordination.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Position | 82 | Navigation guidance covers admin governance, provider retention, consent placements, and the instructor analytics dashboard footprint within the studio shell.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Text Grade | 78 | Privacy, consent, scam-education, and monetisation copy now include jurisdiction badges, fraud guidance, and ranking insights tied to analytics payloads.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Colour Grade | 65 | Severity palette coverage extends to consent badges, privacy alerts, and scam alert tone for analytics banners per shared design system guidance.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Render Grade | 84 | High-fidelity governance renders span DSR tables, policy timelines, privacy dashboards, and creation analytics cards with export buttons.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Compliance Grade | 84 | Privacy dashboards, consent drawers, scam-education flows, and analytics governance cues expose retention windows, receipts, and CDC hooks tied to compliance services.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Security Grade | 80 | Incident escalation strips, MFA-confirmed consent toggles, fraud report workflows, and scam alert dashboards capture actor attribution and SLA timers required by compliance routes.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Functionality Grade | 88 | Manifest, compliance, consent, retention, and analytics flows remain documented for web and mobile with shared telemetry hooks.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Images Grade | 48 | Imagery budgets staged; compliance storytelling assets still pending marketing delivery.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Usability Grade | 82 | Learner privacy hub flows stage guided disclosures, biometric confirmations, playlist-driven safety education, and instructor analytics controls ready for moderated testing.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Bugs-less Grade | 70 | Privacy dashboard specs codify fallback banners, SLA breach indicators, offline evidence handling, and analytics empty/error states to reduce regression risk.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Test Grade | 66 | Privacy hub workflows now include scripted acceptance criteria for consent toggles, export timers, scam-education certifications, and analytics export verification while accessibility runs remain outstanding.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| QA Grade | 68 | Privacy & trust center deliverables enumerate evidence download points, fraud reporting scripts, analytics validation steps, and measurement hooks informing QA sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Accuracy Grade | 83 | Compliance, consent, provider retention, and analytics journeys trace to backend contracts and Flutter models for improved traceability.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Overall Grade | 76 | Updated scores reflect privacy hub, scam-education, and creation analytics coverage aligning learner/web surfaces with compliance automation while localisation and accessibility tooling remain outstanding.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
