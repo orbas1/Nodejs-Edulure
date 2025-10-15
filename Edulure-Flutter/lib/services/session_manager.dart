@@ -11,6 +11,10 @@ class SessionManager {
   static const _readerSettingsBox = 'ebook_reader_settings';
   static const _dashboardBox = 'dashboard_snapshots';
   static const _privacyBox = 'privacy_preferences';
+  static const _creationProjectsBox = 'creation_projects';
+  static const _creationActionBox = 'creation_project_actions';
+  static const _adsGovernanceBox = 'ads_governance';
+  static const _adsActionBox = 'ads_governance_actions';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
   static const _secureAccessTokenKey = 'session.accessToken';
@@ -28,6 +32,10 @@ class SessionManager {
     await Hive.openBox(_readerSettingsBox);
     await Hive.openBox(_dashboardBox);
     await Hive.openBox(_privacyBox);
+    await Hive.openBox(_creationProjectsBox);
+    await Hive.openBox(_creationActionBox);
+    await Hive.openBox(_adsGovernanceBox);
+    await Hive.openBox(_adsActionBox);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
@@ -39,6 +47,10 @@ class SessionManager {
   static Box get readerSettingsCache => Hive.box(_readerSettingsBox);
   static Box get dashboardCache => Hive.box(_dashboardBox);
   static Box get privacyPreferences => Hive.box(_privacyBox);
+  static Box get creationProjectsCache => Hive.box(_creationProjectsBox);
+  static Box get creationActionQueue => Hive.box(_creationActionBox);
+  static Box get adsGovernanceCache => Hive.box(_adsGovernanceBox);
+  static Box get adsGovernanceActionQueue => Hive.box(_adsActionBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -123,6 +135,10 @@ class SessionManager {
     await ebookProgressCache.clear();
     await readerSettingsCache.clear();
     await privacyPreferences.clear();
+    await creationProjectsCache.clear();
+    await creationActionQueue.clear();
+    await adsGovernanceCache.clear();
+    await adsGovernanceActionQueue.clear();
     await SecureStorageService.instance.deleteAll(
       keys: const {
         _secureAccessTokenKey,

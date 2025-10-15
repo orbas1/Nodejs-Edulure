@@ -109,6 +109,36 @@
 - App caches last 10 lessons (video transcripts, attachments) and upcoming assignments. Offline banner indicates limited functionality.
 - Actions queued offline (note edits, assignment drafts) sync upon reconnect with conflict resolution prompts.
 
+## Creation Companion Workflow
+1. **Project Sync & Filtering**
+   - On entry, service loads cached projects and communities, then triggers background sync for remote updates. Filter selection recalculates urgency weighting (requires attention > drafts > published) to sort cards.
+   - Offline banner shows last sync time; manual refresh triggers queue replay before fetching API data.
+2. **Status Changes & Reviews**
+   - Approve/Request Changes actions optimistically update card state, append queue entry, and surface toast indicating immediate update or queued sync. Requesting changes prompts modal for reviewer notes; submission updates metadata map and pending action list.
+   - Outline approvals within detail sheet update metadata and log reviewer/time; offline queue persists payload to Hive.
+3. **Community Sharing**
+   - Share dialog enforces non-empty message and deduplicated tags. Submission posts to `/communities/:id/posts` when online; offline path queues share with context (project id, community id, payload snapshot).
+   - After sync, project pending actions remove queue entry; UI displays success toast referencing community name.
+4. **Queue Replay & Error Handling**
+   - Sync routine processes queue sequentially; 5xx errors mark actions as deferred (message displayed in pending strip) while 4xx/410 mark failed with actionable copy.
+   - Authentication failures remove queue entry and prompt sign-in; offline detection halts replay until connectivity restored.
+
+## Ads Governance Workflow
+1. **Campaign Sync & Filtering**
+   - Screen hydrates from `ads_governance` cache immediately, then fetches `/ads/campaigns` to reconcile latest status. Filter chips (Needs review, Active, Paused, Completed, All) adjust in-memory list without re-querying server.
+   - Risk badge colours tie to compliance `riskScore`; campaigns flagged `halted` auto-pin to the Needs review filter.
+2. **Insight Retrieval**
+   - Tapping **View insights** requests `/ads/campaigns/:id/insights` (windowDays=14). Offline path uses cached insights and decorates modal header with "Offline" pill plus last fetch timestamp.
+   - Insight payload stored in Hive using `campaign:$id:insights` key to prevent redundant calls during same session.
+3. **Pause/Resume Handling**
+   - Pause/resume triggers optimistic status change, appends queue entry in `ads_governance_actions`, and shows toast ("queued" vs "updated"). Replay refreshes campaign detail and prunes queue entry on success.
+   - Server 5xx responses mark action as deferred (amber copy). Auth expiry or 4xx removes queue entry and displays resolution guidance (sign in, refresh campaign).
+4. **Fraud Reporting**
+   - Fraud sheet enforces reason length ≥6, collects optional context, and writes risk slider (0–100). Submission posts to `/moderation/scam-reports`; offline path queues payload with description for audit.
+   - On successful replay, campaign `lastGovernanceEvent` updates and pending chip drops. Failed submissions persist message prompting manual escalation.
+5. **Pending Action Surface**
+   - Pending action ribbon displays queued/deferred/failed entries with severity-specific background. Manual refresh invokes `_service.syncPendingActions()` to retry as soon as network returns.
+
 ## Error Handling & Support
 - Validation errors highlight fields with contextual microcopy. Provide direct link to support if repeated failure occurs.
 - Critical system errors display fallback screen with status code, retry, and copyable error ID.

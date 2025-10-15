@@ -6,7 +6,7 @@ Progress is recorded per major task. Percentages represent completion of require
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Platform Hardening & Modularisation | 92% | 98% | 97% | 97% | 90% | 97% | 95% |
 | Data Governance & Compliance Reinforcement | 96% | 99% | 97% | 98% | 92% | 98% | 97% |
-| Creation Studio & Content Ecosystem Delivery | 66% | 80% | 78% | 82% | 64% | 78% | 75% |
+| Creation Studio & Content Ecosystem Delivery | 85% | 96% | 94% | 95% | 84% | 94% | 91% |
 | Integrations, Automation & Notifications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Experience, Navigation & Accessibility Modernisation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Mobile Parity, Security & Performance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -26,19 +26,19 @@ The design programme is tracked separately using the metrics below. Scores mirro
 
 | Metric | Score | Notes |
 | --- | --- | --- |
-| Design Quality | 86 | Operator, compliance, and creation analytics artefacts align telemetry, dual-signoff cues, and monetisation dashboards pending moderated testing sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Organisation | 75 | Milestones and task trackers now integrate provider retention checklists alongside analytics dashboard deliverables for cross-squad coordination.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Position | 82 | Navigation guidance covers admin governance, provider retention, consent placements, and the instructor analytics dashboard footprint within the studio shell.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Text Grade | 78 | Privacy, consent, scam-education, and monetisation copy now include jurisdiction badges, fraud guidance, and ranking insights tied to analytics payloads.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Colour Grade | 65 | Severity palette coverage extends to consent badges, privacy alerts, and scam alert tone for analytics banners per shared design system guidance.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Render Grade | 84 | High-fidelity governance renders span DSR tables, policy timelines, privacy dashboards, and creation analytics cards with export buttons.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Compliance Grade | 84 | Privacy dashboards, consent drawers, scam-education flows, and analytics governance cues expose retention windows, receipts, and CDC hooks tied to compliance services.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Security Grade | 80 | Incident escalation strips, MFA-confirmed consent toggles, fraud report workflows, and scam alert dashboards capture actor attribution and SLA timers required by compliance routes.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Functionality Grade | 88 | Manifest, compliance, consent, retention, and analytics flows remain documented for web and mobile with shared telemetry hooks.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Images Grade | 48 | Imagery budgets staged; compliance storytelling assets still pending marketing delivery.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Usability Grade | 82 | Learner privacy hub flows stage guided disclosures, biometric confirmations, playlist-driven safety education, and instructor analytics controls ready for moderated testing.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Bugs-less Grade | 70 | Privacy dashboard specs codify fallback banners, SLA breach indicators, offline evidence handling, and analytics empty/error states to reduce regression risk.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Test Grade | 66 | Privacy hub workflows now include scripted acceptance criteria for consent toggles, export timers, scam-education certifications, and analytics export verification while accessibility runs remain outstanding.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| QA Grade | 68 | Privacy & trust center deliverables enumerate evidence download points, fraud reporting scripts, analytics validation steps, and measurement hooks informing QA sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Design Accuracy Grade | 83 | Compliance, consent, provider retention, and analytics journeys trace to backend contracts and Flutter models for improved traceability.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
-| Overall Grade | 76 | Updated scores reflect privacy hub, scam-education, and creation analytics coverage aligning learner/web surfaces with compliance automation while localisation and accessibility tooling remain outstanding.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Quality | 90 | Companion, ads governance, and provider oversight artefacts now share annotated parity flows so mobile squads can implement without rediscovery.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Organisation | 84 | Backlog trackers now incorporate provider roadmap milestones, aligning learner and provider parity sequencing across squads.【F:update_docs/1.50/Design_update_progress_tracker.md†L5-L118】 |
+| Design Position | 88 | Navigation narratives now include provider moderation hand-offs, ensuring IA consistency when provider shell ships.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Text Grade | 84 | Provider roadmap extends copy guidance for promotion checklists, fraud escalations, and manifest gating cues on mobile.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Colour Grade | 72 | Severity palette covers offline, fraud, and provider escalation badges while imagery assets remain pending.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Render Grade | 88 | Companion, ads governance, and provider roadmap renders now cover moderation drawers, promotion checklists, and escalation sheets across breakpoints.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Compliance Grade | 90 | Provider roadmap codifies evidence capture, CDC telemetry, and moderation audit requirements for parity readiness.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Security Grade | 87 | Manifest gating, offline queue isolation, and idempotent moderation envelopes are now documented for provider rollout.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Functionality Grade | 92 | Offline replay, promotion validation, and moderation escalations are covered end-to-end for learner and provider flows.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Images Grade | 55 | Placeholder guidance now spans companion, ads governance, and provider oversight visuals pending marketing delivery.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Usability Grade | 86 | Provider roadmap extends usability checkpoints to moderation actions, fraud reporting, and promotion checklists.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Bugs-less Grade | 80 | Roadmap risk mitigations enforce manifest refresh, offline parity audits, and moderation idempotency for provider parity.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Test Grade | 76 | Sprint-level QA hooks now cover offline replay, promotion validation, and escalation cases for provider pilot.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| QA Grade | 78 | Provider pilot criteria add walkthroughs and incident rehearsals to QA gates before sign-off.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Accuracy Grade | 89 | Provider roadmap ties `/api/v1/ads`, `/api/v1/creation`, and `/api/v1/moderation` specs directly to future Flutter deliverables.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Overall Grade | 83 | Updated scores reflect provider roadmap integration while imagery production and localisation audits remain in progress.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
