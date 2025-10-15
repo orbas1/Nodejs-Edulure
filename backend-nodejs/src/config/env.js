@@ -347,6 +347,27 @@ const envSchema = z
     ASSET_DOWNLOAD_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
     CONTENT_MAX_UPLOAD_MB: z.coerce.number().int().min(10).max(2048).default(512),
     CLOUDCONVERT_API_KEY: z.string().min(1).optional(),
+    HUBSPOT_ENABLED: z.coerce.boolean().default(false),
+    HUBSPOT_PRIVATE_APP_TOKEN: z.string().min(20).optional(),
+    HUBSPOT_BASE_URL: z.string().url().default('https://api.hubapi.com'),
+    HUBSPOT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(12000),
+    HUBSPOT_MAX_RETRIES: z.coerce.number().int().min(0).max(6).default(3),
+    HUBSPOT_SYNC_WINDOW_MINUTES: z.coerce.number().int().min(15).max(720).default(90),
+    SALESFORCE_ENABLED: z.coerce.boolean().default(false),
+    SALESFORCE_LOGIN_URL: z.string().url().default('https://login.salesforce.com'),
+    SALESFORCE_CLIENT_ID: z.string().min(5).optional(),
+    SALESFORCE_CLIENT_SECRET: z.string().min(5).optional(),
+    SALESFORCE_USERNAME: z.string().min(3).optional(),
+    SALESFORCE_PASSWORD: z.string().min(6).optional(),
+    SALESFORCE_SECURITY_TOKEN: z.string().optional(),
+    SALESFORCE_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(12000),
+    SALESFORCE_MAX_RETRIES: z.coerce.number().int().min(0).max(6).default(3),
+    SALESFORCE_EXTERNAL_ID_FIELD: z.string().min(3).default('Edulure_Project_Id__c'),
+    CRM_HUBSPOT_SYNC_CRON: z.string().optional(),
+    CRM_SALESFORCE_SYNC_CRON: z.string().optional(),
+    CRM_RECONCILIATION_CRON: z.string().optional(),
+    CRM_RECONCILIATION_WINDOW_DAYS: z.coerce.number().int().min(1).max(30).default(7),
+    CRM_MAX_CONCURRENT_JOBS: z.coerce.number().int().min(1).max(5).default(1),
     DRM_DOWNLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3),
     DRM_SIGNATURE_SECRET: z.string().min(32).optional(),
     STRIPE_SECRET_KEY: z.string().min(10),
@@ -755,7 +776,34 @@ export const env = {
     quarantineBucket: raw.R2_QUARANTINE_BUCKET
   },
   integrations: {
-    cloudConvertApiKey: raw.CLOUDCONVERT_API_KEY ?? null
+    cloudConvertApiKey: raw.CLOUDCONVERT_API_KEY ?? null,
+    hubspot: {
+      enabled: raw.HUBSPOT_ENABLED,
+      accessToken: raw.HUBSPOT_PRIVATE_APP_TOKEN ?? null,
+      baseUrl: raw.HUBSPOT_BASE_URL ?? 'https://api.hubapi.com',
+      timeoutMs: raw.HUBSPOT_TIMEOUT_MS,
+      maxRetries: raw.HUBSPOT_MAX_RETRIES,
+      syncWindowMinutes: raw.HUBSPOT_SYNC_WINDOW_MINUTES
+    },
+    salesforce: {
+      enabled: raw.SALESFORCE_ENABLED,
+      loginUrl: raw.SALESFORCE_LOGIN_URL ?? 'https://login.salesforce.com',
+      clientId: raw.SALESFORCE_CLIENT_ID ?? null,
+      clientSecret: raw.SALESFORCE_CLIENT_SECRET ?? null,
+      username: raw.SALESFORCE_USERNAME ?? null,
+      password: raw.SALESFORCE_PASSWORD ?? null,
+      securityToken: raw.SALESFORCE_SECURITY_TOKEN ?? null,
+      timeoutMs: raw.SALESFORCE_TIMEOUT_MS,
+      maxRetries: raw.SALESFORCE_MAX_RETRIES,
+      externalIdField: raw.SALESFORCE_EXTERNAL_ID_FIELD ?? 'Edulure_Project_Id__c'
+    },
+    crm: {
+      hubspotCron: raw.CRM_HUBSPOT_SYNC_CRON ?? null,
+      salesforceCron: raw.CRM_SALESFORCE_SYNC_CRON ?? null,
+      reconciliationCron: raw.CRM_RECONCILIATION_CRON ?? null,
+      reconciliationWindowDays: raw.CRM_RECONCILIATION_WINDOW_DAYS,
+      maxConcurrentJobs: raw.CRM_MAX_CONCURRENT_JOBS
+    }
   },
   payments: {
     defaultCurrency,

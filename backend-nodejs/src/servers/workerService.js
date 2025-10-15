@@ -9,6 +9,7 @@ import assetIngestionService from '../services/AssetIngestionService.js';
 import dataRetentionJob from '../jobs/dataRetentionJob.js';
 import communityReminderJob from '../jobs/communityReminderJob.js';
 import dataPartitionJob from '../jobs/dataPartitionJob.js';
+import integrationOrchestratorService from '../services/IntegrationOrchestratorService.js';
 
 const serviceLogger = logger.child({ service: 'worker-service' });
 
@@ -22,6 +23,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'data-retention',
     'community-reminder',
     'data-partitioning',
+    'integration-orchestrator',
     'probe-server'
   ]);
 
@@ -91,6 +93,15 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     serviceLogger.error({ err: error }, 'Failed to start community reminder job');
   }
 
+  readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
+  try {
+    integrationOrchestratorService.start();
+    readiness.markReady('integration-orchestrator', 'Integration orchestrator scheduled');
+  } catch (error) {
+    readiness.markFailed('integration-orchestrator', error);
+    serviceLogger.error({ err: error }, 'Failed to start integration orchestrator');
+  }
+
   const probeApp = createProbeApp({
     service: 'worker-service',
     readinessCheck: () => readiness.snapshot(),
@@ -133,6 +144,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   dataRetentionJob.stop();
   dataPartitionJob.stop();
   communityReminderJob.stop();
+  integrationOrchestratorService.stop();
 
     await infrastructure.stop();
 

@@ -55,3 +55,9 @@
 - Delivered `CommunityModerationService` handling case queues, scam reporting, and analytics logging with RBAC enforcement and domain events so safety teams can triage content without bespoke scripts.【F:backend-nodejs/src/services/CommunityModerationService.js†L1-L676】
 - Exposed moderation endpoints through controllers and router metadata so `/api/v1/moderation` integrates with feature-flag governance and registry tooling.【F:backend-nodejs/src/controllers/CommunityModerationController.js†L1-L342】【F:backend-nodejs/src/routes/communityModeration.routes.js†L1-L45】【F:backend-nodejs/src/routes/routeMetadata.js†L1-L184】【F:backend-nodejs/src/routes/routeRegistry.js†L1-L51】
 - Added Vitest coverage validating moderation flagging, case actions, and analytics summaries to guard against regressions.【F:backend-nodejs/test/communityModerationService.test.js†L1-L287】
+
+## Integrations & Automation
+- Delivered a CRM integration orchestrator that coordinates HubSpot/Salesforce sync runs, retry-aware telemetry, reconcile repo
+  rts, and Prometheus metrics, backed by new sync run/result tables and worker scheduling so enterprise connectors run with prod
+  uction-grade safety rails.【F:backend-nodejs/src/services/IntegrationOrchestratorService.js†L1-L476】【F:backend-nodejs/migrati
+ons/20250220103000_crm_integration_infrastructure.js†L1-L78】【F:backend-nodejs/src/servers/workerService.js†L1-L173】
