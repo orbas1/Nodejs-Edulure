@@ -75,7 +75,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
 - **Objective:** Deliver CRM, Slack, Google Drive, AI adapters, notification mesh, and webhook automation per enterprise integration strategy.【F:update_docs/1.50/features_update_plan.md†L94-L135】【F:update_docs/1.50/features_to_add.md†L118-L171】
 - **Integration Subtasks (11 total):**
   - **Backend:**
-    1. Build integration orchestrator handling HubSpot/Salesforce sync, retry policies, and reconciliation reports.【F:update_docs/1.50/features_to_add.md†L118-L149】
+    1. Build integration orchestrator handling HubSpot/Salesforce sync, retry policies, and reconciliation reports.【F:update_docs/1.50/features_to_add.md†L118-L149】 ✅ Completed – shipped a CRM integration orchestrator with HubSpot/Salesforce clients, dedicated sync log tables, reconciliation reporting, and worker scheduling so enterprise connectors have production-grade telemetry and retry controls.【F:backend-nodejs/src/services/IntegrationOrchestratorService.js†L1-L476】【F:backend-nodejs/migrations/20250220103000_crm_integration_infrastructure.js†L1-L78】【F:backend-nodejs/src/integrations/HubSpotClient.js†L1-L198】【F:backend-nodejs/src/integrations/SalesforceClient.js†L1-L214】
     2. Implement webhook/event bus broadcasting integration and payment events with circuit breakers.【F:update_docs/1.50/features_update_plan.md†L94-L114】
   - **Front-end:**
     3. Add admin integration dashboard showing sync status, error logs, and manual retry controls.

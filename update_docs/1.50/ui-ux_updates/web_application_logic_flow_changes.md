@@ -180,3 +180,8 @@
 ## Deprecations
 - Removed legacy Backbone-based admin panel; traffic redirected to new React experience.
 - Sunsetted old notifications dropdown replaced by full-screen center.
+
+## Integrations Control Centre Flow
+- Admin integration dashboard polls the orchestrator status endpoint to surface per-integration health, last run telemetry, and retry state sourced from the CRM scheduler metadata.【F:backend-nodejs/src/services/IntegrationOrchestratorService.js†L215-L342】
+- Manual resync actions trigger worker orchestration while displaying correlation IDs, record counts, and failure messages retrieved from the sync run/result ledgers for auditability.【F:backend-nodejs/src/models/IntegrationSyncRunModel.js†L1-L173】【F:backend-nodejs/src/models/IntegrationSyncResultModel.js†L1-L103】
+- Reconciliation widgets visualise the most recent mismatch reports so operators can remediate contacts or leads missing in HubSpot/Salesforce, aligning UI prompts with the orchestrator’s evidence store.【F:backend-nodejs/src/models/IntegrationReconciliationReportModel.js†L1-L84】

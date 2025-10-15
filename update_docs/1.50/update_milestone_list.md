@@ -98,6 +98,8 @@ All milestones begin at **0%** completion. Task ownership aligns with the detail
      - Implement HubSpot/Salesforce sync jobs with reconciliation logs.
      - Configure Slack notifications for critical workflow events.
      - Provide integration health dashboards and fallback procedures.【F:update_docs/1.50/features_update_plan.md†L94-L114】
+    - _Progress note:_ HubSpot/Salesforce orchestrator, sync log schema, and worker scheduling now exist, producing reconciliation
+      reports and Prometheus metrics to feed upcoming integration health dashboards.【F:backend-nodejs/src/services/IntegrationOrchestratorService.js†L1-L476】【F:backend-nodejs/migrations/20250220103000_crm_integration_infrastructure.js†L1-L78】
   3. **M4.T3: Storage & Content Automation (0%)**
      - Integrate Google Drive picker and asset ingestion pipeline.
      - Automate backup validation and storage compliance documentation.
