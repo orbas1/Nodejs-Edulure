@@ -1,11 +1,11 @@
 # Edulure Platform – Pre-launch Valuation Assessment
 
 ## Summary valuation
-- **Estimated pre-launch value (midpoint): £1.2M**
-- **Valuation range:** £0.9M – £1.5M
+- **Estimated pre-launch value (midpoint): £0.8M**
+- **Valuation range:** £0.6M – £1.0M
 - **Valuation date:** 2025-05-20
 
-This estimate reflects the replacement cost of reproducing the shipped assets today, adjusted for execution risk, go-to-market readiness, and comparable transactions for community-driven learning platforms that are still pre-revenue.
+This estimate assumes the codebase was produced by a single founder leveraging AI-assisted tooling. The valuation triangulates the opportunity cost of replicating the shipped assets with modern productivity accelerants, the execution premium from arriving at launch readiness ahead of competitors, and comparable transactions for pre-revenue community learning platforms.
 
 ## Platform overview
 Edulure bundles a multi-surface product with:
@@ -22,25 +22,19 @@ Edulure bundles a multi-surface product with:
 | Community & social graph | Real-time feed shell, messaging pagination controls, presence windows, follow recommendations, and moderation levers.【F:frontend-reactjs/README.md†L20-L23】【F:backend-nodejs/README.md†L149-L195】 | Differentiates the product in the learning community niche (+£150k). |
 | Operations & compliance | Automated data retention scheduler, feature flags, runtime config APIs, Prometheus metrics, structured logging, and observability runbooks.【F:backend-nodejs/README.md†L213-L270】 | Lowers future DevOps investment; signals mature engineering (-10% risk discount). |
 
-## Cost-based triangulation
-1. **Engineering effort:** Replicating the API, frontend, and infrastructure would conservatively require ~18 engineer-months (backend 9, frontend 4, DevOps/platform 3, QA/automation 2). Using a blended UK contractor rate of £6,000 per engineer-month, replacement cost ≈ £108k. For venture-backed teams with senior profiles (£10k/mo), cost rises to £180k. Given the sophistication of the API and integrations, we weight towards senior rates (70% weight), producing a replacement cost estimate of £162k.
-2. **Time-to-market premium:** The repository already integrates payments, content ingestion, observability, and governance, shortening launch timelines by an estimated 9–12 months versus greenfield builds. Applying a 0.6 probability of successful launch conversion (reflecting pre-revenue risk) leads to a risk-adjusted execution premium of £600k.
-3. **Intellectual property & comparables:** Recent UK pre-launch acquisitions of specialist edtech/community platforms with similar breadth trade between £0.8M and £1.6M based on disclosed seed valuations. Edulure’s API surface (payments, analytics, runtime config) and multi-channel clients place it near the midpoint.
+## Cost-based triangulation under a solo-builder + AI scenario
+1. **Engineering effort:** Reproducing the API, frontend, and infrastructure with a comparable solo founder using AI copilots would require ~9 founder-months (backend/infrastructure 5, frontend 3, testing/automation 1). Using a solo founder opportunity cost of £8,500 per month (upper decile UK contractor rate blended with AI productivity savings), replacement cost ≈ £77k. To account for the depth of integrations (payments, observability, governance), we gross this up by 40% to reflect specialist knowledge, yielding a replacement cost estimate of **£0.11M**.
+2. **Time-to-market premium:** The repository integrates payments, content ingestion, observability, and governance, compressing launch timelines by ~7–9 months for a lean team. Applying a 0.55 probability of successful launch conversion (reflecting pre-revenue risk and single-operator execution load) results in a risk-adjusted execution premium of **£0.35M**.
+3. **Intellectual property & comparables:** Recent UK pre-launch financings for niche community learning platforms built by compact founding teams cluster between £0.5M and £1.2M post-money. Given Edulure’s payments, analytics, and runtime configuration depth, a midpoint uplift of **£0.34M** is supportable even for a single-builder origin story.
 
-Combining these elements yields:
-
-- Replacement cost (senior-weighted): **£0.16M**
-- Execution & time-to-market premium: **£0.60M**
-- Feature completeness & comparables uplift: **£0.44M**
-
-**Indicative midpoint valuation: £1.20M**
+Combining these elements yields an indicative midpoint valuation of **£0.80M**, with sensitivity bands of £0.6M–£1.0M reflecting execution-risk discounts and potential upside from early traction.
 
 ## Risk adjustments
-- **Product-market risk (-£200k):** No production usage or revenue yet; assumes subsequent customer validation.
-- **Operational complexity (-£100k):** Cloudflare R2, payments, and search clusters add ongoing costs and require specialist maintenance.
-- **Positive adjustment (+£150k):** Strong governance/observability reduces compliance and scaling friction, improving investor confidence.【F:backend-nodejs/README.md†L213-L270】
+- **Product-market risk (-£180k):** No production usage or revenue yet; assumes subsequent customer validation and that a single operator can convert technical readiness into commercial traction.
+- **Operational load (-£90k):** Cloudflare R2, payments, and search clusters add ongoing costs and require specialist maintenance that may exceed a solo founder’s bandwidth.
+- **Positive adjustment (+£120k):** Strong governance/observability reduces compliance and scaling friction, improving investor confidence and lowering diligence risk.【F:backend-nodejs/README.md†L213-L270】
 
-The resulting range (£0.9M – £1.5M) brackets conservative replacement-value scenarios against optimistic market comparables.
+The resulting range (£0.6M – £1.0M) brackets conservative replacement-value scenarios against optimistic market comparables for founder-led, AI-leveraged builds.
 
 ## Recommendations
 1. **Validate early design partners** to justify the upper end of the range and demonstrate conversion for payments and content analytics.
