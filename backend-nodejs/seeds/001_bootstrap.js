@@ -1,8 +1,25 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
+import { generateConsentPolicyChecksum } from '../src/database/domains/compliance.js';
+
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+const incidentEncryptionKey = process.env.SECURITY_INCIDENT_ENCRYPTION_KEY
+  ? Buffer.from(process.env.SECURITY_INCIDENT_ENCRYPTION_KEY, 'hex')
+  : crypto.createHash('sha256').update('edulure-security-seed-key').digest();
+
+const sealSensitive = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', incidentEncryptionKey, iv);
+  const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return Buffer.concat([iv, authTag, encrypted]);
+};
 
 export async function seed(knex) {
   await knex.transaction(async (trx) => {
@@ -67,6 +84,12 @@ export async function seed(knex) {
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
     await trx('domain_events').del();
+    await trx('security_incidents').del();
+    await trx('dsr_requests').del();
+    await trx('cdc_outbox').del();
+    await trx('consent_policies').del();
+    await trx('consent_records').del();
+    await trx('audit_events').del();
     await trx('kyc_audit_logs').del();
     await trx('kyc_documents').del();
     await trx('kyc_verifications').del();
@@ -2262,6 +2285,540 @@ export async function seed(knex) {
 
     const ninetyDaysFromNow = new Date(timelineNow.getTime() + 90 * 24 * 60 * 60 * 1000);
     const sixtyDaysAgo = new Date(timelineNow.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+    const opsBridgeContacts = {
+      slack: '#security-incidents',
+      bridge: 'Zoom 927-555-1443',
+      onCall: 'Ops Duty Manager',
+      phone: '+44 20 3000 0000'
+    };
+
+    const securityIncidents = [
+      {
+        incident_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        reporter_id: adminId,
+        assigned_to: adminId,
+        category: 'scam',
+        severity: 'high',
+        status: 'mitigating',
+        description_ciphertext: sealSensitive(
+          'Phishing payout update campaign blocked by heuristics before any funds were diverted.'
+        ),
+        notes_ciphertext: sealSensitive(
+          'Monitoring for replays across payout endpoints. Wallet monitoring enabled with on-call watchers.'
+        ),
+        source: 'fraud-desk',
+        external_case_id: 'OPS-2045',
+        reported_at: new Date('2025-02-03T08:45:00Z'),
+        triaged_at: new Date('2025-02-03T09:02:00Z'),
+        metadata: JSON.stringify({
+          reference: 'OPS-2045',
+          summary:
+            'Phishing lure targeting instructor payout confirmations. Links disabled before funds moved and affected accounts locked.',
+          detectionChannel: 'fraud-desk',
+          watchers: 14,
+          metrics: { flaggedLearners: 32, blockedPayments: 11200 },
+          ack: {
+            acknowledgedAt: '2025-02-03T09:05:00Z',
+            ackSlaMinutes: 15,
+            ackBreached: false,
+            responder: 'Ops Duty Manager'
+          },
+          resolution: {
+            targetAt: '2025-02-03T12:45:00Z',
+            resolutionSlaMinutes: 240,
+            resolutionBreached: false
+          },
+          recommendedActions: [
+            'Lock payout profiles for flagged instructors until manual verification completes.',
+            'Publish phishing warning banner across operator dashboard and learner feed.',
+            'Trigger credential rotation advisory for impacted instructors.'
+          ],
+          playbook: {
+            id: 'phishing-rapid-lockdown',
+            title: 'Phishing rapid lockdown',
+            url: 'https://runbooks.edulure.test/phishing-rapid-lockdown'
+          },
+          relatedCapabilities: ['payments-and-payouts', 'operator-dashboard', 'identity-authentication'],
+          attachments: [
+            {
+              type: 'link',
+              label: 'Fraud desk escalation thread',
+              url: 'https://slack.test/security-incidents/ops-2045'
+            },
+            {
+              type: 'link',
+              label: 'DM screenshot evidence',
+              url: 'https://cdn.edulure.test/incidents/ops-2045/screenshot.png'
+            }
+          ],
+          contactPoints: opsBridgeContacts,
+          impact: { segments: ['Instructors', 'Payout admins'], geos: ['GB', 'NG'] },
+          timeline: [
+            {
+              timestamp: '2025-02-03T08:45:00Z',
+              event: 'detected',
+              detail: 'Automated payout heuristics blocked suspicious DM link.'
+            },
+            {
+              timestamp: '2025-02-03T08:48:00Z',
+              event: 'escalated',
+              detail: 'Fraud desk escalated to on-call operator via PagerDuty.'
+            },
+            {
+              timestamp: '2025-02-03T09:05:00Z',
+              event: 'acknowledged',
+              detail: 'Duty manager confirmed mitigation steps and locked payouts.'
+            }
+          ]
+        })
+      },
+      {
+        incident_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        reporter_id: adminId,
+        assigned_to: adminId,
+        category: 'account_takeover',
+        severity: 'critical',
+        status: 'triaged',
+        description_ciphertext: sealSensitive(
+          'Multiple admin MFA prompts originating from Lagos region indicated attempted account takeover of console users.'
+        ),
+        notes_ciphertext: sealSensitive(
+          'Initiated forced credential reset and session revocation. Monitoring elevated login attempts for 24 hours.'
+        ),
+        source: 'pagerduty',
+        external_case_id: 'OPS-2046',
+        reported_at: new Date('2025-02-03T06:58:00Z'),
+        triaged_at: new Date('2025-02-03T07:06:00Z'),
+        metadata: JSON.stringify({
+          reference: 'OPS-2046',
+          summary:
+            'Account takeover signals blocked by adaptive MFA and session revocation safeguards. Elevated monitoring activated.',
+          detectionChannel: 'pagerduty',
+          watchers: 21,
+          metrics: { elevatedSessions: 4, flaggedLearners: 0, blockedPayments: 0 },
+          ack: {
+            acknowledgedAt: '2025-02-03T07:07:00Z',
+            ackSlaMinutes: 10,
+            ackBreached: false,
+            responder: 'Security On Call'
+          },
+          resolution: {
+            targetAt: '2025-02-03T08:37:00Z',
+            resolutionSlaMinutes: 90,
+            resolutionBreached: false
+          },
+          recommendedActions: [
+            'Force logout on all admin sessions issued before 07:00 UTC.',
+            'Switch operator dashboard to elevated monitoring mode for four hours.',
+            'Issue security alert to leadership with mitigation summary and residual risk.'
+          ],
+          playbook: {
+            id: 'account-takeover-high',
+            title: 'Account takeover emergency response',
+            url: 'https://runbooks.edulure.test/account-takeover-high'
+          },
+          relatedCapabilities: [
+            'operator-dashboard',
+            'identity-authentication',
+            'platform-runtime-config'
+          ],
+          attachments: [
+            {
+              type: 'link',
+              label: 'PagerDuty timeline',
+              url: 'https://pagerduty.test/incidents/OPS-2046'
+            }
+          ],
+          contactPoints: {
+            ...opsBridgeContacts,
+            bridge: 'Teams 610-883-441',
+            phone: '+44 20 3000 0450'
+          },
+          impact: { segments: ['Admins'], geos: ['NG', 'GB'] },
+          timeline: [
+            {
+              timestamp: '2025-02-03T06:58:00Z',
+              event: 'detected',
+              detail: 'MFA anomaly detection triggered for two admin accounts.'
+            },
+            {
+              timestamp: '2025-02-03T07:06:00Z',
+              event: 'triaged',
+              detail: 'Security on-call initiated forced logout sequence.'
+            },
+            {
+              timestamp: '2025-02-03T07:22:00Z',
+              event: 'mitigation',
+              detail: 'Credential rotation emails dispatched to impacted admins.'
+            }
+          ]
+        })
+      },
+      {
+        incident_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        reporter_id: instructorId,
+        assigned_to: adminId,
+        category: 'fraud',
+        severity: 'medium',
+        status: 'new',
+        description_ciphertext: sealSensitive(
+          'Learner reported suspicious marketplace listing cloning premium course material with fake payout link.'
+        ),
+        notes_ciphertext: sealSensitive(
+          'Waiting on compliance review for takedown and refund guidance. Social moderation notified.'
+        ),
+        source: 'support-portal',
+        external_case_id: 'OPS-2047',
+        reported_at: new Date('2025-02-02T19:22:00Z'),
+        metadata: JSON.stringify({
+          reference: 'OPS-2047',
+          summary: 'Marketplace listing flagged as fraudulent reseller attempt. Pending compliance takedown approval.',
+          detectionChannel: 'support-portal',
+          watchers: 6,
+          metrics: { flaggedLearners: 5, blockedPayments: 0 },
+          ack: {
+            ackSlaMinutes: 30,
+            ackBreached: true
+          },
+          resolution: {
+            targetAt: '2025-02-03T18:00:00Z',
+            resolutionSlaMinutes: 480,
+            resolutionBreached: false
+          },
+          recommendedActions: [
+            'Suspend listing until compliance review completes.',
+            'Notify impacted learners via secure messaging.',
+            'Capture evidence for payment dispute with processor.'
+          ],
+          playbook: {
+            id: 'marketplace-fraud-triage',
+            title: 'Marketplace fraud triage',
+            url: 'https://runbooks.edulure.test/marketplace-fraud-triage'
+          },
+          relatedCapabilities: ['content-library', 'operator-dashboard'],
+          attachments: [
+            {
+              type: 'link',
+              label: 'Support ticket',
+              url: 'https://support.edulure.test/tickets/OPS-2047'
+            }
+          ],
+          contactPoints: opsBridgeContacts,
+          impact: { segments: ['Learners'], geos: ['BR'] },
+          timeline: [
+            {
+              timestamp: '2025-02-02T19:22:00Z',
+              event: 'reported',
+              detail: 'Learner filed ticket referencing cloned checkout link.'
+            }
+          ]
+        })
+      },
+      {
+        incident_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        reporter_id: adminId,
+        assigned_to: adminId,
+        category: 'scam',
+        severity: 'high',
+        status: 'resolved',
+        description_ciphertext: sealSensitive(
+          'Smishing attempt targeted payout administrators with credential harvesting messages.'
+        ),
+        notes_ciphertext: sealSensitive('Telecom takedown executed. No credentials compromised.'),
+        source: 'fraud-desk',
+        external_case_id: 'OPS-2038',
+        reported_at: new Date('2025-01-27T14:10:00Z'),
+        triaged_at: new Date('2025-01-27T14:18:00Z'),
+        resolved_at: new Date('2025-01-27T17:42:00Z'),
+        metadata: JSON.stringify({
+          reference: 'OPS-2038',
+          summary: 'Resolved smishing incident against payout admins after telecom takedown and credential rotation.',
+          detectionChannel: 'fraud-desk',
+          watchers: 11,
+          metrics: { flaggedLearners: 0, blockedPayments: 8200 },
+          ack: {
+            acknowledgedAt: '2025-01-27T14:19:00Z',
+            ackSlaMinutes: 15,
+            ackBreached: false,
+            responder: 'Ops Duty Manager'
+          },
+          resolution: {
+            targetAt: '2025-01-27T18:10:00Z',
+            resolvedAt: '2025-01-27T17:42:00Z',
+            resolutionSlaMinutes: 240,
+            resolutionBreached: false,
+            followUp: 'Coordinate telecom takedown post-mortem and update SMS filtering rules.'
+          },
+          recommendedActions: [
+            'Maintain SMS filtering heuristics with telecom provider.',
+            'Publish post-incident summary for leadership.',
+            'Verify absence of credential reuse across admin accounts.'
+          ],
+          playbook: {
+            id: 'smishing-response',
+            title: 'Smishing response workflow',
+            url: 'https://runbooks.edulure.test/smishing-response'
+          },
+          relatedCapabilities: ['payments-and-payouts', 'operator-dashboard'],
+          attachments: [],
+          contactPoints: opsBridgeContacts,
+          impact: { segments: ['Admins'], geos: ['GB'] },
+          timeline: [
+            {
+              timestamp: '2025-01-27T14:10:00Z',
+              event: 'detected',
+              detail: 'Fraud heuristics flagged telecom messages with phishing link.'
+            },
+            {
+              timestamp: '2025-01-27T17:42:00Z',
+              event: 'resolved',
+              detail: 'Telecom takedown confirmed and admin credentials rotated.'
+            }
+          ]
+        })
+      },
+      {
+        incident_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        reporter_id: adminId,
+        assigned_to: adminId,
+        category: 'abuse',
+        severity: 'low',
+        status: 'resolved',
+        description_ciphertext: sealSensitive('Community spam bots promoting referral codes across public channels.'),
+        notes_ciphertext: sealSensitive('Bots banned and moderation heuristics updated with new signatures.'),
+        source: 'community-report',
+        external_case_id: 'OPS-2035',
+        reported_at: new Date('2025-01-18T09:32:00Z'),
+        triaged_at: new Date('2025-01-18T09:45:00Z'),
+        resolved_at: new Date('2025-01-18T10:12:00Z'),
+        metadata: JSON.stringify({
+          reference: 'OPS-2035',
+          summary: 'Spam bots removed from communities following rapid moderation response.',
+          detectionChannel: 'community-report',
+          watchers: 5,
+          metrics: { flaggedLearners: 0, blockedPayments: 0 },
+          ack: {
+            acknowledgedAt: '2025-01-18T09:46:00Z',
+            ackSlaMinutes: 20,
+            ackBreached: false,
+            responder: 'Community Duty Manager'
+          },
+          resolution: {
+            targetAt: '2025-01-18T11:00:00Z',
+            resolvedAt: '2025-01-18T10:12:00Z',
+            resolutionSlaMinutes: 120,
+            resolutionBreached: false,
+            followUp: 'Deploy updated spam signatures to provider moderation dashboards.'
+          },
+          recommendedActions: [
+            'Share updated spam signatures with moderation team.',
+            'Notify affected community owners of resolution.',
+            'Review moderation automation coverage for referral campaigns.'
+          ],
+          playbook: {
+            id: 'community-abuse-triage',
+            title: 'Community abuse triage',
+            url: 'https://runbooks.edulure.test/community-abuse-triage'
+          },
+          relatedCapabilities: ['community-collaboration', 'operator-dashboard'],
+          attachments: [],
+          contactPoints: opsBridgeContacts,
+          impact: { segments: ['Community owners'], geos: ['US'] },
+          timeline: [
+            {
+              timestamp: '2025-01-18T09:32:00Z',
+              event: 'reported',
+              detail: 'Community owner escalated spam via operations console.'
+            },
+            {
+              timestamp: '2025-01-18T10:12:00Z',
+              event: 'resolved',
+              detail: 'Bots removed, members notified, and heuristics tuned.'
+            }
+          ]
+        })
+      }
+    ];
+
+    await trx('security_incidents').insert(securityIncidents);
+
+    const [phishingIncident, takeoverIncident, marketplaceIncident, resolvedSmishingIncident, resolvedAbuseIncident] =
+      securityIncidents;
+
+    await trx('audit_events').insert([
+      {
+        event_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        actor_id: adminId,
+        actor_type: 'user',
+        actor_role: 'admin',
+        event_type: 'incident.acknowledged',
+        event_severity: 'warning',
+        entity_type: 'security_incident',
+        entity_id: phishingIncident.incident_uuid,
+        payload: JSON.stringify({
+          status: 'mitigating',
+          responder: 'Ops Duty Manager',
+          ackMinutes: 13,
+          reference: phishingIncident.metadata ? JSON.parse(phishingIncident.metadata).reference : 'OPS-2045'
+        }),
+        ip_address_ciphertext: sealSensitive('102.89.10.8'),
+        ip_address_hash: makeHash('102.89.10.8'),
+        request_id: crypto.randomUUID(),
+        occurred_at: new Date('2025-02-03T09:05:00Z'),
+        metadata: JSON.stringify({ channel: 'fraud-desk' })
+      },
+      {
+        event_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        actor_id: adminId,
+        actor_type: 'user',
+        actor_role: 'admin',
+        event_type: 'incident.runbook_launched',
+        event_severity: 'warning',
+        entity_type: 'security_incident',
+        entity_id: takeoverIncident.incident_uuid,
+        payload: JSON.stringify({
+          runbookId: 'account-takeover-high',
+          launchedBy: 'Security On Call',
+          reference: takeoverIncident.metadata ? JSON.parse(takeoverIncident.metadata).reference : 'OPS-2046'
+        }),
+        ip_address_ciphertext: sealSensitive('102.89.10.8'),
+        ip_address_hash: makeHash('102.89.10.8'),
+        request_id: crypto.randomUUID(),
+        occurred_at: new Date('2025-02-03T07:09:00Z'),
+        metadata: JSON.stringify({ bridge: 'Teams 610-883-441' })
+      },
+      {
+        event_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        actor_id: adminId,
+        actor_type: 'user',
+        actor_role: 'admin',
+        event_type: 'incident.closed',
+        event_severity: 'info',
+        entity_type: 'security_incident',
+        entity_id: resolvedSmishingIncident.incident_uuid,
+        payload: JSON.stringify({
+          status: 'resolved',
+          resolvedAt: '2025-01-27T17:42:00Z',
+          reference: 'OPS-2038'
+        }),
+        ip_address_ciphertext: sealSensitive('102.89.10.8'),
+        ip_address_hash: makeHash('102.89.10.8'),
+        request_id: crypto.randomUUID(),
+        occurred_at: new Date('2025-01-27T17:42:00Z'),
+        metadata: JSON.stringify({ channel: 'fraud-desk' })
+      }
+    ]);
+
+    const [marketingConsentPolicyId] = await trx('consent_policies').insert({
+      policy_key: 'marketing.email',
+      version: '2025-02',
+      status: 'published',
+      effective_at: new Date('2025-02-01T00:00:00Z'),
+      title: 'Marketing email communications',
+      summary: 'Describes how Edulure uses opted-in marketing email preferences across newsletters and updates.',
+      document_locations: JSON.stringify({
+        url: 'https://edulure.com/policies/marketing-email-2025-02',
+        locale: 'en-GB'
+      }),
+      content_hash: generateConsentPolicyChecksum({
+        key: 'marketing.email',
+        version: '2025-02',
+        sections: ['Purpose', 'Data Usage', 'Revocation'],
+        locales: ['en-GB']
+      })
+    });
+
+    const [analyticsConsentPolicyId] = await trx('consent_policies').insert({
+      policy_key: 'data.analytics',
+      version: '2025-02',
+      status: 'published',
+      effective_at: new Date('2025-02-01T00:00:00Z'),
+      title: 'Analytics instrumentation consent',
+      summary: 'Sets out how product analytics events are collected for instructors and operators.',
+      document_locations: JSON.stringify({
+        url: 'https://edulure.com/policies/data-analytics-2025-02',
+        locale: 'en-SG'
+      }),
+      content_hash: generateConsentPolicyChecksum({
+        key: 'data.analytics',
+        version: '2025-02',
+        sections: ['Purpose', 'Metrics Captured', 'Opt-out'],
+        locales: ['en-SG']
+      })
+    });
+
+    await trx('consent_records').insert([
+      {
+        user_id: learnerId,
+        consent_type: 'marketing.email',
+        policy_version: '2025-02',
+        policy_id: marketingConsentPolicyId,
+        status: 'granted',
+        granted_at: new Date('2025-02-01T10:00:00Z'),
+        channel: 'web',
+        evidence_ciphertext: sealSensitive('Learner accepted updated marketing email consent via web preferences.'),
+        evidence_checksum: makeHash('learner-marketing-email-2025-02'),
+        metadata: JSON.stringify({ ip: '102.89.10.8', userAgent: 'Chrome/120.0', locale: 'en-GB' })
+      },
+      {
+        user_id: instructorId,
+        consent_type: 'data.analytics',
+        policy_version: '2025-02',
+        policy_id: analyticsConsentPolicyId,
+        status: 'granted',
+        granted_at: new Date('2025-02-02T09:30:00Z'),
+        channel: 'web',
+        evidence_ciphertext: sealSensitive('Instructor accepted analytics instrumentation consent in dashboard settings.'),
+        evidence_checksum: makeHash('instructor-analytics-consent-2025-02'),
+        metadata: JSON.stringify({ ip: '176.23.45.100', userAgent: 'Safari/17.1', locale: 'en-SG' })
+      }
+    ]);
+
+    await trx('dsr_requests').insert([
+      {
+        request_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        user_id: learnerId,
+        request_type: 'access',
+        status: 'in_review',
+        submitted_at: new Date('2025-01-20T09:00:00Z'),
+        due_at: new Date('2025-02-19T09:00:00Z'),
+        handled_by: adminId,
+        escalated: false,
+        case_reference: 'DSR-2025-0001',
+        sla_days: 30,
+        request_ciphertext: sealSensitive('Learner requested export of historical progress and direct messages.'),
+        response_ciphertext: sealSensitive('Operations compiling export and awaiting legal approval.'),
+        metadata: JSON.stringify({ channel: 'support-portal', priority: 'standard' })
+      },
+      {
+        request_uuid: crypto.randomUUID(),
+        tenant_id: 'global',
+        user_id: instructorId,
+        request_type: 'erasure',
+        status: 'completed',
+        submitted_at: new Date('2024-12-10T15:00:00Z'),
+        due_at: new Date('2025-01-09T15:00:00Z'),
+        closed_at: new Date('2024-12-22T11:30:00Z'),
+        handled_by: adminId,
+        escalated: true,
+        escalated_at: new Date('2024-12-15T09:10:00Z'),
+        case_reference: 'DSR-2024-0198',
+        sla_days: 30,
+        request_ciphertext: sealSensitive('Instructor requested erasure of deprecated sandbox account data.'),
+        response_ciphertext: sealSensitive('Account anonymised and retention exceptions logged for compliance.'),
+        metadata: JSON.stringify({ channel: 'support-portal', priority: 'high' })
+      }
+    ]);
 
     await trx('saved_searches').insert({
       user_id: adminId,

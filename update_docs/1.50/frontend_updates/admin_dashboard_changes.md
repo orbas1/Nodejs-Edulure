@@ -1,0 +1,5 @@
+# Admin Dashboard Updates – Version 1.50
+
+- Added a dedicated governance control centre route that consumes the compliance API, renders severity-coded KPIs, and provides inline DSR escalation/completion controls so trust operators can triage requests without leaving the dashboard shell.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L1-L196】【F:frontend-reactjs/src/App.jsx†L1-L150】
+- Persisted navigation and breadcrumb updates inside the dashboard layout so the new governance workspace appears in the admin navigation clusters with the correct RBAC gating and iconography.【F:frontend-reactjs/src/layouts/DashboardLayout.jsx†L1-L420】
+- Implemented Vitest suites for the governance page, consent hook, and profile ledger to validate data loading, action handlers, and error surfacing paths across the admin experience.【F:frontend-reactjs/src/pages/dashboard/__tests__/AdminGovernance.test.jsx†L1-L124】【F:frontend-reactjs/src/hooks/__tests__/useConsentRecords.test.jsx†L1-L74】【F:frontend-reactjs/src/pages/__tests__/ProfileConsentCard.test.jsx†L1-L54】

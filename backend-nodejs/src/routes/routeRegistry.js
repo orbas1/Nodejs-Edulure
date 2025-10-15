@@ -4,6 +4,7 @@ import analyticsRoutes from './analytics.routes.js';
 import authRoutes from './auth.routes.js';
 import blogRoutes from './blog.routes.js';
 import chatRoutes from './chat.routes.js';
+import complianceRoutes from './compliance.routes.js';
 import communityRoutes from './community.routes.js';
 import contentRoutes from './content.routes.js';
 import courseRoutes from './course.routes.js';
@@ -24,6 +25,7 @@ const routerMap = {
   content: contentRoutes,
   'runtime-config': runtimeConfigRoutes,
   payments: paymentRoutes,
+  compliance: complianceRoutes,
   chat: chatRoutes,
   social: socialRoutes,
   explorer: explorerRoutes,

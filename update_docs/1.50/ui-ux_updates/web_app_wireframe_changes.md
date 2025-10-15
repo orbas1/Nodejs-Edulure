@@ -65,6 +65,13 @@
 - Activity audit log table with filters for entity, action, actor, timestamp; export button top-right.
 - Left rail houses governance shortcuts (Role permissions, Feature toggles, Localization packs).
 
+### Operator Command Centre
+- Four-card metric header communicates impacted services, open incidents, engaged watchers, and payments blocked with severity-coded backgrounds so operators instantly gauge platform posture. Each card binds to Redis-backed manifest and incident queue summaries exposed via the new operator dashboard service.【F:frontend-reactjs/src/pages/dashboard/AdminOperator.jsx†L19-L113】【F:backend-nodejs/src/services/OperatorDashboardService.js†L262-L305】
+- Service health panel splits into core services and impacted capabilities, highlighting component-level degradations, dependency summaries, and escalation contacts sourced from capability manifest payloads. Live alerts from the service health context appear inline for parity with the global banner.【F:frontend-reactjs/src/pages/dashboard/AdminOperator.jsx†L115-L199】【F:backend-nodejs/src/services/OperatorDashboardService.js†L92-L154】
+- Incident queue column surfaces the top five escalations with severity badges, acknowledgement/resolution telemetry, watcher counts, and the first two recommended actions so duty managers can triage without leaving the page.【F:frontend-reactjs/src/pages/dashboard/AdminOperator.jsx†L201-L259】【F:backend-nodejs/src/services/OperatorDashboardService.js†L156-L231】
+- Scam intelligence section visualises active scam alerts, detection channels, watcher coverage, and recommended actions, while the adjacent runbook stack links to the relevant playbooks for rapid mitigation.【F:frontend-reactjs/src/pages/dashboard/AdminOperator.jsx†L261-L332】【F:backend-nodejs/src/services/OperatorDashboardService.js†L202-L246】
+- Operational timeline composes incident lifecycle updates and runbook launches in reverse-chronological order, giving operators an audit-friendly journal of acknowledgements, mitigations, and resolutions.【F:frontend-reactjs/src/pages/dashboard/AdminOperator.jsx†L334-L371】【F:backend-nodejs/src/services/OperatorDashboardService.js†L233-L246】
+
 ### Learner Panel (Web)
 - Personalized hero with streak tracker, recommended next lesson, wallet snapshot.
 - Feed column merges announcements, assignments, mentor notes, and comment replies with contextual action buttons.
@@ -184,3 +191,8 @@
 ## Deprecations
 - Removed legacy top tabs from dashboard in favor of left navigation.
 - Deprecated old catalog list view; replaced with card grid to highlight imagery and mentors.
+
+## Governance Control Centre
+- Dashboard section dedicated to GDPR operations with summary cards for queue volume, overdue cases, and policy releases tied to severity color tokens for quick scanning.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L58-L120】
+- Tabular DSR queue view includes escalation/complete actions, SLA chips, and reporter metadata, mirroring backend compliance payloads for admin workflows.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L121-L172】
+- Policy timeline timeline renders effective dates, status pills, and hashed content references so legal reviewers can trace policy evolution directly from the governance workspace.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L173-L196】

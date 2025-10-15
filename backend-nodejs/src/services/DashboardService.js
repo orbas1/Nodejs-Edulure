@@ -1,5 +1,7 @@
 import crypto from 'crypto';
 
+import OperatorDashboardService from './OperatorDashboardService.js';
+
 function safeJsonParse(value, fallback) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;
@@ -11,6 +13,7 @@ function safeJsonParse(value, fallback) {
 }
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const operatorDashboardService = new OperatorDashboardService();
 
 export function formatCurrency(amountCents, currency = 'USD') {
   const amount = Number(amountCents ?? 0) / 100;
@@ -819,6 +822,10 @@ export default class DashboardService {
     }
 
     const instructorSnapshot = buildInstructorDashboard({ user, now: referenceDate }) ?? undefined;
+    let operatorSnapshot;
+    if (['admin', 'operator'].includes(user.role)) {
+      operatorSnapshot = await operatorDashboardService.build({ user, now: referenceDate });
+    }
 
     const dashboards = {};
     const searchIndex = [];
@@ -826,20 +833,43 @@ export default class DashboardService {
       dashboards.instructor = instructorSnapshot.dashboard;
       searchIndex.push(...instructorSnapshot.searchIndex);
     }
+    if (operatorSnapshot) {
+      dashboards.admin = operatorSnapshot.dashboard;
+      searchIndex.push(...operatorSnapshot.searchIndex);
+    }
 
     const roles = [];
-    if (user.role) {
+    if (operatorSnapshot) {
+      roles.push({ id: 'admin', label: 'Admin' });
+    }
+    if (instructorSnapshot) {
+      roles.push({ id: 'instructor', label: 'Instructor' });
+    }
+    if (user.role && !roles.some((role) => role.id === user.role)) {
       roles.push({ id: user.role, label: user.role.charAt(0).toUpperCase() + user.role.slice(1) });
     }
+
+    const profileStats = [
+      ...(instructorSnapshot?.profileStats ?? []),
+      ...(operatorSnapshot?.profileStats ?? [])
+    ];
+    const profileBioSegments = [];
+    if (instructorSnapshot?.profileBio) {
+      profileBioSegments.push(instructorSnapshot.profileBio);
+    }
+    if (operatorSnapshot?.profileBio) {
+      profileBioSegments.push(operatorSnapshot.profileBio);
+    }
+    const profileBio = profileBioSegments.join(' ').trim() || null;
 
     const profile = {
       id: user.id,
       name: resolveName(user.firstName, user.lastName, user.email),
       email: user.email,
       avatar: buildAvatarUrl(user.email),
-      title: instructorSnapshot?.profileTitleSegment ?? null,
-      bio: instructorSnapshot?.profileBio ?? null,
-      stats: instructorSnapshot?.profileStats ?? [],
+      title: instructorSnapshot?.profileTitleSegment ?? operatorSnapshot?.profileTitleSegment ?? null,
+      bio: profileBio,
+      stats: profileStats,
       feedHighlights: []
     };
 

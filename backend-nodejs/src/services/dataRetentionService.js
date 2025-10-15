@@ -1,5 +1,8 @@
+import crypto from 'crypto';
+
 import db from '../config/database.js';
 import logger from '../config/logger.js';
+import changeDataCaptureService from './ChangeDataCaptureService.js';
 
 function toPlainObject(value, fallback = {}) {
   if (!value) {
@@ -169,13 +172,54 @@ export async function fetchActivePolicies(trx = db) {
   return rows.map(mapPolicyRow);
 }
 
+const DEFAULT_ALERT_THRESHOLD = 500;
+
+async function publishRetentionEvent({
+  runId,
+  policy,
+  status,
+  details,
+  dryRun
+}) {
+  try {
+    await changeDataCaptureService.recordEvent({
+      domain: 'governance',
+      entityName: 'data_retention_policy',
+      entityId: policy.id,
+      operation:
+        status === 'failed'
+          ? 'RETENTION_FAILED'
+          : dryRun
+            ? 'RETENTION_SIMULATED'
+            : 'RETENTION_ENFORCED',
+      payload: {
+        runId,
+        policyId: policy.id,
+        entityName: policy.entityName,
+        status,
+        details
+      },
+      dryRun
+    });
+  } catch (error) {
+    logger.error({ err: error, policyId: policy.id, status }, 'Failed to record CDC event for retention policy');
+  }
+}
+
 export async function enforceRetentionPolicies({
   dryRun = false,
+  mode,
   policies: providedPolicies,
-  dbClient = db
+  dbClient = db,
+  alertThreshold = DEFAULT_ALERT_THRESHOLD,
+  onAlert
 } = {}) {
-  const runLogger = logger.child({ module: 'data-retention', dryRun });
+  const resolvedMode = mode ?? (dryRun ? 'simulate' : 'commit');
+  const simulate = resolvedMode === 'simulate';
+  const runDry = dryRun || simulate;
+  const runLogger = logger.child({ module: 'data-retention', dryRun: runDry, mode: resolvedMode });
   const executionResults = [];
+  const runId = crypto.randomUUID();
 
   const policies = providedPolicies
     ? providedPolicies.map((policy) => (policy.entityName ? policy : mapPolicyRow(policy)))
@@ -216,7 +260,7 @@ export async function enforceRetentionPolicies({
 
         if (sampleIds.length === 0) {
           policyLogger.info('No records matched retention policy');
-          if (!dryRun) {
+          if (!runDry) {
             await trx('data_retention_audit_logs').insert({
               policy_id: policy.id,
               dry_run: false,
@@ -224,7 +268,8 @@ export async function enforceRetentionPolicies({
               details: JSON.stringify({
                 reason: strategy.reason,
                 sampleIds: [],
-                dryRun: false
+                dryRun: false,
+                runId
               })
             });
           }
@@ -237,7 +282,7 @@ export async function enforceRetentionPolicies({
         }
 
         const { affectedRows } = await executeAction(policy, buildQuery, {
-          dryRun,
+          dryRun: runDry,
           softDeleteColumn: strategy.softDeleteColumn,
           trx
         });
@@ -245,12 +290,13 @@ export async function enforceRetentionPolicies({
         const auditPayload = {
           reason: strategy.reason,
           sampleIds,
-          dryRun,
+          dryRun: runDry,
+          runId,
           matchedRows: affectedRows,
           context: strategy.context ?? {}
         };
 
-        if (!dryRun) {
+        if (!runDry) {
           await trx('data_retention_audit_logs').insert({
             policy_id: policy.id,
             dry_run: false,
@@ -259,10 +305,7 @@ export async function enforceRetentionPolicies({
           });
         }
 
-        policyLogger.info(
-          { affectedRows, sampleIds, dryRun, action: policy.action },
-          'Retention policy enforced'
-        );
+        policyLogger.info({ affectedRows, sampleIds, dryRun: runDry, action: policy.action }, 'Retention policy enforced');
 
         return {
           affectedRows,
@@ -271,28 +314,55 @@ export async function enforceRetentionPolicies({
         };
       });
 
-      executionResults.push({
+      const outcome = {
         policyId: policy.id,
         entityName: policy.entityName,
         action: policy.action,
         status: 'executed',
         affectedRows: result.affectedRows,
         sampleIds: result.sampleIds,
-        dryRun,
+        dryRun: runDry,
         description: policy.description,
         context: result.context ?? {}
+      };
+
+      executionResults.push(outcome);
+
+      if (typeof onAlert === 'function' && result.affectedRows >= alertThreshold && !runDry) {
+        onAlert({
+          runId,
+          policy,
+          result,
+          mode: resolvedMode
+        });
+      }
+
+      await publishRetentionEvent({
+        runId,
+        policy,
+        status: 'executed',
+        details: outcome,
+        dryRun: runDry
       });
     } catch (error) {
       policyLogger.error({ err: error }, 'Failed to enforce data retention policy');
-      executionResults.push({
+      const failure = {
         policyId: policy.id,
         entityName: policy.entityName,
         action: policy.action,
         status: 'failed',
         error: error.message
+      };
+      executionResults.push(failure);
+      await publishRetentionEvent({
+        runId,
+        policy,
+        status: 'failed',
+        details: failure,
+        dryRun: runDry
       });
     }
   }
 
-  return { dryRun, results: executionResults };
+  return { dryRun: runDry, mode: resolvedMode, runId, results: executionResults };
 }

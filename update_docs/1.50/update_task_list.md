@@ -20,30 +20,30 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **API:**
     8. Publish versioned OpenAPI specs with service separation and automated contract tests. ✅ Completed – automated builder now slices the platform spec into capability catalogs, exposes `/api/v1/docs/services/:service`+UI endpoints, and validates coverage via Vitest contract checks.
   - **Logic:**
-    9. Externalise feature flags/runtime config to Redis with cache warming and failover strategies.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L19-L28】
+    9. Externalise feature flags/runtime config to Redis with cache warming and failover strategies.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L19-L28】 ✅ Completed – feature flags and runtime configuration now hydrate from a Redis-backed distributed snapshot with startup warming, lock-based refresh orchestration, and graceful degradation when Redis is unavailable.【F:backend-nodejs/src/services/DistributedRuntimeCache.js†L1-L129】【F:backend-nodejs/src/services/FeatureFlagService.js†L1-L520】【F:backend-nodejs/src/config/redisClient.js†L1-L92】
   - **Design:**
-    10. Produce operator dashboard wireframes highlighting system health, incident response shortcuts, and scam warning placement.【F:update_docs/1.50/new_feature_brief.md†L18-L71】
+    10. Produce operator dashboard wireframes highlighting system health, incident response shortcuts, and scam warning placement.【F:update_docs/1.50/new_feature_brief.md†L18-L71】 ✅ Completed – Delivered operator command centre wireframes and implementation covering severity-coded KPI cards, service matrices, incident queues, scam intelligence, and runbook shortcuts backed by the new operator dashboard service.【F:update_docs/1.50/ui-ux_updates/web_app_wireframe_changes.md†L125-L151】【F:frontend-reactjs/src/pages/dashboard/AdminOperator.jsx†L19-L371】【F:backend-nodejs/src/services/OperatorDashboardService.js†L92-L305】
 
 ## 2. Data Governance & Compliance Reinforcement (0%)
 - **Objective:** Partition schema, secure PII, modernise seeds, and align retention tooling to deliver compliance-ready infrastructure.【F:update_docs/1.50/features_to_add.md†L12-L70】【F:update_docs/1.50/pre-update_evaluations/issue_list.md†L18-L30】
 - **Integration Subtasks (10 total):**
   - **Backend:**
-    1. Refactor Knex migrations into domain modules with rollback scripts and automated ERD exports.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L30-L37】
-    2. Implement CDC events for analytics warehouse subscriptions and retention job dry runs.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L46-L49】
+    1. Refactor Knex migrations into domain modules with rollback scripts and automated ERD exports.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L30-L37】 ✅ Completed – compliance domain helper provisions audit, consent, incident, and CDC tables with partitioning plus an ERD generator for governance packs.【F:backend-nodejs/src/database/domains/compliance.js†L1-L449】【F:backend-nodejs/scripts/generate-erd.js†L1-L140】
+    2. Implement CDC events for analytics warehouse subscriptions and retention job dry runs.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L46-L49】 ✅ Completed – change data capture service records governance events and retention jobs emit CDC payloads with retry instrumentation and simulation tooling.【F:backend-nodejs/src/services/ChangeDataCaptureService.js†L1-L111】【F:backend-nodejs/src/services/dataRetentionService.js†L1-L231】
   - **Front-end:**
-    3. Build GDPR admin console for DSR queue management and policy version logs.【F:update_docs/1.50/features_to_add.md†L18-L30】
-    4. Surface consent status in user profile, including revocation flows and policy links.
+    3. Build GDPR admin console for DSR queue management and policy version logs.【F:update_docs/1.50/features_to_add.md†L18-L30】 ✅ Completed – React governance control centre renders DSR queues, escalation actions, and policy timeline components backed by the compliance API client.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L1-L196】【F:frontend-reactjs/src/api/complianceApi.js†L1-L86】
+    4. Surface consent status in user profile, including revocation flows and policy links. ✅ Completed – profile consent ledger fetches live records, displays grant metadata, and offers inline revoke controls powered by the shared hook and compliance endpoints.【F:frontend-reactjs/src/pages/Profile.jsx†L830-L870】【F:frontend-reactjs/src/hooks/useConsentRecords.js†L1-L52】
   - **User Phone App:**
-    5. Add consent capture modals, DSR request initiation, and secure cache purge triggers on logout.【F:update_docs/1.50/features_to_add.md†L243-L286】
+    5. Add consent capture modals, DSR request initiation, and secure cache purge triggers on logout.【F:update_docs/1.50/features_to_add.md†L243-L286】 ✅ Completed – Flutter home screen launches a consent dialog, invokes the DSR client, and resets Hive-stored privacy preferences during logout to honour revocations.【F:Edulure-Flutter/lib/screens/home_screen.dart†L268-L332】【F:Edulure-Flutter/lib/services/privacy_preferences.dart†L1-L34】
   - **Provider Phone App:**
     6. Draft governance checklist and API contracts enabling provider admins to honour retention/deletion requests once app exists.
   - **Database:**
     7. Encrypt KYC/financial fields, enforce data classification tags, and add composite indexes for analytics tables.【F:update_docs/1.50/pre-update_evaluations/issue_list.md†L24-L29】
     8. Configure partitioning/archival policies for consent, audit, and incident tables.
   - **API:**
-    9. Expose GDPR/consent endpoints with RBAC gating and audit trail logging.
-  - **Logic:**
-    10. Integrate retention scheduler with simulation mode, alerting, and rollback options.
+      9. Expose GDPR/consent endpoints with RBAC gating and audit trail logging. ✅ Completed – compliance routes enforce admin auth, surface consent lifecycle, and emit CDC events for audit trails across DSR and policy endpoints.【F:backend-nodejs/src/routes/compliance.routes.js†L1-L18】【F:backend-nodejs/src/services/ComplianceService.js†L1-L247】
+    - **Logic:**
+      10. Integrate retention scheduler with simulation mode, alerting, and rollback options. ✅ Completed – retention service now accepts run IDs, dry-run modes, and alert callbacks while emitting CDC snapshots for downstream analytics.【F:backend-nodejs/src/services/dataRetentionService.js†L1-L231】【F:backend-nodejs/scripts/run-data-retention.js†L1-L214】
   - **Design:**
     11. Produce UX flows for consent capture, privacy dashboards, and scam/fraud education surfaces.【F:update_docs/1.50/features_to_add.md†L173-L235】
 

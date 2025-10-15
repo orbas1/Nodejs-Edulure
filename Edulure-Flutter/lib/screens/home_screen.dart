@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../services/session_manager.dart';
+import '../services/privacy_preferences.dart';
+import '../services/dsr_client.dart';
 import '../services/language_service.dart';
 import '../widgets/language_selector.dart';
 
@@ -19,7 +21,7 @@ class HomeScreen extends StatelessWidget {
         if (session == null) {
           return const _PublicHomeView();
         }
-        return _AuthenticatedHomeView(session: session);
+        return AuthenticatedHomeView(session: session);
       },
     );
   }
@@ -208,18 +210,29 @@ class _PublicHomeView extends StatelessWidget {
   }
 }
 
-class _AuthenticatedHomeView extends StatefulWidget {
-  const _AuthenticatedHomeView({required this.session});
+class AuthenticatedHomeView extends StatefulWidget {
+  const AuthenticatedHomeView({
+    required this.session,
+    DsrClient? dsrClient,
+    Future<bool> Function()? requiresConsent,
+    Future<void> Function({DateTime? grantedAt})? recordConsentAccepted,
+  })  : _dsrClient = dsrClient ?? const DsrClient(),
+        _requiresConsent = requiresConsent ?? PrivacyPreferenceService.requiresConsent,
+        _recordConsentAccepted = recordConsentAccepted ?? PrivacyPreferenceService.recordConsentAccepted;
 
   final Map<String, dynamic> session;
+  final DsrClient _dsrClient;
+  final Future<bool> Function() _requiresConsent;
+  final Future<void> Function({DateTime? grantedAt}) _recordConsentAccepted;
 
   @override
-  State<_AuthenticatedHomeView> createState() => _AuthenticatedHomeViewState();
+  State<AuthenticatedHomeView> createState() => AuthenticatedHomeViewState();
 }
 
-class _AuthenticatedHomeViewState extends State<_AuthenticatedHomeView> {
+class AuthenticatedHomeViewState extends State<AuthenticatedHomeView> {
   late final List<String> _availableRoles;
   late String _activeRole;
+  bool _pendingConsent = false;
 
   @override
   void initState() {
@@ -232,6 +245,9 @@ class _AuthenticatedHomeViewState extends State<_AuthenticatedHomeView> {
     _activeRole = storedRole != null && _availableRoles.contains(storedRole)
         ? storedRole
         : _availableRoles.first;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _bootstrapPrivacyWorkflow();
+    });
   }
 
   Map<String, dynamic>? get _user =>
@@ -264,6 +280,76 @@ class _AuthenticatedHomeViewState extends State<_AuthenticatedHomeView> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('You have been signed out.')),
+    );
+  }
+
+  Future<void> _bootstrapPrivacyWorkflow() async {
+    final requiresConsent = await widget._requiresConsent();
+    if (!mounted) return;
+    if (requiresConsent) {
+      setState(() {
+        _pendingConsent = true;
+      });
+      await _showConsentDialog();
+    }
+  }
+
+  Future<void> _showConsentDialog() async {
+    if (!_pendingConsent || !mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Review updated privacy policy'),
+          content: const Text(
+            'We have refreshed our privacy and analytics policies to align with GDPR retention windows. Please consent to the '
+            'new version or request a data export if you need a copy of your records.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await _submitDsrRequest();
+              },
+              child: const Text('Request data export'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await _acceptConsent();
+                if (!mounted) return;
+                Navigator.of(dialogContext).pop();
+              },
+              child: const Text('Accept & continue'),
+            )
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _acceptConsent() async {
+    await widget._recordConsentAccepted();
+    if (!mounted) return;
+    setState(() {
+      _pendingConsent = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Thank you — your privacy preferences are up to date.')),
+    );
+  }
+
+  Future<void> _submitDsrRequest() async {
+    await widget._dsrClient.submitRequest(
+      type: 'access',
+      description: 'Requested export from mobile privacy workflow',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Your data access request has been filed. Our trust team will follow up shortly.'),
+      ),
     );
   }
 

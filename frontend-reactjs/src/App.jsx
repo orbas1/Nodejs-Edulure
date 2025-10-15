@@ -49,6 +49,8 @@ import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
 import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
 import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
 import FieldServices from './pages/dashboard/FieldServices.jsx';
+import AdminOperator from './pages/dashboard/AdminOperator.jsx';
+import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
@@ -199,6 +201,22 @@ function App() {
         <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
         <Route path="tutor-management" element={<InstructorTutorManagement />} />
+        <Route
+          path="operator"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminOperator />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="governance"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminGovernance />
+            </ProtectedRoute>
+          )}
+        />
         <Route
           path="services"
           element={(

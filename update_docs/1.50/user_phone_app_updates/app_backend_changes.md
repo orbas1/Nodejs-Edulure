@@ -1,0 +1,2 @@
+- Privacy preference service persists consent versions to Hive and exposes reset hooks so mobile clients can stay aligned with the web compliance posture during policy rotations.【F:Edulure-Flutter/lib/services/privacy_preferences.dart†L1-L34】
+- Consent-aware home screen workflow prompts users to accept updated policies or file DSR exports, invoking the new DSR client while tests verify acceptance and snackbar feedback flows.【F:Edulure-Flutter/lib/screens/home_screen.dart†L268-L332】【F:Edulure-Flutter/test/home_screen_test.dart†L41-L132】

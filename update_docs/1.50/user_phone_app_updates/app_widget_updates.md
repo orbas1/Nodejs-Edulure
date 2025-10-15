@@ -7,3 +7,7 @@
 ## Bootstrap & State Management
 - Connected `AppBootstrap` to warm both feature flags and capability manifests in parallel, ensuring readiness telemetry is available before routing decisions occur.【F:Edulure-Flutter/lib/bootstrap/app_bootstrap.dart†L19-L58】
 - Built `CapabilityManifestNotifier` and Hive-backed repository to manage cached health snapshots, refresh retries, and telemetry logging for resiliency scenarios.【F:Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart†L1-L112】【F:Edulure-Flutter/lib/core/runtime/capability_manifest_repository.dart†L1-L88】
+
+## Privacy Tooling
+- Session manager now exposes dedicated privacy preference storage and purge helpers so logout flows remove consent metadata alongside cached dashboards, guaranteeing revocations clear local state.【F:Edulure-Flutter/lib/services/session_manager.dart†L59-L110】
+- Lightweight `DsrClient` abstraction enables widgets to file GDPR data access requests while remaining testable through injected fakes in the new widget tests.【F:Edulure-Flutter/lib/services/dsr_client.dart†L1-L10】【F:Edulure-Flutter/test/home_screen_test.dart†L8-L39】

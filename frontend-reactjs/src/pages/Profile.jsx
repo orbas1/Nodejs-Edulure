@@ -3,8 +3,12 @@ import {
   ArrowTopRightOnSquareIcon,
   BanknotesIcon,
   CheckCircleIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  ShieldCheckIcon
 } from '@heroicons/react/24/outline';
+
+import { useAuth } from '../context/AuthContext.jsx';
+import useConsentRecords from '../hooks/useConsentRecords.js';
 
 const profileData = {
   name: 'Alex Morgan',
@@ -182,6 +186,11 @@ export default function Profile() {
   const [selectedIdType, setSelectedIdType] = useState(profileData.verification.supported[0]);
   const [verificationUploads, setVerificationUploads] = useState({ front: null, back: null, selfie: null });
   const [verificationStatus, setVerificationStatus] = useState(profileData.verification.status);
+  const { session } = useAuth();
+  const userId = session?.user?.id ?? null;
+  const { consents, loading: consentLoading, error: consentError, revokeConsent: revokeConsentRecord } =
+    useConsentRecords(userId);
+  const [revokingConsentId, setRevokingConsentId] = useState(null);
   const affiliate = profileData.affiliate;
   const affiliateSummary = affiliate.summary;
   const affiliatePayouts = affiliate.payouts;
@@ -190,6 +199,21 @@ export default function Profile() {
   const affiliateComplianceSettings = affiliate.compliance;
   const affiliateRecentReferrals = affiliate.recentReferrals;
   const [affiliateLinkCopied, setAffiliateLinkCopied] = useState(false);
+  const activeConsents = useMemo(
+    () => consents.filter((consent) => consent.status === 'granted' && consent.active),
+    [consents]
+  );
+
+  const handleRevokeConsent = async (consentId) => {
+    try {
+      setRevokingConsentId(consentId);
+      await revokeConsentRecord({ consentId, reason: 'Revoked from profile dashboard' });
+    } catch (err) {
+      console.error('Failed to revoke consent', err);
+    } finally {
+      setRevokingConsentId(null);
+    }
+  };
 
   const displayedFollowerCount = useMemo(
     () => profileData.followers + (isFollowing ? 1 : 0),
@@ -800,6 +824,56 @@ export default function Profile() {
               </ul>
             </div>
           </div>
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-900">Privacy & consent ledger</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {userId ? 'Live consent records fetched from the compliance API.' : 'Sign in to view consent records.'}
+              </p>
+            </div>
+            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              <ShieldCheckIcon className="h-4 w-4" /> {activeConsents.length} active grants
+            </span>
+          </div>
+          {consentError && (
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              {consentError.message}
+            </div>
+          )}
+          <ul className="mt-4 space-y-3 text-sm text-slate-600">
+            {consentLoading && <li className="text-slate-500">Loading consent history…</li>}
+            {!consentLoading && consents.length === 0 && (
+              <li className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
+                No consent activity captured yet.
+              </li>
+            )}
+            {consents.map((consent) => (
+              <li key={consent.id} className="rounded-2xl border border-slate-200 bg-white/80 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{consent.consentType}</p>
+                    <p className="text-xs text-slate-500">
+                      Version {consent.policyVersion} · Granted {consent.grantedAt ? new Date(consent.grantedAt).toLocaleDateString() : 'N/A'} via {consent.channel}
+                    </p>
+                  </div>
+                  {consent.status === 'granted' ? (
+                    <button
+                      type="button"
+                      disabled={revokingConsentId === consent.id}
+                      onClick={() => handleRevokeConsent(consent.id)}
+                      className="rounded-full border border-rose-500 px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-rose-300 disabled:text-rose-300"
+                    >
+                      {revokingConsentId === consent.id ? 'Revoking…' : 'Revoke'}
+                    </button>
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">{consent.status}</span>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
         </div>
       </div>
     </section>

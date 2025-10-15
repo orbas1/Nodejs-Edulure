@@ -5,6 +5,7 @@ import {
   registerRetentionStrategy,
   unregisterRetentionStrategy
 } from '../src/services/dataRetentionService.js';
+import changeDataCaptureService from '../src/services/ChangeDataCaptureService.js';
 
 const ENTITY = 'unit_records';
 
@@ -40,6 +41,7 @@ describe('dataRetentionService', () => {
         return handler(fakeTrx);
       }
     };
+    vi.spyOn(changeDataCaptureService, 'recordEvent').mockResolvedValue({ id: 1 });
   });
 
   afterEach(() => {
@@ -92,6 +94,10 @@ describe('dataRetentionService', () => {
       policy_id: 99,
       rows_affected: 2
     });
+    const details = JSON.parse(auditInsert.mock.calls[0][0].details);
+    expect(details.runId).toBeDefined();
+    expect(summary.runId).toBeDefined();
+    expect(changeDataCaptureService.recordEvent).toHaveBeenCalled();
   });
 
   it('respects dry-run mode without mutating records', async () => {
@@ -106,7 +112,7 @@ describe('dataRetentionService', () => {
       description: 'Dry run verification'
     };
 
-    const summary = await enforceRetentionPolicies({ dryRun: true, policies: [policy], dbClient: fakeDb });
+    const summary = await enforceRetentionPolicies({ mode: 'simulate', policies: [policy], dbClient: fakeDb });
 
     expect(summary.dryRun).toBe(true);
     expect(summary.results[0]).toMatchObject({ status: 'executed', affectedRows: 1 });
