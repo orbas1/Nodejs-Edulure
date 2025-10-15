@@ -29,6 +29,16 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'community-moderation',
+    capability: 'community-moderation',
+    description: 'Community moderation queues, scam reporting, and safety analytics APIs.',
+    basePath: '/moderation',
+    flagKey: 'platform.api.v1.community-moderation',
+    defaultState: 'enabled',
+    fallbackStatus: 403,
+    disabledMessage: 'Moderation APIs are restricted for this tenant.'
+  },
+  {
     name: 'content',
     capability: 'content-library',
     description: 'Content ingestion, cataloguing, and lifecycle management endpoints.',

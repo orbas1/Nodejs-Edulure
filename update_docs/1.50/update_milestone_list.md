@@ -61,7 +61,7 @@ All milestones begin at **0%** completion. Task ownership aligns with the detail
      - Implement backend services for projects, templates, collaboration, and asset library integration.
      - Develop web creation wizard with AI-assisted flows and template selection.
      - Provide analytics instrumentation for studio usage and completion rates.
-     - _Progress note:_ Backend services, schema migrations, routes, and tests are now live, enabling instructor RBAC, collaboration sessions, and campaign promotion workflows for the creation studio milestone.【F:backend-nodejs/migrations/20250213143000_creation_studio.js†L1-L141】【F:backend-nodejs/src/services/CreationStudioService.js†L1-L522】【F:backend-nodejs/test/creationStudioService.test.js†L1-L164】
+    - _Progress note:_ Backend services, schema migrations, routes, and tests are now live, enabling instructor RBAC, collaboration sessions, and campaign promotion workflows for the creation studio milestone.【F:backend-nodejs/migrations/20250213143000_creation_studio.js†L1-L141】【F:backend-nodejs/src/services/CreationStudioService.js†L1-L823】【F:backend-nodejs/test/creationStudioService.test.js†L1-L283】
   2. **M3.T2: Community & Social Graph Completion (0%)**
      - Build community feed services, memberships, and moderation workflow APIs.
      - Launch frontend/mobile community experiences with moderation cues and analytics.

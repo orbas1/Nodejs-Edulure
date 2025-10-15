@@ -11,6 +11,9 @@ const POST_COLUMNS = [
   'cp.tags',
   'cp.visibility',
   'cp.status',
+  'cp.moderation_state as moderationState',
+  'cp.moderation_metadata as moderationMetadata',
+  'cp.last_moderated_at as lastModeratedAt',
   'cp.scheduled_at as scheduledAt',
   'cp.published_at as publishedAt',
   'cp.comment_count as commentCount',
@@ -45,6 +48,8 @@ export default class CommunityPostModel {
       tags: JSON.stringify(post.tags ?? []),
       visibility: post.visibility ?? 'members',
       status: post.status ?? 'draft',
+      moderation_state: post.moderationState ?? 'clean',
+      moderation_metadata: JSON.stringify(post.moderationMetadata ?? {}),
       scheduled_at: post.scheduledAt ?? null,
       published_at: post.publishedAt ?? null,
       comment_count: post.commentCount ?? 0,
@@ -70,6 +75,29 @@ export default class CommunityPostModel {
       ])
       .where('cp.id', id)
       .first();
+  }
+
+  static async updateModerationState(id, changes, connection = db) {
+    const payload = {
+      updated_at: connection.fn.now()
+    };
+
+    if (changes.state) {
+      payload.moderation_state = changes.state;
+    }
+
+    if (changes.metadata !== undefined) {
+      payload.moderation_metadata = JSON.stringify(changes.metadata ?? {});
+    }
+
+    if (changes.status) {
+      payload.status = changes.status;
+    }
+
+    payload.last_moderated_at = changes.lastModeratedAt ?? connection.fn.now();
+
+    await connection('community_posts').where({ id }).update(payload);
+    return this.findById(id, connection);
   }
 
   static async paginateForCommunity(communityId, filters = {}, connection = db) {
