@@ -41,17 +41,7 @@ const STATUS_TRANSITIONS = {
   archived: ['draft']
 };
 
-const PROJECT_TYPES = new Set([
-  'course',
-  'ebook',
-  'community',
-  'ads_asset',
-  'gig',
-  'job_listing',
-  'experience_launchpad',
-  'volunteering_opportunity',
-  'mentorship'
-]);
+const PROJECT_TYPES = new Set(['course', 'ebook', 'community', 'ads_asset']);
 
 const TYPE_METADATA_DEFAULTS = {
   course: {
@@ -84,52 +74,11 @@ const TYPE_METADATA_DEFAULTS = {
     campaignHooks: [],
     compliance: { approvals: [], expiry: null },
     publishingChannels: ['ads_manager', 'social']
-  },
-  gig: {
-    role: { title: null, expertise: [], deliverables: [] },
-    compensation: { type: 'fixed', amount: null, currency: 'USD' },
-    availability: { startDate: null, endDate: null, hoursPerWeek: null },
-    application: { requirements: [], screening: [], contactEmail: null },
-    publishingChannels: ['marketplace', 'partners']
-  },
-  job_listing: {
-    role: { title: null, department: null, level: null },
-    responsibilities: [],
-    qualifications: { required: [], preferred: [] },
-    compensation: { salaryBand: null, currency: 'USD', benefits: [] },
-    application: { deadline: null, instructions: null, atsLink: null },
-    publishingChannels: ['jobs_board', 'partners', 'newsletter']
-  },
-  experience_launchpad: {
-    concept: { headline: null, promise: null },
-    milestones: [],
-    participantProfile: { slots: 0, prerequisites: [] },
-    mentors: [],
-    publishingChannels: ['experiences', 'campus', 'live_sessions']
-  },
-  volunteering_opportunity: {
-    impactAreas: [],
-    organisation: { name: null, mission: null },
-    schedule: { cadence: null, hoursPerWeek: null },
-    requirements: { skills: [], backgroundChecks: [] },
-    application: { contactEmail: null, formLink: null },
-    publishingChannels: ['volunteer_hub', 'community', 'partners']
-  },
-  mentorship: {
-    programme: { focusAreas: [], durationWeeks: null },
-    mentors: [],
-    mentees: { prerequisites: [], cohortSize: 0 },
-    engagement: { cadence: 'bi_weekly', deliveryModes: ['virtual'] },
-    publishingChannels: ['mentorship_hub', 'community']
   }
 };
 
 const TYPE_ANALYTICS_DEFAULTS = {
-  gig: { goals: ['talent-sourced'], keywords: ['gig', 'short-term'], audiences: ['contractors'] },
-  job_listing: { goals: ['hire'], keywords: ['job', 'career'], audiences: ['professionals'] },
-  experience_launchpad: { goals: ['pilot'], keywords: ['experience', 'cohort'], audiences: ['learners'] },
-  volunteering_opportunity: { goals: ['impact'], keywords: ['volunteer'], audiences: ['community'] },
-  mentorship: { goals: ['mentorship'], keywords: ['mentor', 'mentee'], audiences: ['alumni'] }
+  ads_asset: { goals: ['promote'], keywords: ['campaign', 'asset'], audiences: ['prospects'] }
 };
 
 function toArray(value) {

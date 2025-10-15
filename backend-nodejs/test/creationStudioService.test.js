@@ -214,34 +214,33 @@ describe('CreationStudioService', () => {
       const project = await CreationStudioService.createProject(
         { id: 12, role: 'instructor' },
         {
-          title: 'Mentor-in-residence',
-          type: 'mentorship',
-          summary: 'Connect alumni mentors with early cohorts.',
-          metadata: { engagement: { cadence: 'weekly', deliveryModes: ['virtual', 'hybrid'] } },
-          analyticsTargets: { goals: ['community-growth'] }
+          title: 'Ad blitz Q2',
+          type: 'ads_asset',
+          summary: 'Audience-ready campaign assets and copy.',
+          metadata: { campaignHooks: ['Pre-order'], assets: ['hero.mp4'] },
+          analyticsTargets: { goals: ['awareness'] }
         }
       );
 
       expect(projectModel.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'mentorship',
+          type: 'ads_asset',
           metadata: expect.objectContaining({
-            engagement: expect.objectContaining({ cadence: 'weekly', deliveryModes: ['virtual', 'hybrid'] }),
-            mentors: expect.any(Array),
-            mentees: expect.objectContaining({ cohortSize: 0 })
+            campaignHooks: expect.arrayContaining(['Pre-order']),
+            compliance: expect.objectContaining({ approvals: expect.any(Array), expiry: null })
           }),
           analyticsTargets: expect.objectContaining({
-            goals: ['community-growth'],
-            keywords: expect.arrayContaining(['mentor']),
-            audiences: expect.arrayContaining(['alumni'])
+            goals: expect.arrayContaining(['awareness']),
+            keywords: expect.arrayContaining(['campaign', 'asset']),
+            audiences: expect.arrayContaining(['prospects'])
           }),
-          publishingChannels: expect.arrayContaining(['mentorship_hub', 'community'])
+          publishingChannels: expect.arrayContaining(['ads_manager', 'social'])
         }),
         trx
       );
 
-      expect(project.metadata.mentors).toEqual([]);
-      expect(project.analyticsTargets.keywords).toContain('mentor');
+      expect(project.metadata.compliance.approvals).toEqual([]);
+      expect(project.analyticsTargets.keywords).toEqual(expect.arrayContaining(['campaign', 'asset']));
       expect(project.collaborators).toHaveLength(1);
     });
   });

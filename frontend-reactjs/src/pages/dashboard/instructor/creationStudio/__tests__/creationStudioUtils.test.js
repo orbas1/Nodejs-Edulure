@@ -12,9 +12,9 @@ describe('creationStudioUtils', () => {
   it('calculates project summary metrics', () => {
     const summary = calculateProjectSummary([
       { status: 'draft', type: 'course', collaboratorCount: 2, activeSessions: [{}, {}] },
-      { status: 'ready_for_review', type: 'gig', collaboratorCount: 1, activeSessions: [{}] },
-      { status: 'approved', type: 'mentorship', collaboratorCount: 3, activeSessions: [] },
-      { status: 'published', type: 'mentorship', collaboratorCount: 1 }
+      { status: 'ready_for_review', type: 'community', collaboratorCount: 1, activeSessions: [{}] },
+      { status: 'approved', type: 'ebook', collaboratorCount: 3, activeSessions: [] },
+      { status: 'published', type: 'ads_asset', collaboratorCount: 1 }
     ]);
 
     expect(summary).toMatchObject({
@@ -24,7 +24,7 @@ describe('creationStudioUtils', () => {
       collaborators: 7,
       liveSessions: 3,
       total: 4,
-      typeBreakdown: { course: 1, gig: 1, mentorship: 2 }
+      typeBreakdown: { course: 1, community: 1, ebook: 1, ads_asset: 1 }
     });
   });
 
@@ -50,25 +50,30 @@ describe('creationStudioUtils', () => {
     expect(steps[0].metrics.summaryLength).toBe(project.summary.length);
   });
 
-  it('builds mentorship-focused steps with analytics defaults', () => {
+  it('builds community-focused steps with readiness states', () => {
     const project = {
-      type: 'mentorship',
-      title: 'Career accelerator mentors',
+      type: 'community',
+      title: 'Design Leaders Guild',
       status: 'ready_for_review',
       metadata: {
-        programme: { focusAreas: ['Design'], durationWeeks: 10 },
-        mentors: ['mentor-1'],
-        mentees: { prerequisites: ['Portfolio'], cohortSize: 12 },
-        engagement: { cadence: 'bi_weekly', deliveryModes: ['virtual', 'in-person'] }
+        audience: ['UX designers'],
+        mission: 'Support peer learning across design teams',
+        engagementPrograms: ['Monthly critique'],
+        spaces: ['Slack workspace'],
+        moderation: {
+          guidelines: ['Be respectful'],
+          escalationContacts: ['ops@edulure.com'],
+          tools: ['Escalation queue']
+        }
       }
     };
 
     const steps = determineStepStates(project);
     expect(steps).toHaveLength(5);
-    expect(steps[0]).toMatchObject({ id: 'programme', state: 'complete' });
-    expect(steps[1]).toMatchObject({ id: 'mentors', state: 'complete' });
-    expect(steps[2]).toMatchObject({ id: 'mentees', state: 'complete' });
-    expect(steps[3]).toMatchObject({ id: 'engagement', state: 'complete' });
+    expect(steps[0]).toMatchObject({ id: 'identity', state: 'complete' });
+    expect(steps[1]).toMatchObject({ id: 'programming', state: 'complete' });
+    expect(steps[2]).toMatchObject({ id: 'moderation', state: 'complete' });
+    expect(steps[3]).toMatchObject({ id: 'enablement', state: 'complete' });
     expect(steps[4]).toMatchObject({ id: 'publish', state: 'in-progress' });
   });
 

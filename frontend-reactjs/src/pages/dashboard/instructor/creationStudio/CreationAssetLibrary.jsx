@@ -167,7 +167,7 @@ export default function CreationAssetLibrary({ templates, onCreateProject, creat
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Template library</p>
           <h2 className="mt-1 text-xl font-semibold text-slate-900">Jumpstart with curated blueprints</h2>
           <p className="mt-2 text-sm text-slate-600">
-            Apply approved playbooks for courses, ebooks, communities, ads, gigs, job listings, launchpads, volunteering drives, and mentorship programmes. Templates capture best practices, outline structure, and recommended media to accelerate production.
+            Apply approved playbooks for courses, e-books, communities, and campaign-ready ad assets. Templates capture best practices, outline structure, and recommended media so every production launches with the right governance baked in.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-slate-500">

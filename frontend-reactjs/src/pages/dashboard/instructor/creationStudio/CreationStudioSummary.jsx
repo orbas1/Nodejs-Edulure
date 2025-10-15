@@ -93,8 +93,8 @@ export default function CreationStudioSummary({ summary }) {
         <p className="text-xs font-semibold uppercase tracking-wide text-primary">Creation mix</p>
         <h3 className="mt-1 text-lg font-semibold text-slate-900">Active production catalogue</h3>
         <p className="mt-2 text-sm text-slate-600">
-          Track how creation capacity is distributed across courses, gigs, jobs, launchpads, volunteering, mentorship, and more.
-          Use this mix to steer staffing and go-to-market campaigns.
+          Track how creation capacity is distributed across courses, e-books, communities, and campaign-ready ad assets. Use
+          this mix to steer staffing and go-to-market campaigns.
         </p>
 
         {breakdownEntries.length === 0 ? (
