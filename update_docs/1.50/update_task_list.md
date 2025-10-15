@@ -20,7 +20,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **API:**
     8. Publish versioned OpenAPI specs with service separation and automated contract tests. ✅ Completed – automated builder now slices the platform spec into capability catalogs, exposes `/api/v1/docs/services/:service`+UI endpoints, and validates coverage via Vitest contract checks.
   - **Logic:**
-    9. Externalise feature flags/runtime config to Redis with cache warming and failover strategies.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L19-L28】
+    9. Externalise feature flags/runtime config to Redis with cache warming and failover strategies.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L19-L28】 ✅ Completed – feature flags and runtime configuration now hydrate from a Redis-backed distributed snapshot with startup warming, lock-based refresh orchestration, and graceful degradation when Redis is unavailable.【F:backend-nodejs/src/services/DistributedRuntimeCache.js†L1-L129】【F:backend-nodejs/src/services/FeatureFlagService.js†L1-L520】【F:backend-nodejs/src/config/redisClient.js†L1-L92】
   - **Design:**
     10. Produce operator dashboard wireframes highlighting system health, incident response shortcuts, and scam warning placement.【F:update_docs/1.50/new_feature_brief.md†L18-L71】
 
