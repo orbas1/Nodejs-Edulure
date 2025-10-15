@@ -55,3 +55,6 @@
 ## Mobile Ads Governance Console
 - Code: `Edulure-Flutter/lib/services/mobile_ads_governance_service.dart`, `lib/screens/mobile_ads_governance_screen.dart`, `lib/screens/service_suite_screen.dart`, `lib/screens/home_screen.dart`
 - Documentation: `update_task_list.md`, `update_progress_tracker.md`, `user_phone_app_updates/app_screen_updates.md`, `user_phone_app_updates/app_backend_changes.md`, `user_phone_app_updates/app_widget_updates.md`, `user_phone_app_updates/user_app_change_log.md`, `ui-ux_updates/user_app_wireframe_changes.md`, `ui-ux_updates/user_application_logic_flow_changes.md`, `Design_Change_log.md`, `Design_update_progress_tracker.md`
+
+## Provider Ads & Creation Oversight Roadmap
+- Documentation: `provider_phone_app_updates/ads_creation_oversight_roadmap.md`, `provider_phone_app_updates/provider_app_change_log.md`, `update_task_list.md`, `update_progress_tracker.md`, `Design_Plan.md`, `Design_update_*` trackers
