@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import db from '../config/database.js';
+import DataEncryptionService from '../services/DataEncryptionService.js';
 
 const TABLE = 'payment_intents';
 
@@ -9,9 +10,9 @@ const BASE_COLUMNS = [
   'public_id as publicId',
   'user_id as userId',
   'provider',
-  'provider_intent_id as providerIntentId',
-  'provider_capture_id as providerCaptureId',
-  'provider_latest_charge_id as providerLatestChargeId',
+  'provider_intent_id as providerIntentHash',
+  'provider_capture_id as providerCaptureHash',
+  'provider_latest_charge_id as providerLatestChargeHash',
   'status',
   'currency',
   'amount_subtotal as amountSubtotal',
@@ -24,44 +25,19 @@ const BASE_COLUMNS = [
   'coupon_id as couponId',
   'entity_type as entityType',
   'entity_id as entityId',
-  'receipt_email as receiptEmail',
+  'receipt_email as receiptEmailMask',
   'captured_at as capturedAt',
   'canceled_at as canceledAt',
   'expires_at as expiresAt',
-  'failure_code as failureCode',
-  'failure_message as failureMessage',
+  'failure_code as failureCodeMask',
+  'failure_message as failureMessageMask',
+  'sensitive_details_ciphertext as sensitiveDetailsCiphertext',
+  'sensitive_details_hash as sensitiveDetailsHash',
+  'classification_tag as sensitiveClassification',
+  'encryption_key_version as encryptionKeyVersion',
   'created_at as createdAt',
   'updated_at as updatedAt'
 ];
-
-function toDbPayload(intent) {
-  return {
-    public_id: intent.publicId ?? randomUUID(),
-    user_id: intent.userId ?? null,
-    provider: intent.provider,
-    provider_intent_id: intent.providerIntentId,
-    provider_capture_id: intent.providerCaptureId ?? null,
-    provider_latest_charge_id: intent.providerLatestChargeId ?? null,
-    status: intent.status ?? 'requires_payment_method',
-    currency: intent.currency,
-    amount_subtotal: intent.amountSubtotal,
-    amount_discount: intent.amountDiscount ?? 0,
-    amount_tax: intent.amountTax ?? 0,
-    amount_total: intent.amountTotal,
-    amount_refunded: intent.amountRefunded ?? 0,
-    tax_breakdown: JSON.stringify(intent.taxBreakdown ?? {}),
-    metadata: JSON.stringify(intent.metadata ?? {}),
-    coupon_id: intent.couponId ?? null,
-    entity_type: intent.entityType,
-    entity_id: intent.entityId,
-    receipt_email: intent.receiptEmail ?? null,
-    captured_at: intent.capturedAt ?? null,
-    canceled_at: intent.canceledAt ?? null,
-    expires_at: intent.expiresAt ?? null,
-    failure_code: intent.failureCode ?? null,
-    failure_message: intent.failureMessage ?? null
-  };
-}
 
 function coerceAmount(value) {
   if (value === null || value === undefined) {
@@ -92,6 +68,143 @@ function parseJson(value) {
   }
 }
 
+function buildSensitiveDetails(intent) {
+  return {
+    providerIntentId: intent.providerIntentId ?? null,
+    providerCaptureId: intent.providerCaptureId ?? null,
+    providerLatestChargeId: intent.providerLatestChargeId ?? null,
+    receiptEmail: intent.receiptEmail ?? null,
+    failureCode: intent.failureCode ?? null,
+    failureMessage: intent.failureMessage ?? null
+  };
+}
+
+function encryptSensitiveDetails(details) {
+  return DataEncryptionService.encryptStructured(details, {
+    classificationTag: 'payment.intent',
+    fingerprintValues: [details.providerIntentId ?? '', details.receiptEmail ?? '']
+  });
+}
+
+function maskSensitiveColumns(details, fallbackIdentifier) {
+  const providerIntentSource = details.providerIntentId ?? fallbackIdentifier;
+  return {
+    provider_intent_id: providerIntentSource
+      ? DataEncryptionService.hash(providerIntentSource)
+      : DataEncryptionService.hash(fallbackIdentifier ?? randomUUID()),
+    provider_capture_id: details.providerCaptureId
+      ? DataEncryptionService.hash(details.providerCaptureId)
+      : null,
+    provider_latest_charge_id: details.providerLatestChargeId
+      ? DataEncryptionService.hash(details.providerLatestChargeId)
+      : null,
+    receipt_email: details.receiptEmail ? 'encrypted' : null,
+    failure_code: details.failureCode ? 'encrypted' : null,
+    failure_message: details.failureMessage ? 'encrypted' : null
+  };
+}
+
+function deserializeSensitive(record) {
+  const encrypted = record.sensitiveDetailsCiphertext
+    ? DataEncryptionService.decryptStructured(record.sensitiveDetailsCiphertext, record.encryptionKeyVersion)
+    : null;
+
+  const fallback = {
+    providerIntentId: record.providerIntentHash ?? null,
+    providerCaptureId: record.providerCaptureHash ?? null,
+    providerLatestChargeId: record.providerLatestChargeHash ?? null,
+    receiptEmail: record.receiptEmailMask ?? null,
+    failureCode: record.failureCodeMask ?? null,
+    failureMessage: record.failureMessageMask ?? null
+  };
+
+  if (!encrypted) {
+    return fallback;
+  }
+
+  return {
+    ...fallback,
+    ...encrypted
+  };
+}
+
+function toDbPayload(intent) {
+  const sensitive = buildSensitiveDetails(intent);
+  const encrypted = encryptSensitiveDetails(sensitive);
+  const masked = maskSensitiveColumns(sensitive, intent.providerIntentId ?? intent.publicId ?? randomUUID());
+
+  return {
+    public_id: intent.publicId ?? randomUUID(),
+    user_id: intent.userId ?? null,
+    provider: intent.provider,
+    status: intent.status ?? 'requires_payment_method',
+    currency: intent.currency,
+    amount_subtotal: intent.amountSubtotal,
+    amount_discount: intent.amountDiscount ?? 0,
+    amount_tax: intent.amountTax ?? 0,
+    amount_total: intent.amountTotal,
+    amount_refunded: intent.amountRefunded ?? 0,
+    tax_breakdown: JSON.stringify(intent.taxBreakdown ?? {}),
+    metadata: JSON.stringify(intent.metadata ?? {}),
+    coupon_id: intent.couponId ?? null,
+    entity_type: intent.entityType,
+    entity_id: intent.entityId,
+    captured_at: intent.capturedAt ?? null,
+    canceled_at: intent.canceledAt ?? null,
+    expires_at: intent.expiresAt ?? null,
+    ...masked,
+    sensitive_details_ciphertext: encrypted.ciphertext,
+    sensitive_details_hash: encrypted.hash,
+    classification_tag: encrypted.classificationTag,
+    encryption_key_version: encrypted.keyId
+  };
+}
+
+function deserialize(record) {
+  const sensitive = deserializeSensitive(record);
+  return {
+    id: record.id,
+    publicId: record.publicId,
+    userId: record.userId,
+    provider: record.provider,
+    providerIntentId: sensitive.providerIntentId,
+    providerCaptureId: sensitive.providerCaptureId,
+    providerLatestChargeId: sensitive.providerLatestChargeId,
+    status: record.status,
+    currency: record.currency,
+    amountSubtotal: coerceAmount(record.amountSubtotal),
+    amountDiscount: coerceAmount(record.amountDiscount),
+    amountTax: coerceAmount(record.amountTax),
+    amountTotal: coerceAmount(record.amountTotal),
+    amountRefunded: coerceAmount(record.amountRefunded),
+    taxBreakdown: parseJson(record.taxBreakdown),
+    metadata: parseJson(record.metadata),
+    couponId: record.couponId,
+    entityType: record.entityType,
+    entityId: record.entityId,
+    receiptEmail: sensitive.receiptEmail,
+    capturedAt: record.capturedAt,
+    canceledAt: record.canceledAt,
+    expiresAt: record.expiresAt,
+    failureCode: sensitive.failureCode,
+    failureMessage: sensitive.failureMessage,
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    sensitiveDetailsHash: record.sensitiveDetailsHash,
+    sensitiveClassification: record.sensitiveClassification
+  };
+}
+
+function pickSensitiveUpdates(updates) {
+  const allowed = ['providerIntentId', 'providerCaptureId', 'providerLatestChargeId', 'receiptEmail', 'failureCode', 'failureMessage'];
+  return allowed.reduce((acc, key) => {
+    if (Object.prototype.hasOwnProperty.call(updates, key)) {
+      acc[key] = updates[key];
+    }
+    return acc;
+  }, {});
+}
+
 export default class PaymentIntentModel {
   static async create(intent, connection = db) {
     const payload = toDbPayload(intent);
@@ -101,32 +214,59 @@ export default class PaymentIntentModel {
 
   static async findById(id, connection = db) {
     const record = await connection(TABLE).select(BASE_COLUMNS).where({ id }).first();
-    return record ? this.deserialize(record) : null;
+    return record ? deserialize(record) : null;
   }
 
   static async findByPublicId(publicId, connection = db) {
     const record = await connection(TABLE).select(BASE_COLUMNS).where({ public_id: publicId }).first();
-    return record ? this.deserialize(record) : null;
+    return record ? deserialize(record) : null;
   }
 
   static async findByProviderIntentId(providerIntentId, connection = db) {
+    const fingerprint = DataEncryptionService.hash(providerIntentId);
     const record = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where({ provider_intent_id: fingerprint })
+      .first();
+    if (record) {
+      return deserialize(record);
+    }
+
+    // Fallback for legacy rows stored without hashing
+    const legacyRecord = await connection(TABLE)
       .select(BASE_COLUMNS)
       .where({ provider_intent_id: providerIntentId })
       .first();
-    return record ? this.deserialize(record) : null;
+    return legacyRecord ? deserialize(legacyRecord) : null;
   }
 
   static async lockByPublicId(publicId, connection = db) {
     const record = await connection(TABLE).where({ public_id: publicId }).forUpdate().first();
-    return record ? this.deserialize(record) : null;
+    return record ? deserialize(record) : null;
   }
 
   static async updateById(id, updates, connection = db) {
-    const payload = {};
-    if (updates.providerCaptureId !== undefined) payload.provider_capture_id = updates.providerCaptureId;
-    if (updates.providerLatestChargeId !== undefined)
-      payload.provider_latest_charge_id = updates.providerLatestChargeId;
+    const currentRecord = await connection(TABLE).select(BASE_COLUMNS).where({ id }).first();
+    if (!currentRecord) {
+      return null;
+    }
+
+    const sensitiveUpdates = pickSensitiveUpdates(updates);
+    const mergedSensitive = {
+      ...deserializeSensitive(currentRecord),
+      ...sensitiveUpdates
+    };
+    const encrypted = encryptSensitiveDetails(mergedSensitive);
+    const masked = maskSensitiveColumns(mergedSensitive, currentRecord.publicId);
+
+    const payload = {
+      ...masked,
+      sensitive_details_ciphertext: encrypted.ciphertext,
+      sensitive_details_hash: encrypted.hash,
+      classification_tag: encrypted.classificationTag,
+      encryption_key_version: encrypted.keyId
+    };
+
     if (updates.status) payload.status = updates.status;
     if (updates.currency) payload.currency = updates.currency;
     if (updates.amountSubtotal !== undefined) payload.amount_subtotal = updates.amountSubtotal;
@@ -139,16 +279,9 @@ export default class PaymentIntentModel {
     if (updates.couponId !== undefined) payload.coupon_id = updates.couponId;
     if (updates.entityType) payload.entity_type = updates.entityType;
     if (updates.entityId) payload.entity_id = updates.entityId;
-    if (updates.receiptEmail !== undefined) payload.receipt_email = updates.receiptEmail;
     if (updates.capturedAt !== undefined) payload.captured_at = updates.capturedAt;
     if (updates.canceledAt !== undefined) payload.canceled_at = updates.canceledAt;
     if (updates.expiresAt !== undefined) payload.expires_at = updates.expiresAt;
-    if (updates.failureCode !== undefined) payload.failure_code = updates.failureCode;
-    if (updates.failureMessage !== undefined) payload.failure_message = updates.failureMessage;
-
-    if (Object.keys(payload).length === 0) {
-      return this.findById(id, connection);
-    }
 
     await connection(TABLE)
       .where({ id })
@@ -171,18 +304,5 @@ export default class PaymentIntentModel {
       .where({ id })
       .increment('amount_refunded', amount)
       .update({ updated_at: connection.fn.now() });
-  }
-
-  static deserialize(record) {
-    return {
-      ...record,
-      amountSubtotal: coerceAmount(record.amountSubtotal),
-      amountDiscount: coerceAmount(record.amountDiscount),
-      amountTax: coerceAmount(record.amountTax),
-      amountTotal: coerceAmount(record.amountTotal),
-      amountRefunded: coerceAmount(record.amountRefunded),
-      taxBreakdown: parseJson(record.taxBreakdown),
-      metadata: parseJson(record.metadata)
-    };
   }
 }

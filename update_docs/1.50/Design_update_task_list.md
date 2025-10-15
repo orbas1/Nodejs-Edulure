@@ -25,13 +25,14 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   4. Map branching logic for onboarding flows, lesson consumption, and assignments including error states.【F:update_docs/1.50/Design_Plan.md†L60-L67】
   5. Define reusable navigation partials (tab bars, drawers, overlays) with theme toggles and partial injection guidelines.【F:update_docs/1.50/Design_Plan.md†L55-L62】
   6. Document responsive behaviours for portrait, landscape, and tablet breakpoints including grid adjustments.【F:update_docs/1.50/Design_Plan.md†L49-L58】
-  7. Produce content hierarchy specs covering text styles, CTAs, tooltips, and empty states with dynamic type scaling.【F:update_docs/1.50/Design_Plan.md†L67-L74】
+  7. Produce content hierarchy specs covering text styles, CTAs, tooltips, and empty states with dynamic type scaling.【F:update_docs/1.50/Design_Plan.md†L67-L74】 ✅ Completed – privacy drawer, SLA countdown, and scam-education playlists now document copy tone, escalation CTAs, and badge treatments across learner and web hubs.【F:update_docs/1.50/ui-ux_updates/user_app_wireframe_changes.md†L73-L116】【F:update_docs/1.50/ui-ux_updates/web_app_wireframe_changes.md†L101-L130】
   8. Compile dummy data sets and imagery placeholders to stabilise prototype renders.【F:update_docs/1.50/Design_Plan.md†L71-L74】
   9. Run moderated usability reviews to validate KPIs (task completion SLAs) and capture improvement backlog.【F:update_docs/1.50/Design_Plan.md†L27-L34】
   10. Package Zeplin exports and measurement notes for engineering handoff.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   11. Align analytics instrumentation requirements with data/insights team for critical journeys.【F:update_docs/1.50/Design_Plan.md†L140-L146】
   12. Log risk, dependency, and parity status in design change log for weekly review.【F:update_docs/1.50/Design_Plan.md†L23-L34】
   - _Progress note:_ Capability manifest incident messaging has been prototyped in Flutter, and provider RBAC overlays are now documented alongside hooks so operator shells inherit lock states, guardrail cues, and audit messaging without bespoke rewrites.【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】【F:Edulure-Flutter/lib/provider/runtime/provider_capability_bridge.dart†L1-L182】【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L51】
+  - _Progress note:_ Provider retention blueprint defines dual-signoff prompts, SLA countdown states, and evidence upload guidance tied to new Flutter compliance contracts, ensuring deletion flows meet legal expectations once the provider shell ships.【F:update_docs/1.50/provider_phone_app_updates/governance_retention_contracts.md†L24-L211】【F:Edulure-Flutter/lib/provider/runtime/provider_compliance_contracts.dart†L1-L302】
 
 ## 3. Web Application Navigation & Funnel Redesign (0%)
 - **Objective:** Restructure marketing funnels and authenticated dashboards with modular components and performance guardrails.【F:update_docs/1.50/Design_Plan.md†L78-L117】
@@ -61,7 +62,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   2. Produce asset manifest enumerating illustrations, icons, video stills, and vector requirements by page/screen.【F:update_docs/1.50/Design_Plan.md†L45-L47】【F:update_docs/1.50/Design_Plan.md†L115-L123】
   3. Define dummy data sets for QA and integration tests across mobile and web modules.【F:update_docs/1.50/Design_Plan.md†L71-L74】
   4. Build accessibility testing scripts covering high-contrast modes, keyboard flows, screen readers, and reduced motion settings.【F:update_docs/1.50/Design_Plan.md†L65-L74】【F:update_docs/1.50/Design_Plan.md†L115-L123】
-  5. Produce compliance checklist capturing security considerations, data handling notes, and documentation needs for new pages.【F:update_docs/1.50/Design_Plan.md†L134-L138】
+  5. Produce compliance checklist capturing security considerations, data handling notes, and documentation needs for new pages.【F:update_docs/1.50/Design_Plan.md†L134-L138】 ✅ Completed – privacy & trust center specs enumerate consent receipt storage, fraud escalation paths, evidence download requirements, and retention windows for QA/legal review.【F:update_docs/1.50/ui-ux_updates/web_application_logic_flow_changes.md†L109-L140】【F:update_docs/1.50/Design_Change_log.md†L30-L36】
   6. Align with marketing/brand for emo theme variants and campaign-specific assets, ensuring governance sign-off.【F:update_docs/1.50/Design_Plan.md†L39-L47】【F:update_docs/1.50/Design_Plan.md†L107-L123】
   7. Prepare QA regression notes linking design artefacts to automated/manual test coverage expectations.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   8. Publish documentation updates in central repository and notify stakeholders of version changes.【F:update_docs/1.50/Design_Plan.md†L128-L136】

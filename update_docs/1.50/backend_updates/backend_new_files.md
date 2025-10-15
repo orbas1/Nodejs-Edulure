@@ -26,3 +26,8 @@
 - `src/routes/compliance.routes.js` – admin-gated router registering consent, DSR, and policy endpoints within the versioned API registry.【F:backend-nodejs/src/routes/compliance.routes.js†L1-L18】
 - `test/changeDataCaptureService.test.js` – unit coverage for CDC outbox creation, retry handling, and metadata enrichment using a fake connection adapter.【F:backend-nodejs/test/changeDataCaptureService.test.js†L1-L108】
 - `test/complianceHttpRoutes.test.js` – integration tests validating authentication, validation, and actor metadata across the compliance HTTP surface.【F:backend-nodejs/test/complianceHttpRoutes.test.js†L1-L138】
+- `src/services/DataPartitionService.js` – partition governance engine that streams expired slices to object storage, records archive metadata, and drops MySQL partitions once evidence is captured.【F:backend-nodejs/src/services/DataPartitionService.js†L1-L347】
+- `src/jobs/dataPartitionJob.js` – cron-driven job wrapper around the partition service with pause/resume safeguards and readiness integration.【F:backend-nodejs/src/jobs/dataPartitionJob.js†L1-L154】
+- `migrations/20250212121500_partition_archiving.js` – applies partition archive schema upgrades and metadata seeding for existing environments.【F:backend-nodejs/migrations/20250212121500_partition_archiving.js†L1-L15】
+- `scripts/manage-data-partitions.js` – CLI utility to run partition rotation in dry-run or commit mode with verbose reporting for operators.【F:backend-nodejs/scripts/manage-data-partitions.js†L1-L67】
+- `test/dataPartitionService.test.js` – Vitest coverage validating archive planning, dry-run handling, and manual approval safeguards for the partition service.【F:backend-nodejs/test/dataPartitionService.test.js†L1-L111】

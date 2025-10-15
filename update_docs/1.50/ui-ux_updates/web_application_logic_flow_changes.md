@@ -108,6 +108,24 @@
 - Table of contents component listens to scroll events to update active section indicator.
 - Feedback form at bottom logs suggestions to compliance inbox.
 
+## Privacy Console Flow
+- **Dashboard Load:** Hitting `/dashboard/privacy` triggers parallel requests for consent summary, open DSR queue, and data footprint metrics. Results cached for 5 minutes per tenant; stale caches invalidated when new consent event posted.
+- **Metric Card Actions:** Clicking "Manage" on Active Consents opens side panel listing policy versions with status badges. Each row supports toggle, view policy, and "Download Evidence" action retrieving signed PDF receipts from secure storage.
+- **Activity Timeline:** Filter chips (Consent, Export, Incident) update query parameters and refetch paginated events. Selecting item reveals drawer with event metadata, legal basis, SLA state, and escalation CTA linking to support ticket creation pre-filled with event ID.
+- **Trust Resources:** Download links sign requests to CDN with 5-minute expiry; analytics event logs file type and user role. Expired certifications highlight in amber and present "Request Update" CTA sending notification to compliance team.
+
+## Consent Management & Audit Trail Flow
+- **Consent Toggle Workflow:** When user toggles marketing consent, UI displays confirmation modal summarising impact, requiring MFA if enabled. Backend call to compliance service returns receipt ID; UI stores in local state for timeline update.
+- **Decline Path:** Declining prompts optional feedback form; submission posts to analytics pipeline and surfaces recommended support articles. If user declines mandatory consent (e.g., Terms update), modal enforces "Sign Out" option with explanation.
+- **Export/Deletion Requests:** CTA opens guided wizard (Step 1: Confirm identity, Step 2: Select data scope, Step 3: Review). Wizard tracks progress and prepopulates last known address/timezone to align with jurisdiction rules. Completion triggers asynchronous job; UI displays request card with countdown, status, and ability to add comments/evidence.
+- **Audit Evidence:** Each action logs to `data_partition_archives` reference; UI offers "Copy Event ID" button and shares context with operator dashboard for cross-squad traceability.
+
+## Scam & Fraud Education Flow
+- **Campaign Surfacing:** Privacy dashboard hero rotates campaigns; events push `safetyCampaignViewed` metrics with persona + locale tags. CTA directs to education library filtered by campaign ID.
+- **Content Interaction:** Library rows expand inline to show summary, resources, and "Mark as Complete" button gating behind reading/watching progress. Videos embed secure player with DRM; completion tracked via 90% playback threshold event.
+- **Acknowledgement Tracking:** Policy advisory cards include "Acknowledge" button logging timestamp and IP. Non-acknowledged advisories trigger reminder banner after 48 hours and escalate to email digest.
+- **Report Fraud Shortcut:** Persistent footer button opens modal capturing channel (Email, Phone, App), description, attachments. Submission generates ticket with severity auto-classified based on campaign context and user role.
+
 ## Comment Management Flow
 - Moderation queue polls flagged comments; moderators can approve/reject/edit with actions logged.
 - Escalate action assigns case to admin and notifies via Slack webhook.

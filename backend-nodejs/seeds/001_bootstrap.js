@@ -2,6 +2,9 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { generateConsentPolicyChecksum } from '../src/database/domains/compliance.js';
+import DataEncryptionService from '../src/services/DataEncryptionService.js';
+import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
+import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
 
 const makeHash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const makeVerificationRef = () => `kyc_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -19,6 +22,43 @@ const sealSensitive = (value) => {
   const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return Buffer.concat([iv, authTag, encrypted]);
+};
+
+const buildEncryptedKycDocument = (
+  verificationId,
+  documentType,
+  { status = 'pending', storageBucket, storageKey, fileName, mimeType, sizeBytes, checksum, submittedAt, reviewedAt }
+) => {
+  const payload = {
+    storageBucket,
+    storageKey,
+    fileName,
+    mimeType,
+    sizeBytes,
+    checksumSha256: checksum
+  };
+  const encrypted = DataEncryptionService.encryptStructured(payload, {
+    classificationTag: 'kyc.document',
+    fingerprintValues: [storageKey ?? '', checksum ?? '']
+  });
+
+  return {
+    verification_id: verificationId,
+    document_type: documentType,
+    status,
+    storage_bucket: 'encrypted',
+    storage_key: storageKey ? `enc:${DataEncryptionService.hash(storageKey).slice(0, 48)}` : `enc:${documentType}`,
+    file_name: fileName ? 'encrypted' : 'encrypted',
+    mime_type: mimeType ? 'encrypted' : 'encrypted',
+    size_bytes: sizeBytes,
+    checksum_sha256: checksum ? DataEncryptionService.hash(checksum) : DataEncryptionService.hash(`${verificationId}:${documentType}`),
+    submitted_at: submittedAt,
+    reviewed_at: reviewedAt,
+    document_payload_ciphertext: encrypted.ciphertext,
+    document_payload_hash: encrypted.hash,
+    classification_tag: encrypted.classificationTag,
+    encryption_key_version: encrypted.keyId
+  };
 };
 
 export async function seed(knex) {
@@ -180,97 +220,83 @@ export async function seed(knex) {
     });
 
     await trx('kyc_documents').insert([
-      {
-        verification_id: adminVerificationId,
-        document_type: 'government-id-front',
+      buildEncryptedKycDocument(adminVerificationId, 'government-id-front', {
         status: 'accepted',
-        storage_bucket: 'edulure-uploads',
-        storage_key: `kyc/${adminVerificationRef}/passport-front.png`,
-        file_name: 'passport-front.png',
-        mime_type: 'image/png',
-        size_bytes: 324567,
-        checksum_sha256: makeHash('admin-passport-front'),
-        submitted_at: trx.fn.now(),
-        reviewed_at: trx.fn.now()
-      },
-      {
-        verification_id: adminVerificationId,
-        document_type: 'government-id-back',
+        storageBucket: 'edulure-uploads',
+        storageKey: `kyc/${adminVerificationRef}/passport-front.png`,
+        fileName: 'passport-front.png',
+        mimeType: 'image/png',
+        sizeBytes: 324567,
+        checksum: makeHash('admin-passport-front'),
+        submittedAt: trx.fn.now(),
+        reviewedAt: trx.fn.now()
+      }),
+      buildEncryptedKycDocument(adminVerificationId, 'government-id-back', {
         status: 'accepted',
-        storage_bucket: 'edulure-uploads',
-        storage_key: `kyc/${adminVerificationRef}/passport-back.png`,
-        file_name: 'passport-back.png',
-        mime_type: 'image/png',
-        size_bytes: 287654,
-        checksum_sha256: makeHash('admin-passport-back'),
-        submitted_at: trx.fn.now(),
-        reviewed_at: trx.fn.now()
-      },
-      {
-        verification_id: adminVerificationId,
-        document_type: 'identity-selfie',
+        storageBucket: 'edulure-uploads',
+        storageKey: `kyc/${adminVerificationRef}/passport-back.png`,
+        fileName: 'passport-back.png',
+        mimeType: 'image/png',
+        sizeBytes: 287654,
+        checksum: makeHash('admin-passport-back'),
+        submittedAt: trx.fn.now(),
+        reviewedAt: trx.fn.now()
+      }),
+      buildEncryptedKycDocument(adminVerificationId, 'identity-selfie', {
         status: 'accepted',
-        storage_bucket: 'edulure-uploads',
-        storage_key: `kyc/${adminVerificationRef}/selfie.png`,
-        file_name: 'selfie.png',
-        mime_type: 'image/png',
-        size_bytes: 198765,
-        checksum_sha256: makeHash('admin-selfie'),
-        submitted_at: trx.fn.now(),
-        reviewed_at: trx.fn.now()
-      },
-      {
-        verification_id: instructorVerificationId,
-        document_type: 'government-id-front',
+        storageBucket: 'edulure-uploads',
+        storageKey: `kyc/${adminVerificationRef}/selfie.png`,
+        fileName: 'selfie.png',
+        mimeType: 'image/png',
+        sizeBytes: 198765,
+        checksum: makeHash('admin-selfie'),
+        submittedAt: trx.fn.now(),
+        reviewedAt: trx.fn.now()
+      }),
+      buildEncryptedKycDocument(instructorVerificationId, 'government-id-front', {
         status: 'pending',
-        storage_bucket: 'edulure-uploads',
-        storage_key: `kyc/${instructorVerificationRef}/id-front.png`,
-        file_name: 'id-front.png',
-        mime_type: 'image/png',
-        size_bytes: 256784,
-        checksum_sha256: makeHash('instructor-front'),
-        submitted_at: trx.fn.now(),
-        reviewed_at: null
-      },
-      {
-        verification_id: instructorVerificationId,
-        document_type: 'government-id-back',
+        storageBucket: 'edulure-uploads',
+        storageKey: `kyc/${instructorVerificationRef}/id-front.png`,
+        fileName: 'id-front.png',
+        mimeType: 'image/png',
+        sizeBytes: 256784,
+        checksum: makeHash('instructor-front'),
+        submittedAt: trx.fn.now(),
+        reviewedAt: null
+      }),
+      buildEncryptedKycDocument(instructorVerificationId, 'government-id-back', {
         status: 'pending',
-        storage_bucket: 'edulure-uploads',
-        storage_key: `kyc/${instructorVerificationRef}/id-back.png`,
-        file_name: 'id-back.png',
-        mime_type: 'image/png',
-        size_bytes: 244112,
-        checksum_sha256: makeHash('instructor-back'),
-        submitted_at: trx.fn.now(),
-        reviewed_at: null
-      },
-      {
-        verification_id: instructorVerificationId,
-        document_type: 'identity-selfie',
+        storageBucket: 'edulure-uploads',
+        storageKey: `kyc/${instructorVerificationRef}/id-back.png`,
+        fileName: 'id-back.png',
+        mimeType: 'image/png',
+        sizeBytes: 244112,
+        checksum: makeHash('instructor-back'),
+        submittedAt: trx.fn.now(),
+        reviewedAt: null
+      }),
+      buildEncryptedKycDocument(instructorVerificationId, 'identity-selfie', {
         status: 'pending',
-        storage_bucket: 'edulure-uploads',
-        storage_key: `kyc/${instructorVerificationRef}/selfie.png`,
-        file_name: 'selfie.png',
-        mime_type: 'image/png',
-        size_bytes: 201223,
-        checksum_sha256: makeHash('instructor-selfie'),
-        submitted_at: trx.fn.now(),
-        reviewed_at: null
-      },
-      {
-        verification_id: learnerVerificationId,
-        document_type: 'government-id-front',
+        storageBucket: 'edulure-uploads',
+        storageKey: `kyc/${instructorVerificationRef}/selfie.png`,
+        fileName: 'selfie.png',
+        mimeType: 'image/png',
+        sizeBytes: 201223,
+        checksum: makeHash('instructor-selfie'),
+        submittedAt: trx.fn.now(),
+        reviewedAt: null
+      }),
+      buildEncryptedKycDocument(learnerVerificationId, 'government-id-front', {
         status: 'pending',
-        storage_bucket: 'edulure-uploads',
-        storage_key: `kyc/${learnerVerificationRef}/id-front.png`,
-        file_name: 'id-front.png',
-        mime_type: 'image/png',
-        size_bytes: 243888,
-        checksum_sha256: makeHash('learner-front'),
-        submitted_at: trx.fn.now(),
-        reviewed_at: null
-      }
+        storageBucket: 'edulure-uploads',
+        storageKey: `kyc/${learnerVerificationRef}/id-front.png`,
+        fileName: 'id-front.png',
+        mimeType: 'image/png',
+        sizeBytes: 243888,
+        checksum: makeHash('learner-front'),
+        submittedAt: trx.fn.now(),
+        reviewedAt: null
+      })
     ]);
 
     await trx('kyc_audit_logs').insert([
@@ -1159,47 +1185,51 @@ export async function seed(knex) {
     const providerIntentId = `pi_${crypto.randomBytes(8).toString('hex')}`;
     const providerChargeId = `ch_${crypto.randomBytes(6).toString('hex')}`;
 
-    const [subscriptionPaymentId] = await trx('payment_intents').insert({
-      public_id: crypto.randomUUID(),
-      user_id: learnerId,
-      provider: 'stripe',
-      provider_intent_id: providerIntentId,
-      provider_latest_charge_id: providerChargeId,
-      status: 'succeeded',
-      currency: 'USD',
-      amount_subtotal: 189900,
-      amount_discount: 0,
-      amount_tax: 15192,
-      amount_total: 205092,
-      amount_refunded: 0,
-      tax_breakdown: JSON.stringify({ jurisdiction: 'US-CA', rate: 0.08 }),
-      metadata: JSON.stringify({
-        public_id: subscriptionPublicId,
-        entity_type: 'community_subscription',
-        entity_id: subscriptionPublicId,
-        items: [
-          {
-            id: 'growth-insiders-annual',
-            name: 'Growth Insiders Annual',
-            unitAmount: 189900,
-            quantity: 1,
-            discount: 0,
-            tax: 15192,
-            total: 205092
-          }
-        ],
-        taxableSubtotal: 189900,
-        taxableAfterDiscount: 189900,
-        couponCode: null,
+    const subscriptionPayment = await PaymentIntentModel.create(
+      {
+        publicId: crypto.randomUUID(),
+        userId: learnerId,
+        provider: 'stripe',
+        providerIntentId,
+        providerLatestChargeId: providerChargeId,
+        status: 'succeeded',
+        currency: 'USD',
+        amountSubtotal: 189900,
+        amountDiscount: 0,
+        amountTax: 15192,
+        amountTotal: 205092,
+        amountRefunded: 0,
+        taxBreakdown: { jurisdiction: 'US-CA', rate: 0.08 },
+        metadata: {
+          public_id: subscriptionPublicId,
+          entity_type: 'community_subscription',
+          entity_id: subscriptionPublicId,
+          items: [
+            {
+              id: 'growth-insiders-annual',
+              name: 'Growth Insiders Annual',
+              unitAmount: 189900,
+              quantity: 1,
+              discount: 0,
+              tax: 15192,
+              total: 205092
+            }
+          ],
+          taxableSubtotal: 189900,
+          taxableAfterDiscount: 189900,
+          couponCode: null,
+          couponId: null,
+          referralCode: affiliateReferralCode
+        },
         couponId: null,
-        referralCode: affiliateReferralCode
-      }),
-      coupon_id: null,
-      entity_type: 'community_subscription',
-      entity_id: subscriptionPublicId,
-      receipt_email: 'noemi.carvalho@edulure.test',
-      captured_at: trx.fn.now()
-    });
+        entityType: 'community_subscription',
+        entityId: subscriptionPublicId,
+        receiptEmail: 'noemi.carvalho@edulure.test',
+        capturedAt: trx.fn.now()
+      },
+      trx
+    );
+    const subscriptionPaymentId = subscriptionPayment.id;
 
     await trx('payment_ledger_entries').insert({
       payment_intent_id: subscriptionPaymentId,
@@ -1243,14 +1273,17 @@ export async function seed(knex) {
       .where({ id: growthAffiliateId })
       .update({ total_earned_cents: affiliateCommission, updated_at: trx.fn.now() });
 
-    await trx('community_affiliate_payouts').insert({
-      affiliate_id: growthAffiliateId,
-      amount_cents: Math.floor(affiliateCommission / 2),
-      status: 'processing',
-      payout_reference: 'PAYOUT-2024-10-001',
-      scheduled_at: trx.fn.now(),
-      metadata: JSON.stringify({ invoiceNumber: 'INV-2024-10-001', subscriptionId: growthSubscriptionId })
-    });
+    await CommunityAffiliatePayoutModel.create(
+      {
+        affiliateId: growthAffiliateId,
+        amountCents: Math.floor(affiliateCommission / 2),
+        status: 'processing',
+        payoutReference: 'PAYOUT-2024-10-001',
+        scheduledAt: trx.fn.now(),
+        metadata: { invoiceNumber: 'INV-2024-10-001', subscriptionId: growthSubscriptionId }
+      },
+      trx
+    );
 
     await trx('community_members')
       .where({ community_id: growthCommunityId, user_id: learnerId })

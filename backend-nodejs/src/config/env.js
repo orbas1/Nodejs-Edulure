@@ -107,6 +107,36 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+function parseEncryptionFallbackKeys(value) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry, index) => {
+      const [keyId, ...secretParts] = entry.split(':');
+      const secret = secretParts.join(':').trim();
+      if (!keyId || !secret) {
+        throw new Error(
+          `Invalid DATA_ENCRYPTION_FALLBACK_KEYS entry at position ${index}. Expected "keyId:secret".`
+        );
+      }
+      return { keyId: keyId.trim(), secret };
+    });
+}
+
+function normalizePrefix(value, fallback = '') {
+  const source = (value ?? fallback ?? '').trim();
+  if (!source) {
+    return fallback ?? '';
+  }
+
+  return source.replace(/^\/+/, '').replace(/\/+$/, '');
+}
+
 function clampRate(rate) {
   if (typeof rate !== 'number' || Number.isNaN(rate)) {
     return 0;
@@ -260,6 +290,10 @@ const envSchema = z
     TWO_FACTOR_DIGITS: z.coerce.number().int().min(6).max(10).default(6),
     TWO_FACTOR_STEP_SECONDS: z.coerce.number().int().min(15).max(120).default(30),
     TWO_FACTOR_WINDOW: z.coerce.number().int().min(0).max(2).default(1),
+    DATA_ENCRYPTION_PRIMARY_KEY: z.string().min(32).optional(),
+    DATA_ENCRYPTION_ACTIVE_KEY_ID: z.string().min(2).optional(),
+    DATA_ENCRYPTION_FALLBACK_KEYS: z.string().optional(),
+    DATA_ENCRYPTION_DEFAULT_CLASSIFICATION: z.string().min(3).optional(),
     JWT_REFRESH_SECRET: z
       .string()
       .min(32, 'JWT_REFRESH_SECRET must be at least 32 characters to provide adequate entropy'),
@@ -359,6 +393,24 @@ const envSchema = z
     DATA_RETENTION_RUN_ON_STARTUP: z.coerce.boolean().default(false),
     DATA_RETENTION_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
     DATA_RETENTION_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
+    DATA_PARTITIONING_ENABLED: z.coerce.boolean().default(true),
+    DATA_PARTITIONING_SCHEMA: z.string().optional(),
+    DATA_PARTITIONING_CRON: z.string().default('30 2 * * *'),
+    DATA_PARTITIONING_TIMEZONE: z.string().default('Etc/UTC'),
+    DATA_PARTITIONING_DRY_RUN: z.coerce.boolean().default(false),
+    DATA_PARTITIONING_RUN_ON_STARTUP: z.coerce.boolean().default(false),
+    DATA_PARTITIONING_LOOKAHEAD_MONTHS: z.coerce.number().int().min(1).max(18).default(6),
+    DATA_PARTITIONING_LOOKBEHIND_MONTHS: z.coerce.number().int().min(0).max(12).default(1),
+    DATA_PARTITIONING_MIN_ACTIVE_PARTITIONS: z.coerce.number().int().min(1).max(24).default(3),
+    DATA_PARTITIONING_ARCHIVE_GRACE_DAYS: z.coerce.number().int().min(0).max(180).default(45),
+    DATA_PARTITIONING_ARCHIVE_BUCKET: z.string().optional(),
+    DATA_PARTITIONING_ARCHIVE_PREFIX: z.string().optional(),
+    DATA_PARTITIONING_ARCHIVE_COMPRESS: z.coerce.boolean().default(false),
+    DATA_PARTITIONING_EXPORT_BATCH_SIZE: z.coerce.number().int().min(500).max(50000).default(5000),
+    DATA_PARTITIONING_MAX_EXPORT_ROWS: z.coerce.number().int().min(1000).max(1000000).optional(),
+    DATA_PARTITIONING_MAX_EXPORT_MB: z.coerce.number().min(1).max(1024).optional(),
+    DATA_PARTITIONING_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
+    DATA_PARTITIONING_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
     REDIS_ENABLED: z.coerce.boolean().default(false),
     REDIS_URL: z.string().url().optional(),
     REDIS_HOST: z.string().min(1).default('127.0.0.1'),
@@ -575,6 +627,20 @@ const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRE
 const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
 const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
 
+const dataEncryptionActiveKeyId = raw.DATA_ENCRYPTION_ACTIVE_KEY_ID ?? 'v1';
+const dataEncryptionPrimarySecret = raw.DATA_ENCRYPTION_PRIMARY_KEY ?? raw.JWT_REFRESH_SECRET;
+const dataEncryptionFallbackEntries = parseEncryptionFallbackKeys(raw.DATA_ENCRYPTION_FALLBACK_KEYS ?? '');
+const dataEncryptionKeys = dataEncryptionFallbackEntries.reduce(
+  (acc, entry) => {
+    if (!acc[entry.keyId]) {
+      acc[entry.keyId] = entry.secret;
+    }
+    return acc;
+  },
+  { [dataEncryptionActiveKeyId]: dataEncryptionPrimarySecret }
+);
+const dataEncryptionDefaultClassification = raw.DATA_ENCRYPTION_DEFAULT_CLASSIFICATION ?? 'general';
+
 const webPort = raw.WEB_PORT ?? raw.PORT;
 const webProbePort = raw.WEB_PROBE_PORT ?? webPort;
 const workerProbePort = raw.WORKER_PROBE_PORT;
@@ -587,6 +653,13 @@ const redisRuntimeConfigKey = buildRedisKey(redisKeyPrefix, raw.REDIS_RUNTIME_CO
 const redisFeatureFlagLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_FEATURE_FLAG_LOCK_KEY);
 const redisRuntimeConfigLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_RUNTIME_CONFIG_LOCK_KEY);
 const redisTlsCa = maybeDecodeCertificate(raw.REDIS_TLS_CA);
+const partitionSchema = raw.DATA_PARTITIONING_SCHEMA ?? raw.DB_NAME;
+const partitionArchiveBucket = raw.DATA_PARTITIONING_ARCHIVE_BUCKET ?? raw.R2_PRIVATE_BUCKET;
+const partitionArchivePrefix = normalizePrefix(raw.DATA_PARTITIONING_ARCHIVE_PREFIX, 'archives/compliance');
+const partitionMaxExportBytes = raw.DATA_PARTITIONING_MAX_EXPORT_MB
+  ? raw.DATA_PARTITIONING_MAX_EXPORT_MB * 1024 * 1024
+  : null;
+const partitionMaxExportRows = raw.DATA_PARTITIONING_MAX_EXPORT_ROWS ?? null;
 
 export const env = {
   nodeEnv: raw.NODE_ENV,
@@ -633,6 +706,11 @@ export const env = {
     accountLockoutDurationMinutes: raw.ACCOUNT_LOCKOUT_DURATION_MINUTES,
     sessionValidationCacheTtlMs: raw.SESSION_VALIDATION_CACHE_TTL_MS,
     maxActiveSessionsPerUser: raw.MAX_ACTIVE_SESSIONS_PER_USER,
+    dataEncryption: {
+      activeKeyId: dataEncryptionActiveKeyId,
+      keys: dataEncryptionKeys,
+      defaultClassification: dataEncryptionDefaultClassification
+    },
     twoFactor: {
       encryptionKey: twoFactorEncryptionKey,
       issuer: twoFactorIssuer,
@@ -764,6 +842,29 @@ export const env = {
     runOnStartup: raw.DATA_RETENTION_RUN_ON_STARTUP,
     maxConsecutiveFailures: raw.DATA_RETENTION_MAX_FAILURES,
     failureBackoffMinutes: raw.DATA_RETENTION_FAILURE_BACKOFF_MINUTES
+  },
+  partitioning: {
+    enabled: raw.DATA_PARTITIONING_ENABLED,
+    schema: partitionSchema,
+    cronExpression: raw.DATA_PARTITIONING_CRON,
+    timezone: raw.DATA_PARTITIONING_TIMEZONE,
+    dryRun: raw.DATA_PARTITIONING_DRY_RUN,
+    runOnStartup: raw.DATA_PARTITIONING_RUN_ON_STARTUP,
+    lookaheadMonths: raw.DATA_PARTITIONING_LOOKAHEAD_MONTHS,
+    lookbehindMonths: raw.DATA_PARTITIONING_LOOKBEHIND_MONTHS,
+    minActivePartitions: raw.DATA_PARTITIONING_MIN_ACTIVE_PARTITIONS,
+    archiveGraceDays: raw.DATA_PARTITIONING_ARCHIVE_GRACE_DAYS,
+    exportBatchSize: raw.DATA_PARTITIONING_EXPORT_BATCH_SIZE,
+    maxExportRows: partitionMaxExportRows,
+    maxExportBytes: partitionMaxExportBytes,
+    archive: {
+      bucket: partitionArchiveBucket,
+      prefix: partitionArchivePrefix,
+      compress: raw.DATA_PARTITIONING_ARCHIVE_COMPRESS,
+      visibility: 'workspace'
+    },
+    maxConsecutiveFailures: raw.DATA_PARTITIONING_MAX_FAILURES,
+    failureBackoffMinutes: raw.DATA_PARTITIONING_FAILURE_BACKOFF_MINUTES
   },
   runtimeConfig: {
     featureFlagCacheTtlMs: raw.FEATURE_FLAG_CACHE_TTL_SECONDS * 1000,

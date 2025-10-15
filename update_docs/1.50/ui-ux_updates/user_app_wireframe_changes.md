@@ -117,6 +117,26 @@
 - Finance alerts banner surfaces outstanding invoices with pay now button linking to checkout.
 - Privacy & communication preferences list with toggle chips for marketing emails, SMS reminders, community mentions.
 
+## Privacy & Safety Surfaces
+### Consent Center Drawer
+- Persistent entry point in the profile tab and home support chip that opens a half-height drawer summarising consent posture (Marketing, Research, Third-Party Integrations). Each consent row shows last updated timestamp, jurisdiction badge (GDPR, CCPA, LGPD), and toggle state with inline "View Policy" link.
+- Primary CTA toggles trigger confirmation sheet requiring biometric or PIN confirmation when device supports it; sheet reiterates consequences (e.g., disabling marketing stops tailored recommendations) and records purpose/proof to the audit ledger.
+- Drawer footer includes "Export Data" and "Request Deletion" secondary actions routing to guided workflows with SLA countdown chips and escalation link.
+
+### Privacy Dashboard Canvas
+- Dedicated screen accessible from profile and notification banner summarising privacy insights: cards for "Active Consents", "Open Requests", "Data Footprint" (storage categories with size/retention), and "Recent Policy Updates" arranged in two-column responsive grid for tablet breakpoints.
+- Timeline module surfaces most recent privacy events (consent change, export completion, incident notice) with severity colour coding and deep links to detail modals; incidents display runbook tips and contact options.
+- "Data Categories" accordion details stored personal data (Identity, Learning History, Payments) with encryption icons, retention windows, and quick actions to edit preferences or trigger redaction for eligible items.
+
+### Scam & Fraud Education Hub
+- Carousel banner on privacy dashboard hero rotates featured articles ("Spotting Tuition Scams", "How We Vet Tutors", "Secure Payment Checklist") with CTA to mark as read and share; progress ring indicates completion of recommended modules.
+- Resource grid groups education content into Playlists (Video, Infographic, Quiz). Each tile lists duration, difficulty, and trust badges; completion progress syncs with analytics to unlock "Safety Certified" badge displayed on learner profile.
+- Embedded quiz modal at end of playlist uses multi-step cards with scenario-based questions; scoring above 80% unlocks contextual reward (badge/discount) and registers completion in scam-awareness ledger for compliance reporting.
+
+### Incident Escalation Strip
+- Sticky bottom strip appears when learner reports potential fraud via support chip; summarises case ID, assigned advocate, and latest SLA checkpoint. Provides "Add Evidence" upload button (camera/upload) and "Contact Support" call-to-action with availability indicator.
+- Strip persists across app routes until case resolved, ensuring visibility while allowing core learning tasks to continue uninterrupted.
+
 ### Wallet & Transactions
 - Wallet detail screen shows balance header with gradient background, quick actions (Add Funds, Withdraw, View History).
 - Transaction list uses grouped sections (Learning Purchases, Refunds, Rewards) with iconography and status chips.

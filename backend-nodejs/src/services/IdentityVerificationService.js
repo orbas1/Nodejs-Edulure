@@ -7,6 +7,7 @@ import KycAuditLogModel from '../models/KycAuditLogModel.js';
 import KycDocumentModel from '../models/KycDocumentModel.js';
 import KycVerificationModel from '../models/KycVerificationModel.js';
 import storageService from './StorageService.js';
+import DataEncryptionService from './DataEncryptionService.js';
 
 const REQUIRED_DOCUMENT_TYPES = [
   {
@@ -299,18 +300,21 @@ const reviewSchema = Joi.object({
 
 function mapDocument(row) {
   if (!row) return null;
+  const decrypted = row.documentPayloadCiphertext
+    ? DataEncryptionService.decryptStructured(row.documentPayloadCiphertext, row.documentEncryptionKeyVersion)
+    : null;
   return {
     id: row.id,
     type: row.documentType,
     status: row.status,
-    fileName: row.fileName,
-    mimeType: row.mimeType,
-    sizeBytes: Number(row.sizeBytes ?? 0),
+    fileName: decrypted?.fileName ?? row.fileNameMask ?? null,
+    mimeType: decrypted?.mimeType ?? row.mimeTypeMask ?? null,
+    sizeBytes: Number(decrypted?.sizeBytes ?? row.sizeBytes ?? 0),
     submittedAt: row.submittedAt,
     reviewedAt: row.reviewedAt,
-    storageBucket: row.storageBucket,
-    storageKey: row.storageKey,
-    checksumSha256: row.checksumSha256
+    storageBucket: decrypted?.storageBucket ?? null,
+    storageKey: decrypted?.storageKey ?? null,
+    checksumSha256: decrypted?.checksumSha256 ?? row.checksumMask ?? null
   };
 }
 
@@ -341,6 +345,10 @@ function mapVerification(row, documents = []) {
 
   const normalisedDocuments = normaliseDocuments(documents);
 
+  const decryptedNotes = row.sensitiveNotesCiphertext
+    ? DataEncryptionService.decryptStructured(row.sensitiveNotesCiphertext, row.encryptionKeyVersion)
+    : null;
+
   return {
     id: row.id,
     reference: row.reference,
@@ -353,7 +361,7 @@ function mapVerification(row, documents = []) {
     lastSubmittedAt: row.lastSubmittedAt,
     lastReviewedAt: row.lastReviewedAt,
     reviewedBy: row.reviewedBy ?? null,
-    rejectionReason: row.rejectionReason ?? null,
+    rejectionReason: decryptedNotes?.rejectionReason ?? row.rejectionReason ?? null,
     policyReferences,
     documents: normalisedDocuments
   };
@@ -594,15 +602,27 @@ export default class IdentityVerificationService {
         throw invalidState;
       }
 
+      const encryptedNotes = DataEncryptionService.encryptStructured(
+        value.status === 'approved' ? null : { rejectionReason: value.rejectionReason },
+        {
+          classificationTag: 'kyc.review.notes',
+          fingerprintValues: [String(verificationId), value.rejectionReason ?? '']
+        }
+      );
+
       const updates = {
         status: value.status,
         risk_score: value.riskScore,
-        rejection_reason: value.status === 'approved' ? null : value.rejectionReason ?? null,
+        rejection_reason: null,
         escalation_level: value.escalationLevel,
         reviewed_by: reviewerId,
         last_reviewed_at: trx.fn.now(),
         needs_manual_review: false,
-        policy_references: value.policyReferences.length ? JSON.stringify(value.policyReferences) : null
+        policy_references: value.policyReferences.length ? JSON.stringify(value.policyReferences) : null,
+        sensitive_notes_ciphertext: encryptedNotes.ciphertext,
+        sensitive_notes_hash: encryptedNotes.hash,
+        sensitive_notes_classification: encryptedNotes.classificationTag,
+        encryption_key_version: encryptedNotes.keyId
       };
 
       const updated = await KycVerificationModel.update(verificationId, updates, trx);
