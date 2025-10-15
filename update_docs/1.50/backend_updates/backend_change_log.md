@@ -21,6 +21,10 @@
 - Implemented a capability manifest service that evaluates feature flag exposure, correlates dependencies with readiness probes across the web, worker, and realtime processes, and surfaces availability summaries for clients and operator tooling.【F:backend-nodejs/src/services/CapabilityManifestService.js†L1-L209】
 - Extended the runtime configuration controller with a public `/api/v1/runtime/manifest` endpoint so web and mobile clients can fetch real-time service availability, capability gating reasons, and dependency impact metadata in a single call.【F:backend-nodejs/src/controllers/RuntimeConfigController.js†L1-L155】【F:backend-nodejs/src/routes/runtimeConfig.routes.js†L1-L11】
 
+## Operator Telemetry & Incident Feeds
+- Introduced an operator dashboard service that fuses capability manifest health, security incident telemetry, scam analytics, and runbook shortcuts into a single snapshot powering the new admin command centre UI.【F:backend-nodejs/src/services/OperatorDashboardService.js†L1-L305】【F:backend-nodejs/src/services/DashboardService.js†L826-L899】
+- Added a `SecurityIncidentModel` and enriched seed data for encrypted incident notes, detection channels, and SLA metadata so operator tooling can surface real investigations without exposing sensitive payloads.【F:backend-nodejs/src/models/SecurityIncidentModel.js†L1-L91】【F:backend-nodejs/seeds/001_bootstrap.js†L1-L655】
+
 ## Configuration & Testing
 - Expanded environment schema support for per-service ports, probe bindings, and bootstrap retry tuning so infrastructure-as-code can provision independent deployment targets.【F:backend-nodejs/src/config/env.js†L200-L215】【F:backend-nodejs/src/config/env.js†L455-L507】
 - Added Redis runtime configuration with TLS-aware client factory and distributed cache orchestrator so feature flag and runtime configuration services can hydrate from shared snapshots, coordinate refresh locks, and degrade gracefully when Redis is unavailable.【F:backend-nodejs/src/config/env.js†L220-L335】【F:backend-nodejs/src/config/redisClient.js†L1-L92】【F:backend-nodejs/src/services/DistributedRuntimeCache.js†L1-L129】

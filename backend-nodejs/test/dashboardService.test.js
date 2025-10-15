@@ -7,6 +7,7 @@ import {
   calculateLearningStreak,
   humanizeRelativeTime
 } from '../src/services/DashboardService.js';
+import { buildScamSummary, summariseIncidentQueue } from '../src/services/OperatorDashboardService.js';
 import { normaliseMonetization, resolveDefaultMonetization } from '../src/services/PlatformSettingsService.js';
 
 describe('DashboardService helpers', () => {
@@ -174,6 +175,101 @@ describe('buildAffiliateOverview', () => {
     expect(growthProgramme.performance.conversions).toBe(2);
     expect(growthProgramme.performance.conversions30d).toBe(1);
     expect(growthProgramme.performance.volume30dFormatted).toBe('$450.00');
+  });
+});
+
+describe('Operator dashboard summaries', () => {
+  it('summarises incident queue including breaches and detection channels', () => {
+    const now = new Date('2025-02-03T10:00:00Z');
+    const incidents = [
+      {
+        severity: 'high',
+        category: 'scam',
+        status: 'mitigating',
+        reportedAt: '2025-02-03T08:45:00Z',
+        acknowledgement: { acknowledgedAt: '2025-02-03T09:05:00Z', ackBreached: false },
+        resolution: { resolutionBreached: false },
+        metadata: { detectionChannel: 'fraud-desk', watchers: 10 }
+      },
+      {
+        severity: 'critical',
+        category: 'account_takeover',
+        status: 'triaged',
+        reportedAt: '2025-02-03T06:58:00Z',
+        acknowledgement: { acknowledgedAt: '2025-02-03T07:05:00Z', ackBreached: false },
+        resolution: { resolutionBreached: true },
+        metadata: { detectionChannel: 'pagerduty', watchers: 8 }
+      },
+      {
+        severity: 'medium',
+        category: 'fraud',
+        status: 'new',
+        reportedAt: '2025-02-02T19:22:00Z',
+        acknowledgement: { ackBreached: true },
+        resolution: { resolutionBreached: false },
+        metadata: { detectionChannel: 'support-portal', watchers: 2 }
+      }
+    ];
+
+    const summary = summariseIncidentQueue(incidents, { now });
+
+    expect(summary.totalOpen).toBe(3);
+    expect(summary.severityCounts).toEqual({ critical: 1, high: 1, medium: 1, low: 0 });
+    expect(summary.ackBreaches).toBe(1);
+    expect(summary.resolutionBreaches).toBe(1);
+    expect(summary.watchers).toBe(20);
+    expect(summary.detectionChannels).toEqual(
+      expect.arrayContaining([
+        { channel: 'fraud-desk', count: 1 },
+        { channel: 'pagerduty', count: 1 },
+        { channel: 'support-portal', count: 1 }
+      ])
+    );
+    expect(summary.medianAckMinutes).toBe(14);
+    expect(summary.oldestOpenAt).toBe('2025-02-02T19:22:00.000Z');
+  });
+
+  it('builds scam alert summary with aggregated metrics', () => {
+    const incidents = [
+      {
+        incidentUuid: 'ops-2045',
+        severity: 'critical',
+        category: 'scam',
+        reportedAt: '2025-02-03T08:45:00Z',
+        metadata: {
+          reference: 'OPS-2045',
+          summary: 'Phishing payouts blocked before funds moved.',
+          detectionChannel: 'fraud-desk',
+          watchers: 6,
+          metrics: { blockedPayments: 8200, flaggedLearners: 12 },
+          recommendedActions: ['Lock payouts', 'Warn instructors']
+        }
+      },
+      {
+        incidentUuid: 'ops-2047',
+        severity: 'medium',
+        category: 'fraud',
+        reportedAt: '2025-02-03T07:10:00Z',
+        metadata: {
+          reference: 'OPS-2047',
+          tags: ['scam'],
+          summary: 'Marketplace clone intercepted before checkout.',
+          detectionChannel: 'support-portal',
+          watchers: 3,
+          metrics: { blockedPayments: 4500, flaggedLearners: 5 }
+        }
+      }
+    ];
+
+    const summary = buildScamSummary(incidents, { now: new Date('2025-02-03T10:00:00Z') });
+
+    expect(summary.activeCases).toBe(2);
+    expect(summary.criticalCases).toBe(1);
+    expect(summary.impactedLearners).toBe(17);
+    expect(summary.blockedPaymentsCents).toBe(12700);
+    expect(summary.blockedPaymentsFormatted).toBe('$127.00');
+    expect(summary.alerts).toHaveLength(2);
+    expect(summary.alerts[0]).toMatchObject({ reference: 'OPS-2045', detectionChannel: 'fraud-desk' });
   });
 });
 
