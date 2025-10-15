@@ -1,5 +1,14 @@
 import PropTypes from 'prop-types';
-import { ArrowPathIcon, ChartBarIcon, RocketLaunchIcon, SignalIcon, UsersIcon } from '@heroicons/react/24/outline';
+import {
+  ArrowPathIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ChartBarIcon,
+  MinusSmallIcon,
+  RocketLaunchIcon,
+  SignalIcon,
+  UsersIcon
+} from '@heroicons/react/24/outline';
 
 import { CREATION_TYPE_LABELS, CREATION_TYPE_ORDER } from './creationStudioUtils.js';
 
@@ -41,6 +50,69 @@ const CARD_CONFIG = [
   }
 ];
 
+const PRIORITY_STYLES = {
+  high: 'border-rose-200 bg-rose-50 text-rose-700',
+  medium: 'border-amber-200 bg-amber-50 text-amber-700',
+  low: 'border-slate-200 bg-slate-100 text-slate-600'
+};
+
+const SIGNAL_NUMBER_FORMATTER = new Intl.NumberFormat('en-US', {
+  maximumFractionDigits: 0,
+  useGrouping: false
+});
+
+function resolveSignalWeight(weight) {
+  const numericWeight = Number(weight ?? 0);
+  if (!Number.isFinite(numericWeight)) {
+    return {
+      displayValue: '0',
+      tone: 'text-slate-500',
+      Icon: MinusSmallIcon
+    };
+  }
+
+  if (numericWeight > 0) {
+    return {
+      displayValue: `+${SIGNAL_NUMBER_FORMATTER.format(Math.round(Math.abs(numericWeight)))}`,
+      tone: 'text-emerald-600',
+      Icon: ArrowUpIcon
+    };
+  }
+
+  if (numericWeight < 0) {
+    return {
+      displayValue: `-${SIGNAL_NUMBER_FORMATTER.format(Math.round(Math.abs(numericWeight)))}`,
+      tone: 'text-rose-600',
+      Icon: ArrowDownIcon
+    };
+  }
+
+  return {
+    displayValue: '0',
+    tone: 'text-slate-500',
+    Icon: MinusSmallIcon
+  };
+}
+
+function formatRelativeTime(timestamp) {
+  if (!timestamp) {
+    return null;
+  }
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  const diffMs = Date.now() - date.getTime();
+  const minute = 1000 * 60;
+  const hour = minute * 60;
+  const day = hour * 24;
+
+  if (diffMs < minute) return 'just now';
+  if (diffMs < hour) return `${Math.max(1, Math.round(diffMs / minute))}m ago`;
+  if (diffMs < day) return `${Math.max(1, Math.round(diffMs / hour))}h ago`;
+  return `${Math.max(1, Math.round(diffMs / day))}d ago`;
+}
+
 function SummaryCard({ card, value }) {
   const Icon = card.icon;
   return (
@@ -77,9 +149,18 @@ function formatTypeBreakdown(summary) {
   return [...ordered, ...extras].filter(([, count]) => count > 0);
 }
 
-export default function CreationStudioSummary({ summary }) {
+export default function CreationStudioSummary({
+  summary,
+  recommendations,
+  recommendationsMeta,
+  recommendationsEvaluation,
+  recommendationsLoading,
+  recommendationsError
+}) {
   const breakdownEntries = formatTypeBreakdown(summary);
   const total = summary.total ?? 0;
+  const flagDisabled = recommendationsEvaluation ? recommendationsEvaluation.enabled === false : false;
+  const latestRun = recommendationsMeta?.generatedAt ?? null;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -126,6 +207,107 @@ export default function CreationStudioSummary({ summary }) {
             })}
           </ul>
         )}
+
+        <section className="mt-8 border-t border-slate-200 pt-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Recommended next steps</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-900">Focus the production pipeline</h3>
+          <p className="mt-2 text-sm text-slate-600">
+            Intelligent scoring prioritises reviews, launch tasks, and campaign optimisation so the team can act on the highest
+            impact work first.
+          </p>
+
+          {recommendationsError ? (
+            <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+              {recommendationsError.message}
+            </div>
+          ) : recommendationsLoading ? (
+            <ul className="mt-4 space-y-3" aria-busy="true">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <li
+                  key={`recommendation-skeleton-${index}`}
+                  className="animate-pulse rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <div className="h-4 w-1/2 rounded bg-slate-200" />
+                  <div className="mt-2 h-3 w-full rounded bg-slate-200" />
+                  <div className="mt-1 h-3 w-2/3 rounded bg-slate-200" />
+                </li>
+              ))}
+            </ul>
+          ) : flagDisabled ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-700">
+              Personalised recommendations are disabled for this tenant.{' '}
+              {recommendationsEvaluation?.reason ?? 'Contact an administrator to enable the feature flag.'}
+            </div>
+          ) : recommendations.length > 0 ? (
+            <ul className="mt-4 space-y-4">
+              {recommendations.map((recommendation) => {
+                const priorityTone = PRIORITY_STYLES[recommendation.priority] ?? PRIORITY_STYLES.low;
+                const relativeTime = formatRelativeTime(recommendation.recommendedAt);
+                return (
+                  <li
+                    key={recommendation.projectPublicId ?? recommendation.projectId}
+                    className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{recommendation.action.label}</p>
+                        <p className="mt-1 text-xs text-slate-600">{recommendation.action.instructions}</p>
+                      </div>
+                      <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${priorityTone}`}>
+                        {recommendation.priority === 'high'
+                          ? 'High priority'
+                          : recommendation.priority === 'medium'
+                          ? 'Medium priority'
+                          : 'Low priority'}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-2 py-1 font-medium text-slate-700">
+                        Score {Number(recommendation.score ?? 0).toFixed(1)}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-2 py-1">{recommendation.projectTitle}</span>
+                      {relativeTime ? (
+                        <span className="text-slate-500">Generated {relativeTime}</span>
+                      ) : null}
+                    </div>
+                    {recommendation.signals.length > 0 ? (
+                      <ul className="mt-3 space-y-1 text-xs text-slate-600">
+                        {recommendation.signals.slice(0, 3).map((signal) => (
+                          <li
+                            key={`${recommendation.projectPublicId ?? recommendation.projectId}:${signal.code}`}
+                            className="flex items-center justify-between gap-3"
+                          >
+                            <span className="capitalize">{signal.code.replace(/_/g, ' ')}</span>
+                            {(() => {
+                              const { displayValue, tone, Icon } = resolveSignalWeight(signal.weight);
+                              return (
+                                <span className={`inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 font-semibold ${tone}`}>
+                                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                                  {displayValue}
+                                </span>
+                              );
+                            })()}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+              No personalised actions yet. Publish projects or request reviews to generate prioritised insights.
+            </div>
+          )}
+
+          <p className="mt-4 text-xs text-slate-500">
+            {latestRun ? `Last generated ${formatRelativeTime(latestRun)}.` : 'Recommendations refresh automatically as your pipeline evolves.'}
+            {recommendationsMeta?.history?.length
+              ? ` Historical runs recorded: ${recommendationsMeta.history.length}.`
+              : ''}
+          </p>
+        </section>
       </aside>
     </div>
   );
@@ -140,7 +322,41 @@ CreationStudioSummary.propTypes = {
     liveSessions: PropTypes.number,
     total: PropTypes.number,
     typeBreakdown: PropTypes.objectOf(PropTypes.number)
-  })
+  }),
+  recommendations: PropTypes.arrayOf(
+    PropTypes.shape({
+      projectPublicId: PropTypes.string,
+      projectTitle: PropTypes.string,
+      priority: PropTypes.string,
+      action: PropTypes.shape({
+        code: PropTypes.string,
+        label: PropTypes.string,
+        instructions: PropTypes.string
+      }),
+      score: PropTypes.number,
+      recommendedAt: PropTypes.string,
+      signals: PropTypes.arrayOf(
+        PropTypes.shape({
+          code: PropTypes.string,
+          weight: PropTypes.number,
+          detail: PropTypes.object
+        })
+      )
+    })
+  ),
+  recommendationsMeta: PropTypes.shape({
+    algorithmVersion: PropTypes.string,
+    generatedAt: PropTypes.string,
+    tenantId: PropTypes.string,
+    totalProjectsEvaluated: PropTypes.number,
+    history: PropTypes.array
+  }),
+  recommendationsEvaluation: PropTypes.shape({
+    enabled: PropTypes.bool,
+    reason: PropTypes.string
+  }),
+  recommendationsLoading: PropTypes.bool,
+  recommendationsError: PropTypes.instanceOf(Error)
 };
 
 CreationStudioSummary.defaultProps = {
@@ -152,5 +368,10 @@ CreationStudioSummary.defaultProps = {
     liveSessions: 0,
     total: 0,
     typeBreakdown: {}
-  }
+  },
+  recommendations: [],
+  recommendationsMeta: null,
+  recommendationsEvaluation: null,
+  recommendationsLoading: false,
+  recommendationsError: null
 };

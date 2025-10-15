@@ -7,6 +7,7 @@ const router = Router();
 
 router.get('/projects', auth('user'), CreationStudioController.listProjects);
 router.get('/analytics/summary', auth('user'), CreationStudioController.analyticsSummary);
+router.get('/recommendations', auth('user'), CreationStudioController.recommendations);
 router.post('/projects', auth('instructor'), CreationStudioController.createProject);
 router.get('/projects/:projectId', auth('user'), CreationStudioController.getProject);
 router.patch('/projects/:projectId', auth('instructor'), CreationStudioController.updateProject);

@@ -196,6 +196,103 @@ export async function listProjects({ token, filters = {}, pagination = {}, signa
   };
 }
 
+function normaliseSignal(signal) {
+  if (!signal) {
+    return null;
+  }
+  return {
+    code: signal.code ?? 'unknown',
+    weight: Number(signal.weight ?? 0),
+    detail: typeof signal.detail === 'object' && signal.detail !== null ? signal.detail : {}
+  };
+}
+
+function normaliseRecommendation(recommendation) {
+  if (!recommendation) {
+    return null;
+  }
+
+  return {
+    projectId: recommendation.projectId ?? null,
+    projectPublicId: recommendation.projectPublicId ?? recommendation.project_id ?? null,
+    projectTitle: recommendation.projectTitle ?? recommendation.project_title ?? 'Untitled project',
+    projectType: recommendation.projectType ?? recommendation.project_type ?? 'course',
+    collaboratorCount: Number.isFinite(Number(recommendation.collaboratorCount))
+      ? Number(recommendation.collaboratorCount)
+      : Number.isFinite(Number(recommendation.collaborator_count))
+      ? Number(recommendation.collaborator_count)
+      : 0,
+    priority: recommendation.priority ?? 'medium',
+    action: {
+      code: recommendation.action?.code ?? 'action',
+      label: recommendation.action?.label ?? 'Action required',
+      instructions: recommendation.action?.instructions ?? ''
+    },
+    score: Number(recommendation.score ?? 0),
+    recommendedAt: toIsoDate(recommendation.recommendedAt ?? recommendation.recommended_at),
+    signals: Array.isArray(recommendation.signals)
+      ? recommendation.signals.map(normaliseSignal).filter(Boolean)
+      : []
+  };
+}
+
+function normaliseEvaluation(evaluation) {
+  if (!evaluation) {
+    return { enabled: false };
+  }
+  return {
+    key: evaluation.key ?? 'creation.recommendations',
+    enabled: Boolean(evaluation.enabled),
+    reason: evaluation.reason ?? null,
+    variant: evaluation.variant ?? null,
+    bucket: evaluation.bucket ?? null,
+    strategy: evaluation.strategy ?? null,
+    evaluatedAt: toIsoDate(evaluation.evaluatedAt ?? evaluation.evaluated_at)
+  };
+}
+
+function normaliseHistoryItem(item) {
+  if (!item) return null;
+  return {
+    id: item.id ?? null,
+    generatedAt: toIsoDate(item.generatedAt ?? item.generated_at),
+    algorithmVersion: item.algorithmVersion ?? item.algorithm_version ?? null,
+    tenantId: item.tenantId ?? item.tenant_id ?? 'global',
+    featureFlagState: item.featureFlagState ?? item.feature_flag_state ?? null,
+    featureFlagVariant: item.featureFlagVariant ?? item.feature_flag_variant ?? null,
+    recommendationCount: Number.isFinite(Number(item.recommendationCount))
+      ? Number(item.recommendationCount)
+      : Number.isFinite(Number(item.recommendation_count))
+      ? Number(item.recommendation_count)
+      : 0,
+    context: typeof item.context === 'object' && item.context !== null ? item.context : {}
+  };
+}
+
+function normaliseMeta(meta) {
+  if (!meta) {
+    return {
+      algorithmVersion: null,
+      generatedAt: null,
+      tenantId: 'global',
+      totalProjectsEvaluated: 0,
+      history: []
+    };
+  }
+
+  return {
+    algorithmVersion: meta.algorithmVersion ?? meta.algorithm_version ?? null,
+    generatedAt: toIsoDate(meta.generatedAt ?? meta.generated_at),
+    tenantId: meta.tenantId ?? meta.tenant_id ?? 'global',
+    totalProjectsEvaluated: Number.isFinite(Number(meta.totalProjectsEvaluated))
+      ? Number(meta.totalProjectsEvaluated)
+      : Number.isFinite(Number(meta.total_projects_evaluated))
+      ? Number(meta.total_projects_evaluated)
+      : 0,
+    history: Array.isArray(meta.history) ? meta.history.map(normaliseHistoryItem).filter(Boolean) : []
+  };
+}
+
 export async function getProject(publicId, { token, signal } = {}) {
   if (!token) throw new Error('Authentication token is required to fetch a project');
   if (!publicId) throw new Error('Project identifier is required');
@@ -216,7 +313,13 @@ export async function createProject(payload, { token } = {}) {
   const response = await httpClient.post('/creation/projects', payload, {
     token,
     cache: {
-      invalidateTags: [`creation:projects:${token}`]
+      invalidateTags: [
+        `creation:projects:${token}`,
+        'creation:recommendations',
+        'creation:recommendations:self',
+        'creation:analytics',
+        'creation:analytics:self'
+      ]
     }
   });
   return normaliseProject(response.data);
@@ -248,7 +351,13 @@ export async function startCollaborationSession(publicId, payload = {}, { token 
   const response = await httpClient.post(`/creation/projects/${publicId}/sessions`, payload, {
     token,
     cache: {
-      invalidateTags: [`creation:project:${publicId}:${token}`]
+      invalidateTags: [
+        `creation:project:${publicId}:${token}`,
+        'creation:recommendations',
+        'creation:recommendations:self',
+        'creation:analytics',
+        'creation:analytics:self'
+      ]
     }
   });
   return normaliseSession(response.data);
@@ -261,7 +370,13 @@ export async function endCollaborationSession(publicId, sessionId, { token, term
   const response = await httpClient.post(`/creation/projects/${publicId}/sessions/${sessionId}/end`, { terminate }, {
     token,
     cache: {
-      invalidateTags: [`creation:project:${publicId}:${token}`]
+      invalidateTags: [
+        `creation:project:${publicId}:${token}`,
+        'creation:recommendations',
+        'creation:recommendations:self',
+        'creation:analytics',
+        'creation:analytics:self'
+      ]
     }
   });
   return normaliseSession(response.data);
@@ -277,10 +392,46 @@ export async function fetchAnalyticsSummary({ token, range = '30d', ownerId, sig
     signal,
     cache: {
       ttl: 1000 * 60,
-      tags: [`creation:analytics:${range}:${ownerId ?? 'self'}`]
+      tags: [
+        `creation:analytics:${range}:${ownerId ?? 'self'}`,
+        `creation:analytics:${ownerId ?? 'self'}`,
+        'creation:analytics'
+      ]
     }
   });
   return response.data;
+}
+
+export async function fetchRecommendations({ token, limit, includeHistory = false, ownerId, signal } = {}) {
+  if (!token) throw new Error('Authentication token is required to load recommendations');
+  const params = {};
+  if (limit) params.limit = limit;
+  if (includeHistory) params.includeHistory = true;
+  if (ownerId) params.ownerId = ownerId;
+
+  const response = await httpClient.get('/creation/recommendations', {
+    token,
+    params,
+    signal,
+    cache: {
+      ttl: 1000 * 30,
+      tags: [
+        `creation:recommendations:${ownerId ?? 'self'}`,
+        'creation:recommendations'
+      ]
+    }
+  });
+
+  const payload = response.data ?? {};
+  const recommendations = Array.isArray(payload.recommendations)
+    ? payload.recommendations.map(normaliseRecommendation).filter(Boolean)
+    : [];
+
+  return {
+    recommendations,
+    evaluation: normaliseEvaluation(payload.evaluation),
+    meta: normaliseMeta(payload.meta)
+  };
 }
 
 export const creationStudioApi = {
@@ -290,7 +441,8 @@ export const creationStudioApi = {
   listTemplates,
   startCollaborationSession,
   endCollaborationSession,
-  fetchAnalyticsSummary
+  fetchAnalyticsSummary,
+  fetchRecommendations
 };
 
 export default creationStudioApi;
