@@ -6,7 +6,8 @@ export const TABLES = {
   CONSENT_RECORDS: 'consent_records',
   DSR_REQUESTS: 'dsr_requests',
   SECURITY_INCIDENTS: 'security_incidents',
-  CDC_OUTBOX: 'cdc_outbox'
+  CDC_OUTBOX: 'cdc_outbox',
+  PARTITION_ARCHIVES: 'data_partition_archives'
 };
 
 const POLICY_STATUSES = ['draft', 'published', 'archived'];
@@ -300,6 +301,26 @@ function defineCdcOutboxTable(table, knex) {
   table.index(['correlation_id'], 'cdc_outbox_correlation_idx');
 }
 
+function definePartitionArchiveTable(table, knex) {
+  table.increments('id').primary();
+  table.string('table_name', 191).notNullable();
+  table.string('partition_name', 128).notNullable();
+  table.timestamp('range_start').notNullable();
+  table.timestamp('range_end').notNullable();
+  table.integer('retention_days').unsigned().notNullable().defaultTo(0);
+  table.timestamp('archived_at').notNullable().defaultTo(knex.fn.now());
+  table.timestamp('dropped_at');
+  table.string('storage_bucket', 191).notNullable();
+  table.string('storage_key', 512).notNullable();
+  table.bigInteger('row_count').unsigned().notNullable().defaultTo(0);
+  table.bigInteger('byte_size').unsigned().notNullable().defaultTo(0);
+  table.string('checksum', 128);
+  table.json('metadata').notNullable().defaultTo(createJsonDefault());
+  table.unique(['table_name', 'partition_name'], 'partition_archives_unique_partition');
+  table.index(['table_name', 'archived_at'], 'partition_archives_table_archived_idx');
+  table.index(['table_name', 'dropped_at'], 'partition_archives_dropped_idx');
+}
+
 async function applyPartitioning(knex, tableName, dateColumn) {
   const policyTableExists = await knex.schema.hasTable('data_partition_policies');
   if (!policyTableExists) {
@@ -363,19 +384,35 @@ async function seedPartitionPolicies(knex) {
       table_name: TABLES.AUDIT_EVENTS,
       date_column: 'occurred_at',
       strategy: 'monthly_range',
-      retention_days: 540
+      retention_days: 540,
+      metadata: {
+        archivePrefix: 'governance/audit-events',
+        archiveGraceDays: 30,
+        minActivePartitions: 6
+      }
     },
     {
       table_name: TABLES.CONSENT_RECORDS,
       date_column: 'granted_at',
       strategy: 'monthly_range',
-      retention_days: 720
+      retention_days: 720,
+      metadata: {
+        archivePrefix: 'governance/consent-records',
+        archiveGraceDays: 60,
+        minActivePartitions: 6
+      }
     },
     {
       table_name: TABLES.SECURITY_INCIDENTS,
       date_column: 'detected_at',
       strategy: 'monthly_range',
-      retention_days: 1095
+      retention_days: 1095,
+      metadata: {
+        archivePrefix: 'governance/security-incidents',
+        archiveGraceDays: 90,
+        minActivePartitions: 12,
+        manualApprovalRequired: true
+      }
     }
   ];
 
@@ -391,7 +428,10 @@ async function seedPartitionPolicies(knex) {
           metadata: JSON.stringify(policy.metadata ?? {})
         });
     } else {
-      await knex('data_partition_policies').insert(policy);
+      await knex('data_partition_policies').insert({
+        ...policy,
+        metadata: JSON.stringify(policy.metadata ?? {})
+      });
     }
   }
 }
@@ -405,6 +445,7 @@ export async function applyComplianceDomainSchema(knex) {
   await ensureTable(knex, TABLES.DSR_REQUESTS, defineDsrRequestsTable);
   await ensureTable(knex, TABLES.SECURITY_INCIDENTS, defineSecurityIncidentsTable);
   await ensureTable(knex, TABLES.CDC_OUTBOX, defineCdcOutboxTable);
+  await ensureTable(knex, TABLES.PARTITION_ARCHIVES, definePartitionArchiveTable);
 
   await applyPartitioning(knex, TABLES.AUDIT_EVENTS, 'occurred_at');
   await applyPartitioning(knex, TABLES.CONSENT_RECORDS, 'granted_at');
@@ -413,6 +454,7 @@ export async function applyComplianceDomainSchema(knex) {
 
 export async function rollbackComplianceDomainSchema(knex) {
   const tables = [
+    TABLES.PARTITION_ARCHIVES,
     TABLES.CDC_OUTBOX,
     TABLES.SECURITY_INCIDENTS,
     TABLES.DSR_REQUESTS,

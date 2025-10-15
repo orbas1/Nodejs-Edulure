@@ -17,6 +17,10 @@ const BASE_COLUMNS = [
   'kv.reviewed_by as reviewedBy',
   'kv.rejection_reason as rejectionReason',
   'kv.policy_references as policyReferences',
+  'kv.sensitive_notes_ciphertext as sensitiveNotesCiphertext',
+  'kv.sensitive_notes_hash as sensitiveNotesHash',
+  'kv.sensitive_notes_classification as sensitiveNotesClassification',
+  'kv.encryption_key_version as encryptionKeyVersion',
   'kv.created_at as createdAt',
   'kv.updated_at as updatedAt'
 ];

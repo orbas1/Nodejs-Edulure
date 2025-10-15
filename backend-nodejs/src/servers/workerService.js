@@ -8,6 +8,7 @@ import { createReadinessTracker } from '../observability/readiness.js';
 import assetIngestionService from '../services/AssetIngestionService.js';
 import dataRetentionJob from '../jobs/dataRetentionJob.js';
 import communityReminderJob from '../jobs/communityReminderJob.js';
+import dataPartitionJob from '../jobs/dataPartitionJob.js';
 
 const serviceLogger = logger.child({ service: 'worker-service' });
 
@@ -20,6 +21,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'asset-ingestion',
     'data-retention',
     'community-reminder',
+    'data-partitioning',
     'probe-server'
   ]);
 
@@ -61,6 +63,19 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   } catch (error) {
     readiness.markFailed('data-retention', error);
     serviceLogger.error({ err: error }, 'Failed to start data retention job');
+  }
+
+  readiness.markPending('data-partitioning', 'Starting data partition scheduler');
+  try {
+    dataPartitionJob.start();
+    if (!env.partitioning.enabled) {
+      readiness.markDegraded('data-partitioning', 'Data partition scheduler disabled by configuration');
+    } else {
+      readiness.markReady('data-partitioning', 'Data partition scheduler active');
+    }
+  } catch (error) {
+    readiness.markFailed('data-partitioning', error);
+    serviceLogger.error({ err: error }, 'Failed to start data partition job');
   }
 
   readiness.markPending('community-reminder', 'Starting community reminder scheduler');
@@ -108,15 +123,16 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     readiness.markPending('probe-server', `Shutting down (${signal})`);
 
     await new Promise((resolve) => {
-      probeServer.close(() => {
-        readiness.markDegraded('probe-server', 'Stopped');
-        resolve();
-      });
+    probeServer.close(() => {
+      readiness.markDegraded('probe-server', 'Stopped');
+      resolve();
     });
+  });
 
-    assetIngestionService.stop();
-    dataRetentionJob.stop();
-    communityReminderJob.stop();
+  assetIngestionService.stop();
+  dataRetentionJob.stop();
+  dataPartitionJob.stop();
+  communityReminderJob.stop();
 
     await infrastructure.stop();
 
