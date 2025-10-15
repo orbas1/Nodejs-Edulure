@@ -108,6 +108,18 @@
 - Accessibility statement component and revision history callout at top with download PDF link.
 - Contact CTA at bottom linking to support and compliance email addresses.
 
+### Privacy & Trust Center Dashboard
+- Authenticated privacy dashboard accessible via profile dropdown; hero band summarises consent status, open DSR requests, and latest policy bulletin with severity chip (Informational, Action Required).
+- Grid of metric cards: "Active Consents", "Pending Requests", "Data Categories Stored", "Processing Locations". Each card includes CTA (Manage, Review, View Locations) and KPI sparkline for historical trend.
+- Two-column layout pairs "Activity Timeline" (privacy events with filters by type/severity) on left and "Data Footprint" stack on right showing breakdown by data class with progress bars and retention clocks.
+- Secondary panel lists "Trust Resources" (export reports, audit certificates, SOC/ISO docs) with download icons and expiry badges for compliance tracking.
+
+### Scam & Fraud Education Library
+- Section nested within privacy dashboard featuring featured story carousel (three-up) with hero imagery, severity badge, estimated read time, and "Add to Learning Plan" CTA.
+- Content table supports filtering by persona (Learner, Guardian, Provider), format (Article, Video, Checklist), and time to consume. Each row includes trust badge, translation availability tags, and completion progress.
+- Spotlight card on right promotes latest scam advisory with countdown timer for policy change effective date plus "Acknowledge" button logging confirmation.
+- Footer hosts quick links to report fraud, view security hotline, and subscribe to monthly safety digest.
+
 ### Wallet Experience
 - Dashboard card showing available balance, locked funds, upcoming payouts, and Add Funds button.
 - Transaction ledger table with filters (Type, Status, Date), export CSV action, and dispute button per entry.

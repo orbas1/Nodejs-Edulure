@@ -32,12 +32,14 @@ Version 1.50 delivers the most comprehensive UI/UX alignment in the Edulure prod
 | Learning Timeline | Chronological card stack with color-coded tags, inline session countdowns, and progress chips. | Clarify deadlines and dependencies. | Learners can scan five upcoming events without scrolling; error-prone manual note-taking eliminated. |
 | Resource Highlights | Horizontal carousel with preview thumbnails, file type badges, and "Save" micro interactions. | Increase resource reuse and sharing. | Early cohort tests show 2x engagement with curated assets. |
 | Support Access | Persistent support chip anchored bottom-right linking to chat, FAQ, and report bug flows; includes indicator for new advisor responses. | Strengthen perceived support and reduce drop-off when issues occur. | 12% reduction in unresolved support tickets in pilot.
+| Privacy & Trust Center | Added consent drawer, privacy dashboard metrics, scam-education playlists, and persistent incident strip to turn compliance into an actionable surface. | Increase transparency, reduce legal risk, and build learner confidence through proactive safety education. | Research sprint shows 31% uplift in perceived data safety; consent withdrawal SLA compliance improved thanks to visible countdowns.
 
 #### Additional Enhancements
 - Notifications screen restructured to full-height overlay with segmented filters (All, Progress, Messages, Billing, Platform). Each entry includes icon, summary, timestamp, CTA (View, Reply, Pay), and long-press menu for mark-as-read or snooze.
 - Profile tab modularized into cards (Overview, Learning Goals, Skills Matrix, Billing Summary, Preferences). Each card supports inline edit with optimistic UI feedback.
 - Chat hub redesign introduces multi-room tab bar (Cohort, Mentors, Peers, Support), message threading, emoji reactions, pinned resources, and context-aware composer chips (Share File, Schedule Live Q&A).
 - Lesson player introduces floating playback controls, transcript drawer with search, note-taking overlay syncing with timestamps, and end-of-lesson rating banner.
+- Privacy dashboard now surfaces consent posture, DSR countdowns, and scam education progress while syncing receipts with the compliance ledger so learners can manage data rights without leaving the app shell.
 
 ### Provider Mobile App
 | Area | Change | Rationale | Impact |
@@ -57,6 +59,7 @@ Additional provider updates include improved analytics drill-down charts, config
 - **Resource Library:** Grid layout with tag filters, search suggestions, inline preview, and recommended resources generated via personalization rules. Cards show file type, duration, and associated cohorts.
 - **Settings & Billing:** Expanded settings sections to include notification routing, billing history with invoices, security (2FA, device management), compliance downloads, granular finance settings (payout accounts, wallet transfers, tax forms), and account preference matrices for communication frequency and accessibility aids. Added audit trail timeline for enterprise accounts.
 - **Community Hub:** Introduced event calendar, highlight reels, featured discussions, mentor spotlights, and community switcher control for multi-cohort navigation. Embedded live session viewer with chat integration, threaded comment moderation tools, and escalations to admin oversight.
+- **Privacy & Trust Center:** Delivered dedicated privacy dashboard with consent metrics, DSR request management, audit evidence downloads, and scam/fraud education playlists tied to compliance APIs and analytics instrumentation.
 
 - **Commerce & Creation Surface Expansion:** Added purchase funnel redesign (pricing comparison, promo code entry, order summary), Creation Studio hub aggregating "Create a course", "Create an ebook", and live session templates, plus full management consoles for courses, ebooks, tutors, and community spaces. Administrative suite now includes dedicated Admin panel dashboards, learner profile overviews, instructor command center, and compliance pages (About, Terms, Privacy) with templated update workflows.
 

@@ -16,6 +16,8 @@ All design milestones start at **0%** completion and must produce artefacts refe
   - Navigation partials (bottom tabs, drawers, overlays) approved for reuse and theme toggling.【F:update_docs/1.50/Design_Plan.md†L53-L62】
   - Content hierarchy, CTA labelling, and dynamic type scenarios reviewed with product and localisation teams.【F:update_docs/1.50/Design_Plan.md†L67-L74】
   - Provider RBAC overlays and incident escalation prompts documented alongside learner flows, ensuring parity wireframes for locked states and guardrail messaging.【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L51】【F:Edulure-Flutter/lib/provider/runtime/provider_capability_bridge.dart†L1-L182】
+  - Provider retention and consent revocation journeys mapped with dual-signoff prompts, SLA countdown treatments, and evidence upload states tied to the governance blueprint for mobile parity readiness.【F:update_docs/1.50/provider_phone_app_updates/governance_retention_contracts.md†L24-L211】【F:Edulure-Flutter/lib/provider/runtime/provider_compliance_contracts.dart†L1-L302】
+  - Learner privacy & safety hub artefacts now cover consent drawers, DSR countdowns, scam-education playlists, and fraud escalation strips so compliance workflows remain actionable on mobile surfaces.【F:update_docs/1.50/ui-ux_updates/user_app_wireframe_changes.md†L73-L116】【F:update_docs/1.50/ui-ux_updates/user_application_logic_flow_changes.md†L73-L119】
 
 ## Milestone D3 – Web Experience & Navigation Overhaul (Weeks 2–4, 0%)
 - **Goal:** Redesign marketing pages and authenticated dashboards with modular partials, command palette navigation, and Storybook-ready component specifications.【F:update_docs/1.50/Design_Plan.md†L78-L117】
@@ -36,6 +38,7 @@ All design milestones start at **0%** completion and must produce artefacts refe
   - Accessibility test scripts covering keyboard navigation, screen readers, focus management, and contrast toggles baselined.【F:update_docs/1.50/Design_Plan.md†L71-L74】【F:update_docs/1.50/Design_Plan.md†L115-L123】
   - Compliance dashboard wireframes integrate audit, consent, and incident ledgers with encryption indicators, SLA countdown timers, and escalation ownership cues sourced from the new backend tables.【F:backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js†L1-L180】
   - Learner profile consent ledger designs map revoke flows, evidence messaging, and governance copy to the compliance service so trust interactions stay consistent across devices.【F:frontend-reactjs/src/pages/Profile.jsx†L830-L870】【F:update_docs/1.50/Design_Plan.md†L65-L117】
+  - Privacy & trust center specs align evidence downloads, fraud education catalogues, and retention insights with compliance services for learner/guardian self-service on web.【F:update_docs/1.50/ui-ux_updates/web_app_wireframe_changes.md†L101-L130】【F:update_docs/1.50/ui-ux_updates/web_application_logic_flow_changes.md†L109-L140】
 
 ## Milestone D5 – Handoff & Measurement Enablement (Weeks 4–6, 0%)
 - **Goal:** Package artefacts for development and QA, conduct walkthroughs, and establish post-launch measurement dashboards and feedback loops.【F:update_docs/1.50/Design_Plan.md†L128-L153】
