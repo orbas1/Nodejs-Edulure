@@ -16,12 +16,14 @@ import logger from './config/logger.js';
 import { healthcheck } from './config/database.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
+import auth from './middleware/auth.js';
 import requestContextMiddleware from './middleware/requestContext.js';
 import runtimeConfigMiddleware from './middleware/runtimeConfig.js';
 import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } from './observability/metrics.js';
 import { mountVersionedApi } from './routes/registerApiRoutes.js';
 import { apiRouteRegistry } from './routes/routeRegistry.js';
 import { getServiceSpecDocument, getServiceSpecIndex } from './docs/serviceSpecRegistry.js';
+import { createGraphQLRouter } from './graphql/router.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
@@ -177,6 +179,7 @@ app.get('/health', async (_req, res, next) => {
 
 app.get('/metrics', metricsHandler);
 mountVersionedApi(app, { registry: apiRouteRegistry });
+app.use('/api/v1/graphql', auth('user'), createGraphQLRouter());
 
 app.get('/api/v1/docs/index.json', (_req, res) =>
   res.json({

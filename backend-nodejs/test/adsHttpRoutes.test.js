@@ -41,7 +41,7 @@ describe('Ads HTTP routes', () => {
     });
 
     const response = await request(app)
-      .get('/api/ads/campaigns?status=active,paused&page=2&limit=5')
+      .get('/api/v1/ads/campaigns?status=active,paused&page=2&limit=5')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
@@ -58,7 +58,7 @@ describe('Ads HTTP routes', () => {
     adsServiceMock.createCampaign.mockResolvedValue(campaign);
 
     const response = await request(app)
-      .post('/api/ads/campaigns')
+      .post('/api/v1/ads/campaigns')
       .set('Authorization', 'Bearer token')
       .send({
         name: 'Launch Creator Ads',

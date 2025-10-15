@@ -162,21 +162,42 @@ if (!runtimeConfigReadsMetric) {
 }
 
 export class FeatureFlagService {
-  constructor({ loadFlags, cacheTtlMs, refreshIntervalMs, loggerInstance, distributedCache = null }) {
+  constructor({
+    loadFlags,
+    cacheTtlMs,
+    refreshIntervalMs,
+    loggerInstance,
+    distributedCache = null,
+    skipInitialRefresh = false
+  }) {
     this.loadFlags = loadFlags;
     this.cacheTtlMs = cacheTtlMs;
     this.refreshIntervalMs = refreshIntervalMs;
     this.logger = loggerInstance;
     this.distributedCache = distributedCache ?? null;
+    this.skipInitialRefresh = skipInitialRefresh ?? false;
     this.cache = { flags: new Map(), expiresAt: 0, version: null, source: 'init' };
     this.refreshPromise = null;
     this.interval = null;
   }
 
-  async start() {
-    const hydrated = await this.tryHydrateFromDistributedCache('startup');
-    if (!hydrated) {
-      await this.refresh({ force: true, reason: 'startup' });
+  async start({ skipInitialRefresh } = {}) {
+    const shouldSkip = (skipInitialRefresh ?? this.skipInitialRefresh) === true;
+
+    if (shouldSkip) {
+      const hydrated = await this.tryHydrateFromDistributedCache('startup-skip');
+      if (!hydrated) {
+        const now = Date.now();
+        this.cache.expiresAt = now + this.cacheTtlMs;
+        this.cache.version = now;
+        this.cache.source = 'startup-skip';
+        this.logger.debug('Skipping initial feature flag refresh in test or fast-start mode');
+      }
+    } else {
+      const hydrated = await this.tryHydrateFromDistributedCache('startup');
+      if (!hydrated) {
+        await this.refresh({ force: true, reason: 'startup' });
+      }
     }
 
     if (this.refreshIntervalMs > 0) {
@@ -481,21 +502,42 @@ export class FeatureFlagService {
 }
 
 export class RuntimeConfigService {
-  constructor({ loadEntries, cacheTtlMs, refreshIntervalMs, loggerInstance, distributedCache = null }) {
+  constructor({
+    loadEntries,
+    cacheTtlMs,
+    refreshIntervalMs,
+    loggerInstance,
+    distributedCache = null,
+    skipInitialRefresh = false
+  }) {
     this.loadEntries = loadEntries;
     this.cacheTtlMs = cacheTtlMs;
     this.refreshIntervalMs = refreshIntervalMs;
     this.logger = loggerInstance;
     this.distributedCache = distributedCache ?? null;
+    this.skipInitialRefresh = skipInitialRefresh ?? false;
     this.cache = { entries: new Map(), expiresAt: 0, version: null, source: 'init' };
     this.refreshPromise = null;
     this.interval = null;
   }
 
-  async start() {
-    const hydrated = await this.tryHydrateFromDistributedCache('startup');
-    if (!hydrated) {
-      await this.refresh({ force: true, reason: 'startup' });
+  async start({ skipInitialRefresh } = {}) {
+    const shouldSkip = (skipInitialRefresh ?? this.skipInitialRefresh) === true;
+
+    if (shouldSkip) {
+      const hydrated = await this.tryHydrateFromDistributedCache('startup-skip');
+      if (!hydrated) {
+        const now = Date.now();
+        this.cache.expiresAt = now + this.cacheTtlMs;
+        this.cache.version = now;
+        this.cache.source = 'startup-skip';
+        this.logger.debug('Skipping initial runtime configuration refresh in test or fast-start mode');
+      }
+    } else {
+      const hydrated = await this.tryHydrateFromDistributedCache('startup');
+      if (!hydrated) {
+        await this.refresh({ force: true, reason: 'startup' });
+      }
     }
 
     if (this.refreshIntervalMs > 0) {
@@ -725,7 +767,8 @@ export const featureFlagService = new FeatureFlagService({
   cacheTtlMs: env.runtimeConfig.featureFlagCacheTtlMs,
   refreshIntervalMs: env.runtimeConfig.featureFlagRefreshIntervalMs,
   loggerInstance: logger.child({ service: 'FeatureFlagService' }),
-  distributedCache: distributedRuntimeCache
+  distributedCache: distributedRuntimeCache,
+  skipInitialRefresh: env.nodeEnv === 'test'
 });
 
 export const runtimeConfigService = new RuntimeConfigService({
@@ -733,5 +776,6 @@ export const runtimeConfigService = new RuntimeConfigService({
   cacheTtlMs: env.runtimeConfig.configCacheTtlMs,
   refreshIntervalMs: env.runtimeConfig.configRefreshIntervalMs,
   loggerInstance: logger.child({ service: 'RuntimeConfigService' }),
-  distributedCache: distributedRuntimeCache
+  distributedCache: distributedRuntimeCache,
+  skipInitialRefresh: env.nodeEnv === 'test'
 });

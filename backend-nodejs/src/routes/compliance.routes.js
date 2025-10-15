@@ -7,14 +7,14 @@ const router = Router();
 
 router.use(auth('admin'));
 
-router.get('/compliance/dsr/requests', ComplianceController.listDsrRequests);
-router.post('/compliance/dsr/requests/:requestId/assign', ComplianceController.assignDsrRequest);
-router.post('/compliance/dsr/requests/:requestId/status', ComplianceController.updateDsrStatus);
+router.get('/dsr/requests', ComplianceController.listDsrRequests);
+router.post('/dsr/requests/:requestId/assign', ComplianceController.assignDsrRequest);
+router.post('/dsr/requests/:requestId/status', ComplianceController.updateDsrStatus);
 
-router.get('/compliance/consents/:userId', ComplianceController.listUserConsents);
-router.post('/compliance/consents', ComplianceController.createConsent);
-router.post('/compliance/consents/:consentId/revoke', ComplianceController.revokeConsent);
+router.get('/consents/:userId', ComplianceController.listUserConsents);
+router.post('/consents', ComplianceController.createConsent);
+router.post('/consents/:consentId/revoke', ComplianceController.revokeConsent);
 
-router.get('/compliance/policies', ComplianceController.fetchPolicyTimeline);
+router.get('/policies', ComplianceController.fetchPolicyTimeline);
 
 export default router;

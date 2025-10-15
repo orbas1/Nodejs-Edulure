@@ -1,10 +1,29 @@
 import logger from '../config/logger.js';
 import { env } from '../config/env.js';
-import { getCurrentReadinessReport } from '../app.js';
 import { apiRouteRegistry } from '../routes/routeRegistry.js';
 import { featureFlagService } from './FeatureFlagService.js';
 
 const DEFAULT_TIMEOUT_MS = 4000;
+
+let cachedReadinessAccessor = null;
+
+async function resolveLocalReadiness() {
+  if (!cachedReadinessAccessor) {
+    const module = await import('../app.js');
+    cachedReadinessAccessor = module.getCurrentReadinessReport;
+  }
+
+  if (typeof cachedReadinessAccessor !== 'function') {
+    return {
+      ready: false,
+      status: 'unknown',
+      components: [],
+      message: 'Readiness provider not initialised'
+    };
+  }
+
+  return cachedReadinessAccessor();
+}
 const PROBE_HOST = '127.0.0.1';
 
 const STATUS_RANK = {
@@ -117,7 +136,8 @@ function buildCapabilitySummary({
   evaluation,
   dependencies,
   dependencyStatuses,
-  worstDependencyStatus
+  worstDependencyStatus,
+  missingDependencies
 }) {
   const dependencyNames = dependencies.join(', ');
   if (!evaluation.enabled) {
@@ -126,7 +146,8 @@ function buildCapabilitySummary({
       summary: `Capability gated by feature flag \`${entry.flagKey}\` (${evaluation.reason}).`,
       details: {
         evaluation,
-        dependencyStatuses
+        dependencyStatuses,
+        missingDependencies
       }
     };
   }
@@ -137,7 +158,8 @@ function buildCapabilitySummary({
       summary: `Unavailable while dependent services (${dependencyNames}) recover.`,
       details: {
         evaluation,
-        dependencyStatuses
+        dependencyStatuses,
+        missingDependencies
       }
     };
   }
@@ -148,7 +170,8 @@ function buildCapabilitySummary({
       summary: `Operating in degraded mode because ${dependencyNames} report limited capacity.`,
       details: {
         evaluation,
-        dependencyStatuses
+        dependencyStatuses,
+        missingDependencies
       }
     };
   }
@@ -158,7 +181,8 @@ function buildCapabilitySummary({
     summary: 'Capability available.',
     details: {
       evaluation,
-      dependencyStatuses
+      dependencyStatuses,
+      missingDependencies
     }
   };
 }
@@ -170,7 +194,7 @@ export default class CapabilityManifestService {
     environment = env.nodeEnv,
     readinessTargets,
     fetchImpl = globalThis.fetch?.bind(globalThis),
-    localReadinessProvider = getCurrentReadinessReport,
+    localReadinessProvider = () => resolveLocalReadiness(),
     loggerInstance = logger.child({ service: 'CapabilityManifestService' }),
     timeoutMs = DEFAULT_TIMEOUT_MS
   } = {}) {
@@ -278,7 +302,10 @@ export default class CapabilityManifestService {
       }
 
       const dependencies = CAPABILITY_DEPENDENCIES.get(entry.capability) ?? ['web-service'];
-      const dependencyStatuses = dependencies.map((key) => servicesMap.get(key)?.status ?? 'outage');
+      const dependencyStatuses = dependencies.map((key) =>
+        servicesMap.has(key) ? servicesMap.get(key).status : 'operational'
+      );
+      const missingDependencies = dependencies.filter((key) => !servicesMap.has(key));
       const worstDependencyStatus = computeWorstStatus(dependencyStatuses);
 
       const evaluation = this.featureFlagService.evaluate(entry.flagKey, baseContext, {
@@ -295,7 +322,8 @@ export default class CapabilityManifestService {
         evaluation: { ...evaluation, enabled },
         dependencies,
         dependencyStatuses,
-        worstDependencyStatus
+        worstDependencyStatus,
+        missingDependencies
       });
 
       const availabilityRank = determineStatusRank(summary.status);
@@ -314,6 +342,7 @@ export default class CapabilityManifestService {
         summary: summary.summary,
         dependencies,
         dependencyStatuses,
+        missingDependencies,
         accessible,
         severityRank: availabilityRank,
         evaluation: summary.details.evaluation,

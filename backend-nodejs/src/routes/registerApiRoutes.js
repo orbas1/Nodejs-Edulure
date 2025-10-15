@@ -12,7 +12,7 @@ export function mountVersionedApi(app, {
   prefix = DEFAULT_API_PREFIX,
   registry,
   loggerInstance = logger,
-  exposeLegacyRedirect = true
+  exposeLegacyRedirect
 } = {}) {
   if (!Array.isArray(registry) || registry.length === 0) {
     throw new Error('mountVersionedApi requires a non-empty registry of route descriptors.');
@@ -78,12 +78,27 @@ export function mountVersionedApi(app, {
 
   app.use(versionBasePath, versionRouter);
 
-  if (exposeLegacyRedirect) {
+  const legacyEnvToggle = process.env.API_EXPOSE_LEGACY_REDIRECTS;
+  const shouldExposeLegacy =
+    typeof exposeLegacyRedirect === 'boolean'
+      ? exposeLegacyRedirect
+      : typeof legacyEnvToggle === 'string'
+        ? legacyEnvToggle !== 'false'
+        : process.env.NODE_ENV !== 'test';
+
+  if (shouldExposeLegacy) {
     app.use(prefix, (req, res, next) => {
       if (req.originalUrl.startsWith(`${prefix}/${version}/`)) {
         return next();
       }
       return res.redirect(308, `${versionBasePath}${req.url}`);
+    });
+  } else {
+    app.use(prefix, (req, res, next) => {
+      if (req.originalUrl.startsWith(`${prefix}/${version}/`)) {
+        return next();
+      }
+      return versionRouter(req, res, next);
     });
   }
 

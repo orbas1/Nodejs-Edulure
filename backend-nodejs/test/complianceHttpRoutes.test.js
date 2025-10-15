@@ -42,7 +42,7 @@ beforeEach(() => {
 describe('Compliance HTTP routes', () => {
   it('returns paginated DSR requests with query filters applied', async () => {
     const response = await request(app)
-      .get('/api/compliance/dsr/requests')
+      .get('/api/v1/compliance/dsr/requests')
       .query({ status: 'open', dueBefore: '2025-02-01', limit: '5', offset: '15' });
 
     expect(response.status).toBe(200);
@@ -56,7 +56,7 @@ describe('Compliance HTTP routes', () => {
   });
 
   it('validates assign payloads before delegating to the service', async () => {
-    const response = await request(app).post('/api/compliance/dsr/requests/44/assign').send({});
+    const response = await request(app).post('/api/v1/compliance/dsr/requests/44/assign').send({});
 
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
@@ -65,7 +65,7 @@ describe('Compliance HTTP routes', () => {
 
   it('assigns DSR requests with actor metadata when payload is valid', async () => {
     const response = await request(app)
-      .post('/api/compliance/dsr/requests/44/assign')
+      .post('/api/v1/compliance/dsr/requests/44/assign')
       .send({ assigneeId: 'trust-analyst-7' });
 
     expect(response.status).toBe(200);
@@ -79,7 +79,7 @@ describe('Compliance HTTP routes', () => {
 
   it('requires a status value when updating a DSR', async () => {
     const response = await request(app)
-      .post('/api/compliance/dsr/requests/77/status')
+      .post('/api/v1/compliance/dsr/requests/77/status')
       .send({ resolutionNotes: 'Waiting on legal review' });
 
     expect(response.status).toBe(400);
@@ -89,7 +89,7 @@ describe('Compliance HTTP routes', () => {
 
   it('updates DSR status and passes through actor context', async () => {
     const response = await request(app)
-      .post('/api/compliance/dsr/requests/77/status')
+      .post('/api/v1/compliance/dsr/requests/77/status')
       .send({ status: 'completed', resolutionNotes: 'Delivered report to user' });
 
     expect(response.status).toBe(200);
@@ -103,7 +103,7 @@ describe('Compliance HTTP routes', () => {
   });
 
   it('loads consent records for a user', async () => {
-    const response = await request(app).get('/api/compliance/consents/321');
+    const response = await request(app).get('/api/v1/compliance/consents/321');
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
@@ -111,7 +111,7 @@ describe('Compliance HTTP routes', () => {
   });
 
   it('rejects consent creation when mandatory fields are missing', async () => {
-    const response = await request(app).post('/api/compliance/consents').send({});
+    const response = await request(app).post('/api/v1/compliance/consents').send({});
 
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
@@ -120,7 +120,7 @@ describe('Compliance HTTP routes', () => {
 
   it('creates consent records with actor metadata when payload is valid', async () => {
     const response = await request(app)
-      .post('/api/compliance/consents')
+      .post('/api/v1/compliance/consents')
       .send({
         userId: 501,
         consentType: 'marketing',
@@ -144,7 +144,7 @@ describe('Compliance HTTP routes', () => {
 
   it('revokes consent entries with actor and optional reason', async () => {
     const response = await request(app)
-      .post('/api/compliance/consents/10/revoke')
+      .post('/api/v1/compliance/consents/10/revoke')
       .send({ reason: 'User requested erasure' });
 
     expect(response.status).toBe(200);
@@ -158,7 +158,7 @@ describe('Compliance HTTP routes', () => {
 
   it('fetches policy timelines with optional filtering', async () => {
     const response = await request(app)
-      .get('/api/compliance/policies')
+      .get('/api/v1/compliance/policies')
       .query({ policyKey: 'privacy' });
 
     expect(response.status).toBe(200);

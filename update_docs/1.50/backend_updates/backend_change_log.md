@@ -20,6 +20,7 @@
 ## Capability Manifest & Health Aggregation
 - Implemented a capability manifest service that evaluates feature flag exposure, correlates dependencies with readiness probes across the web, worker, and realtime processes, and surfaces availability summaries for clients and operator tooling.【F:backend-nodejs/src/services/CapabilityManifestService.js†L1-L209】
 - Extended the runtime configuration controller with a public `/api/v1/runtime/manifest` endpoint so web and mobile clients can fetch real-time service availability, capability gating reasons, and dependency impact metadata in a single call.【F:backend-nodejs/src/controllers/RuntimeConfigController.js†L1-L155】【F:backend-nodejs/src/routes/runtimeConfig.routes.js†L1-L11】
+- Refined manifest dependency handling to default missing readiness probes to an "operational" state while logging the absent services for diagnostics, preventing optional dependencies from forcing outage status in tests or lower environments.【F:backend-nodejs/src/services/CapabilityManifestService.js†L137-L207】【F:backend-nodejs/test/capabilityManifestService.test.js†L113-L149】
 
 ## Operator Telemetry & Incident Feeds
 - Introduced an operator dashboard service that fuses capability manifest health, security incident telemetry, scam analytics, and runbook shortcuts into a single snapshot powering the new admin command centre UI.【F:backend-nodejs/src/services/OperatorDashboardService.js†L1-L305】【F:backend-nodejs/src/services/DashboardService.js†L826-L899】

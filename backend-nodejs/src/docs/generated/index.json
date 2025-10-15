@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2025-10-14T23:27:31.936Z",
+  "generatedAt": "2025-10-15T15:32:04.126Z",
   "baseSpec": "../openapi.json",
   "services": [
     {
@@ -73,6 +73,15 @@
       "description": "Follows, recommendations, and user engagement APIs.",
       "basePath": "/social",
       "file": "./social/v1/openapi.json"
+    },
+    {
+      "service": "feed",
+      "name": "feed",
+      "capability": "experience-feed",
+      "version": "v1",
+      "description": "Live feed aggregation, ad placements, and analytics query endpoints.",
+      "basePath": "/feed",
+      "file": "./feed/v1/openapi.json"
     },
     {
       "service": "explorer",

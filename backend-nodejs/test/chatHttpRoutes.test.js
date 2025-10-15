@@ -77,7 +77,7 @@ describe('Community chat HTTP routes', () => {
     ]);
 
     const response = await request(app)
-      .get('/api/communities/7/chat/channels')
+      .get('/api/v1/communities/7/chat/channels')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
@@ -105,7 +105,7 @@ describe('Community chat HTTP routes', () => {
 
     const response = await request(app)
       .get(
-        `/api/communities/7/chat/channels/11/messages?limit=10&before=${encodeURIComponent(
+        `/api/v1/communities/7/chat/channels/11/messages?limit=10&before=${encodeURIComponent(
           now.toISOString()
         )}&includeHidden=true`
       )
@@ -132,7 +132,7 @@ describe('Community chat HTTP routes', () => {
     communityChatServiceMock.postMessage.mockResolvedValue(created);
 
     const response = await request(app)
-      .post('/api/communities/7/chat/channels/11/messages')
+      .post('/api/v1/communities/7/chat/channels/11/messages')
       .set('Authorization', 'Bearer token')
       .send({ body: 'Shipping the chat rollout' });
 
@@ -152,13 +152,13 @@ describe('Community chat HTTP routes', () => {
 
   it('returns a validation error when message body is missing', async () => {
     const response = await request(app)
-      .post('/api/communities/7/chat/channels/11/messages')
+      .post('/api/v1/communities/7/chat/channels/11/messages')
       .set('Authorization', 'Bearer token')
       .send({});
 
     expect(response.status).toBe(422);
     expect(response.body.success).toBe(false);
-    expect(response.body.errors).toBeInstanceOf(Array);
+    expect(response.body.message).toContain('body');
     expect(communityChatServiceMock.postMessage).not.toHaveBeenCalled();
   });
 
@@ -179,21 +179,21 @@ describe('Community chat HTTP routes', () => {
     });
 
     const reactResponse = await request(app)
-      .post('/api/communities/7/chat/channels/11/messages/901/reactions')
+      .post('/api/v1/communities/7/chat/channels/11/messages/901/reactions')
       .set('Authorization', 'Bearer token')
       .send({ emoji: '🚀' });
     expect(reactResponse.status).toBe(200);
     expect(communityChatServiceMock.reactToMessage).toHaveBeenCalledWith('7', '11', 42, '901', '🚀');
 
     const removeResponse = await request(app)
-      .delete('/api/communities/7/chat/channels/11/messages/901/reactions')
+      .delete('/api/v1/communities/7/chat/channels/11/messages/901/reactions')
       .set('Authorization', 'Bearer token')
       .send({ emoji: '🚀' });
     expect(removeResponse.status).toBe(200);
     expect(communityChatServiceMock.removeReaction).toHaveBeenCalledWith('7', '11', 42, '901', '🚀');
 
     const moderateResponse = await request(app)
-      .post('/api/communities/7/chat/channels/11/messages/901/moderate')
+      .post('/api/v1/communities/7/chat/channels/11/messages/901/moderate')
       .set('Authorization', 'Bearer token')
       .send({ action: 'hide', reason: 'Off-topic' });
     expect(moderateResponse.status).toBe(200);
@@ -218,14 +218,14 @@ describe('Community chat HTTP routes', () => {
     });
 
     const listResponse = await request(app)
-      .get('/api/communities/7/chat/presence')
+      .get('/api/v1/communities/7/chat/presence')
       .set('Authorization', 'Bearer token');
     expect(listResponse.status).toBe(200);
     expect(listResponse.body.data[0].status).toBe('online');
     expect(communityChatServiceMock.listPresence).toHaveBeenCalledWith('7');
 
     const updateResponse = await request(app)
-      .post('/api/communities/7/chat/presence')
+      .post('/api/v1/communities/7/chat/presence')
       .set('Authorization', 'Bearer token')
       .send({ status: 'away', metadata: { tab: 'chat' } });
     expect(updateResponse.status).toBe(200);
@@ -255,7 +255,7 @@ describe('Direct message HTTP routes', () => {
     });
 
     const response = await request(app)
-      .get('/api/chat/threads?limit=5&offset=10')
+      .get('/api/v1/chat/threads?limit=5&offset=10')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
@@ -273,7 +273,7 @@ describe('Direct message HTTP routes', () => {
     });
 
     const response = await request(app)
-      .post('/api/chat/threads')
+      .post('/api/v1/chat/threads')
       .set('Authorization', 'Bearer token')
       .send({
         participantIds: [12],
@@ -295,7 +295,7 @@ describe('Direct message HTTP routes', () => {
 
   it('rejects malformed thread payloads', async () => {
     const response = await request(app)
-      .post('/api/chat/threads')
+      .post('/api/v1/chat/threads')
       .set('Authorization', 'Bearer token')
       .send({});
 
@@ -313,7 +313,7 @@ describe('Direct message HTTP routes', () => {
     });
 
     const response = await request(app)
-      .post('/api/chat/threads/300/messages')
+      .post('/api/v1/chat/threads/300/messages')
       .set('Authorization', 'Bearer token')
       .send({ body: 'Kick-off moved to 15:30' });
 
@@ -332,7 +332,7 @@ describe('Direct message HTTP routes', () => {
     });
 
     const response = await request(app)
-      .post('/api/chat/threads/300/read')
+      .post('/api/v1/chat/threads/300/read')
       .set('Authorization', 'Bearer token')
       .send({ messageId: 910 });
 

@@ -36,9 +36,9 @@ describe('DashboardService helpers', () => {
 
     const pace = buildLearningPace(completions, reference);
     expect(pace).toHaveLength(7);
-    expect(pace[6]).toEqual({ day: 'Thu', minutes: 45 });
-    expect(pace[5]).toEqual({ day: 'Wed', minutes: 55 });
-    expect(pace[2]).toEqual({ day: 'Sun', minutes: 60 });
+    expect(pace[6]).toMatchObject({ day: 'Thu', minutes: 45, effortLevel: 'steady' });
+    expect(pace[5]).toMatchObject({ day: 'Wed', minutes: 55, effortLevel: 'steady' });
+    expect(pace[2]).toMatchObject({ day: 'Sun', minutes: 60, effortLevel: 'steady' });
   });
 
   it('renders humanised time differences', () => {

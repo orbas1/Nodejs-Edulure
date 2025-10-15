@@ -13,7 +13,14 @@ const snapshotQuerySchema = Joi.object({
   includeSensitive: Joi.boolean().default(false)
 });
 
-const capabilityManifestService = new CapabilityManifestService();
+let capabilityManifestService;
+
+function getCapabilityManifestService() {
+  if (!capabilityManifestService) {
+    capabilityManifestService = new CapabilityManifestService();
+  }
+  return capabilityManifestService;
+}
 
 export default class RuntimeConfigController {
   static async publicSnapshot(req, res, next) {
@@ -145,7 +152,7 @@ export default class RuntimeConfigController {
         }
       };
 
-      const manifest = await capabilityManifestService.buildManifest({ audience, userContext });
+      const manifest = await getCapabilityManifestService().buildManifest({ audience, userContext });
 
       return success(res, {
         data: manifest,

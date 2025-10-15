@@ -78,6 +78,11 @@
 - Right column surfaces upcoming events, saved resources, and support contacts.
 - Footer region includes quick links to account preferences, finance settings, and help center.
 
+### Live Feed & Highlights
+- Global feed route (`/feed`) displays a two-column layout: left column streams curated timeline cards blending community activity, instructor spotlights, and inline ads placements every fourth tile; right column shows analytics snapshot (engagement velocity, trending tags, ads CTR) sourced from the live feed analytics endpoint with range selector chips (7d, 30d, 90d).【F:backend-nodejs/src/services/LiveFeedService.js†L73-L144】【F:backend-nodejs/src/docs/openapi.json†L13840-L13940】
+- Highlight rail above the fold presents up to four campaign or project spotlights with hero imagery, status chip (New, Trending, Sponsored), and "View detail" CTA that deep links into community posts or ad destinations while respecting capability flags.【F:backend-nodejs/src/services/LiveFeedService.js†L175-L214】【F:backend-nodejs/src/routes/routeRegistry.js†L1-L51】
+- Feed filters persist in header (Context, Community, Search) with pill toggles for Analytics and Highlights; toggles map directly to `includeAnalytics`/`includeHighlights` query parameters so UI mirrors backend controls and GraphQL selection sets.【F:backend-nodejs/test/feedHttpRoutes.test.js†L12-L97】【F:backend-nodejs/test/graphqlFeedRoutes.test.js†L12-L116】
+
 ### Instructor Panel
 - Overview strip with teaching hours, cohort satisfaction, pending reviews.
 - Task board segmented into Today, Upcoming, Needs Attention columns with drag-and-drop interactions.

@@ -108,6 +108,18 @@ export default class AdsCampaignModel {
     return record ? this.deserialize(record) : null;
   }
 
+  static async findByPublicIds(publicIds, connection = db) {
+    if (!publicIds || publicIds.length === 0) {
+      return [];
+    }
+
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .whereIn('public_id', publicIds);
+
+    return rows.map((row) => this.deserialize(row));
+  }
+
   static async updateById(id, updates, connection = db) {
     const payload = {};
     if (updates.name !== undefined) payload.name = updates.name;

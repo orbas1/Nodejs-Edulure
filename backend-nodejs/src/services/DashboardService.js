@@ -13,7 +13,14 @@ function safeJsonParse(value, fallback) {
 }
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
-const operatorDashboardService = new OperatorDashboardService();
+let operatorDashboardService;
+
+function getOperatorDashboardService() {
+  if (!operatorDashboardService) {
+    operatorDashboardService = new OperatorDashboardService();
+  }
+  return operatorDashboardService;
+}
 
 export function formatCurrency(amountCents, currency = 'USD') {
   const amount = Number(amountCents ?? 0) / 100;
@@ -63,157 +70,132 @@ export function humanizeRelativeTime(dateLike, referenceDate = new Date()) {
   return `${diffYears}y ago`;
 }
 
+function clampUtcDay(dateLike) {
+  const date = dateLike instanceof Date ? new Date(dateLike) : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
+
+function resolveCompletionEntry(entry) {
+  if (!entry) return null;
+  const dateValue = entry.completedAt ?? entry.date ?? entry.timestamp ?? entry;
+  const durationValue =
+    entry.durationMinutes ?? entry.duration ?? entry.minutes ?? entry.studyMinutes ?? entry.totalMinutes ?? 0;
+
+  const date = clampUtcDay(dateValue);
+  if (!date) return null;
+
+  const minutes = Number(durationValue ?? 0);
+  return {
+    date,
+    isoDay: date.toISOString().slice(0, 10),
+    minutes: Number.isFinite(minutes) && minutes > 0 ? minutes : 0
+  };
+}
+
 export function calculateLearningStreak(completionDates = [], referenceDate = new Date()) {
-  const completionSet = new Set(
-    completionDates
-      .map((entry) => {
-        const value = entry instanceof Date ? entry : new Date(entry);
-        if (Number.isNaN(value.getTime())) return null;
-        return value.toISOString().slice(0, 10);
-      })
-      .filter(Boolean)
-  );
+  const entries = completionDates.map(resolveCompletionEntry).filter(Boolean);
+  if (entries.length === 0) {
+    return {
+      current: 0,
+      longest: 0,
+      totalDays: 0,
+      currentRange: null,
+      longestRange: null,
+      lastCompletedAt: null
+    };
+  }
 
+  const uniqueDays = new Map();
+  for (const entry of entries) {
+    if (!uniqueDays.has(entry.isoDay) || uniqueDays.get(entry.isoDay).date < entry.date) {
+      uniqueDays.set(entry.isoDay, entry);
+    }
+  }
+
+  const reference = clampUtcDay(referenceDate) ?? new Date();
   let current = 0;
-  let longest = 0;
-  let cursor = new Date(referenceDate);
-
-  while (completionSet.has(cursor.toISOString().slice(0, 10))) {
+  let cursor = new Date(reference);
+  while (uniqueDays.has(cursor.toISOString().slice(0, 10))) {
     current += 1;
     cursor = new Date(cursor.getTime() - DAY_IN_MS);
   }
+  const currentRange =
+    current > 0
+      ? {
+          start: new Date(cursor.getTime() + DAY_IN_MS).toISOString(),
+          end: new Date(reference).toISOString()
+        }
+      : null;
 
+  const sortedDays = Array.from(uniqueDays.keys()).sort();
+  let longest = 0;
+  let longestRange = null;
   let streak = 0;
-  const sortedDays = Array.from(completionSet).sort((a, b) => (a < b ? -1 : 1));
+  let streakStart = null;
   let previous = null;
-  for (const day of sortedDays) {
+  for (const isoDay of sortedDays) {
     if (previous) {
-      const prev = new Date(previous);
-      const currentDay = new Date(day);
-      const diff = Math.round((currentDay - prev) / DAY_IN_MS);
-      streak = diff === 1 ? streak + 1 : 1;
+      const diff = Math.round((new Date(`${isoDay}T00:00:00Z`) - new Date(`${previous}T00:00:00Z`)) / DAY_IN_MS);
+      if (diff === 1) {
+        streak += 1;
+      } else {
+        streak = 1;
+        streakStart = isoDay;
+      }
     } else {
       streak = 1;
+      streakStart = isoDay;
     }
-    longest = Math.max(longest, streak);
-    previous = day;
+
+    if (streak > longest) {
+      longest = streak;
+      longestRange = {
+        start: new Date(`${streakStart}T00:00:00Z`).toISOString(),
+        end: new Date(`${isoDay}T00:00:00Z`).toISOString()
+      };
+    }
+
+    previous = isoDay;
   }
 
-  const projectProposals = assignments
-    .filter(isProjectAssignment)
-    .map((assignment) => {
-      const metadata = assignment.metadata ?? {};
-      const course = courseById.get(Number(assignment.courseId));
-      const dueDate = assignment.dueDate instanceof Date ? assignment.dueDate : null;
-      const dueLabel = dueDate
-        ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined })
-        : 'Schedule pending';
-      const dueIn = dueDate ? humanizeFutureTime(dueDate, now) : 'TBD';
-      const courseValue = Number(course?.priceAmount ?? 0);
-      const weightingPercent = Number(
-        metadata.weight ??
-          metadata.weightPercent ??
-          metadata.weighting ??
-          metadata.weightingPercent ??
-          metadata.contractWeight ??
-          25
-      );
-      const weighting = Number.isFinite(weightingPercent) && weightingPercent > 0 ? weightingPercent / 100 : 0.25;
-      const estimatedValueCents = Math.round(Math.max(courseValue * Math.max(weighting, 0.15), 0));
-      const stage = !dueDate
-        ? 'Scoping'
-        : dueDate.getTime() < now.getTime()
-          ? 'Delivery'
-          : dueDate.getTime() - now.getTime() <= 7 * DAY_IN_MS
-            ? 'Negotiation'
-            : 'Discovery';
-      const confidence = metadata.requiresReview ? 0.64 : 0.82;
-      const reviewers = normaliseStringArray(
-        metadata.reviewers ?? metadata.approvers ?? metadata.stakeholders ?? metadata.signatories
-      );
-      const riskLevelRaw = (metadata.risk ?? metadata.riskLevel ?? metadata.riskScore ?? '').toString().toLowerCase();
-      const riskLevel = ['low', 'medium', 'high'].includes(riskLevelRaw)
-        ? riskLevelRaw
-        : metadata.requiresReview
-          ? 'high'
-          : 'medium';
-      const riskScore = riskLevel === 'high' ? 3 : riskLevel === 'medium' ? 2 : 1;
-      const summaryNote = metadata.summary ?? (assignment.instructions ? assignment.instructions.slice(0, 140) : null);
-      const anchors = normaliseStringArray(metadata.dependencies ?? metadata.inputs ?? metadata.attachments);
-      const timezone = metadata.timezone ?? course?.metadata?.dripCampaign?.timezone ?? 'UTC';
-      const client =
-        metadata.client ??
-        course?.metadata?.catalogueListings?.[0]?.channel ??
-        course?.metadata?.workspace ??
-        course?.title ??
-        assignment.courseTitle;
-      return {
-        id: `proposal-${assignment.id}`,
-        title: assignment.title,
-        client,
-        course: assignment.courseTitle,
-        stage,
-        dueDate,
-        dueLabel,
-        dueIn,
-        owner: assignment.owner,
-        valueCents: estimatedValueCents,
-        value: formatCurrency(estimatedValueCents, course?.priceCurrency ?? 'USD'),
-        confidence,
-        confidenceLabel: `${Math.round(confidence * 100)}%`,
-        reviewers: reviewers.length ? reviewers : [assignment.owner],
-        summary: summaryNote,
-        highlights: [
-          summaryNote ?? 'Structured deliverable awaiting submission',
-          metadata.requiresReview ? 'Manual QA required' : 'Auto-approval eligible'
-        ].filter(Boolean),
-        timezone,
-        riskLevel,
-        riskScore,
-        anchors,
-        reviewWindow: metadata.reviewWindow ?? 'Deal desk review within 48h'
-      };
-    })
-    .sort((a, b) => {
-      if (a.dueDate && b.dueDate) {
-        return a.dueDate - b.dueDate;
-      }
-      if (a.dueDate) return -1;
-      if (b.dueDate) return 1;
-      return a.id.localeCompare(b.id);
-    });
+  const lastCompletedIso = sortedDays[sortedDays.length - 1];
+
+  return {
+    current,
+    longest,
+    totalDays: uniqueDays.size,
+    currentRange,
+    longestRange,
+    lastCompletedAt: lastCompletedIso ? new Date(`${lastCompletedIso}T00:00:00Z`).toISOString() : null
+  };
+}
 
 export function buildLearningPace(completions = [], referenceDate = new Date()) {
-  const start = new Date(referenceDate.getTime() - 6 * DAY_IN_MS);
+  const reference = clampUtcDay(referenceDate) ?? new Date();
+  const start = new Date(reference.getTime() - 6 * DAY_IN_MS);
   const buckets = new Map();
+
   for (let i = 0; i < 7; i += 1) {
     const day = new Date(start.getTime() + i * DAY_IN_MS);
-    const key = day.toISOString().slice(0, 10);
-    buckets.set(key, 0);
+    const isoDay = day.toISOString().slice(0, 10);
+    buckets.set(isoDay, { isoDay, minutes: 0 });
   }
 
-  completions.forEach((entry) => {
-    const completedAt = entry.completedAt ? new Date(entry.completedAt) : null;
-    if (!completedAt) return;
-    const key = completedAt.toISOString().slice(0, 10);
-    if (!buckets.has(key)) return;
-    const minutes = Number(entry.durationMinutes ?? 0);
-    buckets.set(key, buckets.get(key) + (Number.isFinite(minutes) ? minutes : 0));
-  });
-  const approvalsRequired = Math.max(reviewStakeholders.size, 2);
-  const nextReview = proposalTimeline[0]?.dueLabel ?? formatDateTime(now, { dateStyle: 'long' });
-  const nextReviewWindow = proposalTimeline[0]?.dueIn ?? 'Rolling review';
-  const averageRiskScore = projectProposals.length
-    ? projectProposals.reduce((total, proposal) => total + (proposal.riskScore ?? 1), 0) / projectProposals.length
-    : 1;
-  const riskAppetite =
-    averageRiskScore >= 2.5 ? 'High risk portfolio' : averageRiskScore >= 1.75 ? 'Balanced risk posture' : 'Low risk';
+  for (const entry of completions.map(resolveCompletionEntry).filter(Boolean)) {
+    if (!buckets.has(entry.isoDay)) continue;
+    const bucket = buckets.get(entry.isoDay);
+    bucket.minutes += entry.minutes;
+  }
 
   const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
-  return Array.from(buckets.entries()).map(([key, minutes]) => {
-    const day = new Date(`${key}T00:00:00Z`);
-    return { day: dayFormatter.format(day), minutes };
-  });
+  return Array.from(buckets.values()).map(({ isoDay, minutes }) => ({
+    day: dayFormatter.format(new Date(`${isoDay}T00:00:00Z`)),
+    minutes,
+    isoDate: isoDay,
+    effortLevel: minutes >= 90 ? 'intense' : minutes >= 45 ? 'steady' : minutes > 0 ? 'light' : 'idle'
+  }));
 }
 
 function parseMonetizationTier(settings) {
@@ -824,7 +806,7 @@ export default class DashboardService {
     const instructorSnapshot = buildInstructorDashboard({ user, now: referenceDate }) ?? undefined;
     let operatorSnapshot;
     if (['admin', 'operator'].includes(user.role)) {
-      operatorSnapshot = await operatorDashboardService.build({ user, now: referenceDate });
+      operatorSnapshot = await getOperatorDashboardService().build({ user, now: referenceDate });
     }
 
     const dashboards = {};

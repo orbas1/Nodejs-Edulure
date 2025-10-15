@@ -108,7 +108,7 @@ beforeEach(() => {
 
 describe('Dashboard HTTP routes', () => {
   it('returns aggregated dashboard data for the authenticated user', async () => {
-    const response = await request(app).get('/api/dashboard/me').set('Authorization', 'Bearer token');
+    const response = await request(app).get('/api/v1/dashboard/me').set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
