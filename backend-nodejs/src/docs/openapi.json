@@ -7146,6 +7146,649 @@
           "capabilities",
           "summary"
         ]
+      },
+      "FeedRange": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "key",
+          "start",
+          "end"
+        ]
+      },
+      "FeedPagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "perPage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "page",
+          "perPage",
+          "total",
+          "pageCount"
+        ]
+      },
+      "FeedTrendingTag": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "tag",
+          "count"
+        ]
+      },
+      "FeedEngagement": {
+        "type": "object",
+        "properties": {
+          "postsSampled": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "postsTotal": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "comments": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "reactions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "uniqueCommunities": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "trendingTags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedTrendingTag"
+            }
+          },
+          "latestActivityAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "postsSampled",
+          "postsTotal",
+          "comments",
+          "reactions",
+          "uniqueCommunities",
+          "trendingTags"
+        ]
+      },
+      "FeedAdsTotals": {
+        "type": "object",
+        "properties": {
+          "impressions": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversions": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "spendCents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revenueCents": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "impressions",
+          "clicks",
+          "conversions",
+          "spendCents",
+          "revenueCents"
+        ]
+      },
+      "FeedAdsSummary": {
+        "type": "object",
+        "properties": {
+          "placementsServed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "campaignsServed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "activeCampaigns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scheduledCampaigns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/FeedAdsTotals"
+          }
+        },
+        "required": [
+          "placementsServed",
+          "campaignsServed",
+          "activeCampaigns",
+          "scheduledCampaigns",
+          "totals"
+        ]
+      },
+      "FeedAnalytics": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "range": {
+            "$ref": "#/components/schemas/FeedRange"
+          },
+          "engagement": {
+            "$ref": "#/components/schemas/FeedEngagement"
+          },
+          "ads": {
+            "$ref": "#/components/schemas/FeedAdsSummary"
+          }
+        },
+        "required": [
+          "generatedAt",
+          "range",
+          "engagement",
+          "ads"
+        ]
+      },
+      "FeedAdMetrics": {
+        "type": "object",
+        "properties": {
+          "ctr": {
+            "type": "number",
+            "format": "float",
+            "nullable": true
+          },
+          "cpcCents": {
+            "type": "number",
+            "format": "float",
+            "nullable": true
+          },
+          "cpaCents": {
+            "type": "number",
+            "format": "float",
+            "nullable": true
+          }
+        }
+      },
+      "FeedAdTracking": {
+        "type": "object",
+        "properties": {
+          "impressionKey": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "impressionKey",
+          "requestId"
+        ]
+      },
+      "FeedAuthor": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "FeedCommunityRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "slug": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "FeedPostStats": {
+        "type": "object",
+        "properties": {
+          "comments": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "reactions": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "reactionBreakdown": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        }
+      },
+      "FeedPost": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "body": {
+            "type": "string",
+            "nullable": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "visibility": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "channel": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "community": {
+            "$ref": "#/components/schemas/FeedCommunityRef",
+            "nullable": true
+          },
+          "author": {
+            "$ref": "#/components/schemas/FeedAuthor",
+            "nullable": true
+          },
+          "stats": {
+            "$ref": "#/components/schemas/FeedPostStats",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        }
+      },
+      "FeedAd": {
+        "type": "object",
+        "properties": {
+          "placementId": {
+            "type": "string"
+          },
+          "campaignId": {
+            "type": "string"
+          },
+          "context": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "headline": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "ctaUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "advertiser": {
+            "type": "string",
+            "nullable": true
+          },
+          "objective": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "disclosure": {
+            "type": "string",
+            "nullable": true
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/FeedAdMetrics",
+            "nullable": true
+          },
+          "tracking": {
+            "$ref": "#/components/schemas/FeedAdTracking",
+            "nullable": true
+          },
+          "targeting": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        },
+        "required": [
+          "placementId",
+          "campaignId",
+          "context",
+          "slot"
+        ]
+      },
+      "FeedItem": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "post",
+              "ad"
+            ]
+          },
+          "context": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "post": {
+            "$ref": "#/components/schemas/FeedPost",
+            "nullable": true
+          },
+          "ad": {
+            "$ref": "#/components/schemas/FeedAd",
+            "nullable": true
+          }
+        },
+        "required": [
+          "kind",
+          "context",
+          "timestamp"
+        ]
+      },
+      "FeedHighlight": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "projectType": {
+            "type": "string",
+            "nullable": true
+          },
+          "objective": {
+            "type": "string",
+            "nullable": true
+          },
+          "ownerId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/FeedAdMetrics",
+            "nullable": true
+          },
+          "targeting": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "schedule": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "analyticsTargets": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "position": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "context": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "timestamp"
+        ]
+      },
+      "FeedSnapshot": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "type": "string"
+          },
+          "community": {
+            "type": "string",
+            "nullable": true
+          },
+          "range": {
+            "$ref": "#/components/schemas/FeedRange"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/FeedPagination"
+          },
+          "ads": {
+            "$ref": "#/components/schemas/FeedAdsSummary"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedItem"
+            }
+          },
+          "highlights": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FeedHighlight"
+            }
+          },
+          "analytics": {
+            "$ref": "#/components/schemas/FeedAnalytics",
+            "nullable": true
+          }
+        },
+        "required": [
+          "context",
+          "range",
+          "generatedAt",
+          "pagination",
+          "ads",
+          "items",
+          "highlights"
+        ]
+      },
+      "FeedSnapshotResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/FeedSnapshot"
+              }
+            }
+          }
+        ]
+      },
+      "FeedAnalyticsResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/FeedAnalytics"
+              }
+            }
+          }
+        ]
+      },
+      "FeedPlacementsResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FeedAd"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   },
@@ -13203,6 +13846,264 @@
           },
           "401": {
             "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/feed": {
+      "get": {
+        "summary": "Retrieve aggregated live feed snapshot",
+        "description": "Returns a paginated feed composed of community posts, inline ad placements, and optional analytics highlights.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "context",
+            "in": "query",
+            "description": "Feed context to aggregate.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "global",
+                "community"
+              ],
+              "default": "global"
+            }
+          },
+          {
+            "name": "community",
+            "in": "query",
+            "description": "Community slug or ID when retrieving a community feed.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "perPage",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "includeAnalytics",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "includeHighlights",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d",
+                "180d",
+                "365d"
+              ],
+              "default": "30d"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed snapshot generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedSnapshotResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Feed capability disabled"
+          }
+        }
+      }
+    },
+    "/feed/analytics": {
+      "get": {
+        "summary": "Compute feed analytics",
+        "description": "Returns engagement and ad performance analytics for the requested feed context.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "context",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "global",
+                "community"
+              ],
+              "default": "global"
+            }
+          },
+          {
+            "name": "community",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "range",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "30d",
+                "90d",
+                "180d",
+                "365d"
+              ],
+              "default": "30d"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "postType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Feed analytics generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedAnalyticsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Feed capability disabled"
+          }
+        }
+      }
+    },
+    "/feed/placements": {
+      "get": {
+        "summary": "Resolve eligible ad placements",
+        "description": "Returns ad placements ranked for the supplied feed context.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "context",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "global_feed",
+                "community_feed",
+                "search",
+                "course_live"
+              ],
+              "default": "global_feed"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 10,
+              "default": 3
+            }
+          },
+          {
+            "name": "keywords",
+            "in": "query",
+            "description": "Comma separated keyword hints to improve targeting matches.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Eligible placements resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPlacementsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
           }
         }
       }

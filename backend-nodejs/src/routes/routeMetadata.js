@@ -102,6 +102,16 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'feed',
+    capability: 'experience-feed',
+    description: 'Live feed aggregation, ad placements, and analytics query endpoints.',
+    basePath: '/feed',
+    flagKey: 'platform.api.v1.feed',
+    defaultState: 'enabled',
+    fallbackStatus: 403,
+    disabledMessage: 'Live feed services are currently disabled for this tenant.'
+  },
+  {
     name: 'explorer',
     capability: 'search-and-discovery',
     description: 'Explorer search, browse, and recommendation endpoints.',

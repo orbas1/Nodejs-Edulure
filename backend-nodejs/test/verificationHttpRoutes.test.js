@@ -72,7 +72,7 @@ beforeEach(() => {
 
 describe('Identity verification HTTP routes', () => {
   it('returns the verification summary for the authenticated user', async () => {
-    const response = await request(app).get('/api/verification/me').set('Authorization', 'Bearer token');
+    const response = await request(app).get('/api/v1/verification/me').set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
     expect(serviceMock.getVerificationSummaryForUser).toHaveBeenCalledWith(42);
@@ -81,7 +81,7 @@ describe('Identity verification HTTP routes', () => {
 
   it('creates upload requests for verification documents', async () => {
     const response = await request(app)
-      .post('/api/verification/me/upload-requests')
+      .post('/api/v1/verification/me/upload-requests')
       .set('Authorization', 'Bearer token')
       .send({ documentType: 'government-id-front', fileName: 'passport.png', mimeType: 'image/png', sizeBytes: 12345 });
 
@@ -107,7 +107,7 @@ describe('Identity verification HTTP routes', () => {
     };
 
     const response = await request(app)
-      .post('/api/verification/me/documents')
+      .post('/api/v1/verification/me/documents')
       .set('Authorization', 'Bearer token')
       .send(payload);
 
@@ -118,7 +118,7 @@ describe('Identity verification HTTP routes', () => {
 
   it('submits verification packages for review', async () => {
     const response = await request(app)
-      .post('/api/verification/me/submit')
+      .post('/api/v1/verification/me/submit')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
@@ -128,7 +128,7 @@ describe('Identity verification HTTP routes', () => {
 
   it('exposes the admin compliance overview', async () => {
     const response = await request(app)
-      .get('/api/verification/admin/overview')
+      .get('/api/v1/verification/admin/overview')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
@@ -139,7 +139,7 @@ describe('Identity verification HTTP routes', () => {
 
   it('allows admins to review verification cases', async () => {
     const response = await request(app)
-      .post('/api/verification/77/review')
+      .post('/api/v1/verification/77/review')
       .set('Authorization', 'Bearer token')
       .send({ status: 'approved', riskScore: 5 });
 
@@ -149,7 +149,7 @@ describe('Identity verification HTTP routes', () => {
 
   it('returns audit trails for verification cases', async () => {
     const response = await request(app)
-      .get('/api/verification/77/audit')
+      .get('/api/v1/verification/77/audit')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);

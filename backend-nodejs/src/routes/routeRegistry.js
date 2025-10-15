@@ -13,6 +13,7 @@ import courseRoutes from './course.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import ebookRoutes from './ebook.routes.js';
 import explorerRoutes from './explorer.routes.js';
+import feedRoutes from './feed.routes.js';
 import paymentRoutes from './payment.routes.js';
 import runtimeConfigRoutes from './runtimeConfig.routes.js';
 import socialRoutes from './social.routes.js';
@@ -32,6 +33,7 @@ const routerMap = {
   compliance: complianceRoutes,
   chat: chatRoutes,
   social: socialRoutes,
+  feed: feedRoutes,
   explorer: explorerRoutes,
   ads: adsRoutes,
   analytics: analyticsRoutes,

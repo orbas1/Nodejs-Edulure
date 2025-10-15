@@ -51,7 +51,7 @@ describe('Social graph HTTP routes', () => {
       viewerContext: { viewerFollowsSubject: true, subjectFollowsViewer: false }
     });
 
-    const response = await request(app).get('/api/social/followers?limit=10').set('Authorization', 'Bearer test');
+    const response = await request(app).get('/api/v1/social/followers?limit=10').set('Authorization', 'Bearer test');
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -64,7 +64,7 @@ describe('Social graph HTTP routes', () => {
     socialGraphServiceMock.followUser.mockResolvedValue({ status: 'accepted' });
 
     const response = await request(app)
-      .post('/api/social/follows/55')
+      .post('/api/v1/social/follows/55')
       .set('Authorization', 'Bearer test')
       .send({ source: 'profile-card' });
 
@@ -77,7 +77,7 @@ describe('Social graph HTTP routes', () => {
     socialGraphServiceMock.approveFollow.mockResolvedValue({ status: 'accepted' });
 
     const response = await request(app)
-      .post('/api/social/users/42/followers/91/approve')
+      .post('/api/v1/social/users/42/followers/91/approve')
       .set('Authorization', 'Bearer test');
 
     expect(response.status).toBe(200);
@@ -89,7 +89,7 @@ describe('Social graph HTTP routes', () => {
     socialGraphServiceMock.muteUser.mockResolvedValue({ mutedUserId: 91 });
 
     const response = await request(app)
-      .post('/api/social/mutes/91')
+      .post('/api/v1/social/mutes/91')
       .set('Authorization', 'Bearer test')
       .send({ durationMinutes: 120, reason: 'Focus hours' });
 
@@ -107,7 +107,7 @@ describe('Social graph HTTP routes', () => {
     ]);
 
     const response = await request(app)
-      .get('/api/social/recommendations?limit=5')
+      .get('/api/v1/social/recommendations?limit=5')
       .set('Authorization', 'Bearer test');
 
     expect(response.status).toBe(200);

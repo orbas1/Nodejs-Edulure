@@ -162,8 +162,9 @@
 - Comment threads support nested replies; moderation flags propagate to comment management queue.
 
 ## Main Site Feed Flow
-- Personalized content generated server-side using user persona; feed merges marketing, community highlights, and blog posts.
-- Infinite scroll loads next batch when near bottom; sticky filters update query parameters and trigger refetch.
+- Personalized content generated server-side using user persona; feed merges marketing, community highlights, ad placements, and instructor spotlights delivered by the live feed aggregation service.【F:backend-nodejs/src/services/LiveFeedService.js†L73-L144】
+- Infinite scroll loads next batch when near bottom; sticky filters (Context, Community, Search) update query parameters and trigger refetch, while Analytics/Highlights toggles map to `includeAnalytics` and `includeHighlights` flags on the API to keep UI in sync with REST and GraphQL responses.【F:backend-nodejs/src/docs/openapi.json†L13840-L13940】【F:backend-nodejs/test/graphqlFeedRoutes.test.js†L12-L116】
+- Analytics snapshot widget queries `/feed/analytics` when toggled on, caching by range selection (7d/30d/90d/180d/365d) to avoid redundant requests during navigation.【F:backend-nodejs/test/feedHttpRoutes.test.js†L12-L97】
 - Newsletter subscription inline form posts to marketing automation; success displays thank-you banner.
 
 ## Performance Optimizations

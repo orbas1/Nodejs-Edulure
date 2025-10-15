@@ -60,6 +60,8 @@ describe('mountVersionedApi', () => {
       res.status(200).json({ healthy: true });
     });
 
+    const previousToggle = process.env.API_EXPOSE_LEGACY_REDIRECTS;
+    process.env.API_EXPOSE_LEGACY_REDIRECTS = 'true';
     mountVersionedApi(app, {
       registry: [
         {
@@ -76,6 +78,7 @@ describe('mountVersionedApi', () => {
 
     const response = await request(app).get('/api/legacy/health').redirects(0).expect(308);
     expect(response.headers.location).toBe('/api/v1/legacy/health');
+    process.env.API_EXPOSE_LEGACY_REDIRECTS = previousToggle;
   });
 
   it('wraps router handlers with an error boundary', async () => {

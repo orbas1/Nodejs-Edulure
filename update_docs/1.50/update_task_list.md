@@ -64,7 +64,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **Database:**
     8. Create tables for creation_projects, ads_campaigns, community_posts, community_memberships, ranking_insights with indexes.【F:update_docs/1.50/features_to_add.md†L44-L148】 ✅ Completed – creation catalogue metadata now anchors around courses, e-books, communities, and ad assets so defaults and analytics scaffolding exist for every studio workflow.【F:backend-nodejs/migrations/20250213143000_creation_studio.js†L1-L141】【F:backend-nodejs/src/services/CreationStudioService.js†L36-L145】
   - **API:**
-    9. Generate GraphQL/REST endpoints for live feed aggregation, ads placement, and analytics queries.
+    9. Generate GraphQL/REST endpoints for live feed aggregation, ads placement, and analytics queries. ✅ Completed – live feed service now powers `/api/v1/feed` REST + GraphQL surfaces with ads placements, analytics aggregations, OpenAPI contracts, and comprehensive Vitest coverage for regression safety.【F:backend-nodejs/src/services/LiveFeedService.js†L1-L244】【F:backend-nodejs/src/graphql/router.js†L1-L39】【F:backend-nodejs/test/feedHttpRoutes.test.js†L12-L97】【F:backend-nodejs/test/graphqlFeedRoutes.test.js†L12-L116】
   - **Logic:**
     10. Implement recommendation algorithms with explainability logs and multi-tenant feature flags.
     11. Wire AI assistance services with provider-specific throttling and usage metering.【F:update_docs/1.50/features_to_add.md†L118-L171】

@@ -91,3 +91,19 @@ vi.mock('prom-client', () => {
     collectDefaultMetrics: () => {}
   };
 });
+
+vi.mock('../src/models/FeatureFlagModel.js', () => ({
+  default: {
+    all: vi.fn(async () => [])
+  },
+  FeatureFlagAuditModel: {
+    record: vi.fn(async () => undefined),
+    listForFlag: vi.fn(async () => [])
+  }
+}));
+
+vi.mock('../src/models/ConfigurationEntryModel.js', () => ({
+  default: {
+    all: vi.fn(async () => [])
+  }
+}));

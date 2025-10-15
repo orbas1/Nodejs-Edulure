@@ -6,10 +6,19 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./test/setupEnv.js', './test/setupMocks.js'],
     include: ['test/**/*.test.js'],
-    deps: {
-      esbuildOptions: {
-        target: 'esnext'
+    server: {
+      deps: {
+        inline: ['graphql', 'graphql-http'],
+        fallbackCJS: true
       }
+    },
+    deps: {
+      optimizer: {
+        ssr: {
+          include: ['graphql', 'graphql-http']
+        }
+      },
+      interopDefault: true
     }
   },
   esbuild: {
