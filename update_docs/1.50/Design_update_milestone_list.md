@@ -16,6 +16,7 @@ All design milestones start at **0%** completion and must produce artefacts refe
   - Navigation partials (bottom tabs, drawers, overlays) approved for reuse and theme toggling.【F:update_docs/1.50/Design_Plan.md†L53-L62】
   - Content hierarchy, CTA labelling, and dynamic type scenarios reviewed with product and localisation teams.【F:update_docs/1.50/Design_Plan.md†L67-L74】
   - Provider RBAC overlays and incident escalation prompts documented alongside learner flows, ensuring parity wireframes for locked states and guardrail messaging.【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L51】【F:Edulure-Flutter/lib/provider/runtime/provider_capability_bridge.dart†L1-L182】
+  - Provider retention and consent revocation journeys mapped with dual-signoff prompts, SLA countdown treatments, and evidence upload states tied to the governance blueprint for mobile parity readiness.【F:update_docs/1.50/provider_phone_app_updates/governance_retention_contracts.md†L24-L211】【F:Edulure-Flutter/lib/provider/runtime/provider_compliance_contracts.dart†L1-L302】
 
 ## Milestone D3 – Web Experience & Navigation Overhaul (Weeks 2–4, 0%)
 - **Goal:** Redesign marketing pages and authenticated dashboards with modular partials, command palette navigation, and Storybook-ready component specifications.【F:update_docs/1.50/Design_Plan.md†L78-L117】

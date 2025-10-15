@@ -32,6 +32,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   11. Align analytics instrumentation requirements with data/insights team for critical journeys.【F:update_docs/1.50/Design_Plan.md†L140-L146】
   12. Log risk, dependency, and parity status in design change log for weekly review.【F:update_docs/1.50/Design_Plan.md†L23-L34】
   - _Progress note:_ Capability manifest incident messaging has been prototyped in Flutter, and provider RBAC overlays are now documented alongside hooks so operator shells inherit lock states, guardrail cues, and audit messaging without bespoke rewrites.【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】【F:Edulure-Flutter/lib/provider/runtime/provider_capability_bridge.dart†L1-L182】【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L51】
+  - _Progress note:_ Provider retention blueprint defines dual-signoff prompts, SLA countdown states, and evidence upload guidance tied to new Flutter compliance contracts, ensuring deletion flows meet legal expectations once the provider shell ships.【F:update_docs/1.50/provider_phone_app_updates/governance_retention_contracts.md†L24-L211】【F:Edulure-Flutter/lib/provider/runtime/provider_compliance_contracts.dart†L1-L302】
 
 ## 3. Web Application Navigation & Funnel Redesign (0%)
 - **Objective:** Restructure marketing funnels and authenticated dashboards with modular components and performance guardrails.【F:update_docs/1.50/Design_Plan.md†L78-L117】

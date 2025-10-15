@@ -29,6 +29,10 @@ ProviderRoleContext(
    - Manifest health and enablement status for the capability.
    - Guardrail metadata (two-person rule, alert thresholds) for UI messaging.
 4. The returned `CapabilityAccessEnvelope` indicates whether the feature should render, whether consent gating applies, and which audit strings to log.
+5. Compliance capabilities introduced for retention flows include:
+   - `compliance.dsr.manage` – grants access to acknowledge, escalate, fulfil, and close DSRs when the manifest marks the compliance service as healthy.
+   - `compliance.dsr.escalate` – requires dual-signoff metadata and triggers additional runbook prompts when `guardrail.requiresDualSignoff` is true.
+   - `compliance.consent.revoke` – enforces consent revocation guardrails and ensures audit templates capture revocation source metadata (`provider-app`).【F:update_docs/1.50/provider_phone_app_updates/governance_retention_contracts.md†L129-L185】
 
 ## Error Handling
 - Bridge initialisation surfaces errors via the notifier `state.error` property. Provider modules must observe the stream and implement retry/alert surfaces.
