@@ -12,6 +12,12 @@
 - New admin governance surface aggregates DSR queue metrics, overdue escalations, and policy timelines with severity-coded summary cards so compliance teams can triage from a single page.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L58-L184】
 - The page wires into the compliance API client and React Router so navigation menus, breadcrumbs, and CTA buttons respect RBAC gating and reuse the existing dashboard chrome.【F:frontend-reactjs/src/api/complianceApi.js†L1-L86】【F:frontend-reactjs/src/App.jsx†L1-L150】
 
+### Creation Studio Workspace
+- Introduced `/dashboard/instructor/creation-studio` featuring project list management, readiness summaries, and collaborative presence controls fed by the creation service APIs.【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L1-L229】【F:frontend-reactjs/src/api/creationStudioApi.js†L1-L213】
+- Added reusable subcomponents for the creation wizard stepper, collaborator presence panel, and template-driven project creation flow to maintain production-grade UX consistency across studio screens.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationWizardStepper.jsx†L1-L164】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationCollaboratorsPanel.jsx†L1-L175】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationAssetLibrary.jsx†L1-L274】
+- Shared creation studio utility helpers drive readiness summaries, session lookups, and step-state transitions with dedicated Vitest coverage to protect key instructor workflows.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/creationStudioUtils.js†L1-L182】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/__tests__/creationStudioUtils.test.js†L1-L210】
+- Updated dashboard navigation to surface the creation studio hub and align search metadata with the new workspace entry point.【F:frontend-reactjs/src/layouts/DashboardLayout.jsx†L1-L420】【F:frontend-reactjs/src/App.jsx†L1-L260】
+
 ## Learner Profile
 - Added a privacy & consent ledger that fetches live consent records, renders grant metadata, and exposes inline revocation actions that call the compliance API with optimistic loading states.【F:frontend-reactjs/src/pages/Profile.jsx†L830-L870】【F:frontend-reactjs/src/hooks/useConsentRecords.js†L1-L52】
 - Profile shell now surfaces consent status counts in the hero, ensuring governance posture is visible alongside revenue, community, and affiliate insights.【F:frontend-reactjs/src/pages/Profile.jsx†L798-L826】

@@ -37,6 +37,7 @@ import InstructorCommunityPodcasts from './pages/dashboard/InstructorCommunityPo
 import InstructorCourseCreate from './pages/dashboard/InstructorCourseCreate.jsx';
 import InstructorCourseLibrary from './pages/dashboard/InstructorCourseLibrary.jsx';
 import InstructorCourseManage from './pages/dashboard/InstructorCourseManage.jsx';
+import InstructorCreationStudio from './pages/dashboard/InstructorCreationStudio.jsx';
 import InstructorLessonSchedule from './pages/dashboard/InstructorLessonSchedule.jsx';
 import InstructorTutorSchedule from './pages/dashboard/InstructorTutorSchedule.jsx';
 import InstructorTutorManagement from './pages/dashboard/InstructorTutorManagement.jsx';
@@ -193,6 +194,14 @@ function App() {
         <Route path="communities/manage" element={<InstructorCommunityManage />} />
         <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />
         <Route path="communities/podcasts" element={<InstructorCommunityPodcasts />} />
+        <Route
+          path="creation-studio"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <InstructorCreationStudio />
+            </ProtectedRoute>
+          )}
+        />
         <Route path="courses/create" element={<InstructorCourseCreate />} />
         <Route path="courses/library" element={<InstructorCourseLibrary />} />
         <Route path="courses/manage" element={<InstructorCourseManage />} />
