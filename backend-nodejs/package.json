@@ -27,7 +27,8 @@
     "security:rotate-jwt": "node scripts/rotate-jwt-keys.js",
     "storage:provision": "node scripts/provision-r2-buckets.js",
     "search:provision": "node scripts/provision-search-cluster.js",
-    "search:reindex": "node scripts/reindex-search-indexes.js"
+    "search:reindex": "node scripts/reindex-search-indexes.js",
+    "docs:build": "node scripts/build-openapi-specs.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.614.0",

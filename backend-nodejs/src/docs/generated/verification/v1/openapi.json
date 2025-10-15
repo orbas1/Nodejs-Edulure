@@ -1,0 +1,898 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Identity verification, KYC, and trust signals APIs.",
+    "version": "1.50.0",
+    "description": "Identity verification, KYC, and trust signals APIs. (Capability: identity-verification)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/verification/me": {
+      "get": {
+        "summary": "Identity verification summary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/verification/me/upload-requests": {
+      "post": {
+        "summary": "Request presigned upload for verification documents",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "documentType": {
+                    "type": "string"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "sizeBytes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "documentType",
+                  "fileName",
+                  "mimeType",
+                  "sizeBytes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationUploadResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload request"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/verification/me/documents": {
+      "post": {
+        "summary": "Attach uploaded verification document metadata",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "documentType": {
+                    "type": "string"
+                  },
+                  "storageBucket": {
+                    "type": "string"
+                  },
+                  "storageKey": {
+                    "type": "string"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "sizeBytes": {
+                    "type": "integer"
+                  },
+                  "checksumSha256": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "documentType",
+                  "storageBucket",
+                  "storageKey",
+                  "fileName",
+                  "mimeType",
+                  "sizeBytes",
+                  "checksumSha256"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid document payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/verification/me/submit": {
+      "post": {
+        "summary": "Submit verification for manual review",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Verification is not ready for review"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/verification/admin/overview": {
+      "get": {
+        "summary": "Administrative verification overview",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationAdminOverview"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
+        }
+      }
+    },
+    "/verification/{verificationId}/review": {
+      "post": {
+        "summary": "Review verification submission",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "verificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Verification record identifier"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/VerificationSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid review payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Verification record not found"
+          }
+        }
+      }
+    },
+    "/verification/{verificationId}/audit": {
+      "get": {
+        "summary": "Verification audit trail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "verificationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Verification record identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/VerificationAuditEntry"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Verification record not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "VerificationAuditEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "action": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "actor": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "VerificationReviewRequest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected",
+              "resubmission_required"
+            ]
+          },
+          "riskScore": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "rejectionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "escalationLevel": {
+            "type": "string",
+            "enum": [
+              "none",
+              "t1",
+              "t2",
+              "t3"
+            ]
+          },
+          "policyReferences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "VerificationAdminOverview": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationMetric"
+            }
+          },
+          "queue": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationQueueItem"
+            }
+          },
+          "slaBreaches": {
+            "type": "integer"
+          },
+          "manualReviewQueue": {
+            "type": "integer"
+          },
+          "lastGeneratedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "gdpr": {
+            "$ref": "#/components/schemas/GdprComplianceProfile"
+          }
+        }
+      },
+      "GdprComplianceProfile": {
+        "type": "object",
+        "properties": {
+          "dsar": {
+            "type": "object",
+            "properties": {
+              "open": {
+                "type": "integer"
+              },
+              "dueSoon": {
+                "type": "integer"
+              },
+              "overdue": {
+                "type": "integer"
+              },
+              "completed30d": {
+                "type": "integer"
+              },
+              "averageCompletionHours": {
+                "type": "integer"
+              },
+              "slaHours": {
+                "type": "integer"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "nextIcoSubmission": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "registers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "lastReviewed": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "nextReviewDue": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "coverage": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "retentionPolicy": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "controls": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "ico": {
+            "type": "object",
+            "properties": {
+              "registrationNumber": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "feeTier": {
+                "type": "string"
+              },
+              "renewalDue": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "lastSubmitted": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "publicRegisterUrl": {
+                "type": "string",
+                "format": "uri"
+              },
+              "reportingOwner": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "VerificationQueueItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "email"
+            ]
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "escalationLevel": {
+            "type": "string"
+          },
+          "documentsSubmitted": {
+            "type": "integer"
+          },
+          "documentsRequired": {
+            "type": "integer"
+          },
+          "lastSubmittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "waitingHours": {
+            "type": "number"
+          },
+          "hasBreachedSla": {
+            "type": "boolean"
+          },
+          "verification": {
+            "$ref": "#/components/schemas/VerificationSummary"
+          }
+        }
+      },
+      "VerificationSummary": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Current verification status for the user"
+          },
+          "reference": {
+            "type": "string",
+            "description": "Unique verification reference"
+          },
+          "documentsRequired": {
+            "type": "integer"
+          },
+          "documentsSubmitted": {
+            "type": "integer"
+          },
+          "requiredDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationRequirement"
+            }
+          },
+          "outstandingDocuments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationRequirement"
+            }
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "needsManualReview": {
+            "type": "boolean"
+          },
+          "escalationLevel": {
+            "type": "string"
+          },
+          "lastSubmittedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "rejectionReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationDocument"
+            }
+          }
+        }
+      },
+      "VerificationDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string",
+            "description": "Document type uploaded by the user"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "accepted",
+              "rejected"
+            ]
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "VerificationRequirement": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Verification document type identifier"
+          },
+          "label": {
+            "type": "string",
+            "description": "Human readable label presented to users"
+          },
+          "description": {
+            "type": "string",
+            "description": "Guidance for preparing the document"
+          }
+        },
+        "required": [
+          "type",
+          "label"
+        ]
+      },
+      "VerificationMetric": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "nullable": true
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "nullable": true
+          }
+        }
+      },
+      "VerificationUploadResponse": {
+        "type": "object",
+        "properties": {
+          "verificationReference": {
+            "type": "string"
+          },
+          "documentType": {
+            "type": "string"
+          },
+          "upload": {
+            "type": "object",
+            "properties": {
+              "bucket": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "expiresAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "bucket",
+              "key",
+              "url",
+              "expiresAt"
+            ]
+          }
+        },
+        "required": [
+          "verificationReference",
+          "documentType",
+          "upload"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

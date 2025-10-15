@@ -1,0 +1,481 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Runtime configuration and capability manifest endpoints consumed by clients.",
+    "version": "1.50.0",
+    "description": "Runtime configuration and capability manifest endpoints consumed by clients. (Capability: platform-runtime-config)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/runtime/manifest": {
+      "get": {
+        "summary": "Capability manifest and service health",
+        "description": "Returns aggregated readiness, incident, and capability exposure data so clients can render service health indicators and gate features consistently.",
+        "responses": {
+          "200": {
+            "description": "Capability manifest generated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CapabilityManifest"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Capability manifest could not be generated."
+          }
+        },
+        "operationId": "getRuntimeCapabilityManifest"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CapabilityManifest": {
+        "type": "object",
+        "description": "Aggregated readiness report combining service health, capability exposure, and summary counts.",
+        "properties": {
+          "environment": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityManifestServiceStatus"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityManifestCapability"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/CapabilityManifestSummary"
+          }
+        },
+        "required": [
+          "environment",
+          "generatedAt",
+          "audience",
+          "services",
+          "capabilities",
+          "summary"
+        ]
+      },
+      "CapabilityManifestSummary": {
+        "type": "object",
+        "description": "Summary counters representing capability and service health.",
+        "properties": {
+          "services": {
+            "$ref": "#/components/schemas/CapabilityManifestSummaryBreakdown"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/CapabilityManifestSummaryBreakdown"
+          }
+        },
+        "required": [
+          "services",
+          "capabilities"
+        ]
+      },
+      "CapabilityManifestSummaryBreakdown": {
+        "type": "object",
+        "description": "Counts of services or capabilities by availability status.",
+        "properties": {
+          "operational": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "degraded": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "outage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "disabled": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          }
+        },
+        "required": [
+          "operational",
+          "degraded",
+          "outage"
+        ]
+      },
+      "CapabilityManifestCapability": {
+        "type": "object",
+        "description": "Capability exposure information derived from feature flags and service dependencies.",
+        "properties": {
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "capability": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "basePath": {
+            "type": "string"
+          },
+          "flagKey": {
+            "type": "string"
+          },
+          "defaultState": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "disabled"
+            ],
+            "description": "Default rollout state applied when the flag definition is missing."
+          },
+          "audience": {
+            "type": "string",
+            "nullable": true,
+            "description": "Audience tier allowed to consume the capability."
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "degraded",
+              "outage",
+              "disabled"
+            ],
+            "description": "Availability derived from dependencies and flag evaluation."
+          },
+          "summary": {
+            "type": "string"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dependencyStatuses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "accessible": {
+            "type": "boolean"
+          },
+          "severityRank": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Numeric severity ranking to help clients order incidents."
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/FeatureFlagEvaluation"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "capability",
+          "flagKey",
+          "defaultState",
+          "enabled",
+          "status",
+          "summary",
+          "dependencies",
+          "dependencyStatuses",
+          "accessible",
+          "severityRank",
+          "evaluation",
+          "generatedAt"
+        ]
+      },
+      "FeatureFlagEvaluation": {
+        "type": "object",
+        "description": "Result of evaluating a feature flag for a particular request context.",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason describing why the capability is enabled or disabled."
+          },
+          "variant": {
+            "type": "string",
+            "nullable": true,
+            "description": "Variant key selected for the user when enabled."
+          },
+          "bucket": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "description": "Deterministic rollout bucket used when evaluating audience splits."
+          },
+          "strategy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Rollout strategy applied during the evaluation."
+          },
+          "evaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the evaluation was performed."
+          },
+          "definition": {
+            "$ref": "#/components/schemas/FeatureFlagDefinition",
+            "nullable": true,
+            "description": "Snapshot of the flag definition used during evaluation when requested."
+          }
+        },
+        "required": [
+          "key",
+          "enabled",
+          "reason",
+          "evaluatedAt"
+        ]
+      },
+      "FeatureFlagDefinition": {
+        "type": "object",
+        "description": "Full feature flag definition used to evaluate capability access.",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "environments": {
+            "type": "array",
+            "nullable": true,
+            "description": "Environments where the flag is allowed to run.",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rolloutStrategy": {
+            "type": "string",
+            "nullable": true,
+            "description": "Strategy controlling exposure such as percentage or schedule."
+          },
+          "rolloutPercentage": {
+            "type": "number",
+            "nullable": true,
+            "description": "Percentage of traffic eligible when using percentage-based rollouts."
+          },
+          "killSwitch": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Indicates whether the kill switch is forcing the flag off."
+          },
+          "variants": {
+            "type": "array",
+            "nullable": true,
+            "description": "Set of variants available for multivariate rollouts.",
+            "items": {
+              "$ref": "#/components/schemas/FeatureFlagVariant"
+            }
+          },
+          "segmentRules": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Segment targeting rules evaluated during rollout."
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "FeatureFlagVariant": {
+        "type": "object",
+        "description": "Weighted variant definition used when rolling out feature flags.",
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Variant key returned to clients when selected."
+          },
+          "weight": {
+            "type": "number",
+            "nullable": true,
+            "description": "Distribution weight applied during percentage or schedule rollouts."
+          },
+          "payload": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Optional JSON payload returned with the variant selection."
+          }
+        },
+        "required": [
+          "key"
+        ]
+      },
+      "CapabilityManifestServiceStatus": {
+        "type": "object",
+        "description": "Availability state for a core platform service.",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "degraded",
+              "outage",
+              "unknown"
+            ],
+            "description": "Overall service status derived from readiness checks."
+          },
+          "summary": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CapabilityManifestComponentStatus"
+            }
+          },
+          "raw": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true,
+            "description": "Raw readiness payload returned by the probed service."
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "category",
+          "type",
+          "ready",
+          "status",
+          "summary",
+          "checkedAt",
+          "components"
+        ]
+      },
+      "CapabilityManifestComponentStatus": {
+        "type": "object",
+        "description": "Individual component readiness reported by a service probe.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "description": "Component level availability state such as ready or degraded."
+          },
+          "ready": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "ready"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

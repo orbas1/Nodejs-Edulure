@@ -25,6 +25,7 @@ import 'screens/service_suite_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/tutor_booking_screen.dart';
 import 'services/language_service.dart';
+import 'widgets/capability_status_banner.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -95,6 +96,12 @@ class EdulureApp extends ConsumerWidget {
             useMaterial3: true,
           ),
           routes: routes,
+          builder: (context, child) {
+            if (child == null) {
+              return const SizedBox.shrink();
+            }
+            return CapabilityStatusBanner(child: child);
+          },
         );
       },
     );

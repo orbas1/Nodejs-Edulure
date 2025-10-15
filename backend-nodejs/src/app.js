@@ -21,9 +21,11 @@ import runtimeConfigMiddleware from './middleware/runtimeConfig.js';
 import { annotateLogContextFromRequest, httpMetricsMiddleware, metricsHandler } from './observability/metrics.js';
 import { mountVersionedApi } from './routes/registerApiRoutes.js';
 import { apiRouteRegistry } from './routes/routeRegistry.js';
+import { getServiceSpecDocument, getServiceSpecIndex } from './docs/serviceSpecRegistry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const openApiSpec = JSON.parse(readFileSync(path.join(__dirname, 'docs/openapi.json'), 'utf8'));
+const serviceSpecIndex = getServiceSpecIndex();
 
 let readinessReporter = () => ({
   service: 'web-service',
@@ -175,6 +177,51 @@ app.get('/health', async (_req, res, next) => {
 
 app.get('/metrics', metricsHandler);
 mountVersionedApi(app, { registry: apiRouteRegistry });
+
+app.get('/api/v1/docs/index.json', (_req, res) =>
+  res.json({
+    version: openApiSpec.info?.version,
+    generatedAt: new Date().toISOString(),
+    services: serviceSpecIndex
+  })
+);
+
+app.get('/api/v1/docs/services', (_req, res) =>
+  res.json({
+    count: serviceSpecIndex.length,
+    services: serviceSpecIndex
+  })
+);
+
+app.get('/api/v1/docs/services/:service', (req, res) => {
+  const serviceParam = req.params.service;
+  const serviceSpec = getServiceSpecDocument(serviceParam);
+  if (!serviceSpec) {
+    return res.status(404).json({
+      success: false,
+      message: `No OpenAPI document registered for service '${serviceParam}'.`
+    });
+  }
+
+  return res.json(serviceSpec);
+});
+
+app.get('/api/v1/docs/services/:service/ui', (req, res) => {
+  const serviceParam = req.params.service;
+  const serviceSpec = getServiceSpecDocument(serviceParam);
+  if (!serviceSpec) {
+    return res.status(404).json({
+      success: false,
+      message: `No OpenAPI document registered for service '${serviceParam}'.`
+    });
+  }
+
+  const titleSuffix = serviceSpec.info?.title ? ` – ${serviceSpec.info.title}` : '';
+  const html = swaggerUi.generateHTML(serviceSpec, {
+    customSiteTitle: `Edulure API Docs${titleSuffix}`
+  });
+  return res.send(html);
+});
 
 app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(openApiSpec));
 app.get('/api/docs', (_req, res) => res.redirect(308, '/api/v1/docs'));

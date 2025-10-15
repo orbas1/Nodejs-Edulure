@@ -1,0 +1,858 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Realtime chat messaging, channel presence, and DM APIs.",
+    "version": "1.50.0",
+    "description": "Realtime chat messaging, channel presence, and DM APIs. (Capability: realtime-chat)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/chat/threads": {
+      "get": {
+        "summary": "List direct message threads",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Threads fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DirectMessageThreadSummary"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "offset": {
+                                  "type": "integer"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create or reuse a direct message thread",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectMessageThreadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Thread ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DirectMessageThreadCreationResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Participant not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/chat/threads/{threadId}/messages": {
+      "get": {
+        "summary": "List messages in a direct message thread",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/DirectMessage"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "before": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "after": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Thread access denied"
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Send a direct message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DirectMessage"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Thread access denied"
+          },
+          "404": {
+            "description": "Thread not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/chat/threads/{threadId}/read": {
+      "post": {
+        "summary": "Mark a thread as read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "threadId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DirectMessageReadRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Thread read receipt stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DirectMessageReadReceipt"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Thread access denied"
+          },
+          "404": {
+            "description": "Thread not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DirectMessageReadReceipt": {
+        "type": "object",
+        "properties": {
+          "participant": {
+            "$ref": "#/components/schemas/DirectMessageParticipant"
+          },
+          "message": {
+            "$ref": "#/components/schemas/DirectMessage",
+            "nullable": true
+          }
+        },
+        "required": [
+          "participant"
+        ]
+      },
+      "DirectMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "threadId": {
+            "type": "integer"
+          },
+          "senderId": {
+            "type": "integer"
+          },
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "system",
+              "file"
+            ],
+            "default": "text"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "deliveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sender": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "firstName": {
+                "type": "string"
+              },
+              "lastName": {
+                "type": "string",
+                "nullable": true
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "senderId",
+          "messageType",
+          "body",
+          "attachments",
+          "metadata",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "sender"
+        ]
+      },
+      "DirectMessageParticipant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "threadId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          },
+          "isMuted": {
+            "type": "boolean"
+          },
+          "muteUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadMessageId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "threadId",
+          "userId",
+          "role",
+          "notificationsEnabled",
+          "isMuted",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DirectMessageReadRequest": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "DirectMessageRequest": {
+        "type": "object",
+        "properties": {
+          "messageType": {
+            "type": "string",
+            "enum": [
+              "text",
+              "system",
+              "file"
+            ],
+            "default": "text"
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "body"
+        ]
+      },
+      "DirectMessageThreadCreationResult": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/DirectMessageThread"
+          },
+          "initialMessage": {
+            "$ref": "#/components/schemas/DirectMessage",
+            "nullable": true
+          }
+        },
+        "required": [
+          "thread"
+        ]
+      },
+      "DirectMessageThread": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true
+          },
+          "isGroup": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastMessagePreview": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "isGroup",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DirectMessageThreadRequest": {
+        "type": "object",
+        "properties": {
+          "participantIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "forceNew": {
+            "type": "boolean",
+            "default": false
+          },
+          "initialMessage": {
+            "$ref": "#/components/schemas/DirectMessageRequest"
+          }
+        },
+        "required": [
+          "participantIds"
+        ]
+      },
+      "DirectMessageThreadSummary": {
+        "type": "object",
+        "properties": {
+          "thread": {
+            "$ref": "#/components/schemas/DirectMessageThread"
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectMessageParticipantSummary"
+            }
+          },
+          "latestMessage": {
+            "$ref": "#/components/schemas/DirectMessage",
+            "nullable": true
+          },
+          "unreadCount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "thread",
+          "participants",
+          "unreadCount"
+        ]
+      },
+      "DirectMessageParticipantSummary": {
+        "type": "object",
+        "properties": {
+          "participant": {
+            "$ref": "#/components/schemas/DirectMessageParticipant"
+          },
+          "user": {
+            "$ref": "#/components/schemas/User",
+            "nullable": true
+          }
+        },
+        "required": [
+          "participant"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "instructor",
+              "admin"
+            ]
+          },
+          "age": {
+            "type": "integer",
+            "nullable": true
+          },
+          "address": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "streetAddress": {
+                "type": "string",
+                "description": "Primary street address line"
+              },
+              "addressLine2": {
+                "type": "string",
+                "description": "Additional street or unit information"
+              },
+              "town": {
+                "type": "string",
+                "description": "Town or village"
+              },
+              "city": {
+                "type": "string",
+                "description": "City or municipality"
+              },
+              "country": {
+                "type": "string",
+                "description": "Country or territory"
+              },
+              "postcode": {
+                "type": "string",
+                "description": "Postal or ZIP code"
+              }
+            }
+          },
+          "twoFactorEnabled": {
+            "type": "boolean",
+            "description": "Indicates whether multi-factor authentication is enabled for the account.",
+            "default": false
+          },
+          "twoFactorEnrolledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of initial multi-factor enrollment."
+          },
+          "twoFactorLastVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of the last successful multi-factor verification."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "email",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

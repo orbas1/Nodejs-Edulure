@@ -12,13 +12,13 @@ All tasks start at **0%** completion. Percentages will be updated during executi
     3. Consume new health-check and capability endpoints to display service availability banners. ✅ Completed – frontend shell polls capability manifest, renders global service alerts, and surfaces outage messaging across layouts.【F:frontend-reactjs/src/context/ServiceHealthContext.jsx†L1-L165】【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L1-L96】
     4. Update build pipeline to ingest generated TypeScript SDK from modularised APIs. ✅ Completed – React prebuild/dev hooks compile the shared SDK workspace so bundlers consume regenerated clients on every build.【F:frontend-reactjs/package.json†L10-L23】【F:sdk-typescript/scripts/generate-sdk.mjs†L1-L66】
   - **User Phone App:**
-    5. Adjust environment bootstrap to handle new capability manifest, including fallback messaging when services degrade.【F:update_docs/1.50/features_to_add.md†L237-L286】
+    5. Adjust environment bootstrap to handle new capability manifest, including fallback messaging when services degrade.【F:update_docs/1.50/features_to_add.md†L237-L286】 ✅ Completed – Flutter bootstrap now warms the manifest provider, caches responses, and renders a persistent capability banner that communicates degraded or unavailable services across the mobile shell.【F:Edulure-Flutter/lib/bootstrap/app_bootstrap.dart†L1-L58】【F:Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart†L1-L112】【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】
   - **Provider Phone App:**
-    6. Define parity hooks and stubs for future provider app to consume capability manifest and RBAC matrix (documentation + interface contracts).
+    6. Define parity hooks and stubs for future provider app to consume capability manifest and RBAC matrix (documentation + interface contracts). ✅ Completed – provider bootstrap, RBAC matrix models, and parity documentation ready for provider squads to integrate manifest/RBAC flows without rewrites.【F:Edulure-Flutter/lib/provider/bootstrap/provider_app_bootstrap.dart†L1-L94】【F:Edulure-Flutter/lib/provider/runtime/provider_capability_bridge.dart†L1-L182】【F:Edulure-Flutter/lib/core/security/rbac_matrix_models.dart†L1-L214】【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L51】
   - **Database:**
-    7. Create migration scripts for audit, consent, and incident tables with encrypted columns and index policies.【F:update_docs/1.50/features_to_add.md†L12-L70】
+    7. Create migration scripts for audit, consent, and incident tables with encrypted columns and index policies.【F:update_docs/1.50/features_to_add.md†L12-L70】 ✅ Completed – introduced dedicated compliance tables with encrypted payload columns, hashed index support, SLA metadata, and tenant-aware governance to unblock enterprise audits.【F:backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js†L1-L180】
   - **API:**
-    8. Publish versioned OpenAPI specs with service separation and automated contract tests.
+    8. Publish versioned OpenAPI specs with service separation and automated contract tests. ✅ Completed – automated builder now slices the platform spec into capability catalogs, exposes `/api/v1/docs/services/:service`+UI endpoints, and validates coverage via Vitest contract checks.
   - **Logic:**
     9. Externalise feature flags/runtime config to Redis with cache warming and failover strategies.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L19-L28】
   - **Design:**

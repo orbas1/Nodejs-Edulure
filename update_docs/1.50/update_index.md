@@ -1,0 +1,18 @@
+# Version 1.50 – Update Index (in-progress additions)
+
+## Mobile Capability Manifest Enablement
+- Code: `Edulure-Flutter/lib/bootstrap/app_bootstrap.dart`, `lib/core/runtime/*`, `lib/widgets/capability_status_banner.dart`
+- Documentation: `update_task_list.md`, `update_progress_tracker.md`, `user_phone_app_updates/*`, `Design_*` files updated for parity messaging
+
+## Provider Capability & RBAC Foundations
+- Code: `Edulure-Flutter/lib/core/security/*`, `lib/provider/bootstrap/provider_app_bootstrap.dart`, `lib/provider/runtime/provider_capability_bridge.dart`
+- Documentation: `provider_phone_app_updates/*`, `change_log.md`, `Design_*` progress trackers, `update_task_list.md`
+
+## Compliance Audit & Consent Ledger Hardening
+- Code: `backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js`
+- Documentation: `update_task_list.md`, `change_log.md`, `update_progress_tracker.md`, `Design_*` artefacts covering compliance dashboards
+
+## Versioned OpenAPI Catalogue & Contract Testing
+- Code: `backend-nodejs/src/docs/builders/openapiBuilder.js`, `src/docs/serviceSpecRegistry.js`, `src/app.js`, `src/routes/routeMetadata.js`, `test/openApiContracts.test.js`
+- Documentation: `update_task_list.md`, `update_progress_tracker.md`, `change_log.md`, `Design_*` documentation describing API visibility
+

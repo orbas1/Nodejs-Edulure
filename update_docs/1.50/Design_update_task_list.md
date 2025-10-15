@@ -31,6 +31,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   10. Package Zeplin exports and measurement notes for engineering handoff.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   11. Align analytics instrumentation requirements with data/insights team for critical journeys.【F:update_docs/1.50/Design_Plan.md†L140-L146】
   12. Log risk, dependency, and parity status in design change log for weekly review.【F:update_docs/1.50/Design_Plan.md†L23-L34】
+  - _Progress note:_ Capability manifest incident messaging has been prototyped in Flutter, and provider RBAC overlays are now documented alongside hooks so operator shells inherit lock states, guardrail cues, and audit messaging without bespoke rewrites.【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】【F:Edulure-Flutter/lib/provider/runtime/provider_capability_bridge.dart†L1-L182】【F:update_docs/1.50/provider_phone_app_updates/rbac_contracts.md†L1-L51】
 
 ## 3. Web Application Navigation & Funnel Redesign (0%)
 - **Objective:** Restructure marketing funnels and authenticated dashboards with modular components and performance guardrails.【F:update_docs/1.50/Design_Plan.md†L78-L117】
@@ -48,6 +49,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   10. Publish Storybook backlog entries and asset manifests for front-end squads.【F:update_docs/1.50/Design_Plan.md†L99-L123】
   11. Capture conversion and usability success metrics with baseline analytics queries for post-launch comparisons.【F:update_docs/1.50/Design_Plan.md†L140-L153】
   - _Progress note:_ Service availability banner specifications implemented in the shell, ensuring navigation badges mirror readiness telemetry for operator awareness.【F:frontend-reactjs/src/layouts/MainLayout.jsx†L24-L260】【F:update_docs/1.50/ui-ux_updates/web_application_styling_changes.md†L65-L78】
+  - _Progress note:_ Service-specific OpenAPI catalogues are now published, enabling UI copy, badge states, and escalation flows to reference the exact contract serving each dashboard module.【F:backend-nodejs/src/docs/builders/openapiBuilder.js†L1-L169】【F:backend-nodejs/src/app.js†L125-L190】
 
 ## 4. Asset, Copy, and Compliance Enablement (0%)
 - **Objective:** Deliver documentation, assets, and compliance artefacts that unblock development, QA, and marketing teams.【F:update_docs/1.50/Design_Plan.md†L107-L136】
@@ -61,6 +63,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   7. Prepare QA regression notes linking design artefacts to automated/manual test coverage expectations.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   8. Publish documentation updates in central repository and notify stakeholders of version changes.【F:update_docs/1.50/Design_Plan.md†L128-L136】
   9. Capture outstanding compliance or localisation gaps and present to steering committee for mitigation.【F:update_docs/1.50/Design_Plan.md†L23-L34】
+  - _Progress note:_ Compliance dashboard briefs now tap encrypted audit, consent, and incident ledgers so UI states can surface SLA countdowns, encryption badges, and escalation ownership without exposing sensitive payloads in design artefacts.【F:backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js†L1-L180】
 
 ## 5. Handoff, Measurement, and Iteration Framework (0%)
 - **Objective:** Enable smooth transition to development and ensure post-launch measurement and feedback loops are in place.【F:update_docs/1.50/Design_Plan.md†L128-L153】
