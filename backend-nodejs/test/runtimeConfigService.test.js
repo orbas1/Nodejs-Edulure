@@ -1,11 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { RuntimeConfigService } from '../src/services/FeatureFlagService.js';
 
 const logger = {
   debug: () => {},
   error: () => {},
-  info: () => {}
+  info: () => {},
+  warn: () => {}
 };
 
 const entries = [
@@ -98,5 +99,35 @@ describe('RuntimeConfigService', () => {
       includeSensitive: true
     });
     expect(unredacted).toBe('sk_live_sensitive');
+  });
+
+  it('hydrates runtime configuration from distributed snapshot when available', async () => {
+    const distributedCache = {
+      readRuntimeConfig: vi.fn().mockResolvedValue({ value: entries, version: 456 }),
+      acquireRuntimeConfigLock: vi.fn(),
+      releaseRuntimeConfigLock: vi.fn(),
+      writeRuntimeConfig: vi.fn()
+    };
+
+    const loadEntries = vi.fn().mockResolvedValue(entries);
+
+    service = new RuntimeConfigService({
+      loadEntries,
+      cacheTtlMs: 60_000,
+      refreshIntervalMs: 0,
+      loggerInstance: logger,
+      distributedCache
+    });
+
+    await service.start();
+
+    expect(distributedCache.readRuntimeConfig).toHaveBeenCalledTimes(1);
+    expect(loadEntries).not.toHaveBeenCalled();
+
+    const value = service.getValue('support.contact-email', {
+      environment: 'development',
+      audience: 'public'
+    });
+    expect(value).toBe('support@edulure.com');
   });
 });

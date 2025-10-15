@@ -6,6 +6,7 @@ import logger from '../config/logger.js';
 import ConfigurationEntryModel from '../models/ConfigurationEntryModel.js';
 import FeatureFlagModel from '../models/FeatureFlagModel.js';
 import { metricsRegistry } from '../observability/metrics.js';
+import { distributedRuntimeCache } from './DistributedRuntimeCache.js';
 
 function selectVariant(variants, bucket) {
   if (!Array.isArray(variants) || variants.length === 0) {
@@ -161,21 +162,26 @@ if (!runtimeConfigReadsMetric) {
 }
 
 export class FeatureFlagService {
-  constructor({ loadFlags, cacheTtlMs, refreshIntervalMs, loggerInstance }) {
+  constructor({ loadFlags, cacheTtlMs, refreshIntervalMs, loggerInstance, distributedCache = null }) {
     this.loadFlags = loadFlags;
     this.cacheTtlMs = cacheTtlMs;
     this.refreshIntervalMs = refreshIntervalMs;
     this.logger = loggerInstance;
-    this.cache = { flags: new Map(), expiresAt: 0 };
+    this.distributedCache = distributedCache ?? null;
+    this.cache = { flags: new Map(), expiresAt: 0, version: null, source: 'init' };
     this.refreshPromise = null;
     this.interval = null;
   }
 
   async start() {
-    await this.refresh({ force: true });
+    const hydrated = await this.tryHydrateFromDistributedCache('startup');
+    if (!hydrated) {
+      await this.refresh({ force: true, reason: 'startup' });
+    }
+
     if (this.refreshIntervalMs > 0) {
       this.interval = setInterval(() => {
-        this.refresh({ force: true }).catch((error) => {
+        this.refresh({ force: true, reason: 'interval' }).catch((error) => {
           this.logger.error({ err: error }, 'Failed to refresh feature flag cache');
         });
       }, this.refreshIntervalMs);
@@ -190,7 +196,50 @@ export class FeatureFlagService {
     this.interval = null;
   }
 
-  async refresh({ force = false } = {}) {
+  applyFlags(flags, metadata = {}) {
+    const map = new Map();
+    if (Array.isArray(flags)) {
+      for (const flag of flags) {
+        if (flag && flag.key) {
+          map.set(flag.key, flag);
+        }
+      }
+    }
+
+    this.cache.flags = map;
+    this.cache.expiresAt = Date.now() + this.cacheTtlMs;
+    this.cache.version = metadata.version ?? Date.now();
+    this.cache.source = metadata.source ?? 'unknown';
+  }
+
+  async tryHydrateFromDistributedCache(reason = 'scheduled') {
+    if (!this.distributedCache) {
+      return false;
+    }
+
+    try {
+      const snapshot = await this.distributedCache.readFeatureFlags();
+      if (!snapshot || !Array.isArray(snapshot.value)) {
+        return false;
+      }
+
+      this.applyFlags(snapshot.value, {
+        version: snapshot.version ?? Date.now(),
+        source: 'distributed'
+      });
+
+      this.logger.debug(
+        { reason, count: snapshot.value.length, version: snapshot.version ?? null },
+        'Feature flag cache hydrated from distributed snapshot'
+      );
+      return true;
+    } catch (error) {
+      this.logger.warn({ err: error, reason }, 'Failed to hydrate feature flag cache from distributed snapshot');
+      return false;
+    }
+  }
+
+  async refresh({ force = false, reason = 'scheduled' } = {}) {
     const now = Date.now();
     if (!force && this.cache.expiresAt > now) {
       return;
@@ -201,14 +250,44 @@ export class FeatureFlagService {
     }
 
     this.refreshPromise = (async () => {
-      const flags = await this.loadFlags();
-      const map = new Map();
-      for (const flag of flags) {
-        map.set(flag.key, flag);
+      if (!force) {
+        const hydrated = await this.tryHydrateFromDistributedCache(reason);
+        if (hydrated) {
+          return;
+        }
       }
-      this.cache.flags = map;
-      this.cache.expiresAt = Date.now() + this.cacheTtlMs;
-      this.logger.debug({ count: map.size }, 'Feature flag cache refreshed');
+
+      let lockToken = null;
+
+      try {
+        if (this.distributedCache) {
+          lockToken = await this.distributedCache.acquireFeatureFlagLock();
+          if (!lockToken) {
+            const adopted = await this.tryHydrateFromDistributedCache(`${reason}-lock-contention`);
+            if (adopted) {
+              return;
+            }
+          }
+        }
+
+        const flags = await this.loadFlags();
+        this.applyFlags(flags, { version: Date.now(), source: 'primary' });
+        this.logger.debug(
+          { count: this.cache.flags.size, reason, source: 'primary' },
+          'Feature flag cache refreshed from primary store'
+        );
+
+        if (this.distributedCache) {
+          await this.distributedCache.writeFeatureFlags(flags);
+        }
+      } catch (error) {
+        this.logger.error({ err: error, reason }, 'Failed to refresh feature flag cache');
+        throw error;
+      } finally {
+        if (lockToken && this.distributedCache) {
+          await this.distributedCache.releaseFeatureFlagLock(lockToken);
+        }
+      }
     })();
 
     try {
@@ -402,21 +481,26 @@ export class FeatureFlagService {
 }
 
 export class RuntimeConfigService {
-  constructor({ loadEntries, cacheTtlMs, refreshIntervalMs, loggerInstance }) {
+  constructor({ loadEntries, cacheTtlMs, refreshIntervalMs, loggerInstance, distributedCache = null }) {
     this.loadEntries = loadEntries;
     this.cacheTtlMs = cacheTtlMs;
     this.refreshIntervalMs = refreshIntervalMs;
     this.logger = loggerInstance;
-    this.cache = { entries: new Map(), expiresAt: 0 };
+    this.distributedCache = distributedCache ?? null;
+    this.cache = { entries: new Map(), expiresAt: 0, version: null, source: 'init' };
     this.refreshPromise = null;
     this.interval = null;
   }
 
   async start() {
-    await this.refresh({ force: true });
+    const hydrated = await this.tryHydrateFromDistributedCache('startup');
+    if (!hydrated) {
+      await this.refresh({ force: true, reason: 'startup' });
+    }
+
     if (this.refreshIntervalMs > 0) {
       this.interval = setInterval(() => {
-        this.refresh({ force: true }).catch((error) => {
+        this.refresh({ force: true, reason: 'interval' }).catch((error) => {
           this.logger.error({ err: error }, 'Failed to refresh runtime configuration cache');
         });
       }, this.refreshIntervalMs);
@@ -431,7 +515,76 @@ export class RuntimeConfigService {
     this.interval = null;
   }
 
-  async refresh({ force = false } = {}) {
+  buildEntryMap(entries) {
+    const map = new Map();
+    if (Array.isArray(entries)) {
+      for (const entry of entries) {
+        if (!entry || !entry.key) {
+          continue;
+        }
+
+        if (!map.has(entry.key)) {
+          map.set(entry.key, []);
+        }
+
+        map.get(entry.key).push(entry);
+      }
+    }
+
+    for (const entryList of map.values()) {
+      entryList.sort((a, b) => {
+        if (a.environmentScope === b.environmentScope) {
+          return 0;
+        }
+        if (a.environmentScope === 'global') {
+          return 1;
+        }
+        if (b.environmentScope === 'global') {
+          return -1;
+        }
+        return a.environmentScope.localeCompare(b.environmentScope);
+      });
+    }
+
+    return map;
+  }
+
+  applyEntries(entries, metadata = {}) {
+    const map = this.buildEntryMap(entries);
+    this.cache.entries = map;
+    this.cache.expiresAt = Date.now() + this.cacheTtlMs;
+    this.cache.version = metadata.version ?? Date.now();
+    this.cache.source = metadata.source ?? 'unknown';
+  }
+
+  async tryHydrateFromDistributedCache(reason = 'scheduled') {
+    if (!this.distributedCache) {
+      return false;
+    }
+
+    try {
+      const snapshot = await this.distributedCache.readRuntimeConfig();
+      if (!snapshot || !Array.isArray(snapshot.value)) {
+        return false;
+      }
+
+      this.applyEntries(snapshot.value, {
+        version: snapshot.version ?? Date.now(),
+        source: 'distributed'
+      });
+
+      this.logger.debug(
+        { reason, keys: this.cache.entries.size, version: snapshot.version ?? null },
+        'Runtime configuration cache hydrated from distributed snapshot'
+      );
+      return true;
+    } catch (error) {
+      this.logger.warn({ err: error, reason }, 'Failed to hydrate runtime configuration cache from distributed snapshot');
+      return false;
+    }
+  }
+
+  async refresh({ force = false, reason = 'scheduled' } = {}) {
     const now = Date.now();
     if (!force && this.cache.expiresAt > now) {
       return;
@@ -442,33 +595,44 @@ export class RuntimeConfigService {
     }
 
     this.refreshPromise = (async () => {
-      const entries = await this.loadEntries();
-      const map = new Map();
-      for (const entry of entries) {
-        if (!map.has(entry.key)) {
-          map.set(entry.key, []);
+      if (!force) {
+        const hydrated = await this.tryHydrateFromDistributedCache(reason);
+        if (hydrated) {
+          return;
         }
-        map.get(entry.key).push(entry);
       }
 
-      for (const entryList of map.values()) {
-        entryList.sort((a, b) => {
-          if (a.environmentScope === b.environmentScope) {
-            return 0;
-          }
-          if (a.environmentScope === 'global') {
-            return 1;
-          }
-          if (b.environmentScope === 'global') {
-            return -1;
-          }
-          return a.environmentScope.localeCompare(b.environmentScope);
-        });
-      }
+      let lockToken = null;
 
-      this.cache.entries = map;
-      this.cache.expiresAt = Date.now() + this.cacheTtlMs;
-      this.logger.debug({ count: map.size }, 'Runtime configuration cache refreshed');
+      try {
+        if (this.distributedCache) {
+          lockToken = await this.distributedCache.acquireRuntimeConfigLock();
+          if (!lockToken) {
+            const adopted = await this.tryHydrateFromDistributedCache(`${reason}-lock-contention`);
+            if (adopted) {
+              return;
+            }
+          }
+        }
+
+        const entries = await this.loadEntries();
+        this.applyEntries(entries, { version: Date.now(), source: 'primary' });
+        this.logger.debug(
+          { keys: this.cache.entries.size, reason, source: 'primary' },
+          'Runtime configuration cache refreshed from primary store'
+        );
+
+        if (this.distributedCache) {
+          await this.distributedCache.writeRuntimeConfig(entries);
+        }
+      } catch (error) {
+        this.logger.error({ err: error, reason }, 'Failed to refresh runtime configuration cache');
+        throw error;
+      } finally {
+        if (lockToken && this.distributedCache) {
+          await this.distributedCache.releaseRuntimeConfigLock(lockToken);
+        }
+      }
     })();
 
     try {
@@ -560,12 +724,14 @@ export const featureFlagService = new FeatureFlagService({
   loadFlags: () => FeatureFlagModel.all(),
   cacheTtlMs: env.runtimeConfig.featureFlagCacheTtlMs,
   refreshIntervalMs: env.runtimeConfig.featureFlagRefreshIntervalMs,
-  loggerInstance: logger.child({ service: 'FeatureFlagService' })
+  loggerInstance: logger.child({ service: 'FeatureFlagService' }),
+  distributedCache: distributedRuntimeCache
 });
 
 export const runtimeConfigService = new RuntimeConfigService({
   loadEntries: () => ConfigurationEntryModel.all(),
   cacheTtlMs: env.runtimeConfig.configCacheTtlMs,
   refreshIntervalMs: env.runtimeConfig.configRefreshIntervalMs,
-  loggerInstance: logger.child({ service: 'RuntimeConfigService' })
+  loggerInstance: logger.child({ service: 'RuntimeConfigService' }),
+  distributedCache: distributedRuntimeCache
 });

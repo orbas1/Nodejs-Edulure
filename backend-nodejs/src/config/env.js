@@ -124,6 +124,50 @@ function clampRate(rate) {
   return Number(normalised.toFixed(6));
 }
 
+function maybeDecodeCertificate(value) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.includes('-----BEGIN')) {
+    return trimmed;
+  }
+
+  try {
+    return Buffer.from(trimmed, 'base64').toString('utf8');
+  } catch (_error) {
+    return trimmed;
+  }
+}
+
+function normalizeRedisNamespace(value, fallback) {
+  const source = (value ?? fallback ?? '').trim();
+  if (!source) {
+    return fallback ?? '';
+  }
+
+  return source.replace(/:+$/, '');
+}
+
+function buildRedisKey(prefix, key) {
+  const base = normalizeRedisNamespace(prefix, 'edulure');
+  const suffix = String(key ?? '')
+    .trim()
+    .replace(/^:+/, '')
+    .replace(/:+$/, '');
+
+  if (!suffix) {
+    return base;
+  }
+
+  return `${base}:${suffix}`;
+}
+
 function normalizeTaxTable(rawTable) {
   if (!rawTable || typeof rawTable !== 'object') {
     return {};
@@ -315,6 +359,22 @@ const envSchema = z
     DATA_RETENTION_RUN_ON_STARTUP: z.coerce.boolean().default(false),
     DATA_RETENTION_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
     DATA_RETENTION_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(30),
+    REDIS_ENABLED: z.coerce.boolean().default(false),
+    REDIS_URL: z.string().url().optional(),
+    REDIS_HOST: z.string().min(1).default('127.0.0.1'),
+    REDIS_PORT: z.coerce.number().int().min(1).max(65535).default(6379),
+    REDIS_USERNAME: z.string().min(1).optional(),
+    REDIS_PASSWORD: z.string().min(1).optional(),
+    REDIS_TLS_ENABLED: z.coerce.boolean().default(false),
+    REDIS_TLS_CA: z.string().optional(),
+    REDIS_KEY_PREFIX: z.string().min(1).default('edulure:runtime'),
+    REDIS_LOCK_PREFIX: z.string().min(1).default('edulure:locks'),
+    REDIS_FEATURE_FLAG_CACHE_KEY: z.string().min(1).default('feature-flags'),
+    REDIS_RUNTIME_CONFIG_CACHE_KEY: z.string().min(1).default('runtime-config'),
+    REDIS_FEATURE_FLAG_LOCK_KEY: z.string().min(1).default('feature-flags'),
+    REDIS_RUNTIME_CONFIG_LOCK_KEY: z.string().min(1).default('runtime-config'),
+    REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().min(50).max(60000).default(2000),
+    REDIS_LOCK_TTL_SECONDS: z.coerce.number().int().min(5).max(600).default(45),
     FEATURE_FLAG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(30),
     FEATURE_FLAG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(120),
     RUNTIME_CONFIG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(45),
@@ -391,6 +451,14 @@ const envSchema = z
         code: z.ZodIssueCode.custom,
         path: ['METRICS_BEARER_TOKEN'],
         message: 'Use either METRICS_BEARER_TOKEN or METRICS_USERNAME/METRICS_PASSWORD, not both.'
+      });
+    }
+
+    if (!value.REDIS_TLS_ENABLED && value.REDIS_TLS_CA) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['REDIS_TLS_CA'],
+        message: 'Provide REDIS_TLS_CA only when REDIS_TLS_ENABLED is true.'
       });
     }
 
@@ -512,6 +580,13 @@ const webProbePort = raw.WEB_PROBE_PORT ?? webPort;
 const workerProbePort = raw.WORKER_PROBE_PORT;
 const realtimePort = raw.REALTIME_PORT;
 const realtimeProbePort = raw.REALTIME_PROBE_PORT ?? realtimePort;
+const redisKeyPrefix = normalizeRedisNamespace(raw.REDIS_KEY_PREFIX, 'edulure:runtime');
+const redisLockPrefix = normalizeRedisNamespace(raw.REDIS_LOCK_PREFIX, 'edulure:locks');
+const redisFeatureFlagKey = buildRedisKey(redisKeyPrefix, raw.REDIS_FEATURE_FLAG_CACHE_KEY);
+const redisRuntimeConfigKey = buildRedisKey(redisKeyPrefix, raw.REDIS_RUNTIME_CONFIG_CACHE_KEY);
+const redisFeatureFlagLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_FEATURE_FLAG_LOCK_KEY);
+const redisRuntimeConfigLockKey = buildRedisKey(redisLockPrefix, raw.REDIS_RUNTIME_CONFIG_LOCK_KEY);
+const redisTlsCa = maybeDecodeCertificate(raw.REDIS_TLS_CA);
 
 export const env = {
   nodeEnv: raw.NODE_ENV,
@@ -658,6 +733,28 @@ export const env = {
   bootstrap: {
     maxAttempts: raw.BOOTSTRAP_MAX_RETRIES,
     retryDelayMs: raw.BOOTSTRAP_RETRY_DELAY_MS
+  },
+  redis: {
+    enabled: raw.REDIS_ENABLED,
+    url: raw.REDIS_URL ?? null,
+    host: raw.REDIS_HOST,
+    port: raw.REDIS_PORT,
+    username: raw.REDIS_USERNAME ?? null,
+    password: raw.REDIS_PASSWORD ?? null,
+    tls: {
+      enabled: raw.REDIS_TLS_ENABLED,
+      ca: redisTlsCa
+    },
+    keyPrefix: redisKeyPrefix,
+    lockPrefix: redisLockPrefix,
+    keys: {
+      featureFlags: redisFeatureFlagKey,
+      runtimeConfig: redisRuntimeConfigKey,
+      featureFlagLock: redisFeatureFlagLockKey,
+      runtimeConfigLock: redisRuntimeConfigLockKey
+    },
+    commandTimeoutMs: raw.REDIS_COMMAND_TIMEOUT_MS,
+    lockTtlMs: raw.REDIS_LOCK_TTL_SECONDS * 1000
   },
   retention: {
     enabled: raw.DATA_RETENTION_ENABLED,

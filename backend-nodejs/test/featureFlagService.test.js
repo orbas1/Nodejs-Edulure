@@ -1,12 +1,13 @@
 import crypto from 'crypto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { FeatureFlagService } from '../src/services/FeatureFlagService.js';
 
 const logger = {
   debug: () => {},
   error: () => {},
-  info: () => {}
+  info: () => {},
+  warn: () => {}
 };
 
 function computeBucket(flagKey, identifier) {
@@ -163,5 +164,46 @@ describe('FeatureFlagService', () => {
     const evaluation = service.evaluate('schedule.flag');
     expect(evaluation.enabled).toBe(false);
     expect(evaluation.reason).toBe('outside-schedule');
+  });
+
+  it('hydrates from distributed cache snapshot when available', async () => {
+    const flags = [
+      {
+        key: 'distributed.flag',
+        name: 'Distributed flag',
+        description: 'Loaded from redis snapshot',
+        enabled: true,
+        killSwitch: false,
+        rolloutStrategy: 'boolean',
+        rolloutPercentage: 100,
+        segmentRules: {},
+        environments: ['development']
+      }
+    ];
+
+    const distributedCache = {
+      readFeatureFlags: vi.fn().mockResolvedValue({ value: flags, version: 123 }),
+      acquireFeatureFlagLock: vi.fn(),
+      releaseFeatureFlagLock: vi.fn(),
+      writeFeatureFlags: vi.fn()
+    };
+
+    const loadFlags = vi.fn().mockResolvedValue(flags);
+
+    service = new FeatureFlagService({
+      loadFlags,
+      cacheTtlMs: 60_000,
+      refreshIntervalMs: 0,
+      loggerInstance: logger,
+      distributedCache
+    });
+
+    await service.start();
+
+    expect(distributedCache.readFeatureFlags).toHaveBeenCalledTimes(1);
+    expect(loadFlags).not.toHaveBeenCalled();
+
+    const evaluation = service.evaluate('distributed.flag');
+    expect(evaluation.enabled).toBe(true);
   });
 });
