@@ -476,6 +476,7 @@ export default class CommunityService {
     const tags = toArray(post.tags);
     const reactionSummary = parseJsonColumn(post.reactionSummary, {});
     const metadata = parseJsonColumn(post.metadata, {});
+    const moderationMetadata = parseJsonColumn(post.moderationMetadata, {});
     const totalReactions = typeof reactionSummary.total === 'number'
       ? reactionSummary.total
       : Object.values(reactionSummary).reduce((sum, value) => (typeof value === 'number' ? sum + value : sum), 0);
@@ -517,6 +518,15 @@ export default class CommunityService {
         reactions: totalReactions,
         reactionBreakdown: reactionSummary,
         comments: Number(post.commentCount ?? 0)
+      },
+      moderation: {
+        state: post.moderationState ?? 'clean',
+        lastReviewedAt: post.lastModeratedAt ?? undefined,
+        flags: Array.isArray(moderationMetadata.flags) ? moderationMetadata.flags : [],
+        riskHistory: Array.isArray(moderationMetadata.riskHistory)
+          ? moderationMetadata.riskHistory
+          : [],
+        notes: moderationMetadata.notes ?? []
       },
       metadata
     };

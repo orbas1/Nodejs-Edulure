@@ -1,0 +1,45 @@
+import { Router } from 'express';
+
+import CommunityModerationController from '../controllers/CommunityModerationController.js';
+import auth from '../middleware/auth.js';
+
+const router = Router();
+
+router.post(
+  '/communities/:communityId/cases',
+  auth(),
+  CommunityModerationController.flagPost
+);
+router.get(
+  '/communities/:communityId/cases',
+  auth(),
+  CommunityModerationController.listCases
+);
+router.get(
+  '/communities/:communityId/cases/:caseId',
+  auth(),
+  CommunityModerationController.getCase
+);
+router.get(
+  '/communities/:communityId/cases/:caseId/actions',
+  auth(),
+  CommunityModerationController.listCaseActions
+);
+router.post(
+  '/communities/:communityId/cases/:caseId/actions',
+  auth(),
+  CommunityModerationController.applyCaseAction
+);
+
+router.post('/scam-reports', auth(), CommunityModerationController.submitScamReport);
+router.get('/scam-reports', auth(), CommunityModerationController.listScamReports);
+
+router.post('/analytics/events', auth(), CommunityModerationController.recordAnalyticsEvent);
+router.get('/analytics/summary', auth(), CommunityModerationController.getAnalyticsSummary);
+router.get(
+  '/communities/:communityId/analytics/summary',
+  auth(),
+  CommunityModerationController.getAnalyticsSummary
+);
+
+export default router;

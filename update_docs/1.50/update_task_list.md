@@ -51,10 +51,10 @@ All tasks start at **0%** completion. Percentages will be updated during executi
 - **Objective:** Launch creation studio, ads manager, community tooling, and analytics required for monetisation and engagement boosts.【F:update_docs/1.50/new_feature_brief.md†L27-L123】【F:update_docs/1.50/features_to_add.md†L32-L171】
 - **Integration Subtasks (12 total):**
   - **Backend:**
-    1. Implement services for creation projects, templates, collaboration sessions, and ads campaigns with RBAC enforcement.【F:update_docs/1.50/features_to_add.md†L32-L102】
-    2. Build moderation pipeline APIs for community posts, scam reports, and analytics capture.【F:update_docs/1.50/features_to_add.md†L92-L171】
+    1. Implement services for creation projects, templates, collaboration sessions, and ads campaigns with RBAC enforcement.【F:update_docs/1.50/features_to_add.md†L32-L102】 ✅ Completed – creation studio domain, migrations, RBAC-aware service layer, HTTP controller, and tests published for multi-tenant authoring, ad promotion flows, and the streamlined course/e-book/community/ad asset catalogue with governed defaults.【F:backend-nodejs/src/services/CreationStudioService.js†L36-L145】【F:backend-nodejs/src/controllers/CreationStudioController.js†L1-L392】【F:backend-nodejs/test/creationStudioService.test.js†L1-L283】
+    2. Build moderation pipeline APIs for community posts, scam reports, and analytics capture.【F:update_docs/1.50/features_to_add.md†L92-L171】 ✅ Completed – launched moderation case tables, service/controller layer, scam reporting, and analytics events powering the safety review queue and dashboards under `/api/v1/moderation`.【F:backend-nodejs/migrations/20250215120000_community_moderation_pipeline.js†L1-L197】【F:backend-nodejs/src/services/CommunityModerationService.js†L1-L676】【F:backend-nodejs/src/controllers/CommunityModerationController.js†L1-L342】【F:backend-nodejs/src/routes/communityModeration.routes.js†L1-L45】
   - **Front-end:**
-    3. Develop creation studio UI wizard, asset library, and collaborative editing indicators.
+    3. Develop creation studio UI wizard, asset library, and collaborative editing indicators. ✅ Completed – Instructor creation studio now ships a production-grade hub with API-driven project tables, readiness stepper, real-time presence controls, template launch workflows, and catalogue mix analytics that cover courses, e-books, communities, and ad assets.【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L1-L229】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationStudioSummary.jsx†L84-L132】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationAssetLibrary.jsx†L162-L289】【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationProjectList.jsx†L1-L205】
     4. Implement analytics dashboard with export, ranking insights, and scam banner integration.
   - **User Phone App:**
     5. Deliver mobile creation companion for approvals, asset review, and community posting with offline caching.【F:update_docs/1.50/features_to_add.md†L261-L302】
@@ -62,7 +62,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **Provider Phone App:**
     7. Document provider roadmap for ads/creation oversight, including API endpoints and moderation workflows to share with partner team.
   - **Database:**
-    8. Create tables for creation_projects, ads_campaigns, community_posts, community_memberships, ranking_insights with indexes.【F:update_docs/1.50/features_to_add.md†L44-L148】
+    8. Create tables for creation_projects, ads_campaigns, community_posts, community_memberships, ranking_insights with indexes.【F:update_docs/1.50/features_to_add.md†L44-L148】 ✅ Completed – creation catalogue metadata now anchors around courses, e-books, communities, and ad assets so defaults and analytics scaffolding exist for every studio workflow.【F:backend-nodejs/migrations/20250213143000_creation_studio.js†L1-L141】【F:backend-nodejs/src/services/CreationStudioService.js†L36-L145】
   - **API:**
     9. Generate GraphQL/REST endpoints for live feed aggregation, ads placement, and analytics queries.
   - **Logic:**

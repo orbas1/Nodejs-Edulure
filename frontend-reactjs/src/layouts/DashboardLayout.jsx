@@ -20,6 +20,7 @@ import {
   PlayCircleIcon,
   ShieldCheckIcon,
   ShieldExclamationIcon,
+  SparklesIcon,
   Squares2X2Icon,
   UserGroupIcon,
   UserPlusIcon,
@@ -55,6 +56,7 @@ const navigationByRole = {
   ],
   instructor: (basePath) => [
     { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
+    { name: 'Creation studio', to: `${basePath}/creation-studio`, icon: SparklesIcon },
     { name: 'Create community', to: `${basePath}/communities/create`, icon: UserGroupIcon },
     { name: 'Manage communities', to: `${basePath}/communities/manage`, icon: Cog6ToothIcon },
     { name: 'Webinars', to: `${basePath}/communities/webinars`, icon: PlayCircleIcon },

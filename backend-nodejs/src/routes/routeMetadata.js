@@ -29,12 +29,32 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'community-moderation',
+    capability: 'community-moderation',
+    description: 'Community moderation queues, scam reporting, and safety analytics APIs.',
+    basePath: '/moderation',
+    flagKey: 'platform.api.v1.community-moderation',
+    defaultState: 'enabled',
+    fallbackStatus: 403,
+    disabledMessage: 'Moderation APIs are restricted for this tenant.'
+  },
+  {
     name: 'content',
     capability: 'content-library',
     description: 'Content ingestion, cataloguing, and lifecycle management endpoints.',
     basePath: '/content',
     flagKey: 'platform.api.v1.content',
     defaultState: 'enabled'
+  },
+  {
+    name: 'creation',
+    capability: 'creation-studio',
+    description: 'Creation studio projects, templates, collaboration, and campaign promotion endpoints.',
+    basePath: '/creation',
+    flagKey: 'platform.api.v1.creation',
+    defaultState: 'enabled',
+    fallbackStatus: 403,
+    disabledMessage: 'Creation studio is disabled for this tenant.'
   },
   {
     name: 'runtime-config',
