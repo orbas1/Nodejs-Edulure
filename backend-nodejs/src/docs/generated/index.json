@@ -1,0 +1,132 @@
+{
+  "generatedAt": "2025-10-14T23:27:31.936Z",
+  "baseSpec": "../openapi.json",
+  "services": [
+    {
+      "service": "auth",
+      "name": "auth",
+      "capability": "identity-authentication",
+      "version": "v1",
+      "description": "User registration, login, session lifecycle, and verification endpoints.",
+      "basePath": "/auth",
+      "file": "./auth/v1/openapi.json"
+    },
+    {
+      "service": "users",
+      "name": "users",
+      "capability": "user-profile-management",
+      "version": "v1",
+      "description": "Account profile, preferences, and administrative management endpoints.",
+      "basePath": "/users",
+      "file": "./users/v1/openapi.json"
+    },
+    {
+      "service": "communities",
+      "name": "communities",
+      "capability": "community-collaboration",
+      "version": "v1",
+      "description": "Community creation, membership, and scheduling APIs.",
+      "basePath": "/communities",
+      "file": "./communities/v1/openapi.json"
+    },
+    {
+      "service": "content",
+      "name": "content",
+      "capability": "content-library",
+      "version": "v1",
+      "description": "Content ingestion, cataloguing, and lifecycle management endpoints.",
+      "basePath": "/content",
+      "file": "./content/v1/openapi.json"
+    },
+    {
+      "service": "runtime-config",
+      "name": "runtime-config",
+      "capability": "platform-runtime-config",
+      "version": "v1",
+      "description": "Runtime configuration and capability manifest endpoints consumed by clients.",
+      "basePath": "/runtime",
+      "file": "./runtime-config/v1/openapi.json"
+    },
+    {
+      "service": "payments",
+      "name": "payments",
+      "capability": "payments-and-payouts",
+      "version": "v1",
+      "description": "Payments, escrow, and billing orchestration endpoints.",
+      "basePath": "/payments",
+      "file": "./payments/v1/openapi.json"
+    },
+    {
+      "service": "chat",
+      "name": "chat",
+      "capability": "realtime-chat",
+      "version": "v1",
+      "description": "Realtime chat messaging, channel presence, and DM APIs.",
+      "basePath": "/chat",
+      "file": "./chat/v1/openapi.json"
+    },
+    {
+      "service": "social",
+      "name": "social",
+      "capability": "social-graph",
+      "version": "v1",
+      "description": "Follows, recommendations, and user engagement APIs.",
+      "basePath": "/social",
+      "file": "./social/v1/openapi.json"
+    },
+    {
+      "service": "explorer",
+      "name": "explorer",
+      "capability": "search-and-discovery",
+      "version": "v1",
+      "description": "Explorer search, browse, and recommendation endpoints.",
+      "basePath": "/explorer",
+      "file": "./explorer/v1/openapi.json"
+    },
+    {
+      "service": "ads",
+      "name": "ads",
+      "capability": "ads-manager",
+      "version": "v1",
+      "description": "Advertising campaign management and insights APIs.",
+      "basePath": "/ads",
+      "file": "./ads/v1/openapi.json"
+    },
+    {
+      "service": "analytics",
+      "name": "analytics",
+      "capability": "analytics-insights",
+      "version": "v1",
+      "description": "Reporting, dashboards, and analytics export APIs.",
+      "basePath": "/analytics",
+      "file": "./analytics/v1/openapi.json"
+    },
+    {
+      "service": "dashboard",
+      "name": "dashboard",
+      "capability": "operator-dashboard",
+      "version": "v1",
+      "description": "Operational dashboards, incident insights, and governance endpoints.",
+      "basePath": "/dashboard",
+      "file": "./dashboard/v1/openapi.json"
+    },
+    {
+      "service": "verification",
+      "name": "verification",
+      "capability": "identity-verification",
+      "version": "v1",
+      "description": "Identity verification, KYC, and trust signals APIs.",
+      "basePath": "/verification",
+      "file": "./verification/v1/openapi.json"
+    },
+    {
+      "service": "ebooks",
+      "name": "ebooks",
+      "capability": "digital-asset-delivery",
+      "version": "v1",
+      "description": "E-book catalogue and DRM-controlled delivery endpoints.",
+      "basePath": "/ebooks",
+      "file": "./ebooks/v1/openapi.json"
+    }
+  ]
+}

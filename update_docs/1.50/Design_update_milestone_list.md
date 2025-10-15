@@ -24,6 +24,7 @@ All design milestones start at **0%** completion and must produce artefacts refe
   - Dashboard templates (overview, cohort management, analytics, resources, settings) annotated for command palette, breadcrumbs, and contextual sidebars.【F:update_docs/1.50/Design_Plan.md†L95-L105】
   - Component spec dossiers (cards, tables, charts, forms, modals) and interaction prototypes published to Storybook backlog.【F:update_docs/1.50/Design_Plan.md†L99-L105】
   - Operator dashboard mockups reference live service readiness telemetry delivered by the backend squad to ensure health banners and incident shortcuts reflect real-time status; both web and Flutter shells now consume the manifest feed to visualise outages consistently.【F:frontend-reactjs/src/components/status/ServiceHealthBanner.jsx†L1-L96】【F:Edulure-Flutter/lib/widgets/capability_status_banner.dart†L1-L218】
+  - Interaction specs for dashboard capability chips and incident drawers must trace to the service-level OpenAPI catalogue so copy, icons, and escalation flows stay in sync with the `/api/v1/docs/services/:service` contracts.【F:backend-nodejs/src/app.js†L125-L190】【F:backend-nodejs/src/docs/builders/openapiBuilder.js†L1-L169】
 
 ## Milestone D4 – Asset, Copy, and Compliance Delivery (Weeks 3–5, 0%)
 - **Goal:** Finalise copy decks, imagery requirements, dummy data, and accessibility testing protocols to enable engineering readiness and performance governance.【F:update_docs/1.50/Design_Plan.md†L107-L126】

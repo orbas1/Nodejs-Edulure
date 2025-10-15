@@ -1,0 +1,1068 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Advertising campaign management and insights APIs.",
+    "version": "1.50.0",
+    "description": "Advertising campaign management and insights APIs. (Capability: ads-manager)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/ads/campaigns": {
+      "get": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "List campaigns for the authenticated instructor",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional comma separated list of campaign statuses"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "required": false
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": false
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "required": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaign list retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AdsCampaign"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "page": {
+                                  "type": "integer"
+                                },
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "total": {
+                                  "type": "integer"
+                                },
+                                "totalPages": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Create a new ad campaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdsCampaignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Campaign created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsCampaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ads/campaigns/{campaignId}": {
+      "get": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Get campaign detail",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaign fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsCampaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Update an ad campaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAdsCampaignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Campaign updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsCampaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/ads/campaigns/{campaignId}/pause": {
+      "post": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Pause a campaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaign paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsCampaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ads/campaigns/{campaignId}/resume": {
+      "post": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Resume a campaign",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaign resumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsCampaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ads/campaigns/{campaignId}/metrics": {
+      "post": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Record daily metrics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordAdsMetricsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metrics recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsCampaign"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ads/campaigns/{campaignId}/insights": {
+      "get": {
+        "tags": [
+          "Ads"
+        ],
+        "summary": "Fetch rolling performance insights",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "campaignId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "windowDays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Insights generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/AdsInsightsResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdsInsightsResponse": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "$ref": "#/components/schemas/AdsInsightSummary"
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdsInsightDaily"
+            }
+          }
+        }
+      },
+      "AdsInsightDaily": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "impressions": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "conversions": {
+            "type": "integer"
+          },
+          "spendCents": {
+            "type": "integer"
+          },
+          "revenueCents": {
+            "type": "integer"
+          },
+          "ctr": {
+            "type": "number",
+            "format": "float"
+          },
+          "conversionRate": {
+            "type": "number",
+            "format": "float"
+          },
+          "cpcCents": {
+            "type": "integer"
+          },
+          "cpaCents": {
+            "type": "integer"
+          }
+        }
+      },
+      "AdsInsightSummary": {
+        "type": "object",
+        "properties": {
+          "impressions": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "conversions": {
+            "type": "integer"
+          },
+          "spendCents": {
+            "type": "integer"
+          },
+          "revenueCents": {
+            "type": "integer"
+          },
+          "ctr": {
+            "type": "number",
+            "format": "float"
+          },
+          "conversionRate": {
+            "type": "number",
+            "format": "float"
+          },
+          "cpcCents": {
+            "type": "integer"
+          },
+          "cpaCents": {
+            "type": "integer"
+          }
+        }
+      },
+      "RecordAdsMetricsRequest": {
+        "type": "object",
+        "properties": {
+          "metricDate": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "impressions": {
+            "type": "integer"
+          },
+          "clicks": {
+            "type": "integer"
+          },
+          "conversions": {
+            "type": "integer"
+          },
+          "spendCents": {
+            "type": "integer"
+          },
+          "revenueCents": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "impressions",
+          "clicks",
+          "conversions",
+          "spendCents"
+        ]
+      },
+      "UpdateAdsCampaignRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string",
+            "enum": [
+              "awareness",
+              "traffic",
+              "leads",
+              "conversions"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "scheduled",
+              "active",
+              "paused",
+              "completed",
+              "archived"
+            ]
+          },
+          "budget": {
+            "$ref": "#/components/schemas/AdsBudget"
+          },
+          "targeting": {
+            "$ref": "#/components/schemas/AdsTargeting"
+          },
+          "creative": {
+            "$ref": "#/components/schemas/AdsCreative"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/AdsSchedule"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "AdsSchedule": {
+        "type": "object",
+        "properties": {
+          "startAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "AdsCreative": {
+        "type": "object",
+        "properties": {
+          "headline": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          }
+        }
+      },
+      "AdsTargeting": {
+        "type": "object",
+        "properties": {
+          "keywords": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "audiences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "AdsBudget": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "dailyCents": {
+            "type": "integer",
+            "example": 500000
+          }
+        },
+        "required": [
+          "currency",
+          "dailyCents"
+        ]
+      },
+      "CreateAdsCampaignRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string",
+            "enum": [
+              "awareness",
+              "traffic",
+              "leads",
+              "conversions"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "scheduled",
+              "active",
+              "paused"
+            ]
+          },
+          "budget": {
+            "$ref": "#/components/schemas/AdsBudget"
+          },
+          "targeting": {
+            "$ref": "#/components/schemas/AdsTargeting"
+          },
+          "creative": {
+            "$ref": "#/components/schemas/AdsCreative"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "name",
+          "objective",
+          "budget",
+          "creative"
+        ]
+      },
+      "AdsCampaign": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "internalId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string",
+            "enum": [
+              "awareness",
+              "traffic",
+              "leads",
+              "conversions"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "scheduled",
+              "active",
+              "paused",
+              "completed",
+              "archived"
+            ]
+          },
+          "performanceScore": {
+            "type": "number",
+            "format": "float"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/AdsBudget"
+          },
+          "spend": {
+            "$ref": "#/components/schemas/AdsSpend"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/AdsMetrics"
+          },
+          "targeting": {
+            "$ref": "#/components/schemas/AdsTargeting"
+          },
+          "creative": {
+            "$ref": "#/components/schemas/AdsCreative"
+          },
+          "schedule": {
+            "$ref": "#/components/schemas/AdsSchedule"
+          },
+          "compliance": {
+            "$ref": "#/components/schemas/AdsCompliance"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdBy": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "AdsCompliance": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "needs_review",
+              "halted"
+            ]
+          },
+          "riskScore": {
+            "type": "number",
+            "format": "float",
+            "example": 72.5
+          },
+          "violations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdsComplianceViolation"
+            }
+          }
+        }
+      },
+      "AdsComplianceViolation": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "warning"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "AdsMetrics": {
+        "type": "object",
+        "properties": {
+          "lifetime": {
+            "$ref": "#/components/schemas/AdsMetricLifetime"
+          },
+          "trailing7Days": {
+            "$ref": "#/components/schemas/AdsMetricTrailing"
+          },
+          "forecast": {
+            "$ref": "#/components/schemas/AdsMetricForecast"
+          }
+        }
+      },
+      "AdsMetricForecast": {
+        "type": "object",
+        "properties": {
+          "expectedDailySpendCents": {
+            "type": "integer",
+            "example": 52000
+          },
+          "expectedDailyConversions": {
+            "type": "number",
+            "format": "float",
+            "example": 18.4
+          },
+          "projectedRoas": {
+            "type": "number",
+            "format": "float",
+            "nullable": true,
+            "example": 2.54
+          }
+        }
+      },
+      "AdsMetricTrailing": {
+        "type": "object",
+        "properties": {
+          "impressions": {
+            "type": "integer",
+            "example": 48750
+          },
+          "clicks": {
+            "type": "integer",
+            "example": 2043
+          },
+          "conversions": {
+            "type": "integer",
+            "example": 238
+          },
+          "spendCents": {
+            "type": "integer",
+            "example": 41200
+          },
+          "revenueCents": {
+            "type": "integer",
+            "example": 109500
+          },
+          "ctr": {
+            "type": "number",
+            "format": "float",
+            "example": 0.0419
+          },
+          "conversionRate": {
+            "type": "number",
+            "format": "float",
+            "example": 0.1165
+          },
+          "cpcCents": {
+            "type": "integer",
+            "example": 202
+          },
+          "cpaCents": {
+            "type": "integer",
+            "example": 867
+          }
+        }
+      },
+      "AdsMetricLifetime": {
+        "type": "object",
+        "properties": {
+          "impressions": {
+            "type": "integer",
+            "example": 90750
+          },
+          "clicks": {
+            "type": "integer",
+            "example": 3828
+          },
+          "conversions": {
+            "type": "integer",
+            "example": 452
+          },
+          "spendCents": {
+            "type": "integer",
+            "example": 77700
+          },
+          "revenueCents": {
+            "type": "integer",
+            "example": 207700
+          },
+          "lastRecordedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ctr": {
+            "type": "number",
+            "format": "float",
+            "example": 0.0421
+          },
+          "conversionRate": {
+            "type": "number",
+            "format": "float",
+            "example": 0.1181
+          },
+          "cpcCents": {
+            "type": "integer",
+            "example": 203
+          },
+          "cpaCents": {
+            "type": "integer",
+            "example": 901
+          },
+          "roas": {
+            "type": "number",
+            "format": "float",
+            "nullable": true,
+            "example": 2.67
+          }
+        }
+      },
+      "AdsSpend": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "example": "USD"
+          },
+          "totalCents": {
+            "type": "integer",
+            "example": 182500
+          }
+        },
+        "required": [
+          "currency",
+          "totalCents"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

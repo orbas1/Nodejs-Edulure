@@ -18,7 +18,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **Database:**
     7. Create migration scripts for audit, consent, and incident tables with encrypted columns and index policies.【F:update_docs/1.50/features_to_add.md†L12-L70】 ✅ Completed – introduced dedicated compliance tables with encrypted payload columns, hashed index support, SLA metadata, and tenant-aware governance to unblock enterprise audits.【F:backend-nodejs/migrations/20250204100000_compliance_audit_consent_incidents.js†L1-L180】
   - **API:**
-    8. Publish versioned OpenAPI specs with service separation and automated contract tests.
+    8. Publish versioned OpenAPI specs with service separation and automated contract tests. ✅ Completed – automated builder now slices the platform spec into capability catalogs, exposes `/api/v1/docs/services/:service`+UI endpoints, and validates coverage via Vitest contract checks.
   - **Logic:**
     9. Externalise feature flags/runtime config to Redis with cache warming and failover strategies.【F:update_docs/1.50/pre-update_evaluations/fix_suggestions.md†L19-L28】
   - **Design:**

@@ -49,6 +49,7 @@ All tasks start at **0%** completion. Subtasks reference the artefacts and stand
   10. Publish Storybook backlog entries and asset manifests for front-end squads.【F:update_docs/1.50/Design_Plan.md†L99-L123】
   11. Capture conversion and usability success metrics with baseline analytics queries for post-launch comparisons.【F:update_docs/1.50/Design_Plan.md†L140-L153】
   - _Progress note:_ Service availability banner specifications implemented in the shell, ensuring navigation badges mirror readiness telemetry for operator awareness.【F:frontend-reactjs/src/layouts/MainLayout.jsx†L24-L260】【F:update_docs/1.50/ui-ux_updates/web_application_styling_changes.md†L65-L78】
+  - _Progress note:_ Service-specific OpenAPI catalogues are now published, enabling UI copy, badge states, and escalation flows to reference the exact contract serving each dashboard module.【F:backend-nodejs/src/docs/builders/openapiBuilder.js†L1-L169】【F:backend-nodejs/src/app.js†L125-L190】
 
 ## 4. Asset, Copy, and Compliance Enablement (0%)
 - **Objective:** Deliver documentation, assets, and compliance artefacts that unblock development, QA, and marketing teams.【F:update_docs/1.50/Design_Plan.md†L107-L136】

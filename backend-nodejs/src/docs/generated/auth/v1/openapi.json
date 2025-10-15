@@ -1,0 +1,802 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – User registration, login, session lifecycle, and verification endpoints.",
+    "version": "1.50.0",
+    "description": "User registration, login, session lifecycle, and verification endpoints. (Capability: identity-authentication)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "firstName",
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "firstName": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "Minimum 12 characters with upper, lower, number, and symbol"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "instructor",
+                      "admin"
+                    ]
+                  },
+                  "age": {
+                    "type": "integer",
+                    "minimum": 16,
+                    "maximum": 120
+                  },
+                  "address": {
+                    "type": "object",
+                    "properties": {
+                      "streetAddress": {
+                        "type": "string",
+                        "description": "Primary street address line"
+                      },
+                      "addressLine2": {
+                        "type": "string",
+                        "description": "Additional street or unit information"
+                      },
+                      "town": {
+                        "type": "string",
+                        "description": "Town or village"
+                      },
+                      "city": {
+                        "type": "string",
+                        "description": "City or municipality"
+                      },
+                      "country": {
+                        "type": "string",
+                        "description": "Country or territory"
+                      },
+                      "postcode": {
+                        "type": "string",
+                        "description": "Postal or ZIP code"
+                      }
+                    }
+                  },
+                  "twoFactor": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean",
+                        "description": "Enable multi-factor authentication during registration."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "twoFactor": {
+                              "type": "object",
+                              "description": "Multi-factor enrollment details for the new account.",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean",
+                                  "description": "Indicates whether multi-factor authentication was enabled during registration.",
+                                  "readOnly": true
+                                },
+                                "enforced": {
+                                  "type": "boolean",
+                                  "description": "True when the selected role requires multi-factor authentication.",
+                                  "readOnly": true
+                                },
+                                "secret": {
+                                  "type": "string",
+                                  "description": "Base32 secret for configuring an authenticator app. Returned only when MFA is enabled.",
+                                  "readOnly": true
+                                },
+                                "otpauthUrl": {
+                                  "type": "string",
+                                  "description": "otpauth:// URI used for QR code generation.",
+                                  "readOnly": true
+                                },
+                                "issuer": {
+                                  "type": "string",
+                                  "description": "Issuer label presented in authenticator applications.",
+                                  "readOnly": true
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email already exists"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "Authenticate user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "twoFactorCode": {
+                    "type": "string",
+                    "description": "6-10 digit code generated by the user's authenticator application when multi-factor authentication is enabled.",
+                    "pattern": "^\\d{6,10}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification",
+                            "tokens",
+                            "session"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "tokens": {
+                              "$ref": "#/components/schemas/AuthTokens"
+                            },
+                            "session": {
+                              "$ref": "#/components/schemas/SessionEnvelope"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials or incorrect two-factor code"
+          },
+          "403": {
+            "description": "Email verification or multi-factor challenge required"
+          },
+          "409": {
+            "description": "Multi-factor configuration required before access"
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "423": {
+            "description": "Account locked"
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "summary": "Refresh session tokens",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "refreshToken"
+                ],
+                "properties": {
+                  "refreshToken": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session refreshed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification",
+                            "tokens",
+                            "session"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            },
+                            "tokens": {
+                              "$ref": "#/components/schemas/AuthTokens"
+                            },
+                            "session": {
+                              "$ref": "#/components/schemas/SessionEnvelope"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Refresh token missing"
+          },
+          "401": {
+            "description": "Refresh token invalid or expired"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Revoke current session",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Session revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "revoked"
+                          ],
+                          "properties": {
+                            "revoked": {
+                              "type": "boolean"
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/auth/logout-all": {
+      "post": {
+        "summary": "Revoke other active sessions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "includeCurrent": {
+                    "type": "boolean",
+                    "description": "Also revoke the session used for this request",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessions revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "revokedCount",
+                            "revokedSessionIds"
+                          ],
+                          "properties": {
+                            "revokedCount": {
+                              "type": "integer"
+                            },
+                            "revokedSessionIds": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/auth/verify-email": {
+      "post": {
+        "summary": "Confirm email ownership",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "token"
+                ],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Verification token received via email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "user",
+                            "verification"
+                          ],
+                          "properties": {
+                            "user": {
+                              "$ref": "#/components/schemas/User"
+                            },
+                            "verification": {
+                              "$ref": "#/components/schemas/VerificationStatus"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Token expired or already used"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/auth/resend-verification": {
+      "post": {
+        "summary": "Resend verification email",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resend processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "required": [
+                            "delivered",
+                            "expiresAt"
+                          ],
+                          "properties": {
+                            "delivered": {
+                              "type": "boolean"
+                            },
+                            "expiresAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "429": {
+            "description": "Too many requests"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SessionEnvelope": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "AuthTokens": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "tokenType": {
+            "type": "string",
+            "example": "Bearer"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "tokenType",
+          "expiresAt"
+        ]
+      },
+      "VerificationStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified"
+            ]
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "status",
+          "emailVerifiedAt"
+        ]
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "instructor",
+              "admin"
+            ]
+          },
+          "age": {
+            "type": "integer",
+            "nullable": true
+          },
+          "address": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "streetAddress": {
+                "type": "string",
+                "description": "Primary street address line"
+              },
+              "addressLine2": {
+                "type": "string",
+                "description": "Additional street or unit information"
+              },
+              "town": {
+                "type": "string",
+                "description": "Town or village"
+              },
+              "city": {
+                "type": "string",
+                "description": "City or municipality"
+              },
+              "country": {
+                "type": "string",
+                "description": "Country or territory"
+              },
+              "postcode": {
+                "type": "string",
+                "description": "Postal or ZIP code"
+              }
+            }
+          },
+          "twoFactorEnabled": {
+            "type": "boolean",
+            "description": "Indicates whether multi-factor authentication is enabled for the account.",
+            "default": false
+          },
+          "twoFactorEnrolledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of initial multi-factor enrollment."
+          },
+          "twoFactorLastVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Timestamp of the last successful multi-factor verification."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "email",
+          "role",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

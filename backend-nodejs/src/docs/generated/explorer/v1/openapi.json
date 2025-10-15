@@ -1,0 +1,788 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Explorer search, browse, and recommendation endpoints.",
+    "version": "1.50.0",
+    "description": "Explorer search, browse, and recommendation endpoints. (Capability: search-and-discovery)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/explorer/search": {
+      "post": {
+        "tags": [
+          "Explorer"
+        ],
+        "summary": "Federated explorer search",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplorerSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Explorer results returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ExplorerSearchResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explorer/saved-searches": {
+      "get": {
+        "tags": [
+          "Explorer"
+        ],
+        "summary": "List saved explorer searches",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved searches retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/SavedExplorerSearch"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Explorer"
+        ],
+        "summary": "Create a saved explorer search",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedExplorerSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Saved search created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SavedExplorerSearch"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "409": {
+            "description": "Saved search name already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/explorer/saved-searches/{savedSearchId}": {
+      "parameters": [
+        {
+          "name": "savedSearchId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "Explorer"
+        ],
+        "summary": "Get a saved explorer search",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved search retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SavedExplorerSearch"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Saved search not found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Explorer"
+        ],
+        "summary": "Update a saved explorer search",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedExplorerSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved search updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SavedExplorerSearch"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Saved search not found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Explorer"
+        ],
+        "summary": "Delete a saved explorer search",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved search deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "404": {
+            "description": "Saved search not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SavedExplorerSearchRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "entityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "communities",
+                "courses",
+                "ebooks",
+                "tutors",
+                "profiles",
+                "ads",
+                "events"
+              ]
+            }
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "globalFilters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sort": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "isPinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SavedExplorerSearch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "entityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "communities",
+                "courses",
+                "ebooks",
+                "tutors",
+                "profiles",
+                "ads",
+                "events"
+              ]
+            }
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "globalFilters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sortPreferences": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "isPinned": {
+            "type": "boolean"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "entityTypes",
+          "filters",
+          "globalFilters",
+          "sortPreferences",
+          "isPinned",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "ExplorerSearchResponse": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "perPage": {
+            "type": "integer"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "communities",
+                "courses",
+                "ebooks",
+                "tutors",
+                "profiles",
+                "ads",
+                "events"
+              ]
+            }
+          },
+          "results": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ExplorerEntityResult"
+            }
+          },
+          "totals": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "markers": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExplorerMapMarker"
+                }
+              },
+              "bounds": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "minLat": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "maxLat": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "minLng": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "maxLng": {
+                    "type": "number",
+                    "format": "double"
+                  }
+                }
+              }
+            },
+            "required": [
+              "items"
+            ]
+          },
+          "analytics": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "searchEventId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "totalResults": {
+                "type": "integer"
+              },
+              "totalDisplayed": {
+                "type": "integer"
+              },
+              "zeroResult": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "required": [
+          "page",
+          "perPage",
+          "entities",
+          "results",
+          "totals",
+          "markers"
+        ]
+      },
+      "ExplorerMapMarker": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "label": {
+            "type": "string"
+          },
+          "country": {
+            "type": "string",
+            "description": "ISO 3166-1 alpha-2 country code",
+            "nullable": true
+          },
+          "context": {
+            "type": "string",
+            "description": "Entity context for the marker"
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude",
+          "label",
+          "context"
+        ]
+      },
+      "ExplorerEntityResult": {
+        "type": "object",
+        "properties": {
+          "entity": {
+            "type": "string",
+            "enum": [
+              "communities",
+              "courses",
+              "ebooks",
+              "tutors",
+              "profiles",
+              "ads",
+              "events"
+            ]
+          },
+          "totalHits": {
+            "type": "integer"
+          },
+          "page": {
+            "type": "integer"
+          },
+          "perPage": {
+            "type": "integer"
+          },
+          "sort": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "filter": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "facets": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "integer"
+              }
+            }
+          },
+          "hits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerHit"
+            }
+          },
+          "processingTimeMs": {
+            "type": "integer"
+          },
+          "query": {
+            "type": "string"
+          },
+          "markers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExplorerMapMarker"
+            }
+          }
+        },
+        "required": [
+          "entity",
+          "totalHits",
+          "page",
+          "perPage",
+          "hits"
+        ]
+      },
+      "ExplorerHit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "entityType": {
+            "type": "string",
+            "enum": [
+              "communities",
+              "courses",
+              "ebooks",
+              "tutors",
+              "profiles",
+              "ads",
+              "events"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "geo": {
+            "$ref": "#/components/schemas/ExplorerMapMarker",
+            "nullable": true
+          },
+          "raw": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "entityType",
+          "title",
+          "raw"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "ExplorerSearchRequest": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "example": "automation playbook"
+          },
+          "entityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "communities",
+                "courses",
+                "ebooks",
+                "tutors",
+                "profiles",
+                "ads",
+                "events"
+              ]
+            }
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "perPage": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 12
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "globalFilters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sort": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "includeFacets": {
+            "type": "boolean",
+            "default": true
+          },
+          "savedSearchId": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,978 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Operational dashboards, incident insights, and governance endpoints.",
+    "version": "1.50.0",
+    "description": "Operational dashboards, incident insights, and governance endpoints. (Capability: operator-dashboard)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/dashboard/me": {
+      "get": {
+        "summary": "Learner dashboard aggregate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dashboard snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/DashboardResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DashboardResponse": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/DashboardProfile"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardRole"
+            }
+          },
+          "dashboards": {
+            "type": "object",
+            "properties": {
+              "learner": {
+                "$ref": "#/components/schemas/DashboardLearner"
+              }
+            },
+            "required": [
+              "learner"
+            ]
+          },
+          "searchIndex": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardSearchIndexItem"
+            }
+          }
+        },
+        "required": [
+          "profile",
+          "roles",
+          "dashboards",
+          "searchIndex"
+        ]
+      },
+      "DashboardSearchIndexItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "role",
+          "type",
+          "title",
+          "url"
+        ]
+      },
+      "DashboardLearner": {
+        "type": "object",
+        "properties": {
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardMetric"
+            }
+          },
+          "analytics": {
+            "type": "object",
+            "properties": {
+              "learningPace": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardLearningPaceEntry"
+                }
+              },
+              "communityEngagement": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardCommunityEngagementEntry"
+                }
+              }
+            },
+            "required": [
+              "learningPace",
+              "communityEngagement"
+            ]
+          },
+          "upcoming": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardUpcomingItem"
+            }
+          },
+          "communities": {
+            "type": "object",
+            "properties": {
+              "managed": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardCommunitySummary"
+                }
+              },
+              "pipelines": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardPipelineItem"
+                }
+              }
+            },
+            "required": [
+              "managed",
+              "pipelines"
+            ]
+          },
+          "courses": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardCourseSummary"
+                }
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "rating": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "active",
+              "recommendations"
+            ]
+          },
+          "calendar": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardCalendarDay"
+            }
+          },
+          "tutorBookings": {
+            "type": "object",
+            "properties": {
+              "active": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardTutorBooking"
+                }
+              },
+              "history": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardTutorBooking"
+                }
+              }
+            },
+            "required": [
+              "active",
+              "history"
+            ]
+          },
+          "ebooks": {
+            "type": "object",
+            "properties": {
+              "library": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardEbookEntry"
+                }
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "rating": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "library",
+              "recommendations"
+            ]
+          },
+          "financial": {
+            "type": "object",
+            "properties": {
+              "summary": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFinancialSummaryItem"
+                }
+              },
+              "invoices": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardInvoice"
+                }
+              }
+            },
+            "required": [
+              "summary",
+              "invoices"
+            ]
+          },
+          "notifications": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "unreadMessages": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardNotification"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "unreadMessages",
+              "items"
+            ]
+          },
+          "followers": {
+            "type": "object",
+            "properties": {
+              "followers": {
+                "type": "integer"
+              },
+              "following": {
+                "type": "integer"
+              },
+              "pending": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFollowerRecord"
+                }
+              },
+              "outgoing": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFollowerRecord"
+                }
+              },
+              "recommendations": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DashboardFollowerRecord"
+                }
+              }
+            },
+            "required": [
+              "followers",
+              "following",
+              "pending",
+              "outgoing",
+              "recommendations"
+            ]
+          },
+          "settings": {
+            "$ref": "#/components/schemas/DashboardSettings"
+          }
+        },
+        "required": [
+          "metrics",
+          "analytics",
+          "upcoming",
+          "communities",
+          "courses",
+          "calendar",
+          "tutorBookings",
+          "ebooks",
+          "financial",
+          "notifications",
+          "followers",
+          "settings"
+        ]
+      },
+      "DashboardSettings": {
+        "type": "object",
+        "properties": {
+          "privacy": {
+            "$ref": "#/components/schemas/DashboardPrivacySettings"
+          },
+          "messaging": {
+            "$ref": "#/components/schemas/DashboardMessagingSettings"
+          },
+          "communities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardCommunitySetting"
+            }
+          }
+        },
+        "required": [
+          "privacy",
+          "messaging",
+          "communities"
+        ]
+      },
+      "DashboardCommunitySetting": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role",
+          "status"
+        ]
+      },
+      "DashboardMessagingSettings": {
+        "type": "object",
+        "properties": {
+          "unreadThreads": {
+            "type": "integer"
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "unreadThreads",
+          "notificationsEnabled"
+        ]
+      },
+      "DashboardPrivacySettings": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string"
+          },
+          "followApprovalRequired": {
+            "type": "boolean"
+          },
+          "shareActivity": {
+            "type": "boolean"
+          },
+          "messagePermission": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "visibility",
+          "followApprovalRequired",
+          "shareActivity",
+          "messagePermission"
+        ]
+      },
+      "DashboardFollowerRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "requestedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "number",
+            "nullable": true
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "DashboardNotification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "timestamp",
+          "type"
+        ]
+      },
+      "DashboardInvoice": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "amount",
+          "status",
+          "date"
+        ]
+      },
+      "DashboardFinancialSummaryItem": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "nullable": true
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ]
+      },
+      "DashboardEbookEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number"
+          },
+          "price": {
+            "type": "string"
+          },
+          "highlights": {
+            "type": "integer"
+          },
+          "bookmarks": {
+            "type": "integer"
+          },
+          "timeSpent": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "progress",
+          "price"
+        ]
+      },
+      "DashboardTutorBooking": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "mentor": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "rating": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "topic",
+          "mentor",
+          "date"
+        ]
+      },
+      "DashboardCalendarDay": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "day": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "day",
+          "items"
+        ]
+      },
+      "DashboardCourseSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number"
+          },
+          "instructor": {
+            "type": "string"
+          },
+          "nextLesson": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "progress",
+          "instructor"
+        ]
+      },
+      "DashboardPipelineItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "owner",
+          "progress"
+        ]
+      },
+      "DashboardCommunitySummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "members": {
+            "type": "string"
+          },
+          "moderators": {
+            "type": "integer"
+          },
+          "health": {
+            "type": "string"
+          },
+          "initiatives": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "members",
+          "moderators",
+          "health",
+          "initiatives"
+        ]
+      },
+      "DashboardUpcomingItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string",
+            "nullable": true
+          },
+          "action": {
+            "type": "string",
+            "nullable": true
+          },
+          "dateLabel": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "type",
+          "date"
+        ]
+      },
+      "DashboardCommunityEngagementEntry": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "participation": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "participation"
+        ]
+      },
+      "DashboardLearningPaceEntry": {
+        "type": "object",
+        "properties": {
+          "day": {
+            "type": "string"
+          },
+          "minutes": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "day",
+          "minutes"
+        ]
+      },
+      "DashboardMetric": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "change": {
+            "type": "string",
+            "nullable": true
+          },
+          "trend": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ]
+      },
+      "DashboardRole": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label"
+        ]
+      },
+      "DashboardProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "avatar": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
+          "stats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "label",
+                "value"
+              ]
+            }
+          },
+          "feedHighlights": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "headline": {
+                  "type": "string"
+                },
+                "time": {
+                  "type": "string"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "reactions": {
+                  "type": "integer"
+                },
+                "comments": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "headline",
+                "time",
+                "tags",
+                "reactions",
+                "comments"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "avatar",
+          "title",
+          "bio",
+          "stats",
+          "feedHighlights"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}
