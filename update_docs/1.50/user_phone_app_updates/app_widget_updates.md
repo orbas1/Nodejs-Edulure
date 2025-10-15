@@ -11,3 +11,7 @@
 ## Privacy Tooling
 - Session manager now exposes dedicated privacy preference storage and purge helpers so logout flows remove consent metadata alongside cached dashboards, guaranteeing revocations clear local state.【F:Edulure-Flutter/lib/services/session_manager.dart†L59-L110】
 - Lightweight `DsrClient` abstraction enables widgets to file GDPR data access requests while remaining testable through injected fakes in the new widget tests.【F:Edulure-Flutter/lib/services/dsr_client.dart†L1-L10】【F:Edulure-Flutter/test/home_screen_test.dart†L8-L39】
+
+## Creation Companion Entry Points
+- Service suite screen surfaces a creation companion teaser card with project counts, offline sync status, and CTA linking into the mobile workspace so instructors notice pending tasks immediately.【F:Edulure-Flutter/lib/screens/service_suite_screen.dart†L40-L220】
+- Home quick actions expose a "Creation Companion" button for instructors, gated by capability checks and featuring badge counts derived from queued project activity.【F:Edulure-Flutter/lib/screens/home_screen.dart†L180-L320】

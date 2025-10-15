@@ -119,6 +119,10 @@ class _ServiceSuiteScreenState extends State<ServiceSuiteScreen> {
                       style: theme.textTheme.bodyMedium?.copyWith(color: Colors.blueGrey.shade600),
                     ),
                     const SizedBox(height: 20),
+                    _MobileCompanionTeaser(
+                      onOpen: () => Navigator.pushNamed(context, '/creation/companion'),
+                    ),
+                    const SizedBox(height: 20),
                     if (suite != null) ...[
                       _SummarySection(metrics: suite.summary),
                       const SizedBox(height: 24),
@@ -253,6 +257,58 @@ class _SummarySection extends StatelessWidget {
             ),
           )
           .toList(),
+    );
+  }
+}
+
+class _MobileCompanionTeaser extends StatelessWidget {
+  const _MobileCompanionTeaser({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0EA5E9), Color(0xFF6366F1)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x22000000), blurRadius: 20, offset: Offset(0, 12)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Approve projects on the go',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Triage reviews, capture outline notes, and share community updates without waiting for the desktop studio.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white.withOpacity(0.9)),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onOpen,
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF0F172A),
+            ),
+            icon: const Icon(Icons.phone_iphone),
+            label: const Text('Open mobile companion'),
+          ),
+        ],
+      ),
     );
   }
 }

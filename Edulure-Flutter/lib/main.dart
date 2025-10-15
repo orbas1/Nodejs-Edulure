@@ -24,6 +24,7 @@ import 'screens/register_screen.dart';
 import 'screens/service_suite_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/tutor_booking_screen.dart';
+import 'screens/mobile_creation_companion_screen.dart';
 import 'services/language_service.dart';
 import 'widgets/capability_status_banner.dart';
 
@@ -64,6 +65,7 @@ class EdulureApp extends ConsumerWidget {
           '/courses/purchase': (_) => const CoursePurchaseScreen(),
           '/blog': (_) => const BlogScreen(),
           '/settings': (_) => const SettingsScreen(),
+          '/creation/companion': (_) => const MobileCreationCompanionScreen(),
         };
 
         final featureFlags = flagsAsync.maybeWhen(

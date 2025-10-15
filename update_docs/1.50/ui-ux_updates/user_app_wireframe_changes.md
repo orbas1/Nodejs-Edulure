@@ -143,6 +143,28 @@
 - Transaction detail modal includes invoice download, support CTA, and ability to categorize spending for analytics.
 - Wallet integrates with checkout flow, showing toggle to apply balance and projected remaining funds.
 
+## Creation Companion Workspace
+### Project Overview Strip
+- Header surfaces outstanding tasks with pill chips (Needs Review, Awaiting Approval, Queued Share) alongside last sync timestamp and offline badge when replay queue pending.
+- Segmented control toggles (Attention, In Progress, Published, Archived) include count bubbles and reorder cards by urgency score.
+- Hero banner reserves illustration slot for marketing-led companion artwork with fallback gradient when assets unavailable.
+
+### Project Cards
+- Card hero shows title, status chip, and type icon (Course, Community, Campaign) plus collaborator count and readiness bar.
+- Footer action row exposes Approve, Request Changes, View Details buttons; busy overlay appears with spinner + "Syncing" label when offline queue processes.
+
+### Detail Drawer
+- Bottom sheet displays summary, compliance notes, and pending action strip describing queued operations (e.g., "Share update queued – awaiting network").
+- Outline list nested accordions show per-lesson review status with CTA to approve/request changes plus optional note capture modal.
+
+### Share Update Dialog
+- Modal gathers community selector, message body, and tags. Body enforces 10+ characters; tags deduplicated and limited to eight entries.
+- Success toast communicates whether post published immediately or queued for sync, referencing community name.
+
+### Offline & Sync Messaging
+- Global banner communicates "Working offline – updates will sync automatically" with manual retry chip linking to sync routine.
+- Failed queue entries display red badges inside pending action strip with "Retry in studio" copy and support hand-off link.
+
 ## Onboarding & Authentication
 - Animated welcome sequence with brand narrative. Each slide includes illustration and CTA.
 - Sign-up form supports email, Google, Apple. Validation messages inline with accessible descriptions.

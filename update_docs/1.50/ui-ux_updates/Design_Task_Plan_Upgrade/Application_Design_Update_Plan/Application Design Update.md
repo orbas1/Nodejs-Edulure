@@ -21,6 +21,7 @@
 - Logic flow diagrams for key journeys (onboarding, lesson consumption, assignment submission, cohort creation, messaging).
 - Styling compendium detailing typographic scale, palette mapping, shadow tokens, icon usage, imagery guidelines.
 - Accessibility checklist mapping each screen to compliance criteria and remediation tasks.
+- Mobile creation companion specification detailing project triage views, review workflows, offline sync states, and community sharing UX parity with desktop studio.【F:update_docs/1.50/ui-ux_updates/user_app_wireframe_changes.md†L200-L248】【F:update_docs/1.50/ui-ux_updates/user_application_logic_flow_changes.md†L200-L240】
 
 ## Milestones
 1. **Foundation Freeze (Week 1)** – finalize tokens, typography, palette, iconography, spacing. Publish design system update.

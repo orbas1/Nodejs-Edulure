@@ -13,6 +13,11 @@
 - Lessons track progress increments; completion dispatches events updating profile and analytics.
 - Assignments maintain state machine (Not Started → In Progress → Submitted → Graded). Feedback arrival triggers notification update.
 
+### Creation Companion
+- Entry point warms cached projects, calculates attention scores, and surfaces offline banner when sync queue pending.
+- Status changes and outline reviews queue optimistic updates with rollback messaging; metadata updates log reviewer/time for audit trail.
+- Share dialog enforces structured payload (message, tags) and routes offline posts through sync queue with retries and failure messaging.
+
 ### Community Interaction
 - Chat hub uses real-time updates; message composition handles offline queueing.
 - Reactions, mentions, and file shares update conversation metadata and notifications.

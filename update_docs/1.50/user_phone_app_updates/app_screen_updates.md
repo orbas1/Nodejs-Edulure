@@ -11,3 +11,8 @@
 ## Privacy & Compliance Flows
 - Home screen now triggers a policy review dialog when consent is outdated, guiding learners through acceptance or DSR export requests before unlocking the app shell.【F:Edulure-Flutter/lib/screens/home_screen.dart†L268-L332】
 - Consent acceptance records the latest policy version in Hive so the dialog only reappears when policies change, while the logout path clears cached preferences to honour revocation flows.【F:Edulure-Flutter/lib/services/privacy_preferences.dart†L1-L34】【F:Edulure-Flutter/lib/services/session_manager.dart†L1-L110】
+
+## Creation Companion Workspace
+- Added the mobile creation companion hub with project filters, pending action indicators, and sync banners so instructors can review assignments, approvals, and publishing readiness on the go.【F:Edulure-Flutter/lib/screens/mobile_creation_companion_screen.dart†L1-L520】
+- Outline review drawer supports approve/needs revision states with contextual note capture, while pending actions surface queued offline updates across share posts, metadata edits, and status changes.【F:Edulure-Flutter/lib/screens/mobile_creation_companion_screen.dart†L120-L360】【F:Edulure-Flutter/lib/services/mobile_creation_studio_service.dart†L200-L520】
+- Community share dialog enforces meaningful summaries, deduplicates tags, and queues posts for sync when offline, keeping community announcements aligned with creation studio metadata.【F:Edulure-Flutter/lib/screens/mobile_creation_companion_screen.dart†L360-L520】【F:Edulure-Flutter/lib/services/mobile_creation_studio_service.dart†L360-L460】
