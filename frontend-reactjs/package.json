@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "lint": "eslint \"src\"",
     "lint:fix": "eslint \"src\" --fix",
+    "test": "vitest run --coverage",
     "audit:dependencies": "npm audit --audit-level=moderate",
     "sdk:build": "npm run --prefix ../sdk-typescript build",
     "predev": "npm run sdk:build",
@@ -36,18 +37,24 @@
     "@edulure/api-sdk": "file:../sdk-typescript"
   },
   "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^14.2.1",
+    "@testing-library/user-event": "^14.5.2",
     "@types/react": "^18.2.21",
     "@types/react-dom": "^18.2.7",
     "@vitejs/plugin-react": "^4.2.1",
+    "@vitest/coverage-v8": "^1.6.0",
     "autoprefixer": "^10.4.17",
-    "@eslint/js": "^9.14.0",
     "eslint": "^9.14.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react": "^7.35.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "globals": "^15.8.0",
+    "jsdom": "^24.0.0",
     "postcss": "^8.4.35",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.1.6"
+    "vite": "^5.1.6",
+    "vitest": "^1.6.0"
   }
 }

@@ -56,6 +56,16 @@ export const apiRouteMetadata = [
       'Payments are unavailable for your tenant. Please contact an administrator to enable billing capabilities.'
   },
   {
+    name: 'compliance',
+    capability: 'data-governance',
+    description: 'GDPR, consent management, and incident governance endpoints.',
+    basePath: '/compliance',
+    flagKey: 'platform.api.v1.compliance',
+    defaultState: 'enabled',
+    fallbackStatus: 403,
+    disabledMessage: 'Compliance endpoints are restricted in this environment.'
+  },
+  {
     name: 'chat',
     capability: 'realtime-chat',
     description: 'Realtime chat messaging, channel presence, and DM APIs.',

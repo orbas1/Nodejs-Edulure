@@ -28,7 +28,8 @@
     "storage:provision": "node scripts/provision-r2-buckets.js",
     "search:provision": "node scripts/provision-search-cluster.js",
     "search:reindex": "node scripts/reindex-search-indexes.js",
-    "docs:build": "node scripts/build-openapi-specs.js"
+    "docs:build": "node scripts/build-openapi-specs.js",
+    "db:erd": "node scripts/generate-erd.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.614.0",
@@ -45,6 +46,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^6.11.2",
     "fast-xml-parser": "^4.3.6",
+    "ioredis": "^5.3.2",
     "helmet": "^7.0.0",
     "hpp": "^0.2.3",
     "ipaddr.js": "^2.2.0",

@@ -10,6 +10,7 @@ class SessionManager {
   static const _ebookProgressBox = 'ebook_progress';
   static const _readerSettingsBox = 'ebook_reader_settings';
   static const _dashboardBox = 'dashboard_snapshots';
+  static const _privacyBox = 'privacy_preferences';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
   static const _secureAccessTokenKey = 'session.accessToken';
@@ -26,6 +27,7 @@ class SessionManager {
     await Hive.openBox(_ebookProgressBox);
     await Hive.openBox(_readerSettingsBox);
     await Hive.openBox(_dashboardBox);
+    await Hive.openBox(_privacyBox);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
@@ -36,6 +38,7 @@ class SessionManager {
   static Box get ebookProgressCache => Hive.box(_ebookProgressBox);
   static Box get readerSettingsCache => Hive.box(_readerSettingsBox);
   static Box get dashboardCache => Hive.box(_dashboardBox);
+  static Box get privacyPreferences => Hive.box(_privacyBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -115,6 +118,11 @@ class SessionManager {
     await _session.delete(_sessionKey);
     await _session.delete(_activeRoleKey);
     await dashboardCache.clear();
+    await assetsCache.clear();
+    await downloadsCache.clear();
+    await ebookProgressCache.clear();
+    await readerSettingsCache.clear();
+    await privacyPreferences.clear();
     await SecureStorageService.instance.deleteAll(
       keys: const {
         _secureAccessTokenKey,

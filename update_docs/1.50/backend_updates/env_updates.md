@@ -6,3 +6,4 @@
   - `REALTIME_PORT` / `REALTIME_PROBE_PORT`
 - Introduced bootstrap resiliency tuning knobs `BOOTSTRAP_MAX_RETRIES` and `BOOTSTRAP_RETRY_DELAY_MS` to control retry cadence when dependencies (DB, feature flags, search) are temporarily unavailable.
 - The exported `env.services` object now surfaces the resolved port bindings for each process, while `env.bootstrap` exposes retry policy metadata for reuse in orchestration scripts.【F:backend-nodejs/src/config/env.js†L200-L215】【F:backend-nodejs/src/config/env.js†L455-L507】
+- Added Redis runtime configuration block (`REDIS_ENABLED`, `REDIS_URL`/`REDIS_HOST`, `REDIS_KEY_PREFIX`, `REDIS_LOCK_PREFIX`, cache keys, lock TTL, and TLS options) so distributed feature flag and runtime configuration caches can be enabled per environment with secure defaults and certificate support.【F:backend-nodejs/src/config/env.js†L220-L335】【F:backend-nodejs/src/config/redisClient.js†L1-L92】
