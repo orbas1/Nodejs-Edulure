@@ -6,7 +6,7 @@ Progress is recorded per major task. Percentages represent completion of require
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Platform Hardening & Modularisation | 92% | 98% | 97% | 97% | 90% | 97% | 95% |
 | Data Governance & Compliance Reinforcement | 96% | 99% | 97% | 98% | 92% | 98% | 97% |
-| Creation Studio & Content Ecosystem Delivery | 48% | 60% | 55% | 58% | 46% | 57% | 54% |
+| Creation Studio & Content Ecosystem Delivery | 58% | 72% | 68% | 70% | 55% | 69% | 65% |
 | Integrations, Automation & Notifications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Experience, Navigation & Accessibility Modernisation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Mobile Parity, Security & Performance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |

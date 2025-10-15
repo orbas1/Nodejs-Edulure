@@ -159,7 +159,13 @@ describe('CreationStudioService', () => {
       );
 
       expect(projectModel.create).toHaveBeenCalledWith(
-        expect.objectContaining({ metadata: { difficulty: 'intermediate' } }),
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            difficulty: 'intermediate',
+            objectives: expect.any(Array)
+          }),
+          publishingChannels: expect.arrayContaining(['web', 'mobile', 'catalogue'])
+        }),
         trx
       );
       expect(collaboratorModel.add).toHaveBeenCalledWith(
@@ -174,6 +180,68 @@ describe('CreationStudioService', () => {
         expect.objectContaining({ eventType: 'creation.project.created' }),
         trx
       );
+      expect(project.collaborators).toHaveLength(1);
+    });
+
+    it('enriches non-course creations with domain defaults and analytics baselines', async () => {
+      projectModel.create.mockImplementation(async (payload) => ({
+        id: 777,
+        publicId: 'proj-777',
+        ownerId: payload.ownerId,
+        type: payload.type,
+        status: 'draft',
+        title: payload.title,
+        summary: payload.summary ?? null,
+        metadata: payload.metadata,
+        contentOutline: payload.contentOutline ?? [],
+        analyticsTargets: payload.analyticsTargets,
+        publishingChannels: payload.publishingChannels ?? [],
+        complianceNotes: payload.complianceNotes ?? []
+      }));
+      const ownerPermissions = [
+        'project:read',
+        'project:edit',
+        'project:submit',
+        'project:approve',
+        'project:publish',
+        'collaboration:manage',
+        'session:start',
+        'ads:draft'
+      ];
+      collaboratorModel.add.mockResolvedValue({ userId: 12, role: 'owner', permissions: ownerPermissions });
+      collaboratorModel.listByProject.mockResolvedValue([{ userId: 12, role: 'owner', permissions: ownerPermissions }]);
+
+      const project = await CreationStudioService.createProject(
+        { id: 12, role: 'instructor' },
+        {
+          title: 'Mentor-in-residence',
+          type: 'mentorship',
+          summary: 'Connect alumni mentors with early cohorts.',
+          metadata: { engagement: { cadence: 'weekly', deliveryModes: ['virtual', 'hybrid'] } },
+          analyticsTargets: { goals: ['community-growth'] }
+        }
+      );
+
+      expect(projectModel.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'mentorship',
+          metadata: expect.objectContaining({
+            engagement: expect.objectContaining({ cadence: 'weekly', deliveryModes: ['virtual', 'hybrid'] }),
+            mentors: expect.any(Array),
+            mentees: expect.objectContaining({ cohortSize: 0 })
+          }),
+          analyticsTargets: expect.objectContaining({
+            goals: ['community-growth'],
+            keywords: expect.arrayContaining(['mentor']),
+            audiences: expect.arrayContaining(['alumni'])
+          }),
+          publishingChannels: expect.arrayContaining(['mentorship_hub', 'community'])
+        }),
+        trx
+      );
+
+      expect(project.metadata.mentors).toEqual([]);
+      expect(project.analyticsTargets.keywords).toContain('mentor');
       expect(project.collaborators).toHaveLength(1);
     });
   });

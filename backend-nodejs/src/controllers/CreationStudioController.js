@@ -3,7 +3,17 @@ import Joi from 'joi';
 import CreationStudioService from '../services/CreationStudioService.js';
 import { paginated, success } from '../utils/httpResponse.js';
 
-const typeEnum = ['course', 'ebook', 'community', 'ads_asset'];
+const typeEnum = [
+  'course',
+  'ebook',
+  'community',
+  'ads_asset',
+  'gig',
+  'job_listing',
+  'experience_launchpad',
+  'volunteering_opportunity',
+  'mentorship'
+];
 const statusEnum = [
   'draft',
   'ready_for_review',

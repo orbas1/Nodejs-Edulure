@@ -7,13 +7,12 @@ import {
   UsersIcon
 } from '@heroicons/react/24/outline';
 
-const TYPE_FILTERS = [
-  { id: 'all', label: 'All types' },
-  { id: 'course', label: 'Courses' },
-  { id: 'ebook', label: 'E-books' },
-  { id: 'community', label: 'Communities' },
-  { id: 'ads_asset', label: 'Ads assets' }
-];
+import { CREATION_TYPE_LABELS, CREATION_TYPE_ORDER } from './creationStudioUtils.js';
+
+const TYPE_FILTERS = ['all', ...CREATION_TYPE_ORDER].map((type) => ({
+  id: type,
+  label: CREATION_TYPE_LABELS[type] ?? type
+}));
 
 const STATUS_TONE = {
   draft: 'bg-slate-100 text-slate-600',
@@ -54,7 +53,7 @@ function ProjectRow({ project, selected, onSelect }) {
       <td className="px-4 py-4">
         <StatusBadge status={project.status} />
       </td>
-      <td className="px-4 py-4 text-sm text-slate-600 capitalize">{project.type}</td>
+      <td className="px-4 py-4 text-sm text-slate-600">{CREATION_TYPE_LABELS[project.type] ?? project.type}</td>
       <td className="px-4 py-4 text-sm text-slate-600">
         <div className="flex items-center gap-2 text-xs">
           <UsersIcon className="h-4 w-4" />

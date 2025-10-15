@@ -11,19 +11,20 @@ import {
 describe('creationStudioUtils', () => {
   it('calculates project summary metrics', () => {
     const summary = calculateProjectSummary([
-      { status: 'draft', collaboratorCount: 2, activeSessions: [{}, {}] },
-      { status: 'ready_for_review', collaboratorCount: 1, activeSessions: [{}] },
-      { status: 'approved', collaboratorCount: 3, activeSessions: [] },
-      { status: 'published', collaboratorCount: 1 }
+      { status: 'draft', type: 'course', collaboratorCount: 2, activeSessions: [{}, {}] },
+      { status: 'ready_for_review', type: 'gig', collaboratorCount: 1, activeSessions: [{}] },
+      { status: 'approved', type: 'mentorship', collaboratorCount: 3, activeSessions: [] },
+      { status: 'published', type: 'mentorship', collaboratorCount: 1 }
     ]);
 
-    expect(summary).toEqual({
+    expect(summary).toMatchObject({
       drafts: 1,
       awaitingReview: 1,
       launchReady: 2,
       collaborators: 7,
       liveSessions: 3,
-      total: 4
+      total: 4,
+      typeBreakdown: { course: 1, gig: 1, mentorship: 2 }
     });
   });
 
@@ -47,6 +48,28 @@ describe('creationStudioUtils', () => {
     const steps = determineStepStates(project);
     expect(steps.map((step) => step.state)).toEqual(['complete', 'complete', 'complete', 'complete', 'warning']);
     expect(steps[0].metrics.summaryLength).toBe(project.summary.length);
+  });
+
+  it('builds mentorship-focused steps with analytics defaults', () => {
+    const project = {
+      type: 'mentorship',
+      title: 'Career accelerator mentors',
+      status: 'ready_for_review',
+      metadata: {
+        programme: { focusAreas: ['Design'], durationWeeks: 10 },
+        mentors: ['mentor-1'],
+        mentees: { prerequisites: ['Portfolio'], cohortSize: 12 },
+        engagement: { cadence: 'bi_weekly', deliveryModes: ['virtual', 'in-person'] }
+      }
+    };
+
+    const steps = determineStepStates(project);
+    expect(steps).toHaveLength(5);
+    expect(steps[0]).toMatchObject({ id: 'programme', state: 'complete' });
+    expect(steps[1]).toMatchObject({ id: 'mentors', state: 'complete' });
+    expect(steps[2]).toMatchObject({ id: 'mentees', state: 'complete' });
+    expect(steps[3]).toMatchObject({ id: 'engagement', state: 'complete' });
+    expect(steps[4]).toMatchObject({ id: 'publish', state: 'in-progress' });
   });
 
   it('describes template schema counts', () => {

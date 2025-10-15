@@ -41,7 +41,96 @@ const STATUS_TRANSITIONS = {
   archived: ['draft']
 };
 
-const PROJECT_TYPES = new Set(['course', 'ebook', 'community', 'ads_asset']);
+const PROJECT_TYPES = new Set([
+  'course',
+  'ebook',
+  'community',
+  'ads_asset',
+  'gig',
+  'job_listing',
+  'experience_launchpad',
+  'volunteering_opportunity',
+  'mentorship'
+]);
+
+const TYPE_METADATA_DEFAULTS = {
+  course: {
+    objectives: [],
+    audience: [],
+    modules: [],
+    curriculum: [],
+    pricing: { plans: [], currency: 'USD' },
+    schedule: null,
+    publishingChannels: ['catalogue', 'live_sessions']
+  },
+  ebook: {
+    objectives: [],
+    audience: [],
+    chapters: [],
+    pricing: { plans: [], currency: 'USD' },
+    distribution: { formats: ['pdf', 'epub'], drm: false },
+    publishingChannels: ['catalogue', 'download']
+  },
+  community: {
+    objectives: [],
+    audience: [],
+    engagementPrograms: [],
+    moderation: { guidelines: [], escalationContacts: [] },
+    publishingChannels: ['community', 'events']
+  },
+  ads_asset: {
+    objectives: [],
+    audience: [],
+    campaignHooks: [],
+    compliance: { approvals: [], expiry: null },
+    publishingChannels: ['ads_manager', 'social']
+  },
+  gig: {
+    role: { title: null, expertise: [], deliverables: [] },
+    compensation: { type: 'fixed', amount: null, currency: 'USD' },
+    availability: { startDate: null, endDate: null, hoursPerWeek: null },
+    application: { requirements: [], screening: [], contactEmail: null },
+    publishingChannels: ['marketplace', 'partners']
+  },
+  job_listing: {
+    role: { title: null, department: null, level: null },
+    responsibilities: [],
+    qualifications: { required: [], preferred: [] },
+    compensation: { salaryBand: null, currency: 'USD', benefits: [] },
+    application: { deadline: null, instructions: null, atsLink: null },
+    publishingChannels: ['jobs_board', 'partners', 'newsletter']
+  },
+  experience_launchpad: {
+    concept: { headline: null, promise: null },
+    milestones: [],
+    participantProfile: { slots: 0, prerequisites: [] },
+    mentors: [],
+    publishingChannels: ['experiences', 'campus', 'live_sessions']
+  },
+  volunteering_opportunity: {
+    impactAreas: [],
+    organisation: { name: null, mission: null },
+    schedule: { cadence: null, hoursPerWeek: null },
+    requirements: { skills: [], backgroundChecks: [] },
+    application: { contactEmail: null, formLink: null },
+    publishingChannels: ['volunteer_hub', 'community', 'partners']
+  },
+  mentorship: {
+    programme: { focusAreas: [], durationWeeks: null },
+    mentors: [],
+    mentees: { prerequisites: [], cohortSize: 0 },
+    engagement: { cadence: 'bi_weekly', deliveryModes: ['virtual'] },
+    publishingChannels: ['mentorship_hub', 'community']
+  }
+};
+
+const TYPE_ANALYTICS_DEFAULTS = {
+  gig: { goals: ['talent-sourced'], keywords: ['gig', 'short-term'], audiences: ['contractors'] },
+  job_listing: { goals: ['hire'], keywords: ['job', 'career'], audiences: ['professionals'] },
+  experience_launchpad: { goals: ['pilot'], keywords: ['experience', 'cohort'], audiences: ['learners'] },
+  volunteering_opportunity: { goals: ['impact'], keywords: ['volunteer'], audiences: ['community'] },
+  mentorship: { goals: ['mentorship'], keywords: ['mentor', 'mentee'], audiences: ['alumni'] }
+};
 
 function toArray(value) {
   if (!value) return [];
@@ -102,26 +191,71 @@ function hasPermission(actor, collaborator, permission) {
 
 function applyTemplateToProject(template, projectPayload = {}) {
   if (!template) {
-    return projectPayload;
+    return enrichProjectDraft(projectPayload);
   }
   const schema = template.schema ?? {};
-  const draft = { ...projectPayload };
-  if (!draft.contentOutline && Array.isArray(schema.outline)) {
+  const draft = enrichProjectDraft({ ...projectPayload });
+  if ((!draft.contentOutline || draft.contentOutline.length === 0) && Array.isArray(schema.outline)) {
     draft.contentOutline = schema.outline;
   }
-  if (!draft.metadata && schema.defaults) {
-    draft.metadata = schema.defaults;
+  if (schema.defaults) {
+    draft.metadata = deepMerge(draft.metadata ?? {}, schema.defaults);
   }
-  if (!draft.analyticsTargets && schema.analyticsTargets) {
-    draft.analyticsTargets = schema.analyticsTargets;
+  if (schema.analyticsTargets) {
+    draft.analyticsTargets = deepMerge(draft.analyticsTargets ?? {}, schema.analyticsTargets);
   }
-  if (!draft.publishingChannels && schema.publishingChannels) {
-    draft.publishingChannels = schema.publishingChannels;
+  if (schema.publishingChannels) {
+    const existingChannels = new Set(draft.publishingChannels ?? []);
+    for (const channel of schema.publishingChannels) {
+      existingChannels.add(channel);
+    }
+    draft.publishingChannels = Array.from(existingChannels);
   }
   if (!draft.summary && schema.summaryTemplate) {
     draft.summary = schema.summaryTemplate;
   }
   return draft;
+}
+
+function enrichProjectDraft(projectPayload = {}) {
+  const draft = { ...projectPayload };
+  const metadataDefaults = TYPE_METADATA_DEFAULTS[draft.type];
+  const analyticsDefaults = TYPE_ANALYTICS_DEFAULTS[draft.type];
+
+  if (metadataDefaults) {
+    draft.metadata = deepMerge(metadataDefaults, draft.metadata ?? {});
+  }
+
+  if (analyticsDefaults) {
+    draft.analyticsTargets = deepMerge(analyticsDefaults, draft.analyticsTargets ?? {});
+  }
+
+  if (!draft.publishingChannels || draft.publishingChannels.length === 0) {
+    const channels = metadataDefaults?.publishingChannels;
+    if (Array.isArray(channels) && channels.length) {
+      draft.publishingChannels = channels;
+    }
+  }
+
+  return draft;
+}
+
+function deepMerge(base, override) {
+  if (Array.isArray(base) || Array.isArray(override)) {
+    return override ?? base ?? [];
+  }
+  const result = { ...(base ?? {}) };
+  if (!override || typeof override !== 'object') {
+    return result;
+  }
+  for (const [key, value] of Object.entries(override)) {
+    if (value && typeof value === 'object' && !Array.isArray(value) && typeof result[key] === 'object' && !Array.isArray(result[key])) {
+      result[key] = deepMerge(result[key], value);
+    } else if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result;
 }
 
 async function hydrateProject(project, { includeCollaborators = true, includeSessions = false } = {}) {

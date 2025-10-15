@@ -6,7 +6,12 @@ import {
   SparklesIcon
 } from '@heroicons/react/24/outline';
 
-import { describeTemplateSchema, groupTemplatesByType } from './creationStudioUtils.js';
+import {
+  CREATION_TYPE_LABELS,
+  CREATION_TYPE_ORDER,
+  describeTemplateSchema,
+  groupTemplatesByType
+} from './creationStudioUtils.js';
 
 function TemplateCard({ template, onStart }) {
   const stats = describeTemplateSchema(template);
@@ -14,7 +19,9 @@ function TemplateCard({ template, onStart }) {
     <article className="flex flex-col justify-between rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">{template.type}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            {CREATION_TYPE_LABELS[template.type] ?? template.type}
+          </p>
           <h4 className="mt-2 text-lg font-semibold text-slate-900">{template.title}</h4>
           <p className="mt-2 text-sm text-slate-600">{template.description}</p>
         </div>
@@ -160,7 +167,7 @@ export default function CreationAssetLibrary({ templates, onCreateProject, creat
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">Template library</p>
           <h2 className="mt-1 text-xl font-semibold text-slate-900">Jumpstart with curated blueprints</h2>
           <p className="mt-2 text-sm text-slate-600">
-            Apply approved playbooks for courses, ebooks, communities, and ad assets. Templates capture best practices, outline structure, and recommended media to accelerate production.
+            Apply approved playbooks for courses, ebooks, communities, ads, gigs, job listings, launchpads, volunteering drives, and mentorship programmes. Templates capture best practices, outline structure, and recommended media to accelerate production.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-slate-500">
@@ -174,7 +181,7 @@ export default function CreationAssetLibrary({ templates, onCreateProject, creat
       </header>
 
       <div className="flex flex-wrap gap-2">
-        {['all', 'course', 'ebook', 'community', 'ads_asset'].map((type) => (
+        {['all', ...CREATION_TYPE_ORDER].map((type) => (
           <button
             key={type}
             type="button"
@@ -185,7 +192,7 @@ export default function CreationAssetLibrary({ templates, onCreateProject, creat
                 : 'border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary'
             }`}
           >
-            {type === 'all' ? 'All' : type.replace('_', ' ')}
+            {CREATION_TYPE_LABELS[type] ?? type.replace('_', ' ')}
           </button>
         ))}
       </div>
