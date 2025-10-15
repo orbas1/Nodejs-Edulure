@@ -137,6 +137,9 @@
 - Guidance panel on right with templates, best practice links, and support contact.
 - Recent drafts list with status chips, last edited timestamp, and quick actions (Resume, Preview, Publish).
 - Announcement banner for new creation features or policy updates.
+- Analytics strip above the project list summarises total projects, active drafts, published assets, review queue, and launch velocity with severity-aware accents tied to the production dashboard cards.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationAnalyticsDashboard.jsx†L41-L138】
+- Scam vigilance banner sits alongside the analytics cards, surfacing high-risk report counts, last report timestamp, and recommended triage messaging derived from the scam alert payload so instructors can respond before publishing campaigns.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationAnalyticsDashboard.jsx†L85-L138】
+- Engagement + monetisation table renders ranking insights, watch-time metrics, and campaign performance columns with CSV export to reinforce business instrumentation needs captured in the design plan.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationAnalyticsDashboard.jsx†L140-L260】
 
 ### Course Creation Wizard
 - Multi-step flow: Basics → Curriculum → Pricing → Media → Publish Settings.
