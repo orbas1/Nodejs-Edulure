@@ -25,6 +25,7 @@ import 'screens/service_suite_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/tutor_booking_screen.dart';
 import 'screens/mobile_creation_companion_screen.dart';
+import 'screens/mobile_ads_governance_screen.dart';
 import 'services/language_service.dart';
 import 'widgets/capability_status_banner.dart';
 
@@ -46,6 +47,11 @@ class EdulureApp extends ConsumerWidget {
       valueListenable: LanguageService.listenable(),
       builder: (context, code, _) {
         final locale = Locale(code);
+        final featureFlags = flagsAsync.maybeWhen(
+          data: (flags) => flags,
+          orElse: () => const <String, bool>{},
+        );
+
         final routes = <String, WidgetBuilder>{
           '/': (_) => const HomeScreen(),
           '/login': (_) => const LoginScreen(),
@@ -68,13 +74,11 @@ class EdulureApp extends ConsumerWidget {
           '/creation/companion': (_) => const MobileCreationCompanionScreen(),
         };
 
-        final featureFlags = flagsAsync.maybeWhen(
-          data: (flags) => flags,
-          orElse: () => const <String, bool>{},
-        );
-
         if (featureFlags['mobile.serviceSuite'] != false) {
           routes['/services'] = (_) => const ServiceSuiteScreen();
+        }
+        if (featureFlags['mobile.adsGovernance'] != false) {
+          routes['/ads/governance'] = (_) => const MobileAdsGovernanceScreen();
         }
 
         return MaterialApp(

@@ -165,6 +165,14 @@
 - Global banner communicates "Working offline – updates will sync automatically" with manual retry chip linking to sync routine.
 - Failed queue entries display red badges inside pending action strip with "Retry in studio" copy and support hand-off link.
 
+## Ads Governance Console
+- Campaign list view introduces segmented chips for **Needs review**, **Active**, **Paused**, **Completed**, and **All** to quickly switch between compliance triage states. Each card surfaces name, objective, lifecycle status, and high-contrast risk badge (green <50, amber 50–74, red ≥75).
+- Spend strip charts daily spend versus budget with contextual copy, while inline metric pills surface CTR, CPA, conversion rate, and forecast projections to match analytics payloads from `/ads/campaigns` and `/ads/campaigns/:id/insights`.
+- Compliance alerts render as stacked rows with severity iconography, linking to documented violations (headline length, prohibited copy, overspend) so moderators can act without opening the desktop studio.
+- Pending actions ribbon displays queued pause/resume/fraud submissions with amber background; failed retries escalate to red with remediation copy referencing sync or re-authentication steps.
+- Primary actions row bundles **View insights**, **Pause/Resume**, and **Flag fraud** CTAs. Fraud sheet captures reason (>=6 characters), optional description, and risk slider defaulting to 60, mirroring trust & safety requirements.
+- Insight drawer shows lifetime metrics grid, daily table (14-day cap), and timestamp of last fetch to preserve audit trails when reviewing campaign performance on mobile.
+
 ## Onboarding & Authentication
 - Animated welcome sequence with brand narrative. Each slide includes illustration and CTA.
 - Sign-up form supports email, Google, Apple. Validation messages inline with accessible descriptions.

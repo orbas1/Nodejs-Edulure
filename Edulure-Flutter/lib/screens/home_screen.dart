@@ -776,7 +776,8 @@ const Map<String, _RoleHomeDetails> _roleConfigurations = {
     actions: [
       _RoleAction(icon: Icons.travel_explore_outlined, label: 'Launch explorer', route: '/explorer'),
       _RoleAction(icon: Icons.videocam_outlined, label: 'Manage live classrooms', route: '/instructor-dashboard'),
-      _RoleAction(icon: Icons.phone_iphone_outlined, label: 'Creation companion', route: '/creation/companion'),
+            _RoleAction(icon: Icons.phone_iphone_outlined, label: 'Creation companion', route: '/creation/companion'),
+            _RoleAction(icon: Icons.shield_outlined, label: 'Ads governance', route: '/ads/governance'),
       _RoleAction(icon: Icons.add_circle_outline, label: 'Create course', route: '/content'),
       _RoleAction(icon: Icons.message_outlined, label: 'Open inbox', route: '/feed'),
       _RoleAction(icon: Icons.schedule_outlined, label: 'Plan lesson', route: '/profile'),

@@ -15,3 +15,7 @@
 ## Creation Companion Entry Points
 - Service suite screen surfaces a creation companion teaser card with project counts, offline sync status, and CTA linking into the mobile workspace so instructors notice pending tasks immediately.【F:Edulure-Flutter/lib/screens/service_suite_screen.dart†L40-L220】
 - Home quick actions expose a "Creation Companion" button for instructors, gated by capability checks and featuring badge counts derived from queued project activity.【F:Edulure-Flutter/lib/screens/home_screen.dart†L180-L320】
+
+## Ads Governance Widgets
+- Added ads governance teaser to the service suite with dark mode treatment, risk iconography, and CTA into the moderation workflow, aligning mobile entry points with instructor dashboards.【F:Edulure-Flutter/lib/screens/service_suite_screen.dart†L160-L204】
+- Home quick actions now include "Ads governance" shortcut so moderators can jump directly to campaign insights and trust & safety tooling from the primary shell.【F:Edulure-Flutter/lib/screens/home_screen.dart†L770-L785】
