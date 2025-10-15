@@ -7,6 +7,7 @@ import chatRoutes from './chat.routes.js';
 import complianceRoutes from './compliance.routes.js';
 import communityRoutes from './community.routes.js';
 import contentRoutes from './content.routes.js';
+import creationRoutes from './creation.routes.js';
 import courseRoutes from './course.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import ebookRoutes from './ebook.routes.js';
@@ -23,6 +24,7 @@ const routerMap = {
   users: userRoutes,
   communities: communityRoutes,
   content: contentRoutes,
+  creation: creationRoutes,
   'runtime-config': runtimeConfigRoutes,
   payments: paymentRoutes,
   compliance: complianceRoutes,

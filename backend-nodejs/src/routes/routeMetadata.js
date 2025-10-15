@@ -37,6 +37,16 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'creation',
+    capability: 'creation-studio',
+    description: 'Creation studio projects, templates, collaboration, and campaign promotion endpoints.',
+    basePath: '/creation',
+    flagKey: 'platform.api.v1.creation',
+    defaultState: 'enabled',
+    fallbackStatus: 403,
+    disabledMessage: 'Creation studio is disabled for this tenant.'
+  },
+  {
     name: 'runtime-config',
     capability: 'platform-runtime-config',
     description: 'Runtime configuration and capability manifest endpoints consumed by clients.',

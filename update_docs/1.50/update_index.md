@@ -31,3 +31,7 @@
 - Code: `backend-nodejs/src/docs/builders/openapiBuilder.js`, `src/docs/serviceSpecRegistry.js`, `src/app.js`, `src/routes/routeMetadata.js`, `test/openApiContracts.test.js`
 - Documentation: `update_task_list.md`, `update_progress_tracker.md`, `change_log.md`, `Design_*` documentation describing API visibility
 
+## Creation Studio Domain Bootstrap
+- Code: `backend-nodejs/migrations/20250213143000_creation_studio.js`, `src/models/CreationProjectModel.js`, `src/models/CreationProjectCollaboratorModel.js`, `src/models/CreationTemplateModel.js`, `src/models/CreationCollaborationSessionModel.js`, `src/services/CreationStudioService.js`, `src/controllers/CreationStudioController.js`, `src/routes/creation.routes.js`, `src/routes/routeMetadata.js`, `src/routes/routeRegistry.js`, `test/creationStudioService.test.js`
+- Documentation: `update_task_list.md`, `update_progress_tracker.md`, `backend_updates/services_changes.md`, `backend_updates/routes_updates.md`, `backend_updates/controllers_changes.md`, `backend_updates/backend_change_log.md`, `backend_updates/api_changes.md`, `backend_updates/module_changes.md`, `change_log.md`, `Design_*` artefacts for creation studio readiness, `Design_Change_log.md`
+

@@ -40,3 +40,9 @@
 ## Contract Distribution & SDK Automation
 - Normalised OpenAPI path definitions and documented capability manifest schemas so `/api/v1` consumers receive accurate paths and typed payloads when generating SDKs from the contract.【F:backend-nodejs/src/docs/openapi.json†L1-L205】【F:backend-nodejs/src/docs/openapi.json†L15004-L15037】
 - Delivered a dedicated TypeScript SDK package that regenerates clients from the OpenAPI spec, compiles them for bundler consumption, and exposes a configuration helper so web and mobile shells share capability gating logic without duplicating DTOs.【F:sdk-typescript/scripts/generate-sdk.mjs†L1-L66】【F:sdk-typescript/src/index.ts†L1-L3】【F:sdk-typescript/src/runtime/configure.ts†L1-L83】
+
+## Creation Studio Domain
+- Added creation studio schema migrations covering projects, collaborators, templates, collaboration sessions, and version history so the platform captures governance metadata and collaboration footprints for every draft.【F:backend-nodejs/migrations/20250213143000_creation_studio.js†L1-L141】
+- Implemented `CreationStudioService` with RBAC enforcement, templating logic, session orchestration, and ad promotion helpers to provide production-ready APIs for instructors and admins.【F:backend-nodejs/src/services/CreationStudioService.js†L1-L522】
+- Delivered HTTP controllers and routes that expose project CRUD, collaborator management, realtime session lifecycle, and campaign promotion endpoints under the new `/api/v1/creation` surface.【F:backend-nodejs/src/controllers/CreationStudioController.js†L1-L266】【F:backend-nodejs/src/routes/creation.routes.js†L1-L24】【F:backend-nodejs/src/routes/routeMetadata.js†L1-L214】【F:backend-nodejs/src/routes/routeRegistry.js†L1-L37】
+- Added Vitest coverage validating template application, status transitions, and ad promotion safety checks to ensure regressions are caught during CI before rollout.【F:backend-nodejs/test/creationStudioService.test.js†L1-L164】

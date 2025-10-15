@@ -51,7 +51,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
 - **Objective:** Launch creation studio, ads manager, community tooling, and analytics required for monetisation and engagement boosts.【F:update_docs/1.50/new_feature_brief.md†L27-L123】【F:update_docs/1.50/features_to_add.md†L32-L171】
 - **Integration Subtasks (12 total):**
   - **Backend:**
-    1. Implement services for creation projects, templates, collaboration sessions, and ads campaigns with RBAC enforcement.【F:update_docs/1.50/features_to_add.md†L32-L102】
+    1. Implement services for creation projects, templates, collaboration sessions, and ads campaigns with RBAC enforcement.【F:update_docs/1.50/features_to_add.md†L32-L102】 ✅ Completed – creation studio domain, migrations, RBAC-aware service layer, HTTP controller, and tests published for multi-tenant authoring and ad promotion flows.
     2. Build moderation pipeline APIs for community posts, scam reports, and analytics capture.【F:update_docs/1.50/features_to_add.md†L92-L171】
   - **Front-end:**
     3. Develop creation studio UI wizard, asset library, and collaborative editing indicators.
