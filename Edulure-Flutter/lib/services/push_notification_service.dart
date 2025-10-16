@@ -5,6 +5,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'notification_preference_service.dart';
+
 /// Handles Firebase Cloud Messaging push notification configuration for the app.
 class PushNotificationService {
   PushNotificationService._();
@@ -24,6 +26,7 @@ class PushNotificationService {
     await _configureLocalNotifications();
     await _requestPermissions();
     await _attachListeners();
+    await NotificationPreferenceService.instance.loadPreferences();
     await _logFcmToken();
   }
 
@@ -88,6 +91,10 @@ class PushNotificationService {
       if (kDebugMode) {
         debugPrint('FCM registration token: $token');
       }
+      if (token != null) {
+        await NotificationPreferenceService.instance
+            .registerDeviceToken(token, platform: defaultTargetPlatform.name);
+      }
     } catch (error) {
       debugPrint('Unable to fetch FCM token: $error');
     }
@@ -112,6 +119,19 @@ class PushNotificationService {
 
     final notification = message.notification;
     if (notification == null) {
+      return;
+    }
+
+    final preferences =
+        NotificationPreferenceService.instance.cachedPreferences;
+    final category = message.data['category']?.toString();
+    if (preferences != null &&
+        !preferences.allowsChannel('push', category: category)) {
+      if (kDebugMode) {
+        debugPrint(
+          'Dropping push notification for category=$category due to preferences',
+        );
+      }
       return;
     }
 

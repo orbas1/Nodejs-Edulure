@@ -7,6 +7,7 @@
 ## Bootstrap & State Management
 - Connected `AppBootstrap` to warm both feature flags and capability manifests in parallel, ensuring readiness telemetry is available before routing decisions occur.【F:Edulure-Flutter/lib/bootstrap/app_bootstrap.dart†L19-L58】
 - Built `CapabilityManifestNotifier` and Hive-backed repository to manage cached health snapshots, refresh retries, and telemetry logging for resiliency scenarios.【F:Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart†L1-L112】【F:Edulure-Flutter/lib/core/runtime/capability_manifest_repository.dart†L1-L88】
+- Bootstrap now drains pending notification actions after push registration so queued Slack events and preference edits sync automatically when connectivity resumes.【F:Edulure-Flutter/lib/bootstrap/app_bootstrap.dart†L30-L40】【F:Edulure-Flutter/lib/services/notification_preference_service.dart†L700-L791】
 
 ## Privacy Tooling
 - Session manager now exposes dedicated privacy preference storage and purge helpers so logout flows remove consent metadata alongside cached dashboards, guaranteeing revocations clear local state.【F:Edulure-Flutter/lib/services/session_manager.dart†L59-L110】
@@ -19,3 +20,7 @@
 ## Ads Governance Widgets
 - Added ads governance teaser to the service suite with dark mode treatment, risk iconography, and CTA into the moderation workflow, aligning mobile entry points with instructor dashboards.【F:Edulure-Flutter/lib/screens/service_suite_screen.dart†L160-L204】
 - Home quick actions now include "Ads governance" shortcut so moderators can jump directly to campaign insights and trust & safety tooling from the primary shell.【F:Edulure-Flutter/lib/screens/home_screen.dart†L770-L785】
+
+## Settings & Notification Widgets
+- Rebuilt the settings notification card with channel-specific switches, queued-sync banners, and relative timestamp badges that read from the new preference notifier.【F:Edulure-Flutter/lib/screens/settings_screen.dart†L381-L492】
+- Slack escalation editor captures workspace metadata, enforces `#`-prefixed channels, and exposes an inline test button wired to the integration orchestrator for confidence before go-live.【F:Edulure-Flutter/lib/screens/settings_screen.dart†L498-L833】【F:Edulure-Flutter/lib/services/notification_preference_service.dart†L619-L706】
