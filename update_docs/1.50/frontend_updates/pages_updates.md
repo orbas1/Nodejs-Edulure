@@ -12,6 +12,13 @@
 - New admin governance surface aggregates DSR queue metrics, overdue escalations, and policy timelines with severity-coded summary cards so compliance teams can triage from a single page.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L58-L184】
 - The page wires into the compliance API client and React Router so navigation menus, breadcrumbs, and CTA buttons respect RBAC gating and reuse the existing dashboard chrome.【F:frontend-reactjs/src/api/complianceApi.js†L1-L86】【F:frontend-reactjs/src/App.jsx†L1-L150】
 
+### Integrations Control Centre
+- Added `/dashboard/admin/integrations` delivering CRM sync telemetry cards, run tables, failure logs, and reconciliation reports backed by the new admin integrations API so operators can diagnose and remediate connector drift without leaving the dashboard shell.【F:frontend-reactjs/src/pages/dashboard/AdminIntegrations.jsx†L1-L356】【F:frontend-reactjs/src/api/integrationAdminApi.js†L1-L143】
+- Navigation updates surface the integrations workspace alongside operator command and governance hubs with RBAC enforcement and iconography consistent with the admin shell.【F:frontend-reactjs/src/App.jsx†L1-L260】【F:frontend-reactjs/src/layouts/DashboardLayout.jsx†L1-L210】
+- Vitest coverage now wraps asynchronous renders in `act(...)`, exercises manual retry success, API failure, and alert dismissal states so the dashboard resists regression when the backend orchestrator surfaces faults.【F:frontend-reactjs/src/pages/dashboard/__tests__/AdminIntegrations.test.jsx†L1-L157】
+- BYO API key catalogue, rotation indicators, owner metadata, and disable workflows sit alongside integration telemetry so security teams manage provider credentials with inline validation, confirmation prompts, and rotation reminders tied to backend policies.【F:frontend-reactjs/src/pages/dashboard/AdminIntegrations.jsx†L358-L620】【F:frontend-reactjs/src/pages/dashboard/__tests__/AdminIntegrations.test.jsx†L158-L320】
+- Delegated invite orchestration replaces direct key capture—admins issue, resend, or cancel secure invite links, rotation controls display pending state, and toast guidance surfaces claim URLs for operators to share with credential owners.【F:frontend-reactjs/src/pages/dashboard/AdminIntegrations.jsx†L894-L1510】【F:frontend-reactjs/src/pages/dashboard/__tests__/AdminIntegrations.test.jsx†L1-L226】
+
 ### Creation Studio Workspace
 - Introduced `/dashboard/instructor/creation-studio` featuring project list management, readiness summaries, and collaborative presence controls fed by the creation service APIs.【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L1-L229】【F:frontend-reactjs/src/api/creationStudioApi.js†L1-L213】
 - Creation studio summary now surfaces catalogue distribution across courses, e-books, communities, and ad assets with progress bars so instructors can plan staffing against the live production mix.【F:frontend-reactjs/src/pages/dashboard/instructor/creationStudio/CreationStudioSummary.jsx†L84-L132】
@@ -24,3 +31,6 @@
 ## Learner Profile
 - Added a privacy & consent ledger that fetches live consent records, renders grant metadata, and exposes inline revocation actions that call the compliance API with optimistic loading states.【F:frontend-reactjs/src/pages/Profile.jsx†L830-L870】【F:frontend-reactjs/src/hooks/useConsentRecords.js†L1-L52】
 - Profile shell now surfaces consent status counts in the hero, ensuring governance posture is visible alongside revenue, community, and affiliate insights.【F:frontend-reactjs/src/pages/Profile.jsx†L798-L826】
+
+## Credential Invite Claim
+- Introduced `/integrations/credential-invite/:token` as a public claim page that validates invite tokens, pre-fills rotation metadata, educates credential owners on encryption practices, and submits credentials through the new invite API client with Vitest coverage validating load, validation, and submission flows.【F:frontend-reactjs/src/pages/IntegrationCredentialInvite.jsx†L1-L210】【F:frontend-reactjs/src/api/integrationInviteApi.js†L1-L48】【F:frontend-reactjs/src/pages/__tests__/IntegrationCredentialInvite.test.jsx†L1-L128】【F:frontend-reactjs/src/App.jsx†L1-L120】

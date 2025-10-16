@@ -75,6 +75,16 @@ const mockedModules = vi.hoisted(() => {
   };
 });
 
+const communityLifecycleMock = vi.hoisted(() => ({
+  onPaymentSucceeded: vi.fn(),
+  onPaymentFailed: vi.fn(),
+  onPaymentRefunded: vi.fn()
+}));
+
+const webhookEventBusMock = vi.hoisted(() => ({
+  publish: vi.fn()
+}));
+
 vi.mock('../src/models/PaymentIntentModel.js', () => ({
   default: mockedModules.paymentIntentModel
 }));
@@ -94,6 +104,16 @@ vi.mock('../src/models/PaymentRefundModel.js', () => ({
 vi.mock('../src/observability/metrics.js', () => ({
   trackPaymentCaptureMetrics: mockedModules.captureMetricsSpy,
   trackPaymentRefundMetrics: mockedModules.refundMetricsSpy
+}));
+
+vi.mock('../src/services/CommunitySubscriptionLifecycle.js', () => ({
+  onPaymentSucceeded: communityLifecycleMock.onPaymentSucceeded,
+  onPaymentFailed: communityLifecycleMock.onPaymentFailed,
+  onPaymentRefunded: communityLifecycleMock.onPaymentRefunded
+}));
+
+vi.mock('../src/services/WebhookEventBusService.js', () => ({
+  default: webhookEventBusMock
 }));
 
 const {
@@ -149,6 +169,10 @@ describe('PaymentService', () => {
       }
     });
     platformSettingsServiceMock.calculateCommission.mockReturnValue(0);
+    communityLifecycleMock.onPaymentSucceeded.mockResolvedValue();
+    communityLifecycleMock.onPaymentFailed.mockResolvedValue();
+    communityLifecycleMock.onPaymentRefunded.mockResolvedValue();
+    webhookEventBusMock.publish.mockResolvedValue();
     env.payments.allowedCurrencies.splice(0, env.payments.allowedCurrencies.length, ...originalAllowedCurrencies);
     env.payments.tax.inclusive = originalTaxConfig.inclusive;
     env.payments.tax.minimumRate = originalTaxConfig.minimumRate;
@@ -510,5 +534,92 @@ describe('PaymentService', () => {
     expect(failureSpy).not.toHaveBeenCalled();
     expect(refundSpy).not.toHaveBeenCalled();
     expect(response).toEqual({ received: true });
+  });
+
+  it('publishes webhook events when Stripe payment succeeds', async () => {
+    const intentRecord = {
+      id: 12,
+      publicId: 'pay_12',
+      provider: 'stripe',
+      providerIntentId: 'pi_321',
+      status: 'requires_payment_method',
+      currency: 'USD',
+      amountSubtotal: 1200,
+      amountDiscount: 0,
+      amountTax: 120,
+      amountTotal: 0,
+      amountRefunded: 0,
+      metadata: {}
+    };
+
+    paymentIntentModel.findByProviderIntentId.mockResolvedValue(intentRecord);
+    paymentIntentModel.updateById.mockResolvedValue({
+      ...intentRecord,
+      status: 'succeeded',
+      amountTotal: 1320,
+      capturedAt: '2024-05-01T00:00:00.000Z'
+    });
+    paymentLedgerEntryModel.record.mockResolvedValue();
+
+    await PaymentService.handleStripePaymentSucceeded({
+      id: 'pi_321',
+      amount_received: 1320,
+      currency: 'usd',
+      created: Math.floor(Date.now() / 1000),
+      payment_method_types: ['card'],
+      charges: { data: [{ id: 'ch_001', balance_transaction: 'txn_123', receipt_url: 'https://example.com/r' }] }
+    });
+
+    expect(webhookEventBusMock.publish).toHaveBeenCalledWith(
+      'payments.intent.succeeded',
+      expect.objectContaining({
+        paymentId: 'pay_12',
+        processedBy: 'stripe-webhook',
+        amountReceived: 1320,
+        chargeId: 'ch_001'
+      }),
+      expect.objectContaining({ source: 'stripe-webhook' })
+    );
+  });
+
+  it('publishes webhook events when Stripe payment fails', async () => {
+    const intentRecord = {
+      id: 44,
+      publicId: 'pay_44',
+      provider: 'stripe',
+      providerIntentId: 'pi_444',
+      status: 'processing',
+      currency: 'USD',
+      amountSubtotal: 5000,
+      amountDiscount: 0,
+      amountTax: 0,
+      amountTotal: 5000,
+      amountRefunded: 0,
+      metadata: {}
+    };
+
+    paymentIntentModel.findByProviderIntentId.mockResolvedValue(intentRecord);
+    paymentIntentModel.updateById.mockResolvedValue({
+      ...intentRecord,
+      status: 'failed',
+      failureCode: 'card_declined',
+      failureMessage: 'Declined'
+    });
+
+    await PaymentService.handleStripePaymentFailed({
+      id: 'pi_444',
+      last_payment_error: { code: 'card_declined', message: 'Declined', type: 'card_error', created: Math.floor(Date.now() / 1000) },
+      payment_method_types: ['card']
+    });
+
+    expect(webhookEventBusMock.publish).toHaveBeenCalledWith(
+      'payments.intent.failed',
+      expect.objectContaining({
+        paymentId: 'pay_44',
+        failureCode: 'card_declined',
+        processedBy: 'stripe-webhook'
+      }),
+      expect.objectContaining({ source: 'stripe-webhook' })
+    );
   });
 });

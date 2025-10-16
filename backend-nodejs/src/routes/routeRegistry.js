@@ -15,6 +15,7 @@ import ebookRoutes from './ebook.routes.js';
 import explorerRoutes from './explorer.routes.js';
 import feedRoutes from './feed.routes.js';
 import paymentRoutes from './payment.routes.js';
+import integrationInviteRoutes from './integrationInvite.routes.js';
 import runtimeConfigRoutes from './runtimeConfig.routes.js';
 import socialRoutes from './social.routes.js';
 import userRoutes from './user.routes.js';
@@ -30,6 +31,7 @@ const routerMap = {
   creation: creationRoutes,
   'runtime-config': runtimeConfigRoutes,
   payments: paymentRoutes,
+  'integration-invites': integrationInviteRoutes,
   compliance: complianceRoutes,
   chat: chatRoutes,
   social: socialRoutes,

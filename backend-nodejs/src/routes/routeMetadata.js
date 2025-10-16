@@ -164,6 +164,17 @@ export const apiRouteMetadata = [
     disabledMessage: 'Administration endpoints are disabled. Contact the platform owner to request access.'
   },
   {
+    name: 'integration-invites',
+    capability: 'integrations-governance',
+    description: 'Public credential invitation verification and submission endpoints.',
+    basePath: '/integration-invites',
+    flagKey: 'platform.api.v1.integrationInvites',
+    defaultState: 'enabled',
+    audience: 'partner',
+    fallbackStatus: 404,
+    disabledMessage: 'Credential invitation endpoints are not available. Contact your integrations administrator.'
+  },
+  {
     name: 'verification',
     capability: 'identity-verification',
     description: 'Identity verification, KYC, and trust signals APIs.',
