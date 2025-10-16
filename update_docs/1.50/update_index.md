@@ -83,3 +83,6 @@
 
 ## Provider Ads & Creation Oversight Roadmap
 - Documentation: `provider_phone_app_updates/ads_creation_oversight_roadmap.md`, `provider_phone_app_updates/provider_app_change_log.md`, `update_task_list.md`, `update_progress_tracker.md`, `Design_Plan.md`, `Design_update_*` trackers
+
+## Provider Notification Parity Enablement
+- Documentation: `provider_phone_app_updates/integration_parity_checklist.md`, `provider_phone_app_updates/push_notification_design_guidelines.md`, `provider_phone_app_updates/provider_app_change_log.md`, `Design_Change_log.md`, `Design_Plan.md`, `Design_update_*` trackers, `update_task_list.md`, `update_progress_tracker.md`
