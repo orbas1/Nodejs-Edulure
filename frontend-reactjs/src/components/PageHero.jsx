@@ -14,9 +14,9 @@ export default function PageHero({ title, description, subtitle, cta }) {
       </div>
       <div className="relative mx-auto flex max-w-6xl flex-col gap-16 px-6 py-24 lg:flex-row lg:items-center">
         <div className="w-full lg:w-1/2">
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white/80">
-            Enterprise learning OS
-          </span>
+          <p className="text-xs font-semibold uppercase tracking-wide text-white/80">
+            Learning community & marketplace
+          </p>
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">{title}</h1>
           {heroDescription ? (
             <p className="mt-6 max-w-xl text-base leading-7 text-white/80 md:text-lg md:leading-8">{heroDescription}</p>
