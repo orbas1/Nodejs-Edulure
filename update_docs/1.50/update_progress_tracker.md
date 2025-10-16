@@ -7,10 +7,10 @@ Progress is recorded per major task. Percentages represent completion of require
 | Platform Hardening & Modularisation | 92% | 98% | 97% | 97% | 90% | 97% | 95% |
 | Data Governance & Compliance Reinforcement | 96% | 99% | 97% | 98% | 92% | 98% | 97% |
 | Creation Studio & Content Ecosystem Delivery | 92% | 99% | 98% | 99% | 90% | 98% | 96% |
-| Integrations, Automation & Notifications | 18% | 22% | 20% | 22% | 18% | 20% | 20% |
+| Integrations, Automation & Notifications | 82% | 91% | 90% | 93% | 86% | 93% | 89% |
 | Experience, Navigation & Accessibility Modernisation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Mobile Parity, Security & Performance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| Testing, Documentation & Release Enablement | 28% | 38% | 32% | 40% | 28% | 36% | 34% |
+| Testing, Documentation & Release Enablement | 35% | 48% | 42% | 54% | 41% | 49% | 45% |
 
 ## Update Protocol
 1. Update each metric weekly or after significant delivery checkpoints.

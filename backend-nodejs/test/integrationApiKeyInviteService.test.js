@@ -1,0 +1,334 @@
+import crypto from 'crypto';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../src/config/env.js', () => ({
+  env: {
+    integrations: {
+      invites: {
+        baseUrl: 'https://ops.edulure.com',
+        tokenTtlHours: 72
+      }
+    },
+    mail: {
+      verificationBaseUrl: 'https://ops.edulure.com/verify'
+    }
+  }
+}));
+
+vi.mock('../src/config/logger.js', () => ({
+  default: {
+    child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
+    info: vi.fn(),
+    error: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn()
+  }
+}));
+
+vi.mock('uuid', () => ({
+  v4: vi.fn(() => 'invite-uuid')
+}));
+
+import IntegrationApiKeyInviteService from '../src/services/IntegrationApiKeyInviteService.js';
+
+const inviteModelMock = {
+  list: vi.fn(),
+  create: vi.fn(),
+  findByAlias: vi.fn(),
+  findPendingForAlias: vi.fn(),
+  findById: vi.fn(),
+  findActiveByTokenHash: vi.fn(),
+  updateById: vi.fn(),
+  hashToken: vi.fn()
+};
+
+const apiKeyModelMock = {
+  findByAlias: vi.fn()
+};
+
+const apiKeyServiceMock = {
+  createKey: vi.fn(),
+  rotateKey: vi.fn(),
+  sanitize: vi.fn((record) => ({ ...record, sanitized: true }))
+};
+
+const mailServiceMock = {
+  sendMail: vi.fn()
+};
+
+const trxMock = { id: 'trx' };
+const databaseMock = {
+  transaction: vi.fn(async (handler) => handler(trxMock))
+};
+
+const now = new Date('2025-02-26T10:00:00.000Z');
+
+describe('IntegrationApiKeyInviteService', () => {
+  let service;
+  let randomBytesSpy;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    inviteModelMock.hashToken.mockImplementation((token) => `hash-${token}`);
+    mailServiceMock.sendMail.mockResolvedValue(true);
+    randomBytesSpy = vi.spyOn(crypto, 'randomBytes').mockReturnValue(
+      Buffer.from('token-abc123token-abc123token-abc123token-abc123', 'utf8')
+    );
+
+    service = new IntegrationApiKeyInviteService({
+      inviteModel: inviteModelMock,
+      apiKeyModel: apiKeyModelMock,
+      apiKeyService: apiKeyServiceMock,
+      mailService: mailServiceMock,
+      database: databaseMock,
+      nowProvider: () => now
+    });
+  });
+
+  it('creates a new invite, persists metadata, and dispatches an email', async () => {
+    inviteModelMock.findPendingForAlias.mockResolvedValue(null);
+    apiKeyModelMock.findByAlias.mockResolvedValue(null);
+    inviteModelMock.create.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: null,
+      ownerEmail: 'ops@example.com',
+      requestedBy: 'admin@example.com',
+      requestedAt: now,
+      expiresAt: new Date('2025-02-29T10:00:00.000Z'),
+      status: 'pending',
+      tokenHash: 'hash-token',
+      rotationIntervalDays: 90,
+      keyExpiresAt: new Date('2025-03-10T10:00:00.000Z'),
+      metadata: { notes: 'Marketing automations', reason: 'Initial onboarding' },
+      lastSentAt: now,
+      sendCount: 1
+    });
+
+    const result = await service.createInvite({
+      provider: 'OpenAI',
+      environment: 'Production',
+      alias: 'Content Studio Bot',
+      ownerEmail: 'ops@example.com',
+      rotationIntervalDays: 90,
+      keyExpiresAt: '2025-03-10T10:00:00.000Z',
+      notes: 'Marketing automations',
+      reason: 'Initial onboarding',
+      requestedBy: 'admin@example.com',
+      requestedByName: 'Ops Admin'
+    });
+
+    expect(inviteModelMock.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'openai',
+        environment: 'production',
+        alias: 'Content Studio Bot',
+        rotationIntervalDays: 90,
+        ownerEmail: 'ops@example.com'
+      }),
+      databaseMock
+    );
+
+    expect(mailServiceMock.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'ops@example.com',
+        subject: expect.stringContaining('OpenAI'),
+        html: expect.stringContaining('Submit credential'),
+        text: expect.stringContaining('Submit the credential')
+      })
+    );
+
+    expect(result.invite).toEqual(
+      expect.objectContaining({
+        id: 'invite-uuid',
+        provider: 'openai',
+        providerLabel: 'OpenAI',
+        status: 'pending',
+        rotationIntervalDays: 90
+      })
+    );
+    expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
+  });
+
+  it('resends an invite and refreshes expiry and token metadata', async () => {
+    inviteModelMock.findById.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: null,
+      ownerEmail: 'ops@example.com',
+      status: 'pending',
+      expiresAt: new Date('2025-02-27T10:00:00.000Z'),
+      sendCount: 1,
+      metadata: { notes: null }
+    });
+
+    inviteModelMock.updateById.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: null,
+      ownerEmail: 'ops@example.com',
+      status: 'pending',
+      expiresAt: new Date('2025-02-29T10:00:00.000Z'),
+      sendCount: 2,
+      metadata: { notes: null, requestedByName: 'Ops Admin' },
+      lastSentAt: now
+    });
+
+    const result = await service.resendInvite('invite-uuid', {
+      requestedBy: 'admin@example.com',
+      requestedByName: 'Ops Admin'
+    });
+
+    expect(inviteModelMock.updateById).toHaveBeenCalledWith(
+      'invite-uuid',
+      expect.objectContaining({
+        status: 'pending',
+        sendCount: 2
+      }),
+      databaseMock
+    );
+
+    expect(mailServiceMock.sendMail).toHaveBeenCalled();
+    expect(result.invite).toEqual(
+      expect.objectContaining({ id: 'invite-uuid', status: 'pending', sendCount: 2 })
+    );
+    expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
+  });
+
+  it('cancels an invite and records audit metadata', async () => {
+    inviteModelMock.findById.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      ownerEmail: 'ops@example.com',
+      status: 'pending'
+    });
+
+    inviteModelMock.updateById.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      ownerEmail: 'ops@example.com',
+      status: 'cancelled',
+      cancelledAt: now,
+      cancelledBy: 'admin@example.com'
+    });
+
+    const result = await service.cancelInvite('invite-uuid', { cancelledBy: 'admin@example.com' });
+
+    expect(inviteModelMock.updateById).toHaveBeenCalledWith(
+      'invite-uuid',
+      expect.objectContaining({ status: 'cancelled', cancelledBy: 'admin@example.com' }),
+      databaseMock
+    );
+    expect(result).toEqual(expect.objectContaining({ status: 'cancelled', cancelledBy: 'admin@example.com' }));
+  });
+
+  it('submits an invite by creating a new API key when no existing key is linked', async () => {
+    inviteModelMock.findActiveByTokenHash.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: null,
+      ownerEmail: 'ops@example.com',
+      status: 'pending',
+      rotationIntervalDays: 90,
+      keyExpiresAt: null,
+      metadata: { notes: null }
+    });
+
+    inviteModelMock.findById.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: 5,
+      ownerEmail: 'ops@example.com',
+      status: 'completed'
+    });
+
+    apiKeyServiceMock.createKey.mockResolvedValue({ id: 5, alias: 'Content Studio Bot', status: 'active' });
+    inviteModelMock.updateById.mockResolvedValue({ id: 'invite-uuid', status: 'completed', apiKeyId: 5 });
+
+    const result = await service.submitInvitation('token-xyz', {
+      key: 'sk-live-example-credential-1234567890',
+      rotationIntervalDays: 60,
+      keyExpiresAt: '2025-03-10T10:00:00.000Z',
+      actorEmail: 'ops@example.com',
+      actorName: 'Ops Team',
+      reason: 'Initial provision'
+    });
+
+    expect(databaseMock.transaction).toHaveBeenCalled();
+    expect(apiKeyServiceMock.createKey).toHaveBeenCalledWith(
+      expect.objectContaining({ alias: 'Content Studio Bot', ownerEmail: 'ops@example.com' }),
+      { connection: trxMock }
+    );
+    expect(inviteModelMock.updateById).toHaveBeenCalledWith(
+      'invite-uuid',
+      expect.objectContaining({ status: 'completed', completedBy: 'ops@example.com', apiKeyId: 5 }),
+      trxMock
+    );
+    expect(result.apiKey).toEqual(expect.objectContaining({ id: 5, sanitized: true }));
+    expect(result.invite).toEqual(expect.objectContaining({ id: 'invite-uuid', status: 'completed' }));
+  });
+
+  it('submits an invite by rotating an existing API key', async () => {
+    inviteModelMock.findActiveByTokenHash.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: 9,
+      ownerEmail: 'ops@example.com',
+      status: 'pending',
+      rotationIntervalDays: 45,
+      keyExpiresAt: null,
+      metadata: { notes: 'existing' }
+    });
+
+    inviteModelMock.findById.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: 9,
+      ownerEmail: 'ops@example.com',
+      status: 'completed'
+    });
+
+    apiKeyServiceMock.rotateKey.mockResolvedValue({ id: 9, alias: 'Content Studio Bot', status: 'active' });
+    inviteModelMock.updateById.mockResolvedValue({ id: 'invite-uuid', status: 'completed', apiKeyId: 9 });
+
+    const result = await service.submitInvitation('token-xyz', {
+      key: 'sk-live-rotated-credential-abcdef',
+      rotationIntervalDays: 75,
+      actorEmail: 'rotator@example.com',
+      actorName: 'Rotator',
+      reason: 'delegated-rotation'
+    });
+
+    expect(apiKeyServiceMock.rotateKey).toHaveBeenCalledWith(
+      9,
+      expect.objectContaining({
+        rotationIntervalDays: 75,
+        rotatedBy: 'rotator@example.com'
+      }),
+      { connection: trxMock }
+    );
+    expect(result.apiKey).toEqual(expect.objectContaining({ id: 9, sanitized: true }));
+  });
+
+  afterEach(() => {
+    randomBytesSpy.mockRestore();
+  });
+});

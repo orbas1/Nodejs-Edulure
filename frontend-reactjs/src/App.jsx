@@ -16,6 +16,7 @@ import Terms from './pages/Terms.jsx';
 import Blog from './pages/Blog.jsx';
 import BlogPost from './pages/BlogPost.jsx';
 import Communities from './pages/Communities.jsx';
+import IntegrationCredentialInvite from './pages/IntegrationCredentialInvite.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
 import DashboardLayout from './layouts/DashboardLayout.jsx';
@@ -52,6 +53,7 @@ import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
 import FieldServices from './pages/dashboard/FieldServices.jsx';
 import AdminOperator from './pages/dashboard/AdminOperator.jsx';
 import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
+import AdminIntegrations from './pages/dashboard/AdminIntegrations.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
@@ -127,6 +129,7 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/integrations/credential-invite/:token" element={<IntegrationCredentialInvite />} />
       </Route>
       <Route path="/dashboard" element={<DashboardEntryRedirect />} />
       <Route
@@ -215,6 +218,14 @@ function App() {
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminOperator />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="integrations"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminIntegrations />
             </ProtectedRoute>
           )}
         />
