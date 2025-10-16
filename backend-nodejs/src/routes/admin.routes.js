@@ -25,4 +25,28 @@ router.post(
   AdminIntegrationsController.triggerIntegrationSync
 );
 
+router.get(
+  '/integrations/api-keys',
+  auth('admin'),
+  AdminIntegrationsController.listIntegrationApiKeys
+);
+
+router.post(
+  '/integrations/api-keys',
+  auth('admin'),
+  AdminIntegrationsController.createIntegrationApiKey
+);
+
+router.post(
+  '/integrations/api-keys/:id/rotate',
+  auth('admin'),
+  AdminIntegrationsController.rotateIntegrationApiKey
+);
+
+router.post(
+  '/integrations/api-keys/:id/disable',
+  auth('admin'),
+  AdminIntegrationsController.disableIntegrationApiKey
+);
+
 export default router;

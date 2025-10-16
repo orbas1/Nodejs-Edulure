@@ -12,10 +12,11 @@
 - New admin governance surface aggregates DSR queue metrics, overdue escalations, and policy timelines with severity-coded summary cards so compliance teams can triage from a single page.【F:frontend-reactjs/src/pages/dashboard/AdminGovernance.jsx†L58-L184】
 - The page wires into the compliance API client and React Router so navigation menus, breadcrumbs, and CTA buttons respect RBAC gating and reuse the existing dashboard chrome.【F:frontend-reactjs/src/api/complianceApi.js†L1-L86】【F:frontend-reactjs/src/App.jsx†L1-L150】
 
--### Integrations Control Centre
-- Added `/dashboard/admin/integrations` delivering CRM sync telemetry cards, run tables, failure logs, and reconciliation reports backed by the new admin integrations API so operators can diagnose and remediate connector drift without leaving the dashboard shell.【F:frontend-reactjs/src/pages/dashboard/AdminIntegrations.jsx†L1-L356】【F:frontend-reactjs/src/api/integrationAdminApi.js†L1-L36】
+### Integrations Control Centre
+- Added `/dashboard/admin/integrations` delivering CRM sync telemetry cards, run tables, failure logs, and reconciliation reports backed by the new admin integrations API so operators can diagnose and remediate connector drift without leaving the dashboard shell.【F:frontend-reactjs/src/pages/dashboard/AdminIntegrations.jsx†L1-L356】【F:frontend-reactjs/src/api/integrationAdminApi.js†L1-L143】
 - Navigation updates surface the integrations workspace alongside operator command and governance hubs with RBAC enforcement and iconography consistent with the admin shell.【F:frontend-reactjs/src/App.jsx†L1-L260】【F:frontend-reactjs/src/layouts/DashboardLayout.jsx†L1-L210】
 - Vitest coverage now wraps asynchronous renders in `act(...)`, exercises manual retry success, API failure, and alert dismissal states so the dashboard resists regression when the backend orchestrator surfaces faults.【F:frontend-reactjs/src/pages/dashboard/__tests__/AdminIntegrations.test.jsx†L1-L157】
+- BYO API key catalogue, rotation indicators, owner metadata, and disable workflows sit alongside integration telemetry so security teams manage provider credentials with inline validation, confirmation prompts, and rotation reminders tied to backend policies.【F:frontend-reactjs/src/pages/dashboard/AdminIntegrations.jsx†L358-L620】【F:frontend-reactjs/src/pages/dashboard/__tests__/AdminIntegrations.test.jsx†L158-L320】
 
 ### Creation Studio Workspace
 - Introduced `/dashboard/instructor/creation-studio` featuring project list management, readiness summaries, and collaborative presence controls fed by the creation service APIs.【F:frontend-reactjs/src/pages/dashboard/InstructorCreationStudio.jsx†L1-L229】【F:frontend-reactjs/src/api/creationStudioApi.js†L1-L213】

@@ -5,10 +5,21 @@ import {
   CheckCircleIcon,
   CloudArrowUpIcon,
   ExclamationTriangleIcon,
-  ShieldCheckIcon
+  ShieldCheckIcon,
+  KeyIcon,
+  ClockIcon,
+  NoSymbolIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline';
 
-import { fetchIntegrationDashboard, triggerIntegrationRun } from '../../api/integrationAdminApi.js';
+import {
+  fetchIntegrationDashboard,
+  triggerIntegrationRun,
+  listIntegrationApiKeys,
+  createIntegrationApiKey,
+  rotateIntegrationApiKey,
+  disableIntegrationApiKey
+} from '../../api/integrationAdminApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 const HEALTH_THEME = {
@@ -28,6 +39,14 @@ const HEALTH_THEME = {
     badge: 'bg-slate-100 text-slate-500 ring-slate-200',
     dot: 'bg-slate-400'
   }
+};
+
+const ROTATION_BADGE_THEME = {
+  ok: 'bg-emerald-50 text-emerald-700',
+  'due-soon': 'bg-amber-50 text-amber-700',
+  overdue: 'bg-rose-50 text-rose-700',
+  expired: 'bg-rose-50 text-rose-700',
+  disabled: 'bg-slate-200 text-slate-600'
 };
 
 function formatTimestamp(value) {
@@ -133,6 +152,381 @@ function IntegrationSummaryMetrics({ integration }) {
         <SummaryCard key={metric.title} {...metric} />
       ))}
     </div>
+  );
+}
+
+function RotationStatusBadge({ status }) {
+  const theme = ROTATION_BADGE_THEME[status] ?? ROTATION_BADGE_THEME.ok;
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${theme}`}>
+      {status === 'ok' && 'Up to date'}
+      {status === 'due-soon' && 'Rotation due soon'}
+      {status === 'overdue' && 'Rotation overdue'}
+      {status === 'expired' && 'Expired'}
+      {status === 'disabled' && 'Disabled'}
+    </span>
+  );
+}
+
+function describeRotationWindow(key) {
+  if (key.status === 'disabled') {
+    return 'Key disabled';
+  }
+  if (key.rotationStatus === 'expired') {
+    return key.expiresAt ? `Expired ${formatTimestamp(key.expiresAt)}` : 'Expired';
+  }
+  if (key.nextRotationAt) {
+    return `Next rotation ${formatTimestamp(key.nextRotationAt)}`;
+  }
+  return 'Rotation cadence not configured';
+}
+
+function ApiKeyTable({ apiKeys, loading, onRotateRequest, onDisable, disableState }) {
+  if (loading) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
+        Loading API key catalogue…
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-slate-200">
+        <thead>
+          <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-4 py-2">Provider</th>
+            <th className="px-4 py-2">Alias</th>
+            <th className="px-4 py-2">Owner</th>
+            <th className="px-4 py-2">Rotation</th>
+            <th className="px-4 py-2">Status</th>
+            <th className="px-4 py-2 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {apiKeys.length === 0 && (
+            <tr>
+              <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={6}>
+                No API keys stored yet. Capture tenant credentials to unlock AI routing.
+              </td>
+            </tr>
+          )}
+          {apiKeys.map((key) => {
+            const disableStatus = disableState[key.id];
+            return (
+              <tr key={key.id} className="whitespace-nowrap text-sm text-slate-600">
+                <td className="px-4 py-3 font-medium text-slate-700">{key.providerLabel}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-slate-800">{key.alias}</span>
+                    <span className="text-xs text-slate-500">•••• {key.lastFour}</span>
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col">
+                    <span>{key.ownerEmail}</span>
+                    {key.metadata?.lastRotatedBy && (
+                      <span className="text-xs text-slate-500">Last rotated by {key.metadata.lastRotatedBy}</span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-slate-500">
+                  <div className="flex flex-col gap-1">
+                    <span>{describeRotationWindow(key)}</span>
+                    {key.rotationHistory?.[0] && (
+                      <span className="text-xs">
+                        Rotated {formatTimestamp(key.rotationHistory[0].rotatedAt)}
+                      </span>
+                    )}
+                    {typeof key.daysUntilRotation === 'number' && key.status !== 'disabled' && (
+                      <span className="text-xs text-slate-400">
+                        {key.daysUntilRotation >= 0
+                          ? `${key.daysUntilRotation} days remaining`
+                          : `${Math.abs(key.daysUntilRotation)} days overdue`}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <RotationStatusBadge status={key.rotationStatus} />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-col items-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onRotateRequest(key)}
+                      disabled={key.status === 'disabled'}
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 ${
+                        key.status === 'disabled'
+                          ? 'bg-slate-200 text-slate-500'
+                          : 'bg-slate-900 text-white hover:bg-slate-700'
+                      }`}
+                    >
+                      Rotate key
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDisable(key)}
+                      disabled={key.status === 'disabled' || disableStatus === 'pending'}
+                      className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold text-rose-700 transition focus:outline-none focus:ring-2 focus:ring-rose-400 focus:ring-offset-2 disabled:text-rose-300"
+                    >
+                      {disableStatus === 'pending' ? 'Disabling…' : key.status === 'disabled' ? 'Disabled' : 'Disable'}
+                    </button>
+                    {disableStatus && disableStatus !== 'pending' && key.status !== 'disabled' && (
+                      <span className="text-xs text-rose-600">{disableStatus}</span>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ApiKeyCreateForm({
+  form,
+  onChange,
+  onSubmit,
+  errors,
+  status,
+  message
+}) {
+  return (
+    <form className="space-y-4" onSubmit={onSubmit} noValidate>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Store a new key</h3>
+        {status === 'success' && (
+          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+            <CheckCircleIcon className="h-4 w-4" /> Saved
+          </span>
+        )}
+        {status === 'error' && (
+          <span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+            <ExclamationTriangleIcon className="h-4 w-4" /> {message}
+          </span>
+        )}
+      </div>
+      <div className="grid gap-3">
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-provider">
+          Provider
+        </label>
+        <select
+          id="api-key-provider"
+          value={form.provider}
+          onChange={(event) => onChange('provider', event.target.value)}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        >
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic Claude</option>
+          <option value="grok">XAI Grok</option>
+          <option value="azure-openai">Azure OpenAI</option>
+          <option value="google-vertex">Google Vertex AI</option>
+        </select>
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-environment">
+          Environment
+        </label>
+        <select
+          id="api-key-environment"
+          value={form.environment}
+          onChange={(event) => onChange('environment', event.target.value)}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        >
+          <option value="production">Production</option>
+          <option value="staging">Staging</option>
+          <option value="sandbox">Sandbox</option>
+        </select>
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-alias">
+          Alias
+        </label>
+        <input
+          id="api-key-alias"
+          value={form.alias}
+          onChange={(event) => onChange('alias', event.target.value)}
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          placeholder="Content Studio Bot"
+        />
+        {errors.alias && <p className="text-xs text-rose-600">{errors.alias}</p>}
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-owner">
+          Owner email
+        </label>
+        <input
+          id="api-key-owner"
+          type="email"
+          value={form.ownerEmail}
+          onChange={(event) => onChange('ownerEmail', event.target.value)}
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          placeholder="integrations.lead@example.com"
+        />
+        {errors.ownerEmail && <p className="text-xs text-rose-600">{errors.ownerEmail}</p>}
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-secret">
+          API key
+        </label>
+        <textarea
+          id="api-key-secret"
+          value={form.key}
+          onChange={(event) => onChange('key', event.target.value)}
+          className="h-24 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          placeholder="sk-live-..."
+        />
+        {errors.key && <p className="text-xs text-rose-600">{errors.key}</p>}
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-rotation">
+          Rotation cadence (days)
+        </label>
+        <input
+          id="api-key-rotation"
+          type="number"
+          min={30}
+          max={365}
+          value={form.rotationIntervalDays}
+          onChange={(event) => onChange('rotationIntervalDays', event.target.value)}
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        />
+        {errors.rotationIntervalDays && <p className="text-xs text-rose-600">{errors.rotationIntervalDays}</p>}
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-expiry">
+          Expires on (optional)
+        </label>
+        <input
+          id="api-key-expiry"
+          type="date"
+          value={form.expiresAt}
+          onChange={(event) => onChange('expiresAt', event.target.value)}
+          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        />
+        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="api-key-notes">
+          Notes (optional)
+        </label>
+        <textarea
+          id="api-key-notes"
+          value={form.notes}
+          onChange={(event) => onChange('notes', event.target.value)}
+          className="h-16 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          placeholder="Describe use case or integration scope"
+        />
+      </div>
+      {status === 'success' && message && <p className="text-xs text-emerald-600">{message}</p>}
+      {status === 'error' && message && <p className="text-xs text-rose-600">{message}</p>}
+      <button
+        type="submit"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:bg-slate-400"
+        disabled={status === 'submitting'}
+      >
+        {status === 'submitting' ? 'Storing…' : (
+          <>
+            <PlusIcon className="h-4 w-4" /> Store API key
+          </>
+        )}
+      </button>
+    </form>
+  );
+}
+
+function ApiKeyRotationForm({ draft, onChange, onSubmit, onCancel }) {
+  return (
+    <form className="space-y-4" onSubmit={onSubmit} noValidate>
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+            Rotate {draft.alias}
+          </h3>
+          <p className="text-xs text-slate-500">Provide the replacement credential to reset reminders.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {draft.status === 'success' && (
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+              <CheckCircleIcon className="h-4 w-4" /> Rotated
+            </span>
+          )}
+          {draft.status === 'error' && (
+            <span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-700">
+              <ExclamationTriangleIcon className="h-4 w-4" /> {draft.message}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="rotation-key">
+            New API key
+          </label>
+          <textarea
+            id="rotation-key"
+            value={draft.key}
+            onChange={(event) => onChange('key', event.target.value)}
+            className="h-24 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            placeholder="sk-live-..."
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="rotation-days">
+            Rotation cadence (days)
+          </label>
+          <input
+            id="rotation-days"
+            type="number"
+            min={30}
+            max={365}
+            value={draft.rotationIntervalDays}
+            onChange={(event) => onChange('rotationIntervalDays', event.target.value)}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="rotation-expiry">
+            Expires on (optional)
+          </label>
+          <input
+            id="rotation-expiry"
+            type="date"
+            value={draft.expiresAt}
+            onChange={(event) => onChange('expiresAt', event.target.value)}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="rotation-reason">
+            Rotation reason
+          </label>
+          <input
+            id="rotation-reason"
+            value={draft.reason}
+            onChange={(event) => onChange('reason', event.target.value)}
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            placeholder="Scheduled rotation"
+          />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="rotation-notes">
+            Notes (optional)
+          </label>
+          <textarea
+            id="rotation-notes"
+            value={draft.notes}
+            onChange={(event) => onChange('notes', event.target.value)}
+            className="h-16 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            placeholder="Document escalation or incident context"
+          />
+        </div>
+      </div>
+      {draft.status === 'error' && draft.message && <p className="text-xs text-rose-600">{draft.message}</p>}
+      {draft.status === 'success' && draft.message && <p className="text-xs text-emerald-600">{draft.message}</p>}
+      <button
+        type="submit"
+        className="inline-flex items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:bg-slate-400"
+        disabled={draft.status === 'submitting'}
+      >
+        {draft.status === 'submitting' ? 'Rotating…' : 'Confirm rotation'}
+      </button>
+    </form>
   );
 }
 
@@ -285,6 +679,25 @@ export default function AdminIntegrations() {
   const [error, setError] = useState(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [actionState, setActionState] = useState({ integration: null, status: 'idle', message: null });
+  const [apiKeys, setApiKeys] = useState([]);
+  const [apiKeysLoading, setApiKeysLoading] = useState(true);
+  const [apiKeysError, setApiKeysError] = useState(null);
+  const [apiKeyRefreshToken, setApiKeyRefreshToken] = useState(0);
+  const [createForm, setCreateForm] = useState({
+    provider: 'openai',
+    environment: 'production',
+    alias: '',
+    ownerEmail: '',
+    key: '',
+    rotationIntervalDays: 90,
+    expiresAt: '',
+    notes: ''
+  });
+  const [createFormErrors, setCreateFormErrors] = useState({});
+  const [createStatus, setCreateStatus] = useState('idle');
+  const [createMessage, setCreateMessage] = useState(null);
+  const [rotationDraft, setRotationDraft] = useState(null);
+  const [disableState, setDisableState] = useState({});
 
   useEffect(() => {
     if (!token) return undefined;
@@ -309,6 +722,28 @@ export default function AdminIntegrations() {
   }, [token, refreshToken]);
 
   useEffect(() => {
+    if (!token) return undefined;
+    const controller = new AbortController();
+    setApiKeysLoading(true);
+    listIntegrationApiKeys({ token, signal: controller.signal })
+      .then((payload) => {
+        setApiKeys(Array.isArray(payload) ? payload : []);
+        setApiKeysError(null);
+      })
+      .catch((err) => {
+        if (err?.name === 'AbortError' || err?.message === 'canceled') {
+          return;
+        }
+        setApiKeysError(err instanceof Error ? err : new Error('Failed to load API keys'));
+      })
+      .finally(() => setApiKeysLoading(false));
+
+    return () => {
+      controller.abort();
+    };
+  }, [token, apiKeyRefreshToken]);
+
+  useEffect(() => {
     if (actionState.status === 'success' || actionState.status === 'error') {
       const timeout = setTimeout(() => {
         setActionState({ integration: null, status: 'idle', message: null });
@@ -317,6 +752,36 @@ export default function AdminIntegrations() {
     }
     return undefined;
   }, [actionState]);
+
+  useEffect(() => {
+    if (createStatus === 'success' || createStatus === 'error') {
+      const timeout = setTimeout(() => {
+        setCreateStatus('idle');
+        setCreateMessage(null);
+      }, 4000);
+      return () => clearTimeout(timeout);
+    }
+    return undefined;
+  }, [createStatus]);
+
+  useEffect(() => {
+    if (!rotationDraft) {
+      return undefined;
+    }
+    if (rotationDraft.status === 'success') {
+      const timeout = setTimeout(() => {
+        setRotationDraft(null);
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+    if (rotationDraft.status === 'error') {
+      const timeout = setTimeout(() => {
+        setRotationDraft((draft) => (draft ? { ...draft, status: 'idle', message: null } : null));
+      }, 4000);
+      return () => clearTimeout(timeout);
+    }
+    return undefined;
+  }, [rotationDraft]);
 
   const handleRefresh = () => {
     setRefreshToken((value) => value + 1);
@@ -335,6 +800,190 @@ export default function AdminIntegrations() {
         status: 'error',
         message: err instanceof Error ? err.message : 'Failed to trigger sync'
       });
+    }
+  };
+
+  const handleCreateChange = (field, value) => {
+    setCreateForm((prev) => ({ ...prev, [field]: value }));
+    setCreateFormErrors((prev) => ({ ...prev, [field]: undefined }));
+  };
+
+  const handleCreateSubmit = async (event) => {
+    event.preventDefault();
+    if (!token) return;
+
+    const trimmedAlias = createForm.alias.trim();
+    const trimmedOwner = createForm.ownerEmail.trim();
+    const trimmedKey = createForm.key.trim();
+    const rotationDays = Number(createForm.rotationIntervalDays);
+
+    const errors = {};
+    if (!trimmedAlias || trimmedAlias.length < 3) {
+      errors.alias = 'Alias must be at least 3 characters';
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedOwner)) {
+      errors.ownerEmail = 'Enter a valid email';
+    }
+    if (!trimmedKey || trimmedKey.length < 20) {
+      errors.key = 'API key must be at least 20 characters';
+    }
+    if (!Number.isFinite(rotationDays) || rotationDays < 30 || rotationDays > 365) {
+      errors.rotationIntervalDays = 'Rotation cadence must be between 30 and 365 days';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setCreateFormErrors(errors);
+      setCreateStatus('error');
+      setCreateMessage('Please resolve the highlighted validation issues');
+      return;
+    }
+
+    setCreateStatus('submitting');
+    setCreateMessage(null);
+
+    try {
+      await createIntegrationApiKey({
+        token,
+        provider: createForm.provider,
+        environment: createForm.environment,
+        alias: trimmedAlias,
+        ownerEmail: trimmedOwner,
+        key: trimmedKey,
+        rotationIntervalDays: rotationDays,
+        expiresAt: createForm.expiresAt || undefined,
+        notes: createForm.notes?.trim() || undefined
+      });
+      setCreateStatus('success');
+      setCreateMessage('API key stored securely. Rotation reminders scheduled.');
+      setCreateForm({
+        provider: createForm.provider,
+        environment: createForm.environment,
+        alias: '',
+        ownerEmail: trimmedOwner,
+        key: '',
+        rotationIntervalDays: rotationDays,
+        expiresAt: '',
+        notes: ''
+      });
+      setCreateFormErrors({});
+      setApiKeyRefreshToken((value) => value + 1);
+    } catch (err) {
+      setCreateStatus('error');
+      setCreateMessage(err?.message ?? 'Unable to store API key');
+    }
+  };
+
+  const handleRotateRequest = (record) => {
+    setRotationDraft({
+      id: record.id,
+      alias: record.alias,
+      provider: record.provider,
+      rotationIntervalDays: record.rotationIntervalDays,
+      expiresAt: record.expiresAt ? record.expiresAt.slice(0, 10) : '',
+      key: '',
+      reason: 'Scheduled rotation',
+      notes: record.metadata?.notes ?? '',
+      status: 'idle',
+      message: null
+    });
+  };
+
+  const handleRotationChange = (field, value) => {
+    setRotationDraft((prev) => (prev ? { ...prev, [field]: value } : prev));
+  };
+
+  const handleRotationSubmit = async (event) => {
+    event.preventDefault();
+    if (!rotationDraft || !token) {
+      return;
+    }
+
+    const trimmedKey = rotationDraft.key.trim();
+    const rotationDays = Number(rotationDraft.rotationIntervalDays);
+
+    if (!trimmedKey || trimmedKey.length < 20) {
+      setRotationDraft((prev) =>
+        prev ? { ...prev, status: 'error', message: 'API key must be at least 20 characters' } : prev
+      );
+      return;
+    }
+
+    if (!Number.isFinite(rotationDays) || rotationDays < 30 || rotationDays > 365) {
+      setRotationDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'error',
+              message: 'Rotation cadence must be between 30 and 365 days'
+            }
+          : prev
+      );
+      return;
+    }
+
+    setRotationDraft((prev) => (prev ? { ...prev, status: 'submitting', message: null } : prev));
+
+    try {
+      await rotateIntegrationApiKey({
+        token,
+        id: rotationDraft.id,
+        key: trimmedKey,
+        rotationIntervalDays: rotationDays,
+        expiresAt: rotationDraft.expiresAt || undefined,
+        reason: rotationDraft.reason || undefined,
+        notes: rotationDraft.notes || undefined
+      });
+      setRotationDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'success',
+              message: 'API key rotated successfully'
+            }
+          : prev
+      );
+      setApiKeyRefreshToken((value) => value + 1);
+    } catch (err) {
+      setRotationDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'error',
+              message: err?.message ?? 'Unable to rotate API key'
+            }
+          : prev
+      );
+    }
+  };
+
+  const handleRotationCancel = () => {
+    setRotationDraft(null);
+  };
+
+  const handleDisable = async (record) => {
+    if (!token || record.status === 'disabled') {
+      return;
+    }
+    if (disableState[record.id] === 'pending') {
+      return;
+    }
+    const confirmed = typeof window !== 'undefined'
+      ? window.confirm('Disable this API key? This revokes access for downstream services immediately.')
+      : true;
+    if (!confirmed) {
+      return;
+    }
+    setDisableState((prev) => ({ ...prev, [record.id]: 'pending' }));
+    try {
+      await disableIntegrationApiKey({ token, id: record.id, reason: 'Manually revoked from integrations dashboard' });
+      setDisableState((prev) => ({ ...prev, [record.id]: 'Disabled' }));
+      setApiKeyRefreshToken((value) => value + 1);
+    } catch (err) {
+      setDisableState((prev) => ({ ...prev, [record.id]: err?.message ?? 'Disable failed' }));
+    } finally {
+      setTimeout(() => {
+        setDisableState((prev) => ({ ...prev, [record.id]: undefined }));
+      }, 4000);
     }
   };
 
@@ -365,6 +1014,63 @@ export default function AdminIntegrations() {
       }
     ];
   }, [dashboard]);
+
+  const apiKeyInsights = useMemo(() => {
+    if (!apiKeys || apiKeys.length === 0) {
+      return [
+        {
+          title: 'Managed keys',
+          value: '0',
+          description: 'BYO credentials stored',
+          icon: KeyIcon,
+          tone: 'warning'
+        },
+        {
+          title: 'Rotation alerts',
+          value: '0',
+          description: 'No upcoming reminders',
+          icon: ClockIcon,
+          tone: 'success'
+        },
+        {
+          title: 'Disabled keys',
+          value: '0',
+          description: 'Revoked or compromised credentials',
+          icon: NoSymbolIcon,
+          tone: 'neutral'
+        }
+      ];
+    }
+
+    const total = apiKeys.length;
+    const overdue = apiKeys.filter((key) => key.rotationStatus === 'overdue').length;
+    const dueSoon = apiKeys.filter((key) => key.rotationStatus === 'due-soon').length;
+    const disabled = apiKeys.filter((key) => key.status === 'disabled').length;
+
+    return [
+      {
+        title: 'Managed keys',
+        value: formatNumber(total),
+        description: 'BYO credentials stored',
+        icon: KeyIcon,
+        tone: 'neutral'
+      },
+      {
+        title: 'Rotation alerts',
+        value: formatNumber(overdue + dueSoon),
+        description: `${overdue} overdue · ${dueSoon} due soon`,
+        icon: ClockIcon,
+        tone: overdue > 0 ? 'critical' : dueSoon > 0 ? 'warning' : 'success'
+      },
+      {
+        title: 'Disabled keys',
+        value: formatNumber(disabled),
+        description: 'Revoked or compromised credentials',
+        icon: NoSymbolIcon,
+        tone: disabled > 0 ? 'warning' : 'neutral'
+      }
+    ];
+  }, [apiKeys]);
 
   return (
     <div className="space-y-8">
@@ -476,6 +1182,67 @@ export default function AdminIntegrations() {
           </section>
         );
       })}
+
+      <section className="space-y-6 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-semibold text-slate-900">Bring-your-own API keys</h2>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                {formatNumber(apiKeys.length)} stored
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-slate-600">
+              Vault tenant AI credentials, enforce rotation policies, and revoke compromised secrets without downtime.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {apiKeyInsights.map((metric) => (
+            <SummaryCard key={metric.title} {...metric} />
+          ))}
+        </div>
+
+        {apiKeysError && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            {apiKeysError.message}
+          </div>
+        )}
+
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="space-y-4 lg:col-span-3">
+            <ApiKeyTable
+              apiKeys={apiKeys}
+              loading={apiKeysLoading}
+              onRotateRequest={handleRotateRequest}
+              onDisable={handleDisable}
+              disableState={disableState}
+            />
+          </div>
+          <div className="lg:col-span-2">
+            <ApiKeyCreateForm
+              form={createForm}
+              onChange={handleCreateChange}
+              onSubmit={handleCreateSubmit}
+              errors={createFormErrors}
+              status={createStatus}
+              message={createMessage}
+            />
+          </div>
+        </div>
+
+        {rotationDraft && (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <ApiKeyRotationForm
+              draft={rotationDraft}
+              onChange={handleRotationChange}
+              onSubmit={handleRotationSubmit}
+              onCancel={handleRotationCancel}
+            />
+          </div>
+        )}
+      </section>
     </div>
   );
 }
