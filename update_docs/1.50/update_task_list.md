@@ -76,7 +76,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
 - **Integration Subtasks (11 total):**
   - **Backend:**
     1. Build integration orchestrator handling HubSpot/Salesforce sync, retry policies, and reconciliation reports.【F:update_docs/1.50/features_to_add.md†L118-L149】 ✅ Completed – shipped a CRM integration orchestrator with HubSpot/Salesforce clients, dedicated sync log tables, reconciliation reporting, and worker scheduling so enterprise connectors have production-grade telemetry and retry controls.【F:backend-nodejs/src/services/IntegrationOrchestratorService.js†L1-L476】【F:backend-nodejs/migrations/20250220103000_crm_integration_infrastructure.js†L1-L78】【F:backend-nodejs/src/integrations/HubSpotClient.js†L1-L198】【F:backend-nodejs/src/integrations/SalesforceClient.js†L1-L214】
-    2. Implement webhook/event bus broadcasting integration and payment events with circuit breakers.【F:update_docs/1.50/features_update_plan.md†L94-L114】
+    2. Implement webhook/event bus broadcasting integration and payment events with circuit breakers.【F:update_docs/1.50/features_update_plan.md†L94-L114】 ✅ Completed – deployed a resilient webhook dispatcher with circuit breaker telemetry and wired Stripe/PayPal success, failure, and refund events into the bus so downstream systems receive signed payloads with retry governance.【F:backend-nodejs/src/services/WebhookEventBusService.js†L1-L372】【F:backend-nodejs/src/services/PaymentService.js†L1-L1197】【F:backend-nodejs/src/servers/workerService.js†L1-L146】
   - **Front-end:**
     3. Add admin integration dashboard showing sync status, error logs, and manual retry controls.
     4. Provide BYO API key management UI with validation and rotation reminders.

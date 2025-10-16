@@ -368,6 +368,14 @@ const envSchema = z
     CRM_RECONCILIATION_CRON: z.string().optional(),
     CRM_RECONCILIATION_WINDOW_DAYS: z.coerce.number().int().min(1).max(30).default(7),
     CRM_MAX_CONCURRENT_JOBS: z.coerce.number().int().min(1).max(5).default(1),
+    WEBHOOK_BUS_ENABLED: z.coerce.boolean().default(true),
+    WEBHOOK_BUS_POLL_INTERVAL_MS: z.coerce.number().int().min(100).max(60000).default(2000),
+    WEBHOOK_BUS_BATCH_SIZE: z.coerce.number().int().min(1).max(200).default(25),
+    WEBHOOK_BUS_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(6),
+    WEBHOOK_BUS_INITIAL_BACKOFF_SECONDS: z.coerce.number().int().min(5).max(3600).default(60),
+    WEBHOOK_BUS_MAX_BACKOFF_SECONDS: z.coerce.number().int().min(30).max(24 * 60 * 60).default(1800),
+    WEBHOOK_BUS_DELIVERY_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(5000),
+    WEBHOOK_BUS_RECOVER_AFTER_MS: z.coerce.number().int().min(60 * 1000).max(6 * 60 * 60 * 1000).default(5 * 60 * 1000),
     DRM_DOWNLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3),
     DRM_SIGNATURE_SECRET: z.string().min(32).optional(),
     STRIPE_SECRET_KEY: z.string().min(10),
@@ -803,6 +811,16 @@ export const env = {
       reconciliationCron: raw.CRM_RECONCILIATION_CRON ?? null,
       reconciliationWindowDays: raw.CRM_RECONCILIATION_WINDOW_DAYS,
       maxConcurrentJobs: raw.CRM_MAX_CONCURRENT_JOBS
+    },
+    webhooks: {
+      enabled: raw.WEBHOOK_BUS_ENABLED,
+      pollIntervalMs: raw.WEBHOOK_BUS_POLL_INTERVAL_MS,
+      batchSize: raw.WEBHOOK_BUS_BATCH_SIZE,
+      maxAttempts: raw.WEBHOOK_BUS_MAX_ATTEMPTS,
+      initialBackoffSeconds: raw.WEBHOOK_BUS_INITIAL_BACKOFF_SECONDS,
+      maxBackoffSeconds: raw.WEBHOOK_BUS_MAX_BACKOFF_SECONDS,
+      deliveryTimeoutMs: raw.WEBHOOK_BUS_DELIVERY_TIMEOUT_MS,
+      recoverAfterMs: raw.WEBHOOK_BUS_RECOVER_AFTER_MS
     }
   },
   payments: {

@@ -33,3 +33,4 @@
   it trails.【F:backend-nodejs/src/services/IntegrationOrchestratorService.js†L1-L476】【F:backend-nodejs/src/integrations/HubSpo
   tClient.js†L1-L198】【F:backend-nodejs/src/integrations/SalesforceClient.js†L1-L214】【F:backend-nodejs/migrations/20250220103000
   _crm_integration_infrastructure.js†L1-L78】【F:backend-nodejs/src/servers/workerService.js†L1-L173】
+- Added a webhook event bus with signed payloads, per-subscription circuit breakers, and worker-managed polling so Stripe and PayPal lifecycle events broadcast reliably to downstream automation surfaces.【F:backend-nodejs/migrations/20250225120000_webhook_event_bus.js†L1-L98】【F:backend-nodejs/src/services/WebhookEventBusService.js†L1-L372】【F:backend-nodejs/src/services/PaymentService.js†L1-L1197】【F:backend-nodejs/src/servers/workerService.js†L1-L146】【F:backend-nodejs/test/webhookEventBusService.test.js†L1-L137】【F:backend-nodejs/test/paymentService.test.js†L1-L720】
