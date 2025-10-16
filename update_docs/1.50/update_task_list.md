@@ -85,14 +85,14 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **Provider Phone App:**
     6. Prepare integration parity checklist and push-notification design guidelines for future provider release.【F:update_docs/1.50/provider_phone_app_updates/integration_parity_checklist.md†L1-L60】【F:update_docs/1.50/provider_phone_app_updates/push_notification_design_guidelines.md†L1-L86】 ✅ Completed – published a production readiness checklist mapping CRM, webhook, and notification dependencies to live orchestrator services, and issued provider notification UX guidelines covering capability-aware toggles, Slack routing, offline replay, and telemetry instrumentation so provider squads inherit the hardened learner experience without rediscovery.【F:update_docs/1.50/provider_phone_app_updates/integration_parity_checklist.md†L1-L60】【F:update_docs/1.50/provider_phone_app_updates/push_notification_design_guidelines.md†L1-L86】【F:update_docs/1.50/provider_phone_app_updates/provider_app_change_log.md†L38-L49】
   - **Database:**
-    7. Add integration status tables, API key vault references, and audit logs for external calls.
+    7. Add integration status tables, API key vault references, and audit logs for external calls. ✅ Completed – introduced status, status event, and call audit tables with API key foreign keys plus service-layer orchestration so CRM syncs publish health snapshots and request telemetry to the admin dashboard and observability layers.【F:backend-nodejs/migrations/20250228123000_integration_status_and_audits.js†L1-L83】【F:backend-nodejs/src/services/IntegrationStatusService.js†L1-L221】【F:backend-nodejs/src/services/IntegrationOrchestratorService.js†L1-L1128】
   - **API:**
     8. Expose integration health endpoints and Slack notification webhooks with RBAC gating.
   - **Logic:**
     9. Implement AI provider routing with guardrails, safety filters, and per-tenant quotas.【F:update_docs/1.50/features_to_add.md†L149-L171】
     10. Configure notification mesh orchestrator unifying email, push, Slack, and in-app flows.【F:update_docs/1.50/new_feature_brief.md†L56-L83】
   - **Design:**
-    11. Create integration status visualisations, BYO key forms, and notification preference UI guidelines.
+    11. Create integration status visualisations, BYO key forms, and notification preference UI guidelines. ✅ Completed – documented uptime badges, failure streak counters, and provider call breakdown panels and shipped them in the admin dashboard so telemetry from IntegrationStatusService renders beside manual retry, reconciliation, and credential workflows without additional discovery.【F:update_docs/1.50/Design_Plan.md†L96-L122】【F:backend-nodejs/src/services/IntegrationDashboardService.js†L240-L318】【F:frontend-reactjs/src/pages/dashboard/AdminIntegrations.jsx†L40-L356】
 
 ## 5. Experience, Navigation & Accessibility Modernisation (0%)
 - **Objective:** Deliver unified design system, responsive navigation, localisation, accessibility, and resilience improvements on web/mobile.【F:update_docs/1.50/new_feature_brief.md†L84-L171】【F:update_docs/1.50/features_to_add.md†L173-L235】

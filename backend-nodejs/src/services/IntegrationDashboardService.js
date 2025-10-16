@@ -3,6 +3,7 @@ import integrationOrchestratorService from './IntegrationOrchestratorService.js'
 import IntegrationSyncRunModel from '../models/IntegrationSyncRunModel.js';
 import IntegrationSyncResultModel from '../models/IntegrationSyncResultModel.js';
 import IntegrationReconciliationReportModel from '../models/IntegrationReconciliationReportModel.js';
+import integrationStatusService from './IntegrationStatusService.js';
 
 const INTEGRATION_CATALOGUE = {
   hubspot: {
@@ -149,19 +150,51 @@ function deriveHealth(summary, enabled) {
   return 'operational';
 }
 
+function serialiseStatus(status) {
+  if (!status) {
+    return null;
+  }
+
+  return {
+    state: status.status,
+    summary: status.statusSummary,
+    latestSyncRunId: status.latestSyncRunId,
+    consecutiveFailures: status.consecutiveFailures,
+    openIncidents: status.openIncidentCount,
+    lastSuccessAt: status.lastSuccessAt ? status.lastSuccessAt.toISOString() : null,
+    lastFailureAt: status.lastFailureAt ? status.lastFailureAt.toISOString() : null,
+    updatedAt: status.updatedAt ? status.updatedAt.toISOString() : null
+  };
+}
+
+function serialiseCallSummary(summary) {
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    total: Number(summary.total ?? 0),
+    success: Number(summary.success ?? 0),
+    degraded: Number(summary.degraded ?? 0),
+    failure: Number(summary.failure ?? 0)
+  };
+}
+
 export default class IntegrationDashboardService {
   constructor({
     orchestratorService = integrationOrchestratorService,
     runModel = IntegrationSyncRunModel,
     resultModel = IntegrationSyncResultModel,
     reportModel = IntegrationReconciliationReportModel,
-    database = db
+    database = db,
+    statusService = integrationStatusService
   } = {}) {
     this.orchestratorService = orchestratorService;
     this.runModel = runModel;
     this.resultModel = resultModel;
     this.reportModel = reportModel;
     this.db = database;
+    this.statusService = statusService;
   }
 
   async buildSnapshot({
@@ -170,7 +203,7 @@ export default class IntegrationDashboardService {
     failureLookbackHours = 72,
     reportLimit = 5
   } = {}) {
-    const status = await this.orchestratorService.statusSnapshot();
+    const orchestratorStatus = await this.orchestratorService.statusSnapshot();
     const now = new Date();
     const failureSince = new Date(now.getTime() - failureLookbackHours * 60 * 60 * 1000);
 
@@ -186,6 +219,12 @@ export default class IntegrationDashboardService {
         const sanitisedFailures = failuresRaw.slice(0, failureLimit).map(sanitiseFailure);
         const reportsRaw = await this.reportModel.list(meta.id, { limit: reportLimit }, this.db);
         const reports = reportsRaw.map(sanitiseReport);
+
+        const integrationSnapshot = orchestratorStatus?.[meta.id] ?? {};
+        const [statusRecord, callSummary] = await Promise.all([
+          this.statusService.getStatus(meta.id),
+          this.statusService.summariseCalls(meta.id)
+        ]);
 
         const totalRuns = sanitisedRuns.length;
         const successCount = sanitisedRuns.filter((run) => run.status === 'succeeded').length;
@@ -209,7 +248,7 @@ export default class IntegrationDashboardService {
           totalMismatchOpen: reports.reduce((acc, report) => acc + (report.mismatchCount ?? 0), 0)
         };
 
-        const enabledSnapshot = status?.[meta.id]?.enabled ?? false;
+        const enabledSnapshot = Boolean(integrationSnapshot.enabled);
         const summary = {
           lastRunStatus: latestRun?.status ?? null,
           lastRunAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? null,
@@ -227,12 +266,15 @@ export default class IntegrationDashboardService {
         return {
           ...meta,
           enabled: enabledSnapshot,
+          environment: integrationSnapshot.environment ?? 'production',
           health,
           summary,
           recentRuns: sanitisedRuns,
           failureLog: sanitisedFailures,
           reconciliation,
-          status: status?.[meta.id] ?? { enabled: false, recentRuns: [] }
+          status: integrationSnapshot,
+          statusDetails: serialiseStatus(statusRecord) ?? serialiseStatus(integrationSnapshot.status ?? null),
+          callSummary: serialiseCallSummary(callSummary ?? integrationSnapshot.callSummary ?? null)
         };
       })
     );
@@ -240,8 +282,8 @@ export default class IntegrationDashboardService {
     return {
       generatedAt: now.toISOString(),
       concurrency: {
-        activeJobs: status?.concurrentJobs ?? 0,
-        maxConcurrentJobs: status?.maxConcurrentJobs ?? 0
+        activeJobs: orchestratorStatus?.concurrentJobs ?? 0,
+        maxConcurrentJobs: orchestratorStatus?.maxConcurrentJobs ?? 0
       },
       integrations,
       searchIndex: integrations.map((integration) => ({

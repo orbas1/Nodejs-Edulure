@@ -14,7 +14,7 @@ function buildUserAgent() {
 }
 
 export default class HubSpotClient {
-  constructor({ accessToken, baseUrl, timeoutMs = 10000, maxRetries = 3, logger, fetchImpl } = {}) {
+  constructor({ accessToken, baseUrl, timeoutMs = 10000, maxRetries = 3, logger, fetchImpl, auditLogger } = {}) {
     if (!accessToken) {
       throw new Error('HubSpotClient requires a private app access token.');
     }
@@ -25,6 +25,31 @@ export default class HubSpotClient {
     this.maxRetries = maxRetries;
     this.logger = logger ?? console;
     this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
+    this.auditLogger = typeof auditLogger === 'function' ? auditLogger : null;
+  }
+
+  async recordAudit({ requestMethod, requestPath, statusCode, outcome, durationMs, metadata, error }) {
+    if (!this.auditLogger) {
+      return;
+    }
+
+    try {
+      await this.auditLogger({
+        requestMethod,
+        requestPath,
+        statusCode,
+        outcome,
+        durationMs,
+        metadata,
+        errorCode: error?.code ?? error?.name ?? null,
+        errorMessage: error?.message ?? null
+      });
+    } catch (auditError) {
+      this.logger.warn(
+        { module: 'hubspot-client', err: auditError },
+        'Failed to record HubSpot integration audit entry'
+      );
+    }
   }
 
   async request(path, { method = 'GET', body, searchParams, idempotencyKey, headers = {} } = {}) {
@@ -53,6 +78,7 @@ export default class HubSpotClient {
     for (let attempt = 1; attempt <= this.maxRetries + 1; attempt += 1) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      const attemptStartedAt = Date.now();
 
       try {
         const response = await this.fetchImpl(url, {
@@ -62,6 +88,55 @@ export default class HubSpotClient {
           signal: controller.signal
         });
         clearTimeout(timeout);
+
+        const durationMs = Date.now() - attemptStartedAt;
+        const metadata = {
+          attempt,
+          maxRetries: this.maxRetries,
+          hasBody: Boolean(body),
+          idempotencyKey: idempotencyKey ?? null,
+          queryKeys: Array.from(url.searchParams.keys())
+        };
+
+        if (!response.ok) {
+          const errorBody = await this.safeJson(response);
+          const error = new Error(`HubSpot request failed with status ${response.status}`);
+          error.details = errorBody;
+
+          await this.recordAudit({
+            requestMethod: method,
+            requestPath: url.pathname,
+            statusCode: response.status,
+            outcome: 'failure',
+            durationMs,
+            metadata: {
+              ...metadata,
+              errorDetails: Array.isArray(errorBody?.errors)
+                ? errorBody.errors.slice(0, 5)
+                : errorBody
+            },
+            error
+          });
+
+          throw error;
+        }
+
+        let outcome = 'success';
+        if (response.status === 429) {
+          outcome = 'degraded';
+          metadata.retryAfterSeconds = Number(response.headers.get('Retry-After') ?? 0);
+        } else if (response.status >= 500) {
+          outcome = 'failure';
+        }
+
+        await this.recordAudit({
+          requestMethod: method,
+          requestPath: url.pathname,
+          statusCode: response.status,
+          outcome,
+          durationMs,
+          metadata
+        });
 
         if (response.status === 429 || response.status >= 500) {
           const retryAfter = Number(response.headers.get('Retry-After') ?? 0) * 1000;
@@ -85,10 +160,8 @@ export default class HubSpotClient {
         }
 
         if (!response.ok) {
-          const errorBody = await this.safeJson(response);
-          const error = new Error(`HubSpot request failed with status ${response.status}`);
-          error.details = errorBody;
-          throw error;
+          // already handled above
+          throw lastError ?? new Error(`HubSpot request failed with status ${response.status}`);
         }
 
         return this.safeJson(response);
@@ -103,6 +176,24 @@ export default class HubSpotClient {
         } else {
           this.logger.error({ module: 'hubspot-client', err: error, attempt }, 'HubSpot request failed');
         }
+
+        const durationMs = Date.now() - attemptStartedAt;
+        await this.recordAudit({
+          requestMethod: method,
+          requestPath: url.pathname,
+          statusCode: error?.status ?? error?.statusCode ?? null,
+          outcome: attempt <= this.maxRetries ? 'degraded' : 'failure',
+          durationMs,
+          metadata: {
+            attempt,
+            maxRetries: this.maxRetries,
+            hasBody: Boolean(body),
+            idempotencyKey: idempotencyKey ?? null,
+            queryKeys: Array.from(url.searchParams.keys()),
+            timeout: error.name === 'AbortError'
+          },
+          error
+        });
 
         if (attempt > this.maxRetries) {
           throw error;

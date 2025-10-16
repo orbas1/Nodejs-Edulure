@@ -22,7 +22,8 @@ export default class SalesforceClient {
     maxRetries = 3,
     externalIdField = 'Edulure_Project_Id__c',
     logger,
-    fetchImpl
+    fetchImpl,
+    auditLogger
   } = {}) {
     if (!clientId || !clientSecret || !username || !password) {
       throw new Error('SalesforceClient requires clientId, clientSecret, username, and password.');
@@ -39,10 +40,35 @@ export default class SalesforceClient {
     this.externalIdField = externalIdField;
     this.logger = logger ?? console;
     this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
+    this.auditLogger = typeof auditLogger === 'function' ? auditLogger : null;
 
     this.accessToken = null;
     this.instanceUrl = null;
     this.tokenExpiresAt = null;
+  }
+
+  async recordAudit({ requestMethod, requestPath, statusCode, outcome, durationMs, metadata, error }) {
+    if (!this.auditLogger) {
+      return;
+    }
+
+    try {
+      await this.auditLogger({
+        requestMethod,
+        requestPath,
+        statusCode,
+        outcome,
+        durationMs,
+        metadata,
+        errorCode: error?.code ?? error?.name ?? null,
+        errorMessage: error?.message ?? null
+      });
+    } catch (auditError) {
+      this.logger.warn(
+        { module: 'salesforce-client', err: auditError },
+        'Failed to record Salesforce integration audit entry'
+      );
+    }
   }
 
   async authenticate(force = false) {
@@ -104,6 +130,7 @@ export default class SalesforceClient {
     for (let attempt = 1; attempt <= this.maxRetries + 1; attempt += 1) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+      const attemptStartedAt = Date.now();
 
       try {
         const response = await this.fetchImpl(url, {
@@ -114,8 +141,24 @@ export default class SalesforceClient {
         });
         clearTimeout(timeout);
 
+        const durationMs = Date.now() - attemptStartedAt;
+        const metadata = {
+          attempt,
+          maxRetries: this.maxRetries,
+          hasBody: Boolean(body),
+          queryKeys: Array.from(url.searchParams.keys())
+        };
+
         if (response.status === 401 && retryOnUnauthorized) {
           this.logger.warn({ module: 'salesforce-client', attempt }, 'Salesforce token expired – refreshing');
+          await this.recordAudit({
+            requestMethod: method,
+            requestPath: url.pathname,
+            statusCode: response.status,
+            outcome: 'degraded',
+            durationMs,
+            metadata: { ...metadata, reason: 'unauthorised', willRetry: true }
+          });
           await this.authenticate(true);
           return this.request(path, { method, body, query, headers, retryOnUnauthorized: false });
         }
@@ -123,6 +166,14 @@ export default class SalesforceClient {
         if (response.status === 429 || response.status >= 500) {
           const backoff = Math.min(attempt * 600, 5000);
           lastError = new Error(`Salesforce request failed with status ${response.status}`);
+          await this.recordAudit({
+            requestMethod: method,
+            requestPath: url.pathname,
+            statusCode: response.status,
+            outcome: response.status === 429 ? 'degraded' : 'failure',
+            durationMs,
+            metadata: { ...metadata, backoff }
+          });
           if (attempt <= this.maxRetries) {
             await delay(backoff);
             continue;
@@ -133,8 +184,26 @@ export default class SalesforceClient {
           const errorBody = await response.text();
           const error = new Error(`Salesforce request failed with status ${response.status}`);
           error.details = errorBody;
+          await this.recordAudit({
+            requestMethod: method,
+            requestPath: url.pathname,
+            statusCode: response.status,
+            outcome: 'failure',
+            durationMs,
+            metadata: { ...metadata, errorDetails: errorBody },
+            error
+          });
           throw error;
         }
+
+        await this.recordAudit({
+          requestMethod: method,
+          requestPath: url.pathname,
+          statusCode: response.status,
+          outcome: 'success',
+          durationMs,
+          metadata
+        });
 
         return this.safeJson(response);
       } catch (error) {
@@ -145,6 +214,23 @@ export default class SalesforceClient {
         } else {
           this.logger.error({ module: 'salesforce-client', err: error, attempt }, 'Salesforce request failed');
         }
+
+        const durationMs = Date.now() - attemptStartedAt;
+        await this.recordAudit({
+          requestMethod: method,
+          requestPath: url.pathname,
+          statusCode: error?.status ?? error?.statusCode ?? null,
+          outcome: attempt <= this.maxRetries ? 'degraded' : 'failure',
+          durationMs,
+          metadata: {
+            attempt,
+            maxRetries: this.maxRetries,
+            hasBody: Boolean(body),
+            queryKeys: Array.from(url.searchParams.keys()),
+            timeout: error.name === 'AbortError'
+          },
+          error
+        });
 
         if (attempt > this.maxRetries) {
           throw error;
