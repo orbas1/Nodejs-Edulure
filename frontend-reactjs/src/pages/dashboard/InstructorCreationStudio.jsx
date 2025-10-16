@@ -44,6 +44,12 @@ export default function InstructorCreationStudio() {
   const [creationLoading, setCreationLoading] = useState(false);
   const [creationError, setCreationError] = useState(null);
 
+  const [recommendations, setRecommendations] = useState([]);
+  const [recommendationsMeta, setRecommendationsMeta] = useState(null);
+  const [recommendationsEvaluation, setRecommendationsEvaluation] = useState(null);
+  const [recommendationsLoading, setRecommendationsLoading] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState(null);
+
   const summary = useMemo(() => calculateProjectSummary(projects), [projects]);
 
   const selectedProject = useMemo(
@@ -117,6 +123,40 @@ export default function InstructorCreationStudio() {
     return () => controller.abort();
   }, [token]);
 
+  const loadRecommendations = useCallback(() => {
+    if (!token) {
+      setRecommendations([]);
+      setRecommendationsMeta(null);
+      setRecommendationsEvaluation(null);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setRecommendationsLoading(true);
+    setRecommendationsError(null);
+
+    creationStudioApi
+      .fetchRecommendations({ token, includeHistory: true, signal: controller.signal })
+      .then((payload) => {
+        setRecommendations(payload.recommendations ?? []);
+        setRecommendationsMeta(payload.meta ?? null);
+        setRecommendationsEvaluation(payload.evaluation ?? null);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        setRecommendationsError(
+          error instanceof Error ? error : new Error('Failed to load recommendations')
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setRecommendationsLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [token]);
+
   useEffect(() => {
     const abort = loadProjects();
     return () => {
@@ -130,6 +170,13 @@ export default function InstructorCreationStudio() {
       if (typeof abort === 'function') abort();
     };
   }, [loadTemplates]);
+
+  useEffect(() => {
+    const abort = loadRecommendations();
+    return () => {
+      if (typeof abort === 'function') abort();
+    };
+  }, [loadRecommendations, projects.length]);
 
   useEffect(() => {
     if (!token || !selectedProjectId) {
@@ -241,7 +288,14 @@ export default function InstructorCreationStudio() {
 
   return (
     <div className="space-y-10">
-      <CreationStudioSummary summary={summary} />
+      <CreationStudioSummary
+        summary={summary}
+        recommendations={recommendations}
+        recommendationsMeta={recommendationsMeta}
+        recommendationsEvaluation={recommendationsEvaluation}
+        recommendationsLoading={recommendationsLoading}
+        recommendationsError={recommendationsError}
+      />
 
       <CreationAnalyticsDashboard token={token} />
 

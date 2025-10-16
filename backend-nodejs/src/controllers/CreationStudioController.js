@@ -2,6 +2,7 @@ import Joi from 'joi';
 
 import CreationStudioService from '../services/CreationStudioService.js';
 import CreationAnalyticsService from '../services/CreationAnalyticsService.js';
+import CreationRecommendationService from '../services/CreationRecommendationService.js';
 import { paginated, success } from '../utils/httpResponse.js';
 
 const typeEnum = ['course', 'ebook', 'community', 'ads_asset'];
@@ -131,6 +132,12 @@ const analyticsQuerySchema = Joi.object({
   ownerId: Joi.number().integer().positive().optional()
 });
 
+const recommendationQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(20).default(5),
+  includeHistory: Joi.boolean().default(false),
+  ownerId: Joi.number().integer().positive().optional()
+});
+
 function parseCommaSeparated(value) {
   if (!value) return undefined;
   if (Array.isArray(value)) return value;
@@ -187,6 +194,40 @@ export default class CreationStudioController {
       return success(res, {
         data: summary,
         message: 'Creation analytics summary generated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async recommendations(req, res, next) {
+    try {
+      const query = await recommendationQuerySchema.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const actor = {
+        id: req.user.id,
+        role: req.user.role,
+        tenantId: req.user?.tenantId ?? null
+      };
+
+      const payload = await CreationRecommendationService.generate(actor, {
+        limit: query.limit,
+        includeHistory: query.includeHistory,
+        ownerId: query.ownerId,
+        tenantId: actor.tenantId,
+        headersTenantId: req.headers['x-tenant-id'] ?? null
+      });
+
+      return success(res, {
+        data: payload,
+        message: 'Creation recommendations generated'
       });
     } catch (error) {
       if (error.isJoi) {

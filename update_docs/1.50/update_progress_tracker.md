@@ -6,7 +6,7 @@ Progress is recorded per major task. Percentages represent completion of require
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | Platform Hardening & Modularisation | 92% | 98% | 97% | 97% | 90% | 97% | 95% |
 | Data Governance & Compliance Reinforcement | 96% | 99% | 97% | 98% | 92% | 98% | 97% |
-| Creation Studio & Content Ecosystem Delivery | 88% | 97% | 96% | 97% | 88% | 96% | 94% |
+| Creation Studio & Content Ecosystem Delivery | 92% | 99% | 98% | 99% | 90% | 98% | 96% |
 | Integrations, Automation & Notifications | 18% | 22% | 20% | 22% | 18% | 20% | 20% |
 | Experience, Navigation & Accessibility Modernisation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | Mobile Parity, Security & Performance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
@@ -34,7 +34,7 @@ The design programme is tracked separately using the metrics below. Scores mirro
 | Design Render Grade | 88 | Companion, ads governance, and provider roadmap renders now cover moderation drawers, promotion checklists, and escalation sheets across breakpoints.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
 | Compliance Grade | 90 | Provider roadmap codifies evidence capture, CDC telemetry, and moderation audit requirements for parity readiness.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
 | Security Grade | 87 | Manifest gating, offline queue isolation, and idempotent moderation envelopes are now documented for provider rollout.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
-| Design Functionality Grade | 93 | Offline replay, promotion validation, moderation escalations, live feed analytics toggles, and CRM resync dashboards are covered end-to-end for learner, provider, and admin flows.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
+| Design Functionality Grade | 93 | Offline replay, promotion validation, moderation escalations, live feed analytics toggles, CRM resync dashboards, and the icon-coded recommendation rail are covered end-to-end for learner, provider, and admin flows.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
 | Design Images Grade | 55 | Placeholder guidance now spans companion, ads governance, and provider oversight visuals pending marketing delivery.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
 | Design Usability Grade | 86 | Provider roadmap extends usability checkpoints to moderation actions, fraud reporting, and promotion checklists.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |
 | Bugs-less Grade | 80 | Roadmap risk mitigations enforce manifest refresh, offline parity audits, and moderation idempotency for provider parity.【F:update_docs/1.50/Design_update_progress_tracker.md†L1-L118】 |

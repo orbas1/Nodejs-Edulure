@@ -66,7 +66,7 @@ All tasks start at **0%** completion. Percentages will be updated during executi
   - **API:**
     9. Generate GraphQL/REST endpoints for live feed aggregation, ads placement, and analytics queries. ✅ Completed – live feed service now powers `/api/v1/feed` REST + GraphQL surfaces with ads placements, analytics aggregations, OpenAPI contracts, and comprehensive Vitest coverage for regression safety.【F:backend-nodejs/src/services/LiveFeedService.js†L1-L244】【F:backend-nodejs/src/graphql/router.js†L1-L39】【F:backend-nodejs/test/feedHttpRoutes.test.js†L12-L97】【F:backend-nodejs/test/graphqlFeedRoutes.test.js†L12-L116】
   - **Logic:**
-    10. Implement recommendation algorithms with explainability logs and multi-tenant feature flags.
+    10. Implement recommendation algorithms with explainability logs and multi-tenant feature flags. ✅ Completed – creation recommendation service now ranks projects, enriches instructor dashboards, and persists tenant-aware explainability logs with history snapshots and feature-flag telemetry backing the new `/api/v1/creation/recommendations` endpoint.【F:backend-nodejs/src/services/CreationRecommendationService.js†L1-L360】【F:backend-nodejs/src/controllers/CreationStudioController.js†L1-L240】【F:backend-nodejs/src/routes/creation.routes.js†L1-L34】
     11. Wire AI assistance services with provider-specific throttling and usage metering.【F:update_docs/1.50/features_to_add.md†L118-L171】
   - **Design:**
     12. Finalise design system components for studio layouts, ads dashboards, community feeds, and scam warnings.【F:update_docs/1.50/new_feature_brief.md†L84-L123】
