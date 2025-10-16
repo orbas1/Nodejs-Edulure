@@ -45,6 +45,22 @@ const snapshotFixture = {
         recordsFailed: 3,
         openFailures: 2
       },
+      statusDetails: {
+        state: 'degraded',
+        summary: 'Sync run 42 completed with issues – 120 succeeded, 3 failed, 0 skipped',
+        latestSyncRunId: 42,
+        consecutiveFailures: 1,
+        openIncidents: 2,
+        lastSuccessAt: '2025-02-25T11:05:00.000Z',
+        lastFailureAt: '2025-02-25T11:04:00.000Z',
+        updatedAt: '2025-02-25T11:06:30.000Z'
+      },
+      callSummary: {
+        total: 160,
+        success: 140,
+        degraded: 15,
+        failure: 5
+      },
       recentRuns: [
         {
           id: 10,
@@ -213,6 +229,16 @@ describe('<AdminIntegrations />', () => {
 
     const rotationButton = await screen.findByRole('button', { name: 'Invite pending' });
     expect(rotationButton).toBeDisabled();
+  });
+
+  it('renders integration status insights and call telemetry breakdown', async () => {
+    await renderComponent();
+
+    expect(await screen.findByText('Status insights')).toBeInTheDocument();
+    expect(screen.getByText('Run 42')).toBeInTheDocument();
+    expect(screen.getByText('failure streak', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('External call summary')).toBeInTheDocument();
+    expect(screen.getByText('140 · 88%', { exact: false })).toBeInTheDocument();
   });
 
   it('triggers manual sync and surfaces success message', async () => {

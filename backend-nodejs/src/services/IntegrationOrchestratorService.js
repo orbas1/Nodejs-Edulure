@@ -12,6 +12,7 @@ import IntegrationSyncRunModel from '../models/IntegrationSyncRunModel.js';
 import IntegrationSyncResultModel from '../models/IntegrationSyncResultModel.js';
 import IntegrationReconciliationReportModel from '../models/IntegrationReconciliationReportModel.js';
 import { metricsRegistry } from '../observability/metrics.js';
+import integrationStatusService from './IntegrationStatusService.js';
 
 const DEFAULT_HUBSPOT_WINDOW_MINUTES = 90;
 const DEFAULT_SALESFORCE_WINDOW_MINUTES = 120;
@@ -147,13 +148,15 @@ export class IntegrationOrchestratorService {
     resultModel = IntegrationSyncResultModel,
     reportModel = IntegrationReconciliationReportModel,
     scheduler = cron,
-    loggerInstance = logger.child({ service: 'integration-orchestrator' })
+    loggerInstance = logger.child({ service: 'integration-orchestrator' }),
+    statusService = integrationStatusService
   } = {}) {
     this.logger = loggerInstance;
     this.scheduler = scheduler;
     this.runModel = runModel;
     this.resultModel = resultModel;
     this.reportModel = reportModel;
+    this.statusService = statusService;
 
     this.hubspotConfig = envConfig?.hubspot ?? {};
     this.salesforceConfig = envConfig?.salesforce ?? {};
@@ -164,6 +167,9 @@ export class IntegrationOrchestratorService {
 
     this.hubspotEnabled = Boolean(this.hubspotConfig.enabled && this.hubspotClient);
     this.salesforceEnabled = Boolean(this.salesforceConfig.enabled && this.salesforceClient);
+
+    this.hubspotEnvironment = this.hubspotConfig.environment ?? 'production';
+    this.salesforceEnvironment = this.salesforceConfig.environment ?? 'production';
 
     this.hubspotWindowMinutes = parseMinutes(
       this.hubspotConfig.syncWindowMinutes,
@@ -374,7 +380,7 @@ export class IntegrationOrchestratorService {
       });
 
       const status = outboundResults.failed > 0 ? 'partial' : 'succeeded';
-      await this.runModel.markCompleted(run.id, {
+      const completedRun = await this.runModel.markCompleted(run.id, {
         status,
         finishedAt: new Date(),
         recordsPushed: outboundResults.succeeded,
@@ -390,6 +396,33 @@ export class IntegrationOrchestratorService {
       timer({ integration: 'hubspot', sync_type: 'delta', status });
       syncRunCounter.inc({ integration: 'hubspot', status, trigger }, 1);
 
+      const durationSeconds = completedRun?.startedAt && completedRun?.finishedAt
+        ? Math.max(
+            0,
+            Math.round(
+              (new Date(completedRun.finishedAt).getTime() - new Date(completedRun.startedAt).getTime()) / 1000
+            )
+          )
+        : null;
+
+      await this.statusService.recordRunOutcome({
+        integration: 'hubspot',
+        environment: this.hubspotEnvironment,
+        syncRunId: completedRun.id,
+        runStatus: status,
+        triggeredBy: trigger,
+        correlationId: run.correlationId,
+        recordsSucceeded: outboundResults.succeeded,
+        recordsFailed: outboundResults.failed,
+        recordsSkipped: contactsPayload.skipped,
+        durationSeconds,
+        metadata: {
+          outbound: contactsPayload.summary,
+          inbound: inboundSample.summary
+        },
+        apiKeyAlias: this.hubspotConfig.apiKeyAlias
+      });
+
       this.logger.info(
         {
           runId: run.id,
@@ -401,12 +434,42 @@ export class IntegrationOrchestratorService {
         'HubSpot sync completed'
       );
 
-      return { run, outboundResults, inboundSample };
+      return { run: completedRun, outboundResults, inboundSample };
     } catch (error) {
       timer({ integration: 'hubspot', sync_type: 'delta', status: 'failed' });
       syncRunCounter.inc({ integration: 'hubspot', status: 'failed', trigger }, 1);
-      await this.runModel.recordError(run.id, error);
+      const failedRun = await this.runModel.recordError(run.id, error);
       this.logger.error({ err: error, runId: run.id }, 'HubSpot sync failed');
+
+      const durationSeconds = failedRun?.startedAt && failedRun?.finishedAt
+        ? Math.max(
+            0,
+            Math.round(
+              (new Date(failedRun.finishedAt).getTime() - new Date(failedRun.startedAt).getTime()) / 1000
+            )
+          )
+        : null;
+
+      await this.statusService.recordRunOutcome({
+        integration: 'hubspot',
+        environment: this.hubspotEnvironment,
+        syncRunId: failedRun?.id ?? run.id,
+        runStatus: 'failed',
+        triggeredBy: trigger,
+        correlationId: run.correlationId,
+        recordsSucceeded: Number(failedRun?.recordsPushed ?? 0),
+        recordsFailed: Math.max(Number(failedRun?.recordsFailed ?? 0), 1),
+        recordsSkipped: Number(failedRun?.recordsSkipped ?? 0),
+        durationSeconds,
+        metadata: {
+          error: {
+            message: error.message,
+            name: error.name
+          }
+        },
+        apiKeyAlias: this.hubspotConfig.apiKeyAlias
+      });
+
       throw error;
     }
   }
@@ -520,7 +583,7 @@ export class IntegrationOrchestratorService {
       });
 
       const status = failed > 0 ? 'partial' : 'succeeded';
-      await this.runModel.markCompleted(run.id, {
+      const completedRun = await this.runModel.markCompleted(run.id, {
         status,
         finishedAt: new Date(),
         recordsPushed: succeeded,
@@ -536,6 +599,33 @@ export class IntegrationOrchestratorService {
       timer({ integration: 'salesforce', sync_type: 'delta', status });
       syncRunCounter.inc({ integration: 'salesforce', status, trigger }, 1);
 
+      const durationSeconds = completedRun?.startedAt && completedRun?.finishedAt
+        ? Math.max(
+            0,
+            Math.round(
+              (new Date(completedRun.finishedAt).getTime() - new Date(completedRun.startedAt).getTime()) / 1000
+            )
+          )
+        : null;
+
+      await this.statusService.recordRunOutcome({
+        integration: 'salesforce',
+        environment: this.salesforceEnvironment,
+        syncRunId: completedRun.id,
+        runStatus: status,
+        triggeredBy: trigger,
+        correlationId: run.correlationId,
+        recordsSucceeded: succeeded,
+        recordsFailed: failed,
+        recordsSkipped: leadsPayload.skipped,
+        durationSeconds,
+        metadata: {
+          outbound: leadsPayload.summary,
+          inbound: { count: inboundEntries.length }
+        },
+        apiKeyAlias: this.salesforceConfig.apiKeyAlias
+      });
+
       this.logger.info(
         {
           runId: run.id,
@@ -547,12 +637,42 @@ export class IntegrationOrchestratorService {
         'Salesforce sync completed'
       );
 
-      return { run, succeeded, failed };
+      return { run: completedRun, succeeded, failed };
     } catch (error) {
       timer({ integration: 'salesforce', sync_type: 'delta', status: 'failed' });
       syncRunCounter.inc({ integration: 'salesforce', status: 'failed', trigger }, 1);
-      await this.runModel.recordError(run.id, error);
+      const failedRun = await this.runModel.recordError(run.id, error);
       this.logger.error({ err: error, runId: run.id }, 'Salesforce sync failed');
+
+      const durationSeconds = failedRun?.startedAt && failedRun?.finishedAt
+        ? Math.max(
+            0,
+            Math.round(
+              (new Date(failedRun.finishedAt).getTime() - new Date(failedRun.startedAt).getTime()) / 1000
+            )
+          )
+        : null;
+
+      await this.statusService.recordRunOutcome({
+        integration: 'salesforce',
+        environment: this.salesforceEnvironment,
+        syncRunId: failedRun?.id ?? run.id,
+        runStatus: 'failed',
+        triggeredBy: trigger,
+        correlationId: run.correlationId,
+        recordsSucceeded: Number(failedRun?.recordsPushed ?? 0),
+        recordsFailed: Math.max(Number(failedRun?.recordsFailed ?? 0), 1),
+        recordsSkipped: Number(failedRun?.recordsSkipped ?? 0),
+        durationSeconds,
+        metadata: {
+          error: {
+            message: error.message,
+            name: error.name
+          }
+        },
+        apiKeyAlias: this.salesforceConfig.apiKeyAlias
+      });
+
       throw error;
     }
   }
@@ -923,14 +1043,35 @@ export class IntegrationOrchestratorService {
 
     const reconciliationReports = await this.reportModel.list('hubspot', { limit: 3 });
 
+    const [hubspotStatus, hubspotCalls, salesforceStatus, salesforceCalls] = await Promise.all([
+      this.hubspotEnabled
+        ? this.statusService.getStatus('hubspot', this.hubspotEnvironment)
+        : Promise.resolve(null),
+      this.hubspotEnabled
+        ? this.statusService.summariseCalls('hubspot', { sinceHours: 12 })
+        : Promise.resolve(null),
+      this.salesforceEnabled
+        ? this.statusService.getStatus('salesforce', this.salesforceEnvironment)
+        : Promise.resolve(null),
+      this.salesforceEnabled
+        ? this.statusService.summariseCalls('salesforce', { sinceHours: 12 })
+        : Promise.resolve(null)
+    ]);
+
     return {
       hubspot: {
         enabled: this.hubspotEnabled,
-        recentRuns: hubspotRecent
+        environment: this.hubspotEnvironment,
+        recentRuns: hubspotRecent,
+        status: hubspotStatus,
+        callSummary: hubspotCalls
       },
       salesforce: {
         enabled: this.salesforceEnabled,
-        recentRuns: salesforceRecent
+        environment: this.salesforceEnvironment,
+        recentRuns: salesforceRecent,
+        status: salesforceStatus,
+        callSummary: salesforceCalls
       },
       reconciliation: reconciliationReports,
       concurrentJobs: this.concurrentJobs,
@@ -947,7 +1088,18 @@ if (env.integrations?.hubspot?.enabled && env.integrations.hubspot.accessToken) 
       baseUrl: env.integrations.hubspot.baseUrl,
       timeoutMs: env.integrations.hubspot.timeoutMs,
       maxRetries: env.integrations.hubspot.maxRetries,
-      logger: logger.child({ integration: 'hubspot' })
+      logger: logger.child({ integration: 'hubspot' }),
+      auditLogger: async ({ metadata, ...payload }) =>
+        integrationStatusService.recordCallAudit({
+          integration: 'hubspot',
+          provider: 'hubspot',
+          environment: env.integrations.hubspot.environment ?? 'production',
+          metadata: {
+            ...(metadata ?? {}),
+            baseUrl: env.integrations.hubspot.baseUrl
+          },
+          ...payload
+        })
     });
   } catch (error) {
     logger.error({ err: error }, 'Failed to initialise HubSpot client');
@@ -973,7 +1125,18 @@ if (
       timeoutMs: env.integrations.salesforce.timeoutMs,
       maxRetries: env.integrations.salesforce.maxRetries,
       externalIdField: env.integrations.salesforce.externalIdField,
-      logger: logger.child({ integration: 'salesforce' })
+      logger: logger.child({ integration: 'salesforce' }),
+      auditLogger: async ({ metadata, ...payload }) =>
+        integrationStatusService.recordCallAudit({
+          integration: 'salesforce',
+          provider: 'salesforce',
+          environment: env.integrations.salesforce.environment ?? 'production',
+          metadata: {
+            ...(metadata ?? {}),
+            loginUrl: env.integrations.salesforce.loginUrl
+          },
+          ...payload
+        })
     });
   } catch (error) {
     logger.error({ err: error }, 'Failed to initialise Salesforce client');
@@ -983,7 +1146,8 @@ if (
 const integrationOrchestratorService = new IntegrationOrchestratorService({
   envConfig: env.integrations,
   hubspotClient: hubspotClientInstance,
-  salesforceClient: salesforceClientInstance
+  salesforceClient: salesforceClientInstance,
+  statusService: integrationStatusService
 });
 
 export default integrationOrchestratorService;

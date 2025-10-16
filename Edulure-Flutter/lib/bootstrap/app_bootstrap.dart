@@ -8,6 +8,7 @@ import '../core/runtime/capability_manifest_notifier.dart';
 import '../services/language_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/session_manager.dart';
+import '../services/notification_preference_service.dart';
 
 class AppBootstrap {
   AppBootstrap._(this.container);
@@ -31,6 +32,8 @@ class AppBootstrap {
     await LanguageService.init();
     await container.read(telemetryServiceProvider).prepare();
     await PushNotificationService.instance.initialize();
+    await NotificationPreferenceService.instance
+        .synchronizePendingOperations();
     await Future.wait([
       container.read(featureFlagControllerProvider.notifier).warmUp(),
       container.read(capabilityManifestControllerProvider.notifier).warmUp(),

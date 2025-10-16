@@ -173,6 +173,11 @@
 - Primary actions row bundles **View insights**, **Pause/Resume**, and **Flag fraud** CTAs. Fraud sheet captures reason (>=6 characters), optional description, and risk slider defaulting to 60, mirroring trust & safety requirements.
 - Insight drawer shows lifetime metrics grid, daily table (14-day cap), and timestamp of last fetch to preserve audit trails when reviewing campaign performance on mobile.
 
+## Notification & Escalation Hub
+- Settings notification card features channel toggle matrix (Email, Push, SMS, Slack) with inline status badges (“Synced 5m ago”, “Sync queued – offline”).
+- Slack escalation drawer presents workspace badge, channel selector with recent channels list, webhook health banner, and **Send test** CTA with toast confirmation states.
+- Offline mode overlays include persistent banner messaging, queued action list, and retry chip aligned with backend replay cadence so operators understand delivery posture before closing the screen.
+
 ## Onboarding & Authentication
 - Animated welcome sequence with brand narrative. Each slide includes illustration and CTA.
 - Sign-up form supports email, Google, Apple. Validation messages inline with accessible descriptions.

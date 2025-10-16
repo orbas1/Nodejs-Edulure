@@ -791,6 +791,8 @@ export const env = {
       enabled: raw.HUBSPOT_ENABLED,
       accessToken: raw.HUBSPOT_PRIVATE_APP_TOKEN ?? null,
       baseUrl: raw.HUBSPOT_BASE_URL ?? 'https://api.hubapi.com',
+      environment: raw.HUBSPOT_ENVIRONMENT ?? 'production',
+      apiKeyAlias: raw.HUBSPOT_API_KEY_ALIAS ?? null,
       timeoutMs: raw.HUBSPOT_TIMEOUT_MS,
       maxRetries: raw.HUBSPOT_MAX_RETRIES,
       syncWindowMinutes: raw.HUBSPOT_SYNC_WINDOW_MINUTES
@@ -807,6 +809,8 @@ export const env = {
       username: raw.SALESFORCE_USERNAME ?? null,
       password: raw.SALESFORCE_PASSWORD ?? null,
       securityToken: raw.SALESFORCE_SECURITY_TOKEN ?? null,
+      environment: raw.SALESFORCE_ENVIRONMENT ?? 'production',
+      apiKeyAlias: raw.SALESFORCE_API_KEY_ALIAS ?? null,
       timeoutMs: raw.SALESFORCE_TIMEOUT_MS,
       maxRetries: raw.SALESFORCE_MAX_RETRIES,
       externalIdField: raw.SALESFORCE_EXTERNAL_ID_FIELD ?? 'Edulure_Project_Id__c'

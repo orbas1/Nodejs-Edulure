@@ -51,6 +51,27 @@ const ROTATION_BADGE_THEME = {
   disabled: 'bg-slate-200 text-slate-600'
 };
 
+const STATUS_BADGE_THEME = {
+  operational: {
+    label: 'Operational',
+    badge: 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+  },
+  degraded: {
+    label: 'Degraded',
+    badge: 'bg-amber-50 text-amber-700 ring-amber-200'
+  },
+  critical: {
+    label: 'Incident',
+    badge: 'bg-rose-50 text-rose-700 ring-rose-200'
+  }
+};
+
+const CALL_TONE_CLASSES = {
+  success: 'bg-emerald-500',
+  degraded: 'bg-amber-500',
+  failure: 'bg-rose-500'
+};
+
 function formatTimestamp(value) {
   if (!value) return '—';
   const date = new Date(value);
@@ -73,6 +94,142 @@ function formatDuration(seconds) {
 function formatNumber(value) {
   if (!Number.isFinite(value)) return '—';
   return new Intl.NumberFormat().format(value);
+}
+
+function calculatePercentage(value, total) {
+  if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) {
+    return 0;
+  }
+  return Math.round((value / total) * 100);
+}
+
+function StatusStateBadge({ state }) {
+  const theme = STATUS_BADGE_THEME[state] ?? STATUS_BADGE_THEME.operational;
+  return (
+    <span
+      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ${theme.badge}`}
+    >
+      <span className="h-2 w-2 rounded-full bg-current" />
+      {theme.label}
+    </span>
+  );
+}
+
+function IntegrationStatusInsights({ statusDetails, callSummary }) {
+  if (!statusDetails && !callSummary) {
+    return null;
+  }
+
+  const totalCalls = callSummary?.total ?? 0;
+  const callRows = callSummary
+    ? [
+        { key: 'success', label: 'Successful', value: callSummary.success ?? 0 },
+        { key: 'degraded', label: 'Degraded', value: callSummary.degraded ?? 0 },
+        { key: 'failure', label: 'Failed', value: callSummary.failure ?? 0 }
+      ]
+    : [];
+
+  return (
+    <section className="grid gap-4 lg:grid-cols-3">
+      {statusDetails && (
+        <article
+          className={`rounded-2xl border border-slate-200 bg-slate-50 p-5 shadow-inner ${
+            callSummary ? 'lg:col-span-2' : 'lg:col-span-3'
+          }`}
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Status insights</p>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <StatusStateBadge state={statusDetails.state} />
+                {statusDetails.summary && (
+                  <span className="text-sm font-medium text-slate-700">{statusDetails.summary}</span>
+                )}
+              </div>
+            </div>
+            {statusDetails.updatedAt && (
+              <span className="text-[11px] text-slate-500">
+                Updated {formatTimestamp(statusDetails.updatedAt)}
+              </span>
+            )}
+          </div>
+
+          <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+            <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Run snapshot
+              </dt>
+              <dd className="space-y-1">
+                <p className="flex items-center gap-2 text-slate-700">
+                  <BoltIcon className="h-4 w-4" />
+                  {statusDetails.latestSyncRunId ? `Run ${statusDetails.latestSyncRunId}` : 'No runs recorded'}
+                </p>
+                <p className="flex items-center gap-2">
+                  <ClockIcon className="h-4 w-4 text-slate-400" />
+                  Last success {formatTimestamp(statusDetails.lastSuccessAt)}
+                </p>
+                <p className="flex items-center gap-2">
+                  <ExclamationTriangleIcon className="h-4 w-4 text-amber-500" />
+                  Last failure {formatTimestamp(statusDetails.lastFailureAt)}
+                </p>
+              </dd>
+            </div>
+            <div className="space-y-1 rounded-xl border border-slate-200 bg-white p-3">
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Incident posture
+              </dt>
+              <dd className="grid gap-1 text-sm font-medium text-slate-700 sm:grid-cols-2">
+                <span className="rounded-lg bg-slate-100 px-2 py-1 text-center">
+                  {formatNumber(statusDetails.consecutiveFailures ?? 0)}
+                  <span className="ml-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    failure streak
+                  </span>
+                </span>
+                <span className="rounded-lg bg-slate-100 px-2 py-1 text-center">
+                  {formatNumber(statusDetails.openIncidents ?? 0)}
+                  <span className="ml-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    incidents open
+                  </span>
+                </span>
+              </dd>
+            </div>
+          </dl>
+        </article>
+      )}
+
+      {callSummary && (
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">External call summary</p>
+          <p className="mt-2 text-sm text-slate-600">
+            {totalCalls > 0
+              ? `${formatNumber(totalCalls)} tracked requests across provider APIs`
+              : 'No external requests recorded in the current window'}
+          </p>
+          <div className="mt-4 space-y-3">
+            {callRows.map((row) => {
+              const percent = calculatePercentage(row.value, totalCalls);
+              return (
+                <div key={row.key} className="space-y-1 text-sm text-slate-600">
+                  <div className="flex items-center justify-between">
+                    <span>{row.label}</span>
+                    <span className="text-xs font-semibold text-slate-500">
+                      {formatNumber(row.value)} · {percent}%
+                    </span>
+                  </div>
+                  <div className="h-2 w-full rounded-full bg-slate-200">
+                    <div
+                      className={`h-2 rounded-full ${CALL_TONE_CLASSES[row.key] ?? 'bg-slate-500'}`}
+                      style={{ width: `${Math.max(percent, 0)}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      )}
+    </section>
+  );
 }
 
 function HealthBadge({ health }) {
@@ -1366,6 +1523,11 @@ export default function AdminIntegrations() {
             </div>
 
             <IntegrationSummaryMetrics integration={integration} />
+
+            <IntegrationStatusInsights
+              statusDetails={integration.statusDetails}
+              callSummary={integration.callSummary}
+            />
 
             <div className="grid gap-6 lg:grid-cols-5">
               <div className="lg:col-span-3">

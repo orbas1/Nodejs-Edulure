@@ -15,6 +15,8 @@ class SessionManager {
   static const _creationActionBox = 'creation_project_actions';
   static const _adsGovernanceBox = 'ads_governance';
   static const _adsActionBox = 'ads_governance_actions';
+  static const _notificationPreferencesBox = 'notification_preferences';
+  static const _notificationOutboxBox = 'notification_outbox';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
   static const _secureAccessTokenKey = 'session.accessToken';
@@ -36,6 +38,8 @@ class SessionManager {
     await Hive.openBox(_creationActionBox);
     await Hive.openBox(_adsGovernanceBox);
     await Hive.openBox(_adsActionBox);
+    await Hive.openBox(_notificationPreferencesBox);
+    await Hive.openBox(_notificationOutboxBox);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
@@ -51,6 +55,9 @@ class SessionManager {
   static Box get creationActionQueue => Hive.box(_creationActionBox);
   static Box get adsGovernanceCache => Hive.box(_adsGovernanceBox);
   static Box get adsGovernanceActionQueue => Hive.box(_adsActionBox);
+  static Box get notificationPreferencesCache =>
+      Hive.box(_notificationPreferencesBox);
+  static Box get notificationOutbox => Hive.box(_notificationOutboxBox);
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -139,6 +146,8 @@ class SessionManager {
     await creationActionQueue.clear();
     await adsGovernanceCache.clear();
     await adsGovernanceActionQueue.clear();
+    await notificationPreferencesCache.clear();
+    await notificationOutbox.clear();
     await SecureStorageService.instance.deleteAll(
       keys: const {
         _secureAccessTokenKey,
