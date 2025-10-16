@@ -132,7 +132,7 @@ export default function CreationAssetLibrary({ templates, onCreateProject, creat
 
     const payload = compactObject({
       title: formState.title.trim() || selectedTemplate.title,
-      summary: formState.summary.trim() || selectedTemplate.description ?? '',
+      summary: formState.summary.trim() || (selectedTemplate.description ?? ''),
       type: selectedTemplate.type,
       templateId: selectedTemplate.publicId,
       metadata: compactObject({
