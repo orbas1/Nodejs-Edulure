@@ -52,6 +52,7 @@ import DashboardSettings from './pages/dashboard/DashboardSettings.jsx';
 import FieldServices from './pages/dashboard/FieldServices.jsx';
 import AdminOperator from './pages/dashboard/AdminOperator.jsx';
 import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
+import AdminIntegrations from './pages/dashboard/AdminIntegrations.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
@@ -215,6 +216,14 @@ function App() {
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminOperator />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="integrations"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminIntegrations />
             </ProtectedRoute>
           )}
         />
