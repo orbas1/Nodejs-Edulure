@@ -23,6 +23,7 @@ import {
 } from './CommunitySubscriptionLifecycle.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import EscrowService from './EscrowService.js';
+import webhookEventBusService from './WebhookEventBusService.js';
 
 const STRIPE_API_VERSION = '2024-06-20';
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
@@ -40,6 +41,37 @@ function currencyStringToCents(value) {
     return 0;
   }
   return Math.round(parsed * 100);
+}
+
+function buildPaymentEventPayload(intent, extra = {}) {
+  if (!intent) {
+    return { ...extra };
+  }
+
+  return {
+    paymentId: intent.publicId,
+    provider: intent.provider,
+    providerIntentId: intent.providerIntentId ?? null,
+    providerCaptureId: intent.providerCaptureId ?? null,
+    providerLatestChargeId: intent.providerLatestChargeId ?? null,
+    status: intent.status,
+    currency: intent.currency,
+    amountSubtotal: intent.amountSubtotal,
+    amountDiscount: intent.amountDiscount,
+    amountTax: intent.amountTax,
+    amountTotal: intent.amountTotal,
+    amountRefunded: intent.amountRefunded,
+    couponId: intent.couponId ?? null,
+    entityType: intent.entityType ?? null,
+    entityId: intent.entityId ?? null,
+    userId: intent.userId ?? null,
+    metadata: intent.metadata ?? {},
+    capturedAt: intent.capturedAt ?? null,
+    canceledAt: intent.canceledAt ?? null,
+    createdAt: intent.createdAt ?? null,
+    updatedAt: intent.updatedAt ?? null,
+    ...extra
+  };
 }
 
 function allocateProRata(basis, total) {
@@ -822,6 +854,24 @@ class PaymentService {
 
       await handleCommunityPaymentSucceeded(updatedIntent, trx);
 
+      await webhookEventBusService.publish(
+        'payments.intent.succeeded',
+        buildPaymentEventPayload(updatedIntent, {
+          processedBy: 'paypal-capture',
+          captureId: capture.id,
+          captureStatus,
+          feeCents: capture.seller_receivable_breakdown?.paypal_fee?.value
+            ? currencyStringToCents(capture.seller_receivable_breakdown.paypal_fee.value)
+            : null,
+          amountReceived: amountTotal
+        }),
+        {
+          source: 'paypal-capture',
+          correlationId: updatedIntent.publicId ?? intent.publicId ?? capture.id,
+          connection: trx
+        }
+      );
+
       return this.toApiIntent(updatedIntent);
     });
   }
@@ -960,6 +1010,23 @@ class PaymentService {
       });
 
       await handleCommunityPaymentSucceeded(updated, trx);
+
+      await webhookEventBusService.publish(
+        'payments.intent.succeeded',
+        buildPaymentEventPayload(updated, {
+          processedBy: 'stripe-webhook',
+          chargeId: charge?.id ?? null,
+          balanceTransaction: charge?.balance_transaction ?? null,
+          receiptUrl: charge?.receipt_url ?? null,
+          amountReceived,
+          paymentMethodTypes: paymentIntentPayload.payment_method_types ?? []
+        }),
+        {
+          source: 'stripe-webhook',
+          correlationId: updated.publicId ?? intent.publicId ?? providerIntentId,
+          connection: trx
+        }
+      );
     });
   }
 
@@ -982,6 +1049,22 @@ class PaymentService {
       }, trx);
 
       await handleCommunityPaymentFailed(updatedIntent, trx);
+
+      await webhookEventBusService.publish(
+        'payments.intent.failed',
+        buildPaymentEventPayload(updatedIntent, {
+          processedBy: 'stripe-webhook',
+          failureCode: updatedIntent.failureCode ?? failure?.code ?? null,
+          failureMessage: updatedIntent.failureMessage ?? failure?.message ?? null,
+          providerErrorType: failure?.type ?? null,
+          paymentMethodTypes: paymentIntentPayload.payment_method_types ?? []
+        }),
+        {
+          source: 'stripe-webhook',
+          correlationId: updatedIntent.publicId ?? intent.publicId ?? providerIntentId,
+          connection: trx
+        }
+      );
     });
   }
 
@@ -1004,13 +1087,15 @@ class PaymentService {
         if (existing) {
           continue;
         }
+        const refundAmount = Number(refund.amount ?? refund.amount_refunded ?? 0);
+        const refundCurrency = refund.currency?.toUpperCase() ?? intent.currency;
         await PaymentRefundModel.create(
           {
             paymentIntentId: intent.id,
             providerRefundId: refund.id,
             status: refund.status ?? 'succeeded',
-            amount: Number(refund.amount ?? refund.amount_refunded ?? 0),
-            currency: refund.currency?.toUpperCase() ?? intent.currency,
+            amount: refundAmount,
+            currency: refundCurrency,
             reason: refund.reason ?? null,
             processedAt: refund.created ? new Date(refund.created * 1000).toISOString() : new Date().toISOString()
           },
@@ -1020,8 +1105,8 @@ class PaymentService {
           {
             paymentIntentId: intent.id,
             entryType: 'refund',
-            amount: Number(refund.amount ?? 0),
-            currency: refund.currency?.toUpperCase() ?? intent.currency,
+            amount: refundAmount,
+            currency: refundCurrency,
             details: {
               provider: 'stripe',
               refundId: refund.id
@@ -1029,16 +1114,33 @@ class PaymentService {
           },
           trx
         );
-        await PaymentIntentModel.incrementRefundAmount(intent.id, Number(refund.amount ?? 0), trx);
+        await PaymentIntentModel.incrementRefundAmount(intent.id, refundAmount, trx);
 
         trackPaymentRefundMetrics({
           provider: 'stripe',
-          currency: refund.currency?.toUpperCase() ?? intent.currency,
-          amount: Number(refund.amount ?? 0)
+          currency: refundCurrency,
+          amount: refundAmount
         });
 
         const updatedIntent = await PaymentIntentModel.findById(intent.id, trx);
-        await handleCommunityPaymentRefunded(updatedIntent, Number(refund.amount ?? 0), trx);
+        await handleCommunityPaymentRefunded(updatedIntent, refundAmount, trx);
+
+        await webhookEventBusService.publish(
+          'payments.intent.refunded',
+          buildPaymentEventPayload(updatedIntent, {
+            processedBy: 'stripe-webhook',
+            refundId: refund.id,
+            refundStatus: refund.status ?? 'succeeded',
+            refundAmount,
+            refundCurrency,
+            refundReason: refund.reason ?? null
+          }),
+          {
+            source: 'stripe-webhook',
+            correlationId: updatedIntent.publicId ?? intent.publicId ?? providerIntentId,
+            connection: trx
+          }
+        );
       }
 
       const refreshed = await PaymentIntentModel.findById(intent.id, trx);
@@ -1084,6 +1186,10 @@ class PaymentService {
         throw error;
       }
 
+      let providerRefundId = null;
+      let providerRefundStatus = null;
+      let refundCurrency = intent.currency;
+
       if (intent.provider === 'stripe') {
         const stripe = this.getStripeClient();
         const refund = await stripe.refunds.create(
@@ -1094,6 +1200,9 @@ class PaymentService {
           },
           { idempotencyKey: randomUUID() }
         );
+
+        providerRefundId = refund.id;
+        providerRefundStatus = refund.status ?? 'pending';
 
         await PaymentRefundModel.create(
           {
@@ -1106,6 +1215,24 @@ class PaymentService {
             requestedBy: requesterId ?? null
           },
           trx
+        );
+
+        await webhookEventBusService.publish(
+          'payments.refund.requested',
+          buildPaymentEventPayload(intent, {
+            processedBy: 'payments-api',
+            refundId: refund.id,
+            refundAmount,
+            refundCurrency: intent.currency,
+            refundReason: refund.reason ?? reason ?? null,
+            requestedBy: requesterId ?? null,
+            refundStatus: refund.status ?? 'pending'
+          }),
+          {
+            source: 'payments-api',
+            correlationId: intent.publicId ?? paymentPublicId,
+            connection: trx
+          }
         );
       } else if (intent.provider === 'paypal') {
         if (!intent.providerCaptureId) {
@@ -1127,6 +1254,10 @@ class PaymentService {
           paypalRequestId: randomUUID()
         });
 
+        providerRefundId = response.result.id;
+        providerRefundStatus = normalizeProviderStatus('paypal', response.result.status);
+        refundCurrency = intent.currency;
+
         await PaymentRefundModel.create(
           {
             paymentIntentId: intent.id,
@@ -1141,6 +1272,24 @@ class PaymentService {
             requestedBy: requesterId ?? null
           },
           trx
+        );
+
+        await webhookEventBusService.publish(
+          'payments.refund.requested',
+          buildPaymentEventPayload(intent, {
+            processedBy: 'payments-api',
+            refundId: response.result.id,
+            refundAmount,
+            refundCurrency: intent.currency,
+            refundReason: response.result.reason ?? reason ?? null,
+            requestedBy: requesterId ?? null,
+            refundStatus: providerRefundStatus
+          }),
+          {
+            source: 'payments-api',
+            correlationId: intent.publicId ?? paymentPublicId,
+            connection: trx
+          }
         );
       } else {
         const error = new Error('Refunds are only supported for Stripe and PayPal payments.');
@@ -1175,6 +1324,25 @@ class PaymentService {
 
       const finalIntent = await PaymentIntentModel.findById(intent.id, trx);
       await handleCommunityPaymentRefunded(finalIntent, refundAmount, trx);
+
+      await webhookEventBusService.publish(
+        'payments.intent.refunded',
+        buildPaymentEventPayload(finalIntent, {
+          processedBy: 'payments-api',
+          refundAmount,
+          refundCurrency,
+          refundReason: reason ?? null,
+          requestedBy: requesterId ?? null,
+          refundStatus: providerRefundStatus ?? finalIntent.status,
+          refundId: providerRefundId
+        }),
+        {
+          source: 'payments-api',
+          correlationId: finalIntent.publicId ?? paymentPublicId,
+          connection: trx
+        }
+      );
+
       return this.toApiIntent(finalIntent);
     });
   }

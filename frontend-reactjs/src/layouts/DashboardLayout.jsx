@@ -17,6 +17,7 @@ import {
   InboxStackIcon,
   MapIcon,
   MegaphoneIcon,
+  PuzzlePieceIcon,
   PlayCircleIcon,
   ShieldCheckIcon,
   ShieldExclamationIcon,
@@ -85,6 +86,7 @@ const navigationByRole = {
   admin: (basePath) => [
     { name: 'Overview', to: basePath, icon: Squares2X2Icon, end: true },
     { name: 'Operator command', to: `${basePath}/operator`, icon: ShieldExclamationIcon },
+    { name: 'Integrations', to: `${basePath}/integrations`, icon: PuzzlePieceIcon },
     { name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
     { name: 'Messages', to: `${basePath}/inbox`, icon: InboxStackIcon },
     { name: 'Courses', to: `${basePath}/courses`, icon: PlayCircleIcon },

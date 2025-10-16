@@ -10,6 +10,7 @@ import dataRetentionJob from '../jobs/dataRetentionJob.js';
 import communityReminderJob from '../jobs/communityReminderJob.js';
 import dataPartitionJob from '../jobs/dataPartitionJob.js';
 import integrationOrchestratorService from '../services/IntegrationOrchestratorService.js';
+import webhookEventBusService from '../services/WebhookEventBusService.js';
 
 const serviceLogger = logger.child({ service: 'worker-service' });
 
@@ -24,6 +25,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'community-reminder',
     'data-partitioning',
     'integration-orchestrator',
+    'webhook-event-bus',
     'probe-server'
   ]);
 
@@ -102,6 +104,19 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     serviceLogger.error({ err: error }, 'Failed to start integration orchestrator');
   }
 
+  readiness.markPending('webhook-event-bus', 'Starting webhook dispatcher');
+  try {
+    webhookEventBusService.start();
+    if (!webhookEventBusService.enabled) {
+      readiness.markDegraded('webhook-event-bus', 'Webhook dispatcher disabled by configuration');
+    } else {
+      readiness.markReady('webhook-event-bus', 'Webhook dispatcher active');
+    }
+  } catch (error) {
+    readiness.markFailed('webhook-event-bus', error);
+    serviceLogger.error({ err: error }, 'Failed to start webhook dispatcher');
+  }
+
   const probeApp = createProbeApp({
     service: 'worker-service',
     readinessCheck: () => readiness.snapshot(),
@@ -145,6 +160,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   dataPartitionJob.stop();
   communityReminderJob.stop();
   integrationOrchestratorService.stop();
+  webhookEventBusService.stop();
 
     await infrastructure.stop();
 

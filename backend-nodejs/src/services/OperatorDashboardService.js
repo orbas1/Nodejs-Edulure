@@ -1,5 +1,6 @@
 import logger from '../config/logger.js';
 import CapabilityManifestService from './CapabilityManifestService.js';
+import IntegrationDashboardService from './IntegrationDashboardService.js';
 import SecurityIncidentModel from '../models/SecurityIncidentModel.js';
 
 const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
@@ -419,8 +420,8 @@ function buildSearchIndex(activeIncidents, runbooks) {
   ];
 }
 
-function buildProfileStats(queueSummary, scamSummary) {
-  return [
+function buildProfileStats(queueSummary, scamSummary, integrationSnapshot) {
+  const stats = [
     {
       label: 'Open incidents',
       value: `${queueSummary.totalOpen} active`
@@ -434,6 +435,19 @@ function buildProfileStats(queueSummary, scamSummary) {
       value: `${scamSummary.activeCases} monitoring`
     }
   ];
+
+  if (integrationSnapshot?.integrations?.length) {
+    const totalOpenFailures = integrationSnapshot.integrations.reduce(
+      (acc, integration) => acc + (integration.summary?.openFailures ?? 0),
+      0
+    );
+    stats.push({
+      label: 'Integration alerts',
+      value: `${totalOpenFailures} pending`
+    });
+  }
+
+  return stats;
 }
 
 function buildProfileBio(queueSummary, scamSummary, healthSummary) {
@@ -448,11 +462,13 @@ export default class OperatorDashboardService {
   constructor({
     manifestService = new CapabilityManifestService(),
     incidentsModel = SecurityIncidentModel,
+    integrationDashboardService = new IntegrationDashboardService(),
     nowProvider = () => new Date(),
     loggerInstance = logger.child({ service: 'OperatorDashboardService' })
   } = {}) {
     this.manifestService = manifestService;
     this.incidentsModel = incidentsModel;
+    this.integrationDashboardService = integrationDashboardService;
     this.nowProvider = nowProvider;
     this.logger = loggerInstance;
   }
@@ -464,7 +480,7 @@ export default class OperatorDashboardService {
       tenantId
     };
 
-    const [manifest, activeIncidents, resolvedIncidents] = await Promise.all([
+    const [manifest, activeIncidents, resolvedIncidents, integrationSnapshot] = await Promise.all([
       this.manifestService
         .buildManifest({
           audience: 'ops',
@@ -481,7 +497,13 @@ export default class OperatorDashboardService {
       this.incidentsModel.listRecentlyResolved({ tenantId, limit: 15 }).catch((error) => {
         this.logger.error({ err: error }, 'Failed to load resolved security incidents');
         return [];
-      })
+      }),
+      this.integrationDashboardService
+        .buildSnapshot({ runLimit: 8, failureLimit: 25, reportLimit: 3 })
+        .catch((error) => {
+          this.logger.error({ err: error }, 'Failed to build integration dashboard snapshot');
+          return null;
+        })
     ]);
 
     const queueSummary = summariseIncidentQueue(activeIncidents, { now });
@@ -508,10 +530,14 @@ export default class OperatorDashboardService {
           recentResolved: resolvedIncidents.map(formatResolvedIncident)
         },
         runbooks,
-        timeline
+        timeline,
+        integrations: integrationSnapshot
       },
-      searchIndex: buildSearchIndex(activeIncidents, runbooks),
-      profileStats: buildProfileStats(queueSummary, scamSummary),
+      searchIndex: [
+        ...buildSearchIndex(activeIncidents, runbooks),
+        ...(integrationSnapshot?.searchIndex ?? [])
+      ],
+      profileStats: buildProfileStats(queueSummary, scamSummary, integrationSnapshot),
       profileTitleSegment: 'Platform operations overview',
       profileBio: buildProfileBio(queueSummary, scamSummary, serviceHealth.summary)
     };
