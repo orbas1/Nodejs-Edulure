@@ -59,7 +59,7 @@ Chip.propTypes = {
   children: PropTypes.node.isRequired
 };
 
-export default function FixnadoAds() {
+export default function EdulureAds() {
   const { role, dashboard, refresh } = useOutletContext();
   const adsRaw = dashboard?.ads ?? null;
   const ads = useMemo(() => {
@@ -127,7 +127,7 @@ export default function FixnadoAds() {
     return (
       <DashboardStateMessage
         title="Restricted access"
-        description="Switch to an instructor or admin Learnspace to manage Fixnado Ads placements and experiments."
+        description="Switch to an instructor or admin Learnspace to manage Edulure Ads placements and experiments."
         actionLabel="Return"
         onAction={() => window.history.back()}
       />
@@ -137,7 +137,7 @@ export default function FixnadoAds() {
   if (!ads) {
     return (
       <DashboardStateMessage
-        title="Fixnado Ads Learnspace offline"
+        title="Edulure Ads Learnspace offline"
         description="Performance data hasn't synced from your ad accounts yet. Refresh after connecting channels."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
@@ -156,7 +156,7 @@ export default function FixnadoAds() {
     return (
       <DashboardStateMessage
         title="No ads telemetry yet"
-        description="Launch your first Fixnado Ads placement or import an existing campaign to populate performance analytics."
+        description="Launch your first Edulure Ads placement or import an existing campaign to populate performance analytics."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />
@@ -208,7 +208,7 @@ export default function FixnadoAds() {
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Fixnado Ads</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Edulure Ads</h1>
           <p className="mt-2 text-sm text-slate-600">
             Orchestrate placements, fine-tune targeting, and monitor revenue quality in real time.
           </p>
