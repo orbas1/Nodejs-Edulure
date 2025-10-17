@@ -45,7 +45,7 @@ import InstructorTutorManagement from './pages/dashboard/InstructorTutorManageme
 import InstructorServiceSuite from './pages/dashboard/InstructorServiceSuite.jsx';
 import InstructorProjects from './pages/dashboard/InstructorProjects.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
-import FixnadoAds from './pages/dashboard/FixnadoAds.jsx';
+import EdulureAds from './pages/dashboard/EdulureAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
 import DashboardAssessments from './pages/dashboard/DashboardAssessments.jsx';
@@ -261,13 +261,13 @@ function App() {
             </ProtectedRoute>
           )}
         />
-        <Route path="ads" element={<FixnadoAds />} />
+        <Route path="ads" element={<EdulureAds />} />
         <Route path="settings" element={<DashboardSettings />} />
         <Route
           path="ads"
           element={(
             <ProtectedRoute allowedRoles={['instructor']}>
-              <FixnadoAds />
+              <EdulureAds />
             </ProtectedRoute>
           )}
         />

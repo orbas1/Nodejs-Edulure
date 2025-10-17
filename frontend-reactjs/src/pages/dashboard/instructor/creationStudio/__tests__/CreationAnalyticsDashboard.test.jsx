@@ -1,6 +1,8 @@
+/* eslint-env browser */
+
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import CreationAnalyticsDashboard from '../CreationAnalyticsDashboard.jsx';
 import { creationStudioApi } from '../../../../../api/creationStudioApi.js';
@@ -82,8 +84,8 @@ describe('CreationAnalyticsDashboard', () => {
 
   beforeEach(() => {
     creationStudioApi.fetchAnalyticsSummary.mockResolvedValue(baseResponse);
-    global.URL.createObjectURL = vi.fn(() => 'blob:mock');
-    global.URL.revokeObjectURL = vi.fn();
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:mock');
+    globalThis.URL.revokeObjectURL = vi.fn();
     HTMLAnchorElement.prototype.click = vi.fn();
   });
 
@@ -126,7 +128,7 @@ describe('CreationAnalyticsDashboard', () => {
     await userEvent.click(screen.getByRole('button', { name: /Export CSV/i }));
 
     await waitFor(() => {
-      expect(global.URL.createObjectURL).toHaveBeenCalled();
+      expect(globalThis.URL.createObjectURL).toHaveBeenCalled();
     });
   });
 });
