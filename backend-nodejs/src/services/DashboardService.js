@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 
+import db from '../config/database.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
 
 function safeJsonParse(value, fallback) {
@@ -20,6 +21,438 @@ function getOperatorDashboardService() {
     operatorDashboardService = new OperatorDashboardService();
   }
   return operatorDashboardService;
+}
+
+const emptyInstructorSnapshot = {
+  courses: [],
+  courseEnrollments: [],
+  assignments: [],
+  tutorProfiles: [],
+  tutorAvailability: [],
+  tutorBookings: [],
+  liveClassrooms: [],
+  communityMemberships: [],
+  communityStats: [],
+  communityResources: [],
+  communityPosts: [],
+  adsCampaigns: [],
+  adsMetrics: [],
+  paywallTiers: [],
+  communitySubscriptions: [],
+  affiliatePayouts: [],
+  monetizationSettings: {},
+  ebookRows: [],
+  ebookProgressRows: []
+};
+
+async function loadInstructorEntities({ instructorId }) {
+  const numericId = Number(instructorId);
+  if (!Number.isFinite(numericId)) {
+    return emptyInstructorSnapshot;
+  }
+
+  const ownedCommunities = await db('communities as community')
+    .select('community.id', 'community.name', 'community.slug')
+    .where('community.owner_id', numericId);
+
+  const ownedCommunityIds = ownedCommunities.map((community) => community.id);
+
+  const [
+    courseRows,
+    enrollmentRows,
+    assignmentRows,
+    tutorProfileRows,
+    tutorAvailabilityRows,
+    tutorBookingRows,
+    liveClassroomRows,
+    communityMembershipRows,
+    paywallTierRows,
+    communitySubscriptionRows,
+    communityStatsRows,
+    adsCampaignRows,
+    adsMetricRows,
+    ebookProgressRows
+  ] = await Promise.all([
+    db('courses as course')
+      .select(
+        'course.id',
+        'course.title',
+        'course.slug',
+        'course.status',
+        'course.release_at as releaseAt',
+        'course.delivery_format as deliveryFormat',
+        'course.metadata'
+      )
+      .where('course.instructor_id', numericId),
+    db('course_enrollments as enrollment')
+      .select(
+        'enrollment.id',
+        'enrollment.course_id as courseId',
+        'enrollment.user_id as userId',
+        'enrollment.status',
+        'enrollment.started_at as startedAt',
+        'enrollment.completed_at as completedAt',
+        'enrollment.metadata'
+      )
+      .join('courses as course', 'enrollment.course_id', 'course.id')
+      .where('course.instructor_id', numericId),
+    db('course_assignments as assignment')
+      .select(
+        'assignment.id',
+        'assignment.course_id as courseId',
+        'assignment.module_id as moduleId',
+        'assignment.title',
+        'assignment.due_offset_days as dueOffsetDays',
+        'assignment.metadata',
+        'course.title as courseTitle',
+        'course.release_at as courseReleaseAt'
+      )
+      .join('courses as course', 'assignment.course_id', 'course.id')
+      .where('course.instructor_id', numericId),
+    db('tutor_profiles as profile')
+      .select(
+        'profile.id',
+        'profile.display_name as displayName',
+        'profile.headline',
+        'profile.hourly_rate_amount as hourlyRateAmount',
+        'profile.hourly_rate_currency as hourlyRateCurrency',
+        'profile.rating_average as ratingAverage',
+        'profile.rating_count as ratingCount',
+        'profile.metadata'
+      )
+      .where('profile.user_id', numericId),
+    db('tutor_availability_slots as slot')
+      .select(
+        'slot.id',
+        'slot.tutor_id as tutorId',
+        'slot.start_at as startAt',
+        'slot.end_at as endAt',
+        'slot.status',
+        'slot.is_recurring as isRecurring',
+        'slot.recurrence_rule as recurrenceRule',
+        'slot.metadata'
+      )
+      .join('tutor_profiles as profile', 'slot.tutor_id', 'profile.id')
+      .where('profile.user_id', numericId),
+    db('tutor_bookings as booking')
+      .select(
+        'booking.id',
+        'booking.tutor_id as tutorId',
+        'booking.learner_id as learnerId',
+        'booking.status',
+        'booking.requested_at as requestedAt',
+        'booking.confirmed_at as confirmedAt',
+        'booking.scheduled_start as scheduledStart',
+        'booking.scheduled_end as scheduledEnd',
+        'booking.metadata',
+        'learner.first_name as learnerFirstName',
+        'learner.last_name as learnerLastName'
+      )
+      .join('tutor_profiles as profile', 'booking.tutor_id', 'profile.id')
+      .join('users as learner', 'booking.learner_id', 'learner.id')
+      .where('profile.user_id', numericId),
+    db('live_classrooms as classroom')
+      .select(
+        'classroom.id',
+        'classroom.title',
+        'classroom.slug',
+        'classroom.summary',
+        'classroom.type',
+        'classroom.status',
+        'classroom.is_ticketed as isTicketed',
+        'classroom.price_amount as priceAmount',
+        'classroom.price_currency as priceCurrency',
+        'classroom.capacity',
+        'classroom.reserved_seats as reservedSeats',
+        'classroom.timezone',
+        'classroom.start_at as startAt',
+        'classroom.end_at as endAt',
+        'classroom.community_id as communityId',
+        'classroom.metadata',
+        'community.name as communityName'
+      )
+      .leftJoin('communities as community', 'classroom.community_id', 'community.id')
+      .where('classroom.instructor_id', numericId),
+    db('community_members as member')
+      .select(
+        'member.id',
+        'member.community_id as communityId',
+        'member.role',
+        'member.status',
+        'member.metadata',
+        'community.name as communityName'
+      )
+      .join('communities as community', 'member.community_id', 'community.id')
+      .where('member.user_id', numericId),
+    ownedCommunityIds.length
+      ? db('community_paywall_tiers as tier')
+          .select(
+            'tier.id',
+            'tier.community_id as communityId',
+            'tier.name',
+            'tier.price_cents as priceCents',
+            'tier.currency',
+            'tier.billing_interval as billingInterval'
+          )
+          .whereIn('tier.community_id', ownedCommunityIds)
+      : Promise.resolve([]),
+    ownedCommunityIds.length
+      ? db('community_subscriptions as subscription')
+          .select(
+            'subscription.id',
+            'subscription.status',
+            'subscription.tier_id as tierId',
+            'subscription.user_id as userId',
+            'subscription.started_at as startedAt',
+            'subscription.current_period_end as currentPeriodEnd',
+            'subscription.metadata',
+            'tier.name as tierName',
+            'tier.community_id as communityId'
+          )
+          .join('community_paywall_tiers as tier', 'subscription.tier_id', 'tier.id')
+          .whereIn('tier.community_id', ownedCommunityIds)
+      : Promise.resolve([]),
+    ownedCommunityIds.length
+      ? db('community_members as member')
+          .select('member.community_id as communityId')
+          .select(
+            db.raw("SUM(CASE WHEN member.status = 'active' THEN 1 ELSE 0 END) AS active_members")
+          )
+          .select(
+            db.raw("SUM(CASE WHEN member.status = 'pending' THEN 1 ELSE 0 END) AS pending_members")
+          )
+          .select(db.raw("SUM(CASE WHEN member.role = 'moderator' THEN 1 ELSE 0 END) AS moderators"))
+          .whereIn('member.community_id', ownedCommunityIds)
+          .groupBy('member.community_id')
+      : Promise.resolve([]),
+    db('ads_campaigns as campaign')
+      .select(
+        'campaign.id',
+        'campaign.name',
+        'campaign.status',
+        'campaign.objective',
+        'campaign.budget_currency as budgetCurrency',
+        'campaign.budget_daily_cents as budgetDailyCents',
+        'campaign.spend_currency as spendCurrency',
+        'campaign.cpc_cents as cpcCents',
+        'campaign.cpa_cents as cpaCents',
+        'campaign.targeting_keywords as targetingKeywords',
+        'campaign.targeting_audiences as targetingAudiences',
+        'campaign.targeting_locations as targetingLocations',
+        'campaign.targeting_languages as targetingLanguages',
+        'campaign.metadata'
+      )
+      .where('campaign.created_by', numericId),
+    db('ads_campaign_metrics_daily as metric')
+      .select(
+        'metric.id',
+        'metric.campaign_id as campaignId',
+        'metric.metric_date as metricDate',
+        'metric.impressions',
+        'metric.clicks',
+        'metric.conversions',
+        'metric.spend_cents as spendCents',
+        'metric.revenue_cents as revenueCents',
+        'metric.metadata'
+      )
+      .join('ads_campaigns as campaign', 'metric.campaign_id', 'campaign.id')
+      .where('campaign.created_by', numericId),
+    db('ebook_read_progress as progress')
+      .select(
+        'progress.id',
+        'progress.asset_id as assetId',
+        'progress.user_id as userId',
+        'progress.progress_percent as progressPercent',
+        'progress.updated_at as updatedAt'
+      )
+      .join('content_assets as asset', 'progress.asset_id', 'asset.id')
+      .where('asset.created_by', numericId)
+  ]);
+
+  const courses = courseRows.map((course) => ({
+    id: course.id,
+    title: course.title,
+    slug: course.slug,
+    status: course.status,
+    releaseAt: course.releaseAt,
+    deliveryFormat: course.deliveryFormat,
+    metadata: course.metadata
+  }));
+
+  const courseEnrollments = enrollmentRows.map((enrollment) => ({
+    id: enrollment.id,
+    courseId: enrollment.courseId,
+    userId: enrollment.userId,
+    status: enrollment.status,
+    startedAt: enrollment.startedAt,
+    completedAt: enrollment.completedAt,
+    metadata: enrollment.metadata
+  }));
+
+  const assignments = assignmentRows.map((assignment) => ({
+    id: assignment.id,
+    courseId: assignment.courseId,
+    moduleId: assignment.moduleId,
+    title: assignment.title,
+    dueOffsetDays: assignment.dueOffsetDays,
+    metadata: assignment.metadata,
+    courseTitle: assignment.courseTitle,
+    courseReleaseAt: assignment.courseReleaseAt
+  }));
+
+  const tutorProfiles = tutorProfileRows.map((profile) => ({
+    id: profile.id,
+    displayName: profile.displayName,
+    headline: profile.headline,
+    hourlyRateAmount: Number(profile.hourlyRateAmount ?? 0),
+    hourlyRateCurrency: profile.hourlyRateCurrency,
+    ratingAverage: profile.ratingAverage ? Number(profile.ratingAverage) : null,
+    ratingCount: Number(profile.ratingCount ?? 0),
+    metadata: profile.metadata
+  }));
+
+  const tutorAvailability = tutorAvailabilityRows.map((slot) => ({
+    id: slot.id,
+    tutorId: slot.tutorId,
+    startAt: slot.startAt,
+    endAt: slot.endAt,
+    status: slot.status,
+    isRecurring: slot.isRecurring,
+    recurrenceRule: slot.recurrenceRule,
+    metadata: slot.metadata
+  }));
+
+  const tutorBookings = tutorBookingRows.map((booking) => ({
+    id: booking.id,
+    tutorId: booking.tutorId,
+    learnerId: booking.learnerId,
+    status: booking.status,
+    requestedAt: booking.requestedAt,
+    confirmedAt: booking.confirmedAt,
+    scheduledStart: booking.scheduledStart,
+    scheduledEnd: booking.scheduledEnd,
+    metadata: booking.metadata,
+    learnerFirstName: booking.learnerFirstName,
+    learnerLastName: booking.learnerLastName
+  }));
+
+  const liveClassrooms = liveClassroomRows.map((classroom) => ({
+    id: classroom.id,
+    title: classroom.title,
+    slug: classroom.slug,
+    summary: classroom.summary,
+    type: classroom.type,
+    status: classroom.status,
+    isTicketed: classroom.isTicketed,
+    priceAmount: Number(classroom.priceAmount ?? 0),
+    priceCurrency: classroom.priceCurrency,
+    capacity: Number(classroom.capacity ?? 0),
+    reservedSeats: Number(classroom.reservedSeats ?? 0),
+    timezone: classroom.timezone,
+    startAt: classroom.startAt,
+    endAt: classroom.endAt,
+    communityId: classroom.communityId,
+    communityName: classroom.communityName,
+    metadata: classroom.metadata
+  }));
+
+  const communityMemberships = communityMembershipRows.map((membership) => ({
+    id: membership.id,
+    communityId: membership.communityId,
+    role: membership.role,
+    status: membership.status,
+    metadata: membership.metadata,
+    communityName: membership.communityName
+  }));
+
+  const paywallTiers = paywallTierRows.map((tier) => ({
+    id: tier.id,
+    communityId: tier.communityId,
+    name: tier.name,
+    priceCents: Number(tier.priceCents ?? 0),
+    currency: tier.currency,
+    billingInterval: tier.billingInterval
+  }));
+
+  const communitySubscriptions = communitySubscriptionRows.map((subscription) => ({
+    id: subscription.id,
+    status: subscription.status,
+    tierId: subscription.tierId,
+    userId: subscription.userId,
+    startedAt: subscription.startedAt,
+    currentPeriodEnd: subscription.currentPeriodEnd,
+    metadata: subscription.metadata,
+    tierName: subscription.tierName,
+    communityId: subscription.communityId
+  }));
+
+  const communityStats = communityStatsRows.map((stat) => ({
+    communityId: Number(stat.communityId),
+    community_id: Number(stat.communityId),
+    active_members: Number(stat.active_members ?? 0),
+    pending_members: Number(stat.pending_members ?? 0),
+    moderators: Number(stat.moderators ?? 0)
+  }));
+
+  const adsCampaigns = adsCampaignRows.map((campaign) => ({
+    id: campaign.id,
+    name: campaign.name,
+    status: campaign.status,
+    objective: campaign.objective,
+    budgetCurrency: campaign.budgetCurrency,
+    budgetDailyCents: Number(campaign.budgetDailyCents ?? 0),
+    spendCurrency: campaign.spendCurrency,
+    cpcCents: Number(campaign.cpcCents ?? 0),
+    cpaCents: Number(campaign.cpaCents ?? 0),
+    targetingKeywords: campaign.targetingKeywords,
+    targetingAudiences: campaign.targetingAudiences,
+    targetingLocations: campaign.targetingLocations,
+    targetingLanguages: campaign.targetingLanguages,
+    metadata: campaign.metadata
+  }));
+
+  const adsMetrics = adsMetricRows.map((metric) => ({
+    id: metric.id,
+    campaignId: metric.campaignId,
+    metricDate: metric.metricDate,
+    impressions: Number(metric.impressions ?? 0),
+    clicks: Number(metric.clicks ?? 0),
+    conversions: Number(metric.conversions ?? 0),
+    spendCents: Number(metric.spendCents ?? 0),
+    revenueCents: Number(metric.revenueCents ?? 0),
+    metadata: metric.metadata
+  }));
+
+  const ebookProgress = ebookProgressRows.map((progress) => ({
+    id: progress.id,
+    assetId: progress.assetId,
+    userId: progress.userId,
+    progressPercent: Number(progress.progressPercent ?? 0),
+    completedAt: progress.updatedAt,
+    updatedAt: progress.updatedAt
+  }));
+
+  return {
+    courses,
+    courseEnrollments,
+    assignments,
+    tutorProfiles,
+    tutorAvailability,
+    tutorBookings,
+    liveClassrooms,
+    communityMemberships,
+    communityStats,
+    communityResources: [],
+    communityPosts: [],
+    adsCampaigns,
+    adsMetrics,
+    paywallTiers,
+    communitySubscriptions,
+    affiliatePayouts: [],
+    monetizationSettings: {},
+    ebookRows: [],
+    ebookProgressRows: ebookProgress
+  };
 }
 
 export function formatCurrency(amountCents, currency = 'USD') {
@@ -803,7 +1236,8 @@ export default class DashboardService {
       throw error;
     }
 
-    const instructorSnapshot = buildInstructorDashboard({ user, now: referenceDate }) ?? undefined;
+    const instructorData = await loadInstructorEntities({ instructorId: user.id });
+    const instructorSnapshot = buildInstructorDashboard({ user, now: referenceDate, ...instructorData }) ?? undefined;
     let operatorSnapshot;
     if (['admin', 'operator'].includes(user.role)) {
       operatorSnapshot = await getOperatorDashboardService().build({ user, now: referenceDate });
