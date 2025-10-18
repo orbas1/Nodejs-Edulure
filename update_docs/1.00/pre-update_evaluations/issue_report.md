@@ -1,0 +1,37 @@
+# Pre-Update Issue Report – Version 1.00
+
+## Overview
+The Version 1.00 evaluations confirm that the platform markets a full learning and operations suite, yet every tier still relies on placeholders, missing infrastructure, or undocumented manual work. Most advertised capabilities—realtime collaboration, offline-ready mobile, compliant commerce, provider scheduling—lack live integrations, tested workflows, or operational guardrails. As a result, the stack cannot meet enterprise promises around reliability, security, accessibility, or roadmap alignment without a multi-team remediation programme.
+
+## Backend Platform
+* Controllers, resolvers, and schedulers expose an expansive REST/GraphQL surface but return stub data, reference uninitialised services, or depend on queues and cron jobs that never start. Payments, compliance, moderation, analytics, and recommendation routes therefore fail in real environments, and background jobs (enrolment expirations, digest emails, payout batching) never run.
+* Feature flags default to disabled states and lack seeding/governance tooling; cold environments return 403/404/503 on core endpoints until engineers toggle flags manually via scripts. Third-party providers (Stripe, PayPal, S3, MeiliSearch, CloudConvert, ClamAV) require production credentials because there are no sandbox profiles, mocks, or retry/circuit breakers, leaving outages and compliance breaches likely.
+* Operational readiness is superficial. Health checks only probe HTTP, not downstream services; dead letter queues, incident escalation (PagerDuty), OpenTelemetry, and key rotation workflows are missing, so infrastructure drift and dependency CVEs go unnoticed. Multi-tenant isolation, audit logging, and security controls (RBAC depth, CSRF coverage, webhook signing) fall short of enterprise standards.
+
+## Database Layer
+* The Knex migration history provisions dozens of tables (field services, adaptive learning, ads, payouts) that the application never seeds or queries. Idempotent guards and silent seeder failures hide drift, while promised retention, partition rotation, event sourcing, and archival routines lack triggers or scheduled jobs—rendering compliance claims empty.
+* Referential integrity and performance protections are weak: foreign keys omit cascades or over-delete, timezone handling is inconsistent, composite indexes for high-volume joins are absent, and reporting tables/materialised views remain empty. Without schema governance or data masking, analytics dashboards, staging environments, and BI exports rely on manual SQL against unreliable datasets.
+* Security posture is inadequate. Sensitive fields stay plaintext, least-privilege roles and tenant scoping are undefined, backups/restores lack tested runbooks, and data residency/geo-sharding strategies do not exist. Data subject requests, encryption workflows, and audit trails cannot be fulfilled as marketed.
+
+## Dependency & Build Chain
+* The monorepo juggles npm workspaces, yarn remnants, and Flutter modules without a unified toolchain. Shared SDKs (`sdk-typescript`) are unpublished, binary prerequisites (ClamAV, FFmpeg, MJML, Chrome) are undocumented, and scripts assume global CLIs. Engineers experience broken installs, unresolved imports, and native binary crashes across environments.
+* Automated hygiene is absent: no Renovate/Dependabot, SBOM, license tracking, or vulnerability scanning in CI. Known high-severity advisories (`axios`, `adm-zip`, `jsonwebtoken`) remain unresolved, and container/CI images pull outdated toolchains. Supply-chain safeguards (Sigstore, token scope restrictions, provenance checks) are non-existent despite enterprise commitments.
+* Dependency alignment across clients is ad hoc. Generated SDKs drift from backend schemas, Firebase/gradle versions lack a matrix, lockfile policies conflict, and tree-shaking is ineffective—inflating bundle sizes, cold starts, and security exposure while contradicting “one-click environment” messaging.
+
+## Front-end Web Experience
+* The React dashboard mirrors backend breadth but renders mock data, static charts, and dead realtime contexts. Payments, onboarding, authoring, analytics drill-downs, and governance workflows lose state, expose blank screens, or rely on copy that promises “coming soon” functionality. Feature flags never refresh in-session, so operators cannot safely stage rollouts.
+* Usability and accessibility fall far below commitments: dense navigation without onboarding, inconsistent loading/error handling, weak validation, missing ARIA roles/focus traps, and poor responsive behaviour. The design system cannot deliver theming/white-labelling without hard-coded Tailwind overrides, contradicting enterprise branding promises.
+* Integration and security gaps persist. Clients mix raw HTTP calls and the generated SDK, environment config lacks staging/CDN toggles, websocket auth is absent, asset hosting assumes same-origin, and CSP documentation is missing. Tokens live in localStorage without rotation, previews accept unsanitised HTML, and third-party embeds bypass sandboxing—all at odds with “zero-trust” narratives.
+
+## Provider App Gap
+* The legacy provider Flutter app is removed, yet backend endpoints, push topics, roadmaps, and collateral still assume its existence. No replacement workflow, migration guide, or contingency plan exists for scheduling, compliance capture, payouts, or incident response—leaving partners without promised tooling.
+* Operational debris causes ongoing risk: push/payout jobs emit warnings, secrets and IAM roles for the retired app remain active, analytics dashboards include dead metrics, and support/training materials point to 404 resources. Partnerships and KPIs built on mobile engagement cannot be met, introducing contractual and reputational exposure.
+
+## User Mobile App
+* The learner Flutter app exposes wide navigation but relies on mock services, disabled feature flags, and unlaunched isolates. Offline caching, downloads, push notifications, chat, QR attendance, calendar sync, and monetisation scaffolding either crash or no-op, making the “mobile companion” positioning inaccurate.
+* UX foundations are shaky: initial boot shows blank screens, deep links and backgrounding break navigation, layouts fail on smaller devices or accessibility font sizes, localisation is English-only, and settings expose toggles that do nothing. Without telemetry, tests, or crash reporting, regressions and user pain remain invisible.
+* Security and compliance are fragile. Tokens persist without refresh or device binding, feature flags fail open, secure storage fallbacks drop secrets into plaintext preferences, SSL pinning and jailbreak detection are absent, and privacy/consent toggles do not sync server-side—violating stated privacy commitments.
+
+## Cross-Cutting Operational & Alignment Risks
+* Public commitments around enterprise readiness, accessibility, realtime collaboration, offline resilience, and analytics-driven insights are unsubstantiated across tiers. Feature flag manifests, schemas, and SDKs drift between backend, web, and mobile clients; there is no automated validation to keep contracts or content aligned.
+* Incident response, observability, backup/restore, and security governance remain manual or undocumented. Without automated monitoring, dependency hygiene, or compliance tooling, the organisation cannot evidence SOC2/privacy readiness or support sales claims. Shipping Version 1.00 would deliver an aspirational prototype rather than a reliable platform.
