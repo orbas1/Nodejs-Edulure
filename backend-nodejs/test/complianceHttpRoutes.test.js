@@ -73,7 +73,12 @@ describe('Compliance HTTP routes', () => {
     expect(complianceServiceMock.assignDsrRequest).toHaveBeenCalledWith({
       requestId: 44,
       assigneeId: 'trust-analyst-7',
-      actor: { id: 9001, role: 'admin', type: 'user' }
+      actor: { id: 9001, role: 'admin', type: 'user' },
+      requestContext: expect.objectContaining({
+        requestId: expect.any(String),
+        ipAddress: expect.any(String),
+        method: 'POST'
+      })
     });
   });
 
@@ -98,7 +103,12 @@ describe('Compliance HTTP routes', () => {
       requestId: 77,
       status: 'completed',
       resolutionNotes: 'Delivered report to user',
-      actor: { id: 9001, role: 'admin', type: 'user' }
+      actor: { id: 9001, role: 'admin', type: 'user' },
+      requestContext: expect.objectContaining({
+        requestId: expect.any(String),
+        ipAddress: expect.any(String),
+        method: 'POST'
+      })
     });
   });
 
@@ -138,7 +148,11 @@ describe('Compliance HTTP routes', () => {
       channel: 'web_form',
       metadata: { region: 'EU' },
       evidenceCiphertext: undefined,
-      actor: { id: 9001, role: 'admin', type: 'user' }
+      actor: { id: 9001, role: 'admin', type: 'user' },
+      requestContext: expect.objectContaining({
+        method: 'POST',
+        requestId: expect.any(String)
+      })
     });
   });
 
@@ -152,7 +166,11 @@ describe('Compliance HTTP routes', () => {
     expect(complianceServiceMock.revokeConsent).toHaveBeenCalledWith({
       consentId: 10,
       reason: 'User requested erasure',
-      actor: { id: 9001, role: 'admin', type: 'user' }
+      actor: { id: 9001, role: 'admin', type: 'user' },
+      requestContext: expect.objectContaining({
+        method: 'POST',
+        requestId: expect.any(String)
+      })
     });
   });
 

@@ -1,0 +1,230 @@
+{
+  "generatedAt": "2024-11-26T00:00:00.000Z",
+  "database": "edulure",
+  "tables": {
+    "users": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "first_name": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": null },
+        "last_name": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": true, "columnDefault": null },
+        "email": { "dataType": "varchar", "columnType": "varchar(255)", "isNullable": false, "columnDefault": null },
+        "password_hash": { "dataType": "varchar", "columnType": "varchar(255)", "isNullable": false, "columnDefault": null },
+        "role": { "dataType": "enum", "columnType": "enum('user','instructor','admin')", "isNullable": false, "columnDefault": "user" },
+        "age": { "dataType": "int", "columnType": "int unsigned", "isNullable": true, "columnDefault": null },
+        "address": { "dataType": "varchar", "columnType": "varchar(255)", "isNullable": true, "columnDefault": null },
+        "email_verified_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "failed_login_attempts": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "0" },
+        "last_failed_login_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "locked_until": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "last_login_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "password_changed_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "last_verification_sent_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "deleted_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "users_email_unique", "columns": ["email"], "unique": true }
+      ]
+    },
+    "communities": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "owner_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
+        "name": { "dataType": "varchar", "columnType": "varchar(150)", "isNullable": false, "columnDefault": null },
+        "slug": { "dataType": "varchar", "columnType": "varchar(160)", "isNullable": false, "columnDefault": null },
+        "description": { "dataType": "text", "columnType": "text", "isNullable": true, "columnDefault": null },
+        "cover_image_url": { "dataType": "varchar", "columnType": "varchar(500)", "isNullable": true, "columnDefault": null },
+        "visibility": { "dataType": "enum", "columnType": "enum('public','private')", "isNullable": false, "columnDefault": "public" },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "deleted_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "communities_owner_id_index", "columns": ["owner_id"], "unique": false },
+        { "name": "communities_slug_unique", "columns": ["slug"], "unique": true }
+      ]
+    },
+    "feature_flags": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "key": { "dataType": "varchar", "columnType": "varchar(128)", "isNullable": false, "columnDefault": null },
+        "name": { "dataType": "varchar", "columnType": "varchar(180)", "isNullable": false, "columnDefault": null },
+        "description": { "dataType": "varchar", "columnType": "varchar(512)", "isNullable": false, "columnDefault": null },
+        "enabled": { "dataType": "tinyint", "columnType": "tinyint(1)", "isNullable": false, "columnDefault": "1" },
+        "kill_switch": { "dataType": "tinyint", "columnType": "tinyint(1)", "isNullable": false, "columnDefault": "0" },
+        "rollout_strategy": {
+          "dataType": "enum",
+          "columnType": "enum('boolean','percentage','segment','schedule')",
+          "isNullable": false,
+          "columnDefault": "boolean"
+        },
+        "rollout_percentage": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "100" },
+        "segment_rules": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "variants": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "environments": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "[\"development\",\"staging\",\"production\"]" },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "feature_flags_key_unique", "columns": ["key"], "unique": true },
+        { "name": "feature_flags_enabled_kill_switch_index", "columns": ["enabled", "kill_switch"], "unique": false }
+      ]
+    },
+    "feature_flag_tenant_states": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "feature_flag_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
+        "tenant_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": false, "columnDefault": null },
+        "environment": { "dataType": "varchar", "columnType": "varchar(32)", "isNullable": false, "columnDefault": "production" },
+        "state": {
+          "dataType": "enum",
+          "columnType": "enum('enabled','disabled','conditional')",
+          "isNullable": false,
+          "columnDefault": "disabled"
+        },
+        "variant_key": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": true, "columnDefault": null },
+        "rollout_percentage": { "dataType": "decimal", "columnType": "decimal(5,2) unsigned", "isNullable": false, "columnDefault": "0.00" },
+        "criteria": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "notes": { "dataType": "varchar", "columnType": "varchar(512)", "isNullable": true, "columnDefault": null },
+        "updated_by": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": null },
+        "activated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "deactivated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "tenant_flag_env_unique", "columns": ["tenant_id", "feature_flag_id", "environment"], "unique": true },
+        { "name": "tenant_flag_state_env_idx", "columns": ["state", "environment"], "unique": false },
+        { "name": "tenant_flag_flag_idx", "columns": ["feature_flag_id"], "unique": false }
+      ]
+    },
+    "domain_event_dispatch_queue": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "domain_event_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
+        "status": {
+          "dataType": "enum",
+          "columnType": "enum('pending','delivering','delivered','failed','discarded')",
+          "isNullable": false,
+          "columnDefault": "pending"
+        },
+        "delivery_channel": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": "webhook" },
+        "attempts": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "0" },
+        "max_attempts": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "12" },
+        "available_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
+        "locked_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "locked_by": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": true, "columnDefault": null },
+        "delivered_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "failed_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "last_error": { "dataType": "varchar", "columnType": "varchar(500)", "isNullable": true, "columnDefault": null },
+        "last_error_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "payload_checksum": { "dataType": "varchar", "columnType": "varchar(128)", "isNullable": false, "columnDefault": null },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "dry_run": { "dataType": "tinyint", "columnType": "tinyint(1)", "isNullable": false, "columnDefault": "0" },
+        "trace_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": true, "columnDefault": null },
+        "correlation_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": true, "columnDefault": null },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "dedq_status_available_idx", "columns": ["status", "available_at"], "unique": false },
+        { "name": "dedq_lock_idx", "columns": ["locked_by", "locked_at"], "unique": false },
+        { "name": "dedq_event_idx", "columns": ["domain_event_id"], "unique": false },
+        { "name": "dedq_dryrun_status_idx", "columns": ["dry_run", "status"], "unique": false }
+      ]
+    },
+    "data_retention_policies": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "entity_name": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": null },
+        "action": {
+          "dataType": "enum",
+          "columnType": "enum('hard-delete','soft-delete','anonymize')",
+          "isNullable": false,
+          "columnDefault": "hard-delete"
+        },
+        "retention_period_days": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
+        "active": { "dataType": "tinyint", "columnType": "tinyint(1)", "isNullable": false, "columnDefault": "1" },
+        "criteria": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "description": { "dataType": "varchar", "columnType": "varchar(255)", "isNullable": false, "columnDefault": null },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "data_retention_policies_entity_name_unique", "columns": ["entity_name"], "unique": true },
+        { "name": "data_retention_policies_active_index", "columns": ["active"], "unique": false },
+        { "name": "data_retention_policies_entity_name_index", "columns": ["entity_name"], "unique": false }
+      ]
+    },
+    "data_partition_policies": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "table_name": { "dataType": "varchar", "columnType": "varchar(191)", "isNullable": false, "columnDefault": null },
+        "date_column": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": false, "columnDefault": null },
+        "strategy": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": false, "columnDefault": null },
+        "retention_days": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "365" },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "data_partition_policies_table_name_unique", "columns": ["table_name"], "unique": true }
+      ]
+    },
+    "payment_intents": {
+      "columns": {
+        "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
+        "public_id": { "dataType": "char", "columnType": "char(36)", "isNullable": false, "columnDefault": null },
+        "user_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": true, "columnDefault": null },
+        "provider": { "dataType": "enum", "columnType": "enum('stripe','paypal')", "isNullable": false, "columnDefault": null },
+        "provider_intent_id": { "dataType": "varchar", "columnType": "varchar(191)", "isNullable": false, "columnDefault": null },
+        "provider_capture_id": { "dataType": "varchar", "columnType": "varchar(191)", "isNullable": true, "columnDefault": null },
+        "provider_latest_charge_id": { "dataType": "varchar", "columnType": "varchar(191)", "isNullable": true, "columnDefault": null },
+        "status": {
+          "dataType": "enum",
+          "columnType": "enum('requires_payment_method','requires_confirmation','requires_action','processing','succeeded','canceled','failed','refunded','partially_refunded')",
+          "isNullable": false,
+          "columnDefault": "requires_payment_method"
+        },
+        "currency": { "dataType": "varchar", "columnType": "varchar(3)", "isNullable": false, "columnDefault": null },
+        "amount_subtotal": { "dataType": "bigint", "columnType": "bigint unsigned", "isNullable": false, "columnDefault": null },
+        "amount_discount": { "dataType": "bigint", "columnType": "bigint unsigned", "isNullable": false, "columnDefault": "0" },
+        "amount_tax": { "dataType": "bigint", "columnType": "bigint unsigned", "isNullable": false, "columnDefault": "0" },
+        "amount_total": { "dataType": "bigint", "columnType": "bigint unsigned", "isNullable": false, "columnDefault": null },
+        "amount_refunded": { "dataType": "bigint", "columnType": "bigint unsigned", "isNullable": false, "columnDefault": "0" },
+        "tax_breakdown": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
+        "coupon_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": true, "columnDefault": null },
+        "entity_type": { "dataType": "varchar", "columnType": "varchar(60)", "isNullable": false, "columnDefault": null },
+        "entity_id": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": null },
+        "receipt_email": { "dataType": "varchar", "columnType": "varchar(191)", "isNullable": true, "columnDefault": null },
+        "captured_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "canceled_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "expires_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "failure_code": { "dataType": "varchar", "columnType": "varchar(60)", "isNullable": true, "columnDefault": null },
+        "failure_message": { "dataType": "varchar", "columnType": "varchar(500)", "isNullable": true, "columnDefault": null },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        { "name": "PRIMARY", "columns": ["id"], "unique": true },
+        { "name": "payment_intents_public_id_unique", "columns": ["public_id"], "unique": true },
+        { "name": "payment_intents_provider_provider_intent_id_unique", "columns": ["provider", "provider_intent_id"], "unique": true },
+        { "name": "payment_intents_status_index", "columns": ["status"], "unique": false },
+        { "name": "payment_intents_currency_index", "columns": ["currency"], "unique": false },
+        { "name": "payment_intents_user_id_status_index", "columns": ["user_id", "status"], "unique": false },
+        { "name": "payment_intents_entity_type_entity_id_index", "columns": ["entity_type", "entity_id"], "unique": false }
+      ]
+    }
+  }
+}

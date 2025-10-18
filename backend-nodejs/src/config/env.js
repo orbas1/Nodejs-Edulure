@@ -1,8 +1,20 @@
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import dotenv from 'dotenv';
 import { z } from 'zod';
 
 dotenv.config();
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, '..', '..');
+const defaultSchemaBaselinePath = path.resolve(
+  projectRoot,
+  'database',
+  'schema',
+  'mysql-governance-baseline.json'
+);
 
 function tryParseJson(value) {
   if (!value) {
@@ -106,6 +118,17 @@ function parseCsv(value) {
     .map((entry) => entry.trim())
     .filter(Boolean);
 }
+
+const defaultSchemaGuardTables = [
+  'users',
+  'communities',
+  'feature_flags',
+  'feature_flag_tenant_states',
+  'domain_event_dispatch_queue',
+  'payment_intents',
+  'data_retention_policies',
+  'data_partition_policies'
+];
 
 function parseEncryptionFallbackKeys(value) {
   if (!value) {
@@ -314,6 +337,14 @@ const envSchema = z
     RATE_LIMIT_MAX: z.coerce.number().int().min(25).max(2000).default(300),
     SESSION_VALIDATION_CACHE_TTL_MS: z.coerce.number().int().min(1000).max(10 * 60 * 1000).default(60000),
     MAX_ACTIVE_SESSIONS_PER_USER: z.coerce.number().int().min(1).max(50).default(10),
+    AUDIT_LOG_TENANT_ID: z.string().min(1).default('global'),
+    AUDIT_LOG_DEFAULT_SEVERITY: z.enum(['info', 'notice', 'warning', 'error', 'critical']).default('info'),
+    AUDIT_LOG_ALLOWED_EVENT_TYPES: z.string().optional(),
+    AUDIT_LOG_ENABLE_IP_CAPTURE: z.coerce.boolean().default(true),
+    AUDIT_LOG_IP_CLASSIFICATION: z.string().min(3).default('restricted'),
+    AUDIT_LOG_MAX_METADATA_BYTES: z.coerce.number().int().min(256).max(65536).default(4096),
+    AUDIT_LOG_METADATA_REDACT_KEYS: z.string().optional(),
+    AUDIT_LOG_INCLUDE_REQUEST_CONTEXT: z.coerce.boolean().default(true),
     METRICS_ENABLED: z.coerce.boolean().default(true),
     METRICS_USERNAME: z.string().min(3).optional(),
     METRICS_PASSWORD: z.string().min(8).optional(),
@@ -778,6 +809,17 @@ const dataEncryptionKeys = dataEncryptionFallbackEntries.reduce(
 );
 const dataEncryptionDefaultClassification = raw.DATA_ENCRYPTION_DEFAULT_CLASSIFICATION ?? 'general';
 
+const auditLogTenantId = raw.AUDIT_LOG_TENANT_ID ?? 'global';
+const auditLogDefaultSeverity = raw.AUDIT_LOG_DEFAULT_SEVERITY ?? 'info';
+const auditLogAllowedEventTypes = parseCsv(raw.AUDIT_LOG_ALLOWED_EVENT_TYPES ?? '');
+const auditLogMetadataRedactionKeys = parseCsv(
+  raw.AUDIT_LOG_METADATA_REDACT_KEYS ?? 'ip,ipAddress,clientIp'
+);
+const auditLogMaxMetadataBytes = raw.AUDIT_LOG_MAX_METADATA_BYTES;
+const auditLogEnableIpCapture = raw.AUDIT_LOG_ENABLE_IP_CAPTURE;
+const auditLogIncludeRequestContext = raw.AUDIT_LOG_INCLUDE_REQUEST_CONTEXT;
+const auditLogIpClassification = raw.AUDIT_LOG_IP_CLASSIFICATION ?? 'restricted';
+
 const webPort = raw.WEB_PORT ?? raw.PORT;
 const webProbePort = raw.WEB_PROBE_PORT ?? webPort;
 const workerProbePort = raw.WORKER_PROBE_PORT;
@@ -855,6 +897,16 @@ export const env = {
       digits: raw.TWO_FACTOR_DIGITS,
       stepSeconds: raw.TWO_FACTOR_STEP_SECONDS,
       window: raw.TWO_FACTOR_WINDOW
+    },
+    auditLog: {
+      tenantId: auditLogTenantId,
+      defaultSeverity: auditLogDefaultSeverity,
+      allowedEventTypes: auditLogAllowedEventTypes,
+      enableIpCapture: auditLogEnableIpCapture,
+      ipClassificationTag: auditLogIpClassification,
+      maxMetadataBytes: auditLogMaxMetadataBytes,
+      metadataRedactionKeys: auditLogMetadataRedactionKeys,
+      includeRequestContext: auditLogIncludeRequestContext
     }
   },
   database: {
@@ -1195,6 +1247,19 @@ export const env = {
       batchSize: raw.SEARCH_INGESTION_BATCH_SIZE,
       concurrency: raw.SEARCH_INGESTION_CONCURRENCY,
       deleteBeforeReindex: raw.SEARCH_INGESTION_DELETE_BEFORE_REINDEX
+    }
+  },
+  dataGovernance: {
+    schemaGuard: {
+      baselinePath: raw.DATA_GOVERNANCE_SCHEMA_BASELINE_PATH
+        ? path.resolve(projectRoot, raw.DATA_GOVERNANCE_SCHEMA_BASELINE_PATH)
+        : defaultSchemaBaselinePath,
+      failOnDrift: raw.DATA_GOVERNANCE_SCHEMA_FAIL_ON_DRIFT !== 'false',
+      includeIndexes: raw.DATA_GOVERNANCE_SCHEMA_INCLUDE_INDEXES !== 'false',
+      monitoredTables:
+        parseCsv(raw.DATA_GOVERNANCE_MONITORED_TABLES).length > 0
+          ? parseCsv(raw.DATA_GOVERNANCE_MONITORED_TABLES)
+          : defaultSchemaGuardTables
     }
   },
   observability: {

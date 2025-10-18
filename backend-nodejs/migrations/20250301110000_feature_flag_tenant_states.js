@@ -1,50 +1,55 @@
-import { onUpdateTrigger } from '../src/utils/migrationHelpers.js';
+const TABLE_NAME = 'feature_flag_tenant_states';
+
+const STATE_ENUM = ['enabled', 'disabled', 'conditional'];
 
 export async function up(knex) {
-  const hasTable = await knex.schema.hasTable('feature_flag_tenant_states');
-  if (!hasTable) {
-    await knex.schema.createTable('feature_flag_tenant_states', (table) => {
-      table.increments('id').primary();
-      table
-        .integer('flag_id')
-        .unsigned()
-        .notNullable()
-        .references('id')
-        .inTable('feature_flags')
-        .onDelete('CASCADE');
-      table.string('tenant_id', 128).notNullable();
-      table.string('environment', 32).notNullable().defaultTo('production');
-      table
-        .enu('override_state', ['forced_on', 'forced_off'], {
-          useNative: true,
-          enumName: 'feature_flag_override_state'
-        })
-        .notNullable();
-      table.string('variant_key', 64);
-      table.json('metadata');
-      table.string('updated_by', 120);
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table
-        .timestamp('updated_at')
-        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
-      table.unique(['flag_id', 'tenant_id', 'environment']);
-      table.index(['tenant_id', 'environment']);
-      table.index(['flag_id', 'environment']);
-    });
+  const exists = await knex.schema.hasTable(TABLE_NAME);
+  if (exists) {
+    return;
   }
 
-  if (knex.client.config.client === 'pg') {
-    await knex.raw(onUpdateTrigger('feature_flag_tenant_states'));
-  }
+  await knex.schema.createTable(TABLE_NAME, (table) => {
+    table.increments('id').primary();
+    table
+      .integer('feature_flag_id')
+      .unsigned()
+      .notNullable()
+      .references('id')
+      .inTable('feature_flags')
+      .onDelete('CASCADE');
+    table.string('tenant_id', 64).notNullable();
+    table.string('environment', 32).notNullable().defaultTo('production');
+    table
+      .enu('state', STATE_ENUM, {
+        useNative: true,
+        enumName: 'feature_flag_tenant_state'
+      })
+      .notNullable()
+      .defaultTo('disabled');
+    table.string('variant_key', 120);
+    table.decimal('rollout_percentage', 5, 2).unsigned().notNullable().defaultTo(0);
+    table.json('criteria').notNullable().defaultTo('{}');
+    table.string('notes', 512);
+    table.string('updated_by', 120).notNullable();
+    table.timestamp('activated_at');
+    table.timestamp('deactivated_at');
+    table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+    table
+      .timestamp('updated_at')
+      .notNullable()
+      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+
+    table.unique(['tenant_id', 'feature_flag_id', 'environment'], 'tenant_flag_env_unique');
+    table.index(['state', 'environment'], 'tenant_flag_state_env_idx');
+    table.index(['feature_flag_id'], 'tenant_flag_flag_idx');
+  });
 }
 
 export async function down(knex) {
-  const hasTable = await knex.schema.hasTable('feature_flag_tenant_states');
-  if (hasTable) {
-    await knex.schema.dropTable('feature_flag_tenant_states');
+  const exists = await knex.schema.hasTable(TABLE_NAME);
+  if (!exists) {
+    return;
   }
 
-  if (knex.client.config.client === 'pg') {
-    await knex.raw('DROP TYPE IF EXISTS feature_flag_override_state;');
-  }
+  await knex.schema.dropTable(TABLE_NAME);
 }

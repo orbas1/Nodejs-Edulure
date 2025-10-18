@@ -21,3 +21,5 @@
 - `src/integrations/CloudConvertClient.js` — wrapped CloudConvert SDK with sandbox routing, retries, and circuit breaker coordination for asset ingestion.
 - `src/integrations/TwilioMessagingClient.js` — Twilio messaging client with sandbox sender controls, retry handling, and circuit breaker integration.
 - `test/integrations/stripeGateway.test.js` — Vitest coverage for the Stripe gateway retry, duplication, and receipt processing behaviour.
+- `src/services/AuditEventService.js` — centralised compliance logger encapsulating encrypted IP capture, metadata redaction, and request-context enrichment for audit trails.
+- `test/auditEventService.test.js` — focused Vitest coverage validating the audit service encryption, enrichment, and truncation policies.
