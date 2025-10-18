@@ -21,8 +21,8 @@ All tasks start at 0% completion and will be updated as implementation progresse
    Seed defaults in bootstrap scripts, deliver tenant-aware tooling, and document rollout/rollback procedures.
 3. **Third-party integration wrappers** – 100%
    Build provider abstractions with sandbox credentials, retries, circuit breakers, and idempotent webhooks.
-4. **Data governance rebuild** – 0%  
-   Reconstruct migrations/seeds, add schema diff gates, retention jobs, and reporting views with automated tests.
+4. **Data governance rebuild** – 100%
+   Reconstructed migrations and seeds, introduced schema diff gating with a `schema:validate` script, enriched retention automation, and shipped reporting views plus automated tests covering the new governance services.
 5. **Security and compliance hardening** – 0%  
    Encrypt sensitive data, enforce least-privilege roles, document backup/restore drills, and evidence compliance readiness.
 

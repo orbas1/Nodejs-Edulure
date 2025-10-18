@@ -127,6 +127,7 @@ export async function seed(knex) {
     await trx('security_incidents').del();
     await trx('dsr_requests').del();
     await trx('cdc_outbox').del();
+    await trx('data_retention_audit_logs').del();
     await trx('consent_policies').del();
     await trx('consent_records').del();
     await trx('audit_events').del();
@@ -2815,6 +2816,64 @@ export async function seed(knex) {
         metadata: JSON.stringify({ ip: '176.23.45.100', userAgent: 'Safari/17.1', locale: 'en-SG' })
       }
     ]);
+
+    const retentionPolicies = await trx('data_retention_policies')
+      .select('id', 'entity_name', 'action', 'retention_period_days');
+
+    if (retentionPolicies.length > 0) {
+      const retentionAuditRows = retentionPolicies.map((policy, index) => {
+        const matchedRows = index === 0 ? 18 : index === 1 ? 0 : 6;
+        const dryRun = index === 1;
+        const mode = dryRun ? 'simulate' : 'commit';
+        const runIdValue = `bootstrap-retention-${policy.entity_name}`;
+
+        return {
+          policy_id: policy.id,
+          enforced_at: new Date(Date.UTC(2025, 1, 15, 6 + index, 0, 0)),
+          dry_run: dryRun,
+          status: 'executed',
+          mode,
+          run_id: runIdValue,
+          rows_affected: matchedRows,
+          duration_ms: 120 + index * 25,
+          details: JSON.stringify({
+            status: 'executed',
+            mode,
+            runId: runIdValue,
+            matchedRows,
+            dryRun,
+            policy: {
+              entityName: policy.entity_name,
+              action: policy.action,
+              retentionPeriodDays: policy.retention_period_days
+            }
+          })
+        };
+      });
+
+      if (retentionPolicies[0]) {
+        const failureRunId = `bootstrap-retention-${retentionPolicies[0].entity_name}-failure`;
+        retentionAuditRows.push({
+          policy_id: retentionPolicies[0].id,
+          enforced_at: new Date('2025-02-18T04:10:00Z'),
+          dry_run: false,
+          status: 'failed',
+          mode: 'commit',
+          run_id: failureRunId,
+          rows_affected: 0,
+          duration_ms: 95,
+          details: JSON.stringify({
+            status: 'failed',
+            mode: 'commit',
+            runId: failureRunId,
+            dryRun: false,
+            error: 'Lock timeout while pruning domain events'
+          })
+        });
+      }
+
+      await trx('data_retention_audit_logs').insert(retentionAuditRows);
+    }
 
     await trx('dsr_requests').insert([
       {

@@ -1,0 +1,51 @@
+{
+  "version": "2025-03-05",
+  "generatedAt": "2025-03-05T00:00:00.000Z",
+  "tables": {
+    "data_retention_policies": {
+      "columns": {
+        "id": { "type": "int unsigned", "nullable": false, "defaultValue": null },
+        "entity_name": { "type": "varchar(120)", "nullable": false, "defaultValue": null },
+        "action": { "type": "enum('hard-delete','soft-delete','anonymize')", "nullable": false, "defaultValue": "hard-delete" },
+        "retention_period_days": { "type": "int unsigned", "nullable": false, "defaultValue": null },
+        "active": { "type": "tinyint(1)", "nullable": false, "defaultValue": "1" },
+        "criteria": { "type": "json", "nullable": false, "defaultValue": null },
+        "description": { "type": "varchar(255)", "nullable": false, "defaultValue": null },
+        "created_at": { "type": "timestamp", "nullable": true, "defaultValue": "CURRENT_TIMESTAMP" },
+        "updated_at": { "type": "timestamp", "nullable": true, "defaultValue": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": {
+        "PRIMARY": { "columns": ["id"], "unique": true },
+        "data_retention_policies_entity_name_unique": { "columns": ["entity_name"], "unique": true },
+        "data_retention_policies_active_index": { "columns": ["active"], "unique": false },
+        "data_retention_policies_entity_name_index": { "columns": ["entity_name"], "unique": false }
+      }
+    },
+    "data_retention_audit_logs": {
+      "columns": {
+        "id": { "type": "int unsigned", "nullable": false, "defaultValue": null },
+        "policy_id": { "type": "int unsigned", "nullable": false, "defaultValue": null },
+        "enforced_at": { "type": "timestamp", "nullable": false, "defaultValue": "CURRENT_TIMESTAMP" },
+        "dry_run": { "type": "tinyint(1)", "nullable": false, "defaultValue": "0" },
+        "status": { "type": "varchar(32)", "nullable": false, "defaultValue": "executed" },
+        "mode": { "type": "varchar(16)", "nullable": false, "defaultValue": "commit" },
+        "run_id": { "type": "varchar(64)", "nullable": false, "defaultValue": "" },
+        "rows_affected": { "type": "int unsigned", "nullable": false, "defaultValue": "0" },
+        "duration_ms": { "type": "bigint unsigned", "nullable": false, "defaultValue": "0" },
+        "details": { "type": "json", "nullable": false, "defaultValue": null }
+      },
+      "indexes": {
+        "PRIMARY": { "columns": ["id"], "unique": true },
+        "data_retention_audit_logs_policy_id_enforced_at_index": { "columns": ["policy_id", "enforced_at"], "unique": false }
+      }
+    }
+  },
+  "enums": {
+    "data_retention_policies.action": ["hard-delete", "soft-delete", "anonymize"]
+  },
+  "views": {
+    "vw_data_governance_retention_overview": {
+      "definition": "WITH ordered_logs AS ( SELECT l.id, l.policy_id, l.enforced_at, l.rows_affected, l.dry_run, l.status, l.mode, l.run_id, l.duration_ms, ROW_NUMBER() OVER (PARTITION BY l.policy_id ORDER BY l.enforced_at DESC, l.id DESC) AS row_rank FROM data_retention_audit_logs l ), aggregated AS ( SELECT policy_id, COUNT(*) AS total_runs, SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failure_count, SUM(CASE WHEN dry_run = 1 THEN 1 ELSE 0 END) AS dry_run_count, SUM(CASE WHEN status = 'executed' AND dry_run = 0 THEN rows_affected ELSE 0 END) AS total_rows_removed, MAX(enforced_at) AS last_enforced_at FROM data_retention_audit_logs GROUP BY policy_id ) SELECT p.id AS policy_id, p.entity_name, p.action, p.retention_period_days, p.active, p.description, COALESCE(a.total_runs, 0) AS total_runs, COALESCE(a.failure_count, 0) AS failure_count, COALESCE(a.dry_run_count, 0) AS dry_run_count, COALESCE(a.total_rows_removed, 0) AS total_rows_removed, a.last_enforced_at, ol.status AS last_status, ol.mode AS last_mode, ol.dry_run AS last_dry_run, ol.rows_affected AS last_rows_affected, ol.duration_ms AS last_duration_ms FROM data_retention_policies p LEFT JOIN aggregated a ON a.policy_id = p.id LEFT JOIN ordered_logs ol ON ol.policy_id = p.id AND ol.row_rank = 1"
+    }
+  }
+}
