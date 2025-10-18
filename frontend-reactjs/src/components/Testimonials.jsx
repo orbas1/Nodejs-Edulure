@@ -1,12 +1,11 @@
 const testimonials = [
   {
-    quote:
-      'Edulure feels like we hired an entire product team overnight. Our community went from static to thriving in under 30 days.',
+    quote: 'We shipped our cohort in two weeks with the templates and live ops tools.',
     name: 'Lena Ortiz',
     title: 'Founder, CohortCraft'
   },
   {
-    quote: 'The growth playbooks and automations alone paid for the platform 5x over in our first launch.',
+    quote: 'Billing, scheduling, and community rooms finally live in one workflow.',
     name: 'Noah Winter',
     title: 'Director, Global Learning Lab'
   }
