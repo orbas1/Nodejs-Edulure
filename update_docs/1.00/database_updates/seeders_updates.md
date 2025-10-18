@@ -1,0 +1,1 @@
+- Updated `001_bootstrap.js` to clear and repopulate `data_retention_audit_logs` with deterministic histories representing committed, simulated, and failed runs so analytics dashboards and alert thresholds have meaningful fixtures immediately after bootstrap.

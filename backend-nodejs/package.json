@@ -23,6 +23,7 @@
     "seed": "knex --knexfile knexfile.cjs seed:run",
     "data:retention": "node scripts/run-data-retention.js",
     "data:partition": "node scripts/manage-data-partitions.js",
+    "schema:validate": "node scripts/validate-schema-integrity.js",
     "runtime:config": "node scripts/runtime-config.js",
     "audit:dependencies": "npm audit --audit-level=moderate",
     "security:rotate-jwt": "node scripts/rotate-jwt-keys.js",

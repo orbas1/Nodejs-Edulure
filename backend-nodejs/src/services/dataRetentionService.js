@@ -250,6 +250,9 @@ export async function enforceRetentionPolicies({
       continue;
     }
 
+    const policyStartedAt = Date.now();
+    const policyRunId = `${runId}:${policy.id}`;
+
     try {
       // Ensure each policy executes in its own transaction to isolate locking scope.
       const result = await dbClient.transaction(async (trx) => {
@@ -257,27 +260,38 @@ export async function enforceRetentionPolicies({
         const buildQuery = strategy.buildQuery;
         const idColumn = strategy.idColumn ?? 'id';
         const sampleIds = await buildQuery().clone().limit(5).pluck(idColumn);
+        const startedAt = Date.now();
 
         if (sampleIds.length === 0) {
           policyLogger.info('No records matched retention policy');
-          if (!runDry) {
-            await trx('data_retention_audit_logs').insert({
-              policy_id: policy.id,
-              dry_run: false,
-              rows_affected: 0,
-              details: JSON.stringify({
-                reason: strategy.reason,
-                sampleIds: [],
-                dryRun: false,
-                runId
-              })
-            });
-          }
+          const durationMs = Date.now() - startedAt;
+          const auditPayload = {
+            reason: strategy.reason,
+            sampleIds: [],
+            dryRun: runDry,
+            runId: policyRunId,
+            matchedRows: 0,
+            mode: resolvedMode,
+            status: 'executed',
+            context: strategy.context ?? {}
+          };
+
+          await trx('data_retention_audit_logs').insert({
+            policy_id: policy.id,
+            dry_run: runDry,
+            status: 'executed',
+            mode: resolvedMode,
+            run_id: policyRunId,
+            rows_affected: 0,
+            duration_ms: durationMs,
+            details: JSON.stringify(auditPayload)
+          });
 
           return {
             affectedRows: 0,
             sampleIds,
-            context: strategy.context ?? {}
+            context: strategy.context ?? {},
+            durationMs
           };
         }
 
@@ -287,30 +301,36 @@ export async function enforceRetentionPolicies({
           trx
         });
 
+        const durationMs = Date.now() - startedAt;
         const auditPayload = {
           reason: strategy.reason,
           sampleIds,
           dryRun: runDry,
-          runId,
+          runId: policyRunId,
           matchedRows: affectedRows,
+          mode: resolvedMode,
+          status: 'executed',
           context: strategy.context ?? {}
         };
 
-        if (!runDry) {
-          await trx('data_retention_audit_logs').insert({
-            policy_id: policy.id,
-            dry_run: false,
-            rows_affected: affectedRows,
-            details: JSON.stringify(auditPayload)
-          });
-        }
+        await trx('data_retention_audit_logs').insert({
+          policy_id: policy.id,
+          dry_run: runDry,
+          status: 'executed',
+          mode: resolvedMode,
+          run_id: policyRunId,
+          rows_affected: affectedRows,
+          duration_ms: durationMs,
+          details: JSON.stringify(auditPayload)
+        });
 
         policyLogger.info({ affectedRows, sampleIds, dryRun: runDry, action: policy.action }, 'Retention policy enforced');
 
         return {
           affectedRows,
           sampleIds,
-          context: strategy.context ?? {}
+          context: strategy.context ?? {},
+          durationMs
         };
       });
 
@@ -323,7 +343,9 @@ export async function enforceRetentionPolicies({
         sampleIds: result.sampleIds,
         dryRun: runDry,
         description: policy.description,
-        context: result.context ?? {}
+        context: result.context ?? {},
+        runId: policyRunId,
+        durationMs: result.durationMs
       };
 
       executionResults.push(outcome);
@@ -354,6 +376,29 @@ export async function enforceRetentionPolicies({
         error: error.message
       };
       executionResults.push(failure);
+
+      const failureDuration = Date.now() - policyStartedAt;
+      try {
+        await dbClient('data_retention_audit_logs').insert({
+          policy_id: policy.id,
+          dry_run: runDry,
+          status: 'failed',
+          mode: resolvedMode,
+          run_id: policyRunId,
+          rows_affected: 0,
+          duration_ms: failureDuration,
+          details: JSON.stringify({
+            status: 'failed',
+            error: error.message,
+            runId: policyRunId,
+            mode: resolvedMode,
+            dryRun: runDry
+          })
+        });
+      } catch (auditError) {
+        policyLogger.error({ err: auditError }, 'Failed to persist retention failure audit record');
+      }
+
       await publishRetentionEvent({
         runId,
         policy,

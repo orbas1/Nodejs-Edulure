@@ -24,6 +24,9 @@
 - Added a managed migration that creates the `domain_event_dispatch_queue` table with status tracking, lock metadata, and retry scheduling to persist event delivery state across restarts.
 - Extended configuration surfaces (.env, runtime loader, and test harness) with tunable dispatcher controls (batch sizing, backoff, recovery intervals) while documenting defaults in the update notes.
 - Created the `feature_flag_tenant_states` table and manifest catalogue, wiring bootstrap automation to keep flag definitions aligned with documentation and audit overrides per tenant/environment.
+- Delivered a governance-focused migration that upgrades `data_retention_audit_logs` with execution status metadata, run identifiers, and duration tracking while materialising the `vw_data_governance_retention_overview` view so operator tooling can surface policy health without ad-hoc SQL.
+- Introduced a repeatable schema integrity gate powered by a JSON snapshot, MySQL information schema inspection, and a `schema:validate` npm script that fails CI when tables, indexes, enums, or governed views drift from the audited baseline.
+- Seeded deterministic data retention audit history and hydrated reporting views with committed, simulated, and failed runs to support dashboard development, alerting calibration, and analytics smoke tests immediately after bootstrap.
 
 ## Quality Assurance
 - Authored automated unit coverage for the dispatcher service validating success, retry, and acknowledgement paths, and executed the Vitest target suite to guarantee deterministic behaviour for the new pipeline.

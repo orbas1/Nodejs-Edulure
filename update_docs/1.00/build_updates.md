@@ -1,0 +1,1 @@
+- Added `schema:validate` npm target backed by the new `scripts/validate-schema-integrity.js` utility so CI and local engineers can fail fast when the relational schema diverges from the audited snapshot.

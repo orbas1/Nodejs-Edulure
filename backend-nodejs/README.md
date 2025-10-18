@@ -260,6 +260,9 @@ Example Prometheus scrape configuration:
 - **Lifecycle coverage** – Communities dormant for two years are softly deleted rather than wiped, preserving the ability to
   restore IDs while hiding them from member listings. Domain events and content asset telemetry follow rolling hard deletes to
   keep analytics performant and storage predictable.
+- **Governance reporting** – The `vw_data_governance_retention_overview` view aggregates run counts, failures, and the latest
+  enforcement metrics per policy. Combine it with `npm run schema:validate` to guarantee migrations keep the relational schema
+  aligned with the audited snapshot consumed by analytics and compliance dashboards.
 
 ## Feature flags & runtime configuration
 

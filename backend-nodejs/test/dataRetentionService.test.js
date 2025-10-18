@@ -24,23 +24,27 @@ describe('dataRetentionService', () => {
   let auditInsert;
   let fakeDb;
   let fakeTrx;
+  let auditTable;
 
   beforeEach(() => {
     auditInsert = vi.fn().mockResolvedValue();
+    auditTable = { insert: auditInsert };
     fakeTrx = vi.fn((tableName) => {
       if (tableName === 'data_retention_audit_logs') {
-        return { insert: auditInsert };
+        return auditTable;
       }
       return createBuilder();
     });
     fakeTrx.raw = vi.fn(() => 'timestamp');
     fakeTrx.fn = { now: () => new Date() };
 
-    fakeDb = {
-      async transaction(handler) {
-        return handler(fakeTrx);
+    fakeDb = vi.fn((tableName) => {
+      if (tableName === 'data_retention_audit_logs') {
+        return auditTable;
       }
-    };
+      return createBuilder();
+    });
+    fakeDb.transaction = async (handler) => handler(fakeTrx);
     vi.spyOn(changeDataCaptureService, 'recordEvent').mockResolvedValue({ id: 1 });
   });
 
@@ -92,7 +96,9 @@ describe('dataRetentionService', () => {
     expect(auditInsert).toHaveBeenCalledTimes(1);
     expect(auditInsert.mock.calls[0][0]).toMatchObject({
       policy_id: 99,
-      rows_affected: 2
+      rows_affected: 2,
+      status: 'executed',
+      mode: 'commit'
     });
     const details = JSON.parse(auditInsert.mock.calls[0][0].details);
     expect(details.runId).toBeDefined();
@@ -118,7 +124,8 @@ describe('dataRetentionService', () => {
     expect(summary.results[0]).toMatchObject({ status: 'executed', affectedRows: 1 });
     expect(builders.at(-1).count).toHaveBeenCalledTimes(1);
     expect(builders.at(-1).del).not.toHaveBeenCalled();
-    expect(auditInsert).not.toHaveBeenCalled();
+    expect(auditInsert).toHaveBeenCalledTimes(1);
+    expect(auditInsert.mock.calls[0][0]).toMatchObject({ dry_run: true, mode: 'simulate' });
   });
 
   it('skips policies without registered strategies', async () => {
@@ -163,6 +170,7 @@ describe('dataRetentionService', () => {
       status: 'failed',
       error: 'database unavailable'
     });
-    expect(auditInsert).not.toHaveBeenCalled();
+    expect(auditInsert).toHaveBeenCalledTimes(1);
+    expect(auditInsert.mock.calls[0][0]).toMatchObject({ status: 'failed', rows_affected: 0 });
   });
 });
