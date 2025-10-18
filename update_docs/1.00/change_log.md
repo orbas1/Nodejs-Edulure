@@ -33,3 +33,9 @@
 - Added coverage for tenant override evaluation and governance sync workflows, exercising the new manifest automation and admin endpoints through Vitest to prevent regressions.
 - Added unit coverage for the schema guard diff engine to ensure drift detection logic remains stable as new tables and indexes are added.
 - Authored dedicated tests for the audit event service validating IP encryption, request-context enrichment, and metadata truncation so the new compliance telemetry remains deterministic.
+
+## Operator Experience Modernisation
+- Rebuilt the executive operator overview into a production-grade command centre that surfaces live KPIs, consolidated incident metrics, release readiness, and cross-tenant status from service health feeds with responsive layouts tuned for desktop and tablet operators.
+- Added a persistent executive dashboard data orchestration layer that coordinates tenant-aware API calls, caches results in IndexedDB for offline fallback, auto-refreshes while the tab is visible, and exposes manual refresh plus connectivity banners to operators.
+- Extended the dashboard shell to route admin users through the new experience while preserving existing learner and instructor journeys, ensuring role-aware navigation stays intact even when the admin payload is unavailable.
+- Shipped targeted Vitest coverage for the executive data hook to validate happy-path loading, caching, and degradation behaviour so operators always see deterministic data during network turbulence.

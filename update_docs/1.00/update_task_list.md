@@ -26,7 +26,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 5. **Security and compliance hardening** – 100%
    Delivered tenant-aware audit logging with encrypted IP capture, request-scoped evidence trails, and controller-level context propagation to evidence compliance readiness while preserving least-privilege access patterns.
 
-## Task 2 (0%): Modernise operator web experience and support tooling
+## Task 2 (20%): Modernise operator web experience and support tooling
 
 #### Integration coverage
 - **Backend**: Deliver consistent APIs, realtime channels, and error contracts consumed by each dashboard (Executive Overview, Learning Operations, Provider Relations, Compliance & Risk, Revenue & Finance, Support & Communications).
@@ -39,8 +39,8 @@ All tasks start at 0% completion and will be updated as implementation progresse
 - **Design**: Deliver responsive layouts, theming tokens, accessibility specs, and localisation coverage per dashboard, page, and screen.
 
 #### Subtasks
-1. **Executive & health dashboards rebuild** – 0%
-   Wire live KPIs, health widgets, alerts, incident timelines, release dashboards, and cross-tenant switchers into the Executive Overview and Operations Health surfaces with responsive layouts and offline fallbacks.
+1. **Executive & health dashboards rebuild** – 100%
+   Wired live KPIs, platform health widgets, incident timelines, release readiness dashboards, and cross-tenant tenant switchers into the Executive Overview and Operations Health surfaces with responsive layouts, offline fallbacks, and automated refresh intervals.
 2. **Learning & curriculum workspaces** – 0%
    Deliver course catalogue, cohort analytics, assignment pipelines, content authoring modals, and learner management pages with localisation, draft persistence, and collaborative editing.
 3. **Compliance & governance consoles** – 0%
