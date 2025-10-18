@@ -1,0 +1,7 @@
+# Frontend Change Log – Version 1.00
+
+## Operator dashboards
+- Replaced the admin dashboard home fallback with a dedicated executive overview that renders live KPI, incident, release, and operations readiness data with accessibility-friendly status badges and responsive card layouts.
+- Added a tenant-aware executive data pipeline (API client + React hook) that handles offline caching, background refresh, and visibility-aware polling so operators always work with deterministic metrics.
+- Wired the dashboard shell to route admin roles into the rebuilt overview while keeping instructor and learner flows untouched, ensuring multi-role accounts land on the correct workspace automatically.
+- Expanded Vitest coverage to validate the executive data hook’s load, refresh, and cached fallback behaviour to guard against regressions in degraded network conditions.

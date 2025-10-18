@@ -5,6 +5,7 @@ import { useDashboard } from '../../context/DashboardContext.jsx';
 import InstructorOverview from './instructor/InstructorOverview.jsx';
 import LearnerOverview from './learner/LearnerOverview.jsx';
 import CommunityOverview from './community/CommunityOverview.jsx';
+import AdminExecutiveOverview from './admin/AdminExecutiveOverview.jsx';
 
 export default function DashboardHome() {
   const { role, dashboard, refresh } = useOutletContext();
@@ -30,6 +31,10 @@ export default function DashboardHome() {
         onAction={() => refresh?.()}
       />
     );
+  }
+
+  if (role === 'admin') {
+    return <AdminExecutiveOverview />;
   }
 
   if (role === 'instructor') {

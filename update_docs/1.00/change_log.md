@@ -19,12 +19,23 @@
 - Hardened the domain event model with JSON normalisation, transaction-aware dispatch enqueueing, and backward-compatible options so existing services transparently gain outbox support.
 - Delivered manifest-driven feature flag governance with bootstrap synchronisation, tenant override storage, and admin APIs so operators can activate capabilities safely across tenants without database changes or engineer intervention.
 - Wrapped Stripe, PayPal, CloudConvert, and Twilio integrations with sandbox-aware gateways, Redis-backed circuit breakers, idempotent webhook receipts, and retry/backoff orchestration while updating payment flows and community reminders to consume the new abstractions.
+- Centralised compliance evidence capture with a dedicated audit event service that encrypts IP telemetry, enforces metadata retention limits, and wires controller request context into every DSR and consent lifecycle change.
 
 ## Data & Infrastructure Updates
 - Added a managed migration that creates the `domain_event_dispatch_queue` table with status tracking, lock metadata, and retry scheduling to persist event delivery state across restarts.
 - Extended configuration surfaces (.env, runtime loader, and test harness) with tunable dispatcher controls (batch sizing, backoff, recovery intervals) while documenting defaults in the update notes.
 - Created the `feature_flag_tenant_states` table and manifest catalogue, wiring bootstrap automation to keep flag definitions aligned with documentation and audit overrides per tenant/environment.
+- Delivered analytics-ready MySQL views that aggregate enrolment momentum, community engagement, and daily revenue to unblock operator dashboards and finance reconciliations without bespoke SQL.
+- Checked in a schema governance baseline and CLI guard so CI and scheduled jobs surface migration drift before it lands in production environments.
 
 ## Quality Assurance
 - Authored automated unit coverage for the dispatcher service validating success, retry, and acknowledgement paths, and executed the Vitest target suite to guarantee deterministic behaviour for the new pipeline.
 - Added coverage for tenant override evaluation and governance sync workflows, exercising the new manifest automation and admin endpoints through Vitest to prevent regressions.
+- Added unit coverage for the schema guard diff engine to ensure drift detection logic remains stable as new tables and indexes are added.
+- Authored dedicated tests for the audit event service validating IP encryption, request-context enrichment, and metadata truncation so the new compliance telemetry remains deterministic.
+
+## Operator Experience Modernisation
+- Rebuilt the executive operator overview into a production-grade command centre that surfaces live KPIs, consolidated incident metrics, release readiness, and cross-tenant status from service health feeds with responsive layouts tuned for desktop and tablet operators.
+- Added a persistent executive dashboard data orchestration layer that coordinates tenant-aware API calls, caches results in IndexedDB for offline fallback, auto-refreshes while the tab is visible, and exposes manual refresh plus connectivity banners to operators.
+- Extended the dashboard shell to route admin users through the new experience while preserving existing learner and instructor journeys, ensuring role-aware navigation stays intact even when the admin payload is unavailable.
+- Shipped targeted Vitest coverage for the executive data hook to validate happy-path loading, caching, and degradation behaviour so operators always see deterministic data during network turbulence.

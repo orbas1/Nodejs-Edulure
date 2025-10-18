@@ -2,6 +2,9 @@ import db from '../config/database.js';
 import logger from '../config/logger.js';
 import { TABLES as COMPLIANCE_TABLES } from '../database/domains/compliance.js';
 import changeDataCaptureService from './ChangeDataCaptureService.js';
+import AuditEventService from './AuditEventService.js';
+
+const defaultAuditLogger = new AuditEventService();
 
 function normalizeUser(user) {
   if (!user) {
@@ -81,9 +84,14 @@ function mapConsentRow(row) {
 }
 
 export default class ComplianceService {
-  constructor({ connection = db, loggerInstance = logger.child({ module: 'compliance-service' }) } = {}) {
+  constructor({
+    connection = db,
+    loggerInstance = logger.child({ module: 'compliance-service' }),
+    auditLogger = defaultAuditLogger
+  } = {}) {
     this.connection = connection;
     this.logger = loggerInstance;
+    this.auditLogger = auditLogger;
   }
 
   async listDsrRequests({ status, dueBefore, limit = 25, offset = 0 } = {}) {
@@ -152,7 +160,7 @@ export default class ComplianceService {
     };
   }
 
-  async assignDsrRequest({ requestId, assigneeId, actor }) {
+  async assignDsrRequest({ requestId, assigneeId, actor, requestContext }) {
     const updated = await this.connection(COMPLIANCE_TABLES.DSR_REQUESTS)
       .where({ id: requestId })
       .update({ handled_by: assigneeId, updated_at: this.connection.fn.now() });
@@ -166,7 +174,8 @@ export default class ComplianceService {
       entityType: 'dsr_request',
       entityId: requestId,
       actor,
-      metadata: { assigneeId }
+      metadata: { assigneeId },
+      requestContext
     });
 
     await changeDataCaptureService.recordEvent({
@@ -192,7 +201,7 @@ export default class ComplianceService {
     return mapDsrRow(row);
   }
 
-  async updateDsrStatus({ requestId, status, resolutionNotes, actor }) {
+  async updateDsrStatus({ requestId, status, resolutionNotes, actor, requestContext }) {
     const now = this.connection.fn.now();
     const updates = { status, updated_at: now };
 
@@ -215,7 +224,8 @@ export default class ComplianceService {
       entityType: 'dsr_request',
       entityId: requestId,
       actor,
-      metadata: { status, resolutionNotes }
+      metadata: { status, resolutionNotes },
+      requestContext
     });
 
     await changeDataCaptureService.recordEvent({
@@ -267,7 +277,8 @@ export default class ComplianceService {
     channel = 'web',
     actor,
     evidenceCiphertext,
-    metadata = {}
+    metadata = {},
+    requestContext
   }) {
     const policy = await this.connection(COMPLIANCE_TABLES.CONSENT_POLICIES)
       .where({ policy_key: consentType, version: policyVersion })
@@ -290,7 +301,14 @@ export default class ComplianceService {
       entityType: 'consent_record',
       entityId: id,
       actor,
-      metadata: { consentType, policyVersion }
+      metadata: {
+        userId,
+        consentType,
+        policyVersion,
+        channel,
+        evidenceAttached: Boolean(evidenceCiphertext)
+      },
+      requestContext
     });
 
     await changeDataCaptureService.recordEvent({
@@ -303,7 +321,7 @@ export default class ComplianceService {
     return this.connection(COMPLIANCE_TABLES.CONSENT_RECORDS).where({ id }).first();
   }
 
-  async revokeConsent({ consentId, reason, actor }) {
+  async revokeConsent({ consentId, reason, actor, requestContext }) {
     const now = this.connection.fn.now();
     const updated = await this.connection(COMPLIANCE_TABLES.CONSENT_RECORDS)
       .where({ id: consentId })
@@ -318,7 +336,8 @@ export default class ComplianceService {
       entityType: 'consent_record',
       entityId: consentId,
       actor,
-      metadata: { reason }
+      metadata: { reason },
+      requestContext
     });
 
     await changeDataCaptureService.recordEvent({
@@ -350,22 +369,15 @@ export default class ComplianceService {
     }));
   }
 
-  async #recordAuditEvent({ eventType, entityType, entityId, actor, metadata }) {
-    const payload = {
-      event_uuid: this.connection.raw('(UUID())'),
-      tenant_id: 'global',
-      actor_id: actor?.id ?? null,
-      actor_type: actor?.type ?? 'system',
-      actor_role: actor?.role ?? 'system',
-      event_type: eventType,
-      event_severity: 'info',
-      entity_type: entityType,
-      entity_id: String(entityId),
-      payload: metadata ?? {},
-      occurred_at: this.connection.fn.now(),
-      ingested_at: this.connection.fn.now()
-    };
-
-    await this.connection(COMPLIANCE_TABLES.AUDIT_EVENTS).insert(payload);
+  async #recordAuditEvent({ eventType, entityType, entityId, actor, metadata, requestContext }) {
+    await this.auditLogger.record({
+      eventType,
+      entityType,
+      entityId: String(entityId),
+      actor,
+      metadata: metadata ?? {},
+      requestContext,
+      tenantId: 'global'
+    });
   }
 }

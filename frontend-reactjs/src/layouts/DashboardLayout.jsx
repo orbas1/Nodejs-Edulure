@@ -399,7 +399,7 @@ export default function DashboardLayout() {
         description="Your account is not associated with an active learner or instructor Learnspace yet."
       />
     );
-  } else if (!currentDashboard) {
+  } else if (!currentDashboard && resolvedRole !== 'admin') {
     mainContent = (
       <DashboardStateMessage
         title="Dashboard data unavailable"

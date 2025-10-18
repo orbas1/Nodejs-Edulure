@@ -13,6 +13,18 @@ function resolveActor(req) {
   };
 }
 
+function resolveRequestContext(req) {
+  return {
+    requestId: req.id ?? req.headers?.['x-request-id'] ?? null,
+    traceId: req.traceId ?? null,
+    spanId: req.spanId ?? null,
+    ipAddress: req.ip ?? null,
+    userAgent: req.headers?.['user-agent'] ?? null,
+    method: req.method ?? null,
+    path: req.originalUrl ?? req.url ?? null
+  };
+}
+
 export default class ComplianceController {
   static async listDsrRequests(req, res, next) {
     try {
@@ -39,7 +51,8 @@ export default class ComplianceController {
       const record = await complianceService.assignDsrRequest({
         requestId: Number(requestId),
         assigneeId,
-        actor: resolveActor(req)
+        actor: resolveActor(req),
+        requestContext: resolveRequestContext(req)
       });
       return res.json({ success: true, data: record });
     } catch (error) {
@@ -58,7 +71,8 @@ export default class ComplianceController {
         requestId: Number(requestId),
         status,
         resolutionNotes,
-        actor: resolveActor(req)
+        actor: resolveActor(req),
+        requestContext: resolveRequestContext(req)
       });
       return res.json({ success: true, data: record });
     } catch (error) {
@@ -91,7 +105,8 @@ export default class ComplianceController {
         channel,
         metadata,
         evidenceCiphertext,
-        actor: resolveActor(req)
+        actor: resolveActor(req),
+        requestContext: resolveRequestContext(req)
       });
       return res.status(201).json({ success: true, data: record });
     } catch (error) {
@@ -106,7 +121,8 @@ export default class ComplianceController {
       const record = await complianceService.revokeConsent({
         consentId: Number(consentId),
         reason,
-        actor: resolveActor(req)
+        actor: resolveActor(req),
+        requestContext: resolveRequestContext(req)
       });
       return res.json({ success: true, data: record });
     } catch (error) {
