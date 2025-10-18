@@ -1,13 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import Stripe from 'stripe';
-import {
-  Client as PayPalClient,
-  Environment as PayPalEnvironment,
-  OrdersController,
-  PaymentsController
-} from '@paypal/paypal-server-sdk';
-
 import db from '../config/database.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
@@ -24,8 +16,7 @@ import {
 import PlatformSettingsService from './PlatformSettingsService.js';
 import EscrowService from './EscrowService.js';
 import webhookEventBusService from './WebhookEventBusService.js';
-
-const STRIPE_API_VERSION = '2024-06-20';
+import IntegrationProviderService from './IntegrationProviderService.js';
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
 
 function centsToCurrencyString(amount) {
@@ -119,12 +110,6 @@ function sanitizeMetadata(metadata) {
   return metadata;
 }
 
-function resolvePayPalEnvironment() {
-  return env.payments.paypal.environment === 'live'
-    ? PayPalEnvironment.Production
-    : PayPalEnvironment.Sandbox;
-}
-
 function normalizeProviderStatus(provider, providerStatus) {
   if (provider === 'stripe') {
     switch (providerStatus) {
@@ -166,53 +151,22 @@ function normalizeProviderStatus(provider, providerStatus) {
 }
 
 class PaymentService {
-  static stripeClient;
+  static stripeGateway;
 
-  static paypalClient;
+  static paypalGateway;
 
-  static paypalOrdersController;
-
-  static paypalPaymentsController;
-
-  static getStripeClient() {
-    if (!this.stripeClient) {
-      this.stripeClient = new Stripe(env.payments.stripe.secretKey, {
-        apiVersion: STRIPE_API_VERSION,
-        appInfo: {
-          name: 'Edulure Platform',
-          version: '1.50.0'
-        }
-      });
+  static getStripeGateway() {
+    if (!this.stripeGateway) {
+      this.stripeGateway = IntegrationProviderService.getStripeGateway();
     }
-    return this.stripeClient;
+    return this.stripeGateway;
   }
 
-  static getPayPalClient() {
-    if (!this.paypalClient) {
-      this.paypalClient = new PayPalClient({
-        environment: resolvePayPalEnvironment(),
-        timeout: 10000,
-        clientCredentialsAuthCredentials: {
-          oAuthClientId: env.payments.paypal.clientId,
-          oAuthClientSecret: env.payments.paypal.clientSecret
-        }
-      });
+  static getPayPalGateway() {
+    if (!this.paypalGateway) {
+      this.paypalGateway = IntegrationProviderService.getPayPalGateway();
     }
-    return this.paypalClient;
-  }
-
-  static getPayPalOrdersController() {
-    if (!this.paypalOrdersController) {
-      this.paypalOrdersController = new OrdersController(this.getPayPalClient());
-    }
-    return this.paypalOrdersController;
-  }
-
-  static getPayPalPaymentsController() {
-    if (!this.paypalPaymentsController) {
-      this.paypalPaymentsController = new PaymentsController(this.getPayPalClient());
-    }
-    return this.paypalPaymentsController;
+    return this.paypalGateway;
   }
 
   static toApiIntent(intent) {
@@ -591,10 +545,10 @@ class PaymentService {
     }
 
     if (normalizedProvider === 'stripe') {
-      const stripe = this.getStripeClient();
+      const stripeGateway = this.getStripeGateway();
       let stripeIntent;
       try {
-        stripeIntent = await stripe.paymentIntents.create(
+        stripeIntent = await stripeGateway.createPaymentIntent(
           {
             amount: totals.total,
             currency: normalizedCurrency.toLowerCase(),
@@ -613,9 +567,7 @@ class PaymentService {
             statement_descriptor: env.payments.stripe.statementDescriptor,
             statement_descriptor_suffix: (entity?.name ?? 'Edulure').slice(0, 20)
           },
-          {
-            idempotencyKey: publicId
-          }
+          { idempotencyKey: publicId }
         );
       } catch (error) {
         logger.error({ err: error, publicId }, 'Failed to create Stripe payment intent');
@@ -721,10 +673,10 @@ class PaymentService {
 
       let order;
       try {
-        order = await this.getPayPalOrdersController().createOrder({
+        const paypalGateway = this.getPayPalGateway();
+        order = await paypalGateway.createOrder({
           body: paypalOrderPayload,
-          paypalRequestId: publicId,
-          prefer: 'return=representation'
+          requestId: publicId
         });
       } catch (error) {
         logger.error({ err: error, publicId }, 'Failed to create PayPal order');
@@ -790,10 +742,10 @@ class PaymentService {
 
       let captureResponse;
       try {
-        captureResponse = await this.getPayPalOrdersController().captureOrder({
-          id: intent.providerIntentId,
-          paypalRequestId: randomUUID(),
-          prefer: 'return=representation'
+        const paypalGateway = this.getPayPalGateway();
+        captureResponse = await paypalGateway.captureOrder({
+          orderId: intent.providerIntentId,
+          requestId: randomUUID()
         });
       } catch (error) {
         logger.error({ err: error, publicId }, 'PayPal capture failed');
@@ -923,34 +875,48 @@ class PaymentService {
   }
 
   static async handleStripeWebhook(rawBody, signature) {
-    const webhookSecret = env.payments.stripe.webhookSecret;
-    if (!webhookSecret) {
-      const error = new Error('Stripe webhook secret not configured.');
-      error.status = 500;
-      throw error;
-    }
+    const stripeGateway = this.getStripeGateway();
+    let verification;
 
-    let event;
     try {
-      event = this.getStripeClient().webhooks.constructEvent(rawBody, signature, webhookSecret);
+      verification = await stripeGateway.verifyWebhook({ rawBody, signature });
     } catch (error) {
-      logger.error({ err: error }, 'Stripe webhook signature verification failed');
-      error.status = 400;
+      logger.error({ err: error }, 'Stripe webhook verification failed');
       throw error;
     }
 
-    switch (event.type) {
-      case 'payment_intent.succeeded':
-        await this.handleStripePaymentSucceeded(event.data.object);
-        break;
-      case 'payment_intent.payment_failed':
-        await this.handleStripePaymentFailed(event.data.object);
-        break;
-      case 'charge.refunded':
-        await this.handleStripeChargeRefunded(event.data.object);
-        break;
-      default:
-        logger.debug({ type: event.type }, 'Unhandled Stripe webhook event');
+    if (verification.duplicate) {
+      await stripeGateway.markWebhookProcessed(verification.receipt, {
+        status: 'duplicate',
+        errorMessage: null
+      });
+      return { received: true, duplicate: true };
+    }
+
+    const { event, receipt } = verification;
+
+    try {
+      switch (event.type) {
+        case 'payment_intent.succeeded':
+          await this.handleStripePaymentSucceeded(event.data.object);
+          break;
+        case 'payment_intent.payment_failed':
+          await this.handleStripePaymentFailed(event.data.object);
+          break;
+        case 'charge.refunded':
+          await this.handleStripeChargeRefunded(event.data.object);
+          break;
+        default:
+          logger.debug({ type: event.type }, 'Unhandled Stripe webhook event');
+      }
+
+      await stripeGateway.markWebhookProcessed(receipt, { status: 'processed' });
+    } catch (error) {
+      await stripeGateway.markWebhookProcessed(receipt, {
+        status: 'failed',
+        errorMessage: error.message
+      });
+      throw error;
     }
 
     return { received: true };
@@ -1191,8 +1157,8 @@ class PaymentService {
       let refundCurrency = intent.currency;
 
       if (intent.provider === 'stripe') {
-        const stripe = this.getStripeClient();
-        const refund = await stripe.refunds.create(
+        const stripeGateway = this.getStripeGateway();
+        const refund = await stripeGateway.refundPaymentIntent(
           {
             payment_intent: intent.providerIntentId,
             amount: refundAmount,
@@ -1248,10 +1214,11 @@ class PaymentService {
           }
         };
 
-        const response = await this.getPayPalPaymentsController().refundCapturedPayment({
+        const paypalGateway = this.getPayPalGateway();
+        const response = await paypalGateway.refundCapture({
           captureId: intent.providerCaptureId,
           body: refundRequest,
-          paypalRequestId: randomUUID()
+          requestId: randomUUID()
         });
 
         providerRefundId = response.result.id;

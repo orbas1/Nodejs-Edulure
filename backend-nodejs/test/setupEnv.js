@@ -6,6 +6,9 @@ process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'error';
 process.env.JWT_SECRET = process.env.JWT_SECRET ?? 'test-secret-test-secret-test-secret-123';
 process.env.JWT_REFRESH_SECRET =
   process.env.JWT_REFRESH_SECRET ?? 'refresh-secret-refresh-secret-refresh-secret-456';
+process.env.FEATURE_FLAG_SYNC_ON_BOOT = process.env.FEATURE_FLAG_SYNC_ON_BOOT ?? 'true';
+process.env.FEATURE_FLAG_SYNC_ACTOR = process.env.FEATURE_FLAG_SYNC_ACTOR ?? 'test-bootstrap';
+process.env.FEATURE_FLAG_DEFAULT_ENVIRONMENT = process.env.FEATURE_FLAG_DEFAULT_ENVIRONMENT ?? 'staging';
 
 if (!process.env.JWT_KEYSET) {
   const keyset = {
@@ -56,6 +59,16 @@ process.env.ANTIVIRUS_FAIL_OPEN = process.env.ANTIVIRUS_FAIL_OPEN ?? 'false';
 process.env.ANTIVIRUS_CACHE_TTL_SECONDS = process.env.ANTIVIRUS_CACHE_TTL_SECONDS ?? '60';
 process.env.ANTIVIRUS_SKIP_TAG = process.env.ANTIVIRUS_SKIP_TAG ?? 'edulure-skip-scan';
 process.env.CLOUDCONVERT_API_KEY = process.env.CLOUDCONVERT_API_KEY ?? 'test-cloudconvert-key';
+process.env.CLOUDCONVERT_SANDBOX_API_KEY = process.env.CLOUDCONVERT_SANDBOX_API_KEY ?? 'test-cloudconvert-sandbox';
+process.env.CLOUDCONVERT_BASE_URL = process.env.CLOUDCONVERT_BASE_URL ?? 'https://api.cloudconvert.com/v2';
+process.env.CLOUDCONVERT_SANDBOX_MODE = process.env.CLOUDCONVERT_SANDBOX_MODE ?? 'false';
+process.env.CLOUDCONVERT_TIMEOUT_MS = process.env.CLOUDCONVERT_TIMEOUT_MS ?? '15000';
+process.env.CLOUDCONVERT_RETRY_ATTEMPTS = process.env.CLOUDCONVERT_RETRY_ATTEMPTS ?? '1';
+process.env.CLOUDCONVERT_RETRY_BASE_DELAY_MS = process.env.CLOUDCONVERT_RETRY_BASE_DELAY_MS ?? '100';
+process.env.CLOUDCONVERT_CIRCUIT_BREAKER_THRESHOLD =
+  process.env.CLOUDCONVERT_CIRCUIT_BREAKER_THRESHOLD ?? '3';
+process.env.CLOUDCONVERT_CIRCUIT_BREAKER_COOLDOWN_SECONDS =
+  process.env.CLOUDCONVERT_CIRCUIT_BREAKER_COOLDOWN_SECONDS ?? '60';
 process.env.DRM_DOWNLOAD_LIMIT = process.env.DRM_DOWNLOAD_LIMIT ?? '3';
 process.env.SMTP_HOST = process.env.SMTP_HOST ?? '127.0.0.1';
 process.env.SMTP_PORT = process.env.SMTP_PORT ?? '1025';
@@ -77,10 +90,36 @@ process.env.MAX_ACTIVE_SESSIONS_PER_USER = process.env.MAX_ACTIVE_SESSIONS_PER_U
 process.env.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? 'sk_test_1234567890abcdef';
 process.env.STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY ?? 'pk_test_1234567890abcdef';
 process.env.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? 'whsec_test_secret_key';
+process.env.STRIPE_MODE = process.env.STRIPE_MODE ?? 'test';
+process.env.STRIPE_SANDBOX_SECRET_KEY = process.env.STRIPE_SANDBOX_SECRET_KEY ?? process.env.STRIPE_SECRET_KEY;
+process.env.STRIPE_SANDBOX_PUBLISHABLE_KEY =
+  process.env.STRIPE_SANDBOX_PUBLISHABLE_KEY ?? process.env.STRIPE_PUBLISHABLE_KEY;
+process.env.STRIPE_SANDBOX_WEBHOOK_SECRET =
+  process.env.STRIPE_SANDBOX_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET;
+process.env.STRIPE_RETRY_ATTEMPTS = process.env.STRIPE_RETRY_ATTEMPTS ?? '1';
+process.env.STRIPE_RETRY_BASE_DELAY_MS = process.env.STRIPE_RETRY_BASE_DELAY_MS ?? '100';
+process.env.STRIPE_CIRCUIT_BREAKER_THRESHOLD = process.env.STRIPE_CIRCUIT_BREAKER_THRESHOLD ?? '5';
+process.env.STRIPE_CIRCUIT_BREAKER_COOLDOWN_SECONDS =
+  process.env.STRIPE_CIRCUIT_BREAKER_COOLDOWN_SECONDS ?? '60';
+process.env.STRIPE_WEBHOOK_DEDUPE_TTL_SECONDS = process.env.STRIPE_WEBHOOK_DEDUPE_TTL_SECONDS ?? '86400';
+process.env.STRIPE_WEBHOOK_MAX_SKEW_SECONDS = process.env.STRIPE_WEBHOOK_MAX_SKEW_SECONDS ?? '1800';
 process.env.STRIPE_STATEMENT_DESCRIPTOR = process.env.STRIPE_STATEMENT_DESCRIPTOR ?? 'EDULURE TEST';
 process.env.PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID ?? 'paypal-test-client-id';
 process.env.PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET ?? 'paypal-test-client-secret';
 process.env.PAYPAL_ENVIRONMENT = process.env.PAYPAL_ENVIRONMENT ?? 'sandbox';
+process.env.PAYPAL_SANDBOX_CLIENT_ID =
+  process.env.PAYPAL_SANDBOX_CLIENT_ID ?? process.env.PAYPAL_CLIENT_ID;
+process.env.PAYPAL_SANDBOX_CLIENT_SECRET =
+  process.env.PAYPAL_SANDBOX_CLIENT_SECRET ?? process.env.PAYPAL_CLIENT_SECRET;
+process.env.PAYPAL_RETRY_ATTEMPTS = process.env.PAYPAL_RETRY_ATTEMPTS ?? '1';
+process.env.PAYPAL_RETRY_BASE_DELAY_MS = process.env.PAYPAL_RETRY_BASE_DELAY_MS ?? '120';
+process.env.PAYPAL_CIRCUIT_BREAKER_THRESHOLD = process.env.PAYPAL_CIRCUIT_BREAKER_THRESHOLD ?? '4';
+process.env.PAYPAL_CIRCUIT_BREAKER_COOLDOWN_SECONDS =
+  process.env.PAYPAL_CIRCUIT_BREAKER_COOLDOWN_SECONDS ?? '90';
+process.env.PAYPAL_WEBHOOK_DEDUPE_TTL_SECONDS =
+  process.env.PAYPAL_WEBHOOK_DEDUPE_TTL_SECONDS ?? '86400';
+process.env.PAYPAL_WEBHOOK_MAX_SKEW_SECONDS =
+  process.env.PAYPAL_WEBHOOK_MAX_SKEW_SECONDS ?? '3600';
 process.env.PAYPAL_WEBHOOK_ID = process.env.PAYPAL_WEBHOOK_ID ?? 'paypal-webhook-id';
 process.env.PAYMENTS_DEFAULT_CURRENCY = process.env.PAYMENTS_DEFAULT_CURRENCY ?? 'USD';
 process.env.PAYMENTS_ALLOWED_CURRENCIES = process.env.PAYMENTS_ALLOWED_CURRENCIES ?? 'USD,EUR,GBP';
@@ -134,3 +173,18 @@ process.env.MEILISEARCH_REQUEST_TIMEOUT_MS =
   process.env.MEILISEARCH_REQUEST_TIMEOUT_MS ?? '5000';
 process.env.MEILISEARCH_INDEX_PREFIX = process.env.MEILISEARCH_INDEX_PREFIX ?? 'edulure';
 process.env.MEILISEARCH_ALLOWED_IPS = process.env.MEILISEARCH_ALLOWED_IPS ?? '127.0.0.1/32';
+
+process.env.TWILIO_ENVIRONMENT = process.env.TWILIO_ENVIRONMENT ?? 'sandbox';
+process.env.TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID ?? 'AC0000000000000000000000000000000';
+process.env.TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN ?? 'testauthtoken1234567890';
+process.env.TWILIO_MESSAGING_SERVICE_SID =
+  process.env.TWILIO_MESSAGING_SERVICE_SID ?? 'MG0000000000000000000000000000000';
+process.env.TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER ?? '+15005550006';
+process.env.TWILIO_SANDBOX_FROM_NUMBER =
+  process.env.TWILIO_SANDBOX_FROM_NUMBER ?? '+15005550006';
+process.env.TWILIO_RETRY_ATTEMPTS = process.env.TWILIO_RETRY_ATTEMPTS ?? '1';
+process.env.TWILIO_RETRY_BASE_DELAY_MS = process.env.TWILIO_RETRY_BASE_DELAY_MS ?? '100';
+process.env.TWILIO_CIRCUIT_BREAKER_THRESHOLD =
+  process.env.TWILIO_CIRCUIT_BREAKER_THRESHOLD ?? '3';
+process.env.TWILIO_CIRCUIT_BREAKER_COOLDOWN_SECONDS =
+  process.env.TWILIO_CIRCUIT_BREAKER_COOLDOWN_SECONDS ?? '90';

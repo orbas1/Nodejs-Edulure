@@ -94,10 +94,20 @@ vi.mock('prom-client', () => {
 
 vi.mock('../src/models/FeatureFlagModel.js', () => ({
   default: {
-    all: vi.fn(async () => [])
+    all: vi.fn(async () => []),
+    allWithOverrides: vi.fn(async () => []),
+    findByKey: vi.fn(async () => null),
+    insert: vi.fn(async (definition) => ({ ...definition, id: 1, tenantOverrides: [] })),
+    update: vi.fn(async (id, definition) => ({ ...definition, id, tenantOverrides: [] }))
   },
   FeatureFlagAuditModel: {
     record: vi.fn(async () => undefined),
+    listForFlag: vi.fn(async () => [])
+  },
+  FeatureFlagTenantStateModel: {
+    upsert: vi.fn(async () => ({})),
+    remove: vi.fn(async () => 0),
+    listForTenant: vi.fn(async () => []),
     listForFlag: vi.fn(async () => [])
   }
 }));

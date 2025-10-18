@@ -1,3 +1,5 @@
 # Config Changes – Version 1.00
 
 - Introduced `DOMAIN_EVENTS_DISPATCH_*` environment switches in `env.js` to control queue polling cadence, batch size, retry ceilings, jitter, and recovery behaviour for the new domain event dispatcher. These values flow through to runtime configuration, readiness logging, and the test harness so lower environments can dial the worker to safe limits.
+- Added manifest-driven feature flag configuration to `env.js`, including bootstrap synchronisation toggles and the default governance actor, ensuring operators can enable or pause automated syncing per environment while test harnesses inherit deterministic defaults.
+- Expanded `env.js` with provider-specific configuration blocks for Stripe, PayPal, CloudConvert, and Twilio, introducing sandbox credential fallbacks, retry/backoff tunables, circuit breaker thresholds, webhook dedupe windows, and a dedicated `messaging.twilio` namespace so operations can independently tune third-party resilience across environments.

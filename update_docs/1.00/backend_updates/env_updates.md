@@ -2,3 +2,5 @@
 
 - Documented defaults for the dispatcher controls in `.env.example` (`DOMAIN_EVENTS_DISPATCH_ENABLED`, `DOMAIN_EVENTS_DISPATCH_POLL_INTERVAL_MS`, `DOMAIN_EVENTS_DISPATCH_BATCH_SIZE`, etc.) so operations teams can tune throughput, retry policy, and recovery windows per environment.
 - Synchronized `test/setupEnv.js` with the new variables to guarantee Vitest exercises the dispatcher using deterministic values during automation.
+- Added `FEATURE_FLAG_SYNC_ON_BOOT`, `FEATURE_FLAG_SYNC_ACTOR`, and `FEATURE_FLAG_DEFAULT_ENVIRONMENT` to `.env.example` and the Vitest harness so manifest synchronisation, governance audit ownership, and evaluation defaults can be configured per deployment tier.
+- Introduced new `.env.example` knobs for Stripe (`STRIPE_MODE`, sandbox secrets, retry/circuit/webhook tuning), PayPal (sandbox credentials, retry/circuit/webhook windows), CloudConvert (sandbox API key, base URL, retry/circuit settings), and Twilio (environment, credentials, retry/circuit controls) alongside matching `test/setupEnv.js` defaults so third-party wrappers can be exercised consistently across environments.

@@ -4,10 +4,10 @@ Progress is tracked per task and subtask across the required dimensions. Overall
 
 | Task / Subtask | Security level | Completion level | Integration level | Functionality level | Error free level | Production level | Overall level |
 |---------------|----------------|------------------|-------------------|---------------------|------------------|------------------|---------------|
-| **Task 1: Stabilise core services, data governance, and integrations** | 20% | 20% | 20% | 20% | 20% | 20% | 20% |
+| **Task 1: Stabilise core services, data governance, and integrations** | 60% | 60% | 60% | 60% | 60% | 60% | 60% |
 | &nbsp;&nbsp;Service hardening and automation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| &nbsp;&nbsp;Feature flag governance | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| &nbsp;&nbsp;Third-party integration wrappers | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| &nbsp;&nbsp;Feature flag governance | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| &nbsp;&nbsp;Third-party integration wrappers | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Data governance rebuild | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;Security and compliance hardening | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | **Task 2: Modernise operator web experience and support tooling** | 0% | 0% | 0% | 0% | 0% | 0% | 0% |

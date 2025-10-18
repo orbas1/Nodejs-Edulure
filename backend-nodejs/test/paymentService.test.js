@@ -177,10 +177,8 @@ describe('PaymentService', () => {
     env.payments.tax.inclusive = originalTaxConfig.inclusive;
     env.payments.tax.minimumRate = originalTaxConfig.minimumRate;
     env.payments.tax.table = { ...originalTaxConfig.table };
-    PaymentService.stripeClient = null;
-    PaymentService.paypalClient = null;
-    PaymentService.paypalOrdersController = null;
-    PaymentService.paypalPaymentsController = null;
+    PaymentService.stripeGateway = null;
+    PaymentService.paypalGateway = null;
   });
 
   afterEach(() => {
@@ -270,10 +268,8 @@ describe('PaymentService', () => {
       status: 'requires_payment_method'
     }));
 
-    vi.spyOn(PaymentService, 'getStripeClient').mockReturnValue({
-      paymentIntents: {
-        create: stripeCreate
-      }
+    vi.spyOn(PaymentService, 'getStripeGateway').mockReturnValue({
+      createPaymentIntent: stripeCreate
     });
 
     const result = await PaymentService.createPaymentIntent({
@@ -393,7 +389,7 @@ describe('PaymentService', () => {
 
     const captureSpy = vi.fn(async () => captureResponse);
 
-    vi.spyOn(PaymentService, 'getPayPalOrdersController').mockReturnValue({
+    vi.spyOn(PaymentService, 'getPayPalGateway').mockReturnValue({
       captureOrder: captureSpy
     });
 
@@ -402,8 +398,8 @@ describe('PaymentService', () => {
     expect(paymentIntentModel.lockByPublicId).toHaveBeenCalledWith('pay-123', expect.anything());
     expect(captureSpy).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'ORDER-321',
-        prefer: 'return=representation'
+        orderId: 'ORDER-321',
+        requestId: expect.any(String)
       })
     );
     expect(paymentIntentModel.updateById).toHaveBeenCalledWith(
@@ -462,15 +458,13 @@ describe('PaymentService', () => {
       .mockResolvedValueOnce({ ...baseIntent, amountRefunded: 400, status: 'partially_refunded' });
     paymentIntentModel.updateById.mockResolvedValue({ ...baseIntent, status: 'partially_refunded' });
 
-    const stripeRefundCreate = vi.fn(async () => ({
+    const refundPaymentIntent = vi.fn(async () => ({
       id: 're_111',
       status: 'succeeded'
     }));
 
-    vi.spyOn(PaymentService, 'getStripeClient').mockReturnValue({
-      refunds: {
-        create: stripeRefundCreate
-      }
+    vi.spyOn(PaymentService, 'getStripeGateway').mockReturnValue({
+      refundPaymentIntent
     });
 
     const result = await PaymentService.issueRefund({
@@ -480,7 +474,7 @@ describe('PaymentService', () => {
       requesterId: 'admin-42'
     });
 
-    expect(stripeRefundCreate).toHaveBeenCalledWith(
+    expect(refundPaymentIntent).toHaveBeenCalledWith(
       { payment_intent: 'pi_456', amount: 400, reason: 'duplicate' },
       { idempotencyKey: expect.any(String) }
     );
@@ -512,15 +506,18 @@ describe('PaymentService', () => {
   });
 
   it('validates Stripe webhook signatures before delegating handlers', async () => {
-    const constructEvent = vi.fn(() => ({
-      type: 'payment_intent.succeeded',
-      data: { object: { id: 'pi_789', amount_received: 1234, currency: 'usd' } }
+    const verifyWebhook = vi.fn(async () => ({
+      event: {
+        type: 'payment_intent.succeeded',
+        data: { object: { id: 'pi_789', amount_received: 1234, currency: 'usd' } }
+      },
+      receipt: { id: 'r-1' }
     }));
+    const markWebhookProcessed = vi.fn(async () => {});
 
-    vi.spyOn(PaymentService, 'getStripeClient').mockReturnValue({
-      webhooks: {
-        constructEvent
-      }
+    vi.spyOn(PaymentService, 'getStripeGateway').mockReturnValue({
+      verifyWebhook,
+      markWebhookProcessed
     });
 
     const successSpy = vi.spyOn(PaymentService, 'handleStripePaymentSucceeded').mockResolvedValue();
@@ -529,10 +526,11 @@ describe('PaymentService', () => {
 
     const response = await PaymentService.handleStripeWebhook('{"id":"evt"}', 't=test');
 
-    expect(constructEvent).toHaveBeenCalledWith('{"id":"evt"}', 't=test', env.payments.stripe.webhookSecret);
+    expect(verifyWebhook).toHaveBeenCalledWith({ rawBody: '{"id":"evt"}', signature: 't=test' });
     expect(successSpy).toHaveBeenCalledWith({ id: 'pi_789', amount_received: 1234, currency: 'usd' });
     expect(failureSpy).not.toHaveBeenCalled();
     expect(refundSpy).not.toHaveBeenCalled();
+    expect(markWebhookProcessed).toHaveBeenCalledWith({ id: 'r-1' }, { status: 'processed' });
     expect(response).toEqual({ received: true });
   });
 

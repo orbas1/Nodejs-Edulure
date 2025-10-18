@@ -139,6 +139,27 @@ function convertConfigValue(entry) {
   }
 }
 
+const wildcardTenantKey = '*';
+
+function buildTenantOverrideIndex(overrides = []) {
+  const environments = new Map();
+  for (const override of overrides) {
+    if (!override || !override.tenantId) {
+      continue;
+    }
+
+    const environmentKey = (override.environment ?? 'production').toLowerCase();
+    if (!environments.has(environmentKey)) {
+      environments.set(environmentKey, new Map());
+    }
+
+    const tenants = environments.get(environmentKey);
+    tenants.set(override.tenantId, override);
+  }
+
+  return environments;
+}
+
 const featureFlagEvaluationMetricName = 'edulure_feature_flag_evaluations_total';
 let featureFlagEvaluationMetric = metricsRegistry.getSingleMetric(featureFlagEvaluationMetricName);
 if (!featureFlagEvaluationMetric) {
@@ -222,7 +243,12 @@ export class FeatureFlagService {
     if (Array.isArray(flags)) {
       for (const flag of flags) {
         if (flag && flag.key) {
-          map.set(flag.key, flag);
+          const tenantOverrides = Array.isArray(flag.tenantOverrides) ? flag.tenantOverrides : [];
+          map.set(flag.key, {
+            ...flag,
+            tenantOverrides,
+            tenantOverrideIndex: buildTenantOverrideIndex(tenantOverrides)
+          });
         }
       }
     }
@@ -359,7 +385,7 @@ export class FeatureFlagService {
   }
 
   evaluateDefinition(flag, context) {
-    const environment = context.environment ?? env.nodeEnv;
+    const environment = (context.environment ?? env.nodeEnv ?? 'development').toLowerCase();
     const traceId = context.traceId ?? null;
     const targetIdentifier =
       context.targetId ?? context.userId ?? context.sessionId ?? context.tenantId ?? context.accountId ?? traceId ?? null;
@@ -409,7 +435,25 @@ export class FeatureFlagService {
       }
     }
 
-    const variant = enabled ? selectVariant(flag.variants, bucket) : null;
+    let variant = enabled ? selectVariant(flag.variants, bucket) : null;
+
+    const override = this.resolveTenantOverride(flag, context, environment);
+    let overridden = false;
+
+    if (override && override.state) {
+      overridden = true;
+      if (override.state === 'forced_on') {
+        enabled = true;
+        reason = 'tenant-override-enabled';
+        if (override.variantKey) {
+          variant = override.variantKey;
+        }
+      } else if (override.state === 'forced_off') {
+        enabled = false;
+        reason = 'tenant-override-disabled';
+        variant = null;
+      }
+    }
 
     featureFlagEvaluationMetric.inc({
       flag_key: flag.key,
@@ -425,8 +469,60 @@ export class FeatureFlagService {
       variant,
       bucket,
       strategy: flag.rolloutStrategy,
-      evaluatedAt: new Date().toISOString()
+      environment,
+      evaluatedAt: new Date().toISOString(),
+      overridden,
+      override: override
+        ? {
+            state: override.state,
+            variantKey: override.variantKey ?? null,
+            tenantId: override.tenantId,
+            environment: override.environment,
+            updatedBy: override.updatedBy ?? null,
+            updatedAt: override.updatedAt ?? null,
+            metadata: override.metadata ?? {}
+          }
+        : null
     };
+  }
+
+  resolveTenantOverride(flag, context, environment) {
+    if (!flag?.tenantOverrideIndex || !(flag.tenantOverrideIndex instanceof Map)) {
+      return null;
+    }
+
+    const tenantId = context.tenantId ?? null;
+    if (!tenantId) {
+      return null;
+    }
+
+    const searchOrder = Array.from(
+      new Set([
+        environment,
+        `${environment}`.split('-')[0],
+        'production',
+        'global',
+        'all',
+        '*'
+      ])
+    ).filter(Boolean);
+
+    for (const envKey of searchOrder) {
+      const overrides = flag.tenantOverrideIndex.get(envKey);
+      if (!overrides) {
+        continue;
+      }
+
+      if (overrides.has(tenantId)) {
+        return overrides.get(tenantId);
+      }
+
+      if (overrides.has(wildcardTenantKey)) {
+        return overrides.get(wildcardTenantKey);
+      }
+    }
+
+    return null;
   }
 
   matchesSegmentRules(rules, context, bucket) {
@@ -763,7 +859,7 @@ export class RuntimeConfigService {
 }
 
 export const featureFlagService = new FeatureFlagService({
-  loadFlags: () => FeatureFlagModel.all(),
+  loadFlags: () => FeatureFlagModel.allWithOverrides(),
   cacheTtlMs: env.runtimeConfig.featureFlagCacheTtlMs,
   refreshIntervalMs: env.runtimeConfig.featureFlagRefreshIntervalMs,
   loggerInstance: logger.child({ service: 'FeatureFlagService' }),

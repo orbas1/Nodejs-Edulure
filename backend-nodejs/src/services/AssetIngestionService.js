@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import CloudConvert from 'cloudconvert';
 import AdmZip from 'adm-zip';
 import { XMLParser } from 'fast-xml-parser';
 
@@ -11,15 +10,14 @@ import AssetIngestionJobModel from '../models/AssetIngestionJobModel.js';
 import ContentAssetModel from '../models/ContentAssetModel.js';
 import ContentAuditLogModel from '../models/ContentAuditLogModel.js';
 import storageService from './StorageService.js';
+import IntegrationProviderService from './IntegrationProviderService.js';
 
 const POLL_INTERVAL_MS = 15000;
 
 class AssetIngestionService {
   constructor() {
     this.interval = null;
-    this.cloudConvert = env.integrations.cloudConvertApiKey
-      ? new CloudConvert(env.integrations.cloudConvertApiKey)
-      : null;
+    this.cloudConvert = IntegrationProviderService.getCloudConvertClient();
   }
 
   start() {
@@ -71,7 +69,7 @@ class AssetIngestionService {
   }
 
   async processPowerpoint(job, asset) {
-    if (!this.cloudConvert) {
+    if (!this.cloudConvert || !this.cloudConvert.isConfigured()) {
       throw new Error('CloudConvert API key is not configured. Cannot process PowerPoint.');
     }
     const sourceSigned = await storageService.createDownloadUrl({
@@ -80,7 +78,7 @@ class AssetIngestionService {
       responseContentDisposition: `attachment; filename="${asset.originalFilename}"`
     });
 
-    const ccJob = await this.cloudConvert.jobs.create({
+    const ccJob = await this.cloudConvert.createJob({
       tasks: {
         importSource: {
           operation: 'import/url',
@@ -105,7 +103,7 @@ class AssetIngestionService {
       }
     });
 
-    const completed = await this.cloudConvert.jobs.wait(ccJob.id);
+    const completed = await this.cloudConvert.waitForJob(ccJob.id);
     const pdfTask = completed.tasks.find((task) => task.name === 'convertPdf');
     const previewTask = completed.tasks.find((task) => task.name === 'convertThumbnail');
     let previewMetadata = null;

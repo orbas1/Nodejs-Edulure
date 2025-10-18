@@ -347,6 +347,14 @@ const envSchema = z
     ASSET_DOWNLOAD_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(60),
     CONTENT_MAX_UPLOAD_MB: z.coerce.number().int().min(10).max(2048).default(512),
     CLOUDCONVERT_API_KEY: z.string().min(1).optional(),
+    CLOUDCONVERT_SANDBOX_API_KEY: z.string().min(1).optional(),
+    CLOUDCONVERT_BASE_URL: z.string().url().default('https://api.cloudconvert.com/v2'),
+    CLOUDCONVERT_SANDBOX_MODE: z.coerce.boolean().default(false),
+    CLOUDCONVERT_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
+    CLOUDCONVERT_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(6).default(3),
+    CLOUDCONVERT_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(50).max(5000).default(500),
+    CLOUDCONVERT_CIRCUIT_BREAKER_THRESHOLD: z.coerce.number().int().min(1).max(20).default(6),
+    CLOUDCONVERT_CIRCUIT_BREAKER_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),
     HUBSPOT_ENABLED: z.coerce.boolean().default(false),
     HUBSPOT_PRIVATE_APP_TOKEN: z.string().min(20).optional(),
     HUBSPOT_BASE_URL: z.string().url().default('https://api.hubapi.com'),
@@ -380,9 +388,29 @@ const envSchema = z
     WEBHOOK_BUS_RECOVER_AFTER_MS: z.coerce.number().int().min(60 * 1000).max(6 * 60 * 60 * 1000).default(5 * 60 * 1000),
     DRM_DOWNLOAD_LIMIT: z.coerce.number().int().min(1).max(10).default(3),
     DRM_SIGNATURE_SECRET: z.string().min(32).optional(),
+    STRIPE_MODE: z.enum(['test', 'live']).default('test'),
     STRIPE_SECRET_KEY: z.string().min(10),
     STRIPE_PUBLISHABLE_KEY: z.string().min(10).optional(),
     STRIPE_WEBHOOK_SECRET: z.string().min(10).optional(),
+    STRIPE_SANDBOX_SECRET_KEY: z.string().min(10).optional(),
+    STRIPE_SANDBOX_PUBLISHABLE_KEY: z.string().min(10).optional(),
+    STRIPE_SANDBOX_WEBHOOK_SECRET: z.string().min(10).optional(),
+    STRIPE_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(6).default(3),
+    STRIPE_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(50).max(1000).default(250),
+    STRIPE_CIRCUIT_BREAKER_THRESHOLD: z.coerce.number().int().min(1).max(50).default(8),
+    STRIPE_CIRCUIT_BREAKER_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),
+    STRIPE_WEBHOOK_DEDUPE_TTL_SECONDS: z
+      .coerce.number()
+      .int()
+      .min(60)
+      .max(7 * 24 * 3600)
+      .default(86400),
+    STRIPE_WEBHOOK_MAX_SKEW_SECONDS: z
+      .coerce.number()
+      .int()
+      .min(60)
+      .max(4 * 3600)
+      .default(1800),
     STRIPE_STATEMENT_DESCRIPTOR: z.string().min(5).max(22).optional(),
     ESCROW_API_KEY: z.string().min(1).optional(),
     ESCROW_API_SECRET: z.string().min(1).optional(),
@@ -390,7 +418,25 @@ const envSchema = z
     ESCROW_WEBHOOK_SECRET: z.string().min(1).optional(),
     PAYPAL_CLIENT_ID: z.string().min(10),
     PAYPAL_CLIENT_SECRET: z.string().min(10),
+    PAYPAL_SANDBOX_CLIENT_ID: z.string().min(10).optional(),
+    PAYPAL_SANDBOX_CLIENT_SECRET: z.string().min(10).optional(),
     PAYPAL_ENVIRONMENT: z.enum(['sandbox', 'live']).default('sandbox'),
+    PAYPAL_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(6).default(3),
+    PAYPAL_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(50).max(2000).default(400),
+    PAYPAL_CIRCUIT_BREAKER_THRESHOLD: z.coerce.number().int().min(1).max(50).default(6),
+    PAYPAL_CIRCUIT_BREAKER_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(240),
+    PAYPAL_WEBHOOK_DEDUPE_TTL_SECONDS: z
+      .coerce.number()
+      .int()
+      .min(60)
+      .max(7 * 24 * 3600)
+      .default(86400),
+    PAYPAL_WEBHOOK_MAX_SKEW_SECONDS: z
+      .coerce.number()
+      .int()
+      .min(60)
+      .max(4 * 3600)
+      .default(3600),
     PAYPAL_WEBHOOK_ID: z.string().min(10).optional(),
     PAYMENTS_DEFAULT_CURRENCY: z.string().length(3).default('USD'),
     PAYMENTS_ALLOWED_CURRENCIES: z.string().optional(),
@@ -503,6 +549,13 @@ const envSchema = z
     REDIS_LOCK_TTL_SECONDS: z.coerce.number().int().min(5).max(600).default(45),
     FEATURE_FLAG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(30),
     FEATURE_FLAG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(120),
+    FEATURE_FLAG_SYNC_ON_BOOT: z.coerce.boolean().default(true),
+    FEATURE_FLAG_SYNC_ACTOR: z.string().default('system-bootstrap'),
+    FEATURE_FLAG_DEFAULT_ENVIRONMENT: z
+      .string()
+      .min(3)
+      .regex(/^[a-z-]+$/i, 'FEATURE_FLAG_DEFAULT_ENVIRONMENT must be an environment identifier.')
+      .default('production'),
     RUNTIME_CONFIG_CACHE_TTL_SECONDS: z.coerce.number().int().min(5).max(10 * 60).default(45),
     RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS: z.coerce.number().int().min(15).max(24 * 60 * 60).default(300),
     COMMUNITY_DEFAULT_TIMEZONE: z.string().default('Etc/UTC'),
@@ -541,6 +594,16 @@ const envSchema = z
       .regex(/^[a-z0-9_-]+$/i, 'MEILISEARCH_INDEX_PREFIX may only contain letters, numbers, underscores, and dashes.')
       .optional(),
     MEILISEARCH_ALLOWED_IPS: z.string().optional(),
+    TWILIO_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
+    TWILIO_ACCOUNT_SID: z.string().min(10).optional(),
+    TWILIO_AUTH_TOKEN: z.string().min(10).optional(),
+    TWILIO_MESSAGING_SERVICE_SID: z.string().min(10).optional(),
+    TWILIO_FROM_NUMBER: z.string().optional(),
+    TWILIO_SANDBOX_FROM_NUMBER: z.string().optional(),
+    TWILIO_RETRY_ATTEMPTS: z.coerce.number().int().min(0).max(6).default(3),
+    TWILIO_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(50).max(5000).default(500),
+    TWILIO_CIRCUIT_BREAKER_THRESHOLD: z.coerce.number().int().min(1).max(20).default(5),
+    TWILIO_CIRCUIT_BREAKER_COOLDOWN_SECONDS: z.coerce.number().int().min(30).max(3600).default(180),
     SEARCH_INGESTION_BATCH_SIZE: z.coerce.number().int().min(25).max(2000).default(500),
     SEARCH_INGESTION_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
     SEARCH_INGESTION_DELETE_BEFORE_REINDEX: z.coerce.boolean().default(true),
@@ -830,6 +893,21 @@ export const env = {
   },
   integrations: {
     cloudConvertApiKey: raw.CLOUDCONVERT_API_KEY ?? null,
+    cloudConvert: {
+      apiKey: raw.CLOUDCONVERT_API_KEY ?? null,
+      sandboxApiKey: raw.CLOUDCONVERT_SANDBOX_API_KEY ?? null,
+      baseUrl: raw.CLOUDCONVERT_BASE_URL ?? 'https://api.cloudconvert.com/v2',
+      sandboxMode: raw.CLOUDCONVERT_SANDBOX_MODE,
+      timeoutMs: raw.CLOUDCONVERT_TIMEOUT_MS,
+      retry: {
+        maxAttempts: raw.CLOUDCONVERT_RETRY_ATTEMPTS,
+        baseDelayMs: raw.CLOUDCONVERT_RETRY_BASE_DELAY_MS
+      },
+      circuitBreaker: {
+        failureThreshold: raw.CLOUDCONVERT_CIRCUIT_BREAKER_THRESHOLD,
+        cooldownSeconds: raw.CLOUDCONVERT_CIRCUIT_BREAKER_COOLDOWN_SECONDS
+      }
+    },
     hubspot: {
       enabled: raw.HUBSPOT_ENABLED,
       accessToken: raw.HUBSPOT_PRIVATE_APP_TOKEN ?? null,
@@ -900,16 +978,46 @@ export const env = {
       minimumRate: raw.PAYMENTS_MINIMUM_TAX_RATE
     },
     stripe: {
+      mode: raw.STRIPE_MODE,
       secretKey: raw.STRIPE_SECRET_KEY,
       publishableKey: raw.STRIPE_PUBLISHABLE_KEY ?? null,
       webhookSecret: raw.STRIPE_WEBHOOK_SECRET ?? null,
-      statementDescriptor
+      sandboxSecretKey: raw.STRIPE_SANDBOX_SECRET_KEY ?? null,
+      sandboxPublishableKey: raw.STRIPE_SANDBOX_PUBLISHABLE_KEY ?? null,
+      sandboxWebhookSecret: raw.STRIPE_SANDBOX_WEBHOOK_SECRET ?? null,
+      statementDescriptor,
+      retry: {
+        maxAttempts: raw.STRIPE_RETRY_ATTEMPTS,
+        baseDelayMs: raw.STRIPE_RETRY_BASE_DELAY_MS
+      },
+      circuitBreaker: {
+        failureThreshold: raw.STRIPE_CIRCUIT_BREAKER_THRESHOLD,
+        cooldownSeconds: raw.STRIPE_CIRCUIT_BREAKER_COOLDOWN_SECONDS
+      },
+      webhook: {
+        dedupeTtlSeconds: raw.STRIPE_WEBHOOK_DEDUPE_TTL_SECONDS,
+        maxSkewSeconds: raw.STRIPE_WEBHOOK_MAX_SKEW_SECONDS
+      }
     },
     paypal: {
+      environment: raw.PAYPAL_ENVIRONMENT,
       clientId: raw.PAYPAL_CLIENT_ID,
       clientSecret: raw.PAYPAL_CLIENT_SECRET,
-      environment: raw.PAYPAL_ENVIRONMENT,
-      webhookId: raw.PAYPAL_WEBHOOK_ID ?? null
+      sandboxClientId: raw.PAYPAL_SANDBOX_CLIENT_ID ?? null,
+      sandboxClientSecret: raw.PAYPAL_SANDBOX_CLIENT_SECRET ?? null,
+      webhookId: raw.PAYPAL_WEBHOOK_ID ?? null,
+      retry: {
+        maxAttempts: raw.PAYPAL_RETRY_ATTEMPTS,
+        baseDelayMs: raw.PAYPAL_RETRY_BASE_DELAY_MS
+      },
+      circuitBreaker: {
+        failureThreshold: raw.PAYPAL_CIRCUIT_BREAKER_THRESHOLD,
+        cooldownSeconds: raw.PAYPAL_CIRCUIT_BREAKER_COOLDOWN_SECONDS
+      },
+      webhook: {
+        dedupeTtlSeconds: raw.PAYPAL_WEBHOOK_DEDUPE_TTL_SECONDS,
+        maxSkewSeconds: raw.PAYPAL_WEBHOOK_MAX_SKEW_SECONDS
+      }
     },
     escrow: {
       apiKey: raw.ESCROW_API_KEY ?? null,
@@ -935,6 +1043,24 @@ export const env = {
     verificationBaseUrl: raw.EMAIL_VERIFICATION_URL,
     verificationTokenTtlMinutes: raw.EMAIL_VERIFICATION_TOKEN_TTL_MINUTES,
     verificationResendCooldownMinutes: raw.EMAIL_VERIFICATION_RESEND_COOLDOWN_MINUTES
+  },
+  messaging: {
+    twilio: {
+      environment: raw.TWILIO_ENVIRONMENT,
+      accountSid: raw.TWILIO_ACCOUNT_SID ?? null,
+      authToken: raw.TWILIO_AUTH_TOKEN ?? null,
+      messagingServiceSid: raw.TWILIO_MESSAGING_SERVICE_SID ?? null,
+      fromNumber: raw.TWILIO_FROM_NUMBER ?? null,
+      sandboxFromNumber: raw.TWILIO_SANDBOX_FROM_NUMBER ?? null,
+      retry: {
+        maxAttempts: raw.TWILIO_RETRY_ATTEMPTS,
+        baseDelayMs: raw.TWILIO_RETRY_BASE_DELAY_MS
+      },
+      circuitBreaker: {
+        failureThreshold: raw.TWILIO_CIRCUIT_BREAKER_THRESHOLD,
+        cooldownSeconds: raw.TWILIO_CIRCUIT_BREAKER_COOLDOWN_SECONDS
+      }
+    }
   },
   logging: {
     level: raw.LOG_LEVEL,
@@ -1004,6 +1130,11 @@ export const env = {
     featureFlagRefreshIntervalMs: raw.FEATURE_FLAG_REFRESH_INTERVAL_SECONDS * 1000,
     configCacheTtlMs: raw.RUNTIME_CONFIG_CACHE_TTL_SECONDS * 1000,
     configRefreshIntervalMs: raw.RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS * 1000
+  },
+  featureFlags: {
+    syncOnBootstrap: raw.FEATURE_FLAG_SYNC_ON_BOOT,
+    bootstrapActor: raw.FEATURE_FLAG_SYNC_ACTOR,
+    defaultEnvironment: raw.FEATURE_FLAG_DEFAULT_ENVIRONMENT
   },
   chat: {
     presence: {

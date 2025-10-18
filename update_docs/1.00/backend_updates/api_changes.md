@@ -1,0 +1,1 @@
+- Introduced `/api/v1/admin/feature-flags` endpoints for operators to sync the manifest, retrieve tenant snapshots, and apply or remove overrides. Responses include evaluation context and audit metadata so governance actions are transparent.

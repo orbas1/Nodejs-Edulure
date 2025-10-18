@@ -1,0 +1,1 @@
+- Added `AdminFeatureFlagController` with endpoints for manifest synchronisation, tenant snapshot retrieval, and override management so platform operators can govern capability exposure without database access.

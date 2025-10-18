@@ -17,10 +17,14 @@
 - Implemented a production-grade domain event dispatch pipeline powered by a persistent queue, exponential backoff, jitter, and Prometheus metrics so domain events now flow reliably to webhook subscribers instead of remaining passive audit rows.
 - Registered the dispatcher with the worker service readiness probes to ensure background automation boots alongside existing schedulers and surfaces health in probes and logs.
 - Hardened the domain event model with JSON normalisation, transaction-aware dispatch enqueueing, and backward-compatible options so existing services transparently gain outbox support.
+- Delivered manifest-driven feature flag governance with bootstrap synchronisation, tenant override storage, and admin APIs so operators can activate capabilities safely across tenants without database changes or engineer intervention.
+- Wrapped Stripe, PayPal, CloudConvert, and Twilio integrations with sandbox-aware gateways, Redis-backed circuit breakers, idempotent webhook receipts, and retry/backoff orchestration while updating payment flows and community reminders to consume the new abstractions.
 
 ## Data & Infrastructure Updates
 - Added a managed migration that creates the `domain_event_dispatch_queue` table with status tracking, lock metadata, and retry scheduling to persist event delivery state across restarts.
 - Extended configuration surfaces (.env, runtime loader, and test harness) with tunable dispatcher controls (batch sizing, backoff, recovery intervals) while documenting defaults in the update notes.
+- Created the `feature_flag_tenant_states` table and manifest catalogue, wiring bootstrap automation to keep flag definitions aligned with documentation and audit overrides per tenant/environment.
 
 ## Quality Assurance
 - Authored automated unit coverage for the dispatcher service validating success, retry, and acknowledgement paths, and executed the Vitest target suite to guarantee deterministic behaviour for the new pipeline.
+- Added coverage for tenant override evaluation and governance sync workflows, exercising the new manifest automation and admin endpoints through Vitest to prevent regressions.
