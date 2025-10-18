@@ -33,8 +33,8 @@ export default function MainLayout() {
     if (!isAuthenticated) {
       return [
         { name: 'Home', to: '/' },
-        { name: 'Blog', to: '/blog' },
-        { name: 'About', to: '/about' }
+        { name: 'About', to: '/about' },
+        { name: 'Blog', to: '/blog' }
       ];
     }
 
@@ -47,30 +47,26 @@ export default function MainLayout() {
 
     const items = [
       { name: 'Home', to: '/' },
-      { name: 'Live feed', to: '/feed' },
+      { name: 'Feed', to: '/feed' },
+      { name: 'Explore', to: '/explorer' },
       { name: 'Communities', to: '/communities' },
-      { name: 'Explorer', to: '/explorer' },
+      { name: 'Hubs', to: communitiesPath },
       { name: 'Profile', to: '/profile' },
-      { name: 'Blog', to: '/blog' },
       { name: 'Dashboard', to: baseDashboardPath },
-      { name: 'Community Learnspace', to: communitiesPath },
+      { name: 'Blog', to: '/blog' },
       { name: 'About', to: '/about' }
     ];
 
-    if (!items.some((item) => item.to === communitiesPath)) {
-      items.splice(3, 0, { name: 'My communities', to: communitiesPath });
-    }
-
     if (contentLibraryEnabled && (resolvedRole === 'instructor' || resolvedRole === 'admin')) {
-      items.splice(4, 0, { name: 'Content', to: '/content' });
+      items.splice(5, 0, { name: 'Library', to: '/content' });
     }
 
     if (analyticsDashboardEnabled && (resolvedRole === 'instructor' || resolvedRole === 'admin')) {
-      items.splice(4, 0, { name: 'Analytics', to: '/analytics' });
+      items.splice(5, 0, { name: 'Insights', to: '/analytics' });
     }
 
     if (adminConsoleEnabled && resolvedRole === 'admin') {
-      items.splice(4, 0, { name: 'Admin console', to: '/admin' });
+      items.splice(5, 0, { name: 'Admin', to: '/admin' });
     }
 
     return items;

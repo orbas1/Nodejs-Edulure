@@ -47,8 +47,8 @@ function SafetyCard({ icon: Icon, title, description, items, tone }) {
   const ToneIcon = tone === 'warn' ? ShieldExclamationIcon : ShieldCheckIcon;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col gap-4 rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10">
             <Icon className="h-5 w-5 text-primary" />
@@ -60,11 +60,11 @@ function SafetyCard({ icon: Icon, title, description, items, tone }) {
         </div>
         <ToneIcon className={clsx('h-5 w-5', toneIconClass)} />
       </div>
-      <ul className="mt-4 space-y-2 text-xs text-slate-600">
+      <ul className="space-y-2 text-xs text-slate-600">
         {items.map((item) => (
           <li key={item.label} className="flex items-center gap-2">
             <StatusPill tone={item.tone}>{item.status}</StatusPill>
-            <span>{item.label}</span>
+            <span className="break-words">{item.label}</span>
           </li>
         ))}
       </ul>
@@ -196,7 +196,7 @@ export default function LearnerSafetySection({ privacy, messaging, followers, un
           {unreadMessages > 0 ? `${unreadMessages} unread messages` : 'Inbox clear'}
         </StatusPill>
       </div>
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <SafetyCard
           icon={LockClosedIcon}
           title="Privacy controls"

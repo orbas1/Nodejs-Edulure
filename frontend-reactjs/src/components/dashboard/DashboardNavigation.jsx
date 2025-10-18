@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { NavLink, matchPath, useLocation } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
 
 const itemShape = PropTypes.shape({
@@ -85,30 +85,46 @@ DrawerSection.defaultProps = {
 };
 
 export default function DashboardNavigation({ navigation, onNavigate }) {
-  const location = useLocation();
-
   const drawerItems = useMemo(() => navigation.filter((item) => item.type === 'section'), [navigation]);
   const linkItems = useMemo(() => navigation.filter((item) => item.type === 'link'), [navigation]);
 
   const initialOpenState = useMemo(() => {
-    const current = {};
+    const next = {};
     drawerItems.forEach((section) => {
-      const isActive = section.children.some((child) =>
-        matchPath({ path: child.to, end: child.end ?? false }, location.pathname)
-      );
-      current[section.id] = isActive;
+      next[section.id] = true;
     });
-    return current;
-  }, [drawerItems, location.pathname]);
+    return next;
+  }, [drawerItems]);
 
   const [openSections, setOpenSections] = useState(initialOpenState);
 
   useEffect(() => {
-    setOpenSections((state) => ({ ...state, ...initialOpenState }));
-  }, [initialOpenState]);
+    setOpenSections(() => {
+      const next = {};
+      drawerItems.forEach((section) => {
+        next[section.id] = true;
+      });
+      return next;
+    });
+  }, [drawerItems]);
 
   const handleToggle = (id) => {
     setOpenSections((state) => ({ ...state, [id]: !state[id] }));
+  };
+
+  const allOpen = useMemo(() => drawerItems.every((section) => openSections[section.id]), [
+    drawerItems,
+    openSections
+  ]);
+
+  const handleToggleAll = () => {
+    setOpenSections(() => {
+      const next = {};
+      drawerItems.forEach((section) => {
+        next[section.id] = !allOpen;
+      });
+      return next;
+    });
   };
 
   return (
@@ -134,6 +150,17 @@ export default function DashboardNavigation({ navigation, onNavigate }) {
           );
         })}
       </div>
+      {drawerItems.length > 0 ? (
+        <div className="flex items-center justify-end px-1">
+          <button
+            type="button"
+            onClick={handleToggleAll}
+            className="text-xs font-semibold text-primary transition hover:text-primary-dark"
+          >
+            {allOpen ? 'Collapse all' : 'Expand all'}
+          </button>
+        </div>
+      ) : null}
       <div className="space-y-4">
         {drawerItems.map((section) => (
           <DrawerSection
