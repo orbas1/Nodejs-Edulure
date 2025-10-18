@@ -1699,89 +1699,99 @@ export async function seed(knex) {
 
     const tenantFlagStates = [
       {
-        feature_flag_id: adminConsoleFlagId,
-        tenant_id: 'edulure-internal',
+        flagId: adminConsoleFlagId,
+        tenantId: 'edulure-internal',
         environment: 'production',
-        state: 'enabled',
-        variant_key: 'core',
-        rollout_percentage: 100,
-        criteria: { allowedRoles: ['admin'] },
-        notes: 'Baseline operations console access for internal administrators.',
-        updated_by: 'seed-script',
-        activated_at: trx.fn.now(),
-        deactivated_at: null
+        overrideState: 'enabled',
+        variantKey: 'core',
+        priority: 10,
+        metadata: {
+          rolloutPercentage: 100,
+          criteria: { allowedRoles: ['admin'] },
+          notes: 'Baseline operations console access for internal administrators.'
+        },
+        updatedBy: 'seed-script'
       },
       {
-        feature_flag_id: adminConsoleFlagId,
-        tenant_id: 'edulure-internal',
+        flagId: adminConsoleFlagId,
+        tenantId: 'edulure-internal',
         environment: 'staging',
-        state: 'enabled',
-        variant_key: 'beta-insights',
-        rollout_percentage: 100,
-        criteria: { allowedRoles: ['admin'], enableInsights: true },
-        notes: 'Expose beta insights variant in staging for internal QA.',
-        updated_by: 'seed-script',
-        activated_at: trx.fn.now(),
-        deactivated_at: null
-      },
-      {
-        feature_flag_id: checkoutFlagId,
-        tenant_id: 'learning-ops-guild',
-        environment: 'production',
-        state: 'conditional',
-        variant_key: null,
-        rollout_percentage: 45.0,
-        criteria: {
-          allowSegments: ['beta'],
-          guardrails: {
-            minClientVersion: '2.5.0',
-            fallbackVariant: 'checkout-v1'
-          }
+        overrideState: 'enabled',
+        variantKey: 'beta-insights',
+        priority: 5,
+        metadata: {
+          rolloutPercentage: 100,
+          criteria: { allowedRoles: ['admin'], enableInsights: true },
+          notes: 'Expose beta insights variant in staging for internal QA.'
         },
-        notes: 'Gradual checkout v2 rollout pending commerce KPIs.',
-        updated_by: 'seed-script',
-        activated_at: null,
-        deactivated_at: null
+        updatedBy: 'seed-script'
       },
       {
-        feature_flag_id: liveClassroomsFlagId,
-        tenant_id: 'creator-growth-lab',
+        flagId: checkoutFlagId,
+        tenantId: 'learning-ops-guild',
         environment: 'production',
-        state: 'enabled',
-        variant_key: null,
-        rollout_percentage: 100,
-        criteria: { classroomReadiness: true, slaMinutes: 5 },
-        notes: 'Tenant cleared readiness review and SLAs.',
-        updated_by: 'seed-script',
-        activated_at: trx.fn.now(),
-        deactivated_at: null
-      },
-      {
-        feature_flag_id: liveClassroomsFlagId,
-        tenant_id: 'learning-ops-guild',
-        environment: 'production',
-        state: 'conditional',
-        variant_key: null,
-        rollout_percentage: 60.0,
-        criteria: {
-          classroomReadiness: true,
-          rolloutGuardrails: {
-            slo: 'live-classroom-availability',
-            rollbackChannel: '#live-classroom-rollout'
-          }
+        overrideState: 'conditional',
+        variantKey: null,
+        priority: 0,
+        metadata: {
+          rolloutPercentage: 45,
+          criteria: {
+            allowSegments: ['beta'],
+            guardrails: {
+              minClientVersion: '2.5.0',
+              fallbackVariant: 'checkout-v1'
+            }
+          },
+          notes: 'Gradual checkout v2 rollout pending commerce KPIs.'
         },
-        notes: 'Phased ramp with live classroom guardrails.',
-        updated_by: 'seed-script',
-        activated_at: null,
-        deactivated_at: null
+        updatedBy: 'seed-script'
+      },
+      {
+        flagId: liveClassroomsFlagId,
+        tenantId: 'creator-growth-lab',
+        environment: 'production',
+        overrideState: 'enabled',
+        variantKey: null,
+        priority: 0,
+        metadata: {
+          rolloutPercentage: 100,
+          criteria: { classroomReadiness: true, slaMinutes: 5 },
+          notes: 'Tenant cleared readiness review and SLAs.'
+        },
+        updatedBy: 'seed-script'
+      },
+      {
+        flagId: liveClassroomsFlagId,
+        tenantId: 'learning-ops-guild',
+        environment: 'production',
+        overrideState: 'conditional',
+        variantKey: null,
+        priority: 0,
+        metadata: {
+          rolloutPercentage: 60,
+          criteria: {
+            classroomReadiness: true,
+            rolloutGuardrails: {
+              slo: 'live-classroom-availability',
+              rollbackChannel: '#live-classroom-rollout'
+            }
+          },
+          notes: 'Phased ramp with live classroom guardrails.'
+        },
+        updatedBy: 'seed-script'
       }
     ];
 
     await trx('feature_flag_tenant_states').insert(
       tenantFlagStates.map((state) => ({
-        ...state,
-        criteria: JSON.stringify(state.criteria ?? {}),
-        notes: state.notes ?? null
+        flag_id: state.flagId,
+        tenant_id: state.tenantId,
+        environment: state.environment,
+        override_state: state.overrideState,
+        variant_key: state.variantKey ?? null,
+        priority: state.priority ?? 0,
+        metadata: JSON.stringify(state.metadata ?? {}),
+        updated_by: state.updatedBy ?? null
       }))
     );
 
@@ -2952,73 +2962,79 @@ export async function seed(knex) {
 
     if (eventsForDispatch[0]) {
       queueEntries.push({
-        domain_event_id: eventsForDispatch[0].id,
+        event_id: eventsForDispatch[0].id,
         status: 'delivered',
-        delivery_channel: 'webhook',
-        attempts: 1,
-        max_attempts: 12,
+        priority: 10,
+        attempt_count: 1,
         available_at: nowExpression,
         locked_at: nowExpression,
         locked_by: 'seed-worker-1',
         delivered_at: nowExpression,
-        payload_checksum: makeHash(`seed:${eventsForDispatch[0].id}:delivered`),
-        metadata: JSON.stringify({ eventType: eventsForDispatch[0].event_type, delivered: true }),
-        dry_run: false,
-        trace_id: makeHash(`trace-delivered-${eventsForDispatch[0].id}`).slice(0, 32),
-        correlation_id: `seed-${eventsForDispatch[0].id}`
+        metadata: JSON.stringify({
+          eventType: eventsForDispatch[0].event_type,
+          deliveryChannel: 'webhook',
+          payloadChecksum: makeHash(`seed:${eventsForDispatch[0].id}:delivered`),
+          traceId: makeHash(`trace-delivered-${eventsForDispatch[0].id}`).slice(0, 32),
+          correlationId: `seed-${eventsForDispatch[0].id}`,
+          delivered: true
+        })
       });
     }
 
     if (eventsForDispatch[1]) {
       queueEntries.push({
-        domain_event_id: eventsForDispatch[1].id,
-        status: 'delivering',
-        delivery_channel: 'webhook',
-        attempts: 2,
-        max_attempts: 12,
+        event_id: eventsForDispatch[1].id,
+        status: 'processing',
+        priority: 5,
+        attempt_count: 2,
         available_at: nowExpression,
         locked_at: nowExpression,
         locked_by: 'seed-worker-2',
-        payload_checksum: makeHash(`seed:${eventsForDispatch[1].id}:delivering`),
-        metadata: JSON.stringify({ eventType: eventsForDispatch[1].event_type, attempt: 2 }),
-        dry_run: false,
-        trace_id: makeHash(`trace-delivering-${eventsForDispatch[1].id}`).slice(0, 32),
-        correlation_id: `seed-${eventsForDispatch[1].id}`
+        metadata: JSON.stringify({
+          eventType: eventsForDispatch[1].event_type,
+          deliveryChannel: 'webhook',
+          payloadChecksum: makeHash(`seed:${eventsForDispatch[1].id}:delivering`),
+          traceId: makeHash(`trace-delivering-${eventsForDispatch[1].id}`).slice(0, 32),
+          correlationId: `seed-${eventsForDispatch[1].id}`,
+          attempt: 2
+        })
       });
     }
 
     if (eventsForDispatch[2]) {
       queueEntries.push({
-        domain_event_id: eventsForDispatch[2].id,
+        event_id: eventsForDispatch[2].id,
         status: 'pending',
-        delivery_channel: 'webhook',
-        attempts: 0,
-        max_attempts: 12,
+        priority: 0,
+        attempt_count: 0,
         available_at: nowExpression,
-        payload_checksum: makeHash(`seed:${eventsForDispatch[2].id}:pending`),
-        metadata: JSON.stringify({ eventType: eventsForDispatch[2].event_type, priority: 'standard' }),
-        dry_run: false,
-        trace_id: makeHash(`trace-pending-${eventsForDispatch[2].id}`).slice(0, 32),
-        correlation_id: `seed-${eventsForDispatch[2].id}`
+        metadata: JSON.stringify({
+          eventType: eventsForDispatch[2].event_type,
+          deliveryChannel: 'webhook',
+          payloadChecksum: makeHash(`seed:${eventsForDispatch[2].id}:pending`),
+          traceId: makeHash(`trace-pending-${eventsForDispatch[2].id}`).slice(0, 32),
+          correlationId: `seed-${eventsForDispatch[2].id}`,
+          priority: 'standard'
+        })
       });
     }
 
     if (eventsForDispatch[3]) {
       queueEntries.push({
-        domain_event_id: eventsForDispatch[3].id,
+        event_id: eventsForDispatch[3].id,
         status: 'failed',
-        delivery_channel: 'webhook',
-        attempts: 5,
-        max_attempts: 12,
+        priority: -5,
+        attempt_count: 5,
         available_at: nowExpression,
-        failed_at: nowExpression,
         last_error: 'HTTP 500 from integration target',
-        last_error_at: nowExpression,
-        payload_checksum: makeHash(`seed:${eventsForDispatch[3].id}:failed`),
-        metadata: JSON.stringify({ eventType: eventsForDispatch[3].event_type, lastError: 'upstream_http_500' }),
-        dry_run: false,
-        trace_id: makeHash(`trace-failed-${eventsForDispatch[3].id}`).slice(0, 32),
-        correlation_id: `seed-${eventsForDispatch[3].id}`
+        metadata: JSON.stringify({
+          eventType: eventsForDispatch[3].event_type,
+          deliveryChannel: 'webhook',
+          payloadChecksum: makeHash(`seed:${eventsForDispatch[3].id}:failed`),
+          traceId: makeHash(`trace-failed-${eventsForDispatch[3].id}`).slice(0, 32),
+          correlationId: `seed-${eventsForDispatch[3].id}`,
+          lastError: 'upstream_http_500'
+        })
       });
     }
 

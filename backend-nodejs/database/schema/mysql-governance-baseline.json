@@ -79,57 +79,47 @@
     "feature_flag_tenant_states": {
       "columns": {
         "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
-        "feature_flag_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
+        "flag_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
         "tenant_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": false, "columnDefault": null },
         "environment": { "dataType": "varchar", "columnType": "varchar(32)", "isNullable": false, "columnDefault": "production" },
-        "state": {
+        "override_state": {
           "dataType": "enum",
           "columnType": "enum('enabled','disabled','conditional')",
           "isNullable": false,
           "columnDefault": "disabled"
         },
         "variant_key": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": true, "columnDefault": null },
-        "rollout_percentage": { "dataType": "decimal", "columnType": "decimal(5,2) unsigned", "isNullable": false, "columnDefault": "0.00" },
-        "criteria": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
-        "notes": { "dataType": "varchar", "columnType": "varchar(512)", "isNullable": true, "columnDefault": null },
-        "updated_by": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": null },
-        "activated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
-        "deactivated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
+        "priority": { "dataType": "int", "columnType": "int", "isNullable": false, "columnDefault": "0" },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "updated_by": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": true, "columnDefault": null },
         "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
         { "name": "PRIMARY", "columns": ["id"], "unique": true },
-        { "name": "tenant_flag_env_unique", "columns": ["tenant_id", "feature_flag_id", "environment"], "unique": true },
-        { "name": "tenant_flag_state_env_idx", "columns": ["state", "environment"], "unique": false },
-        { "name": "tenant_flag_flag_idx", "columns": ["feature_flag_id"], "unique": false }
+        { "name": "tenant_flag_env_unique", "columns": ["tenant_id", "flag_id", "environment"], "unique": true },
+        { "name": "tenant_flag_state_env_idx", "columns": ["override_state", "environment"], "unique": false },
+        { "name": "tenant_flag_flag_idx", "columns": ["flag_id"], "unique": false }
       ]
     },
     "domain_event_dispatch_queue": {
       "columns": {
         "id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null, "extra": "auto_increment" },
-        "domain_event_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
+        "event_id": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": null },
         "status": {
           "dataType": "enum",
-          "columnType": "enum('pending','delivering','delivered','failed','discarded')",
+          "columnType": "enum('pending','processing','delivered','failed')",
           "isNullable": false,
           "columnDefault": "pending"
         },
-        "delivery_channel": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": "webhook" },
-        "attempts": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "0" },
-        "max_attempts": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "12" },
+        "priority": { "dataType": "int", "columnType": "int", "isNullable": false, "columnDefault": "0" },
+        "attempt_count": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "0" },
         "available_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "locked_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
         "locked_by": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": true, "columnDefault": null },
         "delivered_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
-        "failed_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
-        "last_error": { "dataType": "varchar", "columnType": "varchar(500)", "isNullable": true, "columnDefault": null },
-        "last_error_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
-        "payload_checksum": { "dataType": "varchar", "columnType": "varchar(128)", "isNullable": false, "columnDefault": null },
-        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
-        "dry_run": { "dataType": "tinyint", "columnType": "tinyint(1)", "isNullable": false, "columnDefault": "0" },
-        "trace_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": true, "columnDefault": null },
-        "correlation_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": true, "columnDefault": null },
+        "last_error": { "dataType": "text", "columnType": "text", "isNullable": true, "columnDefault": null },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
         "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
@@ -137,8 +127,7 @@
         { "name": "PRIMARY", "columns": ["id"], "unique": true },
         { "name": "dedq_status_available_idx", "columns": ["status", "available_at"], "unique": false },
         { "name": "dedq_lock_idx", "columns": ["locked_by", "locked_at"], "unique": false },
-        { "name": "dedq_event_idx", "columns": ["domain_event_id"], "unique": false },
-        { "name": "dedq_dryrun_status_idx", "columns": ["dry_run", "status"], "unique": false }
+        { "name": "dedq_event_idx", "columns": ["event_id"], "unique": false }
       ]
     },
     "data_retention_policies": {
