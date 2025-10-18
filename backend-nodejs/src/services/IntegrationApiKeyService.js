@@ -211,17 +211,24 @@ export default class IntegrationApiKeyService {
       throw Object.assign(new Error('Expiry date is invalid'), { status: 422 });
     }
 
-    const aliasConflict = await this.model.findByAlias({
-      provider: normalisedProvider,
-      environment: normalisedEnvironment,
-      alias: resolvedAlias
-    }, connection);
+    const aliasConflict = connection
+      ? await this.model.findByAlias(
+          { provider: normalisedProvider, environment: normalisedEnvironment, alias: resolvedAlias },
+          connection
+        )
+      : await this.model.findByAlias({
+          provider: normalisedProvider,
+          environment: normalisedEnvironment,
+          alias: resolvedAlias
+        });
     if (aliasConflict) {
       throw Object.assign(new Error('Alias already exists for this provider/environment'), { status: 409 });
     }
 
     const keyHash = this.encryptionService.hash(trimmedKey);
-    const hashConflict = await this.model.findByHash(keyHash, connection);
+    const hashConflict = connection
+      ? await this.model.findByHash(keyHash, connection)
+      : await this.model.findByHash(keyHash);
     if (hashConflict && hashConflict.provider === normalisedProvider) {
       throw Object.assign(new Error('API key already registered for this provider'), { status: 409 });
     }
@@ -253,34 +260,37 @@ export default class IntegrationApiKeyService {
       notes: notes ?? null
     };
 
-    const record = await this.model.create(
-      {
-        provider: normalisedProvider,
-        environment: normalisedEnvironment,
-        alias: resolvedAlias,
-        ownerEmail: ownerEmail.trim(),
-        lastFour,
-        keyHash,
-        encryptedKey: encrypted.ciphertext,
-        encryptionKeyId: encrypted.keyId,
-        classificationTag: encrypted.classificationTag,
-        rotationIntervalDays: rotationDays,
-        lastRotatedAt: now,
-        nextRotationAt,
-        expiresAt: expiresDate,
-        status: 'active',
-        metadata,
-        createdBy: createdBy ?? ownerEmail.trim(),
-        updatedBy: createdBy ?? ownerEmail.trim()
-      },
-      connection
-    );
+    const payload = {
+      provider: normalisedProvider,
+      environment: normalisedEnvironment,
+      alias: resolvedAlias,
+      ownerEmail: ownerEmail.trim(),
+      lastFour,
+      keyHash,
+      encryptedKey: encrypted.ciphertext,
+      encryptionKeyId: encrypted.keyId,
+      classificationTag: encrypted.classificationTag,
+      rotationIntervalDays: rotationDays,
+      lastRotatedAt: now,
+      nextRotationAt,
+      expiresAt: expiresDate,
+      status: 'active',
+      metadata,
+      createdBy: createdBy ?? ownerEmail.trim(),
+      updatedBy: createdBy ?? ownerEmail.trim()
+    };
+
+    const record = connection
+      ? await this.model.create(payload, connection)
+      : await this.model.create(payload);
 
     return this.sanitize(record);
   }
 
   async rotateKey(id, { keyValue, rotationIntervalDays, expiresAt, rotatedBy, reason, notes }, { connection } = {}) {
-    const record = await this.model.findById(id, connection);
+    const record = connection
+      ? await this.model.findById(id, connection)
+      : await this.model.findById(id);
     if (!record) {
       throw Object.assign(new Error('API key not found'), { status: 404 });
     }
@@ -331,29 +341,31 @@ export default class IntegrationApiKeyService {
 
     const nextRotationAt = addDays(now, rotationDays);
 
-    const updated = await this.model.updateById(
-      id,
-      {
-        lastFour: trimmedKey.slice(-4),
-        keyHash: newHash,
-        encryptedKey: encrypted.ciphertext,
-        encryptionKeyId: encrypted.keyId,
-        rotationIntervalDays: rotationDays,
-        lastRotatedAt: now,
-        nextRotationAt,
-        expiresAt: expiresDate,
-        status: 'active',
-        metadata: updatedMetadata,
-        updatedBy: rotatedBy ?? record.metadata?.lastRotatedBy ?? record.ownerEmail
-      },
-      connection
-    );
+    const updatedPayload = {
+      lastFour: trimmedKey.slice(-4),
+      keyHash: newHash,
+      encryptedKey: encrypted.ciphertext,
+      encryptionKeyId: encrypted.keyId,
+      rotationIntervalDays: rotationDays,
+      lastRotatedAt: now,
+      nextRotationAt,
+      expiresAt: expiresDate,
+      status: 'active',
+      metadata: updatedMetadata,
+      updatedBy: rotatedBy ?? record.metadata?.lastRotatedBy ?? record.ownerEmail
+    };
+
+    const updated = connection
+      ? await this.model.updateById(id, updatedPayload, connection)
+      : await this.model.updateById(id, updatedPayload);
 
     return this.sanitize(updated);
   }
 
   async disableKey(id, { disabledBy, reason }, { connection } = {}) {
-    const record = await this.model.findById(id, connection);
+    const record = connection
+      ? await this.model.findById(id, connection)
+      : await this.model.findById(id);
     if (!record) {
       throw Object.assign(new Error('API key not found'), { status: 404 });
     }
@@ -369,16 +381,16 @@ export default class IntegrationApiKeyService {
       disabledBy: disabledBy ?? record.metadata?.disabledBy ?? null
     };
 
-    const updated = await this.model.updateById(
-      id,
-      {
-        status: 'disabled',
-        disabledAt: now,
-        metadata: updatedMetadata,
-        updatedBy: disabledBy ?? record.metadata?.lastRotatedBy ?? record.ownerEmail
-      },
-      connection
-    );
+    const disabledPayload = {
+      status: 'disabled',
+      disabledAt: now,
+      metadata: updatedMetadata,
+      updatedBy: disabledBy ?? record.metadata?.lastRotatedBy ?? record.ownerEmail
+    };
+
+    const updated = connection
+      ? await this.model.updateById(id, disabledPayload, connection)
+      : await this.model.updateById(id, disabledPayload);
 
     return this.sanitize(updated);
   }

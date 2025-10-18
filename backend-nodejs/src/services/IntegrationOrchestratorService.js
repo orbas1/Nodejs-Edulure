@@ -194,6 +194,53 @@ export class IntegrationOrchestratorService {
     this.started = false;
   }
 
+  async recordRunOutcomeSafe(payload) {
+    if (!this.statusService?.recordRunOutcome) {
+      return;
+    }
+
+    try {
+      await this.statusService.recordRunOutcome(payload);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, integration: payload?.integration, context: 'recordRunOutcome' },
+        'Failed to persist integration run outcome'
+      );
+    }
+  }
+
+  async getStatusSafe(integration, environment) {
+    if (!this.statusService?.getStatus) {
+      return null;
+    }
+
+    try {
+      return await this.statusService.getStatus(integration, environment);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, integration, environment, context: 'getStatus' },
+        'Failed to load integration status snapshot'
+      );
+      return null;
+    }
+  }
+
+  async summariseCallsSafe(integration, options) {
+    if (!this.statusService?.summariseCalls) {
+      return null;
+    }
+
+    try {
+      return await this.statusService.summariseCalls(integration, options);
+    } catch (error) {
+      this.logger.warn(
+        { err: error, integration, options, context: 'summariseCalls' },
+        'Failed to load integration call summary'
+      );
+      return null;
+    }
+  }
+
   start() {
     if (this.started) {
       return;
@@ -405,7 +452,7 @@ export class IntegrationOrchestratorService {
           )
         : null;
 
-      await this.statusService.recordRunOutcome({
+      await this.recordRunOutcomeSafe({
         integration: 'hubspot',
         environment: this.hubspotEnvironment,
         syncRunId: completedRun.id,
@@ -450,7 +497,7 @@ export class IntegrationOrchestratorService {
           )
         : null;
 
-      await this.statusService.recordRunOutcome({
+      await this.recordRunOutcomeSafe({
         integration: 'hubspot',
         environment: this.hubspotEnvironment,
         syncRunId: failedRun?.id ?? run.id,
@@ -608,7 +655,7 @@ export class IntegrationOrchestratorService {
           )
         : null;
 
-      await this.statusService.recordRunOutcome({
+      await this.recordRunOutcomeSafe({
         integration: 'salesforce',
         environment: this.salesforceEnvironment,
         syncRunId: completedRun.id,
@@ -653,7 +700,7 @@ export class IntegrationOrchestratorService {
           )
         : null;
 
-      await this.statusService.recordRunOutcome({
+      await this.recordRunOutcomeSafe({
         integration: 'salesforce',
         environment: this.salesforceEnvironment,
         syncRunId: failedRun?.id ?? run.id,
@@ -1045,16 +1092,16 @@ export class IntegrationOrchestratorService {
 
     const [hubspotStatus, hubspotCalls, salesforceStatus, salesforceCalls] = await Promise.all([
       this.hubspotEnabled
-        ? this.statusService.getStatus('hubspot', this.hubspotEnvironment)
+        ? this.getStatusSafe('hubspot', this.hubspotEnvironment)
         : Promise.resolve(null),
       this.hubspotEnabled
-        ? this.statusService.summariseCalls('hubspot', { sinceHours: 12 })
+        ? this.summariseCallsSafe('hubspot', { sinceHours: 12 })
         : Promise.resolve(null),
       this.salesforceEnabled
-        ? this.statusService.getStatus('salesforce', this.salesforceEnvironment)
+        ? this.getStatusSafe('salesforce', this.salesforceEnvironment)
         : Promise.resolve(null),
       this.salesforceEnabled
-        ? this.statusService.summariseCalls('salesforce', { sinceHours: 12 })
+        ? this.summariseCallsSafe('salesforce', { sinceHours: 12 })
         : Promise.resolve(null)
     ]);
 

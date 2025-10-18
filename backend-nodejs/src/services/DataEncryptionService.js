@@ -60,10 +60,23 @@ function stableStringify(value) {
 
 class DataEncryptionService {
   constructor() {
-    const { activeKeyId, keys, defaultClassification } = env.security.dataEncryption;
+    const encryptionConfig = env.security?.dataEncryption;
+    this.keys = new Map();
+
+    if (!encryptionConfig || !encryptionConfig.keys || Object.keys(encryptionConfig.keys).length === 0) {
+      const fallbackKeyId = 'edulure-fallback';
+      logger.warn(
+        'Data encryption configuration missing – using fallback key suitable for test environments only'
+      );
+      this.activeKeyId = fallbackKeyId;
+      this.defaultClassification = 'general';
+      this.keys.set(fallbackKeyId, ensureBufferKey('edulure-fallback-secret'));
+      return;
+    }
+
+    const { activeKeyId, keys, defaultClassification } = encryptionConfig;
     this.activeKeyId = activeKeyId;
     this.defaultClassification = defaultClassification ?? 'general';
-    this.keys = new Map();
 
     Object.entries(keys).forEach(([keyId, secret]) => {
       try {
