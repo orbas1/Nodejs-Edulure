@@ -1,0 +1,14 @@
+# Version 1.00 Update Change Log
+
+## Documentation & Evaluation Additions
+- Established the Version 1.00 update documentation workspace derived from the base template so the team can track change requests, testing, and rollout tasks in a consistent format.
+- Authored deeply critical pre-update evaluations for backend, database, dependency, front-end, and learner mobile app surfaces to surface high-risk gaps across functionality, usability, error handling, integration, security, and roadmap alignment.
+- Added a provider operations app evaluation to capture regressions that remain after retiring the legacy mobile experience and to ensure any successor tooling is reviewed before reintroduction.
+- Expanded every pre-update evaluation with additional findings covering operational readiness, performance, observability, compliance, and roadmap alignment gaps uncovered during the second review pass.
+- Documented cross-cutting risks such as missing runbooks, absent automation, and marketing misalignments so leadership can prioritise remediation before approving the 1.00 rollout.
+- Conducted a fourth evaluation sweep to catalogue advanced operational, integration, and security deficiencies (e.g., LMS connector persistence gaps, unencrypted provider exports, mobile token storage issues) ensuring leadership has granular remediation items before sign-off.
+
+## Removals & Scope Decisions
+- Confirmed that all provider phone app assets remain deprecated for this cycle; no resurrection tasks are scheduled until a new business case is approved, preventing scope creep.
+- Completed the fifth evaluation sweep incorporating full-stack static and dynamic scans, dependency audits, and mobile build readiness checks; recorded the expanded backend, database, dependency, frontend, provider, and learner findings in the evaluation dossiers.
+- Initiated build and test verification runs (backend unit suite, frontend production bundle) to validate the documentation against actual project health, capturing failures for engineering follow-up.
