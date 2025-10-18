@@ -5,6 +5,7 @@ import logger from '../config/logger.js';
 import CommunityEventModel from '../models/CommunityEventModel.js';
 import CommunityEventReminderModel from '../models/CommunityEventReminderModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import IntegrationProviderService from '../services/IntegrationProviderService.js';
 
 function createLogger() {
   return logger.child({ module: 'community-reminder-job' });
@@ -24,6 +25,79 @@ async function dispatchReminder(reminder, log) {
     return { reminderId: reminder.id, status: 'failed', reason: 'event_not_found' };
   }
 
+  let deliveryMetadata = null;
+
+  if (reminder.channel === 'sms') {
+    const twilioClient = IntegrationProviderService.getTwilioClient();
+    if (!twilioClient || !twilioClient.isConfigured()) {
+      await CommunityEventReminderModel.markOutcome(reminder.id, {
+        status: 'failed',
+        failureReason: 'sms_not_configured'
+      });
+      log.error({ reminderId: reminder.id }, 'Twilio client not configured for SMS reminder');
+      return { reminderId: reminder.id, status: 'failed', reason: 'sms_not_configured' };
+    }
+
+    const destination =
+      reminder.metadata?.phoneNumber ??
+      reminder.metadata?.phone_number ??
+      reminder.metadata?.destination ??
+      null;
+
+    if (!destination) {
+      await CommunityEventReminderModel.markOutcome(reminder.id, {
+        status: 'failed',
+        failureReason: 'sms_destination_missing'
+      });
+      log.warn({ reminderId: reminder.id }, 'Missing phone number for SMS reminder');
+      return { reminderId: reminder.id, status: 'failed', reason: 'sms_destination_missing' };
+    }
+
+    const eventStart = event.startAt ? new Date(event.startAt) : null;
+    const formatter = eventStart
+      ? new Intl.DateTimeFormat('en-US', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+          timeZone: event.timezone ?? 'UTC'
+        })
+      : null;
+    const formattedStart = formatter && eventStart ? formatter.format(eventStart) : 'soon';
+    const manageUrl =
+      reminder.metadata?.manageUrl ??
+      (process.env.APP_URL
+        ? `${process.env.APP_URL.replace(/\/+$/, '')}/communities/${event.communityId}/events/${event.id}`
+        : null);
+
+    let messageBody = reminder.metadata?.message;
+    if (!messageBody) {
+      messageBody = `Reminder: ${event.title ?? 'Edulure event'} starts ${formattedStart}.`;
+      if (manageUrl) {
+        messageBody += ` Manage your RSVP: ${manageUrl}`;
+      }
+    }
+
+    try {
+      const message = await twilioClient.sendMessage({
+        to: destination,
+        body: messageBody,
+        statusCallback: reminder.metadata?.statusCallbackUrl ?? null
+      });
+      deliveryMetadata = {
+        provider: 'twilio',
+        channel: 'sms',
+        to: destination,
+        messageSid: message.sid
+      };
+    } catch (error) {
+      log.error({ err: error, reminderId: reminder.id }, 'Failed to deliver SMS reminder');
+      await CommunityEventReminderModel.markOutcome(reminder.id, {
+        status: 'failed',
+        failureReason: 'sms_delivery_failed'
+      });
+      return { reminderId: reminder.id, status: 'failed', reason: 'sms_delivery_failed' };
+    }
+  }
+
   await DomainEventModel.record({
     entityType: 'community_event',
     entityId: event.id,
@@ -33,7 +107,8 @@ async function dispatchReminder(reminder, log) {
       eventId: event.id,
       userId: reminder.userId,
       channel: reminder.channel,
-      remindAt: reminder.remindAt
+      remindAt: reminder.remindAt,
+      delivery: deliveryMetadata
     },
     performedBy: reminder.userId
   });
@@ -44,7 +119,7 @@ async function dispatchReminder(reminder, log) {
     lastAttemptAt: new Date()
   });
 
-  return { reminderId: reminder.id, status: 'sent' };
+  return { reminderId: reminder.id, status: 'sent', delivery: deliveryMetadata };
 }
 
 export class CommunityReminderJob {

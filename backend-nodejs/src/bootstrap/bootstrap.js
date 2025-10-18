@@ -4,6 +4,7 @@ import db from '../config/database.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 import { featureFlagService, runtimeConfigService } from '../services/FeatureFlagService.js';
+import { featureFlagGovernanceService } from '../services/FeatureFlagGovernanceService.js';
 import { searchClusterService } from '../services/SearchClusterService.js';
 
 const bootstrapLogger = logger.child({ module: 'bootstrap' });
@@ -79,7 +80,10 @@ export async function ensureDatabaseConnection({ runMigrations = true, readiness
 
 const INFRASTRUCTURE_SERVICES = {
   'feature-flags': {
-    start: () => featureFlagService.start(),
+    start: async () => {
+      await featureFlagGovernanceService.ensureBootstrapSync({ actor: env.featureFlags?.bootstrapActor });
+      await featureFlagService.start();
+    },
     stop: () => featureFlagService.stop(),
     readyMessage: 'Feature flag cache online'
   },

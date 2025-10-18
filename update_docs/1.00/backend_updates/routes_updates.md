@@ -1,0 +1,1 @@
+- Extended `admin.routes.js` with `/feature-flags` routes that expose manifest sync, tenant snapshot, and override CRUD endpoints guarded by the admin auth middleware.

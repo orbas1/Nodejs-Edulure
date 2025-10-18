@@ -1,0 +1,10 @@
+# Service Changes – Version 1.00
+
+- Added `DomainEventDispatcherService` to orchestrate outbox processing with configurable polling, exponential backoff, jitter, stuck-job recovery, and Prometheus instrumentation. The service publishes dispatched events to the webhook bus using correlation-aware metadata so subscriber webhooks receive consistent payloads.
+- Updated the worker bootstrap to register the dispatcher alongside existing schedulers. Readiness probes now expose a `domain-event-dispatcher` component that reports degraded state when the pipeline is disabled and surfaces start-up failures to logs.
+- Extended `DomainEventModel` so every recorded event can enqueue a dispatch entry within the same transaction while preserving backward compatibility for services that pass custom connections. JSON payloads are normalised to avoid parsing bugs during replay.
+- Introduced `FeatureFlagGovernanceService` to synchronise the new manifest catalogue, hydrate tenant overrides, emit audit records, and refresh the runtime cache so feature availability matches documented rollout plans.
+- Enhanced `FeatureFlagService` with tenant override awareness, wildcard handling, and richer evaluation payloads (environment, override metadata) enabling operators and tests to reason about applied governance decisions.
+- Refactored `PaymentService` to consume the new integration gateways, providing sandbox-aware Stripe/PayPal operations, idempotent webhook handling backed by receipt storage, and resilient refund/capture flows instrumented with shared retry and circuit breaker policies.
+- Added `IntegrationProviderService` as the single entry point for provisioning third-party clients, ensuring worker processes and HTTP handlers share Redis-backed circuit breakers, retry defaults, and sandbox routing logic.
+- Taught `CommunityReminderJob` to deliver SMS reminders through the Twilio gateway with templated messaging, metadata-driven destinations, and graceful degradation when messaging is not configured, while continuing to emit domain events for auditing.

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import AdminBlogController from '../controllers/AdminBlogController.js';
+import AdminFeatureFlagController from '../controllers/AdminFeatureFlagController.js';
 import AdminIntegrationsController from '../controllers/AdminIntegrationsController.js';
 import AdminSettingsController from '../controllers/AdminSettingsController.js';
 import auth from '../middleware/auth.js';
@@ -71,6 +72,19 @@ router.post(
   '/integrations/api-keys/invitations/:id/cancel',
   auth('admin'),
   AdminIntegrationsController.cancelIntegrationApiKeyInvitation
+);
+
+router.get('/feature-flags', auth('admin'), AdminFeatureFlagController.snapshot);
+router.post('/feature-flags/sync', auth('admin'), AdminFeatureFlagController.syncManifest);
+router.post(
+  '/feature-flags/:flagKey/overrides',
+  auth('admin'),
+  AdminFeatureFlagController.applyOverride
+);
+router.delete(
+  '/feature-flags/:flagKey/overrides',
+  auth('admin'),
+  AdminFeatureFlagController.removeOverride
 );
 
 export default router;

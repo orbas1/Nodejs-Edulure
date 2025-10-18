@@ -1,0 +1,23 @@
+# New Backend Files – Version 1.00
+
+- `migrations/20250301100000_domain_event_dispatch_queue.js` — creates the domain event dispatch queue table with indexes, locking metadata, and timestamps.
+- `src/models/DomainEventDispatchModel.js` — data access layer for the dispatch queue handling claims, acknowledgements, retries, and recovery scanning.
+- `src/services/DomainEventDispatcherService.js` — background worker that publishes domain events to webhooks with instrumentation and backoff management.
+- `test/domainEventDispatcherService.test.js` — Vitest coverage verifying success, retry, and acknowledgement behaviour of the dispatcher.
+- `migrations/20250301110000_feature_flag_tenant_states.js` — provisions tenant override storage with audit-friendly metadata and indexes for manifest-governed feature flags.
+- `src/config/featureFlagManifest.js` — central catalogue of feature flag definitions, rollout strategies, and default tenant overrides consumed by bootstrap automation and operator tooling.
+- `src/services/FeatureFlagGovernanceService.js` — orchestrates manifest synchronisation, tenant overrides, auditing, and snapshot generation while coordinating with the runtime cache.
+- `src/controllers/AdminFeatureFlagController.js` — exposes admin APIs for synchronising manifest definitions and managing tenant-specific overrides with validation and audit logging.
+- `scripts/manage-feature-flags.js` — CLI utility for operations teams to sync manifests, inspect tenant snapshots, and apply overrides outside the web console.
+- `test/featureFlagServiceOverrides.test.js` — regression coverage ensuring the runtime evaluator honours tenant overrides and wildcard rules.
+- `test/featureFlagGovernanceService.test.js` — service-level unit coverage validating manifest sync plans, override application, and tenant snapshot output.
+- `migrations/20250301120000_integration_webhook_receipts.js` — creates the integration webhook receipt ledger used for webhook idempotency and processing telemetry across partner providers.
+- `src/models/IntegrationWebhookReceiptModel.js` — persistence layer for webhook receipt deduplication, status tracking, and pruning.
+- `src/services/IntegrationWebhookReceiptService.js` — helper for hashing payloads, recording receipt metadata, and marking webhook outcomes.
+- `src/services/IntegrationProviderService.js` — centralised factory that provisions Stripe, PayPal, CloudConvert, and Twilio clients with circuit breakers, retries, and sandbox routing.
+- `src/integrations/IntegrationCircuitBreaker.js` — Redis-aware circuit breaker utility shared by integration gateways to enforce graceful degradation.
+- `src/integrations/StripeGateway.js` — resilient Stripe wrapper providing retry/backoff, webhook verification, and idempotent refund helpers.
+- `src/integrations/PayPalGateway.js` — PayPal Orders/Payments abstraction instrumented with retries and circuit breaker guards.
+- `src/integrations/CloudConvertClient.js` — wrapped CloudConvert SDK with sandbox routing, retries, and circuit breaker coordination for asset ingestion.
+- `src/integrations/TwilioMessagingClient.js` — Twilio messaging client with sandbox sender controls, retry handling, and circuit breaker integration.
+- `test/integrations/stripeGateway.test.js` — Vitest coverage for the Stripe gateway retry, duplication, and receipt processing behaviour.
