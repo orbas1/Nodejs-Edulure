@@ -2,7 +2,7 @@
 
 All tasks start at 0% completion and will be updated as implementation progresses.
 
-## Task 1 (0%): Stabilise core services, data governance, and integrations
+## Task 1 (20%): Stabilise core services, data governance, and integrations
 
 #### Integration coverage
 - **Backend**: Replace mocked controllers/resolvers, reconnect schedulers/queues, enforce feature flag defaults.
@@ -15,7 +15,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 - **Design**: Document service behaviours and admin tooling requirements for downstream UX teams.
 
 #### Subtasks
-1. **Service hardening and automation** – 0%  
+1. **Service hardening and automation** – 100%
    Implement business logic across controllers/resolvers, wire BullMQ/cron workflows, and enable DLQs plus monitoring.
 2. **Feature flag governance** – 0%  
    Seed defaults in bootstrap scripts, deliver tenant-aware tooling, and document rollout/rollback procedures.

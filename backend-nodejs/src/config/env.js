@@ -442,6 +442,49 @@ const envSchema = z
     DATA_PARTITIONING_MAX_EXPORT_MB: z.coerce.number().min(1).max(1024).optional(),
     DATA_PARTITIONING_MAX_FAILURES: z.coerce.number().int().min(1).max(10).default(3),
     DATA_PARTITIONING_FAILURE_BACKOFF_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
+    DOMAIN_EVENTS_DISPATCH_ENABLED: z.coerce.boolean().default(true),
+    DOMAIN_EVENTS_DISPATCH_POLL_INTERVAL_MS: z
+      .coerce.number()
+      .int()
+      .min(200)
+      .max(60 * 1000)
+      .default(2000),
+    DOMAIN_EVENTS_DISPATCH_BATCH_SIZE: z.coerce.number().int().min(1).max(500).default(50),
+    DOMAIN_EVENTS_DISPATCH_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(8),
+    DOMAIN_EVENTS_DISPATCH_INITIAL_BACKOFF_SECONDS: z
+      .coerce.number()
+      .int()
+      .min(5)
+      .max(3600)
+      .default(30),
+    DOMAIN_EVENTS_DISPATCH_MAX_BACKOFF_SECONDS: z
+      .coerce.number()
+      .int()
+      .min(30)
+      .max(7200)
+      .default(900),
+    DOMAIN_EVENTS_DISPATCH_BACKOFF_MULTIPLIER: z
+      .coerce.number()
+      .min(1)
+      .max(10)
+      .default(2),
+    DOMAIN_EVENTS_DISPATCH_JITTER_RATIO: z
+      .coerce.number()
+      .min(0)
+      .max(0.5)
+      .default(0.15),
+    DOMAIN_EVENTS_DISPATCH_RECOVER_INTERVAL_MS: z
+      .coerce.number()
+      .int()
+      .min(5000)
+      .max(10 * 60 * 1000)
+      .default(60000),
+    DOMAIN_EVENTS_DISPATCH_RECOVER_TIMEOUT_MINUTES: z
+      .coerce.number()
+      .int()
+      .min(1)
+      .max(120)
+      .default(10),
     REDIS_ENABLED: z.coerce.boolean().default(false),
     REDIS_URL: z.string().url().optional(),
     REDIS_HOST: z.string().min(1).default('127.0.0.1'),
@@ -831,6 +874,20 @@ export const env = {
       maxBackoffSeconds: raw.WEBHOOK_BUS_MAX_BACKOFF_SECONDS,
       deliveryTimeoutMs: raw.WEBHOOK_BUS_DELIVERY_TIMEOUT_MS,
       recoverAfterMs: raw.WEBHOOK_BUS_RECOVER_AFTER_MS
+    }
+  },
+  domainEvents: {
+    dispatch: {
+      enabled: raw.DOMAIN_EVENTS_DISPATCH_ENABLED,
+      pollIntervalMs: raw.DOMAIN_EVENTS_DISPATCH_POLL_INTERVAL_MS,
+      batchSize: raw.DOMAIN_EVENTS_DISPATCH_BATCH_SIZE,
+      maxAttempts: raw.DOMAIN_EVENTS_DISPATCH_MAX_ATTEMPTS,
+      initialBackoffSeconds: raw.DOMAIN_EVENTS_DISPATCH_INITIAL_BACKOFF_SECONDS,
+      maxBackoffSeconds: raw.DOMAIN_EVENTS_DISPATCH_MAX_BACKOFF_SECONDS,
+      backoffMultiplier: raw.DOMAIN_EVENTS_DISPATCH_BACKOFF_MULTIPLIER,
+      jitterRatio: raw.DOMAIN_EVENTS_DISPATCH_JITTER_RATIO,
+      recoverIntervalMs: raw.DOMAIN_EVENTS_DISPATCH_RECOVER_INTERVAL_MS,
+      recoverTimeoutMinutes: raw.DOMAIN_EVENTS_DISPATCH_RECOVER_TIMEOUT_MINUTES
     }
   },
   payments: {

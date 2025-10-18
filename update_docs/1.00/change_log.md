@@ -12,3 +12,15 @@
 - Confirmed that all provider phone app assets remain deprecated for this cycle; no resurrection tasks are scheduled until a new business case is approved, preventing scope creep.
 - Completed the fifth evaluation sweep incorporating full-stack static and dynamic scans, dependency audits, and mobile build readiness checks; recorded the expanded backend, database, dependency, frontend, provider, and learner findings in the evaluation dossiers.
 - Initiated build and test verification runs (backend unit suite, frontend production bundle) to validate the documentation against actual project health, capturing failures for engineering follow-up.
+
+## Backend Stabilisation
+- Implemented a production-grade domain event dispatch pipeline powered by a persistent queue, exponential backoff, jitter, and Prometheus metrics so domain events now flow reliably to webhook subscribers instead of remaining passive audit rows.
+- Registered the dispatcher with the worker service readiness probes to ensure background automation boots alongside existing schedulers and surfaces health in probes and logs.
+- Hardened the domain event model with JSON normalisation, transaction-aware dispatch enqueueing, and backward-compatible options so existing services transparently gain outbox support.
+
+## Data & Infrastructure Updates
+- Added a managed migration that creates the `domain_event_dispatch_queue` table with status tracking, lock metadata, and retry scheduling to persist event delivery state across restarts.
+- Extended configuration surfaces (.env, runtime loader, and test harness) with tunable dispatcher controls (batch sizing, backoff, recovery intervals) while documenting defaults in the update notes.
+
+## Quality Assurance
+- Authored automated unit coverage for the dispatcher service validating success, retry, and acknowledgement paths, and executed the Vitest target suite to guarantee deterministic behaviour for the new pipeline.
