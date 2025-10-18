@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import logger from '../config/logger.js';
 import integrationOrchestratorService from './IntegrationOrchestratorService.js';
 import IntegrationSyncRunModel from '../models/IntegrationSyncRunModel.js';
 import IntegrationSyncResultModel from '../models/IntegrationSyncResultModel.js';
@@ -187,7 +188,8 @@ export default class IntegrationDashboardService {
     resultModel = IntegrationSyncResultModel,
     reportModel = IntegrationReconciliationReportModel,
     database = db,
-    statusService = integrationStatusService
+    statusService = integrationStatusService,
+    loggerInstance = logger.child({ service: 'IntegrationDashboardService' })
   } = {}) {
     this.orchestratorService = orchestratorService;
     this.runModel = runModel;
@@ -195,6 +197,39 @@ export default class IntegrationDashboardService {
     this.reportModel = reportModel;
     this.db = database;
     this.statusService = statusService;
+    this.logger = loggerInstance;
+  }
+
+  async getStatusSafe(integration) {
+    if (!this.statusService?.getStatus) {
+      return null;
+    }
+
+    try {
+      return await this.statusService.getStatus(integration);
+    } catch (error) {
+      this.logger?.warn(
+        { err: error, integration, context: 'getStatus' },
+        'Failed to load integration status for dashboard snapshot'
+      );
+      return null;
+    }
+  }
+
+  async summariseCallsSafe(integration) {
+    if (!this.statusService?.summariseCalls) {
+      return null;
+    }
+
+    try {
+      return await this.statusService.summariseCalls(integration);
+    } catch (error) {
+      this.logger?.warn(
+        { err: error, integration, context: 'summariseCalls' },
+        'Failed to summarise integration calls for dashboard snapshot'
+      );
+      return null;
+    }
   }
 
   async buildSnapshot({
@@ -203,79 +238,125 @@ export default class IntegrationDashboardService {
     failureLookbackHours = 72,
     reportLimit = 5
   } = {}) {
-    const orchestratorStatus = await this.orchestratorService.statusSnapshot();
+    let orchestratorStatus = {};
+
+    try {
+      orchestratorStatus = await this.orchestratorService.statusSnapshot();
+    } catch (error) {
+      this.logger?.warn({ err: error }, 'Failed to load orchestrator status for dashboard snapshot');
+      orchestratorStatus = {};
+    }
     const now = new Date();
     const failureSince = new Date(now.getTime() - failureLookbackHours * 60 * 60 * 1000);
 
     const integrations = await Promise.all(
       Object.values(INTEGRATION_CATALOGUE).map(async (meta) => {
-        const recentRuns = await this.runModel.listRecent(meta.id, { limit: runLimit }, this.db);
-        const sanitisedRuns = recentRuns.map(sanitiseRun).filter(Boolean);
-        const failuresRaw = await this.resultModel.listFailures(
-          meta.id,
-          { since: failureSince },
-          this.db
-        );
-        const sanitisedFailures = failuresRaw.slice(0, failureLimit).map(sanitiseFailure);
-        const reportsRaw = await this.reportModel.list(meta.id, { limit: reportLimit }, this.db);
-        const reports = reportsRaw.map(sanitiseReport);
-
         const integrationSnapshot = orchestratorStatus?.[meta.id] ?? {};
-        const [statusRecord, callSummary] = await Promise.all([
-          this.statusService.getStatus(meta.id),
-          this.statusService.summariseCalls(meta.id)
-        ]);
+        try {
+          const recentRuns = await this.runModel.listRecent(meta.id, { limit: runLimit }, this.db);
+          const sanitisedRuns = recentRuns.map(sanitiseRun).filter(Boolean);
+          const failuresRaw = await this.resultModel.listFailures(
+            meta.id,
+            { since: failureSince },
+            this.db
+          );
+          const sanitisedFailures = failuresRaw.slice(0, failureLimit).map(sanitiseFailure);
+          const reportsRaw = await this.reportModel.list(meta.id, { limit: reportLimit }, this.db);
+          const reports = reportsRaw.map(sanitiseReport);
 
-        const totalRuns = sanitisedRuns.length;
-        const successCount = sanitisedRuns.filter((run) => run.status === 'succeeded').length;
-        const partialCount = sanitisedRuns.filter((run) => run.status === 'partial').length;
-        const failureCount = sanitisedRuns.filter((run) => run.status === 'failed').length;
-        const successRate = totalRuns ? Math.round((successCount / totalRuns) * 100) : null;
-        const averageDurationSeconds = totalRuns
-          ? Math.round(
-              sanitisedRuns.reduce((acc, run) => acc + (run.durationSeconds ?? 0), 0) / Math.max(totalRuns, 1)
-            )
-          : null;
+          const [statusRecord, callSummary] = await Promise.all([
+            this.getStatusSafe(meta.id),
+            this.summariseCallsSafe(meta.id)
+          ]);
 
-        const recordsPushed = sanitisedRuns.reduce((acc, run) => acc + (run.records?.pushed ?? 0), 0);
-        const recordsFailed = sanitisedRuns.reduce((acc, run) => acc + (run.records?.failed ?? 0), 0);
+          const totalRuns = sanitisedRuns.length;
+          const successCount = sanitisedRuns.filter((run) => run.status === 'succeeded').length;
+          const partialCount = sanitisedRuns.filter((run) => run.status === 'partial').length;
+          const failureCount = sanitisedRuns.filter((run) => run.status === 'failed').length;
+          const successRate = totalRuns ? Math.round((successCount / totalRuns) * 100) : null;
+          const averageDurationSeconds = totalRuns
+            ? Math.round(
+                sanitisedRuns.reduce((acc, run) => acc + (run.durationSeconds ?? 0), 0) / Math.max(totalRuns, 1)
+              )
+            : null;
 
-        const latestRun = sanitisedRuns[0] ?? null;
-        const reconciliation = {
-          reports,
-          latestStatus: reports[0]?.status ?? null,
-          latestGeneratedAt: reports[0]?.generatedAt ?? null,
-          totalMismatchOpen: reports.reduce((acc, report) => acc + (report.mismatchCount ?? 0), 0)
-        };
+          const recordsPushed = sanitisedRuns.reduce((acc, run) => acc + (run.records?.pushed ?? 0), 0);
+          const recordsFailed = sanitisedRuns.reduce((acc, run) => acc + (run.records?.failed ?? 0), 0);
 
-        const enabledSnapshot = Boolean(integrationSnapshot.enabled);
-        const summary = {
-          lastRunStatus: latestRun?.status ?? null,
-          lastRunAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? null,
-          successRate,
-          averageDurationSeconds,
-          recordsPushed,
-          recordsFailed,
-          failureCount,
-          partialCount,
-          openFailures: sanitisedFailures.length
-        };
+          const latestRun = sanitisedRuns[0] ?? null;
+          const reconciliation = {
+            reports,
+            latestStatus: reports[0]?.status ?? null,
+            latestGeneratedAt: reports[0]?.generatedAt ?? null,
+            totalMismatchOpen: reports.reduce((acc, report) => acc + (report.mismatchCount ?? 0), 0)
+          };
 
-        const health = deriveHealth(summary, enabledSnapshot);
+          const enabledSnapshot = Boolean(integrationSnapshot.enabled);
+          const summary = {
+            lastRunStatus: latestRun?.status ?? null,
+            lastRunAt: latestRun?.finishedAt ?? latestRun?.startedAt ?? null,
+            successRate,
+            averageDurationSeconds,
+            recordsPushed,
+            recordsFailed,
+            failureCount,
+            partialCount,
+            openFailures: sanitisedFailures.length
+          };
 
-        return {
-          ...meta,
-          enabled: enabledSnapshot,
-          environment: integrationSnapshot.environment ?? 'production',
-          health,
-          summary,
-          recentRuns: sanitisedRuns,
-          failureLog: sanitisedFailures,
-          reconciliation,
-          status: integrationSnapshot,
-          statusDetails: serialiseStatus(statusRecord) ?? serialiseStatus(integrationSnapshot.status ?? null),
-          callSummary: serialiseCallSummary(callSummary ?? integrationSnapshot.callSummary ?? null)
-        };
+          const health = deriveHealth(summary, enabledSnapshot);
+
+          return {
+            ...meta,
+            enabled: enabledSnapshot,
+            environment: integrationSnapshot.environment ?? 'production',
+            health,
+            summary,
+            recentRuns: sanitisedRuns,
+            failureLog: sanitisedFailures,
+            reconciliation,
+            status: integrationSnapshot,
+            statusDetails:
+              serialiseStatus(statusRecord) ?? serialiseStatus(integrationSnapshot.status ?? null),
+            callSummary: serialiseCallSummary(callSummary ?? integrationSnapshot.callSummary ?? null)
+          };
+        } catch (error) {
+          this.logger?.error(
+            { err: error, integration: meta.id },
+            'Failed to build dashboard snapshot for integration'
+          );
+
+          const enabledSnapshot = Boolean(integrationSnapshot.enabled);
+
+          return {
+            ...meta,
+            enabled: enabledSnapshot,
+            environment: integrationSnapshot.environment ?? 'production',
+            health: enabledSnapshot ? 'unknown' : 'disabled',
+            summary: {
+              lastRunStatus: null,
+              lastRunAt: null,
+              successRate: null,
+              averageDurationSeconds: null,
+              recordsPushed: 0,
+              recordsFailed: 0,
+              failureCount: null,
+              partialCount: null,
+              openFailures: null
+            },
+            recentRuns: [],
+            failureLog: [],
+            reconciliation: {
+              reports: [],
+              latestStatus: null,
+              latestGeneratedAt: null,
+              totalMismatchOpen: 0
+            },
+            status: integrationSnapshot,
+            statusDetails: serialiseStatus(integrationSnapshot.status ?? null),
+            callSummary: serialiseCallSummary(integrationSnapshot.callSummary ?? null)
+          };
+        }
       })
     );
 
