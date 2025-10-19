@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../services/community_chat_service.dart';
 import '../../services/community_service.dart';
 
 final communityEngagementControllerProvider =
@@ -43,6 +44,7 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
   CommunityEngagementController() : super(const CommunityEngagementState());
 
   final Random _random = Random();
+  final CommunityChatService _chatService = CommunityChatService();
 
   Future<void> bootstrap(CommunityDetail detail) async {
     if (state.snapshots.containsKey(detail.id)) {
@@ -53,9 +55,7 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
     state = state.copyWith(loadingCommunities: loading);
 
     try {
-      // Simulate a network round trip so UI can show shimmer/skeleton states.
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      final snapshot = _seedSnapshot(detail);
+      final snapshot = await _buildSnapshot(detail);
       final snapshots = Map<String, CommunityEngagementSnapshot>.from(state.snapshots)
         ..[detail.id] = snapshot;
       state = state.copyWith(
@@ -147,20 +147,9 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
     required CommunityChatMessageInput input,
   }) async {
     final snapshot = _requireSnapshot(communityId);
-    final message = CommunityChatMessage(
-      id: _generateId('msg'),
-      channelId: channel.id,
-      authorName: input.authorName,
-      authorRole: input.authorRole,
-      authorAvatarUrl: input.authorAvatarUrl,
-      content: input.content,
-      attachments: input.attachments,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-      reactions: input.reactions,
-      isThreaded: input.isThreaded,
-      isPriority: input.isPriority,
-    );
+    final draft = input.toDraft();
+    final dto = await _chatService.postMessage(communityId, channel.id, draft);
+    final message = _mapMessageDto(dto);
     final messages = Map<String, List<CommunityChatMessage>>.from(snapshot.messages);
     final channelMessages = [...(messages[channel.id] ?? <CommunityChatMessage>[]), message]
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -175,19 +164,48 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
     required CommunityChatMessageInput input,
   }) async {
     final snapshot = _requireSnapshot(communityId);
+    final draft = input.toDraft(
+      threadRootId: message.threadRootId,
+      replyToMessageId: message.replyToMessageId,
+    );
+    final dto = await _chatService.postMessage(communityId, channel.id, draft);
+    final updatedMessage = _mapMessageDto(dto);
+
+    try {
+      await _chatService.moderateMessage(
+        communityId,
+        channel.id,
+        message.id,
+        CommunityChatModeration(
+          action: 'delete',
+          reason: 'Edited via mobile app',
+          metadata: const {'source': 'mobile-app'},
+        ),
+      );
+    } catch (error) {
+      // Roll back the replacement message so the original remains visible if moderation fails.
+      try {
+        await _chatService.moderateMessage(
+          communityId,
+          channel.id,
+          updatedMessage.id,
+          CommunityChatModeration(
+            action: 'delete',
+            reason: 'Edit rollback due to moderation failure',
+            metadata: const {'source': 'mobile-app'},
+          ),
+        );
+      } catch (_) {
+        // Best-effort rollback: if this also fails, surface the original error to the caller.
+      }
+      rethrow;
+    }
+
     final messages = Map<String, List<CommunityChatMessage>>.from(snapshot.messages);
     final updated = (messages[channel.id] ?? <CommunityChatMessage>[])
-        .map((existing) => existing.id == message.id
-            ? existing.copyWith(
-                content: input.content,
-                attachments: input.attachments,
-                reactions: input.reactions,
-                isPriority: input.isPriority,
-                isThreaded: input.isThreaded,
-                updatedAt: DateTime.now(),
-              )
-            : existing)
+        .where((existing) => existing.id != message.id)
         .toList()
+      ..add(updatedMessage)
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     messages[channel.id] = updated;
     _updateSnapshot(communityId, snapshot.copyWith(messages: messages));
@@ -195,6 +213,16 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
 
   Future<void> deleteMessage(String communityId, CommunityChatChannel channel, CommunityChatMessage message) async {
     final snapshot = _requireSnapshot(communityId);
+    await _chatService.moderateMessage(
+      communityId,
+      channel.id,
+      message.id,
+      CommunityChatModeration(
+        action: 'delete',
+        reason: 'Removed via mobile app',
+        metadata: const {'source': 'mobile-app'},
+      ),
+    );
     final messages = Map<String, List<CommunityChatMessage>>.from(snapshot.messages);
     final updated = (messages[channel.id] ?? <CommunityChatMessage>[])
         .where((existing) => existing.id != message.id)
@@ -253,62 +281,45 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
     state = state.copyWith(snapshots: snapshots);
   }
 
-  CommunityEngagementSnapshot _seedSnapshot(CommunityDetail detail) {
+  Future<CommunityEngagementSnapshot> _buildSnapshot(
+    CommunityDetail detail, {
+    CommunityEngagementSnapshot? existing,
+  }) async {
     final now = DateTime.now();
-    final seededChannels = <CommunityChatChannel>[
-      CommunityChatChannel(
-        id: 'general-${detail.id}',
-        name: 'Campus general',
-        description: 'Announcements, wins, and momentum for ${detail.name}.',
-        type: CommunityChatChannelType.text,
-        createdAt: now.subtract(const Duration(days: 180)),
-        isPrivate: false,
-        allowsThreads: true,
-        allowsVoiceSessions: true,
-        allowsBroadcasts: true,
-        moderators: {'community-ops', 'lead-mentors'},
-        tags: const ['announcements', 'updates'],
-        slowModeCooldown: const Duration(minutes: 2),
-        archived: false,
-      ),
-      CommunityChatChannel(
-        id: 'mentors-${detail.id}',
-        name: 'Mentor lounge',
-        description: 'Peer learning, shadowing rotations, and session planning.',
-        type: CommunityChatChannelType.voice,
-        createdAt: now.subtract(const Duration(days: 120)),
-        isPrivate: true,
-        allowsThreads: true,
-        allowsVoiceSessions: true,
-        allowsBroadcasts: false,
-        moderators: {'lead-mentors'},
-        tags: const ['planning', 'rotations'],
-        slowModeCooldown: const Duration(minutes: 5),
-        archived: false,
-      ),
-      CommunityChatChannel(
-        id: 'events-${detail.id}',
-        name: 'Events studio',
-        description: 'Coordinate live intensives, AMAs, and demo days.',
-        type: CommunityChatChannelType.broadcast,
-        createdAt: now.subtract(const Duration(days: 90)),
-        isPrivate: false,
-        allowsThreads: false,
-        allowsVoiceSessions: true,
-        allowsBroadcasts: true,
-        moderators: {'community-ops', 'events-team'},
-        tags: const ['events', 'livestream'],
-        slowModeCooldown: const Duration(minutes: 1),
-        archived: false,
-      ),
-    ];
-
-    final seededMembers = _seedMembers(detail.id);
-    final seededMessages = <String, List<CommunityChatMessage>>{};
-    for (final channel in seededChannels) {
-      seededMessages[channel.id] = _seedMessages(channel, seededMembers);
+    try {
+      final summaries = await _chatService.listChannels(detail.id);
+      if (summaries.isNotEmpty) {
+        final channels = <CommunityChatChannel>[];
+        final messages = <String, List<CommunityChatMessage>>{};
+        for (final summary in summaries) {
+          final channel = _mapChannelSummary(summary);
+          channels.add(channel);
+          final fetchedMessages = await _chatService.listMessages(detail.id, summary.channel.id, limit: 50);
+          messages[channel.id] = fetchedMessages.map(_mapMessageDto).toList();
+        }
+        final members = existing?.members ?? _seedMembers(detail.id);
+        final about = existing?.about ?? _seedAbout(detail);
+        return CommunityEngagementSnapshot(
+          channels: channels,
+          messages: messages,
+          members: members,
+          about: about,
+          lastSyncedAt: now,
+          lastUpdatedAt: now,
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Falling back to seeded snapshot: $error\n$stackTrace');
     }
 
+    final seededChannels = existing?.channels ?? _seedChannels(detail, now);
+    final seededMembers = existing?.members ?? _seedMembers(detail.id);
+    final seededMessages = existing?.messages ?? <String, List<CommunityChatMessage>>{};
+    if (seededMessages.isEmpty) {
+      for (final channel in seededChannels) {
+        seededMessages[channel.id] = _seedMessages(channel, seededMembers);
+      }
+    }
     final about = CommunityAbout(
       mission: detail.description?.isNotEmpty == true
           ? detail.description!
@@ -348,9 +359,150 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
       messages: seededMessages,
       members: seededMembers,
       about: about,
-      lastSyncedAt: now.subtract(const Duration(minutes: 8)),
-      lastUpdatedAt: now.subtract(const Duration(minutes: 8)),
+      lastSyncedAt: now,
+      lastUpdatedAt: now,
     );
+  }
+
+  List<CommunityChatChannel> _seedChannels(CommunityDetail detail, DateTime now) {
+    return <CommunityChatChannel>[
+      CommunityChatChannel(
+        id: 'general-${detail.id}',
+        name: 'Campus general',
+        description: 'Announcements, wins, and momentum for ${detail.name}.',
+        type: CommunityChatChannelType.text,
+        createdAt: now.subtract(const Duration(days: 180)),
+        isPrivate: false,
+        allowsThreads: true,
+        allowsVoiceSessions: true,
+        allowsBroadcasts: true,
+        moderators: const {'community-ops', 'lead-mentors'},
+        tags: const ['announcements', 'updates'],
+        slowModeCooldown: const Duration(minutes: 2),
+        archived: false,
+      ),
+      CommunityChatChannel(
+        id: 'mentors-${detail.id}',
+        name: 'Mentor lounge',
+        description: 'Peer learning, shadowing rotations, and session planning.',
+        type: CommunityChatChannelType.voice,
+        createdAt: now.subtract(const Duration(days: 120)),
+        isPrivate: true,
+        allowsThreads: true,
+        allowsVoiceSessions: true,
+        allowsBroadcasts: false,
+        moderators: const {'lead-mentors'},
+        tags: const ['planning', 'rotations'],
+        slowModeCooldown: const Duration(minutes: 5),
+        archived: false,
+      ),
+      CommunityChatChannel(
+        id: 'events-${detail.id}',
+        name: 'Events studio',
+        description: 'Coordinate live intensives, AMAs, and demo days.',
+        type: CommunityChatChannelType.broadcast,
+        createdAt: now.subtract(const Duration(days: 90)),
+        isPrivate: false,
+        allowsThreads: false,
+        allowsVoiceSessions: true,
+        allowsBroadcasts: true,
+        moderators: const {'community-ops', 'events-team'},
+        tags: const ['events', 'livestream'],
+        slowModeCooldown: const Duration(minutes: 1),
+        archived: false,
+      ),
+    ];
+  }
+
+  CommunityChatChannel _mapChannelSummary(CommunityChatChannelSummary summary) {
+    final metadata = summary.channel.metadata;
+    final moderators = <String>{
+      if (metadata['moderators'] is List)
+        ...List<String>.from((metadata['moderators'] as List).whereType<String>()),
+      if (summary.membership.role.isNotEmpty) summary.membership.role,
+    };
+    final slowModeSeconds = metadata['slowModeSeconds'] is num ? (metadata['slowModeSeconds'] as num).toInt() : 0;
+    final tags = metadata['tags'] is List
+        ? List<String>.from((metadata['tags'] as List).whereType<String>())
+        : <String>[];
+    return CommunityChatChannel(
+      id: summary.channel.id,
+      name: summary.channel.name,
+      description: summary.channel.description ?? 'Chat channel',
+      type: CommunityChatChannelTypeX.fromApi(summary.channel.channelType),
+      createdAt: summary.channel.createdAt,
+      isPrivate: metadata['privacy'] == 'private' || metadata['isPrivate'] == true,
+      allowsThreads: metadata['allowsThreads'] != false,
+      allowsVoiceSessions: metadata['allowsVoiceSessions'] == true || summary.channel.channelType == 'voice',
+      allowsBroadcasts: metadata['allowsBroadcasts'] == true || summary.channel.channelType == 'broadcast',
+      slowModeCooldown: Duration(seconds: slowModeSeconds),
+      moderators: moderators,
+      tags: tags,
+      archived: metadata['archived'] == true,
+      unreadCount: summary.unreadCount,
+      membership: CommunityChannelMembership(
+        id: summary.membership.id,
+        role: summary.membership.role,
+        lastReadAt: summary.membership.lastReadAt,
+        notificationsEnabled: summary.membership.notificationsEnabled,
+      ),
+      metadata: metadata,
+      slug: summary.channel.slug,
+      isDefault: summary.channel.isDefault,
+    );
+  }
+
+  CommunityChatMessage _mapMessageDto(CommunityChatMessageDto dto) {
+    final authorName = dto.author.displayName.isNotEmpty ? dto.author.displayName : dto.author.email;
+    final metadata = dto.metadata;
+    final avatarUrl = metadata['authorAvatarUrl']?.toString() ?? metadata['avatarUrl']?.toString() ?? '';
+    final attachments = dto.attachments.map(_mapAttachment).whereType<CommunityMediaAttachment>().toList();
+    final reactions = <String, int>{};
+    for (final reaction in dto.reactions) {
+      reactions[reaction.emoji] = reaction.count;
+    }
+    final isPriority = metadata['priority'] == true || metadata['isPriority'] == true;
+    final isThreaded = dto.threadRootId != null || metadata['isThreaded'] == true;
+    return CommunityChatMessage(
+      id: dto.id,
+      channelId: dto.channelId,
+      authorName: authorName.isNotEmpty ? authorName : 'Community member',
+      authorRole: dto.author.role.isNotEmpty ? dto.author.role : (metadata['authorRole']?.toString() ?? 'Member'),
+      authorAvatarUrl: avatarUrl,
+      content: dto.body,
+      attachments: attachments,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+      reactions: reactions,
+      viewerReactions: dto.viewerReactions,
+      isThreaded: isThreaded,
+      isPriority: isPriority,
+      messageType: dto.messageType,
+      metadata: metadata,
+      threadRootId: dto.threadRootId,
+      replyToMessageId: dto.replyToMessageId,
+      status: dto.status,
+      pinned: dto.pinned,
+    );
+  }
+
+  CommunityMediaAttachment? _mapAttachment(Map<String, dynamic> json) {
+    final url = json['url']?.toString();
+    if (url == null || url.isEmpty) {
+      return null;
+    }
+    final type = json['type']?.toString() ?? json['mediaType']?.toString() ?? 'link';
+    final description = json['description']?.toString() ?? json['title']?.toString();
+    switch (type) {
+      case 'image':
+        return CommunityMediaAttachment(type: CommunityMediaType.image, url: url, description: description);
+      case 'video':
+        return CommunityMediaAttachment(type: CommunityMediaType.video, url: url, description: description);
+      case 'file':
+        return CommunityMediaAttachment(type: CommunityMediaType.file, url: url, description: description);
+      default:
+        return CommunityMediaAttachment(type: CommunityMediaType.link, url: url, description: description);
+    }
   }
 
   List<CommunityMemberProfile> _seedMembers(String communityId) {
@@ -581,6 +733,23 @@ class CommunityEngagementSnapshot {
 enum CommunityChatChannelType { text, broadcast, voice, stage, event }
 
 extension CommunityChatChannelTypeX on CommunityChatChannelType {
+  static CommunityChatChannelType fromApi(String value) {
+    switch (value.toLowerCase()) {
+      case 'broadcast':
+        return CommunityChatChannelType.broadcast;
+      case 'voice':
+        return CommunityChatChannelType.voice;
+      case 'stage':
+        return CommunityChatChannelType.stage;
+      case 'event':
+        return CommunityChatChannelType.event;
+      case 'text':
+      case 'general':
+      default:
+        return CommunityChatChannelType.text;
+    }
+  }
+
   String get displayName {
     switch (this) {
       case CommunityChatChannelType.text:
@@ -625,6 +794,21 @@ extension CommunityChatChannelTypeX on CommunityChatChannelType {
         return Colors.pink;
     }
   }
+
+  String get apiValue {
+    switch (this) {
+      case CommunityChatChannelType.text:
+        return 'text';
+      case CommunityChatChannelType.broadcast:
+        return 'broadcast';
+      case CommunityChatChannelType.voice:
+        return 'voice';
+      case CommunityChatChannelType.stage:
+        return 'stage';
+      case CommunityChatChannelType.event:
+        return 'event';
+    }
+  }
 }
 
 class CommunityChatChannel {
@@ -642,6 +826,11 @@ class CommunityChatChannel {
     required this.moderators,
     required this.tags,
     required this.archived,
+    this.unreadCount = 0,
+    this.membership,
+    this.metadata = const <String, dynamic>{},
+    this.slug = '',
+    this.isDefault = false,
   });
 
   final String id;
@@ -657,6 +846,11 @@ class CommunityChatChannel {
   final Set<String> moderators;
   final List<String> tags;
   final bool archived;
+  final int unreadCount;
+  final CommunityChannelMembership? membership;
+  final Map<String, dynamic> metadata;
+  final String slug;
+  final bool isDefault;
 
   CommunityChatChannel copyWith({
     String? name,
@@ -670,6 +864,11 @@ class CommunityChatChannel {
     Set<String>? moderators,
     List<String>? tags,
     bool? archived,
+    int? unreadCount,
+    CommunityChannelMembership? membership,
+    Map<String, dynamic>? metadata,
+    String? slug,
+    bool? isDefault,
   }) {
     return CommunityChatChannel(
       id: id,
@@ -685,8 +884,27 @@ class CommunityChatChannel {
       moderators: moderators ?? this.moderators,
       tags: tags ?? this.tags,
       archived: archived ?? this.archived,
+      unreadCount: unreadCount ?? this.unreadCount,
+      membership: membership ?? this.membership,
+      metadata: metadata ?? this.metadata,
+      slug: slug ?? this.slug,
+      isDefault: isDefault ?? this.isDefault,
     );
   }
+}
+
+class CommunityChannelMembership {
+  const CommunityChannelMembership({
+    required this.id,
+    required this.role,
+    required this.notificationsEnabled,
+    this.lastReadAt,
+  });
+
+  final String id;
+  final String role;
+  final bool notificationsEnabled;
+  final DateTime? lastReadAt;
 }
 
 class CommunityChatChannelInput {
@@ -753,6 +971,14 @@ class CommunityMediaAttachment {
         return Colors.green;
     }
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'type': type.name,
+      'url': url,
+      if (description != null && description!.isNotEmpty) 'description': description,
+    };
+  }
 }
 
 class CommunityChatMessage {
@@ -769,6 +995,13 @@ class CommunityChatMessage {
     required this.reactions,
     required this.isThreaded,
     required this.isPriority,
+    this.viewerReactions = const <String>[],
+    this.messageType = 'text',
+    this.metadata = const <String, dynamic>{},
+    this.threadRootId,
+    this.replyToMessageId,
+    this.status = 'visible',
+    this.pinned = false,
   });
 
   final String id;
@@ -783,6 +1016,13 @@ class CommunityChatMessage {
   final Map<String, int> reactions;
   final bool isThreaded;
   final bool isPriority;
+  final List<String> viewerReactions;
+  final String messageType;
+  final Map<String, dynamic> metadata;
+  final int? threadRootId;
+  final int? replyToMessageId;
+  final String status;
+  final bool pinned;
 
   CommunityChatMessage copyWith({
     String? content,
@@ -791,6 +1031,10 @@ class CommunityChatMessage {
     bool? isThreaded,
     bool? isPriority,
     DateTime? updatedAt,
+    List<String>? viewerReactions,
+    Map<String, dynamic>? metadata,
+    bool? pinned,
+    String? status,
   }) {
     return CommunityChatMessage(
       id: id,
@@ -805,6 +1049,13 @@ class CommunityChatMessage {
       reactions: reactions ?? this.reactions,
       isThreaded: isThreaded ?? this.isThreaded,
       isPriority: isPriority ?? this.isPriority,
+      viewerReactions: viewerReactions ?? this.viewerReactions,
+      messageType: messageType,
+      metadata: metadata ?? this.metadata,
+      threadRootId: threadRootId,
+      replyToMessageId: replyToMessageId,
+      status: status ?? this.status,
+      pinned: pinned ?? this.pinned,
     );
   }
 }
@@ -819,6 +1070,10 @@ class CommunityChatMessageInput {
     this.reactions = const <String, int>{},
     this.isThreaded = false,
     this.isPriority = false,
+    this.messageType = 'text',
+    this.metadata = const <String, dynamic>{},
+    this.replyToMessageId,
+    this.threadRootId,
   });
 
   final String authorName;
@@ -829,6 +1084,30 @@ class CommunityChatMessageInput {
   final Map<String, int> reactions;
   final bool isThreaded;
   final bool isPriority;
+  final String messageType;
+  final Map<String, dynamic> metadata;
+  final int? replyToMessageId;
+  final int? threadRootId;
+
+  CommunityChatMessageDraft toDraft({int? replyToMessageId, int? threadRootId}) {
+    final mergedMetadata = <String, dynamic>{
+      ...metadata,
+      'authorName': authorName,
+      'authorRole': authorRole,
+      'authorAvatarUrl': authorAvatarUrl,
+      if (isPriority) 'priority': true,
+      if (isThreaded) 'isThreaded': true,
+      if (reactions.isNotEmpty) 'seedReactions': reactions,
+    };
+    return CommunityChatMessageDraft(
+      body: content,
+      messageType: messageType,
+      attachments: attachments.map((attachment) => attachment.toJson()).toList(),
+      metadata: mergedMetadata,
+      replyToMessageId: replyToMessageId ?? this.replyToMessageId,
+      threadRootId: threadRootId ?? this.threadRootId,
+    );
+  }
 }
 
 enum CommunityMemberStatus { active, pending, suspended }

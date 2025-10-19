@@ -1892,6 +1892,7 @@ class _ChannelCardState extends ConsumerState<_ChannelCard> {
         attachments: List<CommunityMediaAttachment>.from(_attachments),
         isPriority: _priority,
         isThreaded: _threaded,
+        metadata: const {'source': 'mobile-app'},
       ),
     );
     setState(() {
@@ -2112,6 +2113,10 @@ class _ChannelCardState extends ConsumerState<_ChannelCard> {
           attachments: attachments,
           isPriority: priority,
           isThreaded: threaded,
+          messageType: message.messageType,
+          metadata: message.metadata,
+          threadRootId: message.threadRootId,
+          replyToMessageId: message.replyToMessageId,
         ),
       );
     }
