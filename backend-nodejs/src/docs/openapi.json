@@ -9180,6 +9180,254 @@
             "type": "integer"
           }
         }
+      },
+      "TelemetryEventIngestRequest": {
+        "type": "object",
+        "properties": {
+          "eventName": { "type": "string" },
+          "eventVersion": { "type": "string", "nullable": true },
+          "eventSource": { "type": "string" },
+          "schemaVersion": { "type": "string" },
+          "occurredAt": { "type": "string", "format": "date-time", "nullable": true },
+          "receivedAt": { "type": "string", "format": "date-time", "nullable": true },
+          "tenantId": { "type": "string", "nullable": true },
+          "userId": { "type": "integer", "nullable": true },
+          "sessionId": { "type": "string", "nullable": true },
+          "deviceId": { "type": "string", "nullable": true },
+          "correlationId": { "type": "string", "nullable": true },
+          "consentScope": { "type": "string", "nullable": true },
+          "payload": { "type": "object" },
+          "context": { "type": "object" },
+          "metadata": { "type": "object" },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "required": ["eventName", "eventSource"]
+      },
+      "TelemetryEventIngestResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "duplicate": { "type": "boolean" },
+          "suppressed": { "type": "boolean" },
+          "consentStatus": { "type": "string" },
+          "event": {
+            "type": "object",
+            "properties": {
+              "eventUuid": { "type": "string" },
+              "eventName": { "type": "string" },
+              "eventSource": { "type": "string" },
+              "consentScope": { "type": "string" },
+              "consentStatus": { "type": "string" },
+              "ingestionStatus": { "type": "string" },
+              "occurredAt": { "type": "string", "format": "date-time" },
+              "receivedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "required": ["status", "duplicate", "suppressed", "consentStatus", "event"]
+      },
+      "TelemetryConsentRequest": {
+        "type": "object",
+        "properties": {
+          "consentScope": { "type": "string" },
+          "consentVersion": { "type": "string", "nullable": true },
+          "status": { "type": "string", "enum": ["granted", "revoked", "expired"] },
+          "tenantId": { "type": "string", "nullable": true },
+          "userId": { "type": "integer", "nullable": true },
+          "expiresAt": { "type": "string", "format": "date-time", "nullable": true },
+          "metadata": { "type": "object", "nullable": true },
+          "evidence": { "type": "object", "nullable": true }
+        },
+        "required": ["consentScope"]
+      },
+      "TelemetryConsentRecord": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "userId": { "type": "integer" },
+          "tenantId": { "type": "string" },
+          "consentScope": { "type": "string" },
+          "consentVersion": { "type": "string" },
+          "status": { "type": "string" },
+          "isActive": { "type": "boolean" },
+          "recordedAt": { "type": "string", "format": "date-time" },
+          "effectiveAt": { "type": "string", "format": "date-time" },
+          "expiresAt": { "type": "string", "format": "date-time", "nullable": true },
+          "metadata": { "type": "object" },
+          "evidence": { "type": "object" }
+        }
+      },
+      "TelemetryFreshnessMonitor": {
+        "type": "object",
+        "properties": {
+          "pipelineKey": { "type": "string" },
+          "status": { "type": "string", "enum": ["healthy", "warning", "critical", "noop"] },
+          "lagSeconds": { "type": "integer" },
+          "thresholdMinutes": { "type": "integer" },
+          "lastEventAt": { "type": "string", "format": "date-time", "nullable": true },
+          "metadata": { "type": "object" }
+        }
+      },
+      "TelemetryExportSummary": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["exported", "noop", "disabled"] },
+          "exported": { "type": "integer" },
+          "batchId": { "type": "integer", "nullable": true },
+          "fileKey": { "type": "string", "nullable": true }
+        }
+      },
+      "BiExecutiveOverview": {
+        "type": "object",
+        "properties": {
+          "tenantId": { "type": "string" },
+          "timeframe": {
+            "type": "object",
+            "properties": {
+              "range": { "type": "string" },
+              "days": { "type": "integer" },
+              "start": { "type": "string", "format": "date-time" },
+              "end": { "type": "string", "format": "date-time" },
+              "comparisonStart": { "type": "string", "format": "date-time" },
+              "comparisonEnd": { "type": "string", "format": "date-time" }
+            }
+          },
+          "scorecard": {
+            "type": "object",
+            "properties": {
+              "enrollments": { "$ref": "#/components/schemas/ScorecardMetric" },
+              "completionRate": { "$ref": "#/components/schemas/ScorecardMetric" },
+              "recognisedRevenue": { "$ref": "#/components/schemas/ScorecardMetric" },
+              "netRevenue": { "$ref": "#/components/schemas/ScorecardMetric" },
+              "averageProgressPercent": { "$ref": "#/components/schemas/ScorecardMetric" },
+              "communityEngagement": {
+                "type": "object",
+                "properties": {
+                  "posts": { "$ref": "#/components/schemas/ScorecardMetric" },
+                  "comments": { "$ref": "#/components/schemas/ScorecardMetric" },
+                  "events": { "type": "integer" }
+                }
+              }
+            }
+          },
+          "enrollmentTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string" },
+                "enrollments": { "type": "integer" },
+                "completions": { "type": "integer" },
+                "recognisedRevenueCents": { "type": "integer" }
+              }
+            }
+          },
+          "revenueTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string" },
+                "currency": { "type": "string" },
+                "grossVolumeCents": { "type": "integer" },
+                "recognisedVolumeCents": { "type": "integer" }
+              }
+            }
+          },
+          "revenueByCurrency": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": { "type": "string" },
+                "grossVolumeCents": { "type": "integer" },
+                "recognisedVolumeCents": { "type": "integer" },
+                "discountCents": { "type": "integer" },
+                "taxCents": { "type": "integer" },
+                "refundedCents": { "type": "integer" }
+              }
+            }
+          },
+          "communityTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": { "type": "string" },
+                "posts": { "type": "integer" },
+                "comments": { "type": "integer" }
+              }
+            }
+          },
+          "topCommunities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "communityId": { "type": "integer" },
+                "name": { "type": "string" },
+                "posts": { "type": "integer" },
+                "comments": { "type": "integer" }
+              }
+            }
+          },
+          "categoryBreakdown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": { "type": "string" },
+                "deliveryFormat": { "type": "string" },
+                "level": { "type": "string" },
+                "enrollments": { "type": "integer" },
+                "completions": { "type": "integer" },
+                "recognisedRevenueCents": { "type": "integer" }
+              }
+            }
+          },
+          "experiments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": { "type": "string" },
+                "experimentId": { "type": "string", "nullable": true },
+                "name": { "type": "string" },
+                "status": { "type": "string" },
+                "rolloutPercentage": { "type": "number" },
+                "owner": { "type": "string", "nullable": true }
+              }
+            }
+          },
+          "dataQuality": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string" },
+              "pipelines": {
+                "type": "array",
+                "items": { "$ref": "#/components/schemas/TelemetryFreshnessMonitor" }
+              }
+            }
+          }
+        }
+      },
+      "ScorecardMetric": {
+        "type": "object",
+        "properties": {
+          "total": { "type": "number" },
+          "value": { "type": "number", "nullable": true },
+          "cents": { "type": "integer", "nullable": true },
+          "change": {
+            "type": "object",
+            "properties": {
+              "absolute": { "type": "number" },
+              "percentage": { "type": "number" }
+            }
+          }
+        }
       }
     }
   },
@@ -18519,6 +18767,233 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/telemetry/events": {
+      "post": {
+        "summary": "Ingest telemetry event",
+        "description": "Registers a telemetry event for downstream export while enforcing consent and deduplication policies.",
+        "tags": ["Telemetry"],
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryEventIngestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Telemetry event accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryEventIngestResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Duplicate telemetry event acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryEventIngestResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Telemetry source not authorised"
+          },
+          "422": {
+            "description": "Invalid telemetry payload"
+          },
+          "503": {
+            "description": "Telemetry pipeline disabled"
+          }
+        }
+      }
+    },
+    "/telemetry/consents": {
+      "post": {
+        "summary": "Record telemetry consent decision",
+        "tags": ["Telemetry"],
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryConsentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Consent decision recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consent": {
+                      "$ref": "#/components/schemas/TelemetryConsentRecord"
+                    }
+                  },
+                  "required": ["consent"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User context missing"
+          },
+          "422": {
+            "description": "Invalid consent payload"
+          }
+        }
+      }
+    },
+    "/telemetry/freshness": {
+      "get": {
+        "summary": "List telemetry freshness monitors",
+        "tags": ["Telemetry"],
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Maximum number of freshness monitors to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Telemetry freshness monitors retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monitors": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TelemetryFreshnessMonitor"
+                      }
+                    }
+                  },
+                  "required": ["monitors"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/telemetry/export": {
+      "post": {
+        "summary": "Trigger telemetry warehouse export",
+        "tags": ["Telemetry"],
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "responses": {
+          "202": {
+            "description": "Telemetry export started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryExportSummary"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "No telemetry events pending export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryExportSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "503": {
+            "description": "Telemetry export disabled"
+          }
+        }
+      }
+    },
+    "/analytics/bi/executive-overview": {
+      "get": {
+        "summary": "Executive analytics overview",
+        "description": "Returns aggregated KPIs, trends, and telemetry health indicators for the executive dashboard.",
+        "tags": ["Analytics"],
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["7d", "14d", "30d", "90d"],
+              "default": "30d"
+            },
+            "description": "Time window used when calculating KPI deltas and trend lines."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Executive overview generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StandardResponse" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/BiExecutiveOverview"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
           }
         }
       }

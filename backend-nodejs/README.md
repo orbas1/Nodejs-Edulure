@@ -76,6 +76,27 @@ The following additional variables configure the asset workflow:
 When running locally without CloudConvert the ingestion worker will mark PowerPoint jobs as failed. Other formats (EPUB, PDF) are
 processed entirely within the service and will continue to function.
 
+### Telemetry pipeline
+
+Version 1.50 introduces a governed telemetry pipeline spanning consent capture, event ingestion, freshness monitoring, and warehouse exports. Configure the following variables when enabling telemetry in any environment:
+
+- `TELEMETRY_INGESTION_ENABLED` – master switch for the ingestion API. Disable to prevent writes during maintenance windows.
+- `TELEMETRY_ALLOWED_SOURCES` / `TELEMETRY_STRICT_SOURCE_ENFORCEMENT` – whitelist authorised producers (for example, `web,backend,worker`) and hard-block unknown sources in production.
+- `TELEMETRY_DEFAULT_SCOPE` / `TELEMETRY_CONSENT_DEFAULT_VERSION` / `TELEMETRY_CONSENT_HARD_BLOCK` – control consent scoping and enforcement. When `HARD_BLOCK` is `true` events without active consent are persisted with an ingestion status of `suppressed` and excluded from export.
+- `TELEMETRY_EXPORT_ENABLED`, `TELEMETRY_EXPORT_DESTINATION`, `TELEMETRY_EXPORT_BUCKET`, `TELEMETRY_EXPORT_PREFIX`, `TELEMETRY_EXPORT_BATCH_SIZE`, `TELEMETRY_EXPORT_COMPRESS`, `TELEMETRY_EXPORT_RUN_ON_STARTUP`, `TELEMETRY_EXPORT_CRON`, `TELEMETRY_EXPORT_TIMEZONE` – configure warehouse exports. The default settings batch 5,000 events, compress JSONL payloads, and run every ten minutes in UTC.
+- `TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES` / `TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES` – thresholds surfaced in Prometheus metrics and the `/telemetry/freshness` endpoint so operators can detect pipeline drift.
+- `TELEMETRY_LINEAGE_TOOL` / `TELEMETRY_LINEAGE_AUTO_RECORD` – annotate exports with lineage metadata (defaults to `dbt`).
+
+Operational endpoints:
+
+- `POST /api/v1/telemetry/events` ingests a single event, enforces consent, and records deduplicated payloads for export. A `202` response indicates the event will flow to the warehouse.
+- `POST /api/v1/telemetry/consents` records or revokes consent for a user and scope combination, versioning entries in the consent ledger.
+- `GET /api/v1/telemetry/freshness` lists ingestion and export checkpoints with computed lag so operators can validate pipeline health.
+- `POST /api/v1/telemetry/export` triggers an immediate warehouse export in addition to the scheduled cron execution.
+- `GET /api/v1/analytics/bi/executive-overview` returns aggregated KPIs, revenue trends, community metrics, experiments, and telemetry health powering the operator dashboards. Use the optional `range` query parameter (`7d`, `14d`, `30d`, `90d`) to control KPI deltas.
+
+Exports stream to Cloudflare R2 (or the configured destination) using the background worker. The telemetry warehouse job is registered in `src/jobs/telemetryWarehouseJob.js` and honours the configured cron as well as manual triggers. Freshness checkpoints feed Prometheus metrics (`edulure_telemetry_ingestion_events_total`, `edulure_telemetry_export_lag_seconds`) so alerting can detect stale pipelines.
+
 ### Explorer search environment
 
 The explorer, recommendation, and ads surfaces rely on a hardened Meilisearch cluster. Configure the following variables to

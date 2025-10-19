@@ -87,6 +87,17 @@ export const apiRouteMetadata = [
     disabledMessage: 'Environment parity APIs are restricted to platform administrators.'
   },
   {
+    name: 'telemetry',
+    capability: 'telemetry-pipeline',
+    description: 'Telemetry ingestion, consent governance, and warehouse export endpoints for platform services.',
+    basePath: '/telemetry',
+    flagKey: 'platform.api.v1.telemetry',
+    defaultState: 'enabled',
+    audience: 'service',
+    fallbackStatus: 503,
+    disabledMessage: 'Telemetry APIs are currently paused while pipelines are offline.'
+  },
+  {
     name: 'payments',
     capability: 'payments-and-payouts',
     description: 'Payments, escrow, and billing orchestration endpoints.',
@@ -166,7 +177,8 @@ export const apiRouteMetadata = [
   {
     name: 'analytics',
     capability: 'analytics-insights',
-    description: 'Reporting, dashboards, and analytics export APIs.',
+    description:
+      'Reporting, dashboards, and analytics export APIs including executive BI overviews.',
     basePath: '/analytics',
     flagKey: 'platform.api.v1.analytics',
     defaultState: 'enabled'

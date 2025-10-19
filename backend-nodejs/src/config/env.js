@@ -618,6 +618,25 @@ const envSchema = z
     SLO_CRITICAL_BURN_RATE: z.coerce.number().min(0.1).max(100).default(10),
     SLO_MIN_REQUESTS: z.coerce.number().int().min(1).max(1000000).default(200),
     SLO_DEFAULT_TREAT_4XX_AS_FAILURE: z.coerce.boolean().default(false),
+    TELEMETRY_INGESTION_ENABLED: z.coerce.boolean().default(true),
+    TELEMETRY_ALLOWED_SOURCES: z.string().optional(),
+    TELEMETRY_STRICT_SOURCE_ENFORCEMENT: z.coerce.boolean().default(false),
+    TELEMETRY_DEFAULT_SCOPE: z.string().min(3).default('product.analytics'),
+    TELEMETRY_CONSENT_DEFAULT_VERSION: z.string().min(1).default('v1'),
+    TELEMETRY_CONSENT_HARD_BLOCK: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_ENABLED: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_DESTINATION: z.string().min(2).default('s3'),
+    TELEMETRY_EXPORT_BUCKET: z.string().optional(),
+    TELEMETRY_EXPORT_PREFIX: z.string().optional(),
+    TELEMETRY_EXPORT_BATCH_SIZE: z.coerce.number().int().min(100).max(50000).default(5000),
+    TELEMETRY_EXPORT_COMPRESS: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_RUN_ON_STARTUP: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_CRON: z.string().default('*/5 * * * *'),
+    TELEMETRY_EXPORT_TIMEZONE: z.string().default('Etc/UTC'),
+    TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(15),
+    TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
+    TELEMETRY_LINEAGE_TOOL: z.string().default('dbt'),
+    TELEMETRY_LINEAGE_AUTO_RECORD: z.coerce.boolean().default(true),
     R2_ACCOUNT_ID: z.string().min(1),
     R2_ACCESS_KEY_ID: z.string().min(1),
     R2_SECRET_ACCESS_KEY: z.string().min(1),
@@ -1094,6 +1113,9 @@ const sloConfig = buildSloConfiguration({
   latencySampleSize: raw.SLO_LATENCY_SAMPLE_SIZE,
   defaults: sloDefaults
 });
+const telemetryAllowedSources = parseCsv(raw.TELEMETRY_ALLOWED_SOURCES ?? '');
+const telemetryExportBucket = raw.TELEMETRY_EXPORT_BUCKET ?? raw.R2_PRIVATE_BUCKET;
+const telemetryExportPrefix = normalizePrefix(raw.TELEMETRY_EXPORT_PREFIX, 'warehouse/telemetry');
 const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRESH_SECRET;
 const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
 const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
@@ -1602,5 +1624,36 @@ export const env = {
       allowedIps: metricsAllowedIps
     },
     slo: sloConfig
+  },
+  telemetry: {
+    ingestion: {
+      enabled: raw.TELEMETRY_INGESTION_ENABLED,
+      allowedSources: telemetryAllowedSources,
+      strictSourceEnforcement: raw.TELEMETRY_STRICT_SOURCE_ENFORCEMENT,
+      defaultScope: raw.TELEMETRY_DEFAULT_SCOPE,
+      consent: {
+        defaultVersion: raw.TELEMETRY_CONSENT_DEFAULT_VERSION,
+        hardBlockWithoutConsent: raw.TELEMETRY_CONSENT_HARD_BLOCK
+      }
+    },
+    export: {
+      enabled: raw.TELEMETRY_EXPORT_ENABLED,
+      destination: raw.TELEMETRY_EXPORT_DESTINATION,
+      bucket: telemetryExportBucket,
+      prefix: telemetryExportPrefix,
+      batchSize: raw.TELEMETRY_EXPORT_BATCH_SIZE,
+      compress: raw.TELEMETRY_EXPORT_COMPRESS,
+      cronExpression: raw.TELEMETRY_EXPORT_CRON,
+      timezone: raw.TELEMETRY_EXPORT_TIMEZONE,
+      runOnStartup: raw.TELEMETRY_EXPORT_RUN_ON_STARTUP
+    },
+    freshness: {
+      ingestionThresholdMinutes: raw.TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES,
+      warehouseThresholdMinutes: raw.TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES
+    },
+    lineage: {
+      tool: raw.TELEMETRY_LINEAGE_TOOL,
+      autoRecord: raw.TELEMETRY_LINEAGE_AUTO_RECORD
+    }
   }
 };

@@ -2,3 +2,8 @@
 - Registered `observability.routes.js` to expose `/observability/slos` list/detail endpoints behind admin auth, publishing burn-rate telemetry and metadata for SRE dashboards.
 - Registered `environmentParity.routes.js` under `/environment/health` so admins can retrieve infrastructure parity reports without loading the entire operator app. 【F:backend-nodejs/src/routes/environmentParity.routes.js†L1-L9】
 - Registered `security.routes.js` at `/security` to expose risk register, audit evidence, continuity exercise, and assessment endpoints behind admin RBAC for compliance and security operators. 【F:backend-nodejs/src/routes/security.routes.js†L1-L17】
+- Registered `telemetry.routes.js` at `/telemetry` to provide authenticated event ingestion, consent management, freshness reporting, and export trigger endpoints that front the new telemetry pipeline. 【F:backend-nodejs/src/routes/telemetry.routes.js†L1-L11】【F:backend-nodejs/src/controllers/TelemetryController.js†L1-L115】
+- Extended `analytics.routes.js` with `/bi/executive-overview` to surface the BI snapshot behind admin auth, delegating to the ne
+w business intelligence controller. 【F:backend-nodejs/src/routes/analytics.routes.js†L1-L12】
+- Added Supertest coverage for `/telemetry` and BI routes to the backend test suite, wiring mocks for auth and services. 【F:back
+end-nodejs/test/telemetryHttpRoutes.test.js†L1-L118】【F:backend-nodejs/test/analyticsBiHttpRoutes.test.js†L1-L64】

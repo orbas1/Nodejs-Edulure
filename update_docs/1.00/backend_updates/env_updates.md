@@ -7,3 +7,7 @@
 - Documented the `AUDIT_LOG_*` family (tenant id, severity, IP capture toggle, metadata redaction list, request context switch, and byte budget) to ensure audit evidence policies are explicit for operations, staging, and automated test harnesses.
 - Declared `SLO_*` environment defaults (bucket minutes, window length, latency reservoir, target availability, burn-rate thresholds, optional JSON manifest) so observability policy can be tuned per environment while Vitest inherits deterministic SLO definitions.
 - Documented the new environment parity knobs (`ENVIRONMENT_*`, `RELEASE_CHANNEL`) covering manifest paths, provider metadata, dependency declarations, and parity budgets to keep Terraform/Docker hashes aligned across dev, staging, and production. 【F:backend-nodejs/src/config/env.js†L800-L1547】
+- Added telemetry pipeline configuration (`TELEMETRY_*`) covering ingestion defaults, allowed sources, consent behaviour, export destination/schedule, freshness thresholds, and lineage toggles so operations can govern event capture and warehouse automation per environment. 【F:backend-nodejs/src/config/env.js†L560-L1653】
+- Updated `.env.example` and the Vitest `test/setupEnv.js` harness with the telemetry pipeline variables (`TELEMETRY_*`) so operat
+ions can configure ingestion/exports consistently across environments and tests inherit safe defaults. 【F:backend-nodejs/.env.ex
+ample†L101-L121】【F:backend-nodejs/test/setupEnv.js†L155-L194】

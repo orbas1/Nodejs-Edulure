@@ -1,5 +1,6 @@
 # Backend Test Results – Version 1.00
 
+- `npm run test --workspace backend-nodejs` — **failed**. Full Vitest run reported widespread module resolution failures for `supertest`, `knex`, `dotenv`, `pino`, and other runtime dependencies, cascading into 64 suite failures and three assertion regressions inside the integration API key rotation tests. 【78eb55†L1-L99】
 - `npm test` (backend-nodejs) — **failed**. Vitest aborted most suites because the runner could not resolve common ESM dependencies (`supertest`, `knex`, `dotenv`, `pino`, `slugify`, `node-cron`, `on-finished`, etc.) in this container, so HTTP and integration harnesses never executed. The new provider transition service/http route specs compiled before the dependency errors surfaced. 【e202c8†L1-L118】
 - `npm --prefix backend-nodejs test` — **failed**. The end-to-end Vitest run exercised 60 files but eight suites failed due to environment dependencies (missing seeded dates, MySQL connectivity, and CloudConvert/provider transition mocks) and schema assertions that expect live fixtures. 【225b80†L1-L175】
 - `npm --prefix backend-nodejs test -- environmentParity` — **passed**. Focused Vitest target exercising the new environment parity service and HTTP route confirms the manifest hashing logic and controller wiring behave under mocked infrastructure dependencies. 【1ce85a†L1-L8】

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { generateConsentPolicyChecksum } from '../src/database/domains/compliance.js';
+import { TABLES as TELEMETRY_TABLES } from '../src/database/domains/telemetry.js';
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
@@ -124,6 +125,11 @@ export async function seed(knex) {
     await trx('content_asset_events').del();
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
+    await trx('telemetry_lineage_runs').del();
+    await trx('telemetry_freshness_monitors').del();
+    await trx('telemetry_events').del();
+    await trx('telemetry_event_batches').del();
+    await trx('telemetry_consent_ledger').del();
     await trx('domain_event_dispatch_queue').del();
     await trx('domain_events').del();
     await trx('security_incidents').del();
@@ -3082,3 +3088,70 @@ export async function seed(knex) {
     });
   });
 }
+    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert([
+      {
+        user_id: adminId,
+        tenant_id: 'global',
+        consent_scope: 'product.analytics',
+        consent_version: 'v1',
+        status: 'granted',
+        is_active: true,
+        recorded_at: trx.fn.now(),
+        effective_at: trx.fn.now(),
+        metadata: JSON.stringify({ capturedBy: 'seed', channel: 'bootstrap' }),
+        evidence: JSON.stringify({ method: 'policy-acceptance', version: '2025-03' })
+      },
+      {
+        user_id: instructorId,
+        tenant_id: 'global',
+        consent_scope: 'product.analytics',
+        consent_version: 'v1',
+        status: 'granted',
+        is_active: true,
+        recorded_at: trx.fn.now(),
+        effective_at: trx.fn.now(),
+        metadata: JSON.stringify({ capturedBy: 'seed', channel: 'bootstrap' }),
+        evidence: JSON.stringify({ method: 'policy-acceptance', version: '2025-03' })
+      },
+      {
+        user_id: learnerId,
+        tenant_id: 'global',
+        consent_scope: 'product.analytics',
+        consent_version: 'v1',
+        status: 'granted',
+        is_active: true,
+        recorded_at: trx.fn.now(),
+        effective_at: trx.fn.now(),
+        metadata: JSON.stringify({ capturedBy: 'seed', channel: 'bootstrap' }),
+        evidence: JSON.stringify({ method: 'policy-acceptance', version: '2025-03' })
+      }
+    ]);
+
+    await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
+      {
+        pipeline_key: 'ingestion.raw',
+        status: 'healthy',
+        threshold_minutes: 15,
+        last_event_at: trx.fn.now(),
+        lag_seconds: 0,
+        metadata: JSON.stringify({ seeded: true })
+      },
+      {
+        pipeline_key: 'warehouse.export',
+        status: 'healthy',
+        threshold_minutes: 30,
+        last_event_at: trx.fn.now(),
+        lag_seconds: 0,
+        metadata: JSON.stringify({ seeded: true })
+      }
+    ]);
+
+    await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
+      tool: 'dbt',
+      model_name: 'telemetry_events_rollup',
+      status: 'success',
+      started_at: trx.fn.now(),
+      completed_at: trx.fn.now(),
+      input: JSON.stringify({ source: 'telemetry_events', range: 'seed' }),
+      output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' })
+    });

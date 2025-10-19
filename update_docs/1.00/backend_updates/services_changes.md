@@ -18,3 +18,8 @@
 - Added `EnvironmentParityService` to compute infrastructure manifest hashes, run dependency probes, and assemble parity reports consumed by the new admin health endpoint. 【F:backend-nodejs/src/services/EnvironmentParityService.js†L1-L217】
 - Created `SecurityOperationsService` backed by a repository layer to score risks, record reviews, log audit evidence, orchestrate continuity drills, and schedule assessments with automatic audit and CDC emissions so compliance workflows stay observable and automatable. 【F:backend-nodejs/src/services/SecurityOperationsService.js†L1-L421】【F:backend-nodejs/src/repositories/SecurityOperationsRepository.js†L1-L452】
 - Replaced the CloudConvert integration with a native `CloudConvertClient` that wraps fetch, retry, timeout, and circuit breaker controls so asset ingestion can operate without the deprecated SDK. 【F:backend-nodejs/src/integrations/CloudConvertClient.js†L1-L210】
+- Added `TelemetryIngestionService` to validate payloads, enforce consent, emit metrics, and persist events into the new telemetry domain, wiring request context metadata and freshness tracking for downstream analytics. 【F:backend-nodejs/src/services/TelemetryIngestionService.js†L1-L173】
+- Introduced `TelemetryWarehouseService` to batch pending events, export compressed JSONL manifests to object storage, update freshness checkpoints, and record lineage runs after successful exports. 【F:backend-nodejs/src/services/TelemetryWarehouseService.js†L1-L197】
+- Introduced `BusinessIntelligenceService` to aggregate reporting views, compute KPI deltas, surface experiment metadata, and en
+rich executive dashboards with telemetry freshness and currency breakdowns. 【F:backend-nodejs/src/services/BusinessIntelligence
+Service.js†L1-L265】

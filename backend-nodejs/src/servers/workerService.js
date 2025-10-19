@@ -9,6 +9,7 @@ import assetIngestionService from '../services/AssetIngestionService.js';
 import dataRetentionJob from '../jobs/dataRetentionJob.js';
 import communityReminderJob from '../jobs/communityReminderJob.js';
 import dataPartitionJob from '../jobs/dataPartitionJob.js';
+import telemetryWarehouseJob from '../jobs/telemetryWarehouseJob.js';
 import integrationOrchestratorService from '../services/IntegrationOrchestratorService.js';
 import webhookEventBusService from '../services/WebhookEventBusService.js';
 import domainEventDispatcherService from '../services/DomainEventDispatcherService.js';
@@ -26,6 +27,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'community-reminder',
     'data-partitioning',
     'integration-orchestrator',
+    'telemetry-warehouse',
     'webhook-event-bus',
     'domain-event-dispatcher',
     'probe-server'
@@ -95,6 +97,19 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   } catch (error) {
     readiness.markFailed('community-reminder', error);
     serviceLogger.error({ err: error }, 'Failed to start community reminder job');
+  }
+
+  readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
+  try {
+    telemetryWarehouseJob.start();
+    if (!env.telemetry.export.enabled) {
+      readiness.markDegraded('telemetry-warehouse', 'Telemetry export scheduler disabled by configuration');
+    } else {
+      readiness.markReady('telemetry-warehouse', 'Telemetry export scheduler active');
+    }
+  } catch (error) {
+    readiness.markFailed('telemetry-warehouse', error);
+    serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
   }
 
   readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
@@ -177,6 +192,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   dataRetentionJob.stop();
   dataPartitionJob.stop();
   communityReminderJob.stop();
+  telemetryWarehouseJob.stop();
   integrationOrchestratorService.stop();
   webhookEventBusService.stop();
   domainEventDispatcherService.stop();

@@ -24,6 +24,7 @@ import verificationRoutes from './verification.routes.js';
 import observabilityRoutes from './observability.routes.js';
 import environmentParityRoutes from './environmentParity.routes.js';
 import securityRoutes from './security.routes.js';
+import telemetryRoutes from './telemetry.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 
 const routerMap = {
@@ -52,7 +53,8 @@ const routerMap = {
   blog: blogRoutes,
   'provider-transition': providerTransitionRoutes,
   observability: observabilityRoutes,
-  environment: environmentParityRoutes
+  environment: environmentParityRoutes,
+  telemetry: telemetryRoutes
 };
 
 export const apiRouteRegistry = apiRouteMetadata.map((descriptor) => ({

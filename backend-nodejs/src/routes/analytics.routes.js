@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import AnalyticsController from '../controllers/AnalyticsController.js';
+import BusinessIntelligenceController from '../controllers/BusinessIntelligenceController.js';
 import auth from '../middleware/auth.js';
 
 const router = Router();
@@ -8,5 +9,6 @@ const router = Router();
 router.get('/explorer/summary', auth('instructor'), AnalyticsController.getExplorerSummary);
 router.get('/explorer/alerts', auth('instructor'), AnalyticsController.getExplorerAlerts);
 router.post('/explorer/interactions', auth('user'), AnalyticsController.recordExplorerInteraction);
+router.get('/bi/executive-overview', auth('admin'), BusinessIntelligenceController.getExecutiveOverview);
 
 export default router;

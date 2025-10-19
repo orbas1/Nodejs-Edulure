@@ -96,6 +96,31 @@ const unhandledExceptionsTotal = new promClient.Counter({
   labelNames: ['type']
 });
 
+const telemetryIngestionEventsTotal = new promClient.Counter({
+  name: 'edulure_telemetry_ingestion_events_total',
+  help: 'Count of telemetry events processed grouped by scope, source, and status',
+  labelNames: ['scope', 'source', 'status']
+});
+
+const telemetryExportEventsTotal = new promClient.Counter({
+  name: 'edulure_telemetry_export_events_total',
+  help: 'Count of telemetry events exported grouped by destination and result',
+  labelNames: ['destination', 'result']
+});
+
+const telemetryExportDurationSeconds = new promClient.Histogram({
+  name: 'edulure_telemetry_export_duration_seconds',
+  help: 'Histogram of telemetry export durations in seconds grouped by destination and result',
+  labelNames: ['destination', 'result'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 20, 60, 120]
+});
+
+const telemetryFreshnessLagSeconds = new promClient.Gauge({
+  name: 'edulure_telemetry_pipeline_lag_seconds',
+  help: 'Current telemetry pipeline lag in seconds grouped by pipeline and status',
+  labelNames: ['pipeline', 'status']
+});
+
 const paymentsProcessedTotal = new promClient.Counter({
   name: 'edulure_payments_processed_total',
   help: 'Count of payment intents processed grouped by provider, status, and currency',
@@ -212,6 +237,10 @@ registry.registerMetric(paymentsProcessedTotal);
 registry.registerMetric(paymentsRevenueCentsTotal);
 registry.registerMetric(paymentsTaxCentsTotal);
 registry.registerMetric(paymentsRefundCentsTotal);
+registry.registerMetric(telemetryIngestionEventsTotal);
+registry.registerMetric(telemetryExportEventsTotal);
+registry.registerMetric(telemetryExportDurationSeconds);
+registry.registerMetric(telemetryFreshnessLagSeconds);
 registry.registerMetric(searchOperationDurationSeconds);
 registry.registerMetric(searchNodeHealthGauge);
 registry.registerMetric(searchNodeLastCheckGauge);
@@ -544,6 +573,64 @@ export function trackPaymentRefundMetrics({ provider, currency, amount }) {
     },
     amount
   );
+}
+
+export function recordTelemetryIngestion({ scope, source, status }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  telemetryIngestionEventsTotal.inc({
+    scope: scope ?? 'unknown',
+    source: source ?? 'unknown',
+    status: status ?? 'unknown'
+  });
+}
+
+export function recordTelemetryExport({ destination, result, eventCount = 0, durationSeconds }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const labels = {
+    destination: destination ?? 'unknown',
+    result: result ?? 'success'
+  };
+
+  const count = Number.isFinite(eventCount) && eventCount > 0 ? eventCount : 0;
+  telemetryExportEventsTotal.inc(labels, count);
+
+  if (Number.isFinite(durationSeconds) && durationSeconds >= 0) {
+    telemetryExportDurationSeconds.observe(labels, durationSeconds);
+  }
+}
+
+export function recordTelemetryFreshness({ pipeline, status, lastEventAt, thresholdMinutes }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const pipelineKey = pipeline ?? 'unknown';
+  const now = Date.now();
+  const occurred = lastEventAt ? new Date(lastEventAt).getTime() : now;
+  const lagSeconds = Math.max(0, Math.round((now - occurred) / 1000));
+
+  const severityThresholdSeconds = Number.isFinite(thresholdMinutes)
+    ? Math.max(60, Math.round(thresholdMinutes * 60))
+    : 900;
+
+  let severity = 'healthy';
+  if (lagSeconds > severityThresholdSeconds * 3) {
+    severity = 'critical';
+  } else if (lagSeconds > severityThresholdSeconds) {
+    severity = 'warning';
+  }
+
+  telemetryFreshnessLagSeconds.set({ pipeline: pipelineKey, status: severity }, lagSeconds);
+
+  if (status && status !== severity) {
+    telemetryFreshnessLagSeconds.set({ pipeline: pipelineKey, status }, lagSeconds);
+  }
 }
 
 export function recordUnhandledException(error) {
