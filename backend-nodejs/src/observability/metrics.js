@@ -181,6 +181,30 @@ const monetizationRevenueReversedCentsTotal = new promClient.Counter({
   labelNames: ['product_code', 'currency', 'reason']
 });
 
+const governanceContractLifecycleGauge = new promClient.Gauge({
+  name: 'edulure_governance_contracts_lifecycle',
+  help: 'Governance contract counts grouped by lifecycle bucket',
+  labelNames: ['bucket']
+});
+
+const governanceVendorRiskGauge = new promClient.Gauge({
+  name: 'edulure_governance_vendor_risk',
+  help: 'Vendor assessment distribution grouped by risk level',
+  labelNames: ['risk_level']
+});
+
+const governanceCommunicationScheduledCounter = new promClient.Counter({
+  name: 'edulure_governance_communications_scheduled_total',
+  help: 'Count of roadmap communications scheduled grouped by audience, channel, and status',
+  labelNames: ['audience', 'channel', 'status']
+});
+
+const governanceCommunicationStatusGauge = new promClient.Gauge({
+  name: 'edulure_governance_communications_status',
+  help: 'Governance communication totals grouped by status',
+  labelNames: ['status']
+});
+
 const searchOperationDurationSeconds = new promClient.Histogram({
   name: 'edulure_search_operation_duration_seconds',
   help: 'Duration histogram for Meilisearch administrative operations',
@@ -279,6 +303,10 @@ registry.registerMetric(monetizationUsageRecordedTotal);
 registry.registerMetric(monetizationUsageCentsTotal);
 registry.registerMetric(monetizationRevenueRecognizedCentsTotal);
 registry.registerMetric(monetizationRevenueReversedCentsTotal);
+registry.registerMetric(governanceContractLifecycleGauge);
+registry.registerMetric(governanceVendorRiskGauge);
+registry.registerMetric(governanceCommunicationScheduledCounter);
+registry.registerMetric(governanceCommunicationStatusGauge);
 registry.registerMetric(telemetryIngestionEventsTotal);
 registry.registerMetric(telemetryExportEventsTotal);
 registry.registerMetric(telemetryExportDurationSeconds);
@@ -689,6 +717,76 @@ export function updateDeferredRevenueBalance({ tenantId = 'global', balanceCents
 
   const normalizedTenant = tenantId ? String(tenantId) : 'global';
   monetizationDeferredRevenueGauge.set({ tenant_id: normalizedTenant }, Math.max(balanceCents, 0));
+}
+
+export function updateGovernanceContractHealthMetrics(summary = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const total = Number(summary.totalContracts ?? 0);
+  const active = Number(summary.activeContracts ?? 0);
+  const renewals = Number(summary.renewalsWithinWindow ?? 0);
+  const overdue = Number(summary.overdueRenewals ?? 0);
+  const escalated = Number(summary.escalatedContracts ?? 0);
+
+  governanceContractLifecycleGauge.set({ bucket: 'total' }, Math.max(total, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'active' }, Math.max(active, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'renewal_window' }, Math.max(renewals, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'overdue' }, Math.max(overdue, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'escalated' }, Math.max(escalated, 0));
+}
+
+export function updateVendorAssessmentRiskMetrics(summary = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const total = Number(summary.totalAssessments ?? 0);
+  const high = Number(summary.highRiskAssessments ?? 0);
+  const critical = Number(summary.criticalRiskAssessments ?? 0);
+  const remediation = Number(summary.remediationInProgress ?? 0);
+  const medium = Math.max(total - high - critical, 0);
+
+  governanceVendorRiskGauge.set({ risk_level: 'total' }, Math.max(total, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'high' }, Math.max(high, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'critical' }, Math.max(critical, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'medium' }, Math.max(medium, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'remediation' }, Math.max(remediation, 0));
+}
+
+export function recordGovernanceCommunicationScheduled({ audience, channel, status } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedAudience = audience ? String(audience) : 'unspecified';
+  const normalizedChannel = channel ? String(channel) : 'email';
+  const normalizedStatus = status ? String(status) : 'scheduled';
+
+  governanceCommunicationScheduledCounter.inc(
+    { audience: normalizedAudience, channel: normalizedChannel, status: normalizedStatus },
+    1
+  );
+}
+
+export function recordGovernanceCommunicationPerformance({ summary } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  if (summary) {
+    governanceCommunicationStatusGauge.set({ status: 'total' }, Number(summary.totalCommunications ?? 0));
+    governanceCommunicationStatusGauge.set(
+      { status: 'scheduled' },
+      Number(summary.scheduledCommunications ?? 0)
+    );
+    governanceCommunicationStatusGauge.set({ status: 'sent' }, Number(summary.sentCommunications ?? 0));
+    governanceCommunicationStatusGauge.set(
+      { status: 'cancelled' },
+      Number(summary.cancelledCommunications ?? 0)
+    );
+  }
 }
 
 export function recordTelemetryIngestion({ scope, source, status }) {

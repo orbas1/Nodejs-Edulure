@@ -28,10 +28,10 @@ Progress is tracked per task and subtask across the required dimensions. Overall
 | &nbsp;&nbsp;Dependency and supply-chain governance | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Release management and QA automation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Security, compliance, and risk operations | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| **Task 5: Deliver analytics, monetisation, documentation, and stakeholder enablement** | 80% | 80% | 80% | 80% | 80% | 80% | 80% |
+| **Task 5: Deliver analytics, monetisation, documentation, and stakeholder enablement** | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Telemetry and warehouse implementation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;BI and insight delivery | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Monetisation and finance reconciliation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Documentation and enablement refresh | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| &nbsp;&nbsp;Governance and stakeholder communications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| &nbsp;&nbsp;Governance and stakeholder communications | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 

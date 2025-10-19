@@ -26,6 +26,7 @@ import observabilityRoutes from './observability.routes.js';
 import environmentParityRoutes from './environmentParity.routes.js';
 import securityRoutes from './security.routes.js';
 import telemetryRoutes from './telemetry.routes.js';
+import governanceRoutes from './governance.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 
 const routerMap = {
@@ -56,7 +57,8 @@ const routerMap = {
   observability: observabilityRoutes,
   environment: environmentParityRoutes,
   telemetry: telemetryRoutes,
-  enablement: enablementRoutes
+  enablement: enablementRoutes,
+  governance: governanceRoutes
 };
 
 export const apiRouteRegistry = apiRouteMetadata.map((descriptor) => ({

@@ -3220,6 +3220,267 @@ export async function seed(knex) {
       }
     ]);
 
+    const vendorContractPublicId = crypto.randomUUID();
+    const dataProcessingContractPublicId = crypto.randomUUID();
+    const communicationsContractPublicId = crypto.randomUUID();
+
+    const vendorContractObligations = [
+      {
+        id: crypto.randomUUID(),
+        description: 'Provide quarterly penetration test summary and remediation status.',
+        owner: 'security@edulure.com',
+        dueAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+        completedAt: null,
+        status: 'open'
+      },
+      {
+        id: crypto.randomUUID(),
+        description: 'Refresh incident response contact roster within 5 business days of staff turnover.',
+        owner: 'security@edulure.com',
+        dueAt: null,
+        completedAt: null,
+        status: 'monitor'
+      }
+    ];
+
+    const dataProcessingObligations = [
+      {
+        id: crypto.randomUUID(),
+        description: 'Publish annual GDPR Article 28 addendum update for customer signature.',
+        owner: 'legal@edulure.com',
+        dueAt: '2025-05-15T00:00:00.000Z',
+        completedAt: null,
+        status: 'open'
+      }
+    ];
+
+    const communicationsObligations = [
+      {
+        id: crypto.randomUUID(),
+        description: 'Distribute roadmap summary to executive sponsors within two weeks of review cycle.',
+        owner: 'enablement@edulure.com',
+        dueAt: '2025-04-29T00:00:00.000Z',
+        completedAt: null,
+        status: 'planned'
+      }
+    ];
+
+    await trx('governance_contracts').insert([
+      {
+        public_id: vendorContractPublicId,
+        vendor_name: 'ShieldGuard Security',
+        contract_type: 'penetration-testing',
+        status: 'active',
+        owner_email: 'security@edulure.com',
+        risk_tier: 'high',
+        contract_value_cents: 1800000,
+        currency: 'USD',
+        effective_date: '2024-07-01',
+        renewal_date: '2025-07-01',
+        termination_notice_date: '2025-04-01',
+        obligations: JSON.stringify(vendorContractObligations),
+        metadata: JSON.stringify({ classification: 'critical', regions: ['US', 'EU'] }),
+        last_renewal_evaluated_at: trx.fn.now(),
+        next_governance_check_at: trx.fn.now()
+      },
+      {
+        public_id: dataProcessingContractPublicId,
+        vendor_name: 'CloudSignal Data Platform',
+        contract_type: 'data-processing-addendum',
+        status: 'pending_renewal',
+        owner_email: 'legal@edulure.com',
+        risk_tier: 'medium',
+        contract_value_cents: 960000,
+        currency: 'USD',
+        effective_date: '2023-10-01',
+        renewal_date: '2025-04-15',
+        termination_notice_date: '2025-03-01',
+        obligations: JSON.stringify(dataProcessingObligations),
+        metadata: JSON.stringify({ classification: 'sensitive', processorType: 'CDP' }),
+        last_renewal_evaluated_at: trx.fn.now(),
+        next_governance_check_at: trx.fn.now()
+      },
+      {
+        public_id: communicationsContractPublicId,
+        vendor_name: 'Brightwave Communications',
+        contract_type: 'strategic-communications',
+        status: 'active',
+        owner_email: 'enablement@edulure.com',
+        risk_tier: 'low',
+        contract_value_cents: 420000,
+        currency: 'USD',
+        effective_date: '2024-01-05',
+        renewal_date: '2025-01-05',
+        termination_notice_date: '2024-11-01',
+        obligations: JSON.stringify(communicationsObligations),
+        metadata: JSON.stringify({ deliverables: ['roadmap-briefings', 'executive-townhalls'] }),
+        last_renewal_evaluated_at: trx.fn.now(),
+        next_governance_check_at: trx.fn.now()
+      }
+    ]);
+
+    const shieldGuardContract = await trx('governance_contracts')
+      .select('id')
+      .where({ public_id: vendorContractPublicId })
+      .first();
+    const cdpContract = await trx('governance_contracts')
+      .select('id')
+      .where({ public_id: dataProcessingContractPublicId })
+      .first();
+
+    await trx('governance_vendor_assessments').insert([
+      {
+        public_id: crypto.randomUUID(),
+        contract_id: shieldGuardContract.id,
+        vendor_name: 'ShieldGuard Security',
+        assessment_type: 'security',
+        risk_score: 7.8,
+        risk_level: 'high',
+        status: 'remediation',
+        last_assessed_at: '2025-03-15',
+        next_review_at: '2025-05-01',
+        owner_email: 'security@edulure.com',
+        findings: JSON.stringify([
+          {
+            id: crypto.randomUUID(),
+            category: 'vulnerability-management',
+            severity: 'high',
+            description: 'Missed SLA for patching critical findings during February engagement.'
+          }
+        ]),
+        remediation_plan: JSON.stringify({
+          status: 'in_progress',
+          targetDate: '2025-04-12',
+          owner: 'ShieldGuard TAM'
+        }),
+        evidence_links: JSON.stringify([
+          'https://ops.edulure.com/compliance/shieldguard-feb-2025-report.pdf'
+        ]),
+        metadata: JSON.stringify({ cadence: 'quarterly' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        contract_id: cdpContract.id,
+        vendor_name: 'CloudSignal Data Platform',
+        assessment_type: 'privacy',
+        risk_score: 4.2,
+        risk_level: 'medium',
+        status: 'approved',
+        last_assessed_at: '2025-02-28',
+        next_review_at: '2025-08-31',
+        owner_email: 'legal@edulure.com',
+        findings: JSON.stringify([
+          {
+            id: crypto.randomUUID(),
+            category: 'data-retention',
+            severity: 'medium',
+            description: 'Customer deletion SLA improved to 14 days but requires quarterly attestation.'
+          }
+        ]),
+        remediation_plan: JSON.stringify({
+          status: 'monitor',
+          nextCheckpoint: '2025-06-01',
+          notes: 'Request automated retention evidence feed.'
+        }),
+        evidence_links: JSON.stringify([
+          'https://ops.edulure.com/legal/cloudsignal-art28-2025.pdf'
+        ]),
+        metadata: JSON.stringify({ cadence: 'biannual' })
+      }
+    ]);
+
+    await trx('governance_review_cycles').insert([
+      {
+        public_id: crypto.randomUUID(),
+        cycle_name: 'Quarterly Trust Review Q2 FY25',
+        status: 'in_progress',
+        start_date: '2025-04-01',
+        end_date: '2025-04-30',
+        next_milestone_at: '2025-04-15',
+        focus_areas: JSON.stringify(['security', 'privacy', 'resilience']),
+        participants: JSON.stringify([
+          { name: 'Tara Singh', role: 'CISO' },
+          { name: 'Miguel Rosa', role: 'Head of Data Governance' },
+          { name: 'Dana Ellis', role: 'VP Product' }
+        ]),
+        action_items: JSON.stringify([
+          {
+            id: crypto.randomUUID(),
+            summary: 'Finalize FY25 breach notification runbook refresh.',
+            owner: 'security@edulure.com',
+            dueAt: '2025-04-12T00:00:00.000Z',
+            status: 'open'
+          }
+        ]),
+        outcome_notes: null,
+        readiness_score: 62
+      },
+      {
+        public_id: crypto.randomUUID(),
+        cycle_name: 'Stakeholder Steering Committee – April 2025',
+        status: 'planned',
+        start_date: '2025-04-18',
+        end_date: '2025-04-18',
+        next_milestone_at: '2025-04-16',
+        focus_areas: JSON.stringify(['roadmap', 'enablement', 'customer-advisory']),
+        participants: JSON.stringify([
+          { name: 'Iris Akintola', role: 'Chief Customer Officer' },
+          { name: 'Kenji Morita', role: 'VP Enablement' },
+          { name: 'Lauren Patel', role: 'Head of Partnerships' }
+        ]),
+        action_items: JSON.stringify([]),
+        outcome_notes: null,
+        readiness_score: 48
+      }
+    ]);
+
+    await trx('governance_roadmap_communications').insert([
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'fy25-trust-roadmap-briefing',
+        audience: 'executive-sponsors',
+        channel: 'webinar',
+        subject: 'FY25 Trust & Compliance Roadmap Briefing',
+        body:
+          'Walk executive sponsors through the FY25 security, privacy, and resilience initiatives with clear risk posture updates and request for prioritisation feedback.',
+        status: 'scheduled',
+        schedule_at: '2025-04-22T16:00:00.000Z',
+        sent_at: null,
+        owner_email: 'enablement@edulure.com',
+        metrics: JSON.stringify({
+          targetAudience: 32,
+          expectedRecipients: 32,
+          delivered: 0,
+          engagementRate: 0
+        }),
+        attachments: JSON.stringify([
+          {
+            name: 'briefing-deck',
+            url: 'https://cdn.edulure.com/roadmap/fy25-trust-briefing.pdf'
+          }
+        ]),
+        metadata: JSON.stringify({ cadence: 'quarterly' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'provider-migration-update-apr-2025',
+        audience: 'provider-partners',
+        channel: 'newsletter',
+        subject: 'Provider Migration Update – April 2025',
+        body:
+          'Summarise milestone burn-down, highlight enablement resources, and flag required actions ahead of the May cut-over.',
+        status: 'draft',
+        schedule_at: '2025-04-10T12:00:00.000Z',
+        sent_at: null,
+        owner_email: 'partners@edulure.com',
+        metrics: JSON.stringify({ targetAudience: 640, delivered: 0, expectedRecipients: 640 }),
+        attachments: JSON.stringify([
+          { name: 'migration-checklist', url: 'https://cdn.edulure.com/providers/migration-checklist.pdf' }
+        ]),
+        metadata: JSON.stringify({ cadence: 'biweekly' })
+      }
+    ]);
+
     await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
       tool: 'dbt',
       model_name: 'telemetry_events_rollup',

@@ -196,6 +196,18 @@ export const apiRouteMetadata = [
     disabledMessage: 'Enablement documentation APIs are restricted for your role.'
   },
   {
+    name: 'governance',
+    capability: 'stakeholder-governance',
+    description:
+      'Contract lifecycle, vendor risk assessments, cross-functional review cadences, and roadmap communication APIs for programme owners.',
+    basePath: '/governance',
+    flagKey: 'platform.api.v1.governance',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Governance APIs are restricted to programme administrators.'
+  },
+  {
     name: 'dashboard',
     capability: 'operator-dashboard',
     description: 'Operational dashboards, incident insights, and governance endpoints.',

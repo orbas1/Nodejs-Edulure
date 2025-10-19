@@ -8,3 +8,4 @@ w business intelligence controller. 【F:backend-nodejs/src/routes/analytics.rou
 - Added Supertest coverage for `/telemetry` and BI routes to the backend test suite, wiring mocks for auth and services. 【F:back
 end-nodejs/test/telemetryHttpRoutes.test.js†L1-L118】【F:backend-nodejs/test/analyticsBiHttpRoutes.test.js†L1-L64】
 - Registered `enablement.routes.js` under `/enablement` with admin-authenticated listing, detail, capability matrix, and reindex endpoints backed by the enablement content service. 【F:backend-nodejs/src/routes/enablement.routes.js†L1-L11】【F:backend-nodejs/src/routes/routeMetadata.js†L170-L187】
+- Registered `governance.routes.js` at `/governance` so programme owners can access overview, contract, vendor assessment, review cycle, and communication endpoints behind admin auth. 【F:backend-nodejs/src/routes/governance.routes.js†L1-L21】【F:backend-nodejs/src/routes/routeMetadata.js†L170-L205】

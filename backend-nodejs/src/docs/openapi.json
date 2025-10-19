@@ -10360,6 +10360,540 @@
           "success",
           "data"
         ]
+      },
+      "GovernanceContract": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "vendorName": {
+            "type": "string"
+          },
+          "contractType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "riskTier": {
+            "type": "string"
+          },
+          "contractValueCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "renewalDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "terminationNoticeDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "obligations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "dueAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "description",
+                "owner",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "lastRenewalEvaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextGovernanceCheckAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "daysUntilRenewal": {
+            "type": "integer",
+            "nullable": true
+          },
+          "renewalStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "openObligations": {
+            "type": "integer",
+            "nullable": true
+          },
+          "terminationNoticeDueInDays": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "vendorName",
+          "contractType",
+          "status",
+          "ownerEmail",
+          "riskTier",
+          "contractValueCents",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceContractListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceContract"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceVendorAssessment": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "vendorName": {
+            "type": "string"
+          },
+          "assessmentType": {
+            "type": "string"
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "riskLevel": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "lastAssessedAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "nextReviewAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "remediationPlan": {
+            "type": "object"
+          },
+          "evidenceLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "publicId",
+          "vendorName",
+          "assessmentType",
+          "riskScore",
+          "riskLevel",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceVendorAssessmentListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceVendorAssessment"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceReviewCycle": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "cycleName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "nextMilestoneAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "focusAreas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "actionItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "dueAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "status": {
+                  "type": "string"
+                },
+                "recordedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "summary",
+                "owner",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "outcomeNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "readinessScore": {
+            "type": "integer"
+          },
+          "openActionItems": {
+            "type": "integer",
+            "nullable": true
+          },
+          "milestoneStatus": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "cycleName",
+          "status",
+          "startDate",
+          "focusAreas",
+          "participants",
+          "actionItems",
+          "readinessScore"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceReviewCycleListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceReviewCycle"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceCommunication": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "scheduleAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "metrics": {
+            "type": "object"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "deliveryProgress": {
+            "type": "number",
+            "nullable": true
+          },
+          "engagementRate": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "audience",
+          "channel",
+          "subject",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceCommunicationListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceCommunication"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "contracts": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "object"
+                  },
+                  "upcomingRenewals": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/GovernanceContract"
+                    }
+                  }
+                }
+              },
+              "vendorAssessments": {
+                "type": "object"
+              },
+              "reviewCycles": {
+                "type": "object"
+              },
+              "communications": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "contracts",
+              "vendorAssessments",
+              "reviewCycles",
+              "communications"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
       }
     }
   },
@@ -20730,12 +21264,863 @@
           }
         }
       }
+    },
+    "/governance/overview": {
+      "get": {
+        "summary": "Governance overview",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Governance overview retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceOverviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/contracts": {
+      "get": {
+        "summary": "List governance contracts",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by contract status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vendorName",
+            "in": "query",
+            "description": "Filter by vendor name search term.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "riskTier",
+            "in": "query",
+            "description": "Filter by risk tier (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerEmail",
+            "in": "query",
+            "description": "Filter by contract owner email.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "renewalWithinDays",
+            "in": "query",
+            "description": "Return contracts with renewals within the provided day window.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "description": "Return only overdue or escalated contracts when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of contracts to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the contract result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contracts retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceContractListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/contracts/{contractId}": {
+      "patch": {
+        "summary": "Update governance contract",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public contract identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "ownerEmail": {
+                    "type": "string"
+                  },
+                  "riskTier": {
+                    "type": "string"
+                  },
+                  "renewalDate": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "terminationNoticeDate": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "obligations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "owner": {
+                          "type": "string"
+                        },
+                        "dueAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "completedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "description",
+                        "owner",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contract updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceContract"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Contract not found"
+          }
+        }
+      }
+    },
+    "/governance/vendor-assessments": {
+      "get": {
+        "summary": "List vendor assessments",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vendorName",
+            "in": "query",
+            "description": "Filter by vendor name search term.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assessmentType",
+            "in": "query",
+            "description": "Filter by assessment type (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "riskLevel",
+            "in": "query",
+            "description": "Filter by risk level (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by assessment status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nextReviewBefore",
+            "in": "query",
+            "description": "Return assessments with next review before the provided date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "description": "Only return overdue or remediation assessments when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of assessments to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the assessment result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assessments retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceVendorAssessmentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/vendor-assessments/{assessmentId}/decisions": {
+      "post": {
+        "summary": "Record vendor assessment decision",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assessmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Vendor assessment identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "riskLevel": {
+                    "type": "string"
+                  },
+                  "riskScore": {
+                    "type": "number"
+                  },
+                  "nextReviewAt": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "findings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "remediationPlan": {
+                    "type": "object"
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assessment updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceVendorAssessment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Assessment not found"
+          }
+        }
+      }
+    },
+    "/governance/review-cycles": {
+      "get": {
+        "summary": "List governance review cycles",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by review cycle status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleName",
+            "in": "query",
+            "description": "Filter by review cycle name search term.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startAfter",
+            "in": "query",
+            "description": "Return cycles starting on or after the provided date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "endBefore",
+            "in": "query",
+            "description": "Return cycles ending on or before the provided date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "onlyUpcoming",
+            "in": "query",
+            "description": "Only include upcoming or in-progress cycles when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "description": "Only include cycles with overdue milestones when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of review cycles to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the review cycle result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review cycles retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceReviewCycleListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/review-cycles/{reviewId}/action-items": {
+      "post": {
+        "summary": "Record review cycle action",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reviewId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Review cycle identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "owner": {
+                    "type": "string"
+                  },
+                  "dueAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "readinessScore": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "summary"
+                ],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action item recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceReviewCycle"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Review cycle not found"
+          }
+        }
+      }
+    },
+    "/governance/communications": {
+      "get": {
+        "summary": "List governance communications",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by communication status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "audience",
+            "in": "query",
+            "description": "Filter by communication audience (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "description": "Filter by communication channel (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scheduledBefore",
+            "in": "query",
+            "description": "Return communications scheduled before the provided date-time (ISO 8601).",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ownerEmail",
+            "in": "query",
+            "description": "Filter by owner email.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of communications to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the communication result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Communications retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceCommunicationListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      },
+      "post": {
+        "summary": "Schedule governance communication",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audience": {
+                    "type": "string"
+                  },
+                  "channel": {
+                    "type": "string"
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "scheduleAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "audience",
+                  "channel",
+                  "subject"
+                ],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Communication scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceCommunication"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/communications/{communicationId}/metrics": {
+      "post": {
+        "summary": "Record communication metrics",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Communication identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "delivered": {
+                    "type": "integer"
+                  },
+                  "engagementRate": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "sentAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Communication metrics recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceCommunication"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Communication not found"
+          }
+        }
+      }
     }
   },
   "tags": [
     {
       "name": "Enablement",
       "description": "Enablement knowledge base and training APIs."
+    },
+    {
+      "name": "Governance",
+      "description": "Governance cadences, vendor assessments, contract lifecycle, and stakeholder communication APIs."
     }
   ]
 }
