@@ -9,3 +9,6 @@
 - Added `IntegrationProviderService` as the single entry point for provisioning third-party clients, ensuring worker processes and HTTP handlers share Redis-backed circuit breakers, retry defaults, and sandbox routing logic.
 - Taught `CommunityReminderJob` to deliver SMS reminders through the Twilio gateway with templated messaging, metadata-driven destinations, and graceful degradation when messaging is not configured, while continuing to emit domain events for auditing.
 - Added `AuditEventService` to encapsulate encrypted audit logging with request-context enrichment, metadata redaction, and retention-aware truncation, wiring `ComplianceService` to depend on the new contract for every DSR and consent lifecycle change.
+- Rebuilt the instructor branch of `DashboardService.getDashboardForUser` to lazily import course domain models, hydrate the new
+  `coursesWorkspace` payload (catalogue, cohorts, assignments, authoring, learners), and attach collaborator directories without
+  penalising instructors that do not yet have active courses.

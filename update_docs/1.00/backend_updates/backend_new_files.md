@@ -23,3 +23,12 @@
 - `test/integrations/stripeGateway.test.js` — Vitest coverage for the Stripe gateway retry, duplication, and receipt processing behaviour.
 - `src/services/AuditEventService.js` — centralised compliance logger encapsulating encrypted IP capture, metadata redaction, and request-context enrichment for audit trails.
 - `test/auditEventService.test.js` — focused Vitest coverage validating the audit service encryption, enrichment, and truncation policies.
+- `src/models/CourseModel.js` — instructor-facing data access layer that normalises catalogue metadata, language arrays, and date
+  attributes for the course workspace payload.
+- `src/models/CourseModuleModel.js` — module repository exposing ordered module retrieval with metadata parsing to support cohort
+  pipeline generation.
+- `src/models/CourseLessonModel.js` — lesson data mapper converting release timestamps and metadata for learner pacing analytics.
+- `src/models/CourseAssignmentModel.js` — assignment gateway exposing due date offsets, rubric metadata, and automation flags.
+- `src/models/CourseEnrollmentModel.js` — enrollment model providing cohort segmentation and learner status context for risk scoring.
+- `src/models/CourseProgressModel.js` — lesson progress aggregator fuelling learner risk detection and pacing metrics within the
+  dashboard workspace.

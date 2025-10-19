@@ -14,6 +14,10 @@
 - Initiated build and test verification runs (backend unit suite, frontend production bundle) to validate the documentation against actual project health, capturing failures for engineering follow-up.
 
 ## Backend Stabilisation
+- Delivered the instructor course workspace domain models (`CourseModel`, `CourseModuleModel`, `CourseLessonModel`,
+  `CourseAssignmentModel`, `CourseEnrollmentModel`, `CourseProgressModel`) and wired `DashboardService.getDashboardForUser`
+  to lazily hydrate catalogue, cohort analytics, assignments, authoring drafts, and learner risk signals only when instructors
+  actually own courses, cutting unnecessary imports while returning a production-ready `coursesWorkspace` payload for the API.
 - Implemented a production-grade domain event dispatch pipeline powered by a persistent queue, exponential backoff, jitter, and Prometheus metrics so domain events now flow reliably to webhook subscribers instead of remaining passive audit rows.
 - Registered the dispatcher with the worker service readiness probes to ensure background automation boots alongside existing schedulers and surfaces health in probes and logs.
 - Hardened the domain event model with JSON normalisation, transaction-aware dispatch enqueueing, and backward-compatible options so existing services transparently gain outbox support.
@@ -35,6 +39,9 @@
 - Authored dedicated tests for the audit event service validating IP encryption, request-context enrichment, and metadata truncation so the new compliance telemetry remains deterministic.
 
 ## Operator Experience Modernisation
+- Completed the instructor learning workspace by surfacing catalogue analytics, assignment pipelines, authoring drafts with
+  localisation coverage, and learner management tables in `InstructorCourseManage`, adding persistence-backed modals and new
+  vitest coverage for the sections to guarantee production behaviour.
 - Rebuilt the executive operator overview into a production-grade command centre that surfaces live KPIs, consolidated incident metrics, release readiness, and cross-tenant status from service health feeds with responsive layouts tuned for desktop and tablet operators.
 - Added a persistent executive dashboard data orchestration layer that coordinates tenant-aware API calls, caches results in IndexedDB for offline fallback, auto-refreshes while the tab is visible, and exposes manual refresh plus connectivity banners to operators.
 - Extended the dashboard shell to route admin users through the new experience while preserving existing learner and instructor journeys, ensuring role-aware navigation stays intact even when the admin payload is unavailable.

@@ -355,17 +355,45 @@ describe('buildInstructorDashboard', () => {
           metadata: '{}'
         }
       ],
+      modules: [
+        {
+          id: 210,
+          courseId: 11,
+          title: 'Launch Command Center',
+          position: 1,
+          metadata: JSON.stringify({
+            creation: {
+              owner: 'Kai Watanabe',
+              status: 'Approved',
+              lastUpdatedAt: '2024-11-02T10:00:00Z'
+            },
+            drip: { gating: 'Immediate access' }
+          })
+        }
+      ],
       lessons: [
         {
           id: 301,
           courseId: 11,
+          moduleId: 210,
           title: 'Kickoff Workshop',
           releaseAt: '2024-11-10T15:00:00Z',
           durationMinutes: 45,
           metadata: '{}',
           courseTitle: 'Design Ops Mastery',
           courseReleaseAt: '2024-10-01T00:00:00Z',
-          moduleReleaseOffsetDays: 0
+          moduleReleaseOffsetDays: 0,
+          position: 1
+        },
+        {
+          id: 302,
+          courseId: 11,
+          moduleId: 210,
+          title: 'Simulation Drill',
+          releaseAt: '2024-11-17T15:00:00Z',
+          durationMinutes: 60,
+          metadata: JSON.stringify({ format: 'simulation' }),
+          position: 2
         }
       ],
       assignments: [
@@ -379,6 +407,70 @@ describe('buildInstructorDashboard', () => {
           dueOffsetDays: 7
         }
       ],
+      courseProgress: [
+        {
+          id: 801,
+          enrollmentId: 500,
+          lessonId: 301,
+          completed: true,
+          completedAt: '2024-10-25T10:00:00Z',
+          progressPercent: 100,
+          metadata: JSON.stringify({ completionSource: 'web', note: 'Great engagement' })
+        },
+        {
+          id: 802,
+          enrollmentId: 500,
+          lessonId: 302,
+          completed: false,
+          progressPercent: 25,
+          metadata: JSON.stringify({ lastLocation: 'lesson-302' })
+        }
+      ],
+      creationProjects: [
+        {
+          id: 201,
+          publicId: 'proj-ops',
+          ownerId: 7,
+          type: 'course',
+          status: 'draft',
+          title: 'Design Ops Mastery Revamp',
+          metadata: JSON.stringify({ courseId: 11, locales: ['en', 'es'] }),
+          contentOutline: JSON.stringify([{ id: 'intro', label: 'Introduction' }]),
+          updatedAt: '2024-11-05T12:00:00Z'
+        }
+      ],
+      creationCollaborators: new Map([
+        [
+          201,
+          [
+            {
+              projectId: 201,
+              userId: 7,
+              role: 'owner',
+              permissions: ['outline:edit', 'publish']
+            }
+          ]
+        ]
+      ]),
+      creationSessions: new Map([
+        [
+          201,
+          [
+            {
+              id: 9101,
+              publicId: 'sess-1',
+              participantId: 7,
+              role: 'owner',
+              capabilities: ['outline-edit'],
+              joinedAt: '2024-11-06T10:00:00Z'
+            }
+          ]
+        ]
+      ]),
+      collaboratorDirectory: new Map([
+        [7, { id: 7, firstName: 'Ivy', lastName: 'Instructor', email: 'ivy@edulure.test' }],
+        [901, { id: 901, firstName: 'Noah', lastName: 'Lead', email: 'noah@edulure.test' }]
+      ]),
       tutorProfiles: [
         {
           id: 31,
@@ -663,6 +755,27 @@ describe('buildInstructorDashboard', () => {
     expect(snapshot.dashboard.assessments.timeline.upcoming).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ course: 'Design Ops Mastery', type: 'Assignment' })
+      ])
+    );
+    expect(snapshot.dashboard.courses.catalogue).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          title: 'Design Ops Mastery',
+          learners: expect.objectContaining({ active: 1 })
+        })
+      ])
+    );
+    expect(snapshot.dashboard.courses.pipeline).toEqual(
+      expect.arrayContaining([expect.objectContaining({ name: expect.stringContaining('Design Ops Mastery') })])
+    );
+    expect(snapshot.dashboard.courses.assignments.summary.total).toBe(1);
+    expect(snapshot.dashboard.courses.authoring.drafts[0]).toMatchObject({
+      title: 'Design Ops Mastery Revamp',
+      status: 'draft'
+    });
+    expect(snapshot.dashboard.courses.learners.roster).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ courseTitle: 'Design Ops Mastery', cohort: 'Q4' })
       ])
     );
     expect(snapshot.searchIndex).toEqual(

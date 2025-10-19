@@ -10,9 +10,9 @@ Progress is tracked per task and subtask across the required dimensions. Overall
 | &nbsp;&nbsp;Third-party integration wrappers | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Data governance rebuild | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Security and compliance hardening | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| **Task 2: Modernise operator web experience and support tooling** | 20% | 20% | 20% | 20% | 20% | 20% | 20% |
+| **Task 2: Modernise operator web experience and support tooling** | 40% | 40% | 40% | 40% | 40% | 40% | 40% |
 | &nbsp;&nbsp;Executive & health dashboards rebuild | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| &nbsp;&nbsp;Learning & curriculum workspaces | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| &nbsp;&nbsp;Learning & curriculum workspaces | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Compliance & governance consoles | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;Finance & monetisation centres | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;Support, communications, and settings hub | 0% | 0% | 0% | 0% | 0% | 0% | 0% |

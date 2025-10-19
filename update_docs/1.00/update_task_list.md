@@ -41,7 +41,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 #### Subtasks
 1. **Executive & health dashboards rebuild** – 100%
    Wired live KPIs, platform health widgets, incident timelines, release readiness dashboards, and cross-tenant tenant switchers into the Executive Overview and Operations Health surfaces with responsive layouts, offline fallbacks, and automated refresh intervals.
-2. **Learning & curriculum workspaces** – 0%
+2. **Learning & curriculum workspaces** – 100%
    Deliver course catalogue, cohort analytics, assignment pipelines, content authoring modals, and learner management pages with localisation, draft persistence, and collaborative editing.
 3. **Compliance & governance consoles** – 0%
    Implement audits, accreditation trackers, policy attestations, risk heatmaps, incident response flows, and evidence export screens with secure storage and granular permissions.
