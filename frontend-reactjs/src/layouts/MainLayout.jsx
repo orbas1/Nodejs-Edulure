@@ -49,6 +49,7 @@ export default function MainLayout() {
       { name: 'Home', to: '/' },
       { name: 'Feed', to: '/feed' },
       { name: 'Explore', to: '/explorer' },
+      { name: 'Search hub', to: '/search' },
       { name: 'Communities', to: '/communities' },
       { name: 'Hubs', to: communitiesPath },
       { name: 'Profile', to: '/profile' },
