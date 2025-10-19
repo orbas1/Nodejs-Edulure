@@ -1,9 +1,27 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import DashboardSectionHeader from '../../components/dashboard/DashboardSectionHeader.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
+import { triggerCommunityAction } from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function LearnerCommunities() {
-  const { isLearner, section: data, refresh } = useLearnerDashboardSection('communities');
+  const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('communities');
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  useEffect(() => {
+    if (error) {
+      setStatusMessage({
+        type: 'error',
+        message: error.message ?? 'We were unable to load community operations.'
+      });
+    }
+  }, [error]);
 
   if (!isLearner) {
     return (
@@ -11,6 +29,15 @@ export default function LearnerCommunities() {
         variant="error"
         title="Learner Learnspace required"
         description="Switch to the learner dashboard to access community operations and engagement pipelines."
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <DashboardStateMessage
+        title="Loading community workspace"
+        description="We are gathering managed communities, pipelines, and moderator insights."
       />
     );
   }
@@ -28,6 +55,54 @@ export default function LearnerCommunities() {
 
   const managed = data.managed ?? [];
   const pipelines = data.pipelines ?? [];
+  const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
+
+  const handleCommunityAction = useCallback(
+    async (communityId, action) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage community actions.' });
+        return;
+      }
+
+      setPendingAction(`${communityId}:${action}`);
+      setStatusMessage({ type: 'pending', message: 'Coordinating community action…' });
+      try {
+        const response = await triggerCommunityAction({
+          token,
+          communityId: communityId ?? 'community',
+          payload: { action }
+        });
+        setStatusMessage({
+          type: 'success',
+          message: response?.message ?? 'Community action triggered.'
+        });
+      } catch (actionError) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            actionError instanceof Error ? actionError.message : 'We were unable to trigger that community action.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [token]
+  );
+
+  const handleCreateInitiative = useCallback(() => {
+    const communityId = managed[0]?.id ?? 'community';
+    handleCommunityAction(communityId, 'create-initiative');
+  }, [handleCommunityAction, managed]);
+
+  const handleViewPlaybooks = useCallback(() => {
+    const communityId = managed[0]?.id ?? 'community';
+    handleCommunityAction(communityId, 'view-playbooks');
+  }, [handleCommunityAction, managed]);
+
+  const handleAddPipelineStage = useCallback(() => {
+    const pipelineId = pipelines[0]?.id ?? 'pipeline';
+    handleCommunityAction(pipelineId, 'add-pipeline-stage');
+  }, [handleCommunityAction, pipelines]);
 
   return (
     <div className="space-y-10">
@@ -37,10 +112,20 @@ export default function LearnerCommunities() {
         description="Track the health of every initiative, keep moderators aligned, and ship new programmes with confidence."
         actions={
           <>
-            <button type="button" className="dashboard-pill px-4 py-2">
+            <button
+              type="button"
+              className="dashboard-pill px-4 py-2"
+              onClick={handleViewPlaybooks}
+              disabled={disableActions}
+            >
               View playbooks
             </button>
-            <button type="button" className="dashboard-primary-pill">
+            <button
+              type="button"
+              className="dashboard-primary-pill"
+              onClick={handleCreateInitiative}
+              disabled={disableActions}
+            >
               Create new initiative
             </button>
           </>
@@ -77,13 +162,28 @@ export default function LearnerCommunities() {
               ))}
             </ul>
             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600">
-              <button type="button" className="dashboard-pill px-3 py-1">
+              <button
+                type="button"
+                className="dashboard-pill px-3 py-1"
+                onClick={() => handleCommunityAction(community.id, 'view-analytics')}
+                disabled={disableActions}
+              >
                 View analytics
               </button>
-              <button type="button" className="dashboard-pill px-3 py-1">
+              <button
+                type="button"
+                className="dashboard-pill px-3 py-1"
+                onClick={() => handleCommunityAction(community.id, 'automations')}
+                disabled={disableActions}
+              >
                 Automations
               </button>
-              <button type="button" className="dashboard-pill px-3 py-1">
+              <button
+                type="button"
+                className="dashboard-pill px-3 py-1"
+                onClick={() => handleCommunityAction(community.id, 'export-health-report')}
+                disabled={disableActions}
+              >
                 Export health report
               </button>
             </div>
@@ -99,7 +199,12 @@ export default function LearnerCommunities() {
               Every ongoing community operation with the current owner, risk posture, and execution velocity.
             </p>
           </div>
-          <button type="button" className="dashboard-primary-pill">
+          <button
+            type="button"
+            className="dashboard-primary-pill"
+            onClick={handleAddPipelineStage}
+            disabled={disableActions}
+          >
             Add pipeline stage
           </button>
         </div>
@@ -127,6 +232,22 @@ export default function LearnerCommunities() {
           ))}
         </div>
       </section>
+
+      {statusMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            statusMessage.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : statusMessage.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {statusMessage.message}
+        </div>
+      ) : null}
     </div>
   );
 }

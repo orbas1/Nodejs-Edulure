@@ -184,6 +184,18 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'instructor',
+    capability: 'instructor-orchestration',
+    description:
+      'Instructor orchestration hooks for course production, tutor routing, mentor invites, and pricing exports.',
+    basePath: '/instructor',
+    flagKey: 'platform.api.v1.instructor',
+    defaultState: 'enabled',
+    audience: 'instructor',
+    fallbackStatus: 403,
+    disabledMessage: 'Instructor orchestration APIs are only available to instructor workspaces.'
+  },
+  {
     name: 'enablement',
     capability: 'enablement-documentation',
     description:

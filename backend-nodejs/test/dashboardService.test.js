@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildCommunityDashboard,
   buildAffiliateOverview,
   buildCommunityDashboard,
   buildInstructorDashboard,
+  buildLearnerDashboard,
   buildLearningPace,
   buildLearnerDashboard,
   calculateLearningStreak,

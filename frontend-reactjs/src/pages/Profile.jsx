@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowTopRightOnSquareIcon,
   BanknotesIcon,
@@ -7,6 +7,12 @@ import {
   ShieldCheckIcon
 } from '@heroicons/react/24/outline';
 
+import {
+  attachVerificationDocument,
+  fetchVerificationSummary,
+  requestVerificationUpload,
+  submitVerificationPackage
+} from '../api/verificationApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
 
@@ -177,6 +183,58 @@ const idTypeCopy = {
   'residence-permit': 'Residence permits must display the country seal and validity.'
 };
 
+const fallbackVerificationRequirements = [
+  {
+    type: 'government_id_front',
+    label: 'Front of ID',
+    helper: 'Upload a clear colour photo'
+  },
+  {
+    type: 'government_id_back',
+    label: 'Back of ID',
+    helper: 'Ensure holograms or security features are visible'
+  },
+  {
+    type: 'identity_selfie',
+    label: 'Selfie with ID',
+    helper: 'Hold the ID next to your face in good lighting'
+  }
+];
+
+function resolveStatusColour(status) {
+  switch (status) {
+    case 'approved':
+      return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+    case 'pending_review':
+      return 'text-sky-600 bg-sky-50 border-sky-200';
+    case 'resubmission_required':
+    case 'rejected':
+      return 'text-rose-600 bg-rose-50 border-rose-200';
+    default:
+      return 'text-amber-600 bg-amber-50 border-amber-200';
+  }
+}
+
+function formatStatusLabel(status) {
+  if (!status) {
+    return profileData.verification.status;
+  }
+  return status
+    .toString()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+async function computeChecksum(file) {
+  if (!('crypto' in window) || !window.crypto?.subtle) {
+    throw new Error('Secure hashing is not available in this browser');
+  }
+  const buffer = await file.arrayBuffer();
+  const digest = await window.crypto.subtle.digest('SHA-256', buffer);
+  const bytes = Array.from(new Uint8Array(digest));
+  return bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
 function formatCompactNumber(value) {
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
@@ -184,13 +242,18 @@ function formatCompactNumber(value) {
 export default function Profile() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [selectedIdType, setSelectedIdType] = useState(profileData.verification.supported[0]);
-  const [verificationUploads, setVerificationUploads] = useState({ front: null, back: null, selfie: null });
-  const [verificationStatus, setVerificationStatus] = useState(profileData.verification.status);
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
+  const token = session?.tokens?.accessToken ?? null;
   const { consents, loading: consentLoading, error: consentError, revokeConsent: revokeConsentRecord } =
     useConsentRecords(userId);
   const [revokingConsentId, setRevokingConsentId] = useState(null);
+  const [verificationSummary, setVerificationSummary] = useState(null);
+  const [verificationLoading, setVerificationLoading] = useState(false);
+  const [verificationError, setVerificationError] = useState(null);
+  const [verificationSuccess, setVerificationSuccess] = useState(null);
+  const [submittingVerification, setSubmittingVerification] = useState(false);
+  const [documentStates, setDocumentStates] = useState({});
   const affiliate = profileData.affiliate;
   const affiliateSummary = affiliate.summary;
   const affiliatePayouts = affiliate.payouts;
@@ -219,14 +282,100 @@ export default function Profile() {
     () => profileData.followers + (isFollowing ? 1 : 0),
     [isFollowing]
   );
-  const verificationProgress = useMemo(() => {
-    const completed = Object.values(verificationUploads).filter(Boolean).length;
-    return Math.round((completed / 3) * 100);
-  }, [verificationUploads]);
-  const canSubmitVerification = useMemo(
-    () => Object.values(verificationUploads).filter(Boolean).length === 3,
-    [verificationUploads]
+  const documentRequirements = useMemo(() => {
+    if (verificationSummary?.requiredDocuments?.length) {
+      return verificationSummary.requiredDocuments.map((doc) => ({
+        type: doc.type,
+        label: doc.label ?? doc.type.replace(/_/g, ' '),
+        helper: doc.description ?? ''
+      }));
+    }
+    return fallbackVerificationRequirements;
+  }, [verificationSummary]);
+
+  useEffect(() => {
+    setDocumentStates((prev) => {
+      const requirementTypes = documentRequirements.map((doc) => doc.type);
+      let changed = false;
+      const next = { ...prev };
+      requirementTypes.forEach((type) => {
+        if (!next[type]) {
+          next[type] = { status: 'idle', error: null, fileName: null, completedAt: null };
+          changed = true;
+        }
+      });
+      Object.keys(next).forEach((type) => {
+        if (!requirementTypes.includes(type)) {
+          delete next[type];
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [documentRequirements]);
+
+  const refreshVerificationSummary = useCallback(async () => {
+    if (!token) {
+      setVerificationSummary(null);
+      return;
+    }
+    setVerificationLoading(true);
+    setVerificationError(null);
+    try {
+      const summary = await fetchVerificationSummary({ token });
+      setVerificationSummary(summary);
+    } catch (error) {
+      setVerificationError(error?.message ?? 'Unable to load verification status.');
+    } finally {
+      setVerificationLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    refreshVerificationSummary();
+  }, [refreshVerificationSummary]);
+
+  const summaryDocumentsByType = useMemo(() => {
+    const documents = verificationSummary?.documents ?? [];
+    return documents.reduce((accumulator, document) => {
+      if (document.type) {
+        accumulator[document.type] = document;
+      }
+      return accumulator;
+    }, {});
+  }, [verificationSummary]);
+
+  const localCompleted = useMemo(
+    () =>
+      Object.values(documentStates).filter((state) => state?.status === 'attached' || state?.status === 'uploaded').length,
+    [documentStates]
   );
+
+  const documentsRequired = verificationSummary?.documentsRequired ?? documentRequirements.length;
+  const documentsSubmitted = verificationSummary?.documentsSubmitted ?? localCompleted;
+  const outstandingDocuments = verificationSummary?.outstandingDocuments ?? [];
+
+  const verificationProgress = useMemo(() => {
+    if (!documentsRequired) {
+      return 0;
+    }
+    return Math.min(100, Math.round((documentsSubmitted / documentsRequired) * 100));
+  }, [documentsRequired, documentsSubmitted]);
+
+  const canSubmitVerification = useMemo(() => {
+    if (!documentsRequired) {
+      return false;
+    }
+    if (verificationSummary?.status) {
+      const allowed = ['collecting', 'resubmission_required'];
+      return (
+        allowed.includes(verificationSummary.status) &&
+        documentsSubmitted >= documentsRequired &&
+        outstandingDocuments.length === 0
+      );
+    }
+    return documentsSubmitted >= documentsRequired;
+  }, [documentsRequired, documentsSubmitted, outstandingDocuments, verificationSummary]);
   const affiliateMetrics = useMemo(
     () => [
       {
@@ -307,20 +456,108 @@ export default function Profile() {
     setIsFollowing((prev) => !prev);
   };
 
-  const handleVerificationUpload = (slot) => (event) => {
+  const handleVerificationUpload = (documentType) => async (event) => {
     const file = event.target.files?.[0];
-    setVerificationUploads((prev) => ({
+    if (!file) {
+      return;
+    }
+
+    setVerificationSuccess(null);
+    setVerificationError(null);
+    event.target.value = '';
+
+    if (!token) {
+      setDocumentStates((prev) => ({
+        ...prev,
+        [documentType]: {
+          status: 'error',
+          error: 'You need to be signed in to upload verification documents.',
+          fileName: file.name,
+          completedAt: null
+        }
+      }));
+      return;
+    }
+
+    setDocumentStates((prev) => ({
       ...prev,
-      [slot]: file
-        ? { name: file.name, uploadedAt: new Date().toISOString() }
-        : null
+      [documentType]: { status: 'uploading', error: null, fileName: file.name, completedAt: null }
     }));
+
+    try {
+      const checksum = await computeChecksum(file);
+      const uploadInstruction = await requestVerificationUpload({
+        token,
+        payload: {
+          documentType,
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          sizeBytes: file.size
+        }
+      });
+
+      await fetch(uploadInstruction.upload.url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.type || 'application/octet-stream'
+        },
+        body: file
+      });
+
+      await attachVerificationDocument({
+        token,
+        payload: {
+          documentType,
+          storageBucket: uploadInstruction.upload.bucket,
+          storageKey: uploadInstruction.upload.key,
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          sizeBytes: file.size,
+          checksumSha256: checksum
+        }
+      });
+
+      setDocumentStates((prev) => ({
+        ...prev,
+        [documentType]: {
+          status: 'attached',
+          error: null,
+          fileName: file.name,
+          completedAt: new Date().toISOString()
+        }
+      }));
+      setVerificationSuccess('Document uploaded successfully.');
+      await refreshVerificationSummary();
+    } catch (error) {
+      const message = error?.message ?? 'Failed to upload verification document.';
+      setDocumentStates((prev) => ({
+        ...prev,
+        [documentType]: { status: 'error', error: message, fileName: file.name, completedAt: null }
+      }));
+      setVerificationError(message);
+    }
   };
 
-  const handleVerificationSubmit = (event) => {
+  const handleVerificationSubmit = async (event) => {
     event.preventDefault();
-    if (!canSubmitVerification) return;
-    setVerificationStatus('Submitted for review');
+    if (!canSubmitVerification || !token) {
+      if (!token) {
+        setVerificationError('You need to be signed in to submit verification.');
+      }
+      return;
+    }
+    setVerificationSuccess(null);
+    setVerificationError(null);
+    setSubmittingVerification(true);
+    try {
+      await submitVerificationPackage({ token });
+      setVerificationSuccess('Verification submitted for review.');
+      await refreshVerificationSummary();
+    } catch (error) {
+      setVerificationError(error?.message ?? 'Unable to submit verification for review.');
+    } finally {
+      setSubmittingVerification(false);
+    }
   };
 
   const handleAffiliateLinkCopy = async () => {
@@ -338,7 +575,30 @@ export default function Profile() {
     }
   };
 
-  const statusColour = verificationStatus === 'Submitted for review' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-amber-600 bg-amber-50 border-amber-200';
+  const fallbackStatusColour =
+    profileData.verification.status === 'Submitted for review'
+      ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+      : 'text-amber-600 bg-amber-50 border-amber-200';
+
+  const statusColour = verificationSummary?.status ? resolveStatusColour(verificationSummary.status) : fallbackStatusColour;
+  const verificationStatusLabel = verificationSummary?.status
+    ? formatStatusLabel(verificationSummary.status)
+    : profileData.verification.status;
+  const lastReviewed = useMemo(() => {
+    if (!verificationSummary?.lastReviewedAt) {
+      return profileData.verification.lastReviewed;
+    }
+    const parsed = new Date(verificationSummary.lastReviewedAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return verificationSummary.lastReviewedAt;
+    }
+    return parsed.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  }, [verificationSummary]);
+  const progressCaption = verificationLoading
+    ? 'Refreshing verification status…'
+    : `${verificationProgress}% complete • Last reviewed ${lastReviewed}`;
+  const isSubmitDisabled = !canSubmitVerification || submittingVerification || verificationLoading;
+  const submitButtonLabel = submittingVerification ? 'Submitting…' : 'Submit for review';
 
   return (
     <section className="bg-slate-50/70 py-16">
@@ -671,13 +931,13 @@ export default function Profile() {
                   <h2 className="text-xl font-semibold text-slate-900">Identity verification</h2>
                   <p className="mt-1 text-sm text-slate-500">Complete KYC to unlock payouts, live tutoring, and marketplace visibility.</p>
                 </div>
-                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusColour}`}>{verificationStatus}</span>
+                <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusColour}`}>{verificationStatusLabel}</span>
               </div>
               <div className="mt-4">
                 <div className="h-2 rounded-full bg-slate-100">
                   <div className="h-2 rounded-full bg-primary transition-all" style={{ width: `${verificationProgress}%` }} />
                 </div>
-                <p className="mt-2 text-xs text-slate-500">{verificationProgress}% complete • Last reviewed {profileData.verification.lastReviewed}</p>
+                <p className="mt-2 text-xs text-slate-500">{progressCaption}</p>
               </div>
               <form className="mt-5 space-y-4" onSubmit={handleVerificationSubmit}>
                 <label className="block text-sm font-semibold text-slate-600">
@@ -696,42 +956,62 @@ export default function Profile() {
                 </label>
                 <p className="text-xs text-slate-500">{idTypeCopy[selectedIdType]}</p>
                 <div className="space-y-3 text-xs text-slate-600">
-                  <label className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-4">
-                    <span className="font-semibold text-slate-700">Front of ID</span>
-                    <input type="file" accept="image/*" onChange={handleVerificationUpload('front')} className="text-xs" />
-                    {verificationUploads.front ? (
-                      <span className="text-emerald-600">Uploaded {verificationUploads.front.name}</span>
-                    ) : (
-                      <span>Upload a clear colour photo</span>
-                    )}
-                  </label>
-                  <label className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-4">
-                    <span className="font-semibold text-slate-700">Back of ID</span>
-                    <input type="file" accept="image/*" onChange={handleVerificationUpload('back')} className="text-xs" />
-                    {verificationUploads.back ? (
-                      <span className="text-emerald-600">Uploaded {verificationUploads.back.name}</span>
-                    ) : (
-                      <span>Ensure holograms or security features are visible</span>
-                    )}
-                  </label>
-                  <label className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-4">
-                    <span className="font-semibold text-slate-700">Selfie with ID</span>
-                    <input type="file" accept="image/*" onChange={handleVerificationUpload('selfie')} className="text-xs" />
-                    {verificationUploads.selfie ? (
-                      <span className="text-emerald-600">Uploaded {verificationUploads.selfie.name}</span>
-                    ) : (
-                      <span>Hold the ID next to your face in good lighting</span>
-                    )}
-                  </label>
+                  {documentRequirements.map((requirement) => {
+                    const state = documentStates[requirement.type] ?? {};
+                    const attached = summaryDocumentsByType[requirement.type] ?? null;
+                    const isUploading = state.status === 'uploading';
+                    const hasError = state.status === 'error';
+                    const isAttached = Boolean(attached) || state.status === 'attached';
+                    const displayName = attached?.fileName ?? state.fileName ?? requirement.label;
+                    const statusLabel = attached?.status ? attached.status.replace(/_/g, ' ') : null;
+
+                    let helperContent = <span>{requirement.helper || 'Upload document'}</span>;
+
+                    if (isUploading) {
+                      helperContent = (
+                        <span className="text-primary">
+                          Uploading {state.fileName ?? requirement.label}…
+                        </span>
+                      );
+                    } else if (hasError) {
+                      helperContent = <span className="text-rose-600">{state.error ?? 'Upload failed. Try again.'}</span>;
+                    } else if (isAttached) {
+                      helperContent = (
+                        <span className="text-emerald-600">
+                          Uploaded {displayName}
+                          {statusLabel ? ` • ${statusLabel}` : ''}
+                        </span>
+                      );
+                    }
+
+                    return (
+                      <label
+                        key={requirement.type}
+                        className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-4"
+                      >
+                        <span className="font-semibold text-slate-700">{requirement.label}</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={handleVerificationUpload(requirement.type)}
+                          disabled={isUploading}
+                          className="text-xs disabled:cursor-wait"
+                        />
+                        {helperContent}
+                      </label>
+                    );
+                  })}
                 </div>
                 <p className="text-xs text-slate-500">{profileData.verification.note}</p>
                 <button
                   type="submit"
-                  disabled={!canSubmitVerification}
-                  className="w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card disabled:cursor-not-allowed disabled:bg-primary/40"
+                  disabled={isSubmitDisabled}
+                  className="w-full rounded-full bg-primary px-5 py-3 text-sm font-semibold text-white shadow-card transition disabled:cursor-not-allowed disabled:bg-primary/40"
                 >
-                  Submit for review
+                  {submitButtonLabel}
                 </button>
+                {verificationError ? <p className="text-sm text-rose-600">{verificationError}</p> : null}
+                {verificationSuccess ? <p className="text-sm text-emerald-600">{verificationSuccess}</p> : null}
               </form>
             </div>
 

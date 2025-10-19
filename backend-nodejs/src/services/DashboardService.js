@@ -2920,6 +2920,157 @@ export default class DashboardService {
       operatorSnapshot = await getOperatorDashboardService().build({ user, now: referenceDate });
     }
 
+    let learnerSnapshot;
+    let communitySnapshot;
+    let communityMemberships = [];
+
+    try {
+      const [
+        { default: CourseEnrollmentModel },
+        { default: CourseProgressModel },
+        { default: CourseModel },
+        { default: TutorBookingModel },
+        { default: LiveClassroomModel },
+        { default: EbookProgressModel },
+        { default: EbookModel },
+        { default: PaymentIntentModel },
+        { default: CommunityService },
+        { default: CommunityResourceModel },
+        { default: CommunityEventModel },
+        { default: CommunityPaywallTierModel },
+        { default: CommunitySubscriptionModel },
+        { default: SecurityIncidentModel }
+      ] = await Promise.all([
+        import('../models/CourseEnrollmentModel.js'),
+        import('../models/CourseProgressModel.js'),
+        import('../models/CourseModel.js'),
+        import('../models/TutorBookingModel.js'),
+        import('../models/LiveClassroomModel.js'),
+        import('../models/EbookProgressModel.js'),
+        import('../models/EbookModel.js'),
+        import('../models/PaymentIntentModel.js'),
+        import('../services/CommunityService.js'),
+        import('../models/CommunityResourceModel.js'),
+        import('../models/CommunityEventModel.js'),
+        import('../models/CommunityPaywallTierModel.js'),
+        import('../models/CommunitySubscriptionModel.js'),
+        import('../models/SecurityIncidentModel.js')
+      ]);
+
+      const learnerEnrollments = await CourseEnrollmentModel.listByUserId(user.id);
+      const learnerEnrollmentIds = learnerEnrollments.map((enrollment) => enrollment.id);
+      const [
+        learnerProgress,
+        learnerBookings,
+        learnerLiveClassrooms,
+        learnerEbookProgress,
+        learnerPaymentIntents,
+        memberships
+      ] = await Promise.all([
+        learnerEnrollmentIds.length ? CourseProgressModel.listByEnrollmentIds(learnerEnrollmentIds) : Promise.resolve([]),
+        TutorBookingModel.listByLearnerId(user.id, { limit: 50 }),
+        LiveClassroomModel.listForLearner(user.id, { limit: 50 }),
+        EbookProgressModel.listByUser(user.id),
+        PaymentIntentModel.listByUser(user.id, { limit: 50 }),
+        CommunityService.listForUser(user.id)
+      ]);
+
+      communityMemberships = memberships ?? [];
+      const courseIds = Array.from(new Set(learnerEnrollments.map((enrollment) => enrollment.courseId).filter(Boolean)));
+      const learnerCourses = courseIds.length ? await CourseModel.listByIds(courseIds) : [];
+      const recommendedCourses = await CourseModel.listPublished({ limit: 6, excludeIds: courseIds });
+
+      const instructorDirectory = new Map();
+      const instructorIds = new Set(learnerCourses.map((course) => course.instructorId).filter(Boolean));
+      if (instructorIds.size) {
+        const instructorRecords = await UserModel.findByIds(Array.from(instructorIds));
+        instructorRecords.forEach((record) => instructorDirectory.set(record.id, record));
+      }
+
+      const ebookAssetIds = learnerEbookProgress.map((progress) => progress.assetId).filter(Boolean);
+      const ebookLibrary = ebookAssetIds.length ? await EbookModel.listByAssetIds(ebookAssetIds) : [];
+      const ebookRecommendations = [];
+
+      const communityIds = communityMemberships.map((community) => community.id).filter(Boolean);
+      const [runbookLists, eventLists, tierLists, subscriptionLists, incidentLists] = communityIds.length
+        ? await Promise.all([
+            Promise.all(
+              communityIds.map((communityId) =>
+                CommunityResourceModel.listForCommunity(communityId, { limit: 10, resourceType: 'runbook' })
+              )
+            ),
+            Promise.all(
+              communityIds.map((communityId) =>
+                CommunityEventModel.listForCommunity(communityId, {
+                  from: new Date(referenceDate.getTime() - 14 * DAY_IN_MS).toISOString(),
+                  limit: 15
+                })
+              )
+            ),
+            Promise.all(communityIds.map((communityId) => CommunityPaywallTierModel.listByCommunity(communityId))),
+            Promise.all(communityIds.map((communityId) => CommunitySubscriptionModel.listByCommunity(communityId))),
+            Promise.all(communityIds.map((communityId) => SecurityIncidentModel.listActive({ tenantId: `community-${communityId}` })))
+          ])
+        : [[], [], [], [], []];
+
+      const runbookMap = new Map();
+      const eventMap = new Map();
+      const tierMap = new Map();
+      const subscriptionMap = new Map();
+      const incidentMap = new Map();
+
+      communityIds.forEach((communityId, index) => {
+        const runbookPayload = runbookLists[index];
+        runbookMap.set(communityId, Array.isArray(runbookPayload?.items) ? runbookPayload.items : runbookPayload ?? []);
+        eventMap.set(communityId, eventLists[index] ?? []);
+        tierMap.set(communityId, tierLists[index] ?? []);
+        subscriptionMap.set(communityId, subscriptionLists[index] ?? []);
+        incidentMap.set(communityId, incidentLists[index] ?? []);
+      });
+
+      const communityPipelines = communityMemberships.flatMap((community) => {
+        const pipelines = Array.isArray(community.metadata?.pipelines) ? community.metadata.pipelines : [];
+        return pipelines.map((pipeline, index) => ({
+          id: `${community.id}-pipeline-${index}`,
+          title: pipeline.title ?? `${community.name} pipeline`,
+          owner: pipeline.owner ?? 'Community ops',
+          progress: Number(pipeline.progress ?? pipeline.completion ?? 50)
+        }));
+      });
+
+      learnerSnapshot =
+        buildLearnerDashboard({
+          user,
+          now: referenceDate,
+          enrollments: learnerEnrollments,
+          courses: [...learnerCourses, ...recommendedCourses],
+          courseProgress: learnerProgress,
+          instructorDirectory,
+          tutorBookings: learnerBookings,
+          liveClassrooms: learnerLiveClassrooms,
+          ebookLibrary,
+          ebookProgress: learnerEbookProgress,
+          ebookRecommendations,
+          paymentIntents: learnerPaymentIntents,
+          communities: communityMemberships,
+          communityPipelines
+        }) ?? undefined;
+
+      communitySnapshot =
+        buildCommunityDashboard({
+          now: referenceDate,
+          communities: communityMemberships,
+          runbooks: runbookMap,
+          events: eventMap,
+          paywallTiers: tierMap,
+          subscriptions: subscriptionMap,
+          safetyIncidents: incidentMap,
+          communications: new Map()
+        }) ?? undefined;
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load learner or community dashboard data');
+    }
+
     const dashboards = {};
     const searchIndex = [];
     const roles = [];

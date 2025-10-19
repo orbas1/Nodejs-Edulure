@@ -106,6 +106,33 @@ export default class CourseModel {
     return row ? this.deserialize(row) : null;
   }
 
+  static async listByIds(ids, connection = db) {
+    if (!ids?.length) {
+      return [];
+    }
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .whereIn('id', ids)
+      .orderBy('updated_at', 'desc');
+    return rows.map((row) => this.deserialize(row));
+  }
+
+  static async listPublished({ limit = 10, excludeIds = [] } = {}, connection = db) {
+    const query = connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where('status', 'published')
+      .orderBy('rating_average', 'desc')
+      .orderBy('updated_at', 'desc')
+      .limit(limit);
+
+    if (excludeIds?.length) {
+      query.whereNotIn('id', excludeIds);
+    }
+
+    const rows = await query;
+    return rows.map((row) => this.deserialize(row));
+  }
+
   static deserialize(record) {
     return {
       ...record,
