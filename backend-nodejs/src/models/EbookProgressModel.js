@@ -13,6 +13,12 @@ const BASE_COLUMNS = [
   'created_at as createdAt'
 ];
 
+function toDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 export default class EbookProgressModel {
   static async upsert({ assetId, userId, progressPercent, lastLocation, timeSpentSeconds }, connection = db) {
     const payload = {
@@ -51,7 +57,22 @@ export default class EbookProgressModel {
     return this.deserialize(row);
   }
 
+  static async listByUser(userId, connection = db) {
+    if (!userId) return [];
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where({ user_id: userId })
+      .orderBy('updated_at', 'desc');
+    return rows.map((row) => this.deserialize(row));
+  }
+
   static deserialize(row) {
-    return { ...row };
+    return {
+      ...row,
+      progressPercent: Number(row.progressPercent ?? 0),
+      timeSpentSeconds: Number(row.timeSpentSeconds ?? 0),
+      createdAt: toDate(row.createdAt),
+      updatedAt: toDate(row.updatedAt)
+    };
   }
 }

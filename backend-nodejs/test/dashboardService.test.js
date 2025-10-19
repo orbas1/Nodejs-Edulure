@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildAffiliateOverview,
+  buildCommunityDashboard,
   buildInstructorDashboard,
+  buildLearnerDashboard,
   buildLearningPace,
   calculateLearningStreak,
   humanizeRelativeTime
@@ -175,6 +177,249 @@ describe('buildAffiliateOverview', () => {
     expect(growthProgramme.performance.conversions).toBe(2);
     expect(growthProgramme.performance.conversions30d).toBe(1);
     expect(growthProgramme.performance.volume30dFormatted).toBe('$450.00');
+  });
+});
+
+describe('buildLearnerDashboard', () => {
+  it('assembles learner sections from enrolments, bookings, and communities', () => {
+    const now = new Date('2024-11-08T12:00:00Z');
+    const learnerSnapshot = buildLearnerDashboard({
+      user: { id: 42, email: 'learner@example.com', metadata: {} },
+      now,
+      enrollments: [
+        {
+          id: 1,
+          publicId: 'enr-1',
+          courseId: 11,
+          status: 'active',
+          progressPercent: 45,
+          metadata: { nextLesson: 'Module 3' }
+        }
+      ],
+      courses: [
+        {
+          id: 11,
+          title: 'Design Systems Foundations',
+          metadata: { instructorName: 'Alex Rivers' }
+        }
+      ],
+      courseProgress: [
+        {
+          enrollmentId: 1,
+          completed: true,
+          completedAt: '2024-11-07T09:00:00Z',
+          metadata: { durationMinutes: 35 }
+        }
+      ],
+      tutorBookings: [
+        {
+          id: 21,
+          publicId: 'book-21',
+          tutorId: 7,
+          status: 'confirmed',
+          scheduledStart: '2024-11-09T15:00:00Z',
+          metadata: { topic: 'Portfolio review' },
+          tutor: { name: 'Jamie Mentor' }
+        },
+        {
+          id: 22,
+          publicId: 'book-22',
+          tutorId: 9,
+          status: 'completed',
+          scheduledStart: '2024-11-05T12:00:00Z',
+          metadata: { topic: 'Career planning', rating: 4.5 },
+          tutor: { name: 'Morgan Guide' }
+        }
+      ],
+      liveClassrooms: [
+        {
+          id: 31,
+          publicId: 'live-31',
+          title: 'Ops Weekly Sync',
+          status: 'scheduled',
+          startAt: '2024-11-10T18:00:00Z',
+          endAt: '2024-11-10T19:00:00Z',
+          timezone: 'UTC',
+          communityName: 'Ops Lab',
+          capacity: 50,
+          reservedSeats: 20,
+          metadata: { whiteboard: { template: 'Sprint board', ready: false, updatedAt: '2024-11-07T10:00:00Z' } }
+        }
+      ],
+      ebookProgress: [
+        {
+          id: 41,
+          assetId: 81,
+          progressPercent: 60,
+          timeSpentSeconds: 1800,
+          metadata: { highlights: 2 }
+        }
+      ],
+      ebooks: [
+        {
+          id: 55,
+          assetId: 81,
+          title: 'Operational Excellence',
+          priceAmount: 1500,
+          priceCurrency: 'USD'
+        }
+      ],
+      communityMemberships: [
+        {
+          id: 501,
+          name: 'Ops Lab',
+          stats: { members: 120, posts: 42, resources: 10, moderators: 3 },
+          membership: { role: 'member', status: 'active' },
+          metadata: { initiatives: ['AMAs'] }
+        }
+      ],
+      communitySubscriptions: [
+        {
+          id: 61,
+          publicId: 'sub-61',
+          communityId: 501,
+          tierId: 701,
+          status: 'active',
+          currentPeriodEnd: '2024-12-01T00:00:00Z'
+        }
+      ],
+      paywallTiersByCommunity: new Map([
+        [
+          501,
+          [
+            {
+              id: 701,
+              name: 'Pro',
+              priceCents: 2500,
+              currency: 'USD',
+              billingInterval: 'monthly'
+            }
+          ]
+        ]
+      ]),
+      communityEventsById: new Map([
+        [
+          501,
+          [
+            {
+              id: 91,
+              communityId: 501,
+              title: 'Ops AMA',
+              startAt: '2024-11-12T12:00:00Z',
+              attendanceCount: 45,
+              attendanceLimit: 120,
+              metadata: { host: 'Ops Lab' }
+            }
+          ]
+        ]
+      ])
+    });
+
+    expect(learnerSnapshot.role.id).toBe('learner');
+    expect(learnerSnapshot.dashboard.metrics).toHaveLength(3);
+    expect(learnerSnapshot.dashboard.tutorBookings.active[0].topic).toBe('Portfolio review');
+    expect(learnerSnapshot.dashboard.financial.summary[0].label).toBe('Active memberships');
+    expect(learnerSnapshot.dashboard.liveClassrooms.metrics.length).toBeGreaterThan(0);
+    expect(learnerSnapshot.searchIndex.some((entry) => entry.role === 'learner')).toBe(true);
+  });
+});
+
+describe('buildCommunityDashboard', () => {
+  it('aggregates community telemetry for steward roles', () => {
+    const now = new Date('2024-11-08T12:00:00Z');
+    const communities = [
+      {
+        id: 801,
+        name: 'Design Ops Guild',
+        stats: { members: 180, posts: 55, resources: 14, moderators: 4, lastActivityAt: '2024-11-08T08:00:00Z' },
+        membership: { role: 'owner', status: 'active' },
+        metadata: { approvalsPending: 2 }
+      }
+    ];
+    const runbooks = new Map([
+      [
+        801,
+        [
+          {
+            id: 301,
+            title: 'Launch Ritual',
+            createdByName: 'Alex Rivers',
+            tags: ['Launch'],
+            metadata: JSON.stringify({ automationReady: true }),
+            updatedAt: '2024-11-07T12:00:00Z'
+          }
+        ]
+      ]
+    ]);
+    const events = new Map([
+      [
+        801,
+        [
+          {
+            id: 411,
+            title: 'Design Reviews',
+            startAt: '2024-11-11T17:00:00Z',
+            attendanceCount: 60,
+            attendanceLimit: 120,
+            metadata: { host: 'Design Ops Guild' }
+          }
+        ]
+      ]
+    ]);
+    const subscriptions = new Map([
+      [
+        801,
+        [
+          {
+            id: 901,
+            tierId: 9901,
+            status: 'active',
+            currentPeriodEnd: '2024-12-03T00:00:00Z'
+          }
+        ]
+      ]
+    ]);
+    const paywallTiers = new Map([
+      [
+        801,
+        [
+          { id: 9901, name: 'Leadership Circle', priceCents: 4500, currency: 'USD', billingInterval: 'monthly' }
+        ]
+      ]
+    ]);
+    const moderators = new Map([
+      [
+        801,
+        [
+          {
+            id: 1,
+            userId: 5,
+            role: 'admin',
+            status: 'active',
+            metadata: { timezone: 'UTC', coverage: 'APAC mornings' }
+          }
+        ]
+      ]
+    ]);
+    const moderationCounts = new Map([[801, 3]]);
+
+    const communitySnapshot = buildCommunityDashboard({
+      communities,
+      runbooksByCommunity: runbooks,
+      eventsByCommunity: events,
+      subscriptionsByCommunity: subscriptions,
+      paywallTiersByCommunity: paywallTiers,
+      moderationCounts,
+      moderatorsByCommunity: moderators,
+      now
+    });
+
+    expect(communitySnapshot.role.id).toBe('community');
+    expect(communitySnapshot.dashboard.metrics).toHaveLength(3);
+    expect(communitySnapshot.dashboard.operations.runbooks[0].title).toBe('Launch Ritual');
+    expect(communitySnapshot.dashboard.monetisation.tiers[0].members).toBe('1 members');
+    expect(communitySnapshot.dashboard.safety.incidents).toHaveLength(1);
+    expect(communitySnapshot.searchIndex[0].role).toBe('community');
   });
 });
 

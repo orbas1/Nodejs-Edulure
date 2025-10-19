@@ -106,6 +106,14 @@ export default class CourseModel {
     return row ? this.deserialize(row) : null;
   }
 
+  static async listByIds(ids, connection = db) {
+    if (!ids?.length) return [];
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .whereIn('id', ids);
+    return rows.map((row) => this.deserialize(row));
+  }
+
   static deserialize(record) {
     return {
       ...record,

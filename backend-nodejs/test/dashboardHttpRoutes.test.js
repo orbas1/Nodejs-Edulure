@@ -43,6 +43,14 @@ beforeEach(() => {
         ebooks: { library: [], recommendations: [] },
         financial: { summary: [], invoices: [] },
         notifications: { total: 0, unreadMessages: 0, items: [] },
+        liveClassrooms: {
+          metrics: [],
+          active: [],
+          upcoming: [],
+          completed: [],
+          groups: [],
+          whiteboard: { readiness: [], snapshots: [] }
+        },
         assessments: {
           overview: [],
           timeline: { upcoming: [], overdue: [], completed: [] },
@@ -114,8 +122,15 @@ describe('Dashboard HTTP routes', () => {
     expect(response.body.success).toBe(true);
     expect(dashboardServiceMock.getDashboardForUser).toHaveBeenCalledWith(42);
     expect(response.body.data.profile.id).toBe(42);
+    expect(response.body.data.roles).toContainEqual({ id: 'learner', label: 'Learner' });
     expect(response.body.data.roles).toContainEqual({ id: 'community', label: 'Community' });
     expect(response.body.data.roles).toContainEqual({ id: 'instructor', label: 'Instructor' });
+    expect(response.body.data.dashboards.learner.tutorBookings).toEqual(
+      expect.objectContaining({ active: expect.any(Array), history: expect.any(Array) })
+    );
+    expect(response.body.data.dashboards.learner.liveClassrooms).toEqual(
+      expect.objectContaining({ metrics: expect.any(Array), upcoming: expect.any(Array) })
+    );
     expect(response.body.data.dashboards.community.metrics[0].label).toBe('Active members');
     expect(response.body.data.dashboards.instructor.metrics[0].label).toBe('Active learners');
   });

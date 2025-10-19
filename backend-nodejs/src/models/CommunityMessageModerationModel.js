@@ -43,4 +43,29 @@ export default class CommunityMessageModerationModel {
       .orderBy('created_at', 'desc');
     return rows.map((row) => mapRecord(row));
   }
+
+  static async countRecentByCommunity(communityIds, { since } = {}, connection = db) {
+    if (!communityIds?.length) {
+      return new Map();
+    }
+
+    const query = connection('community_message_moderation_actions as action')
+      .innerJoin('community_messages as message', 'action.message_id', 'message.id')
+      .whereIn('message.community_id', communityIds)
+      .groupBy('message.community_id')
+      .select('message.community_id as communityId')
+      .count({ total: '*' });
+
+    if (since) {
+      const boundary = since instanceof Date ? since.toISOString() : since;
+      query.andWhere('action.created_at', '>=', boundary);
+    }
+
+    const rows = await query;
+    const counts = new Map();
+    rows.forEach((row) => {
+      counts.set(Number(row.communityId), Number(row.total ?? row.count ?? 0));
+    });
+    return counts;
+  }
 }

@@ -969,6 +969,880 @@ function buildTutorNotifications({ bookings = [], now }) {
   return notifications;
 }
 
+function determineSessionStage(session, now) {
+  if (!session.startAt) {
+    return session.status ? session.status.replace(/_/g, ' ') : 'Scheduled';
+  }
+  const start = session.startAt instanceof Date ? session.startAt : new Date(session.startAt);
+  const end = session.endAt instanceof Date ? session.endAt : session.endAt ? new Date(session.endAt) : null;
+  if (!Number.isNaN(start.getTime()) && start <= now && (!end || end >= now)) {
+    return 'Live now';
+  }
+  if (!Number.isNaN(start.getTime()) && start > now) {
+    return 'Upcoming';
+  }
+  if (end && !Number.isNaN(end.getTime()) && end < now) {
+    return 'Completed';
+  }
+  return session.status ? session.status.replace(/_/g, ' ') : 'Scheduled';
+}
+
+function formatIsoDay(dateLike) {
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDayLabel(dateLike) {
+  const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
+  if (Number.isNaN(date.getTime())) {
+    return 'TBC';
+  }
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(date);
+}
+
+function describeWhiteboardSnapshot(session, now) {
+  const whiteboard = session.metadata?.whiteboard ?? {};
+  if (!whiteboard.template && !whiteboard.url) {
+    return null;
+  }
+  const lastUpdatedAt = whiteboard.updatedAt ? new Date(whiteboard.updatedAt) : null;
+  return {
+    id: `${session.publicId ?? session.id}-whiteboard`,
+    title: session.title,
+    template: whiteboard.template ?? 'Collaborative board',
+    ready: Boolean(whiteboard.ready ?? session.status === 'live'),
+    lastUpdatedLabel: lastUpdatedAt ? humanizeRelativeTime(lastUpdatedAt, now) : null,
+    facilitators: Array.isArray(whiteboard.facilitators) ? whiteboard.facilitators : []
+  };
+}
+
+function resolveCourseInstructor(course) {
+  if (!course) return 'Instructor team';
+  const metadata = safeJsonParse(course.metadata, {});
+  if (typeof metadata.instructorName === 'string' && metadata.instructorName.trim()) {
+    return metadata.instructorName.trim();
+  }
+  if (typeof metadata.instructor === 'string' && metadata.instructor.trim()) {
+    return metadata.instructor.trim();
+  }
+  return 'Instructor team';
+}
+
+function resolveCommunityRoleLabel(role) {
+  if (!role) return 'member';
+  return role.replace(/[-_]/g, ' ');
+}
+
+function formatPercentage(value) {
+  if (!Number.isFinite(value)) {
+    return '0%';
+  }
+  return `${Math.max(0, Math.round(value))}%`;
+}
+
+export function buildLearnerDashboard({
+  user,
+  now = new Date(),
+  enrollments = [],
+  courses = [],
+  courseProgress = [],
+  tutorBookings = [],
+  liveClassrooms = [],
+  ebookProgress = [],
+  ebooks = [],
+  communityMemberships = [],
+  communitySubscriptions = [],
+  paywallTiersByCommunity = new Map(),
+  communityEventsById = new Map()
+} = {}) {
+  const courseById = new Map(courses.map((course) => [Number(course.id), course]));
+  const communityById = new Map(communityMemberships.map((community) => [Number(community.id), community]));
+  const ebookByAssetId = new Map(ebooks.map((ebook) => [Number(ebook.assetId ?? ebook.id), ebook]));
+
+  const progressByEnrollment = new Map();
+  const completionEntries = [];
+  courseProgress.forEach((progress) => {
+    const enrollmentId = Number(progress.enrollmentId);
+    if (!Number.isFinite(enrollmentId)) return;
+    const record = progressByEnrollment.get(enrollmentId) ?? {
+      completedLessons: 0,
+      lastCompletedAt: null,
+      lastLocation: null,
+      notes: []
+    };
+
+    if (progress.completed) {
+      record.completedLessons += 1;
+      const completedAt = progress.completedAt ?? progress.updatedAt ?? null;
+      if (!record.lastCompletedAt || (completedAt && completedAt > record.lastCompletedAt)) {
+        record.lastCompletedAt = completedAt;
+      }
+      completionEntries.push({
+        completedAt: completedAt ?? now,
+        durationMinutes:
+          Number(progress.metadata?.studyMinutes ?? progress.metadata?.durationMinutes ?? progress.progressPercent ?? 0)
+      });
+    }
+
+    if (progress.metadata?.lastLocation) {
+      record.lastLocation = progress.metadata.lastLocation;
+    }
+    if (Array.isArray(progress.metadata?.notes) && progress.metadata.notes.length) {
+      record.notes = progress.metadata.notes;
+    }
+    progressByEnrollment.set(enrollmentId, record);
+  });
+
+  const activeEnrollments = enrollments.filter((enrollment) => enrollment.status === 'active');
+  const completedEnrollments = enrollments.filter((enrollment) => enrollment.status === 'completed');
+  const averageProgress = enrollments.length
+    ? Math.round(
+        enrollments.reduce((total, enrollment) => total + Number(enrollment.progressPercent ?? 0), 0) /
+          enrollments.length
+      )
+    : 0;
+
+  const learningStreak = calculateLearningStreak(completionEntries, now);
+  const learningPace = buildLearningPace(completionEntries, now);
+
+  const upcomingBookings = tutorBookings
+    .map((booking) => ({
+      ...booking,
+      scheduledStart: booking.scheduledStart ? new Date(booking.scheduledStart) : null
+    }))
+    .filter(
+      (booking) =>
+        booking.scheduledStart &&
+        booking.scheduledStart >= now &&
+        booking.status !== 'cancelled' &&
+        booking.status !== 'completed'
+    )
+    .sort((a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime());
+
+  const historicalBookings = tutorBookings
+    .map((booking) => ({
+      ...booking,
+      scheduledStart: booking.scheduledStart ? new Date(booking.scheduledStart) : null
+    }))
+    .filter((booking) => booking.status === 'completed' || (booking.scheduledStart && booking.scheduledStart < now))
+    .sort((a, b) => {
+      const aTime = (booking.completedAt ? new Date(booking.completedAt) : booking.scheduledStart)?.getTime() ?? 0;
+      const bTime = (booking.completedAt ? new Date(booking.completedAt) : booking.scheduledStart)?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+
+  const metrics = [
+    {
+      label: 'Active courses',
+      value: `${activeEnrollments.length}`,
+      change: `${completedEnrollments.length} completed to date`,
+      trend: activeEnrollments.length >= completedEnrollments.length ? 'up' : 'down'
+    },
+    {
+      label: 'Learning streak',
+      value: `${learningStreak.current} day${learningStreak.current === 1 ? '' : 's'}`,
+      change: `Longest ${learningStreak.longest} days`,
+      trend: learningStreak.current >= learningStreak.longest ? 'up' : 'down'
+    },
+    {
+      label: 'Mentor sessions',
+      value: `${upcomingBookings.length}`,
+      change: `${tutorBookings.length} total booked`,
+      trend: upcomingBookings.length ? 'up' : null
+    }
+  ];
+
+  const courseSummaries = enrollments.map((enrollment) => {
+    const course = courseById.get(Number(enrollment.courseId));
+    const stats = progressByEnrollment.get(enrollment.id) ?? {};
+    const nextLesson = enrollment.metadata?.nextLesson ?? stats.lastLocation ?? null;
+    return {
+      id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
+      title: course?.title ?? 'Course',
+      status: enrollment.status ?? 'active',
+      progress: Number.isFinite(Number(enrollment.progressPercent))
+        ? Number(enrollment.progressPercent)
+        : Math.round(((stats.completedLessons ?? 0) / Math.max(1, course?.lessonCount ?? 1)) * 100),
+      instructor: resolveCourseInstructor(course),
+      nextLesson
+    };
+  });
+
+  const activeBookings = upcomingBookings.map((booking) => ({
+    id: booking.publicId ?? `booking-${booking.id}`,
+    topic: booking.metadata?.topic ?? 'Mentorship session',
+    mentor: booking.tutor?.name ?? `Tutor ${booking.tutorId}`,
+    date: booking.scheduledStart ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBC',
+    status: booking.status ? booking.status.replace(/_/g, ' ') : 'Requested',
+    rating:
+      typeof booking.metadata?.rating === 'number'
+        ? `${Math.round(Number(booking.metadata.rating) * 10) / 10}★`
+        : null
+  }));
+
+  const bookingHistory = historicalBookings.map((booking) => ({
+    id: booking.publicId ?? `booking-${booking.id}`,
+    topic: booking.metadata?.topic ?? 'Mentorship session',
+    mentor: booking.tutor?.name ?? `Tutor ${booking.tutorId}`,
+    date: booking.scheduledStart ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBC',
+    status: booking.status ? booking.status.replace(/_/g, ' ') : 'Completed',
+    rating:
+      typeof booking.metadata?.rating === 'number'
+        ? `${Math.round(Number(booking.metadata.rating) * 10) / 10}`
+        : booking.metadata?.review ?? null
+  }));
+
+  const ebookEntries = ebookProgress.map((progress) => {
+    const ebook = ebookByAssetId.get(Number(progress.assetId)) ?? null;
+    const completed = Number(progress.progressPercent ?? 0) >= 99;
+    const timeSpentMinutes = Math.round(Number(progress.timeSpentSeconds ?? 0) / 60);
+    return {
+      id: ebook?.publicId ?? `ebook-${progress.assetId}`,
+      title: ebook?.title ?? 'Ebook',
+      status: completed ? 'Completed' : 'In progress',
+      progress: Number(progress.progressPercent ?? 0),
+      price: formatCurrency(ebook?.priceAmount ?? 0, ebook?.priceCurrency ?? 'USD'),
+      highlights: Number(progress.metadata?.highlights ?? 0),
+      bookmarks: Number(progress.metadata?.bookmarks ?? 0),
+      timeSpent: timeSpentMinutes ? `${timeSpentMinutes} min` : '—'
+    };
+  });
+
+  const subscriptionsByCommunity = new Map();
+  communitySubscriptions.forEach((subscription) => {
+    const communityId = Number(subscription.communityId);
+    if (!Number.isFinite(communityId)) return;
+    const list = subscriptionsByCommunity.get(communityId) ?? [];
+    list.push(subscription);
+    subscriptionsByCommunity.set(communityId, list);
+  });
+
+  let monthlySpendCents = 0;
+  const activeSubscriptions = communitySubscriptions.filter((subscription) => subscription.status === 'active');
+  activeSubscriptions.forEach((subscription) => {
+    const tiers = paywallTiersByCommunity.get(Number(subscription.communityId)) ?? [];
+    const tier = tiers.find((entry) => Number(entry.id) === Number(subscription.tierId));
+    if (!tier) return;
+    const priceCents = Number(tier.priceCents ?? 0);
+    if (!priceCents) return;
+    if (tier.billingInterval === 'annual') {
+      monthlySpendCents += Math.round(priceCents / 12);
+    } else if (tier.billingInterval === 'quarterly') {
+      monthlySpendCents += Math.round(priceCents / 3);
+    } else {
+      monthlySpendCents += priceCents;
+    }
+  });
+
+  const invoices = communitySubscriptions.slice(0, 10).map((subscription) => {
+    const community = communityById.get(Number(subscription.communityId));
+    const tiers = paywallTiersByCommunity.get(Number(subscription.communityId)) ?? [];
+    const tier = tiers.find((entry) => Number(entry.id) === Number(subscription.tierId));
+    const amount = tier ? formatCurrency(tier.priceCents, tier.currency ?? 'USD') : formatCurrency(0);
+    const periodEnd = subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null;
+    return {
+      id: subscription.publicId ?? `subscription-${subscription.id}`,
+      label: `${community?.name ?? 'Community membership'}${tier ? ` · ${tier.name}` : ''}`,
+      amount,
+      status: subscription.status ?? 'active',
+      date: periodEnd ? periodEnd.toISOString() : now.toISOString()
+    };
+  });
+
+  const financialSummary = [
+    {
+      label: 'Active memberships',
+      value: `${activeSubscriptions.length}`,
+      change: activeSubscriptions.length ? `${activeSubscriptions.length} renewing` : null,
+      trend: activeSubscriptions.length ? 'up' : null
+    },
+    {
+      label: 'Estimated monthly spend',
+      value: formatCurrency(monthlySpendCents),
+      change: monthlySpendCents ? 'Across all active tiers' : null,
+      trend: monthlySpendCents ? 'up' : null
+    }
+  ];
+
+  const notifications = upcomingBookings.slice(0, 5).map((booking) => ({
+    id: booking.publicId ?? `notification-${booking.id}`,
+    title: `Upcoming mentor session · ${booking.metadata?.topic ?? 'Mentorship'}`,
+    timestamp: booking.scheduledStart
+      ? booking.scheduledStart.toISOString()
+      : new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
+    type: 'booking'
+  }));
+
+  const communityEngagement = communityMemberships.map((community) => ({
+    name: community.name,
+    participation: Number(community.stats?.posts ?? 0) + Number(community.stats?.resources ?? 0)
+  }));
+
+  const communitySummaries = communityMemberships.map((community) => ({
+    id: `community-${community.id}`,
+    name: community.name,
+    members: `${Number(community.stats?.members ?? 0).toLocaleString('en-US')} members`,
+    moderators: Number(community.stats?.moderators ?? 0),
+    health:
+      Number(community.stats?.posts ?? 0) > 10
+        ? 'Healthy'
+        : Number(community.stats?.posts ?? 0) > 0
+          ? 'Emerging'
+          : 'Quiet',
+    initiatives: Array.isArray(community.metadata?.initiatives) ? community.metadata.initiatives : [],
+    metadata: community.metadata ?? {}
+  }));
+
+  const pipelineItems = Array.from(subscriptionsByCommunity.entries()).map(([communityId, subscriptions]) => {
+    const active = subscriptions.filter((subscription) => subscription.status === 'active');
+    const community = communityById.get(communityId);
+    const tiers = paywallTiersByCommunity.get(communityId) ?? [];
+    const coverage = tiers.length
+      ? `${tiers.length} tier${tiers.length === 1 ? '' : 's'} configured`
+      : 'No premium tiers';
+    return {
+      id: `pipeline-${communityId}`,
+      title: community?.name ?? `Community ${communityId}`,
+      owner: resolveCommunityRoleLabel(community?.membership?.role),
+      progress: Math.min(100, Math.round((active.length / Math.max(1, subscriptions.length)) * 100)),
+      coverage
+    };
+  });
+
+  const liveSessions = liveClassrooms.map((session) => {
+    const startAt = session.startAt ? new Date(session.startAt) : null;
+    const endAt = session.endAt ? new Date(session.endAt) : null;
+    const stage = determineSessionStage({ ...session, startAt, endAt }, now);
+    const occupancyRate = session.capacity
+      ? Math.min(100, Math.round((Number(session.reservedSeats ?? 0) / Math.max(1, session.capacity)) * 100))
+      : null;
+    const whiteboard = describeWhiteboardSnapshot(session, now);
+    return {
+      id: session.publicId ?? `live-${session.id}`,
+      title: session.title,
+      stage,
+      status: session.status ?? 'scheduled',
+      startLabel: startAt ? formatDateTime(startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBC',
+      endLabel: endAt ? formatDateTime(endAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+      timezone: session.timezone ?? 'Etc/UTC',
+      community: session.communityName ?? null,
+      summary: session.summary ?? session.description ?? null,
+      occupancy: {
+        reserved: Number(session.reservedSeats ?? session.metadata?.reservedSeats ?? 0),
+        capacity: Number(session.capacity ?? session.metadata?.capacity ?? 0) || null,
+        rate: occupancyRate
+      },
+      callToAction:
+        session.registration?.status === 'registered'
+          ? { action: 'join', label: 'Join session', enabled: stage !== 'Completed' }
+          : { action: 'register', label: 'Register', enabled: stage === 'Upcoming' },
+      whiteboard: whiteboard
+        ? {
+            template: whiteboard.template,
+            ready: whiteboard.ready,
+            lastUpdatedLabel: whiteboard.lastUpdatedLabel
+          }
+        : null,
+      facilitators: Array.isArray(session.metadata?.facilitators) ? session.metadata.facilitators : []
+    };
+  });
+
+  const upcomingSessions = liveSessions.filter((session) => session.stage === 'Upcoming');
+  const activeSessions = liveSessions.filter((session) => session.stage === 'Live now');
+  const completedSessions = liveSessions.filter((session) => session.stage === 'Completed');
+
+  const totalReserved = liveSessions.reduce((total, session) => total + Number(session.occupancy?.reserved ?? 0), 0);
+  const totalCapacity = liveSessions.reduce((total, session) => total + Number(session.occupancy?.capacity ?? 0), 0);
+  const averageOccupancy = totalCapacity ? Math.round((totalReserved / totalCapacity) * 100) : 0;
+
+  const liveClassroomSnapshot = {
+    metrics: [
+      {
+        label: 'Upcoming sessions',
+        value: `${upcomingSessions.length}`,
+        change: `${activeSessions.length} live today`,
+        trend: upcomingSessions.length ? 'up' : null
+      },
+      {
+        label: 'Completed this month',
+        value: `${completedSessions.length}`,
+        change: `Avg fill ${formatPercentage(averageOccupancy)}`,
+        trend: completedSessions.length ? 'up' : null
+      },
+      {
+        label: 'Total registrations',
+        value: `${totalReserved}`,
+        change: totalCapacity ? `${formatPercentage(averageOccupancy)} occupancy` : null,
+        trend: totalReserved ? 'up' : null
+      }
+    ],
+    active: activeSessions,
+    upcoming: upcomingSessions,
+    completed: completedSessions,
+    groups: [],
+    whiteboard: {
+      readiness: liveSessions.slice(0, 5).map((session) => ({
+        id: `${session.id}-readiness`,
+        label: session.title,
+        status: session.whiteboard?.ready ? 'ready' : 'attention',
+        detail: session.whiteboard?.ready ? 'Launch checklist complete' : 'Briefing required'
+      })),
+      snapshots: liveSessions
+        .map((session) => describeWhiteboardSnapshot(session, now))
+        .filter(Boolean)
+        .slice(0, 6)
+    }
+  };
+
+  const upcomingItems = [
+    ...upcomingBookings.map((booking) => ({
+      id: booking.publicId ?? `upcoming-booking-${booking.id}`,
+      type: 'Mentor session',
+      date: booking.scheduledStart
+        ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
+        : 'TBC',
+      title: booking.metadata?.topic ?? 'Mentorship session',
+      host: booking.tutor?.name ?? 'Mentor team',
+      action: 'View brief',
+      scheduledAt: booking.scheduledStart
+    })),
+    ...(membershipCommunityIdsToEvents(communityEventsById).map((event) => ({
+      id: `community-event-${event.communityId}-${event.id}`,
+      type: 'Community event',
+      date: event.startAt ? formatDateTime(event.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBC',
+      title: event.title,
+      host: communityById.get(event.communityId)?.name ?? 'Community team',
+      action: 'View agenda',
+      scheduledAt: event.startAt ? new Date(event.startAt) : null
+    })) || [])
+  ].sort((a, b) => {
+    const aTime = a.scheduledAt instanceof Date ? a.scheduledAt.getTime() : Number.MAX_SAFE_INTEGER;
+    const bTime = b.scheduledAt instanceof Date ? b.scheduledAt.getTime() : Number.MAX_SAFE_INTEGER;
+    return aTime - bTime;
+  });
+
+  const calendarBuckets = new Map();
+  upcomingItems.forEach((item) => {
+    if (!item.scheduledAt) return;
+    const isoDay = formatIsoDay(item.scheduledAt);
+    if (!isoDay) return;
+    const bucket = calendarBuckets.get(isoDay) ?? {
+      id: `calendar-${isoDay}`,
+      day: formatDayLabel(item.scheduledAt),
+      items: []
+    };
+    bucket.items.push(item.title);
+    calendarBuckets.set(isoDay, bucket);
+  });
+
+  const calendar = Array.from(calendarBuckets.values()).sort((a, b) => a.id.localeCompare(b.id));
+
+  const settings = {
+    privacy: {
+      visibility: 'public',
+      followApprovalRequired: Boolean(user?.metadata?.followApprovalRequired ?? false),
+      shareActivity: true,
+      messagePermission: 'followers'
+    },
+    messaging: {
+      unreadThreads: Number(user?.metadata?.unreadThreads ?? 0),
+      notificationsEnabled: true
+    },
+    communities: communityMemberships.map((community) => ({
+      id: `community-${community.id}`,
+      name: community.name,
+      role: resolveCommunityRoleLabel(community.membership?.role),
+      status: community.membership?.status ?? 'active'
+    }))
+  };
+
+  const followers = {
+    followers: Number(user?.metadata?.followers ?? 0),
+    following: communityMemberships.length,
+    pending: [],
+    outgoing: [],
+    recommendations: []
+  };
+
+  const hasSignals =
+    metrics.some((metric) => Number(metric.value) > 0) ||
+    courseSummaries.length ||
+    activeBookings.length ||
+    ebookEntries.length ||
+    communityMemberships.length ||
+    liveSessions.length;
+
+  if (!hasSignals) {
+    return null;
+  }
+
+  const profileStats = [
+    { label: 'Courses active', value: `${activeEnrollments.length}` },
+    { label: 'Communities', value: `${communityMemberships.length}` },
+    { label: 'Mentor sessions', value: `${tutorBookings.length}` }
+  ];
+
+  const profileBio = `Currently learning across ${activeEnrollments.length} course${
+    activeEnrollments.length === 1 ? '' : 's'
+  } and participating in ${communityMemberships.length} community${communityMemberships.length === 1 ? '' : 'ies'}.`;
+
+  const searchIndex = [
+    ...courseSummaries.map((course) => ({
+      id: `search-learner-course-${course.id}`,
+      role: 'learner',
+      type: 'Course',
+      title: course.title,
+      url: '/dashboard/learner/courses'
+    })),
+    ...communitySummaries.map((community) => ({
+      id: `search-learner-community-${community.id}`,
+      role: 'learner',
+      type: 'Community',
+      title: community.name,
+      url: '/dashboard/learner/communities'
+    }))
+  ];
+
+  return {
+    role: { id: 'learner', label: 'Learner' },
+    dashboard: {
+      metrics,
+      analytics: {
+        learningPace,
+        communityEngagement
+      },
+      upcoming: upcomingItems.map(({ scheduledAt, ...rest }) => rest),
+      communities: {
+        managed: communitySummaries,
+        pipelines: pipelineItems
+      },
+      courses: {
+        active: courseSummaries,
+        recommendations: []
+      },
+      calendar,
+      tutorBookings: {
+        active: activeBookings,
+        history: bookingHistory
+      },
+      ebooks: {
+        library: ebookEntries,
+        recommendations: []
+      },
+      financial: {
+        summary: financialSummary,
+        invoices
+      },
+      notifications: {
+        total: notifications.length,
+        unreadMessages: Number(user?.metadata?.unreadMessages ?? 0),
+        items: notifications
+      },
+      followers,
+      settings,
+      liveClassrooms: liveClassroomSnapshot
+    },
+    profileStats,
+    profileBio,
+    profileTitleSegment: 'Learner Learnspace overview',
+    searchIndex
+  };
+}
+
+function membershipCommunityIdsToEvents(eventsById) {
+  const entries = [];
+  if (!(eventsById instanceof Map)) {
+    return entries;
+  }
+  eventsById.forEach((events, communityId) => {
+    if (!Array.isArray(events)) return;
+    events.forEach((event) => {
+      entries.push({ ...event, communityId: Number(communityId) });
+    });
+  });
+  return entries;
+}
+
+export function buildCommunityDashboard({
+  communities = [],
+  runbooksByCommunity = new Map(),
+  eventsByCommunity = new Map(),
+  subscriptionsByCommunity = new Map(),
+  paywallTiersByCommunity = new Map(),
+  moderationCounts = new Map(),
+  moderatorsByCommunity = new Map(),
+  now = new Date()
+} = {}) {
+  if (!communities.length) {
+    return null;
+  }
+
+  const communityById = new Map(communities.map((community) => [Number(community.id), community]));
+
+  const totalMembers = communities.reduce((total, community) => total + Number(community.stats?.members ?? 0), 0);
+  const totalPosts = communities.reduce((total, community) => total + Number(community.stats?.posts ?? 0), 0);
+  const totalResources = communities.reduce((total, community) => total + Number(community.stats?.resources ?? 0), 0);
+
+  let recurringCents = 0;
+  subscriptionsByCommunity.forEach((subscriptions, communityId) => {
+    const tiers = paywallTiersByCommunity.get(Number(communityId)) ?? [];
+    subscriptions
+      .filter((subscription) => subscription.status === 'active')
+      .forEach((subscription) => {
+        const tier = tiers.find((entry) => Number(entry.id) === Number(subscription.tierId));
+        if (!tier) return;
+        const priceCents = Number(tier.priceCents ?? 0);
+        if (tier.billingInterval === 'annual') {
+          recurringCents += Math.round(priceCents / 12);
+        } else if (tier.billingInterval === 'quarterly') {
+          recurringCents += Math.round(priceCents / 3);
+        } else {
+          recurringCents += priceCents;
+        }
+      });
+  });
+
+  const metrics = [
+    {
+      label: 'Active members',
+      value: totalMembers.toLocaleString('en-US'),
+      change: `${communities.length} communities`,
+      trend: totalMembers ? 'up' : null
+    },
+    {
+      label: 'Weekly posts',
+      value: totalPosts.toLocaleString('en-US'),
+      change: `${totalResources.toLocaleString('en-US')} resources shared`,
+      trend: totalPosts >= totalResources ? 'up' : 'down'
+    },
+    {
+      label: 'Recurring revenue',
+      value: formatCurrency(recurringCents),
+      change: `${subscriptionsByCommunity.size} programmes`,
+      trend: recurringCents ? 'up' : null
+    }
+  ];
+
+  const healthOverview = communities.map((community) => {
+    const moderation = Number(moderationCounts.get(Number(community.id)) ?? 0);
+    const role = community.membership?.role ?? 'owner';
+    return {
+      id: `community-${community.id}`,
+      name: community.name,
+      members: `${Number(community.stats?.members ?? 0).toLocaleString('en-US')} members`,
+      trend: community.stats?.lastActivityAt ? humanizeRelativeTime(new Date(community.stats.lastActivityAt), now) : 'Inactive',
+      health:
+        Number(community.stats?.posts ?? 0) > 15
+          ? 'Healthy'
+          : Number(community.stats?.posts ?? 0) > 0
+            ? 'Building'
+            : 'Needs attention',
+      moderators: `${Number(community.stats?.moderators ?? 0)} moderators`,
+      approvalsPending: Number(community.metadata?.approvalsPending ?? 0),
+      incidentsOpen: moderation,
+      escalationsOpen: moderation > 0 ? 1 : 0,
+      role: resolveCommunityRoleLabel(role)
+    };
+  });
+
+  const runbooks = [];
+  runbooksByCommunity.forEach((resources, communityId) => {
+    const community = communityById.get(Number(communityId));
+    if (!Array.isArray(resources)) return;
+    resources.forEach((resource) => {
+      const metadata = safeJsonParse(resource.metadata, {});
+      runbooks.push({
+        id: `runbook-${resource.id}`,
+        title: resource.title,
+        owner: resource.createdByName ?? community?.name ?? 'Community team',
+        automationReady: Boolean(metadata.automationReady ?? false),
+        tags: Array.isArray(resource.tags) ? resource.tags : [],
+        updatedAt: resource.updatedAt ? humanizeRelativeTime(new Date(resource.updatedAt), now) : 'Recently'
+      });
+    });
+  });
+
+  const escalations = [];
+  moderationCounts.forEach((count, communityId) => {
+    if (!count) return;
+    const community = communityById.get(Number(communityId));
+    escalations.push({
+      id: `escalation-${communityId}`,
+      title: 'Review flagged content',
+      due: 'Today',
+      status: count > 3 ? 'urgent' : 'pending',
+      community: community?.name ?? `Community ${communityId}`,
+      owner: resolveCommunityRoleLabel(community?.membership?.role)
+    });
+  });
+
+  const eventEntries = [];
+  eventsByCommunity.forEach((events, communityId) => {
+    const community = communityById.get(Number(communityId));
+    if (!Array.isArray(events)) return;
+    events.forEach((event) => {
+      eventEntries.push({
+        id: `event-${communityId}-${event.id}`,
+        title: event.title,
+        date: event.startAt ? formatDateTime(event.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBC',
+        facilitator: event.metadata?.host ?? community?.name ?? 'Community team',
+        seats:
+          event.attendanceLimit
+            ? `${event.attendanceCount ?? 0}/${event.attendanceLimit} seats`
+            : `${event.attendanceCount ?? 0} registered`,
+        status: event.status ?? 'scheduled'
+      });
+    });
+  });
+
+  const tiers = [];
+  paywallTiersByCommunity.forEach((tierList, communityId) => {
+    const community = communityById.get(Number(communityId));
+    const subscriptions = subscriptionsByCommunity.get(Number(communityId)) ?? [];
+    tierList.forEach((tier) => {
+      const active = subscriptions.filter((subscription) => Number(subscription.tierId) === Number(tier.id));
+      const churn = subscriptions.length
+        ? `${Math.max(0, Math.round(((subscriptions.length - active.length) / subscriptions.length) * 100))}% churn`
+        : '0% churn';
+      const nextRenewal = active
+        .map((subscription) => (subscription.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null))
+        .filter((date) => date && !Number.isNaN(date.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime())[0];
+      tiers.push({
+        id: `tier-${tier.id}`,
+        name: `${community?.name ?? 'Community'} · ${tier.name}`,
+        price: formatCurrency(tier.priceCents, tier.currency ?? 'USD'),
+        members: `${active.length} members`,
+        churn,
+        renewal: nextRenewal ? formatDateTime(nextRenewal, { dateStyle: 'medium' }) : 'TBC'
+      });
+    });
+  });
+
+  const insights = [];
+  if (recurringCents) {
+    insights.push(`Projected recurring revenue this cycle: ${formatCurrency(recurringCents)}.`);
+  }
+  if (totalPosts) {
+    insights.push(`${totalPosts.toLocaleString('en-US')} posts published across all communities this period.`);
+  }
+
+  const moderators = [];
+  moderatorsByCommunity.forEach((members, communityId) => {
+    const community = communityById.get(Number(communityId));
+    members
+      .filter((member) => member.status === 'active')
+      .filter((member) => ['owner', 'admin', 'moderator'].includes(member.role))
+      .forEach((member) => {
+        moderators.push({
+          id: `moderator-${communityId}-${member.userId}`,
+          role: resolveCommunityRoleLabel(member.role),
+          community: community?.name ?? `Community ${communityId}`,
+          timezone: member.metadata?.timezone ?? 'Etc/UTC',
+          coverage: member.metadata?.coverage ?? 'General coverage'
+        });
+      });
+  });
+
+  const incidents = [];
+  moderationCounts.forEach((count, communityId) => {
+    if (!count) return;
+    const community = communityById.get(Number(communityId));
+    incidents.push({
+      id: `incident-${communityId}`,
+      summary: 'Flagged conversations awaiting review',
+      communityName: community?.name ?? `Community ${communityId}`,
+      severity: count > 5 ? 'high' : 'medium',
+      owner: resolveCommunityRoleLabel(community?.membership?.role),
+      openedAt: now.toISOString()
+    });
+  });
+
+  const backlog = escalations.map((task) => ({
+    id: `backlog-${task.id}`,
+    title: task.title,
+    community: task.community,
+    owner: task.owner,
+    status: task.status,
+    due: task.due
+  }));
+
+  const communicationsHighlights = [];
+  eventsByCommunity.forEach((events, communityId) => {
+    const community = communityById.get(Number(communityId));
+    if (!Array.isArray(events)) return;
+    events.slice(0, 3).forEach((event) => {
+      communicationsHighlights.push({
+        id: `highlight-${communityId}-${event.id}`,
+        community: community?.name ?? `Community ${communityId}`,
+        preview: event.summary ?? event.title,
+        postedAt: event.startAt ? formatDateTime(event.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'Upcoming',
+        reactions: Number(event.attendanceCount ?? 0),
+        tags: Array.isArray(event.metadata?.tags) ? event.metadata.tags : []
+      });
+    });
+  });
+
+  const programming = {
+    upcomingEvents: eventEntries,
+    tutorPods: [],
+    broadcasts: []
+  };
+
+  const monetisation = {
+    tiers,
+    experiments: [],
+    insights
+  };
+
+  const safety = {
+    incidents,
+    backlog,
+    moderators
+  };
+
+  return {
+    role: { id: 'community', label: 'Community' },
+    dashboard: {
+      metrics,
+      health: {
+        overview: healthOverview,
+        moderators
+      },
+      operations: {
+        runbooks,
+        escalations
+      },
+      programming,
+      monetisation,
+      safety,
+      communications: {
+        highlights: communicationsHighlights,
+        broadcasts: [],
+        trends: []
+      }
+    },
+    profileStats: [
+      { label: 'Communities stewarded', value: `${communities.length}` },
+      { label: 'Active members', value: totalMembers.toLocaleString('en-US') }
+    ],
+    profileBio: `Stewarding ${communities.length} community${communities.length === 1 ? '' : 'ies'} with ${totalMembers.toLocaleString(
+      'en-US'
+    )} active members.`,
+    profileTitleSegment: 'Community command overview',
+    searchIndex: communities.map((community) => ({
+      id: `search-community-${community.id}`,
+      role: 'community',
+      type: 'Community',
+      title: community.name,
+      url: '/dashboard/community'
+    }))
+  };
+}
+
 function formatDateTime(dateLike, options) {
   const date = dateLike instanceof Date ? dateLike : new Date(dateLike);
   if (Number.isNaN(date.getTime())) return null;
@@ -1359,10 +2233,6 @@ export function buildInstructorDashboard({
   };
 }
 
-export function buildCommunityDashboard() {
-  return null;
-}
-
 export default class DashboardService {
   static async getDashboardForUser(userId, { referenceDate = new Date() } = {}) {
     const { default: UserModel } = await import('../models/UserModel.js');
@@ -1372,6 +2242,34 @@ export default class DashboardService {
       error.status = 404;
       throw error;
     }
+
+    const now = referenceDate;
+    let communityMemberships = [];
+    try {
+      const { default: CommunityService } = await import('./CommunityService.js');
+      communityMemberships = await CommunityService.listForUser(user.id);
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load community memberships for dashboard');
+    }
+
+    const membershipCommunityIds = Array.from(
+      new Set(
+        communityMemberships
+          .map((community) => Number(community.id))
+          .filter((communityId) => Number.isFinite(communityId))
+      )
+    );
+    const managedCommunityIds = Array.from(
+      new Set(
+        communityMemberships
+          .filter((community) => ['owner', 'admin', 'moderator'].includes(community.membership?.role))
+          .map((community) => Number(community.id))
+          .filter((communityId) => Number.isFinite(communityId))
+      )
+    );
+    const managedCommunities = communityMemberships.filter((community) =>
+      managedCommunityIds.includes(Number(community.id))
+    );
 
     let courseWorkspaceInput = {
       courses: [],
@@ -1503,10 +2401,228 @@ export default class DashboardService {
       log.warn({ err: error }, 'Failed to load collaborator directory for course workspace');
     }
 
+    let learnerData = {
+      enrollments: [],
+      courses: [],
+      courseProgress: [],
+      tutorBookings: [],
+      liveClassrooms: [],
+      ebookProgress: [],
+      ebooks: [],
+      communitySubscriptions: [],
+      paywallTiersByCommunity: new Map(),
+      communityEventsById: new Map()
+    };
+
+    try {
+      const [
+        { default: CourseEnrollmentModel },
+        { default: CourseModel },
+        { default: CourseProgressModel },
+        { default: TutorBookingModel },
+        { default: LiveClassroomModel },
+        { default: EbookProgressModel },
+        { default: EbookModel },
+        { default: CommunitySubscriptionModel }
+      ] = await Promise.all([
+        import('../models/CourseEnrollmentModel.js'),
+        import('../models/CourseModel.js'),
+        import('../models/CourseProgressModel.js'),
+        import('../models/TutorBookingModel.js'),
+        import('../models/LiveClassroomModel.js'),
+        import('../models/EbookProgressModel.js'),
+        import('../models/EbookModel.js'),
+        import('../models/CommunitySubscriptionModel.js')
+      ]);
+
+      const [
+        enrollments,
+        bookings,
+        liveSessions,
+        ebookProgressRows,
+        learnerSubscriptions
+      ] = await Promise.all([
+        CourseEnrollmentModel.listByUserId(user.id),
+        TutorBookingModel.listByLearner(user.id),
+        LiveClassroomModel.listForLearner(user.id),
+        EbookProgressModel.listByUser(user.id),
+        CommunitySubscriptionModel.listByUser(user.id)
+      ]);
+
+      let courses = [];
+      let courseProgressRows = [];
+      if (enrollments.length) {
+        const courseIds = Array.from(
+          new Set(
+            enrollments
+              .map((enrollment) => Number(enrollment.courseId))
+              .filter((courseId) => Number.isFinite(courseId))
+          )
+        );
+        if (courseIds.length) {
+          courses = await CourseModel.listByIds(courseIds);
+        }
+        const enrollmentIds = enrollments.map((enrollment) => enrollment.id).filter((id) => Number.isFinite(id));
+        courseProgressRows = enrollmentIds.length ? await CourseProgressModel.listByEnrollmentIds(enrollmentIds) : [];
+      }
+
+      let learnerEbooks = [];
+      if (ebookProgressRows.length) {
+        const assetIds = Array.from(
+          new Set(
+            ebookProgressRows
+              .map((progress) => Number(progress.assetId))
+              .filter((assetId) => Number.isFinite(assetId))
+          )
+        );
+        if (assetIds.length) {
+          learnerEbooks = await EbookModel.listByAssetIds(assetIds);
+        }
+      }
+
+      let communityEventsById = new Map();
+      if (membershipCommunityIds.length) {
+        try {
+          const { default: CommunityEventModel } = await import('../models/CommunityEventModel.js');
+          const eventLists = await Promise.all(
+            membershipCommunityIds.map((communityId) =>
+              CommunityEventModel.listForCommunity(communityId, {
+                from: new Date(now.getTime() - DAY_IN_MS).toISOString(),
+                to: new Date(now.getTime() + 30 * DAY_IN_MS).toISOString(),
+                status: 'scheduled',
+                limit: 20
+              })
+            )
+          );
+          communityEventsById = new Map(
+            membershipCommunityIds.map((communityId, index) => [communityId, eventLists[index] ?? []])
+          );
+        } catch (eventError) {
+          log.warn({ err: eventError }, 'Failed to load learner community events');
+        }
+      }
+
+      let learnerPaywallTiersByCommunity = new Map();
+      const subscriptionCommunityIds = Array.from(
+        new Set(
+          learnerSubscriptions
+            .map((subscription) => Number(subscription.communityId))
+            .filter((communityId) => Number.isFinite(communityId))
+        )
+      );
+      if (subscriptionCommunityIds.length) {
+        try {
+          const { default: CommunityPaywallTierModel } = await import('../models/CommunityPaywallTierModel.js');
+          const tierLists = await Promise.all(
+            subscriptionCommunityIds.map((communityId) =>
+              CommunityPaywallTierModel.listByCommunity(communityId, { includeInactive: true })
+            )
+          );
+          learnerPaywallTiersByCommunity = new Map(
+            subscriptionCommunityIds.map((communityId, index) => [communityId, tierLists[index] ?? []])
+          );
+        } catch (tierError) {
+          log.warn({ err: tierError }, 'Failed to load learner paywall tiers');
+        }
+      }
+
+      learnerData = {
+        enrollments,
+        courses,
+        courseProgress: courseProgressRows,
+        tutorBookings: bookings,
+        liveClassrooms: liveSessions,
+        ebookProgress: ebookProgressRows,
+        ebooks: learnerEbooks,
+        communitySubscriptions: learnerSubscriptions,
+        paywallTiersByCommunity: learnerPaywallTiersByCommunity,
+        communityEventsById
+      };
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load learner dashboard data');
+    }
+
+    let communityRunbooksByCommunity = new Map();
+    let communityEventsByCommunity = new Map();
+    let communitySubscriptionsByCommunity = new Map();
+    let communityPaywallTiersByCommunity = new Map();
+    let communityModeratorsByCommunity = new Map();
+    let communityModerationCounts = new Map();
+
+    if (managedCommunityIds.length) {
+      try {
+        const [
+          { default: CommunityResourceModel },
+          { default: CommunityEventModel },
+          { default: CommunitySubscriptionModel },
+          { default: CommunityPaywallTierModel },
+          { default: CommunityMemberModel },
+          { default: CommunityMessageModerationModel }
+        ] = await Promise.all([
+          import('../models/CommunityResourceModel.js'),
+          import('../models/CommunityEventModel.js'),
+          import('../models/CommunitySubscriptionModel.js'),
+          import('../models/CommunityPaywallTierModel.js'),
+          import('../models/CommunityMemberModel.js'),
+          import('../models/CommunityMessageModerationModel.js')
+        ]);
+
+        const [runbookLists, eventLists, subscriptionLists, tierLists, memberLists] = await Promise.all([
+          Promise.all(
+            managedCommunityIds.map((communityId) =>
+              CommunityResourceModel.listForCommunity(communityId, { resourceType: 'runbook', limit: 20 })
+            )
+          ),
+          Promise.all(
+            managedCommunityIds.map((communityId) =>
+              CommunityEventModel.listForCommunity(communityId, {
+                from: new Date(now.getTime() - DAY_IN_MS).toISOString(),
+                to: new Date(now.getTime() + 45 * DAY_IN_MS).toISOString(),
+                status: 'scheduled',
+                limit: 25
+              })
+            )
+          ),
+          Promise.all(managedCommunityIds.map((communityId) => CommunitySubscriptionModel.listByCommunity(communityId))),
+          Promise.all(
+            managedCommunityIds.map((communityId) =>
+              CommunityPaywallTierModel.listByCommunity(communityId, { includeInactive: true })
+            )
+          ),
+          Promise.all(
+            managedCommunityIds.map((communityId) =>
+              CommunityMemberModel.listByCommunity(communityId, { status: 'active' })
+            )
+          )
+        ]);
+
+        communityRunbooksByCommunity = new Map(
+          managedCommunityIds.map((communityId, index) => [communityId, runbookLists[index] ?? []])
+        );
+        communityEventsByCommunity = new Map(
+          managedCommunityIds.map((communityId, index) => [communityId, eventLists[index] ?? []])
+        );
+        communitySubscriptionsByCommunity = new Map(
+          managedCommunityIds.map((communityId, index) => [communityId, subscriptionLists[index] ?? []])
+        );
+        communityPaywallTiersByCommunity = new Map(
+          managedCommunityIds.map((communityId, index) => [communityId, tierLists[index] ?? []])
+        );
+        communityModeratorsByCommunity = new Map(
+          managedCommunityIds.map((communityId, index) => [communityId, memberLists[index] ?? []])
+        );
+        communityModerationCounts = await CommunityMessageModerationModel.countRecentByCommunity(managedCommunityIds, {
+          since: new Date(now.getTime() - 30 * DAY_IN_MS)
+        });
+      } catch (error) {
+        log.warn({ err: error }, 'Failed to load community stewardship data for dashboard');
+      }
+    }
+
     const instructorSnapshot =
       buildInstructorDashboard({
         user,
-        now: referenceDate,
+        now,
         courses: courseWorkspaceInput?.courses ?? [],
         courseEnrollments: courseWorkspaceInput?.enrollments ?? [],
         modules: courseWorkspaceInput?.modules ?? [],
@@ -1516,18 +2632,58 @@ export default class DashboardService {
         creationProjects: courseWorkspaceInput?.creationProjects ?? [],
         creationCollaborators: courseWorkspaceInput?.creationCollaborators ?? new Map(),
         creationSessions: courseWorkspaceInput?.creationSessions ?? new Map(),
-        collaboratorDirectory: courseWorkspaceInput?.collaboratorDirectory ?? new Map()
+        collaboratorDirectory: courseWorkspaceInput?.collaboratorDirectory ?? new Map(),
+        communityMemberships
       }) ?? undefined;
     let operatorSnapshot;
     if (['admin', 'operator'].includes(user.role)) {
-      operatorSnapshot = await getOperatorDashboardService().build({ user, now: referenceDate });
+      operatorSnapshot = await getOperatorDashboardService().build({ user, now });
     }
+
+    const learnerSnapshot =
+      buildLearnerDashboard({
+        user,
+        now,
+        enrollments: learnerData.enrollments,
+        courses: learnerData.courses,
+        courseProgress: learnerData.courseProgress,
+        tutorBookings: learnerData.tutorBookings,
+        liveClassrooms: learnerData.liveClassrooms,
+        ebookProgress: learnerData.ebookProgress,
+        ebooks: learnerData.ebooks,
+        communityMemberships,
+        communitySubscriptions: learnerData.communitySubscriptions,
+        paywallTiersByCommunity: learnerData.paywallTiersByCommunity,
+        communityEventsById: learnerData.communityEventsById
+      }) ?? undefined;
+
+    const communitySnapshot =
+      managedCommunities.length
+        ? buildCommunityDashboard({
+            communities: managedCommunities,
+            runbooksByCommunity: communityRunbooksByCommunity,
+            eventsByCommunity: communityEventsByCommunity,
+            subscriptionsByCommunity: communitySubscriptionsByCommunity,
+            paywallTiersByCommunity: communityPaywallTiersByCommunity,
+            moderationCounts: communityModerationCounts,
+            moderatorsByCommunity: communityModeratorsByCommunity,
+            now
+          }) ?? undefined
+        : undefined;
 
     const dashboards = {};
     const searchIndex = [];
     if (instructorSnapshot) {
       dashboards.instructor = instructorSnapshot.dashboard;
       searchIndex.push(...instructorSnapshot.searchIndex);
+    }
+    if (communitySnapshot) {
+      dashboards.community = communitySnapshot.dashboard;
+      searchIndex.push(...communitySnapshot.searchIndex);
+    }
+    if (learnerSnapshot) {
+      dashboards.learner = learnerSnapshot.dashboard;
+      searchIndex.push(...learnerSnapshot.searchIndex);
     }
     if (operatorSnapshot) {
       dashboards.admin = operatorSnapshot.dashboard;
@@ -1541,15 +2697,29 @@ export default class DashboardService {
     if (instructorSnapshot) {
       roles.push({ id: 'instructor', label: 'Instructor' });
     }
+    if (communitySnapshot) {
+      roles.push({ id: 'community', label: 'Community' });
+    }
+    if (learnerSnapshot) {
+      roles.push({ id: 'learner', label: 'Learner' });
+    }
     if (user.role && !roles.some((role) => role.id === user.role)) {
       roles.push({ id: user.role, label: user.role.charAt(0).toUpperCase() + user.role.slice(1) });
     }
 
     const profileStats = [
+      ...(learnerSnapshot?.profileStats ?? []),
+      ...(communitySnapshot?.profileStats ?? []),
       ...(instructorSnapshot?.profileStats ?? []),
       ...(operatorSnapshot?.profileStats ?? [])
     ];
     const profileBioSegments = [];
+    if (learnerSnapshot?.profileBio) {
+      profileBioSegments.push(learnerSnapshot.profileBio);
+    }
+    if (communitySnapshot?.profileBio) {
+      profileBioSegments.push(communitySnapshot.profileBio);
+    }
     if (instructorSnapshot?.profileBio) {
       profileBioSegments.push(instructorSnapshot.profileBio);
     }
@@ -1563,7 +2733,12 @@ export default class DashboardService {
       name: resolveName(user.firstName, user.lastName, user.email),
       email: user.email,
       avatar: buildAvatarUrl(user.email),
-      title: instructorSnapshot?.profileTitleSegment ?? operatorSnapshot?.profileTitleSegment ?? null,
+      title:
+        learnerSnapshot?.profileTitleSegment ??
+        communitySnapshot?.profileTitleSegment ??
+        instructorSnapshot?.profileTitleSegment ??
+        operatorSnapshot?.profileTitleSegment ??
+        null,
       bio: profileBio,
       stats: profileStats,
       feedHighlights: []
