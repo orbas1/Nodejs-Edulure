@@ -17,6 +17,7 @@ describe('DomainEventDispatcherService', () => {
   let eventModel;
   let webhookBus;
   let service;
+  let deadLetterModel;
 
   beforeEach(() => {
     metricsRegistry.resetMetrics?.();
@@ -31,6 +32,11 @@ describe('DomainEventDispatcherService', () => {
 
     eventModel = {
       findById: vi.fn()
+    };
+
+    deadLetterModel = {
+      record: vi.fn().mockResolvedValue(),
+      count: vi.fn().mockResolvedValue(0)
     };
 
     webhookBus = {
@@ -53,6 +59,7 @@ describe('DomainEventDispatcherService', () => {
       },
       dispatchModel,
       eventModel,
+      deadLetterModel,
       webhookBus,
       loggerInstance: createLogger()
     });
@@ -74,6 +81,7 @@ describe('DomainEventDispatcherService', () => {
 
     await service.processDispatch(dispatch);
 
+    expect(deadLetterModel.record).not.toHaveBeenCalled();
     expect(webhookBus.publish).toHaveBeenCalledWith('user.registered', { userId: 7 }, {
       source: 'domain-events',
       correlationId: 'domain-event-42',
@@ -86,6 +94,41 @@ describe('DomainEventDispatcherService', () => {
       })
     );
     expect(dispatchModel.markFailed).not.toHaveBeenCalled();
+  });
+
+  it('records terminal failures in the dead-letter table', async () => {
+    const dispatch = { id: 4, eventId: 101, attemptCount: 2 };
+    const event = {
+      id: 101,
+      eventType: 'billing.payout.failed',
+      payload: { payoutId: 'po_123' },
+      entityType: 'payout',
+      entityId: 'po_123',
+      performedBy: 9
+    };
+
+    const error = new Error('provider rejected payload');
+    error.code = 'HTTP_410';
+
+    eventModel.findById.mockResolvedValue(event);
+    webhookBus.publish.mockRejectedValue(error);
+
+    await service.processDispatch(dispatch);
+
+    expect(dispatchModel.markFailed).toHaveBeenCalledWith(
+      4,
+      expect.objectContaining({ terminal: true })
+    );
+    expect(deadLetterModel.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dispatchId: 4,
+        eventId: 101,
+        eventType: 'billing.payout.failed',
+        attemptCount: 3,
+        failureReason: 'HTTP_410',
+        failureMessage: 'provider rejected payload'
+      })
+    );
   });
 
   it('marks dispatch as retry when publish fails', async () => {
@@ -103,6 +146,7 @@ describe('DomainEventDispatcherService', () => {
 
     await service.processDispatch(dispatch);
 
+    expect(deadLetterModel.record).not.toHaveBeenCalled();
     expect(dispatchModel.markDelivered).not.toHaveBeenCalled();
     expect(dispatchModel.markFailed).toHaveBeenCalledWith(
       2,
