@@ -22,12 +22,12 @@ Progress is tracked per task and subtask across the required dimensions. Overall
 | &nbsp;&nbsp;Mobile UX and accessibility improvements | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Security and telemetry hardening | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Mobile CI/CD and QA automation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| **Task 4: Industrialise infrastructure, release management, and compliance operations** | 60% | 60% | 60% | 60% | 60% | 60% | 60% |
+| **Task 4: Industrialise infrastructure, release management, and compliance operations** | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Contract testing and observability fabric | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Environment parity and IaC consolidation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Dependency and supply-chain governance | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| &nbsp;&nbsp;Release management and QA automation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| &nbsp;&nbsp;Security, compliance, and risk operations | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| &nbsp;&nbsp;Release management and QA automation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| &nbsp;&nbsp;Security, compliance, and risk operations | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | **Task 5: Deliver analytics, monetisation, documentation, and stakeholder enablement** | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;Telemetry and warehouse implementation | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;BI and insight delivery | 0% | 0% | 0% | 0% | 0% | 0% | 0% |

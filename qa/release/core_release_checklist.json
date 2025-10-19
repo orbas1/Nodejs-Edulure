@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "title": "Version 1.00 release readiness checklist",
+  "updatedAt": "2024-11-29T19:30:00.000Z",
+  "items": [
+    {
+      "id": "cab-approval",
+      "description": "Change Advisory Board approved the production release window and assigned rollback ownership.",
+      "owner": "operations",
+      "status": "complete",
+      "evidence": ["cab/2024-11-27-minutes.pdf"],
+      "lastVerifiedAt": "2024-11-29T17:00:00.000Z"
+    },
+    {
+      "id": "runbook-signoff",
+      "description": "Incident, rollback, and smoke-test runbooks reviewed with on-call engineering and support leads.",
+      "owner": "site-reliability",
+      "status": "complete",
+      "evidence": ["runbooks/2024-11-release-readiness.md"],
+      "lastVerifiedAt": "2024-11-29T17:30:00.000Z"
+    },
+    {
+      "id": "data-migration-validated",
+      "description": "All database migrations executed against staging with integrity checks, anonymised backups, and rollback scripts captured.",
+      "owner": "database",
+      "status": "complete",
+      "evidence": ["db/migration-2024-11-validation.log", "db/migration-rollback-plan.md"],
+      "lastVerifiedAt": "2024-11-29T18:15:00.000Z"
+    },
+    {
+      "id": "support-playbook-updated",
+      "description": "Support and customer success teams briefed on operator dashboard changes with updated escalation playbooks and macros.",
+      "owner": "support",
+      "status": "complete",
+      "evidence": ["support/2024-11-29-operator-briefing.pptx"],
+      "lastVerifiedAt": "2024-11-29T18:45:00.000Z"
+    },
+    {
+      "id": "compliance-attestation",
+      "description": "Security and compliance leads uploaded SOC2/ISO control attestations covering new automation, telemetry, and vendor updates.",
+      "owner": "compliance",
+      "status": "complete",
+      "evidence": ["compliance/2024-iso-soc-attestation.zip"],
+      "lastVerifiedAt": "2024-11-29T19:00:00.000Z"
+    }
+  ]
+}

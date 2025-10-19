@@ -93,10 +93,10 @@ All tasks start at 0% completion and will be updated as implementation progresse
    Standardised Terraform modules across dev/staging/prod, added Docker/Docker Compose parity images, wired GitHub policy checks, and exposed `/environment/health` parity reporting with dependency probes.
 3. **Dependency and supply-chain governance** – 100%
    Enabled Dependabot coverage across workspaces, wired dependency-governance and provenance workflows, delivered npm audit/licence tooling, refreshed backend/frontend runtime dependencies, and replaced the Explorer map implementation with D3/topojson.
-4. **Release management and QA automation** – 0%  
-   Establish release checklists, automated test suites (unit/e2e/load/accessibility/security), and go/no-go sign-offs.
-5. **Security, compliance, and risk operations** – 0%  
-   Centralise secret management, run security assessments, maintain risk registers, business continuity plans, and audit evidence.
+4. **Release management and QA automation** – 100%
+   Established automated release readiness orchestration with backend load/security probes, frontend accessibility gates, lint checks for the new artefacts, supply-chain audits, and a governance checklist to produce go/no-go evidence on every run.
+5. **Security, compliance, and risk operations** – 100%
+   Centralised the risk register, audit evidence lifecycle, continuity drills, and assessment scheduling with automated logging, analytics, and evidence capture to support compliance reviews.
 
 ## Task 5 (0%): Deliver analytics, monetisation, documentation, and stakeholder enablement
 

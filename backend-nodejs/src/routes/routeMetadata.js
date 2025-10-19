@@ -108,6 +108,18 @@ export const apiRouteMetadata = [
     disabledMessage: 'Compliance endpoints are restricted in this environment.'
   },
   {
+    name: 'security',
+    capability: 'security-compliance-operations',
+    description:
+      'Risk register, audit evidence, continuity planning, and security assessment governance endpoints.',
+    basePath: '/security',
+    flagKey: 'platform.api.v1.security',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Security operations APIs are restricted to compliance administrators.'
+  },
+  {
     name: 'chat',
     capability: 'realtime-chat',
     description: 'Realtime chat messaging, channel presence, and DM APIs.',

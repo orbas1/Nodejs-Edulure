@@ -23,6 +23,7 @@ import userRoutes from './user.routes.js';
 import verificationRoutes from './verification.routes.js';
 import observabilityRoutes from './observability.routes.js';
 import environmentParityRoutes from './environmentParity.routes.js';
+import securityRoutes from './security.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 
 const routerMap = {
@@ -36,6 +37,7 @@ const routerMap = {
   payments: paymentRoutes,
   'integration-invites': integrationInviteRoutes,
   compliance: complianceRoutes,
+  security: securityRoutes,
   chat: chatRoutes,
   social: socialRoutes,
   feed: feedRoutes,

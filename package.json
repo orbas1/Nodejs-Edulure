@@ -19,6 +19,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "release:readiness": "node ./scripts/release/run-readiness.mjs",
     "audit": "node ./scripts/security/run-npm-audit.mjs",
     "audit:ci": "node ./scripts/security/run-npm-audit.mjs --workspace backend-nodejs && node ./scripts/security/run-npm-audit.mjs --workspace frontend-reactjs && npm --workspace sdk-typescript run audit:dependencies",
     "license:report": "node ./scripts/security/generate-license-report.mjs"
