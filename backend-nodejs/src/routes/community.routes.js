@@ -27,6 +27,24 @@ router.put('/:communityId/resources/:resourceId', auth(), CommunityController.up
 router.delete('/:communityId/resources/:resourceId', auth(), CommunityController.deleteResource);
 
 router.get('/:communityId/chat/channels', auth(), CommunityChatController.listChannels);
+router.post('/:communityId/chat/channels', auth(), CommunityChatController.createChannel);
+router.put('/:communityId/chat/channels/:channelId', auth(), CommunityChatController.updateChannel);
+router.delete('/:communityId/chat/channels/:channelId', auth(), CommunityChatController.deleteChannel);
+router.get(
+  '/:communityId/chat/channels/:channelId/members',
+  auth(),
+  CommunityChatController.listChannelMembers
+);
+router.post(
+  '/:communityId/chat/channels/:channelId/members',
+  auth(),
+  CommunityChatController.upsertChannelMember
+);
+router.delete(
+  '/:communityId/chat/channels/:channelId/members/:userId',
+  auth(),
+  CommunityChatController.removeChannelMember
+);
 router.get(
   '/:communityId/chat/channels/:channelId/messages',
   auth(),

@@ -63,6 +63,8 @@ import CommunityProgramming from './pages/dashboard/community/CommunityProgrammi
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
 import CommunitySafety from './pages/dashboard/community/CommunitySafety.jsx';
 import CommunityCommunications from './pages/dashboard/community/CommunityCommunications.jsx';
+import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
+import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
 
 function App() {
   return (
@@ -146,8 +148,10 @@ function App() {
       >
         <Route index element={<DashboardHome />} />
         <Route path="communities" element={<LearnerCommunities />} />
+        <Route path="community-chats" element={<LearnerCommunityChats />} />
         <Route path="courses" element={<LearnerCourses />} />
         <Route path="courses/:courseId" element={<CourseViewer />} />
+        <Route path="social" element={<LearnerSocial />} />
         <Route path="assessments" element={<DashboardAssessments />} />
         <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
         <Route path="calendar" element={<DashboardCalendar />} />

@@ -9,6 +9,7 @@ import {
   BookOpenIcon,
   BriefcaseIcon,
   CalendarDaysIcon,
+  ChatBubbleLeftEllipsisIcon,
   ChartBarIcon,
   ChatBubbleBottomCenterTextIcon,
   ChevronRightIcon,
@@ -59,7 +60,9 @@ const navigationByRole = {
       name: 'Social',
       icon: UserGroupIcon,
       children: [
+        { id: 'learner-social-graph', name: 'Social graph', to: `${basePath}/social`, icon: UserPlusIcon },
         { id: 'learner-communities', name: 'Communities', to: `${basePath}/communities`, icon: UserGroupIcon },
+        { id: 'learner-community-chats', name: 'Community chat', to: `${basePath}/community-chats`, icon: ChatBubbleLeftEllipsisIcon },
         { id: 'learner-inbox', name: 'Inbox', to: `${basePath}/inbox`, icon: InboxStackIcon }
       ]
     },

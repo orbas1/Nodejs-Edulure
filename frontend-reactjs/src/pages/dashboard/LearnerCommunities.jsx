@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import DashboardSectionHeader from '../../components/dashboard/DashboardSectionHeader.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
@@ -10,6 +11,7 @@ export default function LearnerCommunities() {
   const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('communities');
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const navigate = useNavigate();
 
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
@@ -112,6 +114,13 @@ export default function LearnerCommunities() {
         description="Track the health of every initiative, keep moderators aligned, and ship new programmes with confidence."
         actions={
           <>
+            <button
+              type="button"
+              className="dashboard-pill px-4 py-2"
+              onClick={() => navigate('../community-chats')}
+            >
+              Open chat command center
+            </button>
             <button
               type="button"
               className="dashboard-pill px-4 py-2"

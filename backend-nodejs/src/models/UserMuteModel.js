@@ -71,4 +71,11 @@ export default class UserMuteModel {
       .select('muted_user_id');
     return rows.map((row) => row.muted_user_id);
   }
+
+  static async listForUser(actorId, connection = db) {
+    const rows = await connection('user_mute_list')
+      .where({ user_id: actorId })
+      .orderBy('created_at', 'desc');
+    return rows.map((row) => mapRecord(row));
+  }
 }

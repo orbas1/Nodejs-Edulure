@@ -80,6 +80,43 @@ export async function fetchFollowRecommendations({ token, limit, signal } = {}) 
   });
 }
 
+export async function fetchSocialMutes({ token, signal } = {}) {
+  return httpClient.get('/social/mutes', {
+    token,
+    signal,
+    cache: { tags: ['social:mutes'], ttl: 5_000 }
+  });
+}
+
+export async function fetchSocialBlocks({ token, signal } = {}) {
+  return httpClient.get('/social/blocks', {
+    token,
+    signal,
+    cache: { tags: ['social:blocks'], ttl: 5_000 }
+  });
+}
+
+export async function fetchSocialPrivacy({ token, signal } = {}) {
+  return httpClient.get('/social/privacy', {
+    token,
+    signal,
+    cache: { tags: ['social:privacy'], ttl: 10_000 }
+  });
+}
+
+export async function updateSocialPrivacy({ token, payload, signal } = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to update privacy');
+  }
+
+  return httpClient.put('/social/privacy', payload ?? {}, {
+    token,
+    signal,
+    cache: { enabled: false },
+    invalidateTags: ['social:privacy']
+  });
+}
+
 export async function followUser({ token, userId, payload = {}, signal } = {}) {
   if (!userId) {
     throw new Error('A target user identifier is required to follow');
@@ -118,6 +155,58 @@ export async function unfollowUser({ token, userId, signal } = {}) {
       followingTag('me', 'accepted'),
       recommendationsTag('me')
     ]
+  });
+}
+
+export async function muteUser({ token, userId, payload, signal } = {}) {
+  if (!userId) {
+    throw new Error('A target user identifier is required to mute');
+  }
+
+  return httpClient.post(`/social/mutes/${userId}`, payload ?? {}, {
+    token,
+    signal,
+    cache: { enabled: false },
+    invalidateTags: ['social:mutes']
+  });
+}
+
+export async function unmuteUser({ token, userId, signal } = {}) {
+  if (!userId) {
+    throw new Error('A target user identifier is required to unmute');
+  }
+
+  return httpClient.delete(`/social/mutes/${userId}`, {
+    token,
+    signal,
+    cache: { enabled: false },
+    invalidateTags: ['social:mutes']
+  });
+}
+
+export async function blockUser({ token, userId, payload, signal } = {}) {
+  if (!userId) {
+    throw new Error('A target user identifier is required to block');
+  }
+
+  return httpClient.post(`/social/blocks/${userId}`, payload ?? {}, {
+    token,
+    signal,
+    cache: { enabled: false },
+    invalidateTags: ['social:blocks', followersTag(userId, 'accepted'), followingTag('me', 'accepted')]
+  });
+}
+
+export async function unblockUser({ token, userId, signal } = {}) {
+  if (!userId) {
+    throw new Error('A target user identifier is required to unblock');
+  }
+
+  return httpClient.delete(`/social/blocks/${userId}`, {
+    token,
+    signal,
+    cache: { enabled: false },
+    invalidateTags: ['social:blocks']
   });
 }
 

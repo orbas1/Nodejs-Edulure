@@ -70,6 +70,13 @@ export default class UserBlockModel {
     return rows.map((row) => row.blocked_user_id);
   }
 
+  static async listForUser(actorId, connection = db) {
+    const rows = await connection('user_block_list')
+      .where({ user_id: actorId })
+      .orderBy('blocked_at', 'desc');
+    return rows.map((row) => mapRecord(row));
+  }
+
   static async listBlockersFor(userId, connection = db) {
     const rows = await connection('user_block_list')
       .where({ blocked_user_id: userId })

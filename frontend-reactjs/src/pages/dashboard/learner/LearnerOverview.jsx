@@ -11,6 +11,7 @@ import LearnerProfileSection from './sections/LearnerProfileSection.jsx';
 import LearnerSafetySection from './sections/LearnerSafetySection.jsx';
 import LearnerUpcomingSection from './sections/LearnerUpcomingSection.jsx';
 import LearnerBlogSection from './sections/LearnerBlogSection.jsx';
+import LearnerProfileEditor from './sections/LearnerProfileEditor.jsx';
 
 function normaliseMetrics(metrics) {
   if (!Array.isArray(metrics)) return [];
@@ -142,6 +143,8 @@ export default function LearnerOverview({ dashboard, profile, onRefresh }) {
           <LearnerCommunityEngagementSection communities={communityEngagement} />
         </div>
       </section>
+
+      <LearnerProfileEditor onProfileUpdated={onRefresh} />
 
       <VerificationStatusCard verification={profile?.verification ?? null} onRefresh={onRefresh} />
 

@@ -617,11 +617,14 @@ export function buildLearnerDashboard({
 
     return {
       id: community.id ? `community-${community.id}` : crypto.randomUUID(),
+      communityId: community.id ?? null,
+      slug: community.slug ?? null,
       name: community.name ?? `Community ${community.id}`,
       members: `${coercePositiveInteger(community.stats?.members ?? community.stats?.memberCount ?? 0)} members`,
       moderators: coercePositiveInteger(community.stats?.moderators ?? 0),
       health: community.stats?.lastActivityAt ? 'Healthy' : 'New',
       initiatives,
+      role: community.membership?.role ?? null,
       metadata: { lastActivityAt: community.stats?.lastActivityAt }
     };
   });
