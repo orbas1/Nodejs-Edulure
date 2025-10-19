@@ -14,6 +14,7 @@ import {
 import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import FeedCard from '../components/FeedCard.jsx';
+import CommunityInteractiveSuite from '../components/community/CommunityInteractiveSuite.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 
@@ -509,6 +510,97 @@ export default function Communities() {
     return total > resources.length;
   }, [resourcesMeta.total, resources.length]);
 
+  const liveSessions = resolvedDetail.classrooms.live ?? [];
+  const recordedSessions = resolvedDetail.classrooms.recorded ?? [];
+  const liveStage = resolvedDetail.classrooms.liveClassroom ?? null;
+  const leaderboardEntries = resolvedDetail.leaderboard ?? [];
+  const communityEvents = communityDetail?.events ?? [];
+  const communityPodcasts = communityDetail?.podcasts ?? [];
+
+  const interactiveSeeds = useMemo(() => {
+    const safeFeed = Array.isArray(feedItems) ? feedItems : [];
+    const safeLive = Array.isArray(liveSessions) ? liveSessions : [];
+    const safeRecorded = Array.isArray(recordedSessions) ? recordedSessions : [];
+    const stageHost = liveStage?.host ?? 'Community stage';
+
+    const calendarSeed = safeLive.map((session) => {
+      const start = session.startsAt ?? '';
+      let end = '';
+      if (start && Number.isFinite(session.durationMinutes)) {
+        const startDate = new Date(start);
+        if (!Number.isNaN(startDate.getTime())) {
+          end = new Date(startDate.getTime() + session.durationMinutes * 60000).toISOString();
+        }
+      }
+
+      return {
+        id: `calendar-${session.id}`,
+        title: session.title,
+        category: 'Classroom',
+        startsAt: start,
+        endsAt: end,
+        location: stageHost,
+        owner: session.facilitator,
+        description: `Live classroom facilitated by ${session.facilitator}`
+      };
+    });
+
+    const livestreamSeed = [];
+    if (liveStage?.streamUrl) {
+      livestreamSeed.push({
+        id: `stage-${liveStage.streamUrl}`,
+        title: stageHost,
+        host: stageHost,
+        startsAt: safeLive[0]?.startsAt ?? '',
+        streamUrl: liveStage.streamUrl,
+        status: liveStage.status ?? 'Standby'
+      });
+    }
+
+    safeLive.forEach((session) => {
+      livestreamSeed.push({
+        id: `stream-${session.id}`,
+        title: `${session.title} broadcast`,
+        host: session.facilitator,
+        startsAt: session.startsAt ?? '',
+        streamUrl: liveStage?.streamUrl ?? '#',
+        status: session.status ?? 'Scheduled'
+      });
+    });
+
+    const eventsSeed = Array.isArray(communityEvents)
+      ? communityEvents.map((event, index) => ({
+          id: event.id ?? `event-${index}`,
+          title: event.title ?? 'Community event',
+          type: event.type ?? 'Campaign',
+          startsAt: event.startsAt ?? event.startDate ?? '',
+          endsAt: event.endsAt ?? event.endDate ?? '',
+          location: event.location ?? '',
+          registrationUrl: event.registrationUrl ?? event.url ?? '',
+          description: event.description ?? ''
+        }))
+      : [];
+
+    return {
+      feed: safeFeed,
+      liveSessions: safeLive,
+      recordedSessions: safeRecorded,
+      calendar: calendarSeed,
+      livestreams: livestreamSeed,
+      podcasts: Array.isArray(communityPodcasts) ? communityPodcasts : [],
+      leaderboard: Array.isArray(leaderboardEntries) ? leaderboardEntries : [],
+      events: eventsSeed
+    };
+  }, [
+    feedItems,
+    liveSessions,
+    recordedSessions,
+    liveStage,
+    communityEvents,
+    communityPodcasts,
+    leaderboardEntries
+  ]);
+
   useEffect(() => {
     if (!resolvedDetail?.subscription?.plans) return;
     if (!selectedPlanId) {
@@ -992,6 +1084,19 @@ export default function Communities() {
                   </table>
                 </div>
               </div>
+
+              <CommunityInteractiveSuite
+                communityId={selectedCommunityId}
+                communityName={resolvedDetail.name}
+                initialFeed={interactiveSeeds.feed}
+                initialLiveClassrooms={interactiveSeeds.liveSessions}
+                initialRecordedClassrooms={interactiveSeeds.recordedSessions}
+                initialCalendar={interactiveSeeds.calendar}
+                initialLivestreams={interactiveSeeds.livestreams}
+                initialPodcasts={interactiveSeeds.podcasts}
+                initialLeaderboard={interactiveSeeds.leaderboard}
+                initialEvents={interactiveSeeds.events}
+              />
             </div>
 
             <aside className="space-y-6 lg:col-span-2">
