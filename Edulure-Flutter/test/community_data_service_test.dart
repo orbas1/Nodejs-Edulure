@@ -194,4 +194,85 @@ void main() {
     );
     expect(afterDelete.any((resource) => resource.id == updated.id), isFalse);
   });
+
+  test('event planner updates rituals and synchronises explorer catalog', () async {
+    final service = CommunityDataService.instance;
+    final community = (await service.fetchCommunities()).first;
+
+    final created = await service.addEvent(
+      community.id,
+      CommunityEventDraft(
+        title: 'Community AMA',
+        description: 'Live Q&A with product mentors and founding team.',
+        start: DateTime.now().add(const Duration(days: 3)),
+        end: DateTime.now().add(const Duration(days: 3, hours: 2)),
+        location: 'Virtual',
+        meetingUrl: 'https://meet.edulure.ai/ama',
+        coverImage: 'https://cdn.edulure.ai/events/ama.png',
+      ),
+    );
+
+    final updated = await service.updateEvent(
+      community.id,
+      created.id,
+      CommunityEventDraft(
+        title: 'Community AMA — Spotlight Edition',
+        description: 'Deep dive session with customer success stories and live coaching.',
+        start: created.start.add(const Duration(days: 2)),
+        end: created.end.add(const Duration(days: 2)),
+        location: 'Hybrid Hub · Lagos',
+        meetingUrl: 'https://meet.edulure.ai/ama-spotlight',
+        coverImage: 'https://cdn.edulure.ai/events/ama-spotlight.png',
+      ),
+    );
+
+    expect(updated.title, contains('Spotlight Edition'));
+    expect(updated.location, contains('Hybrid Hub'));
+    expect(updated.coverImage, endsWith('spotlight.png'));
+
+    final refreshedCommunity = (await service.fetchCommunities())
+        .firstWhere((entry) => entry.id == community.id);
+    final refreshedEvent = refreshedCommunity.events.firstWhere((event) => event.id == created.id);
+    expect(refreshedEvent.title, equals(updated.title));
+
+    final explorerResults = await service.searchExplorer(
+      const ExplorerQuery(query: 'AMA', entityTypes: <String>{'event'}, tags: <String>{}),
+    );
+    final explorerEvent = explorerResults.firstWhere((resource) => resource.id == 'event-${created.id}');
+    expect(explorerEvent.title, contains('Spotlight Edition'));
+    expect(explorerEvent.coverImage, endsWith('spotlight.png'));
+    expect(explorerEvent.link, equals('https://meet.edulure.ai/ama-spotlight'));
+  });
+
+  test('member editor can revise contributor profiles', () async {
+    final service = CommunityDataService.instance;
+    final community = (await service.fetchCommunities()).first;
+
+    final member = await service.addMember(
+      community.id,
+      const CommunityMemberDraft(
+        name: 'Jordan Lee',
+        role: 'Learning Designer',
+        avatarUrl: 'https://i.pravatar.cc/150?img=48',
+      ),
+    );
+
+    final updated = await service.updateMember(
+      community.id,
+      member.id,
+      const CommunityMemberDraft(
+        name: 'Jordan Lee',
+        role: 'Head of Learning Design',
+        avatarUrl: 'https://i.pravatar.cc/150?img=12',
+      ),
+    );
+
+    expect(updated.role, contains('Head of Learning Design'));
+    expect(updated.avatarUrl, contains('img=12'));
+
+    final refreshedCommunity = (await service.fetchCommunities())
+        .firstWhere((entry) => entry.id == community.id);
+    final refreshedMember = refreshedCommunity.members.firstWhere((item) => item.id == member.id);
+    expect(refreshedMember.role, equals(updated.role));
+  });
 }

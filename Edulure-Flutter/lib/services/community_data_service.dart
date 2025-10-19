@@ -207,6 +207,92 @@ class CommunityDataService {
     return event;
   }
 
+  Future<CommunityEvent> updateEvent(
+    String communityId,
+    String eventId,
+    CommunityEventDraft draft,
+  ) async {
+    await ensureInitialised();
+    final communityIndex = _communities.indexWhere((element) => element.id == communityId);
+    if (communityIndex == -1) throw Exception('Community not found');
+    final community = _communities[communityIndex];
+    final events = community.events;
+    final eventIndex = events.indexWhere((event) => event.id == eventId);
+    if (eventIndex == -1) throw Exception('Event not found');
+
+    final updatedEvent = events[eventIndex].copyWith(
+      title: draft.title,
+      description: draft.description,
+      start: draft.start,
+      end: draft.end,
+      location: draft.location,
+      coverImage: draft.coverImage,
+      meetingUrl: draft.meetingUrl,
+    );
+
+    final updatedCommunity = community.copyWith(
+      events: [
+        ...events.sublist(0, eventIndex),
+        updatedEvent,
+        ...events.sublist(eventIndex + 1),
+      ],
+    );
+
+    _communities = [
+      ..._communities.sublist(0, communityIndex),
+      updatedCommunity,
+      ..._communities.sublist(communityIndex + 1),
+    ];
+    await _persistCommunities();
+
+    final resourceId = 'event-$eventId';
+    final resourceIndex = _resources.indexWhere((resource) => resource.id == resourceId);
+    if (resourceIndex != -1) {
+      final existing = _resources[resourceIndex];
+      final updatedResource = existing.copyWith(
+        title: updatedEvent.title,
+        subtitle: updatedCommunity.name,
+        description: updatedEvent.description,
+        tags: [
+          ...{...updatedCommunity.tags, 'event'},
+        ],
+        updatedAt: updatedEvent.start,
+        coverImage: updatedEvent.coverImage,
+        communityId: updatedCommunity.id,
+        link: updatedEvent.meetingUrl,
+        owner: updatedCommunity.name,
+      );
+      _resources = [
+        ..._resources.sublist(0, resourceIndex),
+        updatedResource,
+        ..._resources.sublist(resourceIndex + 1),
+      ];
+      await _persistResources();
+    } else {
+      _resources = [
+        ExplorerResource(
+          id: resourceId,
+          entityType: 'event',
+          title: updatedEvent.title,
+          subtitle: updatedCommunity.name,
+          description: updatedEvent.description,
+          tags: [
+            ...{...updatedCommunity.tags, 'event'},
+          ],
+          updatedAt: updatedEvent.start,
+          coverImage: updatedEvent.coverImage,
+          communityId: updatedCommunity.id,
+          link: updatedEvent.meetingUrl,
+          owner: updatedCommunity.name,
+        ),
+        ..._resources,
+      ];
+      await _persistResources();
+    }
+
+    return updatedEvent;
+  }
+
   Future<void> removeEvent(String communityId, String eventId) async {
     await ensureInitialised();
     final index = _communities.indexWhere((element) => element.id == communityId);
@@ -248,6 +334,43 @@ class CommunityDataService {
     ];
     await _persistCommunities();
     return member;
+  }
+
+  Future<CommunityMember> updateMember(
+    String communityId,
+    String memberId,
+    CommunityMemberDraft draft,
+  ) async {
+    await ensureInitialised();
+    final communityIndex = _communities.indexWhere((element) => element.id == communityId);
+    if (communityIndex == -1) throw Exception('Community not found');
+    final community = _communities[communityIndex];
+    final members = community.members;
+    final memberIndex = members.indexWhere((member) => member.id == memberId);
+    if (memberIndex == -1) throw Exception('Member not found');
+
+    final updatedMember = members[memberIndex].copyWith(
+      name: draft.name,
+      role: draft.role,
+      avatarUrl: draft.avatarUrl,
+    );
+
+    final updatedCommunity = community.copyWith(
+      members: [
+        ...members.sublist(0, memberIndex),
+        updatedMember,
+        ...members.sublist(memberIndex + 1),
+      ],
+    );
+
+    _communities = [
+      ..._communities.sublist(0, communityIndex),
+      updatedCommunity,
+      ..._communities.sublist(communityIndex + 1),
+    ];
+
+    await _persistCommunities();
+    return updatedMember;
   }
 
   Future<void> removeMember(String communityId, String memberId) async {

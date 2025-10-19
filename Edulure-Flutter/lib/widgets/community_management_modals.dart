@@ -485,14 +485,19 @@ Future<void> showCommunityEventPlanner({
   required BuildContext context,
   required WidgetRef ref,
   required CommunityModel community,
+  CommunityEvent? editing,
   void Function(String message)? onMessage,
 }) async {
-  final titleController = TextEditingController();
-  final descriptionController = TextEditingController();
-  final locationController = TextEditingController(text: community.location ?? 'Virtual');
-  final linkController = TextEditingController();
-  DateTime start = DateTime.now().add(const Duration(days: 1));
-  DateTime end = start.add(const Duration(hours: 1));
+  final isEditing = editing != null;
+  final titleController = TextEditingController(text: editing?.title ?? '');
+  final descriptionController = TextEditingController(text: editing?.description ?? '');
+  final locationController = TextEditingController(
+    text: editing?.location ?? community.location ?? 'Virtual',
+  );
+  final linkController = TextEditingController(text: editing?.meetingUrl ?? '');
+  final coverController = TextEditingController(text: editing?.coverImage ?? '');
+  DateTime start = editing?.start ?? DateTime.now().add(const Duration(days: 1));
+  DateTime end = editing?.end ?? start.add(const Duration(hours: 1));
 
   Future<void> pickDate({required bool isStart, required StateSetter setModalState}) async {
     final initial = isStart ? start : end;
@@ -547,7 +552,9 @@ Future<void> showCommunityEventPlanner({
                   Row(
                     children: [
                       Text(
-                        'Schedule event for ${community.name}',
+                        isEditing
+                            ? 'Update ritual for ${community.name}'
+                            : 'Schedule event for ${community.name}',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const Spacer(),
@@ -612,11 +619,19 @@ Future<void> showCommunityEventPlanner({
                       border: OutlineInputBorder(),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: coverController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cover image URL (optional)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      icon: const Icon(Icons.event_available_outlined),
+                      icon: Icon(isEditing ? Icons.event_note : Icons.event_available_outlined),
                       onPressed: () async {
                         if (titleController.text.trim().isEmpty) {
                           onMessage?.call('Give the event a clear title.');
@@ -631,14 +646,22 @@ Future<void> showCommunityEventPlanner({
                               ? 'Virtual'
                               : locationController.text.trim(),
                           meetingUrl: linkController.text.trim().isEmpty ? null : linkController.text.trim(),
+                          coverImage: coverController.text.trim().isEmpty ? null : coverController.text.trim(),
                         );
-                        await ref.read(communityDirectoryControllerProvider.notifier).addEvent(community.id, draft);
-                        onMessage?.call('Event scheduled for ${community.name}.');
+                        if (isEditing) {
+                          await ref
+                              .read(communityDirectoryControllerProvider.notifier)
+                              .updateEvent(community.id, editing!.id, draft);
+                          onMessage?.call('Event updated for ${community.name}.');
+                        } else {
+                          await ref.read(communityDirectoryControllerProvider.notifier).addEvent(community.id, draft);
+                          onMessage?.call('Event scheduled for ${community.name}.');
+                        }
                         if (Navigator.of(context).canPop()) Navigator.of(context).pop();
                       },
-                      label: const Text('Schedule event'),
+                      label: Text(isEditing ? 'Save changes' : 'Schedule event'),
                     ),
-                  )
+                  ),
                 ],
               ),
             );
@@ -648,21 +671,28 @@ Future<void> showCommunityEventPlanner({
     },
   );
 }
-
 Future<void> showCommunityMemberInvite({
   required BuildContext context,
   required WidgetRef ref,
   required CommunityModel community,
+  CommunityMember? editing,
   void Function(String message)? onMessage,
 }) async {
-  final nameController = TextEditingController();
-  final roleController = TextEditingController(text: 'Contributor');
-  final avatarController = TextEditingController(text: 'https://i.pravatar.cc/150?img=11');
+  final isEditing = editing != null;
+  final nameController = TextEditingController(text: editing?.name ?? '');
+  final roleController = TextEditingController(text: editing?.role ?? 'Contributor');
+  final avatarController = TextEditingController(
+    text: editing?.avatarUrl ?? 'https://i.pravatar.cc/150?img=11',
+  );
   await showDialog<void>(
     context: context,
     builder: (context) {
       return AlertDialog(
-        title: Text('Invite member to ${community.name}'),
+        title: Text(
+          isEditing
+              ? 'Update member profile'
+              : 'Invite member to ${community.name}',
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -673,7 +703,7 @@ Future<void> showCommunityMemberInvite({
             const SizedBox(height: 12),
             TextField(
               controller: roleController,
-              decoration: const InputDecoration(labelText: 'Role'),
+              decoration: const InputDecoration(labelText: 'Role or headline'),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -690,21 +720,36 @@ Future<void> showCommunityMemberInvite({
           FilledButton(
             onPressed: () async {
               if (nameController.text.trim().isEmpty) {
-                onMessage?.call('Add their name to send an invite.');
+                onMessage?.call(isEditing
+                    ? 'Member name is required to update their profile.'
+                    : 'Add their name to send an invite.');
                 return;
               }
               final draft = CommunityMemberDraft(
                 name: nameController.text.trim(),
-                role: roleController.text.trim().isEmpty ? 'Contributor' : roleController.text.trim(),
+                role: roleController.text.trim().isEmpty
+                    ? 'Contributor'
+                    : roleController.text.trim(),
                 avatarUrl: avatarController.text.trim().isEmpty
                     ? 'https://i.pravatar.cc/150?img=35'
                     : avatarController.text.trim(),
               );
-              await ref.read(communityDirectoryControllerProvider.notifier).addMember(community.id, draft);
-              onMessage?.call('Invitation queued for ${draft.name}.');
-              if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+              if (isEditing) {
+                await ref
+                    .read(communityDirectoryControllerProvider.notifier)
+                    .updateMember(community.id, editing!.id, draft);
+                onMessage?.call('Member details refreshed.');
+              } else {
+                await ref
+                    .read(communityDirectoryControllerProvider.notifier)
+                    .addMember(community.id, draft);
+                onMessage?.call('Invitation queued for ${draft.name}.');
+              }
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              }
             },
-            child: const Text('Send invite'),
+            child: Text(isEditing ? 'Save member' : 'Send invite'),
           )
         ],
       );

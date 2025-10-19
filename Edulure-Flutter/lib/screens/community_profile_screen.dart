@@ -339,19 +339,51 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
         final event = events[index];
         return Card(
           child: ListTile(
-            leading: const Icon(Icons.calendar_today_outlined),
+            leading: event.coverImage != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.network(
+                      event.coverImage!,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(Icons.event_available_outlined);
+                      },
+                    ),
+                  )
+                : const Icon(Icons.calendar_today_outlined),
             title: Text(event.title),
             subtitle: Text(
               '${DateFormat.yMMMd().add_jm().format(event.start)} · ${event.location}',
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () async {
-                await ref
-                    .read(communityDirectoryControllerProvider.notifier)
-                    .removeEvent(community.id, event.id);
-                _showSnack('Event removed');
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) async {
+                switch (value) {
+                  case 'edit':
+                    await showCommunityEventPlanner(
+                      context: context,
+                      ref: ref,
+                      community: community,
+                      editing: event,
+                      onMessage: _showSnack,
+                    );
+                    break;
+                  case 'delete':
+                    await ref
+                        .read(communityDirectoryControllerProvider.notifier)
+                        .removeEvent(community.id, event.id);
+                    _showSnack('Event removed');
+                    break;
+                }
               },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit details')),
+                PopupMenuItem(
+                  value: 'delete',
+                  child: Text('Delete event'),
+                ),
+              ],
             ),
           ),
         );
@@ -385,14 +417,30 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
             leading: CircleAvatar(backgroundImage: NetworkImage(member.avatarUrl)),
             title: Text(member.name),
             subtitle: Text('${member.role} · Joined ${DateFormat.yMMMd().format(member.joinedAt)}'),
-            trailing: IconButton(
-              icon: const Icon(Icons.remove_circle_outline),
-              onPressed: () async {
-                await ref
-                    .read(communityDirectoryControllerProvider.notifier)
-                    .removeMember(community.id, member.id);
-                _showSnack('${member.name} removed');
+            trailing: PopupMenuButton<String>(
+              onSelected: (value) async {
+                switch (value) {
+                  case 'edit':
+                    await showCommunityMemberInvite(
+                      context: context,
+                      ref: ref,
+                      community: community,
+                      editing: member,
+                      onMessage: _showSnack,
+                    );
+                    break;
+                  case 'remove':
+                    await ref
+                        .read(communityDirectoryControllerProvider.notifier)
+                        .removeMember(community.id, member.id);
+                    _showSnack('${member.name} removed');
+                    break;
+                }
               },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit member')),
+                PopupMenuItem(value: 'remove', child: Text('Remove from community')),
+              ],
             ),
           ),
         );

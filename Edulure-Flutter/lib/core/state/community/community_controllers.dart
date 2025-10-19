@@ -226,6 +226,17 @@ class CommunityDirectoryController extends AsyncNotifier<List<CommunityModel>> {
     return event;
   }
 
+  Future<CommunityEvent> updateEvent(
+    String communityId,
+    String eventId,
+    CommunityEventDraft draft,
+  ) async {
+    final service = ref.read(communityDataServiceProvider);
+    final event = await service.updateEvent(communityId, eventId, draft);
+    await refreshDirectory();
+    return event;
+  }
+
   Future<void> removeEvent(String communityId, String eventId) async {
     final service = ref.read(communityDataServiceProvider);
     await service.removeEvent(communityId, eventId);
@@ -235,6 +246,17 @@ class CommunityDirectoryController extends AsyncNotifier<List<CommunityModel>> {
   Future<CommunityMember> addMember(String id, CommunityMemberDraft draft) async {
     final service = ref.read(communityDataServiceProvider);
     final member = await service.addMember(id, draft);
+    await refreshDirectory();
+    return member;
+  }
+
+  Future<CommunityMember> updateMember(
+    String communityId,
+    String memberId,
+    CommunityMemberDraft draft,
+  ) async {
+    final service = ref.read(communityDataServiceProvider);
+    final member = await service.updateMember(communityId, memberId, draft);
     await refreshDirectory();
     return member;
   }
