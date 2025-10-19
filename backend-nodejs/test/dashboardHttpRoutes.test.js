@@ -114,6 +114,7 @@ describe('Dashboard HTTP routes', () => {
     expect(response.body.success).toBe(true);
     expect(dashboardServiceMock.getDashboardForUser).toHaveBeenCalledWith(42);
     expect(response.body.data.profile.id).toBe(42);
+    expect(response.body.data.dashboards.learner.metrics).toBeDefined();
     expect(response.body.data.roles).toContainEqual({ id: 'community', label: 'Community' });
     expect(response.body.data.roles).toContainEqual({ id: 'instructor', label: 'Instructor' });
     expect(response.body.data.dashboards.community.metrics[0].label).toBe('Active members');

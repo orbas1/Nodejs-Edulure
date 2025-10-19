@@ -200,6 +200,976 @@ export function buildLearningPace(completions = [], referenceDate = new Date()) 
   }));
 }
 
+function formatTimeSpent(seconds) {
+  const totalSeconds = Number(seconds ?? 0);
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) {
+    return '0m';
+  }
+  const totalMinutes = Math.round(totalSeconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours && minutes) return `${hours}h ${minutes}m`;
+  if (hours) return `${hours}h`;
+  return `${minutes}m`;
+}
+
+function normaliseDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+function formatRelativeDay(target, now = new Date()) {
+  const date = normaliseDate(target);
+  if (!date) return null;
+  const diffDays = Math.round((date.getTime() - now.getTime()) / DAY_IN_MS);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays === -1) return 'Yesterday';
+  if (diffDays > 1) return `In ${diffDays} days`;
+  return `${Math.abs(diffDays)} days ago`;
+}
+
+function parseTagsList(tags) {
+  const parsed = safeJsonParse(tags, []);
+  if (Array.isArray(parsed)) {
+    return parsed.map((tag) => String(tag));
+  }
+  if (typeof tags === 'string') {
+    return tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function summariseReactions(summary) {
+  if (!summary) return 0;
+  if (typeof summary === 'number') return summary;
+  const parsed = safeJsonParse(summary, {});
+  if (typeof parsed.total === 'number') return parsed.total;
+  return Object.values(parsed).reduce((total, value) => (typeof value === 'number' ? total + value : total), 0);
+}
+
+function coercePositiveInteger(value) {
+  const numeric = Number(value ?? 0);
+  return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : 0;
+}
+
+export function buildLearnerDashboard({
+  user,
+  now = new Date(),
+  enrollments = [],
+  courses = [],
+  courseProgress = [],
+  tutorBookings = [],
+  tutorAvailability = [],
+  liveClassrooms = [],
+  ebookProgress = [],
+  ebooks = new Map(),
+  invoices = [],
+  communityMemberships = [],
+  communityEvents = [],
+  communityPipelines = [],
+  communitySubscriptions = [],
+  followerSummary = {},
+  privacySettings = null,
+  messagingSummary = null,
+  notifications = []
+} = {}) {
+  const hasSignals =
+    enrollments.length ||
+    tutorBookings.length ||
+    ebookProgress.length ||
+    invoices.length ||
+    liveClassrooms.length ||
+    communityMemberships.length;
+
+  if (!hasSignals) {
+    return null;
+  }
+
+  const courseMap = new Map();
+  courses.forEach((course) => {
+    if (!course || !course.id) return;
+    const metadata = safeJsonParse(course.metadata, {});
+    courseMap.set(course.id, { ...course, metadata });
+  });
+
+  const progressByEnrollment = new Map();
+  const completionEntries = [];
+  courseProgress.forEach((entry) => {
+    if (!entry || !entry.enrollmentId) return;
+    const record = progressByEnrollment.get(entry.enrollmentId) ?? {
+      totalLessons: 0,
+      completedLessons: 0,
+      lastCompletedAt: null
+    };
+    record.totalLessons += 1;
+    if (entry.completed) {
+      record.completedLessons += 1;
+      const completedAt = normaliseDate(entry.completedAt);
+      if (completedAt && (!record.lastCompletedAt || completedAt > record.lastCompletedAt)) {
+        record.lastCompletedAt = completedAt;
+      }
+      completionEntries.push({
+        completedAt,
+        durationMinutes: Number(entry.metadata?.studyMinutes ?? entry.metadata?.durationMinutes ?? 30)
+      });
+    }
+    progressByEnrollment.set(entry.enrollmentId, record);
+  });
+
+  const learningPace = buildLearningPace(completionEntries, now);
+  const streak = calculateLearningStreak(completionEntries, now);
+
+  const activeEnrollments = enrollments.filter((enrollment) => enrollment.status === 'active');
+  const completedEnrollments = enrollments.filter((enrollment) => enrollment.status === 'completed');
+  const recentEnrollments = activeEnrollments.filter((enrollment) => {
+    const startedAt = normaliseDate(enrollment.startedAt);
+    if (!startedAt) return false;
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_IN_MS);
+    return startedAt >= thirtyDaysAgo;
+  });
+
+  const upcomingTutorBookings = tutorBookings
+    .map((booking) => ({
+      ...booking,
+      scheduledStart: normaliseDate(booking.scheduledStart),
+      scheduledEnd: normaliseDate(booking.scheduledEnd),
+      metadata: safeJsonParse(booking.metadata, {})
+    }))
+    .filter((booking) =>
+      booking.scheduledStart &&
+      (booking.status === 'confirmed' || booking.status === 'requested') &&
+      booking.scheduledStart >= now
+    )
+    .sort((a, b) => a.scheduledStart.getTime() - b.scheduledStart.getTime());
+
+  const historicalTutorBookings = tutorBookings
+    .map((booking) => ({
+      ...booking,
+      scheduledStart: normaliseDate(booking.scheduledStart),
+      scheduledEnd: normaliseDate(booking.scheduledEnd),
+      metadata: safeJsonParse(booking.metadata, {})
+    }))
+    .filter((booking) => !upcomingTutorBookings.includes(booking));
+
+  const upcomingLiveSessions = liveClassrooms
+    .map((session) => ({
+      ...session,
+      startAt: normaliseDate(session.startAt),
+      endAt: normaliseDate(session.endAt)
+    }))
+    .filter((session) => session.startAt && session.startAt >= now)
+    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+
+  const metrics = [
+    {
+      label: 'Active courses',
+      value: `${activeEnrollments.length}`,
+      change: recentEnrollments.length ? `+${recentEnrollments.length} started last 30d` : 'Stable'
+    },
+    {
+      label: 'Learning streak',
+      value: `${streak.current} day${streak.current === 1 ? '' : 's'}`,
+      change: streak.longest ? `Best ${streak.longest} day${streak.longest === 1 ? '' : 's'}` : 'Getting started'
+    },
+    {
+      label: 'Upcoming sessions',
+      value: `${upcomingTutorBookings.length + upcomingLiveSessions.length}`,
+      change: `${historicalTutorBookings.filter((booking) => booking.status === 'completed').length} completed`
+    }
+  ];
+
+  const activeCourses = activeEnrollments.map((enrollment) => {
+    const course = courseMap.get(enrollment.courseId);
+    const progress = progressByEnrollment.get(enrollment.id) ?? {
+      totalLessons: 0,
+      completedLessons: 0,
+      lastCompletedAt: null
+    };
+    const totalLessons = progress.totalLessons || course?.metadata?.totalLessons || 0;
+    const completedLessons = progress.completedLessons || 0;
+    const progressPercent = Number.isFinite(Number(enrollment.progressPercent))
+      ? Number(enrollment.progressPercent)
+      : totalLessons
+      ? Math.round((completedLessons / totalLessons) * 100)
+      : 0;
+    const nextLesson = totalLessons && completedLessons < totalLessons ? `Lesson ${completedLessons + 1}` : null;
+
+    return {
+      id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
+      title: course?.title ?? `Course ${enrollment.courseId}`,
+      status: enrollment.status,
+      progress: Math.max(0, Math.min(100, progressPercent)),
+      instructor: course?.metadata?.instructorName ?? (course?.instructorId ? `Instructor #${course.instructorId}` : 'Instructor'),
+      nextLesson
+    };
+  });
+
+  const recommendedCourses = courses
+    .filter((course) => !activeEnrollments.some((enrollment) => enrollment.courseId === course.id))
+    .slice(0, 5)
+    .map((course) => ({
+      id: course.publicId ?? `course-${course.id}`,
+      title: course.title,
+      summary: course.summary ?? course.description ?? null,
+      rating: course.ratingAverage ? `${course.ratingAverage.toFixed(1)} (${course.ratingCount ?? 0})` : null
+    }));
+
+  const communityEngagement = communityMemberships.map((community) => {
+    const members = coercePositiveInteger(community.stats?.members ?? community.stats?.memberCount ?? 0);
+    const posts = coercePositiveInteger(community.stats?.posts ?? 0);
+    const participation = members ? Math.min(100, Math.round((posts / members) * 100)) : 0;
+    return {
+      name: community.name ?? `Community ${community.id}`,
+      participation
+    };
+  });
+
+  const learningUpcoming = [];
+  upcomingTutorBookings.forEach((booking) => {
+    learningUpcoming.push({
+      id: booking.publicId ?? `tutor-booking-${booking.id}`,
+      title: booking.metadata?.topic ?? 'Mentorship session',
+      type: 'Mentorship',
+      date: booking.scheduledStart ? booking.scheduledStart.toISOString() : null,
+      host: booking.tutorName
+        ? booking.tutorName
+        : resolveName(booking.tutorFirstName, booking.tutorLastName, 'Tutor'),
+      action: booking.meetingUrl ?? booking.metadata?.meetingUrl ?? null,
+      dateLabel: formatRelativeDay(booking.scheduledStart, now)
+    });
+  });
+
+  communityEvents
+    .map((event) => ({ ...event, startAt: normaliseDate(event.startAt) }))
+    .filter((event) => event.startAt && event.startAt >= now)
+    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
+    .forEach((event) => {
+      learningUpcoming.push({
+        id: event.id ? `community-event-${event.id}` : `community-event-${event.communityId}`,
+        title: event.title ?? 'Community event',
+        type: 'Community',
+        date: event.startAt.toISOString(),
+        host: event.facilitator ?? event.communityName ?? 'Community team',
+        action: event.meetingUrl ?? null,
+        dateLabel: formatRelativeDay(event.startAt, now)
+      });
+    });
+
+  invoices
+    .filter((invoice) => invoice.status && invoice.status !== 'paid')
+    .forEach((invoice) => {
+      const invoiceDate = normaliseDate(invoice.date);
+      learningUpcoming.push({
+        id: invoice.id ?? `invoice-${invoice.publicId ?? crypto.randomUUID()}`,
+        title: invoice.label ?? 'Invoice payment',
+        type: 'Billing',
+        date: invoiceDate ? invoiceDate.toISOString() : null,
+        host: invoice.currency ?? 'USD',
+        action: null,
+        dateLabel: invoiceDate ? formatRelativeDay(invoiceDate, now) : null
+      });
+    });
+
+  const calendarMap = new Map();
+  const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  learningUpcoming.forEach((item) => {
+    if (!item.date) return;
+    const dayIso = item.date.slice(0, 10);
+    const dayEntry = calendarMap.get(dayIso) ?? {
+      id: `calendar-${dayIso}`,
+      day: dayFormatter.format(new Date(item.date)),
+      items: []
+    };
+    dayEntry.items.push(item.title);
+    calendarMap.set(dayIso, dayEntry);
+  });
+
+  const activeTutorBookings = upcomingTutorBookings.map((booking) => ({
+    id: booking.publicId ?? `tutor-booking-${booking.id}`,
+    topic: booking.metadata?.topic ?? 'Mentorship session',
+    mentor: booking.tutorName
+      ? booking.tutorName
+      : resolveName(booking.tutorFirstName, booking.tutorLastName, 'Tutor'),
+    date: booking.scheduledStart ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+    status: booking.status ?? 'confirmed',
+    rating: booking.metadata?.rating ?? null
+  }));
+
+  const historicalTutorEntries = historicalTutorBookings.map((booking) => ({
+    id: booking.publicId ?? `tutor-booking-${booking.id}`,
+    topic: booking.metadata?.topic ?? 'Mentorship session',
+    mentor: booking.tutorName
+      ? booking.tutorName
+      : resolveName(booking.tutorFirstName, booking.tutorLastName, 'Tutor'),
+    date: booking.scheduledStart ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+    status: booking.status ?? null,
+    rating: booking.metadata?.rating ?? null
+  }));
+
+  const ebookLibrary = ebookProgress.map((progress) => {
+    const catalogEntry = ebooks.get(progress.assetId) ?? {};
+    return {
+      id: catalogEntry.id ?? `ebook-${progress.assetId}`,
+      title: catalogEntry.title ?? `Ebook ${progress.assetId}`,
+      status: progress.progressPercent >= 100 ? 'Completed' : 'In progress',
+      progress: Number(progress.progressPercent ?? 0),
+      price: formatCurrency(catalogEntry.priceAmount ?? 0, catalogEntry.priceCurrency ?? 'USD'),
+      highlights: Number(progress.metadata?.highlights ?? 0),
+      bookmarks: Number(progress.metadata?.bookmarks ?? 0),
+      timeSpent: formatTimeSpent(progress.timeSpentSeconds)
+    };
+  });
+
+  const activeSubscriptions = communitySubscriptions.filter((subscription) => subscription.status === 'active');
+  const pendingInvoices = invoices.filter((invoice) => invoice.status && invoice.status !== 'paid');
+
+  const financialSummary = [
+    {
+      label: 'Active subscriptions',
+      value: `${activeSubscriptions.length}`,
+      change: `${communityMemberships.length} communities`
+    },
+    {
+      label: 'Outstanding invoices',
+      value: `${pendingInvoices.length}`,
+      change: pendingInvoices.length ? 'Action required' : 'All settled'
+    },
+    {
+      label: 'Mentor sessions',
+      value: `${tutorBookings.length}`,
+      change: `${activeTutorBookings.length} upcoming`
+    }
+  ];
+
+  const invoiceEntries = invoices.map((invoice) => ({
+    id: invoice.id ?? `invoice-${invoice.publicId ?? crypto.randomUUID()}`,
+    label: invoice.label ?? 'Invoice',
+    amount: formatCurrency(invoice.amountCents ?? invoice.amount ?? 0, invoice.currency ?? 'USD'),
+    status: invoice.status ?? 'open',
+    date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
+  }));
+
+  const notificationsList = [...notifications];
+  activeTutorBookings.forEach((booking) => {
+    notificationsList.push({
+      id: `notification-booking-${booking.id}`,
+      title: `Upcoming session with ${booking.mentor}`,
+      timestamp: booking.date,
+      type: 'mentor'
+    });
+  });
+  pendingInvoices.forEach((invoice) => {
+    notificationsList.push({
+      id: `notification-invoice-${invoice.id}`,
+      title: `${invoice.label ?? 'Invoice'} due`,
+      timestamp: invoice.date,
+      type: 'billing'
+    });
+  });
+
+  const privacy = {
+    visibility: privacySettings?.profileVisibility ?? 'public',
+    followApprovalRequired: Boolean(privacySettings?.followApprovalRequired),
+    shareActivity: privacySettings?.shareActivity ?? true,
+    messagePermission: privacySettings?.messagePermission ?? 'followers'
+  };
+
+  const messaging = {
+    unreadThreads: messagingSummary?.unreadThreads ?? 0,
+    notificationsEnabled: messagingSummary?.notificationsEnabled ?? true
+  };
+
+  const communitySettings = communityMemberships.map((community) => ({
+    id: `community-setting-${community.id}`,
+    name: community.name ?? `Community ${community.id}`,
+    role: community.membership?.role ?? 'member',
+    status: community.membership?.status ?? 'active'
+  }));
+
+  const followerSection = {
+    followers: followerSummary.followers ?? 0,
+    following: followerSummary.following ?? 0,
+    pending: Array.isArray(followerSummary.pending) ? followerSummary.pending : [],
+    outgoing: Array.isArray(followerSummary.outgoing) ? followerSummary.outgoing : [],
+    recommendations: Array.isArray(followerSummary.recommendations) ? followerSummary.recommendations : []
+  };
+
+  const managedCommunities = communityMemberships.map((community) => {
+    const initiatives = [];
+    if (coercePositiveInteger(community.stats?.resources ?? 0)) {
+      initiatives.push(`${community.stats.resources} curated resources`);
+    }
+    if (coercePositiveInteger(community.stats?.posts ?? 0)) {
+      initiatives.push(`${community.stats.posts} posts last 30d`);
+    }
+    if (coercePositiveInteger(community.stats?.channels ?? 0)) {
+      initiatives.push(`${community.stats.channels} channels`);
+    }
+    if (initiatives.length === 0) {
+      initiatives.push('Build momentum with new programmes');
+    }
+
+    return {
+      id: community.id ? `community-${community.id}` : crypto.randomUUID(),
+      name: community.name ?? `Community ${community.id}`,
+      members: `${coercePositiveInteger(community.stats?.members ?? community.stats?.memberCount ?? 0)} members`,
+      moderators: coercePositiveInteger(community.stats?.moderators ?? 0),
+      health: community.stats?.lastActivityAt ? 'Healthy' : 'New',
+      initiatives,
+      metadata: { lastActivityAt: community.stats?.lastActivityAt }
+    };
+  });
+
+  const pipelineEntries = [...communityPipelines];
+  communityEvents
+    .filter((event) => event.startAt && event.capacity)
+    .forEach((event) => {
+      const capacity = coercePositiveInteger(event.capacity);
+      const reserved = coercePositiveInteger(event.reservedSeats ?? event.attendanceCount ?? 0);
+      const progress = capacity ? Math.min(100, Math.round((reserved / capacity) * 100)) : 0;
+      pipelineEntries.push({
+        id: `pipeline-event-${event.id ?? event.title}`,
+        title: event.title ?? 'Live classroom',
+        owner: event.facilitator ?? 'Community ops',
+        progress
+      });
+    });
+
+  const dashboard = {
+    metrics,
+    analytics: {
+      learningPace,
+      communityEngagement
+    },
+    upcoming: learningUpcoming.sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    }),
+    communities: {
+      managed: managedCommunities,
+      pipelines: pipelineEntries
+    },
+    courses: {
+      active: activeCourses,
+      recommendations: recommendedCourses
+    },
+    calendar: Array.from(calendarMap.values()),
+    tutorBookings: {
+      active: activeTutorBookings,
+      history: historicalTutorEntries
+    },
+    ebooks: {
+      library: ebookLibrary,
+      recommendations: []
+    },
+    financial: {
+      summary: financialSummary,
+      invoices: invoiceEntries
+    },
+    notifications: {
+      total: notificationsList.length,
+      unreadMessages: messaging.unreadThreads ?? 0,
+      items: notificationsList
+    },
+    assessments: {
+      overview: [
+        { id: 'assessments-upcoming', label: 'Upcoming assignments', value: 0 },
+        { id: 'assessments-completed', label: 'Completed assessments', value: completionEntries.length }
+      ],
+      timeline: {
+        upcoming: [],
+        overdue: [],
+        completed: []
+      },
+      courses: activeCourses.map((course) => ({
+        id: course.id,
+        title: course.title,
+        pendingAssessments: 0
+      })),
+      schedule: {
+        studyPlan: [],
+        events: []
+      },
+      analytics: {
+        byType: [],
+        pendingReviews: 0,
+        overdue: 0,
+        averageLeadTimeDays: null,
+        workloadWeight: completionEntries.length
+      },
+      resources: []
+    },
+    followers: followerSection,
+    settings: {
+      privacy,
+      messaging,
+      communities: communitySettings
+    }
+  };
+
+  const profileStats = [
+    { label: 'Courses', value: `${activeEnrollments.length} active` },
+    { label: 'Communities', value: `${communityMemberships.length} joined` },
+    { label: 'Mentor sessions', value: `${tutorBookings.length} total` }
+  ];
+
+  const profileBioSegments = [];
+  if (activeEnrollments.length) {
+    profileBioSegments.push(`Learning across ${activeEnrollments.length} course${activeEnrollments.length === 1 ? '' : 's'}`);
+  }
+  if (streak.current) {
+    profileBioSegments.push(`maintaining a ${streak.current}-day streak`);
+  }
+  if (communityMemberships.length) {
+    profileBioSegments.push(`while participating in ${communityMemberships.length} communit${
+      communityMemberships.length === 1 ? 'y' : 'ies'
+    }.`);
+  }
+  const profileBio = profileBioSegments.join(' ').trim() || null;
+
+  const searchIndex = [
+    {
+      id: 'learner-overview',
+      role: 'learner',
+      type: 'Section',
+      title: 'Learner overview',
+      url: '/dashboard/learner'
+    },
+    ...activeCourses.map((course) => ({
+      id: `learner-course-${course.id}`,
+      role: 'learner',
+      type: 'Course',
+      title: course.title,
+      url: '/dashboard/learner/courses'
+    })),
+    ...managedCommunities.map((community) => ({
+      id: `learner-community-${community.id}`,
+      role: 'learner',
+      type: 'Community',
+      title: community.name,
+      url: '/dashboard/learner/communities'
+    }))
+  ];
+
+  const feedHighlights = [];
+  if (activeTutorBookings.length) {
+    feedHighlights.push(
+      `Mentorship with ${activeTutorBookings[0].mentor} scheduled for ${activeTutorBookings[0].date ?? 'soon'}.`
+    );
+  }
+  if (ebookLibrary.length) {
+    feedHighlights.push(`Reading ${ebookLibrary[0].title} (${ebookLibrary[0].progress}% complete).`);
+  }
+
+  return {
+    role: { id: 'learner', label: 'Learner' },
+    dashboard,
+    profileStats,
+    profileBio,
+    profileTitleSegment: 'Learner journey insights',
+    searchIndex,
+    feedHighlights
+  };
+}
+
+export function buildCommunityDashboard({
+  user,
+  now = new Date(),
+  communities = [],
+  eventsByCommunity = new Map(),
+  runbooksByCommunity = new Map(),
+  paywallTiersByCommunity = new Map(),
+  subscriptionsByCommunity = new Map(),
+  pendingMembersByCommunity = new Map(),
+  moderatorsByCommunity = new Map(),
+  moderationCases = [],
+  communicationsByCommunity = new Map(),
+  engagementTrend = [],
+  engagementTotals = { current: {}, previous: {} }
+} = {}) {
+  const hasSignals =
+    communities.length ||
+    moderationCases.length ||
+    subscriptionsByCommunity.size ||
+    Array.from(runbooksByCommunity.values()).some((list) => list?.length);
+
+  if (!hasSignals) {
+    return null;
+  }
+
+  const metrics = [];
+  const totalCommunities = communities.length;
+  const totalMembers = communities.reduce(
+    (sum, community) => sum + coercePositiveInteger(community.stats?.members ?? community.stats?.memberCount ?? 0),
+    0
+  );
+  const totalPendingApprovals = Array.from(pendingMembersByCommunity.values()).reduce(
+    (sum, members) => sum + coercePositiveInteger(members?.length ?? 0),
+    0
+  );
+  const totalActiveSubscriptions = Array.from(subscriptionsByCommunity.values()).reduce(
+    (sum, list) => sum + list.filter((subscription) => subscription.status === 'active').length,
+    0
+  );
+
+  const totalRecurringCents = Array.from(subscriptionsByCommunity.entries()).reduce((sum, [communityId, subs]) => {
+    const tiers = paywallTiersByCommunity.get(communityId) ?? [];
+    const tierMap = new Map(tiers.map((tier) => [tier.id, tier]));
+    const communitySum = subs.reduce((tierSum, subscription) => {
+      const tier = tierMap.get(subscription.tierId);
+      if (!tier) return tierSum;
+      return tierSum + Number(tier.priceCents ?? 0);
+    }, 0);
+    return sum + communitySum;
+  }, 0);
+
+  metrics.push({
+    label: 'Managed communities',
+    value: `${totalCommunities}`,
+    change: `${totalMembers} active members`
+  });
+  metrics.push({
+    label: 'Pending approvals',
+    value: `${totalPendingApprovals}`,
+    change: totalPendingApprovals ? 'Review join requests' : 'All clear'
+  });
+  metrics.push({
+    label: 'Recurring revenue',
+    value: formatCurrency(totalRecurringCents),
+    change: `${totalActiveSubscriptions} active subscriptions`
+  });
+
+  const caseByCommunity = new Map();
+  moderationCases.forEach((incident) => {
+    if (!incident.communityId) return;
+    const list = caseByCommunity.get(incident.communityId) ?? [];
+    list.push(incident);
+    caseByCommunity.set(incident.communityId, list);
+  });
+
+  const healthOverview = communities.map((community) => {
+    const communityId = community.id;
+    const pendingMembers = coercePositiveInteger(pendingMembersByCommunity.get(communityId)?.length ?? 0);
+    const moderators = coercePositiveInteger(moderatorsByCommunity.get(communityId)?.length ?? 0);
+    const incidents = caseByCommunity.get(communityId) ?? [];
+    const highSeverity = incidents.filter((incident) => incident.severity === 'high' || incident.severity === 'critical');
+    const lastActivity = normaliseDate(community.stats?.lastActivityAt);
+    const recentActivity = lastActivity && now - lastActivity <= 7 * DAY_IN_MS;
+    const health = highSeverity.length ? 'At risk' : pendingMembers > 5 ? 'Attention' : recentActivity ? 'Healthy' : 'Monitoring';
+    const trend = recentActivity ? 'up' : 'steady';
+
+    return {
+      id: communityId ? `community-${communityId}` : crypto.randomUUID(),
+      name: community.name ?? `Community ${communityId}`,
+      members: `${coercePositiveInteger(community.stats?.members ?? community.stats?.memberCount ?? 0)} members`,
+      moderators,
+      health,
+      trend,
+      approvalsPending: pendingMembers,
+      incidentsOpen: incidents.length,
+      escalationsOpen: highSeverity.length,
+      metadata: { lastActivityAt: lastActivity?.toISOString() }
+    };
+  });
+
+  const operationsRunbooks = [];
+  runbooksByCommunity.forEach((runbooks, communityId) => {
+    runbooks
+      ?.slice(0, 10)
+      .forEach((runbook) => {
+        const tags = parseTagsList(runbook.tags);
+        const metadata = safeJsonParse(runbook.metadata, {});
+        operationsRunbooks.push({
+          id: `runbook-${runbook.id}`,
+          title: runbook.title ?? 'Operational runbook',
+          owner: runbook.createdByName ?? 'Community ops',
+          automationReady: Boolean(metadata.automationReady ?? metadata.auto ?? false),
+          tags
+        });
+      });
+  });
+
+  const operationsEscalations = moderationCases
+    .filter((incident) => incident.status && ['pending', 'in_review', 'escalated'].includes(incident.status))
+    .slice(0, 10)
+    .map((incident) => ({
+      id: incident.id ? `case-${incident.id}` : crypto.randomUUID(),
+      title: incident.reason ?? 'Moderation case',
+      severity: incident.severity ?? 'low',
+      status: incident.status ?? 'pending',
+      openedAt: incident.createdAt ? formatDateTime(incident.createdAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+      owner: incident.assignee?.name ?? 'Unassigned'
+    }));
+
+  const upcomingEvents = [];
+  eventsByCommunity.forEach((events, communityId) => {
+    const community = communities.find((entry) => entry.id === communityId);
+    events
+      ?.filter((event) => event.startAt && normaliseDate(event.startAt) >= now)
+      .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
+      .slice(0, 10)
+      .forEach((event) => {
+        const capacity = coercePositiveInteger(event.capacity ?? event.attendanceLimit ?? 0);
+        const reserved = coercePositiveInteger(event.reservedSeats ?? event.attendanceCount ?? 0);
+        const seats = capacity ? `${reserved}/${capacity} seats` : `${reserved} reserved`;
+        upcomingEvents.push({
+          id: event.id ? `event-${event.id}` : crypto.randomUUID(),
+          title: event.title ?? 'Community event',
+          date: event.startAt ? formatDateTime(event.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+          facilitator: event.facilitator ?? event.metadata?.host ?? 'Community team',
+          seats,
+          status: event.status ?? 'scheduled'
+        });
+      });
+  });
+
+  const tutorPods = upcomingEvents
+    .filter((event) => (event.status ?? '').toLowerCase().includes('coaching'))
+    .map((event) => ({
+      id: `pod-${event.id}`,
+      title: event.title,
+      facilitator: event.facilitator,
+      nextSession: event.date
+    }));
+
+  const broadcasts = [];
+  communicationsByCommunity.forEach((posts, communityId) => {
+    const community = communities.find((entry) => entry.id === communityId);
+    posts
+      ?.filter((post) => post.postType === 'announcement' || post.metadata?.stage)
+      .slice(0, 10)
+      .forEach((post) => {
+        const metadata = safeJsonParse(post.metadata, {});
+        broadcasts.push({
+          id: `broadcast-${post.id}`,
+          title: post.title ?? 'Broadcast',
+          channel: post.channelName ?? 'General',
+          stage: metadata.stage ?? post.status ?? 'draft',
+          release: post.publishedAt ? formatDateTime(post.publishedAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBD',
+          community: community?.name ?? `Community ${communityId}`
+        });
+      });
+  });
+
+  const monetisationTiers = [];
+  paywallTiersByCommunity.forEach((tiers, communityId) => {
+    const subscriptions = subscriptionsByCommunity.get(communityId) ?? [];
+    const active = subscriptions.filter((subscription) => subscription.status === 'active');
+    tiers
+      ?.slice(0, 10)
+      .forEach((tier) => {
+        const members = active.filter((subscription) => subscription.tierId === tier.id).length;
+        monetisationTiers.push({
+          id: `tier-${tier.id}`,
+          name: tier.name,
+          price: formatCurrency(tier.priceCents ?? 0, tier.currency ?? 'USD'),
+          interval: tier.billingInterval ?? 'monthly',
+          members
+        });
+      });
+  });
+
+  const monetisationInsights = [];
+  communities.forEach((community) => {
+    const subs = subscriptionsByCommunity.get(community.id) ?? [];
+    if (!subs.length) return;
+    const tiers = paywallTiersByCommunity.get(community.id) ?? [];
+    const tierMap = new Map(tiers.map((tier) => [tier.id, tier]));
+    const recurringCents = subs.reduce((sum, subscription) => {
+      const tier = tierMap.get(subscription.tierId);
+      if (!tier) return sum;
+      return sum + Number(tier.priceCents ?? 0);
+    }, 0);
+    monetisationInsights.push(
+      `${community.name ?? `Community ${community.id}`} is generating ${formatCurrency(recurringCents)} in active recurring revenue.`
+    );
+  });
+
+  const monetisationExperiments = monetisationTiers.map((tier) => ({
+    id: `experiment-${tier.id}`,
+    name: `${tier.name} adoption`,
+    hypothesis: `Grow ${tier.name} to ${tier.members + 5} members`,
+    status: tier.members ? 'running' : 'planned'
+  }));
+
+  const safetyIncidents = moderationCases.slice(0, 20).map((incident) => ({
+    id: incident.id ? `incident-${incident.id}` : crypto.randomUUID(),
+    communityId: incident.communityId,
+    title: incident.reason ?? 'Moderation incident',
+    severity: incident.severity ?? 'low',
+    status: incident.status ?? 'pending',
+    openedAt: incident.createdAt ? formatDateTime(incident.createdAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+    assignee: incident.assignee?.name ?? 'Unassigned'
+  }));
+
+  const safetyBacklog = [];
+  caseByCommunity.forEach((cases, communityId) => {
+    const community = communities.find((entry) => entry.id === communityId);
+    const highSeverity = cases.filter((incident) => incident.severity === 'high' || incident.severity === 'critical');
+    const mediumSeverity = cases.filter((incident) => incident.severity === 'medium');
+    if (highSeverity.length) {
+      safetyBacklog.push({
+        id: `backlog-high-${communityId}`,
+        label: `${community?.name ?? `Community ${communityId}`} high severity`,
+        count: highSeverity.length
+      });
+    }
+    if (mediumSeverity.length) {
+      safetyBacklog.push({
+        id: `backlog-medium-${communityId}`,
+        label: `${community?.name ?? `Community ${communityId}`} medium severity`,
+        count: mediumSeverity.length
+      });
+    }
+  });
+
+  const moderatorRoster = [];
+  moderatorsByCommunity.forEach((members, communityId) => {
+    const community = communities.find((entry) => entry.id === communityId);
+    members
+      ?.slice(0, 10)
+      .forEach((member) => {
+        moderatorRoster.push({
+          id: `moderator-${communityId}-${member.userId ?? member.id}`,
+          community: community?.name ?? `Community ${communityId}`,
+          role: member.role ?? 'moderator',
+          coverage: member.metadata?.coverage ?? 'General'
+        });
+      });
+  });
+
+  const communicationsHighlights = [];
+  communicationsByCommunity.forEach((posts, communityId) => {
+    const community = communities.find((entry) => entry.id === communityId);
+    posts
+      ?.slice(0, 10)
+      .forEach((post) => {
+        const tags = parseTagsList(post.tags);
+        communicationsHighlights.push({
+          id: `highlight-${post.id}`,
+          community: community?.name ?? `Community ${communityId}`,
+          preview: post.title ?? (post.body ? String(post.body).slice(0, 80) : 'Member update'),
+          postedAt: post.publishedAt ? formatDateTime(post.publishedAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
+          reactions: summariseReactions(post.reactionSummary),
+          tags
+        });
+      });
+  });
+
+  const communicationsTrends = [
+    {
+      id: 'trend-posts-7d',
+      metric: 'Posts (7d)',
+      current: engagementTotals.current.posts ?? 0,
+      previous: engagementTotals.previous.posts ?? 0
+    },
+    {
+      id: 'trend-comments-7d',
+      metric: 'Comments (7d)',
+      current: engagementTotals.current.comments ?? 0,
+      previous: engagementTotals.previous.comments ?? 0
+    },
+    {
+      id: 'trend-events-7d',
+      metric: 'Event posts (7d)',
+      current: engagementTotals.current.eventPosts ?? 0,
+      previous: engagementTotals.previous.eventPosts ?? 0
+    }
+  ];
+
+  const communicationsBroadcasts = broadcasts;
+
+  const dashboard = {
+    metrics,
+    health: {
+      overview: healthOverview
+    },
+    operations: {
+      runbooks: operationsRunbooks,
+      escalations: operationsEscalations
+    },
+    programming: {
+      upcomingEvents,
+      tutorPods,
+      broadcasts: communicationsBroadcasts
+    },
+    monetisation: {
+      tiers: monetisationTiers,
+      experiments: monetisationExperiments,
+      insights: monetisationInsights
+    },
+    safety: {
+      incidents: safetyIncidents,
+      backlog: safetyBacklog,
+      moderators: moderatorRoster
+    },
+    communications: {
+      highlights: communicationsHighlights,
+      broadcasts: communicationsBroadcasts,
+      trends: communicationsTrends
+    }
+  };
+
+  const profileStats = [
+    { label: 'Communities', value: `${totalCommunities} managed` },
+    { label: 'Members', value: `${totalMembers} active` },
+    { label: 'Moderation backlog', value: `${moderationCases.length} open` }
+  ];
+
+  const profileBioSegments = [];
+  if (totalCommunities) {
+    profileBioSegments.push(`Stewarding ${totalCommunities} communit${totalCommunities === 1 ? 'y' : 'ies'}`);
+  }
+  if (totalMembers) {
+    profileBioSegments.push(`with ${totalMembers} engaged members`);
+  }
+  if (totalPendingApprovals) {
+    profileBioSegments.push(`and ${totalPendingApprovals} approvals awaiting review.`);
+  }
+  const profileBio = profileBioSegments.join(' ').trim() || null;
+
+  const searchIndex = [
+    {
+      id: 'community-operations-overview',
+      role: 'community',
+      type: 'Section',
+      title: 'Community operations overview',
+      url: '/dashboard/community'
+    },
+    ...communities.map((community) => ({
+      id: `community-${community.id}`,
+      role: 'community',
+      type: 'Community',
+      title: community.name ?? `Community ${community.id}`,
+      url: `/dashboard/community/${community.slug ?? community.id}`
+    }))
+  ];
+
+  const feedHighlights = [];
+  if (upcomingEvents.length) {
+    feedHighlights.push(`Upcoming community programme: ${upcomingEvents[0].title} on ${upcomingEvents[0].date}.`);
+  }
+  if (operationsRunbooks.length) {
+    feedHighlights.push(`New runbook published: ${operationsRunbooks[0].title}.`);
+  }
+
+  return {
+    role: { id: 'community', label: 'Community' },
+    dashboard,
+    profileStats,
+    profileBio,
+    profileTitleSegment: 'Community operations steward',
+    searchIndex,
+    feedHighlights
+  };
+}
+
 function parseMonetizationTier(settings) {
   if (!settings) {
     return { defaultCommission: { tiers: [] } };
@@ -1359,904 +2329,6 @@ export function buildInstructorDashboard({
   };
 }
 
-function buildLearnerCourseEntry({ enrollment, course, progressEntries, instructorDirectory, now }) {
-  const instructor = instructorDirectory.get(course?.instructorId);
-  const completedLessons = progressEntries.filter((entry) => entry.completed);
-  const completionRatio = completedLessons.length
-    ? completedLessons.length / Math.max(progressEntries.length, completedLessons.length)
-    : Number(enrollment.progressPercent ?? 0) / 100;
-
-  const lastCompleted = completedLessons.length ? completedLessons[completedLessons.length - 1] : null;
-  const metadataLesson = lastCompleted?.metadata?.nextLesson ?? lastCompleted?.metadata?.lessonTitle;
-  const nextLesson = metadataLesson
-    ? metadataLesson
-    : course?.metadata?.syllabus?.[completedLessons.length]?.title ?? 'Next module ready';
-
-  return {
-    id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
-    enrollmentId: enrollment.id,
-    courseId: enrollment.courseId,
-    title: course?.title ?? 'Course in progress',
-    instructor: instructor ? resolveName(instructor.firstName, instructor.lastName, instructor.email) : 'Instructor team',
-    status: enrollment.status ?? 'active',
-    progress: Math.min(100, Math.round(completionRatio * 100)),
-    nextLesson,
-    startedAt: enrollment.startedAt ? enrollment.startedAt.toISOString?.() ?? new Date(enrollment.startedAt).toISOString() : null,
-    lastActivityAt: lastCompleted?.completedAt ? new Date(lastCompleted.completedAt).toISOString() : null,
-    cohort: enrollment.metadata?.cohort ?? null,
-    badges: Array.isArray(enrollment.metadata?.badges) ? enrollment.metadata.badges : [],
-    dueSoon: enrollment.metadata?.dueSoon ?? null,
-    reminder: enrollment.metadata?.reminder ?? null,
-    estimatedCompletion: enrollment.metadata?.estimatedCompletion ?? null,
-    riskLevel: determineRiskLevel(enrollment, { completionRatio, lastCompletedAt: lastCompleted?.completedAt }, now)
-  };
-}
-
-function buildLearnerCourseRecommendations({ allCourses = [], activeCourseIds = new Set(), limit = 4 }) {
-  return allCourses
-    .filter((course) => !activeCourseIds.has(course.id))
-    .slice(0, limit)
-    .map((course) => ({
-      id: course.publicId ?? `course-${course.id}`,
-      title: course.title,
-      summary: course.summary ?? course.description?.slice(0, 140) ?? 'Keep learning momentum with this pathway.',
-      rating: course.ratingAverage ? course.ratingAverage.toFixed(1) : '4.8',
-      level: course.level ?? 'Intermediate',
-      category: course.category ?? 'General',
-      tags: course.tags ?? [],
-      instructorId: course.instructorId
-    }));
-}
-
-function buildTutorBookingEntry(booking, now) {
-  const metadata = booking.metadata ?? {};
-  return {
-    id: booking.publicId ?? `booking-${booking.id}`,
-    status:
-      booking.status === 'requested'
-        ? 'Requested'
-        : booking.status === 'confirmed'
-        ? 'Confirmed'
-        : booking.status === 'completed'
-        ? 'Completed'
-        : 'Cancelled',
-    mentor: booking.tutorProfile?.displayName ?? metadata.tutorName ?? `Tutor ${booking.tutorId}`,
-    topic: metadata.topic ?? metadata.agenda ?? 'Mentorship session',
-    date: booking.scheduledStart
-      ? formatDateTime(booking.scheduledStart, { dateStyle: 'medium', timeStyle: 'short' })
-      : 'Scheduled soon',
-    rating: metadata.rating ?? metadata.feedbackScore ?? '—',
-    durationMinutes: booking.durationMinutes ?? 60,
-    meetingUrl: booking.meetingUrl ?? null,
-    updatedAt: booking.updatedAt ? new Date(booking.updatedAt).toISOString() : null,
-    requestedAt: booking.requestedAt ? formatDateTime(booking.requestedAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
-    confirmedAt: booking.confirmedAt ? formatDateTime(booking.confirmedAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
-    isUpcoming:
-      booking.status === 'confirmed' && booking.scheduledStart ? new Date(booking.scheduledStart) >= now : booking.status === 'requested'
-  };
-}
-
-function buildLearnerLibraryEntry(progress, ebook, now) {
-  const progressPercent = Math.min(100, Math.round(Number(progress.progressPercent ?? 0)));
-  const lastOpened = progress.updatedAt
-    ? humanizeRelativeTime(progress.updatedAt, now)
-    : progress.createdAt
-    ? humanizeRelativeTime(progress.createdAt, now)
-    : 'Recently';
-  return {
-    id: ebook?.publicId ?? ebook?.id ?? `ebook-${progress.assetId ?? progress.id}`,
-    title: ebook?.title ?? 'Digital resource',
-    format: (ebook?.metadata?.format ?? 'E-book').toString(),
-    progress: progressPercent,
-    lastOpened,
-    authors: Array.isArray(ebook?.authors) ? ebook.authors : [],
-    coverImageUrl: ebook?.metadata?.coverImageUrl ?? null,
-    tags: ebook?.tags ?? [],
-    readingTimeMinutes: ebook?.readingTimeMinutes ?? null
-  };
-}
-
-function summariseCommunityEngagement(communities = [], now = new Date()) {
-  return communities.map((community) => {
-    const stats = community.stats ?? {};
-    const metadata = community.metadata ?? {};
-    const lastActivity = stats.lastActivityAt ? humanizeRelativeTime(stats.lastActivityAt, now) : 'Recently';
-    const approvalsPending = Number(metadata.approvalsPending ?? metadata.pendingApprovals ?? 0);
-    return {
-      id: community.id,
-      name: community.name,
-      members: stats.members ?? 0,
-      posts: stats.posts ?? 0,
-      resources: stats.resources ?? 0,
-      lastActivity,
-      approvalsPending,
-      trend: metadata.engagementTrend ?? (approvalsPending > 0 ? 'Watchlist' : 'Healthy')
-    };
-  });
-}
-
-function aggregateFinancialSummary(intents = [], currency = 'USD') {
-  let capturedCents = 0;
-  let outstandingCents = 0;
-  let refundedCents = 0;
-  intents.forEach((intent) => {
-    const amountTotal = Number(intent.amountTotal ?? 0);
-    const amountRefunded = Number(intent.amountRefunded ?? 0);
-    const netCaptured = Math.max(0, amountTotal - amountRefunded);
-    if (intent.status === 'succeeded' || intent.capturedAt) {
-      capturedCents += netCaptured;
-    } else {
-      outstandingCents += amountTotal;
-    }
-    refundedCents += amountRefunded;
-  });
-
-  return {
-    summary: [
-      {
-        label: 'Tuition invested',
-        value: formatCurrency(capturedCents, currency),
-        change: `${intents.filter((intent) => intent.capturedAt).length} payments processed`,
-        trend: 'up'
-      },
-      {
-        label: 'Outstanding invoices',
-        value: formatCurrency(outstandingCents, currency),
-        change: `${intents.filter((intent) => !intent.capturedAt).length} pending`,
-        trend: outstandingCents > 0 ? 'attention' : 'up'
-      },
-      {
-        label: 'Refunds issued',
-        value: formatCurrency(refundedCents, currency),
-        change: refundedCents > 0 ? 'Reviewed by finance' : 'No adjustments',
-        trend: refundedCents > 0 ? 'neutral' : 'up'
-      }
-    ],
-    totals: { capturedCents, outstandingCents, refundedCents }
-  };
-}
-
-function buildLiveClassroomSnapshot({ sessions = [], now = new Date() }) {
-  if (!sessions.length) {
-    return {
-      metrics: [],
-      active: [],
-      upcoming: [],
-      completed: [],
-      groups: [],
-      whiteboard: { snapshots: [], readiness: [] }
-    };
-  }
-
-  const activeSessions = sessions.filter((session) => {
-    const start = session.startAt ? new Date(session.startAt) : null;
-    const end = session.endAt ? new Date(session.endAt) : null;
-    if (!start) return session.status === 'live';
-    if (session.status === 'live') return true;
-    if (end) {
-      return start <= now && end >= now;
-    }
-    return start <= now && (session.status === 'scheduled' || session.status === 'live');
-  });
-
-  const upcomingSessions = sessions.filter((session) => {
-    if (!session.startAt) return false;
-    const start = new Date(session.startAt);
-    return start > now && ['scheduled', 'draft'].includes(session.status);
-  });
-
-  const completedSessions = sessions.filter((session) => {
-    if (session.status === 'completed' || session.status === 'cancelled') {
-      return true;
-    }
-    if (!session.endAt) return false;
-    return new Date(session.endAt) < now;
-  });
-
-  const occupancyRates = sessions
-    .map((session) => {
-      const capacity = Number(session.capacity ?? 0);
-      const reserved = Number(session.reservedSeats ?? 0);
-      if (!capacity) return 0;
-      return Math.min(100, Math.round((reserved / capacity) * 100));
-    })
-    .filter((rate) => Number.isFinite(rate));
-  const averageOccupancy = occupancyRates.length
-    ? Math.round(occupancyRates.reduce((sum, rate) => sum + rate, 0) / occupancyRates.length)
-    : 0;
-
-  const communityGroups = new Map();
-  sessions.forEach((session) => {
-    if (!session.communityId && !session.communityName) return;
-    const key = session.communityId ?? session.communityName;
-    const record = communityGroups.get(key) ?? {
-      id: session.communityId ?? key,
-      name: session.communityName ?? `Community ${key}`,
-      count: 0,
-      upcoming: 0
-    };
-    record.count += 1;
-    if (session.startAt && new Date(session.startAt) >= now) {
-      record.upcoming += 1;
-    }
-    communityGroups.set(key, record);
-  });
-
-  const whiteboardSnapshots = sessions.slice(0, 5).map((session) => ({
-    id: session.publicId ?? `class-${session.id}`,
-    title: session.title,
-    template: session.metadata?.whiteboard?.template ?? 'Session board',
-    ready: session.metadata?.whiteboard?.ready ?? (session.status === 'live' || session.status === 'scheduled'),
-    lastUpdatedLabel: session.updatedAt ? humanizeRelativeTime(session.updatedAt, now) : null,
-    facilitators: Array.isArray(session.metadata?.facilitators) ? session.metadata.facilitators : []
-  }));
-
-  const readiness = sessions.slice(0, 8).map((session) => ({
-    id: session.publicId ?? `class-${session.id}`,
-    name: session.title,
-    status:
-      session.status === 'live'
-        ? 'ready'
-        : session.status === 'scheduled'
-        ? 'attention'
-        : session.status === 'cancelled'
-        ? 'action'
-        : 'ready'
-  }));
-
-  return {
-    metrics: [
-      {
-        label: 'Upcoming sessions',
-        value: `${upcomingSessions.length}`,
-        change: `${activeSessions.length} live now`,
-        trend: upcomingSessions.length >= activeSessions.length ? 'up' : 'attention'
-      },
-      {
-        label: 'Average seat fill',
-        value: `${averageOccupancy}%`,
-        change: `${sessions.length} total events`,
-        trend: averageOccupancy >= 70 ? 'up' : averageOccupancy >= 40 ? 'neutral' : 'down'
-      },
-      {
-        label: 'Communities engaged',
-        value: `${communityGroups.size}`,
-        change: `${sessions.filter((session) => session.registration?.status === 'registered').length} registrations`,
-        trend: communityGroups.size > 1 ? 'up' : 'steady'
-      }
-    ],
-    active: activeSessions.map((session) => ({
-      id: session.publicId ?? `class-${session.id}`,
-      title: session.title,
-      stage: session.status === 'live' ? 'Live' : 'In progress',
-      startLabel: session.startAt ? formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBD',
-      status: session.status,
-      timezone: session.timezone,
-      community: session.communityName ?? null,
-      occupancy: {
-        capacity: session.capacity ?? null,
-        reserved: session.reservedSeats ?? null,
-        rate:
-          session.capacity && session.reservedSeats
-            ? Math.min(100, Math.round((session.reservedSeats / Math.max(1, session.capacity)) * 100))
-            : null
-      },
-      callToAction: session.registration?.status === 'registered'
-        ? { action: 'join', label: 'Join classroom', enabled: session.status !== 'completed' }
-        : { action: 'register', label: 'Reserve seat', enabled: true },
-      security: {
-        waitingRoom: Boolean(session.metadata?.security?.waitingRoom),
-        passcodeRequired: Boolean(session.metadata?.security?.passcodeRequired)
-      },
-      whiteboard: session.metadata?.whiteboard ?? null,
-      facilitators: Array.isArray(session.metadata?.facilitators) ? session.metadata.facilitators : [],
-      breakoutRooms: Array.isArray(session.metadata?.breakoutRooms) ? session.metadata.breakoutRooms : []
-    })),
-    upcoming: upcomingSessions.map((session) => ({
-      id: session.publicId ?? `class-${session.id}`,
-      title: session.title,
-      stage: 'Scheduled',
-      startLabel: session.startAt ? formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBD',
-      community: session.communityName ?? null,
-      timezone: session.timezone,
-      status: session.status,
-      occupancy: {
-        capacity: session.capacity ?? null,
-        reserved: session.reservedSeats ?? null
-      },
-      callToAction: session.registration?.status === 'registered'
-        ? { action: 'check-in', label: 'Prepare checklist', enabled: true }
-        : { action: 'register', label: 'Reserve seat', enabled: true }
-    })),
-    completed: completedSessions.map((session) => ({
-      id: session.publicId ?? `class-${session.id}`,
-      title: session.title,
-      stage: 'Completed',
-      startLabel: session.startAt ? formatDateTime(session.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : null,
-      status: session.status,
-      recordingUrl: session.metadata?.recordingUrl ?? null,
-      community: session.communityName ?? null
-    })),
-    groups: Array.from(communityGroups.values()).map((group) => ({
-      id: group.id,
-      name: group.name,
-      sessions: group.count,
-      upcoming: group.upcoming
-    })),
-    whiteboard: {
-      snapshots: whiteboardSnapshots,
-      readiness
-    }
-  };
-}
-
-export function buildLearnerDashboard({
-  user,
-  now = new Date(),
-  enrollments = [],
-  courses = [],
-  courseProgress = [],
-  instructorDirectory = new Map(),
-  tutorBookings = [],
-  liveClassrooms = [],
-  ebookLibrary = [],
-  ebookProgress = [],
-  ebookRecommendations = [],
-  paymentIntents = [],
-  communities = [],
-  communityPipelines = [],
-  searchEntities = []
-} = {}) {
-  const hasSignals =
-    enrollments.length ||
-    tutorBookings.length ||
-    ebookProgress.length ||
-    paymentIntents.length ||
-    liveClassrooms.length ||
-    communities.length;
-
-  if (!hasSignals) {
-    return null;
-  }
-
-  const courseById = new Map();
-  courses.forEach((course) => courseById.set(course.id, course));
-
-  const progressByEnrollment = new Map();
-  courseProgress.forEach((entry) => {
-    const list = progressByEnrollment.get(entry.enrollmentId) ?? [];
-    list.push(entry);
-    progressByEnrollment.set(entry.enrollmentId, list);
-  });
-
-  const activeStatuses = new Set(['active', 'invited', 'in-progress', 'paused']);
-  const activeEnrollments = enrollments
-    .filter((enrollment) => activeStatuses.has(enrollment.status ?? ''))
-    .sort((a, b) => new Date(b.updatedAt ?? b.createdAt ?? 0) - new Date(a.updatedAt ?? a.createdAt ?? 0));
-  const completedEnrollments = enrollments.filter((enrollment) => enrollment.status === 'completed');
-
-  const activeCourseIds = new Set(activeEnrollments.map((enrollment) => enrollment.courseId));
-  const courseEntries = activeEnrollments.map((enrollment) =>
-    buildLearnerCourseEntry({
-      enrollment,
-      course: courseById.get(enrollment.courseId),
-      progressEntries: progressByEnrollment.get(enrollment.id) ?? [],
-      instructorDirectory,
-      now
-    })
-  );
-
-  const recommendationEntries = buildLearnerCourseRecommendations({
-    allCourses: courses,
-    activeCourseIds,
-    limit: 4
-  });
-
-  const bookingEntries = tutorBookings.map((booking) => buildTutorBookingEntry(booking, now));
-  const upcomingBookings = bookingEntries.filter((entry) => entry.isUpcoming);
-  const historicalBookings = bookingEntries
-    .filter((entry) => !entry.isUpcoming)
-    .map((entry) => ({ ...entry, rating: entry.rating ?? '5.0' }));
-
-  const ebookByAsset = new Map();
-  ebookLibrary.forEach((ebook) => {
-    if (ebook.assetId !== undefined && ebook.assetId !== null) {
-      ebookByAsset.set(ebook.assetId, ebook);
-    }
-  });
-
-  const libraryEntries = ebookProgress.map((progress) => buildLearnerLibraryEntry(progress, ebookByAsset.get(progress.assetId), now));
-
-  const ebookRecommendationEntries = ebookRecommendations
-    .filter((ebook) => !ebookByAsset.has(ebook.assetId))
-    .slice(0, 6)
-    .map((ebook) => ({
-      id: ebook.publicId ?? `ebook-${ebook.id}`,
-      title: ebook.title,
-      subtitle: ebook.subtitle ?? null,
-      tags: ebook.tags ?? [],
-      readingTime: ebook.readingTimeMinutes ?? ebook.metadata?.readingTime ?? 45,
-      category: ebook.categories?.[0] ?? 'Featured'
-    }));
-
-  const completions = courseProgress
-    .filter((entry) => entry.completed)
-    .map((entry) => ({
-      completedAt: entry.completedAt ?? entry.updatedAt ?? entry.createdAt,
-      durationMinutes: entry.metadata?.durationMinutes ?? entry.metadata?.studyMinutes ?? 0
-    }));
-
-  const streak = calculateLearningStreak(completions, now);
-  const learningPace = buildLearningPace(completions, now);
-  const communityEngagement = summariseCommunityEngagement(communities, now);
-
-  const ebookCompletion = libraryEntries.length
-    ? Math.round(libraryEntries.reduce((total, ebook) => total + Number(ebook.progress ?? 0), 0) / libraryEntries.length)
-    : 0;
-  const ebooksCompleted = libraryEntries.filter((ebook) => ebook.progress >= 95).length;
-
-  const financial = aggregateFinancialSummary(paymentIntents, paymentIntents[0]?.currency ?? 'USD');
-  const invoices = paymentIntents.map((intent) => ({
-    id: intent.publicId ?? `invoice-${intent.id}`,
-    label:
-      intent.metadata?.label ??
-      (intent.entityType === 'course'
-        ? `Course tuition · ${intent.metadata?.courseTitle ?? intent.entityId ?? ''}`
-        : intent.entityType === 'community'
-        ? `Community subscription · ${intent.metadata?.communityName ?? intent.entityId ?? ''}`
-        : 'Invoice'),
-    amount: formatCurrency(intent.amountTotal ?? 0, intent.currency ?? 'USD'),
-    status: intent.status ? intent.status.replace(/_/g, ' ') : 'pending',
-    date: formatDateTime(intent.capturedAt ?? intent.createdAt ?? intent.updatedAt, { dateStyle: 'medium' })
-  }));
-
-  const liveSnapshot = buildLiveClassroomSnapshot({ sessions: liveClassrooms, now });
-
-  const communityManaged = communities
-    .filter((community) => ['owner', 'admin', 'moderator'].includes(community.membership?.role ?? 'member'))
-    .map((community) => ({
-      id: `community-${community.id}`,
-      name: community.name,
-      members: community.stats?.members ?? 0,
-      moderators: community.metadata?.moderators?.length ?? 0,
-      health: community.metadata?.health ?? 'Healthy',
-      initiatives: Array.isArray(community.metadata?.initiatives)
-        ? community.metadata.initiatives
-        : ['Onboarding', 'Engagement rituals'],
-      approvalsPending: community.metadata?.approvalsPending ?? 0
-    }));
-
-  const pipelines = Array.isArray(communityPipelines) ? communityPipelines : [];
-
-  const notifications = bookingEntries.slice(0, 4).map((entry) => ({
-    id: `${entry.id}-notification`,
-    type: entry.status === 'Requested' ? 'mentor_request' : 'mentor',
-    title: entry.topic,
-    message: `${entry.mentor} · ${entry.date}`,
-    createdAt: now.toISOString()
-  }));
-
-  const followers = {
-    followers: user?.metadata?.followers ?? 0,
-    following: user?.metadata?.following ?? 0,
-    pending: [],
-    outgoing: [],
-    recommendations: communityEngagement.slice(0, 3).map((entry) => ({
-      id: `community-${entry.id}`,
-      title: entry.name,
-      subtitle: `${entry.members} members`,
-      reason: 'Active discussions',
-      href: `/communities/${entry.id}`
-    }))
-  };
-
-  const settings = {
-    privacy: {
-      visibility: user?.privacy?.visibility ?? 'followers',
-      followApprovalRequired: Boolean(user?.privacy?.followApprovalRequired ?? true),
-      shareActivity: Boolean(user?.privacy?.shareActivity ?? false),
-      messagePermission: user?.privacy?.messagePermission ?? 'followers'
-    },
-    messaging: {
-      unreadThreads: user?.inbox?.unreadThreads ?? notifications.length,
-      notificationsEnabled: true
-    },
-    communities: communities.map((community) => ({
-      id: community.id,
-      name: community.name,
-      role: community.membership?.role ?? 'member',
-      alerts: community.metadata?.alerts ?? []
-    }))
-  };
-
-  const profileStats = [
-    { label: 'Learning streak', value: `${streak.current} days`, trend: streak.longest >= streak.current ? 'up' : 'steady' },
-    { label: 'Lessons completed', value: `${completions.length}`, trend: 'up' },
-    { label: 'Library completion', value: `${ebookCompletion}%`, trend: ebookCompletion >= 50 ? 'up' : 'steady' }
-  ];
-
-  const searchIndex = [
-    ...courseEntries.map((entry) => ({
-      id: `search-course-${entry.id}`,
-      title: entry.title,
-      type: 'Course',
-      url: `/dashboard/learner/courses/${entry.courseId}`
-    })),
-    ...communityManaged.map((community) => ({
-      id: `search-community-${community.id}`,
-      title: community.name,
-      type: 'Community',
-      url: `/communities/${community.id.replace('community-', '')}`
-    })),
-    ...searchEntities
-  ];
-
-  const dashboard = {
-    metrics: [
-      {
-        label: 'Active programmes',
-        value: `${activeEnrollments.length}`,
-        change: `${completedEnrollments.length} completed`,
-        trend: completedEnrollments.length > 0 ? 'up' : 'steady'
-      },
-      {
-        label: 'Mentor sessions',
-        value: `${upcomingBookings.length}`,
-        change: `${tutorBookings.length} total`,
-        trend: upcomingBookings.length >= historicalBookings.length ? 'up' : 'neutral'
-      },
-      {
-        label: 'Library progress',
-        value: `${ebookCompletion}%`,
-        change: `${ebooksCompleted} titles finished`,
-        trend: ebookCompletion >= 70 ? 'up' : ebookCompletion >= 30 ? 'neutral' : 'attention'
-      }
-    ],
-    analytics: {
-      learningPace,
-      communityEngagement
-    },
-    tutorBookings: {
-      active: upcomingBookings,
-      history: historicalBookings
-    },
-    courses: {
-      active: courseEntries,
-      recommendations: recommendationEntries
-    },
-    liveClassrooms: liveSnapshot,
-    ebooks: {
-      library: libraryEntries,
-      recommendations: ebookRecommendationEntries
-    },
-    financial: {
-      summary: financial.summary,
-      invoices
-    },
-    communities: {
-      managed: communityManaged,
-      pipelines
-    },
-    notifications: {
-      total: notifications.length,
-      unreadMessages: notifications.length,
-      items: notifications
-    },
-    assessments: {
-      overview: [],
-      timeline: { upcoming: [], overdue: [], completed: [] },
-      courses: [],
-      schedule: { studyPlan: [], events: [] },
-      analytics: {
-        byType: [],
-        pendingReviews: 0,
-        overdue: 0,
-        averageLeadTimeDays: null,
-        workloadWeight: 0
-      },
-      resources: []
-    },
-    followers,
-    settings
-  };
-
-  return {
-    dashboard,
-    profileStats,
-    profileBio: `Active learner focused on ${courseEntries[0]?.title ?? 'lifelong learning'}.`,
-    profileTitleSegment: 'Learner momentum overview',
-    searchIndex
-  };
-}
-
-export function buildCommunityDashboard({
-  now = new Date(),
-  communities = [],
-  runbooks = new Map(),
-  events = new Map(),
-  paywallTiers = new Map(),
-  subscriptions = new Map(),
-  safetyIncidents = new Map(),
-  communications = new Map()
-} = {}) {
-  const hasSignals =
-    communities.length ||
-    Array.from(runbooks.values()).some((list) => list?.length) ||
-    Array.from(events.values()).some((list) => list?.length) ||
-    Array.from(paywallTiers.values()).some((list) => list?.length) ||
-    Array.from(safetyIncidents.values()).some((list) => list?.length);
-
-  if (!hasSignals) {
-    return null;
-  }
-
-  let totalMembers = 0;
-  let totalPendingApprovals = 0;
-  let totalEvents = 0;
-  let totalRevenueCents = 0;
-
-  const overview = communities.map((community) => {
-    const stats = community.stats ?? {};
-    const metadata = community.metadata ?? {};
-    const incidents = safetyIncidents.get(community.id) ?? [];
-    const pendingApprovals = Number(metadata.approvalsPending ?? metadata.pendingApprovals ?? 0);
-    totalMembers += Number(stats.members ?? 0);
-    totalPendingApprovals += pendingApprovals;
-    const communityEvents = events.get(community.id) ?? [];
-    totalEvents += communityEvents.length;
-
-    const communitySubscriptions = subscriptions.get(community.id) ?? [];
-    const recurringRevenue = communitySubscriptions
-      .filter((subscription) => subscription.status === 'active')
-      .reduce((sum, subscription) => sum + Number(subscription.metadata?.priceCents ?? subscription.priceCents ?? 0), 0);
-    totalRevenueCents += recurringRevenue;
-
-    return {
-      id: community.id,
-      name: community.name,
-      members: `${stats.members ?? 0} members`,
-      health: metadata.health ?? 'Healthy',
-      trend: metadata.trend ?? 'Steady',
-      approvalsPending: pendingApprovals,
-      moderators: `${metadata.moderators?.length ?? 0} moderators`,
-      incidentsOpen: incidents.filter((incident) => incident.status !== 'resolved' && incident.status !== 'dismissed').length,
-      escalationsOpen: metadata.escalations?.length ?? 0
-    };
-  });
-
-  const metrics = [
-    {
-      label: 'Active members',
-      value: `${totalMembers}`,
-      change: totalPendingApprovals > 0 ? `+${totalPendingApprovals} awaiting approval` : 'All clear',
-      trend: totalPendingApprovals > 0 ? 'attention' : 'up'
-    },
-    {
-      label: 'Upcoming programmes',
-      value: `${totalEvents}`,
-      change: `${communities.length} communities tracked`,
-      trend: totalEvents > 0 ? 'up' : 'steady'
-    },
-    {
-      label: 'Recurring revenue',
-      value: formatCurrency(totalRevenueCents, 'USD'),
-      change: `${communities.filter((community) => (subscriptions.get(community.id) ?? []).length > 0).length} monetised`,
-      trend: totalRevenueCents > 0 ? 'up' : 'neutral'
-    }
-  ];
-
-  const runbookEntries = [];
-  runbooks.forEach((list, communityId) => {
-    const community = communities.find((entry) => entry.id === communityId);
-    list?.slice(0, 8).forEach((resource) => {
-      const metadata = safeJsonParse(resource.metadata, {});
-      runbookEntries.push({
-        id: resource.id,
-        communityId,
-        community: community?.name ?? `Community ${communityId}`,
-        title: resource.title,
-        owner: metadata.owner ?? metadata.maintainer ?? 'Operations',
-        automationReady: metadata.automationReady ?? metadata.workflow === 'automated',
-        tags: Array.isArray(resource.tags) ? resource.tags.slice(0, 4) : [],
-        updatedAt: resource.updatedAt ? humanizeRelativeTime(resource.updatedAt, now) : 'Recently'
-      });
-    });
-  });
-
-  const escalationEntries = communities.flatMap((community) => {
-    const tasks = community.metadata?.escalations ?? [];
-    if (!Array.isArray(tasks) || tasks.length === 0) return [];
-    return tasks.slice(0, 5).map((task, index) => ({
-      id: `${community.id}-escalation-${index}`,
-      title: task.title ?? 'Escalation task',
-      status: task.status ?? 'Open',
-      due: task.due ? humanizeRelativeTime(task.due, now) : 'Soon',
-      community: community.name,
-      owner: task.owner ?? 'Community ops'
-    }));
-  });
-
-  const programmingEvents = [];
-  events.forEach((list, communityId) => {
-    const community = communities.find((entry) => entry.id === communityId);
-    list?.slice(0, 10).forEach((event) => {
-      programmingEvents.push({
-        id: event.id,
-        title: event.title,
-        date: event.startAt ? formatDateTime(event.startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'Scheduled',
-        facilitator: event.metadata?.facilitator ?? 'Community team',
-        seats: event.attendanceLimit ? `${event.attendanceCount ?? 0}/${event.attendanceLimit} seats` : `${event.attendanceCount ?? 0} registered`,
-        status: event.status,
-        community: community?.name ?? null
-      });
-    });
-  });
-
-  const monetisationTiers = [];
-  paywallTiers.forEach((list, communityId) => {
-    const community = communities.find((entry) => entry.id === communityId);
-    list?.forEach((tier) => {
-      monetisationTiers.push({
-        id: tier.id,
-        communityId,
-        community: community?.name ?? `Community ${communityId}`,
-        name: tier.name,
-        price: formatCurrency(tier.priceCents ?? 0, tier.currency ?? 'USD'),
-        billingInterval: tier.billingInterval ?? 'monthly',
-        benefits: tier.benefits ?? []
-      });
-    });
-  });
-
-  const monetisationExperiments = communities.flatMap((community) => {
-    const experiments = community.metadata?.monetisation?.experiments ?? [];
-    if (!Array.isArray(experiments)) return [];
-    return experiments.slice(0, 4).map((experiment, index) => ({
-      id: `${community.id}-experiment-${index}`,
-      title: experiment.title ?? 'Monetisation experiment',
-      status: experiment.status ?? 'Testing',
-      hypothesis: experiment.hypothesis ?? 'Increase community conversion rate',
-      community: community.name
-    }));
-  });
-
-  const monetisationInsights = [
-    {
-      id: 'insight-revenue',
-      title: 'ARR projection',
-      value: formatCurrency(totalRevenueCents * 12, 'USD'),
-      change: 'Projected next 12 months'
-    },
-    {
-      id: 'insight-conversion',
-      title: 'Trial conversion',
-      value: `${communities.length ? Math.round((monetisationTiers.length / communities.length) * 25) : 15}%`,
-      change: 'Across monetised communities'
-    }
-  ];
-
-  const activeIncidents = [];
-  const incidentBacklog = [];
-  safetyIncidents.forEach((list, communityId) => {
-    const community = communities.find((entry) => entry.id === communityId);
-    list?.forEach((incident) => {
-      const formatted = {
-        id: incident.incidentUuid ?? incident.id,
-        title: incident.category ?? 'Incident',
-        severity: incident.severity ?? 'medium',
-        reportedAt: incident.reportedAt ? humanizeRelativeTime(incident.reportedAt, now) : 'Recently',
-        status: incident.status,
-        community: community?.name ?? `Community ${communityId}`,
-        ackBreached: incident.acknowledgement?.ackBreached ?? false,
-        resolutionBreached: incident.resolution?.resolutionBreached ?? false
-      };
-      if (incident.status === 'resolved' || incident.status === 'dismissed') {
-        incidentBacklog.push(formatted);
-      } else {
-        activeIncidents.push(formatted);
-      }
-    });
-  });
-
-  const moderatorRoster = communities.flatMap((community) => {
-    const moderators = community.metadata?.moderators ?? [];
-    if (!Array.isArray(moderators)) return [];
-    return moderators.slice(0, 6).map((moderator, index) => ({
-      id: `${community.id}-moderator-${index}`,
-      community: community.name,
-      role: moderator.role ?? 'Moderator',
-      timezone: moderator.timezone ?? 'UTC',
-      coverage: moderator.coverage ?? 'Core hours'
-    }));
-  });
-
-  const communicationHighlights = [];
-  communications.forEach((list, communityId) => {
-    const community = communities.find((entry) => entry.id === communityId);
-    list?.slice(0, 5).forEach((highlight, index) => {
-      communicationHighlights.push({
-        id: `${communityId}-highlight-${index}`,
-        title: highlight.title ?? 'Campaign highlight',
-        excerpt: highlight.excerpt ?? highlight.summary ?? 'Member response and engagement metrics captured.',
-        community: community?.name ?? `Community ${communityId}`,
-        publishedAt: highlight.publishedAt ? formatDateTime(highlight.publishedAt, { dateStyle: 'medium' }) : 'Recently'
-      });
-    });
-  });
-
-  const broadcasts = communities.flatMap((community) => {
-    const items = communications.get(community.id)?.filter((entry) => entry.type === 'broadcast') ?? [];
-    return items.slice(0, 4).map((item, index) => ({
-      id: `${community.id}-broadcast-${index}`,
-      title: item.title ?? 'Community broadcast',
-      status: item.status ?? 'Scheduled',
-      audience: item.audience ?? 'Members',
-      sendAt: item.sendAt ? formatDateTime(item.sendAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'Queued'
-    }));
-  });
-
-  const communicationTrends = communities.map((community) => ({
-    id: community.id,
-    name: community.name,
-    cadence: community.metadata?.communications?.cadence ?? 'Bi-weekly',
-    openRate: community.metadata?.communications?.openRate ?? '58%',
-    clickRate: community.metadata?.communications?.clickRate ?? '17%'
-  }));
-
-  const searchIndex = overview.map((entry) => ({
-    id: `search-community-${entry.id}`,
-    title: entry.name,
-    type: 'Community',
-    url: `/dashboard/community/${entry.id}`
-  }));
-
-  const dashboard = {
-    metrics,
-    health: {
-      overview,
-      moderators: moderatorRoster
-    },
-    operations: {
-      runbooks: runbookEntries,
-      escalations: escalationEntries
-    },
-    programming: {
-      upcomingEvents: programmingEvents,
-      tutorPods: [],
-      broadcasts
-    },
-    monetisation: {
-      tiers: monetisationTiers,
-      experiments: monetisationExperiments,
-      insights: monetisationInsights
-    },
-    safety: {
-      incidents: activeIncidents,
-      backlog: incidentBacklog,
-      moderators: moderatorRoster
-    },
-    communications: {
-      highlights: communicationHighlights,
-      broadcasts,
-      trends: communicationTrends
-    }
-  };
-
-  const profileStats = [
-    { label: 'Communities stewarded', value: `${communities.length}`, trend: 'up' },
-    { label: 'Runbooks published', value: `${runbookEntries.length}`, trend: runbookEntries.length ? 'up' : 'neutral' },
-    { label: 'Incident queue', value: `${activeIncidents.length}`, trend: activeIncidents.length ? 'attention' : 'up' }
-  ];
-
-  return {
-    dashboard,
-    profileStats,
-    profileBio: 'Community operator ensuring healthy member experiences and monetisation readiness.',
-    profileTitleSegment: 'Community operations overview',
-    searchIndex
-  };
-}
-
 export default class DashboardService {
   static async getDashboardForUser(userId, { referenceDate = new Date() } = {}) {
     const { default: UserModel } = await import('../models/UserModel.js');
@@ -2395,6 +2467,437 @@ export default class DashboardService {
       }
     } catch (error) {
       log.warn({ err: error }, 'Failed to load collaborator directory for course workspace');
+    }
+
+    let learnerSnapshot;
+    let communitySnapshot;
+    let communitySummaries = [];
+    const communityEventsByCommunity = new Map();
+    const communityRunbooksByCommunity = new Map();
+    const communityPaywallTiersByCommunity = new Map();
+    const communitySubscriptionsByCommunity = new Map();
+    const communityPendingMembersByCommunity = new Map();
+    const communityModeratorsByCommunity = new Map();
+    const communicationsByCommunity = new Map();
+    let communityModerationCases = [];
+    let engagementTotals = { current: {}, previous: {} };
+
+    try {
+      const [
+        { default: db },
+        { default: CourseEnrollmentModel },
+        { default: CourseProgressModel },
+        { default: CourseModel },
+        { default: EbookProgressModel },
+        { default: CommunityService },
+        { default: CommunitySubscriptionModel },
+        { default: CommunityEventModel },
+        { default: UserFollowModel },
+        { default: UserPrivacySettingModel },
+        { default: FollowRecommendationModel }
+      ] = await Promise.all([
+        import('../config/database.js'),
+        import('../models/CourseEnrollmentModel.js'),
+        import('../models/CourseProgressModel.js'),
+        import('../models/CourseModel.js'),
+        import('../models/EbookProgressModel.js'),
+        import('./CommunityService.js'),
+        import('../models/CommunitySubscriptionModel.js'),
+        import('../models/CommunityEventModel.js'),
+        import('../models/UserFollowModel.js'),
+        import('../models/UserPrivacySettingModel.js'),
+        import('../models/FollowRecommendationModel.js')
+      ]);
+
+      const enrollmentRows = await db('course_enrollments as ce')
+        .select([
+          'ce.id',
+          'ce.public_id as publicId',
+          'ce.course_id as courseId',
+          'ce.user_id as userId',
+          'ce.status',
+          'ce.progress_percent as progressPercent',
+          'ce.started_at as startedAt',
+          'ce.completed_at as completedAt',
+          'ce.last_accessed_at as lastAccessedAt',
+          'ce.metadata',
+          'ce.created_at as createdAt',
+          'ce.updated_at as updatedAt'
+        ])
+        .where('ce.user_id', user.id)
+        .orderBy('ce.created_at', 'desc');
+      const enrollments = enrollmentRows.map((row) => CourseEnrollmentModel.deserialize(row));
+      const enrollmentIds = enrollments.map((enrollment) => enrollment.id);
+      const courseProgress = enrollmentIds.length
+        ? await CourseProgressModel.listByEnrollmentIds(enrollmentIds)
+        : [];
+
+      const courseIds = Array.from(new Set(enrollments.map((enrollment) => enrollment.courseId))).filter(Boolean);
+      const courseRecords = courseIds.length
+        ? await Promise.all(courseIds.map((id) => CourseModel.findById(id)))
+        : [];
+      const courses = courseRecords.filter(Boolean);
+
+      const tutorBookingRows = await db('tutor_bookings as tb')
+        .leftJoin('tutor_profiles as tp', 'tb.tutor_id', 'tp.id')
+        .leftJoin('users as tu', 'tp.user_id', 'tu.id')
+        .select([
+          'tb.id',
+          'tb.public_id as publicId',
+          'tb.tutor_id as tutorId',
+          'tb.learner_id as learnerId',
+          'tb.scheduled_start as scheduledStart',
+          'tb.scheduled_end as scheduledEnd',
+          'tb.duration_minutes as durationMinutes',
+          'tb.hourly_rate_amount as hourlyRateAmount',
+          'tb.hourly_rate_currency as hourlyRateCurrency',
+          'tb.meeting_url as meetingUrl',
+          'tb.status',
+          'tb.metadata',
+          'tp.display_name as tutorDisplayName',
+          'tu.first_name as tutorFirstName',
+          'tu.last_name as tutorLastName'
+        ])
+        .where('tb.learner_id', user.id)
+        .orderBy('tb.scheduled_start', 'desc')
+        .limit(100);
+      const tutorBookings = tutorBookingRows.map((row) => ({
+        id: row.id,
+        publicId: row.publicId,
+        tutorId: row.tutorId,
+        learnerId: row.learnerId,
+        tutorFirstName: row.tutorFirstName,
+        tutorLastName: row.tutorLastName,
+        tutorName: row.tutorDisplayName ?? resolveName(row.tutorFirstName, row.tutorLastName, `Tutor ${row.tutorId}`),
+        scheduledStart: row.scheduledStart ? new Date(row.scheduledStart) : null,
+        scheduledEnd: row.scheduledEnd ? new Date(row.scheduledEnd) : null,
+        durationMinutes: Number(row.durationMinutes ?? 60),
+        hourlyRateAmount: Number(row.hourlyRateAmount ?? 0),
+        hourlyRateCurrency: row.hourlyRateCurrency ?? 'USD',
+        meetingUrl: row.meetingUrl ?? null,
+        status: row.status ?? 'requested',
+        metadata: safeJsonParse(row.metadata, {})
+      }));
+
+      const tutorIds = Array.from(new Set(tutorBookings.map((booking) => booking.tutorId).filter(Boolean)));
+      const availabilityRows = tutorIds.length
+        ? await db('tutor_availability_slots as tas')
+            .select([
+              'tas.id',
+              'tas.tutor_id as tutorId',
+              'tas.start_at as startAt',
+              'tas.end_at as endAt',
+              'tas.status',
+              'tas.metadata'
+            ])
+            .whereIn('tas.tutor_id', tutorIds)
+            .andWhere('tas.start_at', '>=', referenceDate)
+            .orderBy('tas.start_at', 'asc')
+            .limit(100)
+        : [];
+      const tutorAvailability = availabilityRows.map((row) => ({
+        tutorId: row.tutorId,
+        startAt: row.startAt ? new Date(row.startAt) : null,
+        endAt: row.endAt ? new Date(row.endAt) : null,
+        status: row.status,
+        metadata: safeJsonParse(row.metadata, {})
+      }));
+
+      communitySummaries = await CommunityService.listForUser(user.id);
+      const communityIds = communitySummaries
+        .map((community) => (Number.isFinite(Number(community.id)) ? Number(community.id) : null))
+        .filter((id) => id !== null);
+
+      const ebookProgressRows = await db('ebook_read_progress as erp')
+        .select([
+          'erp.id',
+          'erp.asset_id as assetId',
+          'erp.user_id as userId',
+          'erp.progress_percent as progressPercent',
+          'erp.last_location as lastLocation',
+          'erp.time_spent_seconds as timeSpentSeconds',
+          'erp.updated_at as updatedAt',
+          'erp.created_at as createdAt'
+        ])
+        .where('erp.user_id', user.id)
+        .orderBy('erp.updated_at', 'desc')
+        .limit(100);
+      const ebookProgress = ebookProgressRows.map((row) => EbookProgressModel.deserialize(row));
+
+      const ebookAssetIds = Array.from(new Set(ebookProgress.map((entry) => entry.assetId).filter(Boolean)));
+      const ebookCatalog = new Map();
+      if (ebookAssetIds.length) {
+        const ebookRows = await db('ebooks')
+          .select(['id', 'public_id as publicId', 'asset_id as assetId', 'title', 'price_amount as priceAmount', 'price_currency as priceCurrency', 'status'])
+          .whereIn('asset_id', ebookAssetIds);
+        ebookRows.forEach((row) => {
+          ebookCatalog.set(row.assetId, {
+            id: row.publicId ?? `ebook-${row.id}`,
+            title: row.title,
+            priceAmount: Number(row.priceAmount ?? 0),
+            priceCurrency: row.priceCurrency ?? 'USD',
+            status: row.status ?? 'draft'
+          });
+        });
+      }
+
+      const paymentRows = await db('payment_intents as pi')
+        .select([
+          'pi.id',
+          'pi.public_id as publicId',
+          'pi.amount_total as amountTotal',
+          'pi.amount_refunded as amountRefunded',
+          'pi.currency',
+          'pi.status',
+          'pi.metadata',
+          'pi.created_at as createdAt'
+        ])
+        .where('pi.user_id', user.id)
+        .orderBy('pi.created_at', 'desc')
+        .limit(25);
+      const invoices = paymentRows.map((row) => ({
+        id: row.publicId ?? `invoice-${row.id}`,
+        label: safeJsonParse(row.metadata, {}).description ?? 'Invoice',
+        amountCents: Number(row.amountTotal ?? 0),
+        currency: row.currency ?? 'USD',
+        status: row.status ?? 'open',
+        date: row.createdAt ? new Date(row.createdAt) : null
+      }));
+
+      const communitySubscriptions = await CommunitySubscriptionModel.listByUser(user.id);
+
+      const [followersCount, followingCount, pendingFollowersData, outgoingFollowersData, recommendationData, privacySettings] =
+        await Promise.all([
+          UserFollowModel.countFollowers(user.id),
+          UserFollowModel.countFollowing(user.id),
+          UserFollowModel.listFollowers(user.id, { status: 'pending', limit: 10 }),
+          UserFollowModel.listFollowing(user.id, { status: 'pending', limit: 10 }),
+          FollowRecommendationModel.listForUser(user.id, { limit: 10 }),
+          UserPrivacySettingModel.getForUser(user.id)
+        ]);
+
+      const mapFollowEntry = (entry, prefix) => ({
+        id: `${prefix}-${entry.relationship.id}`,
+        name: resolveName(entry.user?.firstName, entry.user?.lastName, entry.user?.email ?? 'Member'),
+        email: entry.user?.email ?? null,
+        requestedAt: entry.relationship?.createdAt ?? null,
+        score: entry.relationship?.metadata?.score ?? null,
+        reason: entry.relationship?.reason ?? null
+      });
+
+      const pendingFollowers = Array.isArray(pendingFollowersData?.items)
+        ? pendingFollowersData.items.map((entry) => mapFollowEntry(entry, 'pending'))
+        : [];
+      const outgoingFollowers = Array.isArray(outgoingFollowersData?.items)
+        ? outgoingFollowersData.items.map((entry) => mapFollowEntry(entry, 'outgoing'))
+        : [];
+      const followRecommendations = Array.isArray(recommendationData)
+        ? recommendationData.map((entry) => ({
+            id: `recommendation-${entry.recommendation.id}`,
+            name: resolveName(entry.user?.firstName, entry.user?.lastName, entry.user?.email ?? 'Member'),
+            email: entry.user?.email ?? null,
+            score: entry.recommendation?.score ?? null,
+            reason: entry.recommendation?.reasonCode ?? null
+          }))
+        : [];
+
+      const communityEventsList =
+        communityIds.length > 0
+          ? await Promise.all(
+              communityIds.map((communityId) =>
+                CommunityEventModel.listForCommunity(communityId, { from: referenceDate, limit: 10 })
+              )
+            )
+          : [];
+
+      const flattenedCommunityEvents = [];
+      communityIds.forEach((communityId, index) => {
+        const events = communityEventsList[index] ?? [];
+        communityEventsByCommunity.set(communityId, events);
+        const community = communitySummaries.find((entry) => entry.id === communityId);
+        events.forEach((event) => {
+          flattenedCommunityEvents.push({
+            ...event,
+            communityId,
+            communityName: community?.name ?? `Community ${communityId}`
+          });
+        });
+      });
+
+      const liveClassroomRows =
+        communityIds.length > 0
+          ? await db('live_classrooms as lc')
+              .select([
+                'lc.id',
+                'lc.public_id as publicId',
+                'lc.community_id as communityId',
+                'lc.title',
+                'lc.type',
+                'lc.status',
+                'lc.start_at as startAt',
+                'lc.end_at as endAt',
+                'lc.capacity',
+                'lc.reserved_seats as reservedSeats',
+                'lc.metadata'
+              ])
+              .whereIn('lc.community_id', communityIds)
+              .andWhere('lc.status', 'scheduled')
+              .andWhere('lc.start_at', '>=', referenceDate)
+              .orderBy('lc.start_at', 'asc')
+              .limit(50)
+          : [];
+      const liveClassrooms = liveClassroomRows.map((row) => ({
+        id: row.publicId ?? `live-${row.id}`,
+        communityId: row.communityId,
+        title: row.title,
+        type: row.type,
+        status: row.status,
+        startAt: row.startAt ? new Date(row.startAt) : null,
+        endAt: row.endAt ? new Date(row.endAt) : null,
+        capacity: Number(row.capacity ?? 0),
+        reservedSeats: Number(row.reservedSeats ?? 0),
+        metadata: safeJsonParse(row.metadata, {})
+      }));
+
+      const learnerFollowerSummary = {
+        followers: followersCount ?? 0,
+        following: followingCount ?? 0,
+        pending: pendingFollowers,
+        outgoing: outgoingFollowers,
+        recommendations: followRecommendations
+      };
+
+      learnerSnapshot =
+        buildLearnerDashboard({
+          user,
+          now: referenceDate,
+          enrollments,
+          courses,
+          courseProgress,
+          tutorBookings,
+          tutorAvailability,
+          liveClassrooms,
+          ebookProgress,
+          ebooks: ebookCatalog,
+          invoices,
+          communityMemberships: communitySummaries,
+          communityEvents: flattenedCommunityEvents,
+          communityPipelines: [],
+          communitySubscriptions,
+          followerSummary: learnerFollowerSummary,
+          privacySettings,
+          messagingSummary: null,
+          notifications: []
+        }) ?? undefined;
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load learner dashboard data');
+    }
+
+    try {
+      if (communitySummaries.length) {
+        const [
+          { default: CommunityMemberModel },
+          { default: CommunityResourceModel },
+          { default: CommunityPaywallTierModel },
+          { default: CommunitySubscriptionModel },
+          { default: CommunityPostModerationCaseModel },
+          { default: ReportingCommunityEngagementDailyView },
+          { default: CommunityPostModel },
+          { default: CommunityEventModel }
+        ] = await Promise.all([
+          import('../models/CommunityMemberModel.js'),
+          import('../models/CommunityResourceModel.js'),
+          import('../models/CommunityPaywallTierModel.js'),
+          import('../models/CommunitySubscriptionModel.js'),
+          import('../models/CommunityPostModerationCaseModel.js'),
+          import('../models/ReportingCommunityEngagementDailyView.js'),
+          import('../models/CommunityPostModel.js'),
+          import('../models/CommunityEventModel.js')
+        ]);
+
+        const communityIds = communitySummaries
+          .map((community) => (Number.isFinite(Number(community.id)) ? Number(community.id) : null))
+          .filter((id) => id !== null);
+
+        if (communityIds.length && communityEventsByCommunity.size === 0) {
+          const eventsLists = await Promise.all(
+            communityIds.map((communityId) =>
+              CommunityEventModel.listForCommunity(communityId, { from: referenceDate, limit: 10 })
+            )
+          );
+          communityIds.forEach((communityId, index) => {
+            communityEventsByCommunity.set(communityId, eventsLists[index] ?? []);
+          });
+        }
+
+        const memberLists = await Promise.all(communityIds.map((id) => CommunityMemberModel.listByCommunity(id)));
+        const runbookLists = await Promise.all(
+          communityIds.map((id) => CommunityResourceModel.listForCommunity(id, { resourceType: 'runbook', limit: 10 }))
+        );
+        const tierLists = await Promise.all(communityIds.map((id) => CommunityPaywallTierModel.listByCommunity(id)));
+        const subscriptionLists = await Promise.all(
+          communityIds.map((id) => CommunitySubscriptionModel.listByCommunity(id, { status: 'active' }))
+        );
+        const moderationLists = await Promise.all(
+          communityIds.map((id) =>
+            CommunityPostModerationCaseModel.list(
+              { communityId: id, status: ['pending', 'in_review', 'escalated'] },
+              { perPage: 50 }
+            )
+          )
+        );
+        const communicationsLists = await Promise.all(
+          communityIds.map((id) => CommunityPostModel.paginateForCommunity(id, { perPage: 10 }))
+        );
+
+        communityIds.forEach((communityId, index) => {
+          const members = memberLists[index] ?? [];
+          communityPendingMembersByCommunity.set(
+            communityId,
+            members.filter((member) => member.status && member.status !== 'active')
+          );
+          communityModeratorsByCommunity.set(
+            communityId,
+            members.filter((member) => ['owner', 'admin', 'moderator'].includes(member.role))
+          );
+          communityRunbooksByCommunity.set(communityId, runbookLists[index]?.items ?? []);
+          communityPaywallTiersByCommunity.set(communityId, tierLists[index] ?? []);
+          communitySubscriptionsByCommunity.set(communityId, subscriptionLists[index] ?? []);
+          communityModerationCases.push(...(moderationLists[index]?.items ?? []));
+          communicationsByCommunity.set(communityId, communicationsLists[index]?.items ?? []);
+        });
+
+        const engagementStart = new Date(referenceDate.getTime() - 7 * DAY_IN_MS);
+        const previousStart = new Date(engagementStart.getTime() - 7 * DAY_IN_MS);
+        const previousEnd = new Date(engagementStart.getTime() - DAY_IN_MS);
+        const currentTotals = await ReportingCommunityEngagementDailyView.fetchTotals({
+          start: engagementStart,
+          end: referenceDate
+        });
+        const previousTotals = await ReportingCommunityEngagementDailyView.fetchTotals({
+          start: previousStart,
+          end: previousEnd
+        });
+        engagementTotals = { current: currentTotals, previous: previousTotals };
+
+        communitySnapshot =
+          buildCommunityDashboard({
+            user,
+            now: referenceDate,
+            communities: communitySummaries,
+            eventsByCommunity: communityEventsByCommunity,
+            runbooksByCommunity: communityRunbooksByCommunity,
+            paywallTiersByCommunity: communityPaywallTiersByCommunity,
+            subscriptionsByCommunity: communitySubscriptionsByCommunity,
+            pendingMembersByCommunity: communityPendingMembersByCommunity,
+            moderatorsByCommunity: communityModeratorsByCommunity,
+            moderationCases: communityModerationCases,
+            communicationsByCommunity,
+            engagementTotals
+          }) ?? undefined;
+      }
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load community operations dashboard data');
     }
 
     const instructorSnapshot =
@@ -2570,75 +3073,79 @@ export default class DashboardService {
 
     const dashboards = {};
     const searchIndex = [];
-    if (instructorSnapshot) {
-      dashboards.instructor = instructorSnapshot.dashboard;
-      searchIndex.push(...instructorSnapshot.searchIndex);
-    }
-    if (learnerSnapshot) {
-      dashboards.learner = learnerSnapshot.dashboard;
-      searchIndex.push(...learnerSnapshot.searchIndex);
-    }
-    if (communitySnapshot) {
-      dashboards.community = communitySnapshot.dashboard;
-      searchIndex.push(...communitySnapshot.searchIndex);
-    }
+    const roles = [];
+    const profileStats = [];
+    const profileBioSegments = [];
+    const feedHighlights = [];
+    let profileTitleSegment = null;
+
+    const pushRole = (role) => {
+      if (!role || !role.id) return;
+      if (roles.some((entry) => entry.id === role.id)) return;
+      roles.push({ id: role.id, label: role.label ?? role.id });
+    };
+
+    const applySnapshot = (key, snapshot) => {
+      if (!snapshot) return;
+      dashboards[key] = snapshot.dashboard;
+      if (Array.isArray(snapshot.searchIndex)) {
+        searchIndex.push(...snapshot.searchIndex);
+      }
+      if (Array.isArray(snapshot.profileStats)) {
+        profileStats.push(...snapshot.profileStats);
+      }
+      if (snapshot.profileBio) {
+        profileBioSegments.push(snapshot.profileBio);
+      }
+      if (!profileTitleSegment && snapshot.profileTitleSegment) {
+        profileTitleSegment = snapshot.profileTitleSegment;
+      }
+      if (Array.isArray(snapshot.feedHighlights)) {
+        feedHighlights.push(...snapshot.feedHighlights);
+      }
+      pushRole(snapshot.role);
+    };
+
+    applySnapshot('learner', learnerSnapshot);
+    applySnapshot('community', communitySnapshot);
+    applySnapshot('instructor', instructorSnapshot);
+
     if (operatorSnapshot) {
       dashboards.admin = operatorSnapshot.dashboard;
-      searchIndex.push(...operatorSnapshot.searchIndex);
+      if (Array.isArray(operatorSnapshot.searchIndex)) {
+        searchIndex.push(...operatorSnapshot.searchIndex);
+      }
+      if (Array.isArray(operatorSnapshot.profileStats)) {
+        profileStats.push(...operatorSnapshot.profileStats);
+      }
+      if (operatorSnapshot.profileBio) {
+        profileBioSegments.push(operatorSnapshot.profileBio);
+      }
+      if (!profileTitleSegment && operatorSnapshot.profileTitleSegment) {
+        profileTitleSegment = operatorSnapshot.profileTitleSegment;
+      }
+      if (Array.isArray(operatorSnapshot.feedHighlights)) {
+        feedHighlights.push(...operatorSnapshot.feedHighlights);
+      }
+      pushRole({ id: 'admin', label: 'Admin' });
     }
 
-    const roles = [];
-    if (operatorSnapshot) {
-      roles.push({ id: 'admin', label: 'Admin' });
-    }
-    if (communitySnapshot) {
-      roles.push({ id: 'community', label: 'Community' });
-    }
-    if (instructorSnapshot) {
-      roles.push({ id: 'instructor', label: 'Instructor' });
-    }
-    if (learnerSnapshot) {
-      roles.push({ id: 'learner', label: 'Learner' });
-    }
     if (user.role && !roles.some((role) => role.id === user.role)) {
       roles.push({ id: user.role, label: user.role.charAt(0).toUpperCase() + user.role.slice(1) });
     }
 
-    const profileStats = [
-      ...(learnerSnapshot?.profileStats ?? []),
-      ...(communitySnapshot?.profileStats ?? []),
-      ...(instructorSnapshot?.profileStats ?? []),
-      ...(operatorSnapshot?.profileStats ?? [])
-    ];
-    const profileBioSegments = [];
-    if (learnerSnapshot?.profileBio) {
-      profileBioSegments.push(learnerSnapshot.profileBio);
-    }
-    if (communitySnapshot?.profileBio) {
-      profileBioSegments.push(communitySnapshot.profileBio);
-    }
-    if (instructorSnapshot?.profileBio) {
-      profileBioSegments.push(instructorSnapshot.profileBio);
-    }
-    if (operatorSnapshot?.profileBio) {
-      profileBioSegments.push(operatorSnapshot.profileBio);
-    }
     const profileBio = profileBioSegments.join(' ').trim() || null;
+    const uniqueFeedHighlights = Array.from(new Set(feedHighlights));
 
     const profile = {
       id: user.id,
       name: resolveName(user.firstName, user.lastName, user.email),
       email: user.email,
       avatar: buildAvatarUrl(user.email),
-      title:
-        learnerSnapshot?.profileTitleSegment ??
-        communitySnapshot?.profileTitleSegment ??
-        instructorSnapshot?.profileTitleSegment ??
-        operatorSnapshot?.profileTitleSegment ??
-        null,
+      title: profileTitleSegment,
       bio: profileBio,
       stats: profileStats,
-      feedHighlights: []
+      feedHighlights: uniqueFeedHighlights
     };
 
     return {
