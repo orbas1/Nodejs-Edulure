@@ -1,1900 +1,1524 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
   ChatBubbleBottomCenterTextIcon,
-  PlusIcon,
   ArrowPathIcon,
-  TrashIcon,
-  PencilSquareIcon,
+  PaperAirplaneIcon,
   VideoCameraIcon,
-  SpeakerWaveIcon,
   MusicalNoteIcon,
-  ShieldCheckIcon
+  DocumentTextIcon,
+  ShieldCheckIcon,
+  ExclamationTriangleIcon
 } from '@heroicons/react/24/outline';
 
-const DEFAULT_CHANNELS = [
-  {
-    id: 'general-lounge',
-    name: 'General Lounge',
-    type: 'discussion',
-    topic: 'Announcements, wins, and weekly goals',
-    description:
-      'Pinned for all members. Slow mode enabled during launches to keep updates readable. Scheduled digest summary every Friday.',
-    members: 1842,
-    slowMode: 30,
-    isPrivate: false,
-    allowMedia: true,
-    permissions: ['threads', 'reactions', 'links'],
-    moderators: ['Community Leads'],
-    tags: ['updates', 'intros'],
-    lastActivity: '8 minutes ago'
-  },
-  {
-    id: 'live-lab',
-    name: 'Live Lab',
-    type: 'voice-stage',
-    topic: 'Pop-up co-working and breakout voice rooms',
-    description:
-      'Stage channel for weekly build sprints. Members can raise hands, moderators can spin up breakout rooms instantly.',
-    members: 684,
-    slowMode: 0,
-    isPrivate: true,
-    allowMedia: true,
-    permissions: ['voice', 'screen', 'recording'],
-    moderators: ['Studio Hosts', 'Technical Producers'],
-    tags: ['live', 'studio'],
-    lastActivity: '24 minutes ago'
-  },
-  {
-    id: 'broadcast-center',
-    name: 'Broadcast Center',
-    type: 'broadcast',
-    topic: 'One-to-many announcements and launch coverage',
-    description: 'Broadcast channel with mirrored social post automation and analytics feed.',
-    members: 2410,
-    slowMode: 0,
-    isPrivate: false,
-    allowMedia: false,
-    permissions: ['announcements'],
-    moderators: ['Community Ops'],
-    tags: ['launch', 'announcements'],
-    lastActivity: '1 hour ago'
+import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import {
+  listCommunityChannels,
+  listCommunityMessages,
+  postCommunityMessage,
+  markCommunityChannelRead,
+  addCommunityMessageReaction,
+  removeCommunityMessageReaction,
+  moderateCommunityMessage,
+  listCommunityPresence,
+  updateCommunityPresence
+} from '../../api/communityChatApi.js';
+import {
+  fetchCommunityResources,
+  createCommunityResource,
+  listCommunityRoles,
+  createCommunityRole,
+  assignCommunityRole,
+  listCommunityEvents,
+  createCommunityEvent
+} from '../../api/communityApi.js';
+
+const MESSAGE_PAGE_SIZE = 25;
+
+const channelTypeLabels = {
+  general: { label: 'Discussion', icon: ChatBubbleBottomCenterTextIcon },
+  broadcast: { label: 'Broadcast', icon: ShieldCheckIcon },
+  voice: { label: 'Voice room', icon: MusicalNoteIcon },
+  'voice-stage': { label: 'Stage', icon: VideoCameraIcon },
+  live: { label: 'Live session', icon: VideoCameraIcon }
+};
+
+function resolveChannelLabel(channel) {
+  const typeMeta = channelTypeLabels[channel.channelType];
+  if (!typeMeta) {
+    return { label: 'Channel', icon: ChatBubbleBottomCenterTextIcon };
   }
-];
+  return typeMeta;
+}
 
-const DEFAULT_ROLES = [
-  {
-    id: 'community-leads',
-    name: 'Community Leads',
-    color: '#2563eb',
-    members: 8,
-    canBroadcast: true,
-    canModerate: true,
-    canManageVoice: true,
-    permissions: ['Manage channels', 'Pin updates', 'Launch stages']
-  },
-  {
-    id: 'studio-hosts',
-    name: 'Studio Hosts',
-    color: '#16a34a',
-    members: 14,
-    canBroadcast: false,
-    canModerate: true,
-    canManageVoice: true,
-    permissions: ['Trigger scene switches', 'Start recordings', 'Approve speakers']
-  },
-  {
-    id: 'community-crew',
-    name: 'Community Crew',
-    color: '#f97316',
-    members: 43,
-    canBroadcast: false,
-    canModerate: false,
-    canManageVoice: false,
-    permissions: ['Flag posts', 'Share resources']
+function parseCommunityId(rawId) {
+  if (!rawId) return null;
+  if (rawId.startsWith('community-')) {
+    return rawId.replace('community-', '');
   }
-];
+  return rawId;
+}
 
-const DEFAULT_EVENTS = [
-  {
-    id: 'weekly-build',
-    title: 'Weekly Build Sprint',
-    type: 'co-working',
-    host: 'Studio Hosts',
-    scheduledFor: 'Wednesdays · 14:00 UTC',
-    duration: '90 minutes',
-    channels: ['live-lab'],
-    status: 'Scheduled',
-    assets: ['Sprint brief.pdf', 'Intro bumper.mp4']
-  },
-  {
-    id: 'launch-room',
-    title: 'Launch Room: AI Accelerators',
-    type: 'broadcast',
-    host: 'Community Leads',
-    scheduledFor: 'Fridays · 17:00 UTC',
-    duration: '45 minutes',
-    channels: ['broadcast-center'],
-    status: 'Preparing',
-    assets: ['Run-of-show.docx']
+function formatDateTime(value, options = {}) {
+  if (!value) return '—';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: options.dateStyle ?? 'medium',
+    timeStyle: options.timeStyle ?? 'short'
+  }).format(date);
+}
+
+function formatRelative(value) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const diff = Date.now() - date.getTime();
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  const minutes = Math.round(diff / 60000);
+  if (Math.abs(minutes) < 60) {
+    return rtf.format(-minutes, 'minute');
   }
-];
-
-const DEFAULT_MEDIA_ASSETS = [
-  {
-    id: 'asset-launch-intro',
-    name: 'Launch intro bumper.mp4',
-    type: 'Video',
-    duration: '00:45',
-    size: '148 MB',
-    owner: 'Studio Team',
-    status: 'Ready',
-    assignedTo: ['broadcast-center'],
-    notes: 'ProRes 422 master with alpha matte'
-  },
-  {
-    id: 'asset-chill-bed',
-    name: 'Focus lounge loop.aiff',
-    type: 'Audio',
-    duration: '15:00',
-    size: '102 MB',
-    owner: 'Audio Ops',
-    status: 'Published',
-    assignedTo: ['live-lab'],
-    notes: 'Seamless loop, normalised to −14 LUFS'
-  },
-  {
-    id: 'asset-runbook',
-    name: 'Weekly ritual runbook.pdf',
-    type: 'Document',
-    duration: '—',
-    size: '2.4 MB',
-    owner: 'Community Leads',
-    status: 'Ready',
-    assignedTo: ['general-lounge', 'live-lab'],
-    notes: 'Updated with 2024 OKRs'
+  const hours = Math.round(diff / 3600000);
+  if (Math.abs(hours) < 24) {
+    return rtf.format(-hours, 'hour');
   }
-];
-
-const DEFAULT_INCIDENTS = [
-  {
-    id: 'incident-flagged-post',
-    channelId: 'general-lounge',
-    severity: 'Medium',
-    type: 'Content flag',
-    status: 'Open',
-    reportedBy: 'Community Crew',
-    openedAt: '2024-03-11T14:20:00.000Z',
-    notes: 'Automated filter caught promotional link. Awaiting moderator review.'
-  },
-  {
-    id: 'incident-audio',
-    channelId: 'live-lab',
-    severity: 'Low',
-    type: 'Audio quality',
-    status: 'Investigating',
-    reportedBy: 'Studio Hosts',
-    openedAt: '2024-03-11T13:05:00.000Z',
-    notes: 'Participants reported echo during breakout handoff.'
-  }
-];
-
-const DEFAULT_CHECKS = [
-  {
-    id: 'permissions-sync',
-    label: 'Verify permission sync',
-    description: 'Confirm channel permission updates propagated to Discord and the LMS webhooks.',
-    status: 'Pending'
-  },
-  {
-    id: 'stage-audio',
-    label: 'Stage audio test',
-    description: 'Run 30-second latency and clipping test on the Live Lab stage.',
-    status: 'Pending'
-  },
-  {
-    id: 'broadcast-failover',
-    label: 'Broadcast failover',
-    description: 'Switch ingest node to secondary encoder and confirm stream continuity.',
-    status: 'Pending'
-  }
-];
-
-const DEFAULT_ACTIVITY = [
-  {
-    id: 'activity-webinar',
-    scope: 'events',
-    message: 'Launch Room: AI Accelerators marked as preparing by Community Leads.',
-    timestamp: '2024-03-11T12:30:00.000Z'
-  },
-  {
-    id: 'activity-role-update',
-    scope: 'roles',
-    message: 'Community Crew permissions updated – reactions enabled.',
-    timestamp: '2024-03-11T11:10:00.000Z'
-  }
-];
-
-const PERMISSION_OPTIONS = [
-  { id: 'threads', label: 'Threads & replies' },
-  { id: 'reactions', label: 'Reactions & polls' },
-  { id: 'links', label: 'External links' },
-  { id: 'voice', label: 'Voice rooms' },
-  { id: 'screen', label: 'Screen share' },
-  { id: 'recording', label: 'Recording' },
-  { id: 'announcements', label: 'Broadcast posts' }
-];
-
-const ROLE_PERMISSION_OPTIONS = [
-  { id: 'Manage channels', label: 'Manage channels' },
-  { id: 'Pin updates', label: 'Pin updates' },
-  { id: 'Launch stages', label: 'Launch stages' },
-  { id: 'Trigger scene switches', label: 'Trigger scene switches' },
-  { id: 'Start recordings', label: 'Start recordings' },
-  { id: 'Approve speakers', label: 'Approve speakers' },
-  { id: 'Flag posts', label: 'Flag posts' },
-  { id: 'Share resources', label: 'Share resources' }
-];
-
-const EVENT_TYPES = [
-  { id: 'co-working', label: 'Co-working sprint' },
-  { id: 'broadcast', label: 'Broadcast show' },
-  { id: 'voice-panel', label: 'Voice panel' },
-  { id: 'roundtable', label: 'Roundtable discussion' }
-];
-
-const MEDIA_STATUS_FLOW = ['Staging', 'Ready', 'Published'];
-
-function generateId(prefix) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+  const days = Math.round(diff / 86400000);
+  return rtf.format(-days, 'day');
 }
 
-function normaliseChannels(payload) {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item && (item.id || item.name))
-    .map((item) => ({
-      id: item.id ?? generateId('channel'),
-      name: item.name ?? 'Channel',
-      type: item.type ?? 'discussion',
-      topic: item.topic ?? item.description ?? '',
-      description: item.description ?? '',
-      members: Number.parseInt(item.members ?? 0, 10) || 0,
-      slowMode: Number.parseInt(item.slowMode ?? 0, 10) || 0,
-      isPrivate: Boolean(item.isPrivate),
-      allowMedia: item.allowMedia !== false,
-      permissions: Array.isArray(item.permissions) ? item.permissions : [],
-      moderators: Array.isArray(item.moderators) ? item.moderators : [],
-      tags: Array.isArray(item.tags) ? item.tags : [],
-      lastActivity: item.lastActivity ?? 'Just now'
-    }));
-}
-
-function normaliseRoles(payload) {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item && (item.id || item.name))
-    .map((item) => ({
-      id: item.id ?? generateId('role'),
-      name: item.name ?? 'Role',
-      color: item.color ?? '#1d4ed8',
-      members: Number.parseInt(item.members ?? 0, 10) || 0,
-      canBroadcast: Boolean(item.canBroadcast),
-      canModerate: Boolean(item.canModerate),
-      canManageVoice: Boolean(item.canManageVoice),
-      permissions: Array.isArray(item.permissions) ? item.permissions : []
-    }));
-}
-
-function normaliseEvents(payload) {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item && (item.id || item.title))
-    .map((item) => ({
-      id: item.id ?? generateId('event'),
-      title: item.title ?? 'Community event',
-      type: item.type ?? 'co-working',
-      host: item.host ?? 'Community Team',
-      scheduledFor: item.scheduledFor ?? 'To be scheduled',
-      duration: item.duration ?? '60 minutes',
-      channels: Array.isArray(item.channels) ? item.channels : [],
-      status: item.status ?? 'Draft',
-      assets: Array.isArray(item.assets) ? item.assets : []
-    }));
-}
-
-function normaliseMediaAssets(payload) {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item && (item.id || item.name))
-    .map((item) => ({
-      id: item.id ?? generateId('asset'),
-      name: item.name ?? 'Untitled asset',
-      type: item.type ?? 'Document',
-      duration: item.duration ?? '—',
-      size: item.size ?? '—',
-      owner: item.owner ?? 'Community Ops',
-      status: item.status ?? 'Staging',
-      assignedTo: Array.isArray(item.assignedTo) ? item.assignedTo : [],
-      notes: item.notes ?? ''
-    }));
-}
-
-function normaliseIncidents(payload) {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item && (item.id || item.channelId))
-    .map((item) => ({
-      id: item.id ?? generateId('incident'),
-      channelId: item.channelId ?? 'general-lounge',
-      severity: item.severity ?? 'Low',
-      type: item.type ?? 'Content flag',
-      status: item.status ?? 'Open',
-      reportedBy: item.reportedBy ?? 'Community Ops',
-      openedAt: item.openedAt ?? new Date().toISOString(),
-      resolvedAt: item.resolvedAt ?? null,
-      resolution: item.resolution ?? null,
-      notes: item.notes ?? ''
-    }));
-}
-
-function normaliseChecks(payload) {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item && (item.id || item.label))
-    .map((item) => ({
-      id: item.id ?? generateId('check'),
-      label: item.label ?? 'Operational check',
-      description: item.description ?? '',
-      status: item.status ?? 'Pending'
-    }));
-}
-
-function normaliseActivity(payload) {
-  if (!Array.isArray(payload)) return [];
-  return payload
-    .filter((item) => item && (item.id || item.message))
-    .map((item) => ({
-      id: item.id ?? generateId('activity'),
-      scope: item.scope ?? 'system',
-      message: item.message ?? 'Activity logged',
-      timestamp: item.timestamp ?? new Date().toISOString()
-    }));
-}
-
-function determineAssetType(fileName, mimeType) {
-  if (mimeType?.startsWith('video')) return 'Video';
-  if (mimeType?.startsWith('audio')) return 'Audio';
-  if (mimeType?.includes('pdf')) return 'Document';
-  if (mimeType?.includes('presentation')) return 'Slides';
-  const extension = fileName?.split('.').pop()?.toLowerCase();
-  if (['mp4', 'mov', 'webm'].includes(extension)) return 'Video';
-  if (['mp3', 'wav', 'aiff', 'aac'].includes(extension)) return 'Audio';
-  if (['pdf', 'doc', 'docx'].includes(extension)) return 'Document';
-  if (['ppt', 'pptx', 'key'].includes(extension)) return 'Slides';
-  return 'Document';
-}
-
-function formatTimestamp(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Just now';
-  return date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
+function normaliseMessages(messages) {
+  return [...messages].sort((a, b) => {
+    const timeA = new Date(a.createdAt ?? a.deliveredAt ?? 0).getTime();
+    const timeB = new Date(b.createdAt ?? b.deliveredAt ?? 0).getTime();
+    return timeA - timeB;
   });
 }
 
-const EMPTY_FORM = {
+const initialComposerState = {
+  messageType: 'text',
+  body: '',
+  attachmentUrl: '',
+  attachmentLabel: '',
+  liveTopic: '',
+  metadataNote: ''
+};
+
+const initialRoleForm = {
   name: '',
-  type: 'discussion',
-  topic: '',
+  roleKey: '',
   description: '',
-  members: 0,
-  slowMode: 0,
-  isPrivate: false,
-  allowMedia: true,
-  permissions: [],
-  moderators: '',
-  tags: ''
-};
-
-const EMPTY_ROLE_FORM = {
-  name: '',
-  color: '#2563eb',
-  members: 0,
-  canBroadcast: false,
+  canBroadcast: true,
   canModerate: false,
-  canManageVoice: false,
-  permissions: []
+  canHostVoice: false
 };
 
-const EMPTY_EVENT_FORM = {
+const initialAssignmentForm = {
+  userId: '',
+  roleKey: ''
+};
+
+const initialEventForm = {
   title: '',
-  type: 'co-working',
-  host: '',
-  scheduledFor: '',
-  duration: '60 minutes',
-  channels: [],
-  status: 'Draft',
-  assets: ''
+  summary: '',
+  startAt: '',
+  endAt: '',
+  meetingUrl: '',
+  visibility: 'members',
+  attendanceLimit: '',
+  isOnline: true
+};
+
+const initialResourceForm = {
+  title: '',
+  description: '',
+  resourceType: 'external_link',
+  linkUrl: '',
+  tags: '',
+  visibility: 'members'
+};
+
+const initialPresenceForm = {
+  status: 'online',
+  client: 'web',
+  ttlMinutes: 15,
+  metadata: ''
 };
 
 export default function InstructorCommunityChats() {
-  const { dashboard } = useOutletContext();
-  const seed = dashboard?.communities?.chatSuite ?? {};
+  const { dashboard, refresh } = useOutletContext();
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
 
-  const [channels, setChannels] = useState(() => {
-    const normalised = normaliseChannels(seed.channels);
-    return normalised.length ? normalised : DEFAULT_CHANNELS;
-  });
-  const [roles, setRoles] = useState(() => {
-    const normalised = normaliseRoles(seed.roles);
-    return normalised.length ? normalised : DEFAULT_ROLES;
-  });
-  const [events, setEvents] = useState(() => {
-    const normalised = normaliseEvents(seed.events);
-    return normalised.length ? normalised : DEFAULT_EVENTS;
-  });
-  const [mediaAssets, setMediaAssets] = useState(() => {
-    const normalised = normaliseMediaAssets(seed.mediaAssets);
-    return normalised.length ? normalised : DEFAULT_MEDIA_ASSETS;
-  });
-  const [incidents, setIncidents] = useState(() => {
-    const normalised = normaliseIncidents(seed.incidents);
-    return normalised.length ? normalised : DEFAULT_INCIDENTS;
-  });
-  const [qualityChecks, setQualityChecks] = useState(() => {
-    const normalised = normaliseChecks(seed.checks);
-    return normalised.length ? normalised : DEFAULT_CHECKS;
-  });
-  const [activityLog, setActivityLog] = useState(() => {
-    const normalised = normaliseActivity(seed.activity);
-    const baseline = normalised.length ? normalised : DEFAULT_ACTIVITY;
-    return baseline
-      .slice()
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  });
+  const communityOptions = useMemo(() => {
+    const deck = Array.isArray(dashboard?.communities?.manageDeck) ? dashboard.communities.manageDeck : [];
+    return deck
+      .map((card) => ({
+        id: parseCommunityId(card.id),
+        title: card.title ?? 'Community',
+        metrics: card.metrics ?? { active: 0, pending: 0, moderators: 0 },
+        role: card.role ?? 'member'
+      }))
+      .filter((option) => option.id);
+  }, [dashboard?.communities?.manageDeck]);
 
-  const [selectedChannelId, setSelectedChannelId] = useState(() => channels[0]?.id ?? '__new');
-  const [channelForm, setChannelForm] = useState(EMPTY_FORM);
-  const [roleForm, setRoleForm] = useState(EMPTY_ROLE_FORM);
-  const [selectedRoleId, setSelectedRoleId] = useState(null);
-  const [eventForm, setEventForm] = useState(EMPTY_EVENT_FORM);
-  const [selectedEventId, setSelectedEventId] = useState(null);
-  const [channelFilter, setChannelFilter] = useState('');
-
+  const [selectedCommunityId, setSelectedCommunityId] = useState(() => communityOptions[0]?.id ?? null);
   useEffect(() => {
-    const normalisedChannels = normaliseChannels(seed.channels);
-    if (normalisedChannels.length) {
-      setChannels(normalisedChannels);
-      setSelectedChannelId((current) => {
-        if (!current) return normalisedChannels[0].id;
-        return normalisedChannels.some((channel) => channel.id === current)
-          ? current
-          : normalisedChannels[0].id;
-      });
+    if (!communityOptions.length) {
+      setSelectedCommunityId(null);
+      return;
     }
-  }, [seed.channels]);
+    setSelectedCommunityId((prev) => (prev ? prev : communityOptions[0].id));
+  }, [communityOptions]);
 
-  useEffect(() => {
-    const normalisedRoles = normaliseRoles(seed.roles);
-    if (normalisedRoles.length) {
-      setRoles(normalisedRoles);
-    }
-  }, [seed.roles]);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState(null);
+  const [channels, setChannels] = useState([]);
+  const [activeChannelId, setActiveChannelId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [presence, setPresence] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [feedback, setFeedback] = useState(null);
 
-  useEffect(() => {
-    const normalisedEvents = normaliseEvents(seed.events);
-    if (normalisedEvents.length) {
-      setEvents(normalisedEvents);
-    }
-  }, [seed.events]);
+  const [composer, setComposer] = useState(initialComposerState);
+  const [roleForm, setRoleForm] = useState(initialRoleForm);
+  const [assignmentForm, setAssignmentForm] = useState(initialAssignmentForm);
+  const [eventForm, setEventForm] = useState(initialEventForm);
+  const [resourceForm, setResourceForm] = useState(initialResourceForm);
+  const [presenceForm, setPresenceForm] = useState(initialPresenceForm);
 
-  useEffect(() => {
-    const normalisedAssets = normaliseMediaAssets(seed.mediaAssets);
-    if (normalisedAssets.length) {
-      setMediaAssets(normalisedAssets);
-    }
-  }, [seed.mediaAssets]);
-
-  useEffect(() => {
-    const normalisedIncidents = normaliseIncidents(seed.incidents);
-    if (normalisedIncidents.length) {
-      setIncidents(normalisedIncidents);
-    }
-  }, [seed.incidents]);
-
-  useEffect(() => {
-    const normalisedChecks = normaliseChecks(seed.checks);
-    if (normalisedChecks.length) {
-      setQualityChecks(normalisedChecks);
-    }
-  }, [seed.checks]);
-
-  useEffect(() => {
-    const normalisedActivity = normaliseActivity(seed.activity);
-    if (normalisedActivity.length) {
-      setActivityLog(
-        normalisedActivity
-          .slice()
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      );
-    }
-  }, [seed.activity]);
-
-  const selectedChannel = useMemo(
-    () => channels.find((channel) => channel.id === selectedChannelId) ?? null,
-    [channels, selectedChannelId]
+  const selectedCommunity = useMemo(
+    () => communityOptions.find((option) => option.id === selectedCommunityId) ?? null,
+    [communityOptions, selectedCommunityId]
   );
 
-  const channelLookup = useMemo(() => {
-    const map = new Map();
-    channels.forEach((channel) => {
-      map.set(channel.id, channel.name);
-    });
-    return map;
-  }, [channels]);
-
-  const filteredChannels = useMemo(() => {
-    const term = channelFilter.trim().toLowerCase();
-    if (!term) return channels;
-    return channels.filter((channel) =>
-      [channel.name, channel.topic, channel.description]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(term))
-    );
-  }, [channelFilter, channels]);
-
-  const channelMetrics = useMemo(() => {
-    const totalMembers = channels.reduce((sum, channel) => sum + (channel.members ?? 0), 0);
-    const privateCount = channels.filter((channel) => channel.isPrivate).length;
-    const mediaEnabled = channels.filter((channel) => channel.allowMedia).length;
-    return {
-      totalMembers,
-      privateCount,
-      mediaEnabled
-    };
-  }, [channels]);
-
-  const stagedAssets = useMemo(() => mediaAssets.filter((asset) => asset.status === 'Staging'), [mediaAssets]);
-  const readyAssets = useMemo(() => mediaAssets.filter((asset) => asset.status === 'Ready'), [mediaAssets]);
-  const displayedActivity = useMemo(() => activityLog.slice(0, 12), [activityLog]);
-  const openIncidents = useMemo(() => incidents.filter((incident) => incident.status !== 'Resolved'), [incidents]);
-
-  const severityBadge = useMemo(
-    () => ({
-      Low: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      Medium: 'border-amber-200 bg-amber-50 text-amber-700',
-      High: 'border-rose-200 bg-rose-50 text-rose-700'
-    }),
-    []
-  );
-
-  const checkBadge = useMemo(
-    () => ({
-      Pending: 'border-slate-200 bg-slate-50 text-slate-600',
-      Passed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      Blocked: 'border-rose-200 bg-rose-50 text-rose-700'
-    }),
-    []
-  );
-
-  const assetStatusTone = useMemo(
-    () => ({
-      Staging: 'border-amber-200 bg-amber-50 text-amber-700',
-      Ready: 'border-sky-200 bg-sky-50 text-sky-700',
-      Published: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-      Archived: 'border-slate-200 bg-slate-50 text-slate-500'
-    }),
-    []
-  );
-
-  const assetAdvanceLabel = (status) => {
-    if (status === 'Staging') return 'Mark ready';
-    if (status === 'Ready') return 'Publish';
-    if (status === 'Published') return 'Restage';
-    if (status === 'Archived') return 'Restore';
-    return 'Advance state';
-  };
-
-  const logActivity = (message, scope = 'system') => {
-    setActivityLog((previous) => [
-      { id: generateId('activity'), scope, message, timestamp: new Date().toISOString() },
-      ...previous
-    ].slice(0, 40));
-  };
-
-  useEffect(() => {
-    if (selectedChannelId === '__new' || !selectedChannel) {
-      setChannelForm(EMPTY_FORM);
-      return;
-    }
-    setChannelForm({
-      name: selectedChannel.name,
-      type: selectedChannel.type,
-      topic: selectedChannel.topic ?? '',
-      description: selectedChannel.description ?? '',
-      members: selectedChannel.members ?? 0,
-      slowMode: selectedChannel.slowMode ?? 0,
-      isPrivate: selectedChannel.isPrivate ?? false,
-      allowMedia: selectedChannel.allowMedia ?? false,
-      permissions: selectedChannel.permissions ?? [],
-      moderators: (selectedChannel.moderators ?? []).join(', '),
-      tags: (selectedChannel.tags ?? []).join(', ')
-    });
-  }, [selectedChannelId, selectedChannel]);
-
-  useEffect(() => {
-    if (!selectedRoleId) {
-      setRoleForm(EMPTY_ROLE_FORM);
-      return;
-    }
-    const role = roles.find((item) => item.id === selectedRoleId);
-    if (!role) {
-      setRoleForm(EMPTY_ROLE_FORM);
-      return;
-    }
-    setRoleForm({
-      name: role.name,
-      color: role.color,
-      members: role.members,
-      canBroadcast: role.canBroadcast,
-      canModerate: role.canModerate,
-      canManageVoice: role.canManageVoice,
-      permissions: role.permissions
-    });
-  }, [roles, selectedRoleId]);
-
-  useEffect(() => {
-    if (!selectedEventId) {
-      setEventForm(EMPTY_EVENT_FORM);
-      return;
-    }
-    const event = events.find((item) => item.id === selectedEventId);
-    if (!event) {
-      setEventForm(EMPTY_EVENT_FORM);
-      return;
-    }
-    setEventForm({
-      title: event.title,
-      type: event.type,
-      host: event.host,
-      scheduledFor: event.scheduledFor,
-      duration: event.duration,
-      channels: event.channels,
-      status: event.status,
-      assets: event.assets.join(', ')
-    });
-  }, [events, selectedEventId]);
-
-  const handleChannelFormChange = (field, value) => {
-    setChannelForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const handlePermissionToggle = (permission) => {
-    setChannelForm((current) => {
-      const hasPermission = current.permissions.includes(permission);
-      return {
-        ...current,
-        permissions: hasPermission
-          ? current.permissions.filter((item) => item !== permission)
-          : [...current.permissions, permission]
-      };
-    });
-  };
-
-  const handleChannelSubmit = (event) => {
-    event.preventDefault();
-    const isNewChannel = selectedChannelId === '__new' || !channels.some((channel) => channel.id === selectedChannelId);
-    const payload = {
-      id: selectedChannelId === '__new' ? generateId('channel') : selectedChannelId,
-      name: channelForm.name.trim() || 'Untitled channel',
-      type: channelForm.type,
-      topic: channelForm.topic.trim(),
-      description: channelForm.description.trim(),
-      members: Number.parseInt(channelForm.members, 10) || 0,
-      slowMode: Number.parseInt(channelForm.slowMode, 10) || 0,
-      isPrivate: Boolean(channelForm.isPrivate),
-      allowMedia: Boolean(channelForm.allowMedia),
-      permissions: channelForm.permissions,
-      moderators: channelForm.moderators
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean),
-      tags: channelForm.tags
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean),
-      lastActivity: selectedChannel?.lastActivity ?? 'Just now'
-    };
-
-    setChannels((previous) => {
-      const exists = previous.some((channel) => channel.id === payload.id);
-      if (exists) {
-        return previous.map((channel) => (channel.id === payload.id ? { ...channel, ...payload } : channel));
+  const loadWorkspace = useCallback(
+    async (communityId) => {
+      if (!communityId || !token) {
+        return;
       }
-      return [...previous, payload];
-    });
+      setWorkspaceLoading(true);
+      setWorkspaceError(null);
+      try {
+        const [channelRes, presenceRes, roleRes, eventsRes, resourcesRes] = await Promise.all([
+          listCommunityChannels({ communityId, token }),
+          listCommunityPresence({ communityId, token }),
+          listCommunityRoles({ communityId, token }),
+          listCommunityEvents({ communityId, token, params: { limit: 12 } }),
+          fetchCommunityResources({ communityId, token, limit: 8 })
+        ]);
+        setChannels(Array.isArray(channelRes.data) ? channelRes.data : []);
+        setPresence(Array.isArray(presenceRes.data) ? presenceRes.data : []);
+        setRoles(Array.isArray(roleRes.data) ? roleRes.data : []);
+        setEvents(Array.isArray(eventsRes.data) ? eventsRes.data : []);
+        setResources(Array.isArray(resourcesRes.data) ? resourcesRes.data : []);
+        const firstChannel = channelRes.data?.[0]?.channel?.id ?? null;
+        setActiveChannelId(firstChannel);
+        setMessages([]);
+        setHasMoreMessages(false);
+      } catch (error) {
+        setWorkspaceError(error?.message ?? 'Failed to load chat workspace.');
+      } finally {
+        setWorkspaceLoading(false);
+      }
+    },
+    [token]
+  );
 
-    setSelectedChannelId(payload.id);
-    logActivity(
-      `${isNewChannel ? 'Created' : 'Updated'} #${payload.name} ${payload.type.replace('-', ' ')} channel`,
-      'channels'
-    );
-  };
+  useEffect(() => {
+    if (selectedCommunityId && token) {
+      loadWorkspace(selectedCommunityId);
+    }
+  }, [selectedCommunityId, token, loadWorkspace]);
 
-  const handleChannelDelete = (id) => {
-    const target = channels.find((channel) => channel.id === id);
-    setChannels((previous) => {
-      const next = previous.filter((channel) => channel.id !== id);
-      setSelectedChannelId((current) => {
-        if (current === id) {
-          return next[0]?.id ?? '__new';
+  useEffect(() => {
+    if (!selectedCommunityId || !activeChannelId || !token) {
+      setMessages([]);
+      setHasMoreMessages(false);
+      return;
+    }
+    let cancelled = false;
+    async function fetchMessages() {
+      setMessagesLoading(true);
+      try {
+        const response = await listCommunityMessages({
+          communityId: selectedCommunityId,
+          channelId: activeChannelId,
+          token,
+          limit: MESSAGE_PAGE_SIZE
+        });
+        if (cancelled) return;
+        const items = Array.isArray(response.data) ? response.data : [];
+        setMessages(normaliseMessages(items));
+        const count = response.meta?.pagination?.count ?? items.length;
+        setHasMoreMessages(count >= MESSAGE_PAGE_SIZE);
+      } catch (error) {
+        if (cancelled) return;
+        setFeedback({ tone: 'error', message: error?.message ?? 'Failed to load messages' });
+      } finally {
+        if (!cancelled) {
+          setMessagesLoading(false);
         }
-        return current;
+      }
+    }
+    fetchMessages();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCommunityId, activeChannelId, token]);
+
+  const handleRefreshChannels = useCallback(() => {
+    if (selectedCommunityId) {
+      loadWorkspace(selectedCommunityId);
+    }
+  }, [selectedCommunityId, loadWorkspace]);
+
+  const handleLoadOlderMessages = useCallback(async () => {
+    if (!selectedCommunityId || !activeChannelId || !token || !messages.length) {
+      return;
+    }
+    const oldest = messages[0];
+    const cursor = oldest?.createdAt ?? oldest?.deliveredAt;
+    if (!cursor) {
+      setHasMoreMessages(false);
+      return;
+    }
+    try {
+      const response = await listCommunityMessages({
+        communityId: selectedCommunityId,
+        channelId: activeChannelId,
+        token,
+        limit: MESSAGE_PAGE_SIZE,
+        before: cursor
       });
-      return next;
-    });
-    if (target) {
-      logActivity(`Deleted #${target.name} channel`, 'channels');
-    }
-  };
-
-  const handleChannelDuplicate = (id) => {
-    const source = channels.find((channel) => channel.id === id);
-    if (!source) return;
-    const duplicate = {
-      ...source,
-      id: generateId('channel'),
-      name: `${source.name} Copy`,
-      lastActivity: 'Just now'
-    };
-    setChannels((previous) => [...previous, duplicate]);
-    setSelectedChannelId(duplicate.id);
-    logActivity(`Duplicated #${source.name} into ${duplicate.name}`, 'channels');
-  };
-
-  const handleRoleFormChange = (field, value) => {
-    setRoleForm((current) => ({ ...current, [field]: value }));
-  };
-
-  const handleRolePermissionToggle = (permission) => {
-    setRoleForm((current) => {
-      const hasPermission = current.permissions.includes(permission);
-      return {
-        ...current,
-        permissions: hasPermission
-          ? current.permissions.filter((item) => item !== permission)
-          : [...current.permissions, permission]
-      };
-    });
-  };
-
-  const handleRoleSubmit = (event) => {
-    event.preventDefault();
-    const isNewRole = !selectedRoleId || !roles.some((role) => role.id === selectedRoleId);
-    const payload = {
-      id: selectedRoleId ?? generateId('role'),
-      name: roleForm.name.trim() || 'New role',
-      color: roleForm.color,
-      members: Number.parseInt(roleForm.members, 10) || 0,
-      canBroadcast: Boolean(roleForm.canBroadcast),
-      canModerate: Boolean(roleForm.canModerate),
-      canManageVoice: Boolean(roleForm.canManageVoice),
-      permissions: roleForm.permissions
-    };
-
-    setRoles((previous) => {
-      const exists = previous.some((role) => role.id === payload.id);
-      if (exists) {
-        return previous.map((role) => (role.id === payload.id ? { ...role, ...payload } : role));
+      const items = Array.isArray(response.data) ? response.data : [];
+      if (!items.length) {
+        setHasMoreMessages(false);
+        return;
       }
-      return [...previous, payload];
-    });
-
-    setSelectedRoleId(payload.id);
-    logActivity(`${isNewRole ? 'Created' : 'Updated'} ${payload.name} role`, 'roles');
-  };
-
-  const handleRoleDelete = (id) => {
-    const target = roles.find((role) => role.id === id);
-    setRoles((previous) => previous.filter((role) => role.id !== id));
-    setSelectedRoleId((current) => (current === id ? null : current));
-    if (target) {
-      logActivity(`Removed ${target.name} role`, 'roles');
+      setMessages((prev) => [...normaliseMessages(items), ...prev]);
+      const count = response.meta?.pagination?.count ?? items.length;
+      setHasMoreMessages(count >= MESSAGE_PAGE_SIZE);
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error?.message ?? 'Unable to load older messages' });
     }
-  };
+  }, [selectedCommunityId, activeChannelId, token, messages]);
 
-  const handleEventFormChange = (field, value) => {
-    setEventForm((current) => ({ ...current, [field]: value }));
-  };
+  const handleSelectChannel = useCallback((channelId) => {
+    setActiveChannelId(channelId);
+  }, []);
 
-  const handleEventSubmit = (event) => {
-    event.preventDefault();
-    const isNewEvent = !selectedEventId || !events.some((item) => item.id === selectedEventId);
-    const payload = {
-      id: selectedEventId ?? generateId('event'),
-      title: eventForm.title.trim() || 'Untitled event',
-      type: eventForm.type,
-      host: eventForm.host.trim() || 'Community Team',
-      scheduledFor: eventForm.scheduledFor.trim() || 'To be scheduled',
-      duration: eventForm.duration.trim() || '60 minutes',
-      channels: eventForm.channels,
-      status: eventForm.status.trim() || 'Draft',
-      assets: eventForm.assets
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean)
-    };
-
-    setEvents((previous) => {
-      const exists = previous.some((item) => item.id === payload.id);
-      if (exists) {
-        return previous.map((item) => (item.id === payload.id ? { ...item, ...payload } : item));
-      }
-      return [...previous, payload];
-    });
-
-    setSelectedEventId(payload.id);
-    logActivity(`${isNewEvent ? 'Scheduled' : 'Updated'} ${payload.title}`, 'events');
-  };
-
-  const handleEventDelete = (id) => {
-    const target = events.find((item) => item.id === id);
-    setEvents((previous) => previous.filter((item) => item.id !== id));
-    setSelectedEventId((current) => (current === id ? null : current));
-    if (target) {
-      logActivity(`Cancelled ${target.title}`, 'events');
-    }
-  };
-
-  const handleMediaUpload = (event) => {
-    const files = Array.from(event.target.files ?? []);
-    if (files.length === 0) return;
-    const uploads = files.map((file) => ({
-      id: generateId('asset'),
-      name: file.name,
-      type: determineAssetType(file.name, file.type),
-      duration: file.type.startsWith('audio') ? '03:00' : file.type.startsWith('video') ? '00:30' : '—',
-      size: file.size ? `${Math.max(file.size / (1024 * 1024), 0.1).toFixed(1)} MB` : '—',
-      owner: 'You',
-      status: 'Staging',
-      assignedTo: [],
-      notes: 'Uploaded from dashboard'
-    }));
-    setMediaAssets((previous) => [...uploads, ...previous]);
-    logActivity(`Uploaded ${uploads.length} asset${uploads.length > 1 ? 's' : ''} to staging`, 'media');
-    event.target.value = '';
-  };
-
-  const handleMediaAdvance = (id) => {
-    const asset = mediaAssets.find((item) => item.id === id);
-    if (!asset) return;
-    const currentIndex = MEDIA_STATUS_FLOW.indexOf(asset.status);
-    let nextStatus;
-    if (asset.status === 'Published' || asset.status === 'Archived') {
-      nextStatus = 'Staging';
-    } else {
-      nextStatus = MEDIA_STATUS_FLOW[Math.min(currentIndex + 1, MEDIA_STATUS_FLOW.length - 1)] ?? 'Published';
-    }
-    if (asset.status === nextStatus) return;
-    setMediaAssets((previous) =>
-      previous.map((item) => (item.id === id ? { ...item, status: nextStatus } : item))
-    );
-    logActivity(`Advanced ${asset.name} to ${nextStatus.toLowerCase()} state`, 'media');
-  };
-
-  const handleMediaArchive = (id) => {
-    const asset = mediaAssets.find((item) => item.id === id);
-    if (!asset) return;
-    setMediaAssets((previous) =>
-      previous.map((item) => (item.id === id ? { ...item, status: 'Archived' } : item))
-    );
-    logActivity(`Archived ${asset.name}`, 'media');
-  };
-
-  const handleMediaAssign = (assetId, channelId) => {
-    if (!channelId) return;
-    setMediaAssets((previous) =>
-      previous.map((asset) => {
-        if (asset.id !== assetId || asset.assignedTo.includes(channelId)) return asset;
-        return { ...asset, assignedTo: [...asset.assignedTo, channelId] };
-      })
-    );
-    const channelName = channelLookup.get(channelId) ?? channelId;
-    const asset = mediaAssets.find((item) => item.id === assetId);
-    if (asset) {
-      logActivity(`Assigned ${asset.name} to #${channelName}`, 'media');
-    }
-  };
-
-  const handleMediaRemoveAssignment = (assetId, channelId) => {
-    const asset = mediaAssets.find((item) => item.id === assetId);
-    if (!asset) return;
-    setMediaAssets((previous) =>
-      previous.map((item) =>
-        item.id === assetId
-          ? { ...item, assignedTo: item.assignedTo.filter((entry) => entry !== channelId) }
-          : item
-      )
-    );
-    const channelName = channelLookup.get(channelId) ?? channelId;
-    logActivity(`Unassigned ${asset.name} from #${channelName}`, 'media');
-  };
-
-  const handleMediaDelete = (id) => {
-    const asset = mediaAssets.find((item) => item.id === id);
-    setMediaAssets((previous) => previous.filter((item) => item.id !== id));
-    if (asset) {
-      logActivity(`Removed ${asset.name} from library`, 'media');
-    }
-  };
-
-  const handleLibrarySync = () => {
-    logActivity('Triggered cloud library sync', 'media');
-  };
-
-  const handleIncidentResolve = (id, resolution) => {
-    const incident = incidents.find((item) => item.id === id);
-    if (!incident) return;
-    setIncidents((previous) =>
-      previous.map((item) =>
-        item.id === id
-          ? { ...item, status: 'Resolved', resolution, resolvedAt: new Date().toISOString() }
-          : item
-      )
-    );
-    const channelName = channelLookup.get(incident.channelId) ?? incident.channelId;
-    logActivity(`Resolved ${incident.type.toLowerCase()} in #${channelName}`, 'moderation');
-  };
-
-  const handleChecklistPass = (id) => {
-    setQualityChecks((previous) =>
-      previous.map((item) => (item.id === id ? { ...item, status: 'Passed' } : item))
-    );
-    const check = qualityChecks.find((item) => item.id === id);
-    if (check) {
-      logActivity(`Passed check: ${check.label}`, 'qa');
-    }
-  };
-
-  const handleChecklistBlock = (id) => {
-    setQualityChecks((previous) =>
-      previous.map((item) => (item.id === id ? { ...item, status: 'Blocked' } : item))
-    );
-    const check = qualityChecks.find((item) => item.id === id);
-    if (check) {
-      logActivity(`Flagged blocker on ${check.label}`, 'qa');
-    }
-  };
-
-  const activeVoiceRooms = useMemo(
-    () =>
-      events
-        .filter((item) => item.type !== 'broadcast')
-        .map((item) => ({
-          id: item.id,
-          title: item.title,
-          host: item.host,
-          status: item.status,
-          listeners: Math.max(12, Math.round(Math.random() * 80)),
-          duration: item.duration
-        })),
-    [events]
+  const activeChannelSummary = useMemo(
+    () => channels.find((entry) => entry.channel?.id === activeChannelId) ?? null,
+    [channels, activeChannelId]
   );
+
+  const canModerate = useMemo(() => {
+    const role = activeChannelSummary?.membership?.role ?? selectedCommunity?.role;
+    return ['moderator', 'admin', 'owner'].includes(role);
+  }, [activeChannelSummary?.membership?.role, selectedCommunity?.role]);
+
+  const handleMarkChannelRead = useCallback(
+    async (channelId) => {
+      if (!selectedCommunityId || !token) {
+        setFeedback({ tone: 'error', message: 'Sign in required to update read state.' });
+        return;
+      }
+      const summary = channels.find((entry) => entry.channel?.id === channelId);
+      try {
+        const latestMessageId = summary?.latestMessage?.id ?? messages[messages.length - 1]?.id ?? undefined;
+        const response = await markCommunityChannelRead({
+          communityId: selectedCommunityId,
+          channelId,
+          token,
+          payload: latestMessageId ? { messageId: latestMessageId } : {}
+        });
+        const updatedMembership = response.data ?? null;
+        setChannels((prev) =>
+          prev.map((entry) =>
+            entry.channel.id === channelId
+              ? { ...entry, membership: updatedMembership ?? entry.membership, unreadCount: 0 }
+              : entry
+          )
+        );
+        setFeedback({ tone: 'success', message: 'Channel marked as read.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Failed to mark channel as read.' });
+      }
+    },
+    [selectedCommunityId, token, channels, messages]
+  );
+
+  const handleSendMessage = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!selectedCommunityId || !activeChannelId || !token) {
+        setFeedback({ tone: 'error', message: 'Select a community channel before sending.' });
+        return;
+      }
+      const trimmedBody = composer.body.trim();
+      if (!trimmedBody) {
+        setFeedback({ tone: 'warning', message: 'Message body cannot be empty.' });
+        return;
+      }
+      const attachments = composer.attachmentUrl
+        ? [
+            {
+              url: composer.attachmentUrl.trim(),
+              title: composer.attachmentLabel.trim() || undefined
+            }
+          ]
+        : [];
+      const metadata = {};
+      if (composer.liveTopic) metadata.topic = composer.liveTopic;
+      if (composer.metadataNote) metadata.note = composer.metadataNote;
+      if (composer.messageType === 'live') {
+        metadata.kind = 'live-session';
+      }
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        communityId: selectedCommunityId,
+        channelId: activeChannelId,
+        authorId: session?.user?.id ?? null,
+        messageType: composer.messageType,
+        body: trimmedBody,
+        attachments,
+        metadata,
+        status: 'visible',
+        reactions: [],
+        viewerReactions: [],
+        createdAt: new Date().toISOString(),
+        author: {
+          id: session?.user?.id ?? null,
+          firstName: session?.user?.firstName ?? session?.user?.name ?? 'You',
+          lastName: session?.user?.lastName ?? '',
+          email: session?.user?.email ?? '',
+          role: session?.user?.role ?? 'member'
+        }
+      };
+      setMessages((prev) => [...prev, optimisticMessage]);
+      setChannels((prev) =>
+        prev.map((entry) =>
+          entry.channel.id === activeChannelId
+            ? { ...entry, latestMessage: optimisticMessage, unreadCount: 0 }
+            : entry
+        )
+      );
+      setComposer(initialComposerState);
+      try {
+        const response = await postCommunityMessage({
+          communityId: selectedCommunityId,
+          channelId: activeChannelId,
+          token,
+          payload: {
+            messageType: composer.messageType,
+            body: trimmedBody,
+            attachments,
+            metadata
+          }
+        });
+        if (response.data) {
+          setMessages((prev) =>
+            prev.map((message) => (message.id === optimisticMessage.id ? response.data : message))
+          );
+          setChannels((prev) =>
+            prev.map((entry) =>
+              entry.channel.id === activeChannelId
+                ? { ...entry, latestMessage: response.data, unreadCount: 0 }
+                : entry
+            )
+          );
+        }
+        setFeedback({ tone: 'success', message: 'Message sent to the community.' });
+      } catch (error) {
+        setMessages((prev) => prev.filter((message) => message.id !== optimisticMessage.id));
+        setFeedback({ tone: 'error', message: error?.message ?? 'Failed to send message.' });
+      }
+    },
+    [selectedCommunityId, activeChannelId, token, composer, session?.user]
+  );
+
+  const handleToggleReaction = useCallback(
+    async (message, emoji) => {
+      if (!selectedCommunityId || !activeChannelId || !token) {
+        setFeedback({ tone: 'error', message: 'Unable to react without an active community.' });
+        return;
+      }
+      const hasReaction = message.viewerReactions?.includes(emoji);
+      try {
+        const api = hasReaction ? removeCommunityMessageReaction : addCommunityMessageReaction;
+        const response = await api({
+          communityId: selectedCommunityId,
+          channelId: activeChannelId,
+          messageId: message.id,
+          token,
+          emoji
+        });
+        if (response.data) {
+          setMessages((prev) =>
+            prev.map((entry) =>
+              entry.id === message.id
+                ? { ...entry, reactions: response.data.reactions ?? [], viewerReactions: response.data.viewerReactions ?? [] }
+                : entry
+            )
+          );
+        }
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to update reaction.' });
+      }
+    },
+    [selectedCommunityId, activeChannelId, token]
+  );
+
+  const handleModerateMessage = useCallback(
+    async (message, action) => {
+      if (!canModerate || !selectedCommunityId || !activeChannelId || !token) {
+        setFeedback({ tone: 'error', message: 'You do not have permission to moderate messages.' });
+        return;
+      }
+      const reason = window.prompt('Provide an optional reason for this action', '') ?? '';
+      try {
+        const response = await moderateCommunityMessage({
+          communityId: selectedCommunityId,
+          channelId: activeChannelId,
+          messageId: message.id,
+          token,
+          payload: { action, reason }
+        });
+        if (response.data?.message) {
+          const updated = response.data.message;
+          setMessages((prev) => prev.map((entry) => (entry.id === message.id ? { ...entry, status: updated.status } : entry)));
+        }
+        setFeedback({ tone: 'success', message: 'Moderation action applied.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Failed to moderate message.' });
+      }
+    },
+    [canModerate, selectedCommunityId, activeChannelId, token]
+  );
+
+  const handleRoleSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!selectedCommunityId || !token) {
+        setFeedback({ tone: 'error', message: 'Select a community before creating roles.' });
+        return;
+      }
+      if (!roleForm.name.trim()) {
+        setFeedback({ tone: 'warning', message: 'Role name is required.' });
+        return;
+      }
+      try {
+        const response = await createCommunityRole({
+          communityId: selectedCommunityId,
+          token,
+          payload: {
+            name: roleForm.name.trim(),
+            roleKey: roleForm.roleKey.trim() || undefined,
+            description: roleForm.description.trim() || undefined,
+            permissions: {
+              broadcast: roleForm.canBroadcast,
+              moderate: roleForm.canModerate,
+              voice: roleForm.canHostVoice
+            }
+          }
+        });
+        if (response.data) {
+          setRoles((prev) => [response.data, ...prev]);
+        }
+        setRoleForm(initialRoleForm);
+        setFeedback({ tone: 'success', message: 'Community role created.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to create role.' });
+      }
+    },
+    [roleForm, selectedCommunityId, token]
+  );
+
+  const handleAssignmentSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!selectedCommunityId || !token) {
+        setFeedback({ tone: 'error', message: 'Select a community before assigning roles.' });
+        return;
+      }
+      const userId = Number.parseInt(assignmentForm.userId, 10);
+      if (!Number.isFinite(userId)) {
+        setFeedback({ tone: 'warning', message: 'Provide a valid member identifier.' });
+        return;
+      }
+      if (!assignmentForm.roleKey.trim()) {
+        setFeedback({ tone: 'warning', message: 'Select a role to assign.' });
+        return;
+      }
+      try {
+        await assignCommunityRole({
+          communityId: selectedCommunityId,
+          userId,
+          token,
+          payload: { roleKey: assignmentForm.roleKey.trim() }
+        });
+        setAssignmentForm(initialAssignmentForm);
+        setFeedback({ tone: 'success', message: 'Member role updated.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to update member role.' });
+      }
+    },
+    [assignmentForm, selectedCommunityId, token]
+  );
+
+  const handleEventSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!selectedCommunityId || !token) {
+        setFeedback({ tone: 'error', message: 'Community selection required to create events.' });
+        return;
+      }
+      if (!eventForm.title.trim() || !eventForm.startAt || !eventForm.endAt) {
+        setFeedback({ tone: 'warning', message: 'Event title and schedule are required.' });
+        return;
+      }
+      try {
+        const response = await createCommunityEvent({
+          communityId: selectedCommunityId,
+          token,
+          payload: {
+            title: eventForm.title.trim(),
+            summary: eventForm.summary.trim() || undefined,
+            startAt: new Date(eventForm.startAt).toISOString(),
+            endAt: new Date(eventForm.endAt).toISOString(),
+            meetingUrl: eventForm.meetingUrl.trim() || undefined,
+            visibility: eventForm.visibility,
+            attendanceLimit: eventForm.attendanceLimit ? Number(eventForm.attendanceLimit) : undefined,
+            isOnline: eventForm.isOnline,
+            metadata: eventForm.isOnline ? { mode: 'virtual' } : {}
+          }
+        });
+        if (response.data) {
+          setEvents((prev) => [response.data, ...prev]);
+        }
+        setEventForm(initialEventForm);
+        setFeedback({ tone: 'success', message: 'Event scheduled for the community.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Failed to create event.' });
+      }
+    },
+    [eventForm, selectedCommunityId, token]
+  );
+
+  const handleResourceSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!selectedCommunityId || !token) {
+        setFeedback({ tone: 'error', message: 'Select a community before adding resources.' });
+        return;
+      }
+      if (!resourceForm.title.trim()) {
+        setFeedback({ tone: 'warning', message: 'Resource title is required.' });
+        return;
+      }
+      if (resourceForm.resourceType !== 'content_asset' && !resourceForm.linkUrl.trim()) {
+        setFeedback({ tone: 'warning', message: 'Provide a link for this resource.' });
+        return;
+      }
+      try {
+        const response = await createCommunityResource({
+          communityId: selectedCommunityId,
+          token,
+          payload: {
+            title: resourceForm.title.trim(),
+            description: resourceForm.description.trim() || undefined,
+            resourceType: resourceForm.resourceType,
+            linkUrl: resourceForm.linkUrl.trim() || undefined,
+            tags: resourceForm.tags
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean),
+            visibility: resourceForm.visibility,
+            status: 'published'
+          }
+        });
+        if (response.data) {
+          setResources((prev) => [response.data, ...prev].slice(0, 12));
+        }
+        setResourceForm(initialResourceForm);
+        setFeedback({ tone: 'success', message: 'Resource published to the library.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to publish resource.' });
+      }
+    },
+    [resourceForm, selectedCommunityId, token]
+  );
+
+  const handlePresenceSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!selectedCommunityId || !token) {
+        setFeedback({ tone: 'error', message: 'Select a community before updating presence.' });
+        return;
+      }
+      let metadata = {};
+      if (presenceForm.metadata.trim()) {
+        try {
+          metadata = JSON.parse(presenceForm.metadata);
+        } catch (_error) {
+          metadata = { note: presenceForm.metadata.trim() };
+        }
+      }
+      try {
+        const response = await updateCommunityPresence({
+          communityId: selectedCommunityId,
+          token,
+          payload: {
+            status: presenceForm.status,
+            client: presenceForm.client,
+            ttlMinutes: Number(presenceForm.ttlMinutes) || 5,
+            metadata
+          }
+        });
+        if (response.data) {
+          setPresence((prev) => {
+            const existingIndex = prev.findIndex((entry) => entry.id === response.data.id);
+            if (existingIndex >= 0) {
+              const next = [...prev];
+              next[existingIndex] = response.data;
+              return next;
+            }
+            return [response.data, ...prev];
+          });
+        }
+        setPresenceForm(initialPresenceForm);
+        setFeedback({ tone: 'success', message: 'Presence updated.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to update presence.' });
+      }
+    },
+    [presenceForm, selectedCommunityId, token]
+  );
+
+  const handleShareResource = useCallback((resource) => {
+    setComposer((prev) => ({
+      ...prev,
+      body: prev.body ? `${prev.body}\n${resource.title}: ${resource.linkUrl ?? ''}` : `${resource.title}: ${resource.linkUrl ?? ''}`,
+      attachmentUrl: resource.linkUrl ?? prev.attachmentUrl,
+      attachmentLabel: resource.title ?? prev.attachmentLabel
+    }));
+  }, []);
+
+  const handleAnnounceEvent = useCallback((eventRecord) => {
+    const summaryLine = `${eventRecord.title} — ${formatDateTime(eventRecord.startAt, {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    })}`;
+    setComposer((prev) => ({
+      ...prev,
+      messageType: 'event',
+      body: prev.body ? `${prev.body}\n${summaryLine}` : summaryLine,
+      attachmentLabel: eventRecord.title,
+      attachmentUrl: eventRecord.meetingUrl ?? prev.attachmentUrl,
+      metadataNote: eventRecord.summary ?? ''
+    }));
+  }, []);
+
+  if (!token) {
+    return (
+      <DashboardStateMessage
+        title="Sign in required"
+        description="Authenticate to manage your community chat operations and publish updates to members."
+      />
+    );
+  }
+
+  if (!communityOptions.length) {
+    return (
+      <DashboardStateMessage
+        title="No managed communities"
+        description="Once you launch a community space it will appear here with full chat controls and moderation tools."
+        actionLabel="Refresh"
+        onAction={() => refresh?.()}
+      />
+    );
+  }
 
   return (
-    <div className="space-y-10">
-      <section className="dashboard-section">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="dashboard-kicker">Instructor community · Chats</p>
-            <h1 className="dashboard-title">Engage every cohort in real-time</h1>
-            <p className="dashboard-subtitle">
-              Launch text, voice, and broadcast spaces with granular permissions, production-ready runbooks, and
-              integrated media libraries.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              className="dashboard-primary-pill"
-              onClick={() => {
-                setSelectedChannelId('__new');
-                setChannelForm(EMPTY_FORM);
-              }}
-            >
-              <PlusIcon className="mr-2 h-4 w-4" />
-              New channel
-            </button>
-            <button type="button" className="dashboard-pill px-4 py-2" onClick={() => setChannelFilter('')}>
-              <ArrowPathIcon className="mr-2 h-4 w-4" />
-              Reset filters
-            </button>
+    <div className="space-y-8">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="dashboard-kicker">Community chats</p>
+          <h1 className="dashboard-title">Live operations control</h1>
+          <p className="dashboard-subtitle">
+            Spin up live sessions, share media, and moderate member spaces in real time just like a production-grade
+            Discord server.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <select
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            value={selectedCommunityId ?? ''}
+            onChange={(event) => setSelectedCommunityId(event.target.value)}
+          >
+            {communityOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.title}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="dashboard-pill inline-flex items-center gap-2 px-4 py-2 text-sm"
+            onClick={handleRefreshChannels}
+          >
+            <ArrowPathIcon className="h-4 w-4" /> Refresh workspace
+          </button>
+        </div>
+      </header>
+
+      {feedback ? <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} /> : null}
+
+      {workspaceError ? (
+        <div className="dashboard-section border-rose-200 bg-rose-50 text-rose-700">
+          <div className="flex items-start gap-3">
+            <ExclamationTriangleIcon className="mt-1 h-5 w-5" />
+            <div>
+              <p className="font-semibold">{workspaceError}</p>
+              <p className="mt-1 text-sm">Retry once your network connection is stable.</p>
+            </div>
           </div>
         </div>
+      ) : null}
 
-        <dl className="mt-8 grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <dt className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-              <ChatBubbleBottomCenterTextIcon className="h-5 w-5 text-primary" />
-              Active channels
-            </dt>
-            <dd className="mt-2 text-3xl font-semibold text-slate-900">{channels.length}</dd>
-            <p className="mt-1 text-xs text-slate-500">{channelMetrics.totalMembers} members routed across spaces.</p>
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <aside className="dashboard-section space-y-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="dashboard-kicker">Channels</p>
+              <h2 className="text-base font-semibold text-slate-900">Conversation spaces</h2>
+            </div>
+            <span className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {channels.length} live
+            </span>
           </div>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <dt className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-              <ShieldCheckIcon className="h-5 w-5 text-primary" />
-              Private lounges
-            </dt>
-            <dd className="mt-2 text-3xl font-semibold text-slate-900">{channelMetrics.privateCount}</dd>
-            <p className="mt-1 text-xs text-slate-500">High-trust spaces with moderator workflows enabled.</p>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <dt className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-              <VideoCameraIcon className="h-5 w-5 text-primary" />
-              Media-ready rooms
-            </dt>
-            <dd className="mt-2 text-3xl font-semibold text-slate-900">{channelMetrics.mediaEnabled}</dd>
-            <p className="mt-1 text-xs text-slate-500">Spaces with screen share and asset libraries activated.</p>
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
-            <dt className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-              <MusicalNoteIcon className="h-5 w-5 text-primary" />
-              Assets staging
-            </dt>
-            <dd className="mt-2 text-3xl font-semibold text-slate-900">{stagedAssets.length}</dd>
-            <p className="mt-1 text-xs text-slate-500">{readyAssets.length} ready · {mediaAssets.length} total assets.</p>
-          </div>
-        </dl>
+          <ul className="space-y-3">
+            {channels.map((entry) => {
+              const { label, icon: Icon } = resolveChannelLabel(entry.channel);
+              const isActive = entry.channel.id === activeChannelId;
+              return (
+                <li key={entry.channel.id}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectChannel(entry.channel.id)}
+                    className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                      isActive
+                        ? 'border-primary/50 bg-primary/5 text-primary'
+                        : 'border-slate-200 text-slate-700 hover:border-primary/40 hover:bg-primary/5'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <Icon className="h-5 w-5" />
+                        <div>
+                          <p className="font-semibold">{entry.channel.name}</p>
+                          <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
+                        </div>
+                      </div>
+                      {entry.unreadCount > 0 ? (
+                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-white">
+                          {entry.unreadCount}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                      <span>Last activity {formatRelative(entry.latestMessage?.createdAt ?? entry.channel.updatedAt)}</span>
+                      <button
+                        type="button"
+                        className="underline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleMarkChannelRead(entry.channel.id);
+                        }}
+                      >
+                        Mark read
+                      </button>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+            {workspaceLoading && channels.length === 0 ? (
+              <li className="rounded-2xl border border-slate-200 bg-white/60 p-4 text-sm text-slate-500">
+                Loading channel roster…
+              </li>
+            ) : null}
+          </ul>
+        </aside>
+
+        <article className="dashboard-section flex flex-col gap-5">
+          <header className="flex flex-col gap-2 border-b border-slate-100 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="dashboard-kicker">{activeChannelSummary?.channel?.name ?? 'Channel'}</p>
+                <h2 className="text-lg font-semibold text-slate-900">Live feed</h2>
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {activeChannelSummary?.membership?.role ? `You are ${activeChannelSummary.membership.role}` : ''}
+              </span>
+            </div>
+            <p className="text-sm text-slate-600">
+              Broadcast updates, kick off live co-working, or drop rich media. Members see changes instantly.
+            </p>
+          </header>
+
+          {activeChannelId ? (
+            <div className="flex flex-col gap-4">
+              <form onSubmit={handleSendMessage} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Message type
+                    <select
+                      className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      value={composer.messageType}
+                      onChange={(event) => setComposer((prev) => ({ ...prev, messageType: event.target.value }))}
+                    >
+                      <option value="text">Discussion</option>
+                      <option value="event">Event announcement</option>
+                      <option value="live">Live session</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Attach link
+                    <input
+                      type="url"
+                      placeholder="https://"
+                      value={composer.attachmentUrl}
+                      onChange={(event) => setComposer((prev) => ({ ...prev, attachmentUrl: event.target.value }))}
+                      className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                  <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Attachment label
+                    <input
+                      type="text"
+                      value={composer.attachmentLabel}
+                      onChange={(event) => setComposer((prev) => ({ ...prev, attachmentLabel: event.target.value }))}
+                      className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                  <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Metadata note
+                    <input
+                      type="text"
+                      value={composer.metadataNote}
+                      onChange={(event) => setComposer((prev) => ({ ...prev, metadataNote: event.target.value }))}
+                      className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                </div>
+                {composer.messageType === 'live' ? (
+                  <label className="mt-4 flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Live session topic
+                    <input
+                      type="text"
+                      value={composer.liveTopic}
+                      onChange={(event) => setComposer((prev) => ({ ...prev, liveTopic: event.target.value }))}
+                      className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    />
+                  </label>
+                ) : null}
+                <label className="mt-4 flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Message body
+                  <textarea
+                    rows={4}
+                    value={composer.body}
+                    onChange={(event) => setComposer((prev) => ({ ...prev, body: event.target.value }))}
+                    placeholder="Share an update with your members…"
+                    className="mt-1 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+                <div className="mt-4 flex items-center justify-end">
+                  <button type="submit" className="dashboard-primary-pill inline-flex items-center gap-2 px-5 py-2">
+                    <PaperAirplaneIcon className="h-4 w-4" />
+                    Send update
+                  </button>
+                </div>
+              </form>
+
+              <div className="space-y-4">
+                {hasMoreMessages ? (
+                  <button
+                    type="button"
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:border-primary/40 hover:text-primary"
+                    onClick={handleLoadOlderMessages}
+                  >
+                    Load earlier messages
+                  </button>
+                ) : null}
+
+                <ol className="space-y-4">
+                  {messages.map((message) => (
+                    <li key={message.id} className="rounded-2xl border border-slate-200 p-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                            {message.author?.firstName?.[0] ?? 'M'}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {message.author?.firstName || message.author?.email || 'Member'}{' '}
+                              {message.author?.lastName}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {formatDateTime(message.createdAt ?? message.deliveredAt)} · {message.messageType}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                          {canModerate ? (
+                            <>
+                              <button
+                                type="button"
+                                className="dashboard-pill px-3 py-1"
+                                onClick={() => handleModerateMessage(message, 'hide')}
+                              >
+                                Hide
+                              </button>
+                              <button
+                                type="button"
+                                className="dashboard-pill px-3 py-1"
+                                onClick={() => handleModerateMessage(message, 'restore')}
+                              >
+                                Restore
+                              </button>
+                            </>
+                          ) : null}
+                          <button
+                            type="button"
+                            className="dashboard-pill px-3 py-1"
+                            onClick={() => handleToggleReaction(message, '👍')}
+                          >
+                            👍 {message.reactions?.find((reaction) => reaction.emoji === '👍')?.count ?? 0}
+                          </button>
+                          <button
+                            type="button"
+                            className="dashboard-pill px-3 py-1"
+                            onClick={() => handleToggleReaction(message, '🎉')}
+                          >
+                            🎉 {message.reactions?.find((reaction) => reaction.emoji === '🎉')?.count ?? 0}
+                          </button>
+                          <button
+                            type="button"
+                            className="dashboard-pill px-3 py-1"
+                            onClick={() => handleToggleReaction(message, '🚀')}
+                          >
+                            🚀 {message.reactions?.find((reaction) => reaction.emoji === '🚀')?.count ?? 0}
+                          </button>
+                        </div>
+                      </div>
+                      {message.status !== 'visible' ? (
+                        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-rose-500">
+                          {message.status}
+                        </p>
+                      ) : null}
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{message.body}</p>
+                      {message.attachments?.length ? (
+                        <ul className="mt-3 flex flex-wrap gap-3 text-sm text-primary">
+                          {message.attachments.map((attachment, index) => (
+                            <li key={`${message.id}-attachment-${index}`}>
+                              <a
+                                href={attachment.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-4 py-1 text-sm font-semibold text-primary hover:bg-primary/10"
+                              >
+                                <DocumentTextIcon className="h-4 w-4" />
+                                {attachment.title ?? 'Attachment'}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </li>
+                  ))}
+                  {messagesLoading ? (
+                    <li className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                      Fetching latest messages…
+                    </li>
+                  ) : null}
+                </ol>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+              Select a channel to view live conversations and run operations.
+            </div>
+          )}
+        </article>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[2fr,3fr]">
-        <div className="space-y-6">
-          <div className="dashboard-section">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Channel catalogue</h2>
-              <input
-                type="search"
-                value={channelFilter}
-                onChange={(event) => setChannelFilter(event.target.value)}
-                className="w-48 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 focus:border-primary focus:outline-none"
-                placeholder="Search channels"
-              />
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="dashboard-section space-y-5">
+          <header>
+            <p className="dashboard-kicker">Roles & permissions</p>
+            <h2 className="text-lg font-semibold text-slate-900">Moderator coverage</h2>
+            <p className="text-sm text-slate-600">
+              Create production roles, then assign them to trusted members to manage events, broadcasts, and voice rooms.
+            </p>
+          </header>
+          <form className="space-y-4" onSubmit={handleRoleSubmit}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Name
+                <input
+                  type="text"
+                  value={roleForm.name}
+                  onChange={(event) => setRoleForm((prev) => ({ ...prev, name: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  required
+                />
+              </label>
+              <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Role key
+                <input
+                  type="text"
+                  value={roleForm.roleKey}
+                  onChange={(event) => setRoleForm((prev) => ({ ...prev, roleKey: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  placeholder="ops-lead"
+                />
+              </label>
             </div>
-
-            <ul className="mt-4 space-y-3">
-              {filteredChannels.map((channel) => (
-                <li key={channel.id} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedChannelId(channel.id)}
-                        className="text-left text-base font-semibold text-slate-900 hover:text-primary"
-                      >
-                        {channel.name}
-                      </button>
-                      <p className="mt-1 text-sm text-slate-600">{channel.topic}</p>
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                        <span className="rounded-full bg-slate-100 px-2 py-1">{channel.type}</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-1">{channel.members} members</span>
-                        {channel.isPrivate && (
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-amber-700">Private</span>
-                        )}
-                        {channel.tags.map((tag) => (
-                          <span key={tag} className="rounded-full bg-primary/10 px-2 py-1 text-primary">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="dashboard-pill px-3 py-1 text-xs"
-                        onClick={() => handleChannelDuplicate(channel.id)}
-                      >
-                        Duplicate
-                      </button>
-                      <button
-                        type="button"
-                        className="dashboard-pill px-3 py-1 text-xs text-red-600 hover:border-red-200"
-                        onClick={() => handleChannelDelete(channel.id)}
-                      >
-                        <TrashIcon className="mr-1 h-3 w-3" />
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                  <p className="mt-3 text-xs text-slate-500">Last active {channel.lastActivity}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="dashboard-section">
-            <h2 className="text-lg font-semibold text-slate-900">
-              {selectedChannelId === '__new' ? 'Create new channel' : 'Channel configuration'}
-            </h2>
-            <form className="mt-4 space-y-4" onSubmit={handleChannelSubmit}>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Name
-                  <input
-                    required
-                    type="text"
-                    value={channelForm.name}
-                    onChange={(event) => handleChannelFormChange('name', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  />
-                </label>
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Channel type
-                  <select
-                    value={channelForm.type}
-                    onChange={(event) => handleChannelFormChange('type', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  >
-                    <option value="discussion">Discussion</option>
-                    <option value="broadcast">Broadcast</option>
-                    <option value="voice-stage">Voice & stage</option>
-                    <option value="voice-room">Voice room</option>
-                    <option value="live-support">Live support</option>
-                  </select>
-                </label>
-              </div>
-
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Topic
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Description
+              <textarea
+                rows={2}
+                value={roleForm.description}
+                onChange={(event) => setRoleForm((prev) => ({ ...prev, description: event.target.value }))}
+                className="mt-1 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Manages weekly live sessions and post-show wrap-ups"
+              />
+            </label>
+            <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+              <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2">
                 <input
-                  type="text"
-                  value={channelForm.topic}
-                  onChange={(event) => handleChannelFormChange('topic', event.target.value)}
-                  className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  placeholder="What’s the focus?"
+                  type="checkbox"
+                  checked={roleForm.canBroadcast}
+                  onChange={(event) => setRoleForm((prev) => ({ ...prev, canBroadcast: event.target.checked }))}
+                />
+                Broadcast channels
+              </label>
+              <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2">
+                <input
+                  type="checkbox"
+                  checked={roleForm.canModerate}
+                  onChange={(event) => setRoleForm((prev) => ({ ...prev, canModerate: event.target.checked }))}
+                />
+                Moderate chat
+              </label>
+              <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2">
+                <input
+                  type="checkbox"
+                  checked={roleForm.canHostVoice}
+                  onChange={(event) => setRoleForm((prev) => ({ ...prev, canHostVoice: event.target.checked }))}
+                />
+                Host voice rooms
+              </label>
+            </div>
+            <div className="flex justify-end">
+              <button type="submit" className="dashboard-primary-pill px-5 py-2">
+                Create role
+              </button>
+            </div>
+          </form>
+
+          <form className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4" onSubmit={handleAssignmentSubmit}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assign role</p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Member ID
+                <input
+                  type="number"
+                  value={assignmentForm.userId}
+                  onChange={(event) => setAssignmentForm((prev) => ({ ...prev, userId: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  required
                 />
               </label>
-
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Description
-                <textarea
-                  rows={3}
-                  value={channelForm.description}
-                  onChange={(event) => handleChannelFormChange('description', event.target.value)}
-                  className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  placeholder="Share moderation notes, pinned resources, and publishing guidelines"
-                />
-              </label>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Member slots
-                  <input
-                    type="number"
-                    min={0}
-                    value={channelForm.members}
-                    onChange={(event) => handleChannelFormChange('members', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  />
-                </label>
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Slow mode (seconds)
-                  <input
-                    type="number"
-                    min={0}
-                    value={channelForm.slowMode}
-                    onChange={(event) => handleChannelFormChange('slowMode', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  />
-                </label>
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Channel tags
-                  <input
-                    type="text"
-                    value={channelForm.tags}
-                    onChange={(event) => handleChannelFormChange('tags', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                    placeholder="launch, studio, intros"
-                  />
-                </label>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={channelForm.isPrivate}
-                    onChange={(event) => handleChannelFormChange('isPrivate', event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  Private channel
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={channelForm.allowMedia}
-                    onChange={(event) => handleChannelFormChange('allowMedia', event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  Allow media uploads & stage scenes
-                </label>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-slate-700">Permissions</p>
-                <div className="mt-2 grid gap-2 md:grid-cols-2">
-                  {PERMISSION_OPTIONS.map((option) => (
-                    <label key={option.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={channelForm.permissions.includes(option.id)}
-                        onChange={() => handlePermissionToggle(option.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
-                      {option.label}
-                    </label>
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Role
+                <select
+                  value={assignmentForm.roleKey}
+                  onChange={(event) => setAssignmentForm((prev) => ({ ...prev, roleKey: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  required
+                >
+                  <option value="">Select</option>
+                  {roles.map((role) => (
+                    <option key={role.id ?? role.roleKey ?? role.name} value={role.roleKey ?? role.name}>
+                      {role.name}
+                    </option>
                   ))}
-                </div>
-              </div>
-
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Moderation teams
-                <input
-                  type="text"
-                  value={channelForm.moderators}
-                  onChange={(event) => handleChannelFormChange('moderators', event.target.value)}
-                  className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  placeholder="Community Leads, Studio Hosts"
-                />
+                </select>
               </label>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button type="submit" className="dashboard-pill px-4 py-2">
+                Assign role
+              </button>
+            </div>
+          </form>
 
-              <div className="flex justify-end gap-3">
-                <button type="button" className="dashboard-pill px-4 py-2" onClick={() => setChannelForm(EMPTY_FORM)}>
-                  Reset
-                </button>
-                <button type="submit" className="dashboard-primary-pill">
-                  <PencilSquareIcon className="mr-2 h-4 w-4" />
-                  {selectedChannelId === '__new' ? 'Create channel' : 'Save changes'}
-                </button>
-              </div>
-            </form>
-          </div>
+          <ul className="space-y-3">
+            {roles.map((role) => (
+              <li key={role.id ?? role.roleKey ?? role.name} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{role.name}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{role.roleKey}</p>
+                  </div>
+                  <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                    {role.members ?? 0} members
+                  </span>
+                </div>
+                {role.description ? <p className="mt-2 text-sm text-slate-600">{role.description}</p> : null}
+              </li>
+            ))}
+            {roles.length === 0 ? (
+              <li className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                No custom roles yet. Create one to delegate community operations.
+              </li>
+            ) : null}
+          </ul>
         </div>
 
-        <div className="space-y-6">
-          <div className="dashboard-section">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Role controls</h2>
-              <button
-                type="button"
-                className="dashboard-pill px-4 py-2"
-                onClick={() => {
-                  setSelectedRoleId(null);
-                  setRoleForm(EMPTY_ROLE_FORM);
-                }}
+        <div className="dashboard-section space-y-5">
+          <header>
+            <p className="dashboard-kicker">Presence & live sessions</p>
+            <h2 className="text-lg font-semibold text-slate-900">Team availability</h2>
+            <p className="text-sm text-slate-600">
+              Broadcast when you are live or heads-down so members know when to drop into voice rooms or DM you.
+            </p>
+          </header>
+
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={handlePresenceSubmit}>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Status
+              <select
+                value={presenceForm.status}
+                onChange={(event) => setPresenceForm((prev) => ({ ...prev, status: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
-                <PlusIcon className="mr-2 h-4 w-4" />
-                New role
+                <option value="online">Online</option>
+                <option value="away">Away</option>
+                <option value="offline">Offline</option>
+              </select>
+            </label>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Client
+              <select
+                value={presenceForm.client}
+                onChange={(event) => setPresenceForm((prev) => ({ ...prev, client: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="web">Web</option>
+                <option value="mobile">Mobile</option>
+                <option value="provider">Provider</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              TTL (minutes)
+              <input
+                type="number"
+                min={1}
+                value={presenceForm.ttlMinutes}
+                onChange={(event) => setPresenceForm((prev) => ({ ...prev, ttlMinutes: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <label className="sm:col-span-2 flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Metadata (JSON or note)
+              <input
+                type="text"
+                value={presenceForm.metadata}
+                onChange={(event) => setPresenceForm((prev) => ({ ...prev, metadata: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder='{"stage":"co-working"}'
+              />
+            </label>
+            <div className="sm:col-span-2 flex justify-end">
+              <button type="submit" className="dashboard-pill px-4 py-2">
+                Update presence
               </button>
             </div>
+          </form>
 
-            <div className="mt-4 space-y-3">
-              {roles.map((role) => (
-                <div key={role.id} className="flex flex-col gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: role.color }} aria-hidden="true" />
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{role.name}</p>
-                      <p className="text-xs text-slate-500">{role.members} members · {role.permissions.join(', ') || 'No advanced permissions'}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 text-xs text-slate-600">
-                    {role.canBroadcast && <span className="rounded-full bg-primary/10 px-3 py-1">Broadcast</span>}
-                    {role.canModerate && <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">Moderation</span>}
-                    {role.canManageVoice && <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">Voice ops</span>}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="dashboard-pill px-3 py-1 text-xs"
-                      onClick={() => setSelectedRoleId(role.id)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="dashboard-pill px-3 py-1 text-xs text-red-600 hover:border-red-200"
-                      onClick={() => handleRoleDelete(role.id)}
-                    >
-                      <TrashIcon className="mr-1 h-3 w-3" />
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <form className="mt-6 space-y-4 border-t border-slate-100 pt-4" onSubmit={handleRoleSubmit}>
-              <h3 className="text-sm font-semibold text-slate-800">
-                {selectedRoleId ? 'Edit role' : 'Create role'}
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Role name
-                  <input
-                    required
-                    type="text"
-                    value={roleForm.name}
-                    onChange={(event) => handleRoleFormChange('name', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  />
-                </label>
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Accent colour
-                  <input
-                    type="color"
-                    value={roleForm.color}
-                    onChange={(event) => handleRoleFormChange('color', event.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-slate-200"
-                  />
-                </label>
-              </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Members assigned
-                  <input
-                    type="number"
-                    min={0}
-                    value={roleForm.members}
-                    onChange={(event) => handleRoleFormChange('members', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={roleForm.canBroadcast}
-                    onChange={(event) => handleRoleFormChange('canBroadcast', event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  Broadcast access
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={roleForm.canModerate}
-                    onChange={(event) => handleRoleFormChange('canModerate', event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  Moderation controls
-                </label>
-                <label className="flex items-center gap-2 text-sm text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={roleForm.canManageVoice}
-                    onChange={(event) => handleRoleFormChange('canManageVoice', event.target.checked)}
-                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                  />
-                  Manage voice rooms
-                </label>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-slate-700">Advanced permissions</p>
-                <div className="mt-2 grid gap-2 md:grid-cols-2">
-                  {ROLE_PERMISSION_OPTIONS.map((option) => (
-                    <label key={option.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={roleForm.permissions.includes(option.id)}
-                        onChange={() => handleRolePermissionToggle(option.id)}
-                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button type="button" className="dashboard-pill px-4 py-2" onClick={() => setRoleForm(EMPTY_ROLE_FORM)}>
-                  Reset
-                </button>
-                <button type="submit" className="dashboard-primary-pill">
-                  <PencilSquareIcon className="mr-2 h-4 w-4" />
-                  {selectedRoleId ? 'Save role' : 'Create role'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className="dashboard-section">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Live events & voice stages</h2>
-              <button
-                type="button"
-                className="dashboard-pill px-4 py-2"
-                onClick={() => {
-                  setSelectedEventId(null);
-                  setEventForm(EMPTY_EVENT_FORM);
-                }}
-              >
-                <PlusIcon className="mr-2 h-4 w-4" />
-                Plan event
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              {events.map((item) => (
-                <div key={item.id} className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                      <p className="text-xs uppercase tracking-wide text-slate-500">{item.status}</p>
-                      <p className="mt-1 text-sm text-slate-600">Hosted by {item.host}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                      <span className="rounded-full bg-slate-100 px-3 py-1">{item.scheduledFor}</span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1">{item.duration}</span>
-                      {item.channels.map((channelId) => {
-                        const channel = channels.find((channelItem) => channelItem.id === channelId);
-                        return (
-                          <span key={channelId} className="rounded-full bg-primary/10 px-3 py-1 text-primary">
-                            #{channel?.name ?? channelId}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="dashboard-pill px-3 py-1 text-xs"
-                        onClick={() => setSelectedEventId(item.id)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="dashboard-pill px-3 py-1 text-xs text-red-600 hover:border-red-200"
-                        onClick={() => handleEventDelete(item.id)}
-                      >
-                        <TrashIcon className="mr-1 h-3 w-3" />
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                  {item.assets.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                      {item.assets.map((asset) => (
-                        <span key={asset} className="rounded-full bg-slate-100 px-2 py-1">
-                          {asset}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <form className="mt-6 space-y-4 border-t border-slate-100 pt-4" onSubmit={handleEventSubmit}>
-              <h3 className="text-sm font-semibold text-slate-800">
-                {selectedEventId ? 'Edit event' : 'Create event'}
-              </h3>
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Title
-                <input
-                  required
-                  type="text"
-                  value={eventForm.title}
-                  onChange={(event) => handleEventFormChange('title', event.target.value)}
-                  className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                />
-              </label>
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Event type
-                  <select
-                    value={eventForm.type}
-                    onChange={(event) => handleEventFormChange('type', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  >
-                    {EVENT_TYPES.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Host team
-                  <input
-                    type="text"
-                    value={eventForm.host}
-                    onChange={(event) => handleEventFormChange('host', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                    placeholder="Community Leads"
-                  />
-                </label>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Schedule
-                  <input
-                    type="text"
-                    value={eventForm.scheduledFor}
-                    onChange={(event) => handleEventFormChange('scheduledFor', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                    placeholder="Fridays · 17:00 UTC"
-                  />
-                </label>
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Duration
-                  <input
-                    type="text"
-                    value={eventForm.duration}
-                    onChange={(event) => handleEventFormChange('duration', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                    placeholder="60 minutes"
-                  />
-                </label>
-                <label className="flex flex-col text-sm font-medium text-slate-700">
-                  Status
-                  <input
-                    type="text"
-                    value={eventForm.status}
-                    onChange={(event) => handleEventFormChange('status', event.target.value)}
-                    className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                    placeholder="Scheduled"
-                  />
-                </label>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-slate-700">Channels</p>
-                <div className="mt-2 grid gap-2 md:grid-cols-2">
-                  {channels.map((channel) => (
-                    <label key={channel.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={eventForm.channels.includes(channel.id)}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setEventForm((current) => ({
-                            ...current,
-                            channels: checked
-                              ? [...current.channels, channel.id]
-                              : current.channels.filter((id) => id !== channel.id)
-                          }));
-                        }}
-                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
-                      #{channel.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <label className="flex flex-col text-sm font-medium text-slate-700">
-                Run of show assets
-                <input
-                  type="text"
-                  value={eventForm.assets}
-                  onChange={(event) => handleEventFormChange('assets', event.target.value)}
-                  className="mt-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none"
-                  placeholder="Run-of-show.docx, Intro bumper.mp4"
-                />
-              </label>
-
-              <div className="flex justify-end gap-3">
-                <button type="button" className="dashboard-pill px-4 py-2" onClick={() => setEventForm(EMPTY_EVENT_FORM)}>
-                  Reset
-                </button>
-                <button type="submit" className="dashboard-primary-pill">
-                  <PencilSquareIcon className="mr-2 h-4 w-4" />
-                  {selectedEventId ? 'Save event' : 'Create event'}
-                </button>
-              </div>
-            </form>
-          </div>
-
-          <div className="dashboard-section">
-            <h2 className="text-lg font-semibold text-slate-900">Live control room</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Monitor active voice rooms, track listener counts, and trigger session recordings without leaving the
-              dashboard.
-            </p>
-            <div className="mt-4 grid gap-4 lg:grid-cols-2">
-              {activeVoiceRooms.map((room) => (
-                <div key={room.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
-                    <SpeakerWaveIcon className="h-4 w-4" /> Voice room
-                  </div>
-                  <p className="mt-2 text-sm font-semibold text-slate-900">{room.title}</p>
-                  <p className="text-xs text-slate-500">{room.status}</p>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-                    <span className="rounded-full bg-white px-2 py-1">{room.listeners} listeners</span>
-                    <span className="rounded-full bg-white px-2 py-1">{room.duration}</span>
-                    <span className="rounded-full bg-white px-2 py-1">Host {room.host}</span>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    <button type="button" className="dashboard-pill px-3 py-1 text-xs">
-                      Start recording
-                    </button>
-                    <button type="button" className="dashboard-pill px-3 py-1 text-xs">
-                      Open backstage
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="dashboard-section">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">Media staging &amp; asset ops</h2>
-                <p className="mt-2 text-sm text-slate-600">
-                  Upload bumpers, ambience loops, and runbooks. Ready assets sync instantly to the channels you assign.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <label className="dashboard-primary-pill cursor-pointer">
-                  <PlusIcon className="mr-2 h-4 w-4" />
-                  Upload media
-                  <input
-                    type="file"
-                    multiple
-                    accept="video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx"
-                    onChange={handleMediaUpload}
-                    className="sr-only"
-                  />
-                </label>
-                <button type="button" className="dashboard-pill px-4 py-2" onClick={handleLibrarySync}>
-                  <ArrowPathIcon className="mr-2 h-4 w-4" />
-                  Sync cloud drive
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-100">
-              <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <tr>
-                    <th scope="col" className="px-4 py-3">Asset</th>
-                    <th scope="col" className="px-4 py-3">Assigned to</th>
-                    <th scope="col" className="px-4 py-3">Status</th>
-                    <th scope="col" className="px-4 py-3">Owner</th>
-                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {mediaAssets.map((asset) => {
-                    const statusTone = assetStatusTone[asset.status] ?? 'border-slate-200 bg-slate-50 text-slate-500';
-                    return (
-                      <tr key={asset.id} className="align-top">
-                        <td className="px-4 py-4">
-                          <p className="font-semibold text-slate-900">{asset.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {asset.type} · {asset.duration} · {asset.size}
-                          </p>
-                          {asset.notes && <p className="mt-2 text-xs text-slate-500">{asset.notes}</p>}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            {asset.assignedTo.length > 0 ? (
-                              asset.assignedTo.map((channelId) => (
-                                <span
-                                  key={channelId}
-                                  className="flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-600"
-                                >
-                                  #{channelLookup.get(channelId) ?? channelId}
-                                  <button
-                                    type="button"
-                                    className="ml-1 text-slate-400 transition hover:text-rose-500"
-                                    onClick={() => handleMediaRemoveAssignment(asset.id, channelId)}
-                                    aria-label={`Remove ${channelLookup.get(channelId) ?? channelId}`}
-                                  >
-                                    ×
-                                  </button>
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs text-slate-400">Not assigned</span>
-                            )}
-                          </div>
-                          <div className="mt-3 flex gap-2">
-                            <select
-                              defaultValue=""
-                              className="w-44 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 focus:border-primary focus:outline-none"
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                handleMediaAssign(asset.id, value);
-                                event.target.value = '';
-                              }}
-                            >
-                              <option value="">Assign channel…</option>
-                              {channels.map((channel) => (
-                                <option key={channel.id} value={channel.id}>
-                                  {channel.name}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusTone}`}
-                          >
-                            {asset.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4">
-                          <p className="text-sm font-medium text-slate-700">{asset.owner}</p>
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-col items-end gap-2 text-xs">
-                            <button
-                              type="button"
-                              className="dashboard-pill px-3 py-1"
-                              onClick={() => handleMediaAdvance(asset.id)}
-                            >
-                              {assetAdvanceLabel(asset.status)}
-                            </button>
-                            <button
-                              type="button"
-                              className="dashboard-pill px-3 py-1"
-                              onClick={() => handleMediaArchive(asset.id)}
-                              disabled={asset.status === 'Archived'}
-                            >
-                              Archive
-                            </button>
-                            <button
-                              type="button"
-                              className="dashboard-pill px-3 py-1 text-red-600 hover:border-red-200"
-                              onClick={() => handleMediaDelete(asset.id)}
-                            >
-                              <TrashIcon className="mr-1 h-3 w-3" />
-                              Remove
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {mediaAssets.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
-                        Upload media to build your staging library.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <section className="grid gap-6 lg:grid-cols-2">
-            <div className="dashboard-section">
-              <h2 className="text-lg font-semibold text-slate-900">Moderation &amp; safety</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                Track escalations and document how each case was resolved to maintain community trust.
-              </p>
-              <div className="mt-4 space-y-3">
-                {incidents.map((incident) => {
-                  const severityTone = severityBadge[incident.severity] ?? severityBadge.Medium;
-                  const channelName = channelLookup.get(incident.channelId) ?? incident.channelId;
-                  return (
-                    <article key={incident.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          <span className={`rounded-full border px-2 py-1 text-[11px] ${severityTone}`}>
-                            {incident.severity}
-                          </span>
-                          <span>#{channelName}</span>
-                        </div>
-                        <p className="text-xs text-slate-400">Opened {formatTimestamp(incident.openedAt)}</p>
-                      </div>
-                      <h3 className="mt-2 text-sm font-semibold text-slate-900">{incident.type}</h3>
-                      <p className="mt-1 text-sm text-slate-600">{incident.notes}</p>
-                      {incident.resolution && (
-                        <p className="mt-2 text-xs text-emerald-600">
-                          Resolved {formatTimestamp(incident.resolvedAt)} · {incident.resolution}
-                        </p>
-                      )}
-                      <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                        <button
-                          type="button"
-                          className="dashboard-pill px-3 py-1"
-                          onClick={() => handleIncidentResolve(incident.id, 'Muted user for 24h')}
-                          disabled={incident.status === 'Resolved'}
-                        >
-                          Close &amp; mute
-                        </button>
-                        <button
-                          type="button"
-                          className="dashboard-pill px-3 py-1"
-                          onClick={() => handleIncidentResolve(incident.id, 'Escalated to safety team')}
-                          disabled={incident.status === 'Resolved'}
-                        >
-                          Escalate
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-              {openIncidents.length === 0 && (
-                <p className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
-                  All incidents cleared. Keep proactive monitoring enabled during live launches.
-                </p>
-              )}
-            </div>
-
-            <div className="dashboard-section">
-              <h2 className="text-lg font-semibold text-slate-900">Operational readiness</h2>
-              <p className="mt-2 text-sm text-slate-600">
-                Run pre-flight QA before major streams so production teams have absolute confidence.
-              </p>
-              <ul className="mt-4 space-y-3">
-                {qualityChecks.map((check) => (
-                  <li key={check.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{check.label}</p>
-                        <p className="mt-1 text-sm text-slate-600">{check.description}</p>
-                      </div>
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-                          checkBadge[check.status] ?? checkBadge.Pending
-                        }`}
-                      >
-                        {check.status}
-                      </span>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                      <button
-                        type="button"
-                        className="dashboard-pill px-3 py-1"
-                        onClick={() => handleChecklistPass(check.id)}
-                      >
-                        Mark passed
-                      </button>
-                      <button
-                        type="button"
-                        className="dashboard-pill px-3 py-1 text-amber-600 hover:border-amber-200"
-                        onClick={() => handleChecklistBlock(check.id)}
-                      >
-                        Flag blocker
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </section>
-
-          <div className="dashboard-section">
-            <h2 className="text-lg font-semibold text-slate-900">Activity feed</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Every change is tracked for audit trails so operations and compliance can review quickly.
-            </p>
-            <ul className="mt-4 space-y-3">
-              {displayedActivity.map((entry) => (
-                <li key={entry.id} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4">
+          <ul className="space-y-3">
+            {presence.map((entry) => (
+              <li key={entry.id ?? `${entry.userId}-${entry.client}`} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex items-center justify-between text-sm">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{entry.message}</p>
-                    <p className="text-xs uppercase tracking-wide text-slate-500">{entry.scope}</p>
+                    <p className="font-semibold text-slate-900">User {entry.userId}</p>
+                    <p className="text-xs text-slate-500">{entry.client} · {entry.status}</p>
                   </div>
-                  <time dateTime={entry.timestamp} className="text-xs text-slate-400">
-                    {formatTimestamp(entry.timestamp)}
-                  </time>
-                </li>
-              ))}
-            </ul>
-          </div>
+                  <span className="text-xs text-slate-500">
+                    TTL {entry.ttlMinutes ?? 5}m · {formatRelative(entry.updatedAt ?? entry.connectedAt)}
+                  </span>
+                </div>
+                {entry.metadata ? (
+                  <p className="mt-2 text-xs text-slate-500">{JSON.stringify(entry.metadata)}</p>
+                ) : null}
+              </li>
+            ))}
+            {presence.length === 0 ? (
+              <li className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                No live presence signals yet. Update status to let members know when you are online.
+              </li>
+            ) : null}
+          </ul>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="dashboard-section space-y-5">
+          <header>
+            <p className="dashboard-kicker">Programming</p>
+            <h2 className="text-lg font-semibold text-slate-900">Events pipeline</h2>
+            <p className="text-sm text-slate-600">
+              Schedule launches, AMAs, and live cohorts, then announce them to members with one click.
+            </p>
+          </header>
+          <form className="space-y-4" onSubmit={handleEventSubmit}>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Title
+              <input
+                type="text"
+                value={eventForm.title}
+                onChange={(event) => setEventForm((prev) => ({ ...prev, title: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                required
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Starts
+                <input
+                  type="datetime-local"
+                  value={eventForm.startAt}
+                  onChange={(event) => setEventForm((prev) => ({ ...prev, startAt: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  required
+                />
+              </label>
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Ends
+                <input
+                  type="datetime-local"
+                  value={eventForm.endAt}
+                  onChange={(event) => setEventForm((prev) => ({ ...prev, endAt: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  required
+                />
+              </label>
+            </div>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Meeting link
+              <input
+                type="url"
+                value={eventForm.meetingUrl}
+                onChange={(event) => setEventForm((prev) => ({ ...prev, meetingUrl: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="https://"
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Visibility
+                <select
+                  value={eventForm.visibility}
+                  onChange={(event) => setEventForm((prev) => ({ ...prev, visibility: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="members">Members</option>
+                  <option value="admins">Admins</option>
+                  <option value="owners">Owners</option>
+                </select>
+              </label>
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Attendance limit
+                <input
+                  type="number"
+                  min={1}
+                  value={eventForm.attendanceLimit}
+                  onChange={(event) => setEventForm((prev) => ({ ...prev, attendanceLimit: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </label>
+            </div>
+            <label className="flex items-center gap-3 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={eventForm.isOnline}
+                onChange={(event) => setEventForm((prev) => ({ ...prev, isOnline: event.target.checked }))}
+              />
+              Online event
+            </label>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Summary
+              <textarea
+                rows={2}
+                value={eventForm.summary}
+                onChange={(event) => setEventForm((prev) => ({ ...prev, summary: event.target.value }))}
+                className="mt-1 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="Outline agenda, speakers, or formats"
+              />
+            </label>
+            <div className="flex justify-end">
+              <button type="submit" className="dashboard-primary-pill px-5 py-2">
+                Schedule event
+              </button>
+            </div>
+          </form>
+
+          <ul className="space-y-3">
+            {events.map((eventRecord) => (
+              <li key={eventRecord.id ?? eventRecord.slug ?? eventRecord.title} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{eventRecord.title}</p>
+                    <p className="text-xs text-slate-500">
+                      {formatDateTime(eventRecord.startAt)} · {eventRecord.visibility}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="dashboard-pill px-3 py-1"
+                    onClick={() => handleAnnounceEvent(eventRecord)}
+                  >
+                    Announce
+                  </button>
+                </div>
+                {eventRecord.summary ? <p className="mt-2 text-sm text-slate-600">{eventRecord.summary}</p> : null}
+              </li>
+            ))}
+            {events.length === 0 ? (
+              <li className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                No events scheduled yet. Publish one to kick off your next live session.
+              </li>
+            ) : null}
+          </ul>
+        </div>
+
+        <div className="dashboard-section space-y-5">
+          <header>
+            <p className="dashboard-kicker">Media & resources</p>
+            <h2 className="text-lg font-semibold text-slate-900">Library distribution</h2>
+            <p className="text-sm text-slate-600">
+              Upload runbooks, launch assets, and playlists so producers can share them in any channel instantly.
+            </p>
+          </header>
+          <form className="space-y-4" onSubmit={handleResourceSubmit}>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Title
+              <input
+                type="text"
+                value={resourceForm.title}
+                onChange={(event) => setResourceForm((prev) => ({ ...prev, title: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                required
+              />
+            </label>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Link URL
+              <input
+                type="url"
+                value={resourceForm.linkUrl}
+                onChange={(event) => setResourceForm((prev) => ({ ...prev, linkUrl: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="https://"
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Type
+                <select
+                  value={resourceForm.resourceType}
+                  onChange={(event) => setResourceForm((prev) => ({ ...prev, resourceType: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="external_link">External link</option>
+                  <option value="document">Document</option>
+                  <option value="classroom_session">Classroom session</option>
+                  <option value="content_asset">Platform asset</option>
+                </select>
+              </label>
+              <label className="flex flex-col text-xs font-semibold text-slate-500">
+                Visibility
+                <select
+                  value={resourceForm.visibility}
+                  onChange={(event) => setResourceForm((prev) => ({ ...prev, visibility: event.target.value }))}
+                  className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="members">Members</option>
+                  <option value="admins">Admins</option>
+                </select>
+              </label>
+            </div>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Tags
+              <input
+                type="text"
+                value={resourceForm.tags}
+                onChange={(event) => setResourceForm((prev) => ({ ...prev, tags: event.target.value }))}
+                className="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                placeholder="launch, ritual"
+              />
+            </label>
+            <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Description
+              <textarea
+                rows={2}
+                value={resourceForm.description}
+                onChange={(event) => setResourceForm((prev) => ({ ...prev, description: event.target.value }))}
+                className="mt-1 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <div className="flex justify-end">
+              <button type="submit" className="dashboard-primary-pill px-5 py-2">
+                Publish resource
+              </button>
+            </div>
+          </form>
+
+          <ul className="space-y-3">
+            {resources.map((resource) => (
+              <li key={resource.id ?? resource.title} className="rounded-2xl border border-slate-200 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{resource.title}</p>
+                    <p className="text-xs text-slate-500">{resource.resourceType} · {resource.visibility}</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="dashboard-pill px-3 py-1"
+                    onClick={() => handleShareResource(resource)}
+                  >
+                    Share to chat
+                  </button>
+                </div>
+                {resource.description ? <p className="mt-2 text-sm text-slate-600">{resource.description}</p> : null}
+              </li>
+            ))}
+            {resources.length === 0 ? (
+              <li className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                No resources yet. Publish operating manuals, videos, or playlists to use in live chats.
+              </li>
+            ) : null}
+          </ul>
         </div>
       </section>
     </div>
