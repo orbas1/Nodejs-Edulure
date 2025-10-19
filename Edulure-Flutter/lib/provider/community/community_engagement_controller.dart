@@ -164,21 +164,42 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
     required CommunityChatMessageInput input,
   }) async {
     final snapshot = _requireSnapshot(communityId);
-    // Soft-delete the original message before reposting the updated content.
-    await _chatService.moderateMessage(
-      communityId,
-      channel.id,
-      message.id,
-      CommunityChatModeration(
-        action: 'delete',
-        reason: 'Edited via mobile app',
-        metadata: const {'source': 'mobile-app'},
-      ),
+    final draft = input.toDraft(
+      threadRootId: message.threadRootId,
+      replyToMessageId: message.replyToMessageId,
     );
-
-    final draft = input.toDraft(threadRootId: message.threadRootId, replyToMessageId: message.replyToMessageId);
     final dto = await _chatService.postMessage(communityId, channel.id, draft);
     final updatedMessage = _mapMessageDto(dto);
+
+    try {
+      await _chatService.moderateMessage(
+        communityId,
+        channel.id,
+        message.id,
+        CommunityChatModeration(
+          action: 'delete',
+          reason: 'Edited via mobile app',
+          metadata: const {'source': 'mobile-app'},
+        ),
+      );
+    } catch (error) {
+      // Roll back the replacement message so the original remains visible if moderation fails.
+      try {
+        await _chatService.moderateMessage(
+          communityId,
+          channel.id,
+          updatedMessage.id,
+          CommunityChatModeration(
+            action: 'delete',
+            reason: 'Edit rollback due to moderation failure',
+            metadata: const {'source': 'mobile-app'},
+          ),
+        );
+      } catch (_) {
+        // Best-effort rollback: if this also fails, surface the original error to the caller.
+      }
+      rethrow;
+    }
 
     final messages = Map<String, List<CommunityChatMessage>>.from(snapshot.messages);
     final updated = (messages[channel.id] ?? <CommunityChatMessage>[])
