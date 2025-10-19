@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { fetchCommunities } from '../../api/communityApi.js';
 import ChannelSidebar from './community/instructorChats/ChannelSidebar.jsx';
 import MessageTimeline from './community/instructorChats/MessageTimeline.jsx';
 import MessageComposer from './community/instructorChats/MessageComposer.jsx';
@@ -23,16 +24,24 @@ const initialComposerState = {
   metadataNote: ''
 };
 
-const initialRoleForm = {
+const initialPresenceForm = {
+  status: 'online',
+  client: 'web',
+  ttlMinutes: 15,
+  metadata: '{}'
+};
+
+const initialRoleCreateForm = {
   name: '',
   roleKey: '',
   description: '',
-  canBroadcast: true,
+  canBroadcast: false,
   canModerate: false,
-  canHostVoice: false
+  canHostVoice: false,
+  isDefaultAssignable: true
 };
 
-const initialAssignmentForm = {
+const initialRoleAssignmentForm = {
   userId: '',
   roleKey: ''
 };
@@ -45,7 +54,8 @@ const initialEventForm = {
   meetingUrl: '',
   visibility: 'members',
   attendanceLimit: '',
-  isOnline: true
+  isOnline: true,
+  timezone: ''
 };
 
 const initialResourceForm = {
@@ -53,552 +63,549 @@ const initialResourceForm = {
   description: '',
   resourceType: 'external_link',
   linkUrl: '',
+  assetId: '',
   tags: '',
   visibility: 'members'
 };
 
-const buildInitialPresenceForm = (userId) => ({
-  userId: userId ?? 'instructor',
-  status: 'online',
-  client: 'web',
-  ttlMinutes: 15,
-  metadata: ''
-});
-
-function buildFallbackWorkspace(option) {
-  if (!option) {
-    return {
-      channels: [],
-      messages: {},
-      presence: [],
-      roles: [],
-      events: [],
-      resources: []
-    };
+const parseMetadata = (value) => {
+  if (!value || !value.trim()) return {};
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return { note: value };
   }
-
-  const baseId = option.id;
-  const baseTitle = option.title ?? 'Community';
-  const now = new Date();
-  const isoNow = now.toISOString();
-  const generalChannelId = `${baseId}-general`;
-  const broadcastChannelId = `${baseId}-broadcast`;
-
-  return {
-    channels: [
-      {
-        id: generalChannelId,
-        name: `${baseTitle} lounge`,
-        channelType: 'general',
-        members: option.metrics?.active ?? 0,
-        unreadCount: option.metrics?.pending ?? 0,
-        updatedAt: isoNow
-      },
-      {
-        id: broadcastChannelId,
-        name: 'Announcements',
-        channelType: 'broadcast',
-        members: option.metrics?.active ?? 0,
-        unreadCount: 0,
-        updatedAt: isoNow
-      },
-      {
-        id: `${baseId}-voice`,
-        name: 'Voice studio',
-        channelType: 'voice',
-        members: option.metrics?.moderators ?? 0,
-        unreadCount: 0,
-        updatedAt: isoNow
-      }
-    ],
-    messages: {
-      [generalChannelId]: [
-        {
-          id: `${generalChannelId}-msg-1`,
-          body: 'Welcome to the production lounge. Drop questions for the studio pod or surface blockers from your cohorts.',
-          messageType: 'text',
-          attachmentUrl: '',
-          attachmentLabel: '',
-          author: { displayName: 'Ops Lead', role: 'moderator' },
-          createdAt: isoNow,
-          reactions: [{ emoji: '👍', count: 6 }]
-        },
-        {
-          id: `${generalChannelId}-msg-2`,
-          body: 'Reminder: upload your cohort retro decks before Friday so the insight squad can prep highlights.',
-          messageType: 'announcement',
-          attachmentUrl: 'https://assets.edulure.com/templates/retro-checklist.pdf',
-          attachmentLabel: 'Retro checklist',
-          author: { displayName: 'Producer HQ', role: 'producer' },
-          createdAt: new Date(now.getTime() - 3600000).toISOString(),
-          reactions: [{ emoji: '💬', count: 3 }]
-        }
-      ],
-      [broadcastChannelId]: [
-        {
-          id: `${broadcastChannelId}-msg-1`,
-          body: 'Community AMA goes live tomorrow at 17:00 UTC. Please route questions to the prep thread.',
-          messageType: 'announcement',
-          author: { displayName: 'Community Director', role: 'admin' },
-          createdAt: new Date(now.getTime() - 7200000).toISOString()
-        }
-      ]
-    },
-    presence: [
-      {
-        id: `${baseId}-presence-1`,
-        userId: `${baseId}-mod-1`,
-        displayName: 'Avery Quinn',
-        role: 'moderator',
-        status: 'online',
-        expiresAt: new Date(now.getTime() + 1800000).toISOString()
-      },
-      {
-        id: `${baseId}-presence-2`,
-        userId: `${baseId}-mod-2`,
-        displayName: 'Jordan Lee',
-        role: 'producer',
-        status: 'idle',
-        expiresAt: new Date(now.getTime() + 3600000).toISOString()
-      }
-    ],
-    roles: [
-      {
-        id: `${baseId}-role-1`,
-        name: 'Community moderator',
-        roleKey: 'community.moderator',
-        members: option.metrics?.moderators ?? 0,
-        canBroadcast: true,
-        canModerate: true,
-        canHostVoice: true
-      },
-      {
-        id: `${baseId}-role-2`,
-        name: 'Broadcast host',
-        roleKey: 'community.broadcast_host',
-        members: 2,
-        canBroadcast: true,
-        canModerate: false,
-        canHostVoice: false
-      }
-    ],
-    events: [
-      {
-        id: `${baseId}-event-1`,
-        title: 'Weekly studio office hours',
-        summary: 'Live voice coaching and production QA.',
-        startAt: new Date(now.getTime() + 86400000).toISOString(),
-        meetingUrl: 'https://live.edulure.com/office-hours',
-        visibility: 'members'
-      }
-    ],
-    resources: [
-      {
-        id: `${baseId}-resource-1`,
-        title: 'Onboarding playbook',
-        description: 'Standard operating procedures for new moderators.',
-        resourceType: 'external_link',
-        linkUrl: 'https://guides.edulure.com/onboarding.pdf',
-        tags: 'operations, onboarding',
-        visibility: 'moderators',
-        createdAt: isoNow
-      },
-      {
-        id: `${baseId}-resource-2`,
-        title: 'Content calendar template',
-        resourceType: 'file',
-        linkUrl: 'https://assets.edulure.com/templates/content-calendar.xlsx',
-        tags: 'planning',
-        visibility: 'members',
-        createdAt: isoNow
-      }
-    ]
-  };
-}
+};
 
 export default function InstructorCommunityChats() {
-  const { dashboard, refresh } = useOutletContext();
-  const { session } = useAuth();
+  const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
-  const currentUserId = session?.user?.id ?? 'instructor';
+  const outletContext = useOutletContext();
 
-  const communityOptions = useMemo(() => {
-    const deck = Array.isArray(dashboard?.communities?.manageDeck) ? dashboard.communities.manageDeck : [];
-    return deck
-      .map((community) => ({
-        id: community.id?.replace('community-', '') ?? community.id ?? '',
-        title: community.title ?? 'Community',
-        role: community.role ?? 'member',
-        metrics: community.metrics ?? { active: 0, pending: 0, moderators: 0 }
-      }))
-      .filter((community) => community.id);
-  }, [dashboard?.communities?.manageDeck]);
+  const [communitiesState, setCommunitiesState] = useState({ items: [], loading: false, error: null });
+  const [selectedCommunityId, setSelectedCommunityId] = useState(null);
+  const [communityReloadToken, setCommunityReloadToken] = useState(0);
 
-  const [selectedCommunityId, setSelectedCommunityId] = useState(() => communityOptions[0]?.id ?? null);
-  useEffect(() => {
-    if (!communityOptions.length) {
-      setSelectedCommunityId(null);
-      return;
-    }
-    setSelectedCommunityId((prev) => (prev && communityOptions.some((community) => community.id === prev) ? prev : communityOptions[0].id));
-  }, [communityOptions]);
-
-  const fallbackMap = useMemo(() => {
-    const entries = communityOptions.map((community) => [community.id, buildFallbackWorkspace(community)]);
-    return Object.fromEntries(entries);
-  }, [communityOptions]);
-
-  const fallbackWorkspace = selectedCommunityId ? fallbackMap[selectedCommunityId] : buildFallbackWorkspace(null);
-
-  const workspace = useCommunityChatWorkspace({ communityId: selectedCommunityId, token, fallback: fallbackWorkspace });
-
-  const activeChannel = useMemo(
-    () => workspace.channelsState.items.find((channel) => channel.id === workspace.activeChannelId) ?? null,
-    [workspace.channelsState.items, workspace.activeChannelId]
-  );
-
-  const selectedCommunity = useMemo(
-    () => communityOptions.find((community) => community.id === selectedCommunityId) ?? null,
-    [communityOptions, selectedCommunityId]
-  );
-
-  const [composer, setComposer] = useState(initialComposerState);
+  const [composerState, setComposerState] = useState(initialComposerState);
   const [sendingMessage, setSendingMessage] = useState(false);
-  const [roleForm, setRoleForm] = useState(initialRoleForm);
-  const [assignmentForm, setAssignmentForm] = useState(initialAssignmentForm);
+  const [presenceForm, setPresenceForm] = useState(initialPresenceForm);
+  const [roleCreateForm, setRoleCreateForm] = useState(initialRoleCreateForm);
+  const [roleAssignmentForm, setRoleAssignmentForm] = useState(initialRoleAssignmentForm);
   const [eventForm, setEventForm] = useState(initialEventForm);
   const [resourceForm, setResourceForm] = useState(initialResourceForm);
-  const [presenceForm, setPresenceForm] = useState(buildInitialPresenceForm(currentUserId));
-  const [feedback, setFeedback] = useState(null);
+
+  const {
+    interactive,
+    channelsState,
+    activeChannelId,
+    activeChannel,
+    selectChannel,
+    loadChannels,
+    messagesState,
+    loadMessages,
+    presenceState,
+    loadPresence,
+    updatePresenceStatus,
+    rolesState,
+    loadRoles,
+    createRoleEntry,
+    assignRoleToMember,
+    eventsState,
+    loadEvents,
+    createEventEntry,
+    resourcesState,
+    loadResources,
+    createResourceEntry,
+    sendMessage,
+    reactToMessage,
+    removeReaction,
+    moderateMessage,
+    workspaceNotice,
+    setWorkspaceNotice,
+    refreshWorkspace
+  } = useCommunityChatWorkspace({ communityId: selectedCommunityId, token });
 
   useEffect(() => {
-    setPresenceForm(buildInitialPresenceForm(currentUserId));
-  }, [currentUserId, selectedCommunityId]);
-
-  useEffect(() => {
-    if (!workspace.activeChannelId) return undefined;
-    const controller = new AbortController();
-    workspace.loadMessages({ channelId: workspace.activeChannelId, refresh: true }, controller.signal);
-    return () => controller.abort();
-  }, [workspace.activeChannelId, workspace.loadMessages]);
-
-  useEffect(() => {
-    setComposer(initialComposerState);
-  }, [workspace.activeChannelId, selectedCommunityId]);
-
-  const handleSendMessage = useCallback(async () => {
-    if (!workspace.activeChannelId) {
-      setFeedback({ tone: 'warning', message: 'Select a channel', detail: 'Choose a channel before broadcasting updates.' });
-      return;
+    if (!isAuthenticated || !token) {
+      setCommunitiesState({ items: [], loading: false, error: null });
+      setSelectedCommunityId(null);
+      return undefined;
     }
-    if (!composer.body.trim()) {
-      setFeedback({ tone: 'warning', message: 'Message body required', detail: 'Compose a message before sending.' });
-      return;
-    }
 
-    setSendingMessage(true);
-    try {
-      await workspace.sendMessage({
-        channelId: workspace.activeChannelId,
-        messageType: composer.messageType,
-        body: composer.body.trim(),
-        attachmentUrl: composer.attachmentUrl || undefined,
-        attachmentLabel: composer.attachmentLabel || undefined,
-        liveTopic: composer.liveTopic || undefined,
-        meetingUrl: composer.meetingUrl || undefined,
-        metadata: composer.metadataNote ? { note: composer.metadataNote } : undefined
+    let cancelled = false;
+    setCommunitiesState((prev) => ({ ...prev, loading: true, error: null }));
+    fetchCommunities(token)
+      .then((response) => {
+        if (cancelled) return;
+        const items = Array.isArray(response?.data) ? response.data : [];
+        setCommunitiesState({ items, loading: false, error: null });
+        setSelectedCommunityId((current) => {
+          if (current && items.some((community) => String(community.id) === current)) {
+            return current;
+          }
+          return items[0] ? String(items[0].id) : null;
+        });
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        const normalised = error instanceof Error ? error : new Error('Failed to load communities');
+        setCommunitiesState({ items: [], loading: false, error: normalised });
       });
-      setComposer(initialComposerState);
-    } catch (error) {
-      setFeedback({
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, token, communityReloadToken]);
+
+  useEffect(() => {
+    setComposerState(initialComposerState);
+    setPresenceForm(initialPresenceForm);
+    setRoleCreateForm(initialRoleCreateForm);
+    setRoleAssignmentForm(initialRoleAssignmentForm);
+    setEventForm(initialEventForm);
+    setResourceForm(initialResourceForm);
+  }, [selectedCommunityId]);
+
+  const communityOptions = useMemo(
+    () =>
+      communitiesState.items.map((community) => ({
+        id: String(community.id),
+        title: community.name ?? `Community ${community.id}`
+      })),
+    [communitiesState.items]
+  );
+
+  const handleSendMessage = async () => {
+    if (!composerState.body.trim()) {
+      setWorkspaceNotice({
         tone: 'error',
-        message: 'Unable to send message',
-        detail: error instanceof Error ? error.message : 'An unexpected error occurred while contacting the chat service.'
+        message: 'Message body required',
+        detail: 'Add content to your update before sending.'
+      });
+      return;
+    }
+    setSendingMessage(true);
+    const attachments = composerState.attachmentUrl
+      ? [
+          {
+            url: composerState.attachmentUrl,
+            title: composerState.attachmentLabel || undefined
+          }
+        ]
+      : [];
+    const metadata = composerState.metadataNote ? { note: composerState.metadataNote } : {};
+    if (composerState.messageType === 'live') {
+      if (composerState.liveTopic) metadata.topic = composerState.liveTopic;
+      if (composerState.meetingUrl) metadata.meetingUrl = composerState.meetingUrl;
+    }
+    try {
+      await sendMessage({
+        messageType: composerState.messageType,
+        body: composerState.body,
+        attachments,
+        metadata
+      });
+      setComposerState(initialComposerState);
+    } catch (error) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Failed to send message',
+        detail: error?.message ?? 'Please retry shortly.'
       });
     } finally {
       setSendingMessage(false);
     }
-  }, [composer, workspace]);
+  };
 
-  const handleLoadMore = useCallback(
-    (before) => {
-      if (!before) return;
-      workspace.loadMessages({ channelId: workspace.activeChannelId, before });
-    },
-    [workspace]
-  );
-
-  const handleReact = useCallback(
-    (messageId, emoji) => {
-      if (!workspace.activeChannelId) return;
-      workspace.reactToMessage({ channelId: workspace.activeChannelId, messageId, emoji });
-    },
-    [workspace]
-  );
-
-  const handleRemoveReaction = useCallback(
-    (messageId, emoji) => {
-      if (!workspace.activeChannelId) return;
-      workspace.removeReaction({ channelId: workspace.activeChannelId, messageId, emoji });
-    },
-    [workspace]
-  );
-
-  const handleModerate = useCallback(
-    (messageId, moderationPayload) => {
-      if (!workspace.activeChannelId) return;
-      workspace.moderateMessage({ channelId: workspace.activeChannelId, messageId, payload: moderationPayload });
-    },
-    [workspace]
-  );
-
-  const handleCreateRole = useCallback(async () => {
-    if (!roleForm.name.trim() || !roleForm.roleKey.trim()) {
-      setFeedback({ tone: 'warning', message: 'Role details incomplete', detail: 'Provide a name and role key before creating.' });
-      return;
-    }
+  const handleLoadMoreMessages = async (before) => {
+    const targetTimestamp = before ?? messagesState.items[0]?.createdAt;
+    if (!targetTimestamp) return;
     try {
-      await workspace.createRoleEntry({
-        ...roleForm,
-        name: roleForm.name.trim(),
-        roleKey: roleForm.roleKey.trim()
-      });
-      setRoleForm(initialRoleForm);
+      await loadMessages({ channelId: activeChannelId, before: targetTimestamp, refresh: false });
     } catch (error) {
-      setFeedback({
+      setWorkspaceNotice({
         tone: 'error',
-        message: 'Unable to create role',
-        detail: error instanceof Error ? error.message : 'An unexpected error occurred while saving the role.'
+        message: 'Failed to load earlier messages',
+        detail: error?.message ?? 'Try refreshing the workspace.'
       });
     }
-  }, [roleForm, workspace]);
+  };
 
-  const handleAssignRole = useCallback(async () => {
-    if (!assignmentForm.userId.trim() || !assignmentForm.roleKey.trim()) {
-      setFeedback({
-        tone: 'warning',
-        message: 'Assignment details missing',
-        detail: 'Specify a member ID and role key before assigning.'
-      });
-      return;
-    }
+  const handleReactToMessage = async (messageId, emoji) => {
     try {
-      await workspace.assignRoleToMember({
-        userId: assignmentForm.userId.trim(),
-        payload: { roleKey: assignmentForm.roleKey.trim() }
-      });
-      setAssignmentForm(initialAssignmentForm);
+      await reactToMessage({ channelId: activeChannelId, messageId, emoji });
     } catch (error) {
-      setFeedback({
+      setWorkspaceNotice({
         tone: 'error',
-        message: 'Unable to assign role',
-        detail: error instanceof Error ? error.message : 'An unexpected error occurred while updating the member permissions.'
+        message: 'Unable to add reaction',
+        detail: error?.message ?? 'Please try again.'
       });
     }
-  }, [assignmentForm, workspace]);
+  };
 
-  const handleScheduleEvent = useCallback(async () => {
-    if (!eventForm.title.trim()) {
-      setFeedback({ tone: 'warning', message: 'Event title required', detail: 'Provide a title before scheduling the event.' });
-      return;
-    }
+  const handleRemoveReaction = async (messageId, emoji) => {
     try {
-      await workspace.createEventEntry({
-        ...eventForm,
-        title: eventForm.title.trim(),
-        summary: eventForm.summary?.trim() ?? '',
-        attendanceLimit: eventForm.attendanceLimit ? Number(eventForm.attendanceLimit) : undefined
-      });
-      setEventForm(initialEventForm);
+      await removeReaction({ channelId: activeChannelId, messageId, emoji });
     } catch (error) {
-      setFeedback({
+      setWorkspaceNotice({
         tone: 'error',
-        message: 'Unable to schedule event',
-        detail: error instanceof Error ? error.message : 'An unexpected error occurred while scheduling the event.'
+        message: 'Unable to remove reaction',
+        detail: error?.message ?? 'Please try again.'
       });
     }
-  }, [eventForm, workspace]);
+  };
 
-  const handlePublishResource = useCallback(async () => {
-    if (!resourceForm.title.trim() || !resourceForm.linkUrl.trim()) {
-      setFeedback({
-        tone: 'warning',
-        message: 'Resource details incomplete',
-        detail: 'Add a title and link before publishing.'
-      });
-      return;
-    }
+  const handleModerateMessage = async (messageId, action) => {
     try {
-      await workspace.createResourceEntry({
-        ...resourceForm,
-        title: resourceForm.title.trim(),
-        description: resourceForm.description?.trim() ?? '',
-        linkUrl: resourceForm.linkUrl.trim(),
-        tags: resourceForm.tags?.trim() ?? ''
-      });
-      setResourceForm(initialResourceForm);
+      await moderateMessage({ channelId: activeChannelId, messageId, action, reason: 'Updated via instructor dashboard' });
     } catch (error) {
-      setFeedback({
+      setWorkspaceNotice({
         tone: 'error',
-        message: 'Unable to publish resource',
-        detail: error instanceof Error ? error.message : 'An unexpected error occurred while publishing the resource.'
+        message: 'Unable to update message moderation',
+        detail: error?.message ?? 'Please try again.'
       });
     }
-  }, [resourceForm, workspace]);
+  };
 
-  const handleUpdatePresence = useCallback(async () => {
+  const handlePresenceSubmit = async () => {
     try {
-      await workspace.updatePresenceStatus({
-        ...presenceForm,
-        metadata: presenceForm.metadata ? { note: presenceForm.metadata } : undefined
+      const metadata = parseMetadata(presenceForm.metadata);
+      await updatePresenceStatus({
+        status: presenceForm.status,
+        client: presenceForm.client,
+        ttlMinutes: Number(presenceForm.ttlMinutes) || 15,
+        metadata
       });
-      setPresenceForm((prev) => ({ ...prev, metadata: '' }));
+      loadPresence();
     } catch (error) {
-      setFeedback({
+      setWorkspaceNotice({
         tone: 'error',
         message: 'Unable to update presence',
-        detail: error instanceof Error ? error.message : 'An unexpected error occurred while syncing presence.'
+        detail: error?.message ?? 'Please try again.'
       });
     }
-  }, [presenceForm, workspace]);
+  };
 
-  const dismissFeedback = useCallback(() => setFeedback(null), []);
-  const dismissWorkspaceNotice = useCallback(() => workspace.setWorkspaceNotice(null), [workspace]);
+  const handleCreateRole = async () => {
+    if (!roleCreateForm.name || !roleCreateForm.roleKey) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Role details required',
+        detail: 'Enter a name and key for the role before creating it.'
+      });
+      return;
+    }
+    try {
+      await createRoleEntry({
+        name: roleCreateForm.name,
+        roleKey: roleCreateForm.roleKey,
+        description: roleCreateForm.description,
+        permissions: {
+          broadcast: roleCreateForm.canBroadcast,
+          moderate: roleCreateForm.canModerate,
+          voice: roleCreateForm.canHostVoice
+        },
+        isDefaultAssignable: roleCreateForm.isDefaultAssignable
+      });
+      setRoleCreateForm(initialRoleCreateForm);
+      loadRoles();
+    } catch (error) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Unable to create role',
+        detail: error?.message ?? 'Please try again.'
+      });
+    }
+  };
 
-  if (!communityOptions.length) {
+  const handleAssignRole = async () => {
+    if (!roleAssignmentForm.userId || !roleAssignmentForm.roleKey) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Assignment details required',
+        detail: 'Provide a member ID and role to assign.'
+      });
+      return;
+    }
+    try {
+      await assignRoleToMember({
+        userId: roleAssignmentForm.userId.trim(),
+        roleKey: roleAssignmentForm.roleKey
+      });
+      setRoleAssignmentForm(initialRoleAssignmentForm);
+      loadRoles();
+    } catch (error) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Unable to assign role',
+        detail: error?.message ?? 'Please try again.'
+      });
+    }
+  };
+
+  const handleCreateEvent = async () => {
+    if (!eventForm.title || !eventForm.startAt || !eventForm.endAt) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Event details required',
+        detail: 'Provide a title, start time, and end time for the event.'
+      });
+      return;
+    }
+    const start = new Date(eventForm.startAt);
+    const end = new Date(eventForm.endAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Invalid dates',
+        detail: 'Ensure the event start and end times are valid.'
+      });
+      return;
+    }
+    try {
+      await createEventEntry({
+        title: eventForm.title,
+        summary: eventForm.summary || undefined,
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        meetingUrl: eventForm.meetingUrl || null,
+        visibility: eventForm.visibility,
+        attendanceLimit: eventForm.attendanceLimit ? Number(eventForm.attendanceLimit) : undefined,
+        isOnline: Boolean(eventForm.isOnline),
+        timezone: eventForm.timezone || undefined
+      });
+      setEventForm(initialEventForm);
+      loadEvents();
+    } catch (error) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Unable to schedule event',
+        detail: error?.message ?? 'Please try again.'
+      });
+    }
+  };
+
+  const handleCreateResource = async () => {
+    if (!resourceForm.title) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Resource title required',
+        detail: 'Add a title before publishing a resource.'
+      });
+      return;
+    }
+    if (resourceForm.resourceType === 'content_asset' && !resourceForm.assetId) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Asset ID required',
+        detail: 'Provide an asset ID for content assets.'
+      });
+      return;
+    }
+    if (resourceForm.resourceType !== 'content_asset' && !resourceForm.linkUrl) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Link required',
+        detail: 'Provide a link URL for this resource type.'
+      });
+      return;
+    }
+    try {
+      const tags = resourceForm.tags
+        ? resourceForm.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : [];
+      const payload = {
+        title: resourceForm.title,
+        description: resourceForm.description || undefined,
+        resourceType: resourceForm.resourceType,
+        visibility: resourceForm.visibility,
+        tags
+      };
+      if (resourceForm.resourceType === 'content_asset') {
+        payload.assetId = Number(resourceForm.assetId);
+      } else {
+        payload.linkUrl = resourceForm.linkUrl;
+      }
+      await createResourceEntry(payload);
+      setResourceForm(initialResourceForm);
+      loadResources();
+    } catch (error) {
+      setWorkspaceNotice({
+        tone: 'error',
+        message: 'Unable to publish resource',
+        detail: error?.message ?? 'Please try again.'
+      });
+    }
+  };
+
+  if (!isAuthenticated) {
     return (
       <DashboardStateMessage
-        title="Communities unavailable"
-        description="We could not find any active communities linked to your instructor account. Create one from the community builder to unlock the chat workspace."
-        actionLabel="Refresh"
-        onAction={() => refresh?.()}
+        title="Sign in required"
+        description="Sign in to manage community chats and live operations."
+      />
+    );
+  }
+
+  if (communitiesState.loading && communitiesState.items.length === 0) {
+    return (
+      <DashboardStateMessage
+        variant="loading"
+        title="Loading instructor communities"
+        description="Fetching the communities you moderate so we can load the chat workspace."
+      />
+    );
+  }
+
+  if (communitiesState.error) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Unable to load communities"
+        description={communitiesState.error.message ?? 'Please refresh to try again.'}
+        actionLabel="Retry"
+        onAction={() => setCommunityReloadToken((value) => value + 1)}
+      />
+    );
+  }
+
+  if (!selectedCommunityId) {
+    return (
+      <DashboardStateMessage
+        title="No communities available"
+        description="Create or join a community to manage chats and live operations."
       />
     );
   }
 
   return (
     <div className="space-y-8">
-      <div className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="dashboard-kicker text-primary">Instructor control</p>
-            <h1 className="text-2xl font-semibold text-slate-900">Community chat command centre</h1>
-            <p className="mt-2 max-w-3xl text-sm text-slate-600">
-              Coordinate moderation, surface programme signals, and ship announcements across every space. Channels, live presence, roles, and resources are wired for full CRUD so your operations stay production ready.
-            </p>
-          </div>
-          {selectedCommunity ? (
-            <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-500">
-              <p className="text-sm font-semibold text-slate-800">{selectedCommunity.title}</p>
-              <div className="flex items-center gap-4">
-                <span>{selectedCommunity.metrics?.active ?? 0} active</span>
-                <span>{selectedCommunity.metrics?.pending ?? 0} pending</span>
-                <span>{selectedCommunity.metrics?.moderators ?? 0} moderators</span>
-              </div>
-              <span className="inline-flex w-max rounded-full border border-slate-300 px-3 py-1 text-[11px] uppercase tracking-wide text-slate-500">
-                Your role: {selectedCommunity.role}
-              </span>
-            </div>
-          ) : null}
-        </div>
-      </div>
+      <header className="space-y-3">
+        <p className="dashboard-kicker text-primary">Community chat operations</p>
+        <h1 className="dashboard-title">Instructor community chats</h1>
+        <p className="dashboard-subtitle">
+          Monitor live conversations, coordinate moderation, and keep resources in sync across every instructor-led community.
+        </p>
+      </header>
 
-      {workspace.workspaceNotice ? (
-        <DashboardActionFeedback feedback={workspace.workspaceNotice} onDismiss={dismissWorkspaceNotice} />
+      {workspaceNotice ? (
+        <DashboardActionFeedback
+          tone={workspaceNotice.tone}
+          message={workspaceNotice.message}
+          detail={workspaceNotice.detail}
+          onDismiss={() => setWorkspaceNotice(null)}
+        />
       ) : null}
-      {feedback ? <DashboardActionFeedback feedback={feedback} onDismiss={dismissFeedback} /> : null}
 
-      <div className="grid gap-6 xl:grid-cols-[320px,1fr]">
+      <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <ChannelSidebar
           communities={communityOptions}
-          selectedCommunityId={selectedCommunityId ?? undefined}
-          onSelectCommunity={setSelectedCommunityId}
-          channels={workspace.channelsState.items}
-          loading={workspace.channelsState.loading}
-          error={workspace.channelsState.error}
-          onRefresh={() => {
-            workspace.refreshWorkspace();
-            refresh?.();
+          selectedCommunityId={selectedCommunityId}
+          onSelectCommunity={(communityId) => {
+            setSelectedCommunityId(communityId);
+            selectChannel(null);
+            loadChannels();
           }}
-          activeChannelId={workspace.activeChannelId}
-          onSelectChannel={(channelId) => workspace.selectChannel(channelId)}
-          interactive={workspace.interactive}
+          channels={channelsState.items}
+          loading={channelsState.loading}
+          error={channelsState.error}
+          onRefresh={refreshWorkspace}
+          activeChannelId={activeChannelId}
+          onSelectChannel={(channelId) => {
+            selectChannel(channelId);
+            loadMessages({ channelId, refresh: true });
+          }}
+          interactive={interactive}
         />
 
         <div className="flex flex-col gap-6">
           <MessageTimeline
-            channel={activeChannel}
-            messages={workspace.messagesState.items}
-            loading={workspace.messagesState.loading}
-            error={workspace.messagesState.error}
-            hasMore={workspace.messagesState.hasMore ?? false}
-            onLoadMore={handleLoadMore}
-            onReact={handleReact}
+            channel={activeChannel?.channel ?? null}
+            messages={messagesState.items}
+            loading={messagesState.loading}
+            error={messagesState.error}
+            hasMore={messagesState.hasMore}
+            onLoadMore={handleLoadMoreMessages}
+            onReact={handleReactToMessage}
             onRemoveReaction={handleRemoveReaction}
-            onModerate={handleModerate}
+            onModerate={handleModerateMessage}
           />
 
           <MessageComposer
-            value={composer}
-            onChange={setComposer}
+            value={composerState}
+            onChange={setComposerState}
             onSend={handleSendMessage}
-            onReset={() => setComposer(initialComposerState)}
+            onReset={() => setComposerState(initialComposerState)}
             sending={sendingMessage}
-            disabled={!workspace.activeChannelId}
+            disabled={!interactive || !activeChannelId}
           />
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3">
         <PresencePanel
-          presence={workspace.presenceState.items}
-          loading={workspace.presenceState.loading}
-          error={workspace.presenceState.error}
-          onRefresh={() => workspace.loadPresence()}
+          presence={presenceState.items}
+          loading={presenceState.loading}
+          error={presenceState.error}
+          onRefresh={loadPresence}
           formValue={presenceForm}
           onFormChange={setPresenceForm}
-          onSubmit={handleUpdatePresence}
-          interactive={workspace.interactive}
+          onSubmit={handlePresenceSubmit}
+          interactive={interactive}
         />
 
         <RoleManagementPanel
-          roles={workspace.rolesState.items}
-          loading={workspace.rolesState.loading}
-          error={workspace.rolesState.error}
-          onRefresh={() => workspace.loadRoles()}
-          createForm={roleForm}
-          onCreateChange={setRoleForm}
+          roles={rolesState.items}
+          assignments={rolesState.assignments}
+          loading={rolesState.loading}
+          error={rolesState.error}
+          onRefresh={loadRoles}
+          createForm={roleCreateForm}
+          onCreateChange={setRoleCreateForm}
           onCreateSubmit={handleCreateRole}
-          assignmentForm={assignmentForm}
-          onAssignmentChange={setAssignmentForm}
+          assignmentForm={roleAssignmentForm}
+          onAssignmentChange={setRoleAssignmentForm}
           onAssignmentSubmit={handleAssignRole}
-          interactive={workspace.interactive}
+          interactive={interactive}
         />
 
-        <div className="space-y-6">
+        <div className="grid gap-6">
           <EventPlanner
-            events={workspace.eventsState.items}
-            loading={workspace.eventsState.loading}
-            error={workspace.eventsState.error}
-            onRefresh={() => workspace.loadEvents()}
+            events={eventsState.items}
+            loading={eventsState.loading}
+            error={eventsState.error}
+            onRefresh={loadEvents}
             formValue={eventForm}
             onFormChange={setEventForm}
-            onSubmit={handleScheduleEvent}
-            interactive={workspace.interactive}
+            onSubmit={handleCreateEvent}
+            interactive={interactive}
           />
 
           <ResourceLibraryPanel
-            resources={workspace.resourcesState.items}
-            loading={workspace.resourcesState.loading}
-            error={workspace.resourcesState.error}
-            onRefresh={() => workspace.loadResources()}
+            resources={resourcesState.items}
+            loading={resourcesState.loading}
+            error={resourcesState.error}
+            onRefresh={loadResources}
             formValue={resourceForm}
             onFormChange={setResourceForm}
-            onSubmit={handlePublishResource}
-            interactive={workspace.interactive}
+            onSubmit={handleCreateResource}
+            interactive={interactive}
           />
         </div>
       </div>
+
+      {outletContext?.dashboard?.community?.insights ? (
+        <section className="rounded-3xl border border-dashed border-slate-200 p-6 text-sm text-slate-600">
+          <h2 className="text-base font-semibold text-slate-900">Community intelligence</h2>
+          <p className="mt-2 text-xs text-slate-500">
+            Use the community dashboard to review engagement metrics, programme health, and monetisation insights that power this
+            chat workspace.
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }

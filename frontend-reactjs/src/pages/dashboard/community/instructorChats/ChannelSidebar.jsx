@@ -106,15 +106,17 @@ export default function ChannelSidebar({
             <p className="px-3 py-2 text-xs text-slate-500">No channels detected for this community yet.</p>
           ) : (
             <ul className="space-y-1">
-              {channels.map((channel) => {
-                const meta = getChannelTypeMeta(channel.channelType);
+              {channels.map((entry) => {
+                const meta = getChannelTypeMeta(entry.channel?.channelType);
                 const Icon = meta.icon;
-                const isActive = channel.id === activeChannelId;
+                const isActive = entry.id === activeChannelId;
+                const memberRole = entry.membership?.role;
+                const lastActivity = entry.latestMessage?.createdAt ?? entry.channel?.updatedAt;
                 return (
-                  <li key={channel.id}>
+                  <li key={entry.id}>
                     <button
                       type="button"
-                      onClick={() => onSelectChannel(channel.id)}
+                      onClick={() => onSelectChannel(entry.id)}
                       className={`group flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40 ${
                         isActive
                           ? 'bg-primary/10 text-primary shadow-inner'
@@ -130,15 +132,18 @@ export default function ChannelSidebar({
                           <Icon className="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div>
-                          <p className="text-sm font-semibold">{channel.name ?? channel.label ?? meta.label}</p>
+                          <p className="text-sm font-semibold">{entry.channel?.name ?? meta.label}</p>
                           <p className="text-[11px] text-slate-400">{meta.description}</p>
                         </div>
                       </div>
                       <div className="text-right text-[11px] text-slate-400">
-                        <p>{channel.members ?? channel.memberCount ?? '—'} members</p>
-                        {channel.unreadCount ? (
+                        {memberRole ? <p className="capitalize">Role: {memberRole}</p> : null}
+                        {lastActivity ? (
+                          <p>{new Date(lastActivity).toLocaleDateString()}</p>
+                        ) : null}
+                        {entry.unreadCount ? (
                           <p className="mt-1 inline-flex items-center rounded-full bg-primary/10 px-2 py-[2px] text-[10px] font-semibold text-primary">
-                            {channel.unreadCount} unread
+                            {entry.unreadCount} unread
                           </p>
                         ) : null}
                       </div>

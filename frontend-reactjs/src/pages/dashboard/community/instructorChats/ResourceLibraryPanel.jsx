@@ -106,10 +106,10 @@ export default function ResourceLibraryPanel({
               onChange={(event) => onFormChange({ ...formValue, resourceType: event.target.value })}
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
+              <option value="content_asset">Content asset</option>
               <option value="external_link">External link</option>
-              <option value="file">File</option>
-              <option value="video">Video</option>
-              <option value="audio">Audio</option>
+              <option value="document">Document</option>
+              <option value="classroom_session">Classroom session</option>
             </select>
           </label>
           <label className="text-xs font-medium text-slate-500">
@@ -120,21 +120,33 @@ export default function ResourceLibraryPanel({
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="members">Members</option>
-              <option value="moderators">Moderators</option>
-              <option value="public">Public</option>
+              <option value="admins">Admins</option>
             </select>
           </label>
         </div>
-        <label className="text-xs font-medium text-slate-500">
-          Link URL
-          <input
-            type="url"
-            value={formValue.linkUrl}
-            onChange={(event) => onFormChange({ ...formValue, linkUrl: event.target.value })}
-            placeholder="https://guides.edulure.com/community-playbook.pdf"
-            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </label>
+        {formValue.resourceType === 'content_asset' ? (
+          <label className="text-xs font-medium text-slate-500">
+            Asset ID
+            <input
+              type="number"
+              value={formValue.assetId}
+              onChange={(event) => onFormChange({ ...formValue, assetId: event.target.value })}
+              placeholder="123"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+        ) : (
+          <label className="text-xs font-medium text-slate-500">
+            Link URL
+            <input
+              type="url"
+              value={formValue.linkUrl}
+              onChange={(event) => onFormChange({ ...formValue, linkUrl: event.target.value })}
+              placeholder="https://guides.edulure.com/community-playbook.pdf"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+        )}
         <label className="text-xs font-medium text-slate-500">
           Tags
           <input

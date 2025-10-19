@@ -3,9 +3,10 @@ import { PaperAirplaneIcon, PhotoIcon, VideoCameraIcon } from '@heroicons/react/
 
 const MESSAGE_TYPES = [
   { value: 'text', label: 'Text update' },
-  { value: 'announcement', label: 'Announcement' },
-  { value: 'live', label: 'Live session' },
-  { value: 'resource', label: 'Resource drop' }
+  { value: 'system', label: 'Announcement' },
+  { value: 'event', label: 'Event highlight' },
+  { value: 'file', label: 'File drop' },
+  { value: 'live', label: 'Live session' }
 ];
 
 export default function MessageComposer({ value, onChange, onSend, onReset, sending, disabled }) {
@@ -59,7 +60,7 @@ export default function MessageComposer({ value, onChange, onSend, onReset, send
             Message body
             <textarea
               required
-              rows={value.messageType === 'announcement' ? 5 : 4}
+              rows={value.messageType === 'system' ? 5 : 4}
               value={value.body}
               onChange={(event) => handleChange('body', event.target.value)}
               placeholder="Share updates, coordinate production, or route feedback."

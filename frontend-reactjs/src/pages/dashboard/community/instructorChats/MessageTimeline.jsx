@@ -10,29 +10,44 @@ import {
 
 import { getChannelTypeMeta } from './channelMetadata.js';
 
-function MessageAttachment({ attachmentUrl, attachmentLabel }) {
-  if (!attachmentUrl) return null;
+function MessageAttachments({ attachments }) {
+  if (!attachments?.length) return null;
   return (
-    <a
-      href={attachmentUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-primary transition hover:border-primary/40 hover:bg-primary/5"
-    >
-      <PaperClipIcon className="h-4 w-4" aria-hidden="true" />
-      {attachmentLabel || 'View attachment'}
-    </a>
+    <ul className="mt-3 space-y-2">
+      {attachments.map((attachment) => {
+        const label = attachment.title || attachment.label || attachment.name || 'Attachment';
+        const url = attachment.url || attachment.link || attachment.href;
+        return (
+          <li key={`${label}-${url ?? Math.random()}`}>
+            {url ? (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-primary transition hover:border-primary/40 hover:bg-primary/5"
+              >
+                <PaperClipIcon className="h-4 w-4" aria-hidden="true" />
+                {label}
+              </a>
+            ) : (
+              <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500">
+                <PaperClipIcon className="h-4 w-4" aria-hidden="true" />
+                {label}
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-MessageAttachment.propTypes = {
-  attachmentUrl: PropTypes.string,
-  attachmentLabel: PropTypes.string
+MessageAttachments.propTypes = {
+  attachments: PropTypes.arrayOf(PropTypes.object)
 };
 
-MessageAttachment.defaultProps = {
-  attachmentUrl: null,
-  attachmentLabel: null
+MessageAttachments.defaultProps = {
+  attachments: []
 };
 
 function ReactionPill({ emoji, count, onReact, onRemove }) {
@@ -61,9 +76,9 @@ ReactionPill.defaultProps = {
   onRemove: null
 };
 
-function ModerationBadge({ moderation }) {
-  if (!moderation?.status) return null;
-  const statusLabel = moderation.status === 'hidden' ? 'Hidden' : moderation.status;
+function ModerationBadge({ status }) {
+  if (!status || status === 'visible') return null;
+  const statusLabel = status === 'hidden' ? 'Hidden' : status;
   return (
     <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-[2px] text-[10px] font-semibold uppercase tracking-wide text-rose-600">
       <ExclamationTriangleIcon className="h-3 w-3" aria-hidden="true" />
@@ -73,14 +88,11 @@ function ModerationBadge({ moderation }) {
 }
 
 ModerationBadge.propTypes = {
-  moderation: PropTypes.shape({
-    status: PropTypes.string,
-    note: PropTypes.string
-  })
+  status: PropTypes.string
 };
 
 ModerationBadge.defaultProps = {
-  moderation: null
+  status: null
 };
 
 export default function MessageTimeline({
@@ -132,20 +144,24 @@ export default function MessageTimeline({
                     </span>
                     <div>
                       <p className="text-sm font-semibold text-slate-900">{message.author?.displayName ?? 'Member'}</p>
-                      <p className="text-[11px] uppercase tracking-wide text-slate-400">{message.author?.role ?? 'member'}</p>
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                        {message.author?.role ?? 'member'}
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 text-right">
                     <time className="text-xs text-slate-400" dateTime={message.createdAt}>
                       {message.createdAt ? new Date(message.createdAt).toLocaleString() : 'Just now'}
                     </time>
-                    <ModerationBadge moderation={message.moderation} />
+                    <ModerationBadge status={message.status} />
                   </div>
                 </div>
                 <div className="mt-4 space-y-3 text-sm text-slate-700">
                   {message.body ? <p>{message.body}</p> : null}
                   {message.metadata?.note ? (
-                    <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">Moderator note: {message.metadata.note}</p>
+                    <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                      Moderator note: {message.metadata.note}
+                    </p>
                   ) : null}
                   {message.messageType === 'live' ? (
                     <p className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
@@ -153,7 +169,7 @@ export default function MessageTimeline({
                       Live session scheduled
                     </p>
                   ) : null}
-                  <MessageAttachment attachmentUrl={message.attachmentUrl} attachmentLabel={message.attachmentLabel} />
+                  <MessageAttachments attachments={message.attachments} />
                 </div>
                 <footer className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-400">
                   <button
@@ -192,16 +208,11 @@ export default function MessageTimeline({
                     ))}
                     <button
                       type="button"
-                      onClick={() =>
-                        onModerate?.(message.id, {
-                          action: message.moderation?.status === 'hidden' ? 'restore' : 'hidden',
-                          note: message.moderation?.note ?? 'Flagged by instructor dashboard'
-                        })
-                      }
+                      onClick={() => onModerate?.(message.id, message.status === 'hidden' ? 'restore' : 'hide')}
                       className="inline-flex items-center gap-1 rounded-full border border-rose-200 px-3 py-[3px] text-rose-600 transition hover:border-rose-400 hover:bg-rose-50"
                     >
                       <ExclamationTriangleIcon className="h-4 w-4" aria-hidden="true" />
-                      {message.moderation?.status === 'hidden' ? 'Restore' : 'Hide'}
+                      {message.status === 'hidden' ? 'Restore' : 'Hide'}
                     </button>
                   </div>
                 </footer>

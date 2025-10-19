@@ -23,239 +23,271 @@ import {
 
 const MESSAGE_PAGE_SIZE = 30;
 
-const initialCollection = (items = []) => ({ items, loading: false, error: null });
+const emptyCollection = { items: [], loading: false, error: null };
 
-function deriveHasMore(meta, length) {
-  if (!meta) return length === MESSAGE_PAGE_SIZE;
-  if (meta?.hasMore !== undefined) return Boolean(meta.hasMore);
-  if (meta?.pagination?.hasMore !== undefined) return Boolean(meta.pagination.hasMore);
-  if (meta?.pagination?.next !== undefined) return Boolean(meta.pagination.next);
-  if (meta?.page && meta?.totalPages) return meta.page < meta.totalPages;
-  return length === MESSAGE_PAGE_SIZE;
-}
+const normaliseChannelEntry = (entry) => {
+  const channel = entry?.channel ?? entry ?? {};
+  return {
+    id: String(channel.id ?? ''),
+    channel,
+    membership: entry?.membership ?? null,
+    latestMessage: entry?.latestMessage ?? null,
+    unreadCount: Number(entry?.unreadCount ?? 0)
+  };
+};
 
-export function useCommunityChatWorkspace({ communityId, token, fallback }) {
-  const interactive = Boolean(token && communityId);
-  const lastLoadedCommunity = useRef(null);
+const normaliseMessage = (message) => {
+  if (!message) return null;
+  const attachments = Array.isArray(message.attachments) ? message.attachments : [];
+  const metadata = typeof message.metadata === 'object' && message.metadata !== null ? message.metadata : {};
+  const author = message.author ?? {};
+  const displayName = [author.firstName, author.lastName]
+    .filter((part) => Boolean(part && part.trim()))
+    .join(' ');
+  return {
+    id: String(message.id),
+    channelId: message.channelId,
+    body: message.body ?? '',
+    messageType: message.messageType ?? 'text',
+    attachments,
+    metadata,
+    status: message.status ?? 'visible',
+    pinned: Boolean(message.pinned),
+    threadRootId: message.threadRootId ?? null,
+    replyToMessageId: message.replyToMessageId ?? null,
+    createdAt: message.createdAt ?? message.deliveredAt ?? null,
+    updatedAt: message.updatedAt ?? null,
+    author: {
+      id: author.id ?? message.authorId ?? null,
+      displayName: displayName || author.email || `Member ${message.authorId ?? ''}`,
+      role: author.role ?? null,
+      email: author.email ?? null
+    },
+    reactions: Array.isArray(message.reactions) ? message.reactions : [],
+    viewerReactions: Array.isArray(message.viewerReactions) ? message.viewerReactions : []
+  };
+};
 
-  const [channelsState, setChannelsState] = useState(initialCollection(fallback?.channels ?? []));
-  const [activeChannelId, setActiveChannelId] = useState(fallback?.channels?.[0]?.id ?? null);
+const normalisePresence = (session) => ({
+  id: session?.id ? String(session.id) : `${session?.userId ?? 'session'}-${session?.sessionId ?? ''}`,
+  userId: session?.userId ?? null,
+  sessionId: session?.sessionId ?? null,
+  client: session?.client ?? 'web',
+  status: session?.status ?? 'online',
+  connectedAt: session?.connectedAt ?? null,
+  lastSeenAt: session?.lastSeenAt ?? null,
+  expiresAt: session?.expiresAt ?? null,
+  metadata: session?.metadata ?? {}
+});
+
+export default function useCommunityChatWorkspace({ communityId, token }) {
+  const interactive = Boolean(communityId && token);
+  const lastCommunityRef = useRef(null);
+  const loadedChannelsRef = useRef(new Set());
+
+  const [channelsState, setChannelsState] = useState(emptyCollection);
+  const [activeChannelId, setActiveChannelId] = useState(null);
   const [messageCache, setMessageCache] = useState({});
-  const [presenceState, setPresenceState] = useState(initialCollection(fallback?.presence ?? []));
-  const [rolesState, setRolesState] = useState(initialCollection(fallback?.roles ?? []));
-  const [eventsState, setEventsState] = useState(initialCollection(fallback?.events ?? []));
-  const [resourcesState, setResourcesState] = useState(initialCollection(fallback?.resources ?? []));
+  const [presenceState, setPresenceState] = useState(emptyCollection);
+  const [rolesState, setRolesState] = useState({ ...emptyCollection, assignments: [] });
+  const [eventsState, setEventsState] = useState(emptyCollection);
+  const [resourcesState, setResourcesState] = useState(emptyCollection);
   const [workspaceNotice, setWorkspaceNotice] = useState(null);
 
   useEffect(() => {
-    setChannelsState((prev) => ({ ...prev, items: fallback?.channels ?? prev.items }));
-    setPresenceState((prev) => ({ ...prev, items: fallback?.presence ?? prev.items }));
-    setRolesState((prev) => ({ ...prev, items: fallback?.roles ?? prev.items }));
-    setEventsState((prev) => ({ ...prev, items: fallback?.events ?? prev.items }));
-    setResourcesState((prev) => ({ ...prev, items: fallback?.resources ?? prev.items }));
-  }, [fallback?.channels, fallback?.presence, fallback?.roles, fallback?.events, fallback?.resources]);
-
-  useEffect(() => {
-    if (communityId !== lastLoadedCommunity.current) {
-      lastLoadedCommunity.current = communityId;
-      setChannelsState(initialCollection(fallback?.channels ?? []));
-      setActiveChannelId(fallback?.channels?.[0]?.id ?? null);
+    if (communityId !== lastCommunityRef.current) {
+      lastCommunityRef.current = communityId;
+      loadedChannelsRef.current = new Set();
+      setChannelsState(emptyCollection);
+      setActiveChannelId(null);
       setMessageCache({});
-      setPresenceState(initialCollection(fallback?.presence ?? []));
-      setRolesState(initialCollection(fallback?.roles ?? []));
-      setEventsState(initialCollection(fallback?.events ?? []));
-      setResourcesState(initialCollection(fallback?.resources ?? []));
+      setPresenceState(emptyCollection);
+      setRolesState({ ...emptyCollection, assignments: [] });
+      setEventsState(emptyCollection);
+      setResourcesState(emptyCollection);
       setWorkspaceNotice(null);
     }
-  }, [communityId, fallback?.channels, fallback?.events, fallback?.presence, fallback?.resources, fallback?.roles]);
+  }, [communityId]);
 
   const selectChannel = useCallback((channelId) => {
-    setActiveChannelId(channelId);
+    setActiveChannelId(channelId ? String(channelId) : null);
   }, []);
 
   const loadChannels = useCallback(
     async (signal) => {
-      if (!communityId) {
-        setChannelsState(initialCollection([]));
-        setActiveChannelId(null);
-        return;
-      }
-
       if (!interactive) {
-        setChannelsState(initialCollection(fallback?.channels ?? []));
-        setActiveChannelId((prev) => prev ?? fallback?.channels?.[0]?.id ?? null);
+        setChannelsState(emptyCollection);
         return;
       }
-
       setChannelsState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const { data } = await listCommunityChannels({ communityId, token, signal });
-        const nextChannels = Array.isArray(data) ? data : [];
-        setChannelsState({ items: nextChannels, loading: false, error: null });
-        setActiveChannelId((prev) => prev ?? nextChannels[0]?.id ?? null);
+        const items = Array.isArray(data)
+          ? data
+              .map(normaliseChannelEntry)
+              .filter((entry) => entry.id)
+          : [];
+        setChannelsState({ items, loading: false, error: null });
+        setActiveChannelId((current) => {
+          if (current && items.some((item) => item.id === current)) {
+            return current;
+          }
+          return items[0]?.id ?? null;
+        });
       } catch (error) {
         if (signal?.aborted) return;
         setChannelsState((prev) => ({ ...prev, loading: false, error }));
       }
     },
-    [communityId, interactive, token, fallback?.channels]
+    [communityId, interactive, token]
   );
 
   const loadMessages = useCallback(
     async ({ channelId, before, refresh = false } = {}, signal) => {
-      const targetChannel = channelId ?? activeChannelId;
-      if (!communityId || !targetChannel) return;
+      if (!interactive) return;
+      const targetChannelId = String(channelId ?? activeChannelId ?? '');
+      if (!communityId || !targetChannelId) return;
 
-      const existing = messageCache[targetChannel] ?? {
-        items: fallback?.messages?.[targetChannel] ?? [],
-        hasMore: false,
-        loading: false,
-        error: null
-      };
-
-      if (!interactive) {
-        setMessageCache((prev) => ({
+      setMessageCache((prev) => {
+        const existing = prev[targetChannelId] ?? { ...emptyCollection, hasMore: false };
+        return {
           ...prev,
-          [targetChannel]: { ...existing, items: fallback?.messages?.[targetChannel] ?? existing.items }
-        }));
-        return;
-      }
-
-      setMessageCache((prev) => ({
-        ...prev,
-        [targetChannel]: {
-          ...existing,
-          loading: true,
-          error: null,
-          items: refresh ? [] : existing.items
-        }
-      }));
+          [targetChannelId]: {
+            ...existing,
+            loading: true,
+            error: null,
+            items: refresh ? [] : existing.items,
+            hasMore: existing.hasMore ?? false
+          }
+        };
+      });
 
       try {
         const response = await listCommunityMessages({
           communityId,
-          channelId: targetChannel,
+          channelId: targetChannelId,
           token,
           limit: MESSAGE_PAGE_SIZE,
           before,
           signal
         });
-        const fetched = Array.isArray(response.data) ? response.data : [];
-        const combined = refresh ? fetched : [...fetched.reverse(), ...existing.items];
-        setMessageCache((prev) => ({
-          ...prev,
-          [targetChannel]: {
-            items: combined,
-            hasMore: deriveHasMore(response.meta, fetched.length),
-            loading: false,
-            error: null
-          }
-        }));
-        await markCommunityChannelRead({ communityId, channelId: targetChannel, token });
+        const fetched = Array.isArray(response.data)
+          ? response.data.map(normaliseMessage).filter(Boolean)
+          : [];
+        const chronological = fetched.slice().reverse();
+        setMessageCache((prev) => {
+          const existing = prev[targetChannelId] ?? { ...emptyCollection, hasMore: false };
+          const nextItems = refresh
+            ? chronological
+            : [...chronological, ...(existing.items ?? [])];
+          return {
+            ...prev,
+            [targetChannelId]: {
+              items: nextItems,
+              loading: false,
+              error: null,
+              hasMore: fetched.length === MESSAGE_PAGE_SIZE
+            }
+          };
+        });
+        markCommunityChannelRead({ communityId, channelId: targetChannelId, token }).catch(() => undefined);
       } catch (error) {
         if (signal?.aborted) return;
-        setMessageCache((prev) => ({
-          ...prev,
-          [targetChannel]: {
-            ...existing,
-            loading: false,
-            error
-          }
-        }));
+        setMessageCache((prev) => {
+          const existing = prev[targetChannelId] ?? { ...emptyCollection, hasMore: false };
+          return {
+            ...prev,
+            [targetChannelId]: {
+              ...existing,
+              loading: false,
+              error
+            }
+          };
+        });
       }
     },
-    [activeChannelId, communityId, interactive, token, messageCache, fallback?.messages]
+    [activeChannelId, communityId, interactive, token]
   );
 
   const loadPresence = useCallback(
     async (signal) => {
-      if (!communityId) {
-        setPresenceState(initialCollection([]));
-        return;
-      }
       if (!interactive) {
-        setPresenceState(initialCollection(fallback?.presence ?? []));
+        setPresenceState(emptyCollection);
         return;
       }
       setPresenceState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const { data } = await listCommunityPresence({ communityId, token, signal });
-        setPresenceState({ items: Array.isArray(data) ? data : [], loading: false, error: null });
+        const items = Array.isArray(data) ? data.map(normalisePresence) : [];
+        setPresenceState({ items, loading: false, error: null });
       } catch (error) {
         if (signal?.aborted) return;
         setPresenceState((prev) => ({ ...prev, loading: false, error }));
       }
     },
-    [communityId, interactive, token, fallback?.presence]
+    [communityId, interactive, token]
   );
 
   const loadRoles = useCallback(
     async (signal) => {
-      if (!communityId) {
-        setRolesState(initialCollection([]));
-        return;
-      }
       if (!interactive) {
-        setRolesState(initialCollection(fallback?.roles ?? []));
+        setRolesState({ ...emptyCollection, assignments: [] });
         return;
       }
       setRolesState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const { data } = await listCommunityRoles({ communityId, token, signal });
-        setRolesState({ items: Array.isArray(data) ? data : [], loading: false, error: null });
+        const definitions = Array.isArray(data?.definitions) ? data.definitions : [];
+        const assignments = Array.isArray(data?.assignments) ? data.assignments : [];
+        setRolesState({ items: definitions, assignments, loading: false, error: null });
       } catch (error) {
         if (signal?.aborted) return;
         setRolesState((prev) => ({ ...prev, loading: false, error }));
       }
     },
-    [communityId, interactive, token, fallback?.roles]
+    [communityId, interactive, token]
   );
 
   const loadEvents = useCallback(
     async (signal) => {
-      if (!communityId) {
-        setEventsState(initialCollection([]));
-        return;
-      }
       if (!interactive) {
-        setEventsState(initialCollection(fallback?.events ?? []));
+        setEventsState(emptyCollection);
         return;
       }
       setEventsState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const { data } = await listCommunityEvents({ communityId, token, signal });
-        setEventsState({ items: Array.isArray(data) ? data : [], loading: false, error: null });
+        const items = Array.isArray(data) ? data : [];
+        setEventsState({ items, loading: false, error: null });
       } catch (error) {
         if (signal?.aborted) return;
         setEventsState((prev) => ({ ...prev, loading: false, error }));
       }
     },
-    [communityId, interactive, token, fallback?.events]
+    [communityId, interactive, token]
   );
 
   const loadResources = useCallback(
     async (signal) => {
-      if (!communityId) {
-        setResourcesState(initialCollection([]));
-        return;
-      }
       if (!interactive) {
-        setResourcesState(initialCollection(fallback?.resources ?? []));
+        setResourcesState(emptyCollection);
         return;
       }
       setResourcesState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const { data } = await fetchCommunityResources({ communityId, token, signal });
-        setResourcesState({ items: Array.isArray(data) ? data : [], loading: false, error: null });
+        const items = Array.isArray(data) ? data : [];
+        setResourcesState({ items, loading: false, error: null });
       } catch (error) {
         if (signal?.aborted) return;
         setResourcesState((prev) => ({ ...prev, loading: false, error }));
       }
     },
-    [communityId, interactive, token, fallback?.resources]
+    [communityId, interactive, token]
   );
 
   const refreshWorkspace = useCallback(() => {
+    if (!interactive) return () => undefined;
     const controller = new AbortController();
     loadChannels(controller.signal);
     loadPresence(controller.signal);
@@ -263,219 +295,183 @@ export function useCommunityChatWorkspace({ communityId, token, fallback }) {
     loadEvents(controller.signal);
     loadResources(controller.signal);
     return () => controller.abort();
-  }, [loadChannels, loadEvents, loadPresence, loadResources, loadRoles]);
+  }, [interactive, loadChannels, loadEvents, loadPresence, loadResources, loadRoles]);
 
   useEffect(() => {
-    if (!communityId) return undefined;
+    if (!interactive) return undefined;
     const abort = refreshWorkspace();
     return () => {
       if (typeof abort === 'function') abort();
     };
-  }, [communityId, refreshWorkspace]);
+  }, [interactive, refreshWorkspace]);
+
+  useEffect(() => {
+    if (!interactive || !activeChannelId) return undefined;
+    if (loadedChannelsRef.current.has(activeChannelId)) return undefined;
+    const controller = new AbortController();
+    loadMessages({ channelId: activeChannelId, refresh: true }, controller.signal);
+    loadedChannelsRef.current.add(activeChannelId);
+    return () => controller.abort();
+  }, [activeChannelId, interactive, loadMessages]);
 
   const appendMessage = useCallback((channelId, message) => {
     if (!channelId || !message) return;
     setMessageCache((prev) => {
-      const current = prev[channelId] ?? {
-        items: [],
-        hasMore: false,
-        loading: false,
-        error: null
-      };
-      const items = [...current.items, message];
+      const existing = prev[channelId] ?? { ...emptyCollection, hasMore: false };
       return {
         ...prev,
-        [channelId]: { ...current, items }
+        [channelId]: {
+          ...existing,
+          items: [...(existing.items ?? []), message]
+        }
       };
     });
   }, []);
 
   const updateMessage = useCallback((channelId, messageId, updater) => {
-    if (!channelId || !messageId) return;
+    if (!channelId || !messageId || typeof updater !== 'function') return;
     setMessageCache((prev) => {
-      const current = prev[channelId];
-      if (!current) return prev;
-      const items = current.items.map((item) => (item.id === messageId ? updater(item) : item));
+      const existing = prev[channelId];
+      if (!existing) return prev;
+      const items = existing.items.map((item) => (item.id === String(messageId) ? updater(item) : item));
       return {
         ...prev,
-        [channelId]: { ...current, items }
+        [channelId]: { ...existing, items }
       };
     });
   }, []);
 
   const sendMessage = useCallback(
-    async (payload) => {
-      const channelId = payload?.channelId ?? activeChannelId;
-      if (!communityId || !channelId) throw new Error('Select a channel before sending messages.');
-
-      if (!interactive) {
-        const optimistic = {
-          id: `local-${Date.now()}`,
-          body: payload?.body,
-          messageType: payload?.messageType ?? 'text',
-          attachmentUrl: payload?.attachmentUrl,
-          attachmentLabel: payload?.attachmentLabel,
-          author: { displayName: 'You', role: 'instructor' },
-          createdAt: new Date().toISOString(),
-          metadata: payload?.metadataNote ? { note: payload.metadataNote } : undefined
-        };
-        appendMessage(channelId, optimistic);
-        setWorkspaceNotice({
-          tone: 'info',
-          message: 'Offline mode',
-          detail: 'Message stored locally until sync is available.'
-        });
-        return optimistic;
+    async ({ channelId, messageType, body, attachments = [], metadata = {} }) => {
+      const targetChannelId = String(channelId ?? activeChannelId ?? '');
+      if (!interactive || !communityId || !targetChannelId) {
+        throw new Error('Select a channel before sending messages.');
       }
-
-      const response = await postCommunityMessage({ communityId, channelId, token, payload });
-      appendMessage(channelId, response.data);
+      const payload = {
+        messageType: messageType ?? 'text',
+        body,
+        attachments,
+        metadata
+      };
+      const { data } = await postCommunityMessage({ communityId, channelId: targetChannelId, token, payload });
+      const message = normaliseMessage(data);
+      appendMessage(targetChannelId, message);
       setWorkspaceNotice({
         tone: 'success',
         message: 'Message delivered',
-        detail: 'Your update has been delivered to the channel.'
+        detail: 'Your update has been published to the channel.'
       });
-      return response.data;
+      return message;
     },
     [activeChannelId, appendMessage, communityId, interactive, token]
   );
 
   const reactToMessage = useCallback(
     async ({ channelId, messageId, emoji }) => {
-      if (!communityId || !channelId || !messageId) return;
-      if (!interactive) {
-        updateMessage(channelId, messageId, (message) => {
-          const reactions = Array.isArray(message.reactions) ? message.reactions : [];
-          const existing = reactions.find((reaction) => reaction.emoji === emoji);
-          if (existing) {
-            return {
-              ...message,
-              reactions: reactions.map((reaction) =>
-                reaction.emoji === emoji ? { ...reaction, count: (reaction.count ?? 0) + 1 } : reaction
-              )
-            };
-          }
-          return {
-            ...message,
-            reactions: [...reactions, { emoji, count: 1 }]
-          };
-        });
-        return;
-      }
-      await addCommunityMessageReaction({ communityId, channelId, messageId, token, emoji });
-      updateMessage(channelId, messageId, (message) => {
-        const reactions = Array.isArray(message.reactions) ? message.reactions : [];
+      if (!interactive || !communityId) return;
+      const targetChannelId = String(channelId ?? activeChannelId ?? '');
+      if (!targetChannelId || !messageId || !emoji) return;
+      await addCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
+      updateMessage(targetChannelId, messageId, (message) => {
+        const reactions = Array.isArray(message.reactions) ? [...message.reactions] : [];
         const existing = reactions.find((reaction) => reaction.emoji === emoji);
         if (existing) {
-          return {
-            ...message,
-            reactions: reactions.map((reaction) =>
-              reaction.emoji === emoji ? { ...reaction, count: (reaction.count ?? 0) + 1 } : reaction
-            )
-          };
+          existing.count = Number(existing.count ?? 0) + 1;
+        } else {
+          reactions.push({ emoji, count: 1 });
         }
-        return {
-          ...message,
-          reactions: [...reactions, { emoji, count: 1 }]
-        };
+        const viewerReactions = Array.isArray(message.viewerReactions)
+          ? Array.from(new Set([...message.viewerReactions, emoji]))
+          : [emoji];
+        return { ...message, reactions, viewerReactions };
       });
     },
-    [communityId, interactive, token, updateMessage]
+    [activeChannelId, communityId, interactive, token, updateMessage]
   );
 
   const removeReaction = useCallback(
     async ({ channelId, messageId, emoji }) => {
-      if (!communityId || !channelId || !messageId) return;
-      if (!interactive) {
-        updateMessage(channelId, messageId, (message) => ({
-          ...message,
-          reactions: (message.reactions ?? []).filter((reaction) => reaction.emoji !== emoji)
-        }));
-        return;
-      }
-      await removeCommunityMessageReaction({ communityId, channelId, messageId, token, emoji });
-      updateMessage(channelId, messageId, (message) => ({
-        ...message,
-        reactions: (message.reactions ?? []).filter((reaction) => reaction.emoji !== emoji)
-      }));
+      if (!interactive || !communityId) return;
+      const targetChannelId = String(channelId ?? activeChannelId ?? '');
+      if (!targetChannelId || !messageId || !emoji) return;
+      await removeCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
+      updateMessage(targetChannelId, messageId, (message) => {
+        const reactions = Array.isArray(message.reactions)
+          ? message.reactions.filter((reaction) => reaction.emoji !== emoji)
+          : [];
+        const viewerReactions = Array.isArray(message.viewerReactions)
+          ? message.viewerReactions.filter((reaction) => reaction !== emoji)
+          : [];
+        return { ...message, reactions, viewerReactions };
+      });
     },
-    [communityId, interactive, token, updateMessage]
+    [activeChannelId, communityId, interactive, token, updateMessage]
   );
 
   const moderateMessage = useCallback(
-    async ({ channelId, messageId, payload }) => {
-      if (!communityId || !channelId || !messageId) return;
-      if (!interactive) {
-        updateMessage(channelId, messageId, (message) => ({
-          ...message,
-          moderation: { status: payload?.action ?? 'flagged', note: payload?.note }
-        }));
-        return;
+    async ({ channelId, messageId, action, reason }) => {
+      if (!interactive || !communityId) return;
+      const targetChannelId = String(channelId ?? activeChannelId ?? '');
+      if (!targetChannelId || !messageId || !action) return;
+      const { data } = await moderateCommunityMessage({
+        communityId,
+        channelId: targetChannelId,
+        messageId,
+        token,
+        payload: { action, reason }
+      });
+      const updated = normaliseMessage(data?.message ?? data);
+      if (updated) {
+        updateMessage(targetChannelId, messageId, () => updated);
       }
-      await moderateCommunityMessage({ communityId, channelId, messageId, token, payload });
-      updateMessage(channelId, messageId, (message) => ({
-        ...message,
-        moderation: { status: payload?.action, note: payload?.note }
-      }));
+      setWorkspaceNotice({
+        tone: 'success',
+        message: 'Message moderation updated',
+        detail: 'The message visibility has been updated.'
+      });
     },
-    [communityId, interactive, token, updateMessage]
+    [activeChannelId, communityId, interactive, token, updateMessage]
   );
 
   const updatePresenceStatus = useCallback(
-    async (payload) => {
-      if (!communityId) return;
-      if (!interactive) {
-        setPresenceState((prev) => ({
-          ...prev,
-          items: prev.items.map((record) =>
-            record.userId === payload?.userId ? { ...record, status: payload.status, metadata: payload.metadata } : record
-          )
-        }));
-        setWorkspaceNotice({
-          tone: 'info',
-          message: 'Presence cached',
-          detail: 'Presence updated locally until you connect.'
-        });
-        return;
-      }
+    async ({ status, client, ttlMinutes, metadata }) => {
+      if (!interactive || !communityId) return null;
+      const payload = {
+        status: status ?? 'online',
+        client: client ?? 'web',
+        ttlMinutes: Number(ttlMinutes ?? 15),
+        metadata: metadata ?? {}
+      };
       const { data } = await updateCommunityPresence({ communityId, token, payload });
-      setPresenceState((prev) => ({
-        ...prev,
-        items: prev.items.map((record) => (record.userId === data?.userId ? { ...record, ...data } : record))
-      }));
+      const session = normalisePresence(data);
+      setPresenceState((prev) => {
+        const items = prev.items.some((item) => item.sessionId === session.sessionId)
+          ? prev.items.map((item) => (item.sessionId === session.sessionId ? session : item))
+          : [...prev.items, session];
+        return { ...prev, items };
+      });
       setWorkspaceNotice({
         tone: 'success',
         message: 'Presence updated',
-        detail: 'Community roster has been refreshed.'
+        detail: 'Your availability has been broadcast to the community.'
       });
+      return session;
     },
     [communityId, interactive, token]
   );
 
   const createRoleEntry = useCallback(
     async (payload) => {
-      if (!communityId) return null;
-      if (!interactive) {
-        const draftRole = {
-          id: `local-role-${Date.now()}`,
-          ...payload,
-          members: 0,
-          createdAt: new Date().toISOString()
-        };
-        setRolesState((prev) => ({ ...prev, items: [...prev.items, draftRole] }));
-        setWorkspaceNotice({
-          tone: 'info',
-          message: 'Role drafted',
-          detail: 'Role stored locally until sync resumes.'
-        });
-        return draftRole;
-      }
+      if (!interactive || !communityId) return null;
       const { data } = await createCommunityRole({ communityId, token, payload });
-      setRolesState((prev) => ({ ...prev, items: [...prev.items, data] }));
+      setRolesState((prev) => ({
+        ...prev,
+        items: [...prev.items, data]
+      }));
       setWorkspaceNotice({
         tone: 'success',
         message: 'Role created',
-        detail: 'New responsibilities are now available to assign.'
+        detail: 'New role definition available for assignment.'
       });
       return data;
     },
@@ -483,50 +479,28 @@ export function useCommunityChatWorkspace({ communityId, token, fallback }) {
   );
 
   const assignRoleToMember = useCallback(
-    async ({ userId, payload }) => {
-      if (!communityId || !userId) return;
-      if (!interactive) {
-        setWorkspaceNotice({
-          tone: 'info',
-          message: 'Assignment pending',
-          detail: 'Role assignments will sync once online.'
-        });
-        return;
-      }
-      await assignCommunityRole({ communityId, userId, token, payload });
+    async ({ userId, roleKey }) => {
+      if (!interactive || !communityId || !userId || !roleKey) return;
+      await assignCommunityRole({ communityId, userId, token, payload: { roleKey } });
       setWorkspaceNotice({
         tone: 'success',
-        message: 'Role assignment updated',
-        detail: 'Member permissions updated successfully.'
+        message: 'Member role updated',
+        detail: 'Assignment saved successfully.'
       });
+      loadRoles();
     },
-    [communityId, interactive, token]
+    [communityId, interactive, loadRoles, token]
   );
 
   const createEventEntry = useCallback(
     async (payload) => {
-      if (!communityId) return null;
-      if (!interactive) {
-        const draftEvent = {
-          id: `local-event-${Date.now()}`,
-          ...payload,
-          status: 'draft',
-          createdAt: new Date().toISOString()
-        };
-        setEventsState((prev) => ({ ...prev, items: [...prev.items, draftEvent] }));
-        setWorkspaceNotice({
-          tone: 'info',
-          message: 'Event drafted',
-          detail: 'Event saved locally until you reconnect.'
-        });
-        return draftEvent;
-      }
+      if (!interactive || !communityId) return null;
       const { data } = await createCommunityEvent({ communityId, token, payload });
-      setEventsState((prev) => ({ ...prev, items: [...prev.items, data] }));
+      setEventsState((prev) => ({ ...prev, items: [data, ...prev.items] }));
       setWorkspaceNotice({
         tone: 'success',
         message: 'Event scheduled',
-        detail: 'Members will be notified about the new session.'
+        detail: 'Community members will be notified.'
       });
       return data;
     },
@@ -535,51 +509,43 @@ export function useCommunityChatWorkspace({ communityId, token, fallback }) {
 
   const createResourceEntry = useCallback(
     async (payload) => {
-      if (!communityId) return null;
-      if (!interactive) {
-        const draftResource = {
-          id: `local-resource-${Date.now()}`,
-          ...payload,
-          createdAt: new Date().toISOString()
-        };
-        setResourcesState((prev) => ({ ...prev, items: [draftResource, ...prev.items] }));
-        setWorkspaceNotice({
-          tone: 'info',
-          message: 'Resource drafted',
-          detail: 'Resource will sync when a connection is available.'
-        });
-        return draftResource;
-      }
+      if (!interactive || !communityId) return null;
       const { data } = await createCommunityResource({ communityId, token, payload });
       setResourcesState((prev) => ({ ...prev, items: [data, ...prev.items] }));
       setWorkspaceNotice({
         tone: 'success',
         message: 'Resource published',
-        detail: 'Learning library has been updated.'
+        detail: 'Resource is now available in the library.'
       });
       return data;
     },
     [communityId, interactive, token]
   );
 
-  const activeMessages = useMemo(() => {
-    if (!activeChannelId) {
-      return { ...initialCollection([]), hasMore: false };
-    }
-    return (
+  const activeChannel = useMemo(
+    () => channelsState.items.find((entry) => entry.id === activeChannelId) ?? null,
+    [activeChannelId, channelsState.items]
+  );
+
+  const messagesState = useMemo(
+    () =>
       messageCache[activeChannelId] ?? {
-        ...initialCollection(fallback?.messages?.[activeChannelId] ?? []),
+        items: [],
+        loading: false,
+        error: null,
         hasMore: false
-      }
-    );
-  }, [activeChannelId, messageCache, fallback?.messages]);
+      },
+    [activeChannelId, messageCache]
+  );
 
   return {
+    interactive,
     channelsState,
     activeChannelId,
+    activeChannel,
     selectChannel,
     loadChannels,
-    messagesState: activeMessages,
+    messagesState,
     loadMessages,
     presenceState,
     loadPresence,
@@ -600,9 +566,6 @@ export function useCommunityChatWorkspace({ communityId, token, fallback }) {
     moderateMessage,
     workspaceNotice,
     setWorkspaceNotice,
-    refreshWorkspace,
-    interactive
+    refreshWorkspace
   };
 }
-
-export default useCommunityChatWorkspace;

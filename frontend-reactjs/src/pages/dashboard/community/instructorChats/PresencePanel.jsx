@@ -3,8 +3,7 @@ import { ArrowPathIcon, SignalIcon } from '@heroicons/react/24/outline';
 
 const STATUS_OPTIONS = [
   { value: 'online', label: 'Online' },
-  { value: 'idle', label: 'Idle' },
-  { value: 'dnd', label: 'Do not disturb' },
+  { value: 'away', label: 'Away' },
   { value: 'offline', label: 'Offline' }
 ];
 
@@ -55,11 +54,11 @@ export default function PresencePanel({
               >
                 <div className="flex items-center gap-2">
                   <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">
-                    {(record.displayName ?? 'Member').slice(0, 2).toUpperCase()}
+                    {(record.userId ?? 'Member').toString().slice(0, 2).toUpperCase()}
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-slate-800">{record.displayName ?? 'Member'}</p>
-                    <p className="text-[11px] uppercase tracking-wide text-slate-400">{record.role ?? 'moderator'}</p>
+                    <p className="text-sm font-semibold text-slate-800">User {record.userId ?? 'unknown'}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-400">Client: {record.client ?? 'web'}</p>
                   </div>
                 </div>
                 <div className="text-right text-[11px] text-slate-400">
@@ -68,6 +67,7 @@ export default function PresencePanel({
                     {record.status ?? 'online'}
                   </p>
                   {record.expiresAt ? <p className="mt-1">Expires {new Date(record.expiresAt).toLocaleTimeString()}</p> : null}
+                  {record.metadata?.note ? <p className="mt-1 text-slate-500">{record.metadata.note}</p> : null}
                 </div>
               </li>
             ))}
@@ -117,12 +117,12 @@ export default function PresencePanel({
           />
         </label>
         <label className="text-xs font-medium text-slate-500">
-          Metadata
+          Metadata (JSON)
           <input
             type="text"
             value={formValue.metadata}
             onChange={(event) => onFormChange({ ...formValue, metadata: event.target.value })}
-            placeholder="Office hours coverage"
+            placeholder='{"note": "Office hours"}'
             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>

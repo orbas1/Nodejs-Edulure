@@ -1,8 +1,14 @@
 import PropTypes from 'prop-types';
 import { ArrowPathIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
+const BUILT_IN_ROLES = [
+  { roleKey: 'moderator', name: 'Moderator' },
+  { roleKey: 'member', name: 'Member' }
+];
+
 export default function RoleManagementPanel({
   roles,
+  assignments,
   loading,
   error,
   onRefresh,
@@ -14,6 +20,14 @@ export default function RoleManagementPanel({
   onAssignmentSubmit,
   interactive
 }) {
+  const roleOptions = [...roles.map((role) => ({ roleKey: role.roleKey, name: role.name })), ...BUILT_IN_ROLES];
+
+  const memberCounts = roles.reduce((acc, role) => {
+    const count = assignments.filter((assignment) => assignment.role === role.roleKey).length;
+    acc.set(role.roleKey, count);
+    return acc;
+  }, new Map());
+
   return (
     <section className="rounded-3xl border border-slate-200 bg-white/95 p-5 shadow-sm">
       <header className="flex items-start justify-between gap-3">
@@ -59,8 +73,8 @@ export default function RoleManagementPanel({
                   </div>
                 </div>
                 <div className="text-right text-[11px] text-slate-400">
-                  <p>{role.members ?? role.memberCount ?? 0} members</p>
-                  <p className="mt-1">Broadcast: {role.canBroadcast ? 'Yes' : 'No'}</p>
+                  <p>{memberCounts.get(role.roleKey) ?? 0} members</p>
+                  <p className="mt-1">Broadcast: {role.permissions?.broadcast ? 'Yes' : 'No'}</p>
                 </div>
               </li>
             ))}
@@ -135,6 +149,15 @@ export default function RoleManagementPanel({
             Host voice rooms
           </label>
         </div>
+        <label className="flex items-center gap-2 text-xs font-medium text-slate-500">
+          <input
+            type="checkbox"
+            checked={createForm.isDefaultAssignable}
+            onChange={(event) => onCreateChange({ ...createForm, isDefaultAssignable: event.target.checked })}
+            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+          />
+          Default assignable
+        </label>
         <button
           type="submit"
           className="w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-primary/50"
@@ -171,8 +194,8 @@ export default function RoleManagementPanel({
             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
             <option value="">Select role</option>
-            {roles.map((role) => (
-              <option key={role.roleKey ?? role.id} value={role.roleKey ?? role.id}>
+            {roleOptions.map((role) => (
+              <option key={role.roleKey} value={role.roleKey}>
                 {role.name}
               </option>
             ))}
@@ -192,6 +215,7 @@ export default function RoleManagementPanel({
 
 RoleManagementPanel.propTypes = {
   roles: PropTypes.arrayOf(PropTypes.object).isRequired,
+  assignments: PropTypes.arrayOf(PropTypes.object).isRequired,
   loading: PropTypes.bool.isRequired,
   error: PropTypes.any,
   onRefresh: PropTypes.func.isRequired,
@@ -201,7 +225,8 @@ RoleManagementPanel.propTypes = {
     description: PropTypes.string,
     canBroadcast: PropTypes.bool,
     canModerate: PropTypes.bool,
-    canHostVoice: PropTypes.bool
+    canHostVoice: PropTypes.bool,
+    isDefaultAssignable: PropTypes.bool
   }).isRequired,
   onCreateChange: PropTypes.func.isRequired,
   onCreateSubmit: PropTypes.func.isRequired,

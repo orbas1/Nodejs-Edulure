@@ -140,11 +140,21 @@ export default function EventPlanner({
               className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
               <option value="members">Members</option>
-              <option value="public">Public</option>
-              <option value="moderators">Moderators</option>
+              <option value="admins">Admins</option>
+              <option value="owners">Owners</option>
             </select>
           </label>
         </div>
+        <label className="text-xs font-medium text-slate-500">
+          Timezone (optional)
+          <input
+            type="text"
+            value={formValue.timezone}
+            onChange={(event) => onFormChange({ ...formValue, timezone: event.target.value })}
+            placeholder="UTC"
+            className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
         <label className="text-xs font-medium text-slate-500">
           Attendance limit
           <input
@@ -189,7 +199,8 @@ EventPlanner.propTypes = {
     meetingUrl: PropTypes.string,
     visibility: PropTypes.string,
     attendanceLimit: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
-    isOnline: PropTypes.bool
+    isOnline: PropTypes.bool,
+    timezone: PropTypes.string
   }).isRequired,
   onFormChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
