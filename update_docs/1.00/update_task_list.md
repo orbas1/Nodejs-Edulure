@@ -45,9 +45,9 @@ All tasks start at 0% completion and will be updated as implementation progresse
    Deliver course catalogue, cohort analytics, assignment pipelines, content authoring modals, and learner management pages with localisation, draft persistence, and collaborative editing.
 3. **Compliance & governance consoles** – 100%
    Delivered audit, accreditation, attestation analytics, risk heatmaps, incident response orchestration, and evidence export screens backed by secure storage and granular permissions.
-4. **Finance & monetisation centres** – 0%
+4. **Finance & monetisation centres** – 100%
    Build billing centre, payout approvals, revenue dashboards, experimentation lab, pricing configuration, and financial reconciliation screens with real-time data, error handling, and ledger integrations.
-5. **Support, communications, and settings hub** – 0%
+5. **Support, communications, and settings hub** – 100%
    Launch support ticketing, announcements, in-app chat, notification centre, onboarding wizard, tenant settings, and knowledge base experiences with guided tours, contextual help, and RBAC-controlled admin modals.
 
 ## Task 3 (0%): Reintroduce provider value and harden learner mobile app

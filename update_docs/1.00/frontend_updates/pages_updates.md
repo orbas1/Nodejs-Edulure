@@ -7,3 +7,5 @@
 - Expanded `InstructorCourseManage` to render the production-ready learning workspace, wiring in catalogue analytics, assignment
   queues, authoring drafts with modal inspection, and learner risk tables sourced from the `coursesWorkspace` API payload.
 - Rebuilt `AdminComplianceSection` within `src/pages/admin/sections/` to surface audit summaries, attestation analytics, framework trackers, risk heatmaps, incident response flows, and evidence exports with accessible tab navigation and defensive state management.
+- Added `AdminFinanceMonetisation` under `src/pages/dashboard/admin/` to deliver the revenue & finance centre with tenant selectors, offline-aware refresh controls, billing ageing analytics, open invoice actions, payout approvals, ledger reconciliation, experimentation controls, and pricing catalogue governance.
+- Added `AdminSupportHub` under `src/pages/dashboard/admin/` to ship the support, communications, and settings hub with tenant-aware ticket triage, escalation workflows, automation health analytics, broadcast scheduling, knowledge base governance, and notification policy controls.

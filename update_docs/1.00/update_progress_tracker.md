@@ -10,12 +10,12 @@ Progress is tracked per task and subtask across the required dimensions. Overall
 | &nbsp;&nbsp;Third-party integration wrappers | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Data governance rebuild | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Security and compliance hardening | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| **Task 2: Modernise operator web experience and support tooling** | 60% | 60% | 60% | 60% | 60% | 60% | 60% |
+| **Task 2: Modernise operator web experience and support tooling** | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Executive & health dashboards rebuild | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Learning & curriculum workspaces | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Compliance & governance consoles | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| &nbsp;&nbsp;Finance & monetisation centres | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
-| &nbsp;&nbsp;Support, communications, and settings hub | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
+| &nbsp;&nbsp;Finance & monetisation centres | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
+| &nbsp;&nbsp;Support, communications, and settings hub | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | **Task 3: Reintroduce provider value and harden learner mobile app** | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;Provider transition and communications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;Learner app service integration | 0% | 0% | 0% | 0% | 0% | 0% | 0% |

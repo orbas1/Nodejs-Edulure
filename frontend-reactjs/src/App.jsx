@@ -54,6 +54,8 @@ import FieldServices from './pages/dashboard/FieldServices.jsx';
 import AdminOperator from './pages/dashboard/AdminOperator.jsx';
 import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
 import AdminIntegrations from './pages/dashboard/AdminIntegrations.jsx';
+import AdminFinanceMonetisation from './pages/dashboard/admin/AdminFinanceMonetisation.jsx';
+import AdminSupportHub from './pages/dashboard/admin/AdminSupportHub.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
@@ -226,6 +228,22 @@ function App() {
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminIntegrations />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="finance"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminFinanceMonetisation />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="support"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminSupportHub />
             </ProtectedRoute>
           )}
         />

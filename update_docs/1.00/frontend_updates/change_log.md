@@ -8,3 +8,5 @@
 - Completed the instructor course management workspace by introducing catalogue, analytics, assignment pipeline, authoring, and
   learner management sections with persistent modals and Vitest coverage to protect the new UI surface.
 - Replaced the placeholder compliance tile with a full admin compliance console that renders audits, attestation coverage, frameworks, risk heatmaps, incident response queues, and evidence export controls backed by new Vitest coverage.
+- Delivered the revenue & finance centres with a dedicated admin page, finance-specific React hook, actionable billing dashboards, payout approvals, ledger reconciliation widgets, experimentation tables, and pricing governance workflows so operators can close the loop on monetisation.
+- Delivered the support, communications, and settings hub with a production-ready admin page, support-specific data hook, actionable ticket workflows, escalation controls, knowledge base governance, broadcast scheduling, and notification policy management so frontline teams can deliver on contractual SLAs.
