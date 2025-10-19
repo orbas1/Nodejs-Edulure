@@ -298,6 +298,101 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
     );
   }
 
+  Widget _buildMonetizationExplainer(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _brandSurface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _brandPrimary.withOpacity(0.14)),
+        boxShadow: [
+          BoxShadow(
+            color: _brandPrimary.withOpacity(0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: _brandPrimary.withOpacity(0.12),
+                child: const Icon(Icons.volunteer_activism_outlined, color: _brandPrimary),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Creator-first monetisation',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: _brandPrimaryDark,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Community subscriptions and mentor bookings only retain a 2.5% platform fee. '
+            'Live stream donations contribute 10% towards infrastructure while affiliates capture 25% of '
+            'that fee. Digital courses and e-books share the same 25% affiliate bonus with a 5% platform '
+            'retention so 95% of the sale reaches the publisher.',
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.4, color: Colors.blueGrey.shade700),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Every checkout is powered by Stripe so learners can tip, donate, or enrol without leaving the app.',
+            style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.favorite_outline),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Live donation checkout opens a secure Stripe payment flow.'),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _brandPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                ),
+                label: const Text('Send a live donation'),
+              ),
+              OutlinedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Share your affiliate code to capture 25% of platform fees.'),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _brandPrimaryDark,
+                  side: BorderSide(color: _brandPrimary.withOpacity(0.4)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                ),
+                child: const Text('Affiliate share breakdown'),
+              )
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
   Widget _buildMarketplaceEmptyState(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
@@ -770,6 +865,7 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
                                 : ListView(
                                     physics: const BouncingScrollPhysics(),
                                     children: [
+                                      _buildMonetizationExplainer(context),
                                       _buildMarketplaceHighlights(context),
                                       ..._marketplace.map((item) {
                                         final pending = _pendingPurchaseId == item.id;

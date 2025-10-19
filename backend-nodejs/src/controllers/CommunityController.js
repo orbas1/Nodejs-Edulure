@@ -61,6 +61,24 @@ const createResourceSchema = Joi.object({
   metadata: Joi.object().default({})
 });
 
+const updateResourceSchema = Joi.object({
+  title: Joi.string().max(200),
+  description: Joi.string().max(2000).allow('', null),
+  resourceType: Joi.string().valid('content_asset', 'external_link', 'document', 'classroom_session'),
+  assetId: Joi.number().integer().min(1),
+  linkUrl: Joi.string().uri().allow(null, ''),
+  classroomReference: Joi.string().max(120).allow(null, ''),
+  tags: Joi.array().items(Joi.string().trim().max(40)).max(15),
+  visibility: Joi.string().valid('members', 'admins'),
+  status: Joi.string().valid('draft', 'published', 'archived'),
+  publishedAt: Joi.date().allow(null),
+  metadata: Joi.object(),
+  clearAsset: Joi.boolean().optional(),
+  clearLink: Joi.boolean().optional()
+})
+  .min(1)
+  .messages({ 'object.min': 'At least one field must be provided for update' });
+
 const moderatePostSchema = Joi.object({
   action: Joi.string().valid('suppress', 'restore').required(),
   reason: Joi.string().max(500).allow('', null)
@@ -326,6 +344,56 @@ export default class CommunityController {
         error.status = 422;
         error.details = error.details.map((d) => d.message);
       }
+      return next(error);
+    }
+  }
+
+  static async updateResource(req, res, next) {
+    try {
+      const payload = await updateResourceSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const resourcePayload = {
+        ...payload,
+        assetId: payload.clearAsset ? null : payload.assetId,
+        linkUrl: payload.clearLink ? null : payload.linkUrl
+      };
+      delete resourcePayload.clearAsset;
+      delete resourcePayload.clearLink;
+
+      const resource = await CommunityService.updateResource(
+        req.params.communityId,
+        req.params.resourceId,
+        req.user.id,
+        resourcePayload
+      );
+      return success(res, {
+        data: resource,
+        message: 'Resource updated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async deleteResource(req, res, next) {
+    try {
+      const result = await CommunityService.deleteResource(
+        req.params.communityId,
+        req.params.resourceId,
+        req.user.id
+      );
+      return success(res, {
+        data: result,
+        message: 'Resource removed'
+      });
+    } catch (error) {
       return next(error);
     }
   }

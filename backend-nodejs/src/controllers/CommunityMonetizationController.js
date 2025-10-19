@@ -48,6 +48,17 @@ const checkoutSchema = Joi.object({
   affiliateCode: Joi.string().max(60).optional()
 });
 
+const donationSchema = Joi.object({
+  amountCents: Joi.number().integer().min(100).max(5_000_000).required(),
+  currency: Joi.string().length(3).uppercase().optional(),
+  provider: Joi.string().valid('stripe', 'paypal').optional(),
+  receiptEmail: Joi.string().email().optional(),
+  donorName: Joi.string().max(120).allow('', null).optional(),
+  message: Joi.string().max(500).allow('', null).optional(),
+  eventId: Joi.number().integer().optional(),
+  affiliateCode: Joi.string().max(60).optional()
+});
+
 const affiliateApplySchema = Joi.object({
   referralCode: Joi.string().max(60).optional(),
   commissionRateBasisPoints: Joi.number().integer().min(250).max(5000).optional(),
@@ -195,6 +206,28 @@ export default class CommunityMonetizationController {
       );
       return success(res, { data: subscriptions, message: 'Subscriptions fetched' });
     } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createDonation(req, res, next) {
+    try {
+      const payload = await donationSchema.validateAsync(req.body, { abortEarly: false, stripUnknown: true });
+      const result = await CommunityMonetizationService.createLiveDonation(
+        req.params.communityId,
+        req.user?.id ?? null,
+        payload
+      );
+      return success(res, {
+        data: result,
+        message: 'Live donation checkout initiated',
+        status: 201
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
       return next(error);
     }
   }

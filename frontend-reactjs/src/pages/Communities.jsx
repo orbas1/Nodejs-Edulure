@@ -8,7 +8,8 @@ import {
   fetchCommunityDetail,
   fetchCommunityFeed,
   fetchCommunityResources,
-  joinCommunity
+  joinCommunity,
+  leaveCommunity
 } from '../api/communityApi.js';
 import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
@@ -209,6 +210,9 @@ const FALLBACK_COMMUNITY_DETAIL = {
     lastPenTest: '2024-04-19',
     dataResidency: 'SOC2 Type II aligned, US & EU data clusters'
   },
+  permissions: {
+    canLeave: false
+  },
   launchChecklist: {
     overallStatus: 'Ready for launch',
     items: [
@@ -278,6 +282,7 @@ function normaliseDetail(detail, resources) {
     },
     roles: { ...FALLBACK_COMMUNITY_DETAIL.roles, ...(detail.roles ?? {}) },
     security: { ...FALLBACK_COMMUNITY_DETAIL.security, ...(detail.security ?? {}) },
+    permissions: { ...FALLBACK_COMMUNITY_DETAIL.permissions, ...(detail.permissions ?? {}) },
     launchChecklist: {
       ...FALLBACK_COMMUNITY_DETAIL.launchChecklist,
       ...(detail.launchChecklist ?? {}),
@@ -345,14 +350,28 @@ export default function Communities() {
 
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState(null);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState(null);
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [selectedAddons, setSelectedAddons] = useState([]);
+
+  const selectedCommunityId = selectedCommunity?.id ?? null;
 
   useEffect(() => {
     if (!token || !canAccessCommunityFeed) {
       setCommunities([ALL_COMMUNITIES_NODE]);
       setSelectedCommunity(ALL_COMMUNITIES_NODE);
+      setCommunityDetail(null);
+      setResources([]);
+      setResourcesMeta({ ...DEFAULT_RESOURCES_META });
+      setResourcesError(null);
+      setFeedItems([]);
+      setFeedError(null);
+      setJoinError(null);
+      setLeaveError(null);
+      setIsJoining(false);
+      setIsLeaving(false);
       return;
     }
 
@@ -420,7 +439,12 @@ export default function Communities() {
         if (resourcesResult.status === 'fulfilled') {
           const resourceItems = resourcesResult.value?.data ?? [];
           setResources(resourceItems);
-          setResourcesMeta(resourcesResult.value?.meta ?? { ...DEFAULT_RESOURCES_META, total: resourceItems.length });
+          const pagination = resourcesResult.value?.meta?.pagination ?? {};
+          setResourcesMeta({
+            limit: pagination.limit ?? DEFAULT_RESOURCES_META.limit,
+            offset: pagination.offset ?? DEFAULT_RESOURCES_META.offset,
+            total: pagination.total ?? resourceItems.length
+          });
         } else {
           setResources([]);
           setResourcesMeta({ ...DEFAULT_RESOURCES_META });
@@ -459,8 +483,8 @@ export default function Communities() {
   );
 
   useEffect(() => {
-    if (!selectedCommunity?.id) return;
-    if (selectedCommunity.id === 'all') {
+    if (!selectedCommunityId) return;
+    if (selectedCommunityId === 'all') {
       setCommunityDetail(null);
       setResources([]);
       setResourcesMeta({ ...DEFAULT_RESOURCES_META });
@@ -471,14 +495,19 @@ export default function Communities() {
       return;
     }
 
-    loadCommunityDetail(selectedCommunity.id);
-    loadFeed(selectedCommunity.id);
-  }, [selectedCommunity, loadCommunityDetail, loadFeed]);
+    loadCommunityDetail(selectedCommunityId);
+    loadFeed(selectedCommunityId);
+  }, [selectedCommunityId, loadCommunityDetail, loadFeed]);
 
   const resolvedDetail = useMemo(
-    () => normaliseDetail(selectedCommunity?.id === 'all' ? null : communityDetail, resources),
-    [selectedCommunity?.id, communityDetail, resources]
+    () => normaliseDetail(selectedCommunityId === 'all' ? null : communityDetail, resources),
+    [selectedCommunityId, communityDetail, resources]
   );
+
+  const hasMoreResources = useMemo(() => {
+    const total = resourcesMeta.total ?? resources.length;
+    return total > resources.length;
+  }, [resourcesMeta.total, resources.length]);
 
   useEffect(() => {
     if (!resolvedDetail?.subscription?.plans) return;
@@ -489,7 +518,7 @@ export default function Communities() {
 
   useEffect(() => {
     setSelectedAddons([]);
-  }, [selectedCommunity?.id]);
+  }, [selectedCommunityId]);
 
   const selectedPlan = useMemo(() => {
     if (!resolvedDetail?.subscription?.plans) return null;
@@ -515,17 +544,104 @@ export default function Communities() {
     });
   };
 
+  const handleLoadMoreResources = useCallback(async () => {
+    if (!token || !canAccessCommunityFeed) return;
+    if (!selectedCommunityId || selectedCommunityId === 'all') return;
+    if (!hasMoreResources) return;
+
+    const limit = resourcesMeta.limit || DEFAULT_RESOURCES_META.limit;
+    const offset = resources.length;
+
+    setIsLoadingResources(true);
+    setResourcesError(null);
+
+    try {
+      const response = await fetchCommunityResources({ communityId: selectedCommunityId, token, limit, offset });
+      const items = response.data ?? [];
+      const pagination = response.meta?.pagination ?? {};
+      setResources((prev) => [...prev, ...items]);
+      setResourcesMeta({
+        limit: pagination.limit ?? limit,
+        offset: pagination.offset ?? offset,
+        total: pagination.total ?? (resourcesMeta.total ?? offset + items.length)
+      });
+    } catch (error) {
+      setResourcesError(error.message ?? 'Unable to load community resources');
+    } finally {
+      setIsLoadingResources(false);
+    }
+  }, [
+    token,
+    canAccessCommunityFeed,
+    selectedCommunityId,
+    hasMoreResources,
+    resourcesMeta.limit,
+    resourcesMeta.total,
+    resources.length
+  ]);
+
   const handleJoin = async () => {
-    if (!selectedCommunity?.id || selectedCommunity.id === 'all' || !canJoinCommunities || !token) return;
+    if (!selectedCommunityId || selectedCommunityId === 'all' || !canJoinCommunities || !token) return;
     setIsJoining(true);
     setJoinError(null);
+    setLeaveError(null);
     try {
-      const response = await joinCommunity({ communityId: selectedCommunity.id, token });
-      setCommunityDetail(response.data ?? null);
+      const response = await joinCommunity({ communityId: selectedCommunityId, token });
+      const nextDetail = response.data ?? null;
+      if (nextDetail) {
+        setCommunityDetail(nextDetail);
+        setCommunities((prev) =>
+          prev.map((community) =>
+            String(community.id) === String(selectedCommunityId)
+              ? { ...community, ...nextDetail }
+              : community
+          )
+        );
+      }
+      await loadCommunityDetail(selectedCommunityId);
+      await loadFeed(selectedCommunityId);
     } catch (error) {
       setJoinError(error.message ?? 'Unable to update membership');
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!selectedCommunityId || selectedCommunityId === 'all' || !token) return;
+    setIsLeaving(true);
+    setLeaveError(null);
+    try {
+      const response = await leaveCommunity({ communityId: selectedCommunityId, token });
+      const summary = response.data ?? null;
+      if (summary) {
+        setCommunityDetail(summary);
+        setCommunities((prev) =>
+          prev.map((community) =>
+            String(community.id) === String(selectedCommunityId)
+              ? { ...community, ...summary }
+              : community
+          )
+        );
+      } else {
+        setCommunityDetail((prev) =>
+          prev
+            ? {
+                ...prev,
+                membership: { status: 'non-member', role: 'non-member' },
+                permissions: { ...(prev.permissions ?? {}), canLeave: false }
+              }
+            : prev
+        );
+      }
+      setResources([]);
+      setResourcesMeta({ ...DEFAULT_RESOURCES_META });
+      setFeedItems([]);
+      setFeedError(null);
+    } catch (error) {
+      setLeaveError(error.message ?? 'Unable to leave this community right now.');
+    } finally {
+      setIsLeaving(false);
     }
   };
 
@@ -635,6 +751,9 @@ export default function Communities() {
 
   const ratingsBreakdown = useMemo(() => Object.entries(resolvedDetail.ratings.breakdown), [resolvedDetail.ratings.breakdown]);
 
+  const communityPermissions = communityDetail?.permissions ?? {};
+  const canLeaveCommunity = Boolean(communityPermissions.canLeave);
+
   const joinCtaLabel = useMemo(() => {
     if (resolvedDetail.membership?.status === 'active') {
       return 'You are active in this community';
@@ -702,8 +821,21 @@ export default function Communities() {
                 >
                   {isJoining ? 'Processing…' : joinCtaLabel}
                 </button>
+                {canLeaveCommunity && (
+                  <button
+                    type="button"
+                    onClick={handleLeave}
+                    disabled={isLeaving}
+                    className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-5 py-2 text-sm font-semibold text-rose-600 shadow-card transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                  >
+                    {isLeaving ? 'Leaving…' : 'Leave community'}
+                  </button>
+                )}
                 {joinError && (
                   <p className="text-xs text-rose-600">{joinError}</p>
+                )}
+                {leaveError && (
+                  <p className="text-xs text-rose-600">{leaveError}</p>
                 )}
               </div>
             </div>
@@ -892,14 +1024,18 @@ export default function Communities() {
                 </p>
                 <div className="mt-6">
                   <CommunityProfile
-                    community={selectedCommunity?.id === 'all' ? null : communityDetail}
-                    isAggregate={selectedCommunity?.id === 'all'}
+                    community={selectedCommunityId === 'all' ? null : communityDetail}
+                    isAggregate={selectedCommunityId === 'all'}
                     resources={resources}
                     resourcesMeta={resourcesMeta}
-                    isLoadingDetail={isLoadingDetail}
+                    isLoadingDetail={selectedCommunityId !== 'all' && (isLoadingDetail || isLoadingCommunities)}
                     isLoadingResources={isLoadingResources}
                     error={detailError}
                     resourcesError={resourcesError}
+                    onLoadMoreResources={hasMoreResources ? handleLoadMoreResources : null}
+                    onLeave={canLeaveCommunity ? handleLeave : null}
+                    isLeaving={isLeaving}
+                    canLeave={canLeaveCommunity}
                   />
                 </div>
               </div>

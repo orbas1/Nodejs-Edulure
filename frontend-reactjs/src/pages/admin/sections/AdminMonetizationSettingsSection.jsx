@@ -3,12 +3,32 @@ import PropTypes from 'prop-types';
 
 import { updateMonetizationSettings } from '../../../api/adminApi.js';
 
+const COMMISSION_CATEGORY_LABELS = Object.freeze({
+  community_subscription: 'Community subscriptions',
+  community_live_donation: 'Community live stream donations',
+  course_sale: 'Course sales',
+  ebook_sale: 'E-book sales',
+  tutor_booking: 'Tutor bookings'
+});
+
 const DEFAULT_SETTINGS = Object.freeze({
   commissions: {
     enabled: true,
     rateBps: 250,
     minimumFeeCents: 0,
-    allowCommunityOverride: true
+    allowCommunityOverride: true,
+    default: {
+      rateBps: 250,
+      minimumFeeCents: 0,
+      affiliateShare: 0.25
+    },
+    categories: {
+      community_subscription: { rateBps: 250, minimumFeeCents: 0, affiliateShare: 0.25 },
+      community_live_donation: { rateBps: 1000, minimumFeeCents: 0, affiliateShare: 0.25 },
+      course_sale: { rateBps: 500, minimumFeeCents: 0, affiliateShare: 0.25 },
+      ebook_sale: { rateBps: 500, minimumFeeCents: 0, affiliateShare: 0.25 },
+      tutor_booking: { rateBps: 250, minimumFeeCents: 0, affiliateShare: 0.25 }
+    }
   },
   subscriptions: {
     enabled: true,
@@ -46,7 +66,7 @@ const DEFAULT_SETTINGS = Object.freeze({
     recommendedServicemanShareBps: 7500,
     nonCustodialWallets: true,
     complianceNarrative:
-      'Commission is fixed at 2.5% for the platform. Providers decide service professional rates while the ledger operates on a non-custodial basis.'
+      'Commissions stay capped at 2.5% for communities and mentors, 5% on digital catalogues, and 10% on live donations. Providers set their own rates while the ledger remains non-custodial.'
   }
 });
 
@@ -92,16 +112,56 @@ function normaliseSettings(settings) {
         : defaultAffiliate.defaultCommission.maxOccurrences ?? 1
       : null;
 
+  const commissionSource = settings.commissions ?? {};
+  const commissionDefault = commissionSource.default ?? {};
+  const defaultRate = Number.isFinite(Number(commissionSource.rateBps ?? commissionDefault.rateBps))
+    ? Number(commissionSource.rateBps ?? commissionDefault.rateBps)
+    : DEFAULT_SETTINGS.commissions.default.rateBps;
+  const defaultMinimum = Number.isFinite(
+    Number(commissionSource.minimumFeeCents ?? commissionDefault.minimumFeeCents)
+  )
+    ? Number(commissionSource.minimumFeeCents ?? commissionDefault.minimumFeeCents)
+    : DEFAULT_SETTINGS.commissions.default.minimumFeeCents;
+  const defaultAffiliateShare = clampShareRatio(
+    commissionDefault.affiliateShare ?? DEFAULT_SETTINGS.commissions.default.affiliateShare
+  );
+
+  const fallbackCategories = DEFAULT_SETTINGS.commissions.categories;
+  const providedCategories = commissionSource.categories ?? {};
+  const categoryKeys = Array.from(
+    new Set([...Object.keys(fallbackCategories), ...Object.keys(providedCategories)])
+  );
+  const commissionCategories = {};
+  categoryKeys.forEach((key) => {
+    const source = providedCategories[key] ?? fallbackCategories[key] ?? {};
+    const fallback = fallbackCategories[key] ?? DEFAULT_SETTINGS.commissions.default;
+    commissionCategories[key] = {
+      rateBps: Number.isFinite(Number(source.rateBps))
+        ? Number(source.rateBps)
+        : fallback.rateBps ?? defaultRate,
+      minimumFeeCents: Number.isFinite(Number(source.minimumFeeCents))
+        ? Number(source.minimumFeeCents)
+        : fallback.minimumFeeCents ?? defaultMinimum,
+      affiliateShare: clampShareRatio(
+        source.affiliateShare ?? fallback.affiliateShare ?? defaultAffiliateShare
+      )
+    };
+  });
+
   return {
     commissions: {
-      enabled: Boolean(settings.commissions?.enabled ?? DEFAULT_SETTINGS.commissions.enabled),
-      rateBps: Number(settings.commissions?.rateBps ?? DEFAULT_SETTINGS.commissions.rateBps),
-      minimumFeeCents: Number(
-        settings.commissions?.minimumFeeCents ?? DEFAULT_SETTINGS.commissions.minimumFeeCents
-      ),
+      enabled: Boolean(commissionSource.enabled ?? DEFAULT_SETTINGS.commissions.enabled),
+      rateBps: defaultRate,
+      minimumFeeCents: defaultMinimum,
       allowCommunityOverride: Boolean(
-        settings.commissions?.allowCommunityOverride ?? DEFAULT_SETTINGS.commissions.allowCommunityOverride
-      )
+        commissionSource.allowCommunityOverride ?? DEFAULT_SETTINGS.commissions.allowCommunityOverride
+      ),
+      default: {
+        rateBps: defaultRate,
+        minimumFeeCents: defaultMinimum,
+        affiliateShare: defaultAffiliateShare
+      },
+      categories: commissionCategories
     },
     subscriptions: {
       enabled: Boolean(settings.subscriptions?.enabled ?? DEFAULT_SETTINGS.subscriptions.enabled),
@@ -174,6 +234,27 @@ function buildFormState(settings) {
     commissionRateBps: monetization.commissions.rateBps,
     commissionMinimumFeeCents: monetization.commissions.minimumFeeCents,
     allowOverride: monetization.commissions.allowCommunityOverride,
+    commissionDefaultAffiliateSharePct: clampSharePercentage(
+      monetization.commissions.default.affiliateShare * 100,
+      monetization.commissions.default.affiliateShare
+    ),
+    commissionCategories: Array.from(
+      new Set([
+        ...Object.keys(COMMISSION_CATEGORY_LABELS),
+        ...Object.keys(monetization.commissions.categories ?? {})
+      ])
+    ).map((key) => {
+      const config = monetization.commissions.categories?.[key] ?? monetization.commissions.default;
+      return {
+        key,
+        rateBps: config.rateBps,
+        minimumFeeCents: config.minimumFeeCents,
+        affiliateSharePct: clampSharePercentage(
+          (config.affiliateShare ?? monetization.commissions.default.affiliateShare) * 100,
+          config.affiliateShare ?? monetization.commissions.default.affiliateShare
+        )
+      };
+    }),
     subscriptionsEnabled: monetization.subscriptions.enabled,
     restrictedFeaturesText: monetization.subscriptions.restrictedFeatures.join('\n'),
     gracePeriodDays: monetization.subscriptions.gracePeriodDays,
@@ -226,6 +307,35 @@ function clampBasisPoints(value, fallback) {
 
   const rounded = Math.round(numeric);
   return Math.min(Math.max(rounded, 0), 10_000);
+}
+
+function clampShareRatio(value, fallback = DEFAULT_SETTINGS.commissions.default.affiliateShare) {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  if (numeric < 0) {
+    return 0;
+  }
+  if (numeric > 1) {
+    return 1;
+  }
+  return numeric;
+}
+
+function clampSharePercentage(value, fallbackRatio) {
+  if (value === undefined || value === null || value === '') {
+    return Math.round((fallbackRatio ?? 0) * 1000) / 10;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return Math.round((fallbackRatio ?? 0) * 1000) / 10;
+  }
+  const bounded = Math.min(Math.max(numeric, 0), 100);
+  return Math.round(bounded * 10) / 10;
 }
 
 export default function AdminMonetizationSettingsSection({
@@ -309,6 +419,44 @@ export default function AdminMonetizationSettingsSection({
 
   const handleProviderChange = (event) => {
     setFormState((prev) => ({ ...prev, defaultProvider: event.target.value }));
+  };
+
+  const handleCommissionDefaultShareChange = (event) => {
+    const value = event.target.value;
+    setFormState((prev) => ({
+      ...prev,
+      commissionDefaultAffiliateSharePct: value === '' ? '' : Number(value)
+    }));
+  };
+
+  const handleCommissionCategoryNumberChange = (index, field) => (event) => {
+    const value = event.target.value;
+    setFormState((prev) => {
+      const categories = Array.isArray(prev.commissionCategories) ? [...prev.commissionCategories] : [];
+      if (!categories[index]) {
+        return prev;
+      }
+      categories[index] = {
+        ...categories[index],
+        [field]: value === '' ? '' : Number(value)
+      };
+      return { ...prev, commissionCategories: categories };
+    });
+  };
+
+  const handleCommissionCategoryShareChange = (index) => (event) => {
+    const value = event.target.value;
+    setFormState((prev) => {
+      const categories = Array.isArray(prev.commissionCategories) ? [...prev.commissionCategories] : [];
+      if (!categories[index]) {
+        return prev;
+      }
+      categories[index] = {
+        ...categories[index],
+        affiliateSharePct: value === '' ? '' : Number(value)
+      };
+      return { ...prev, commissionCategories: categories };
+    });
   };
 
   const updateAffiliateTiers = (updater) => {
@@ -437,16 +585,54 @@ export default function AdminMonetizationSettingsSection({
       .trim()
       .slice(0, 2000);
 
+    const commissionRateBps = clampBasisPoints(
+      formState.commissionRateBps,
+      DEFAULT_SETTINGS.commissions.rateBps
+    );
+    const commissionMinimumFeeCents = Number.isFinite(Number(formState.commissionMinimumFeeCents))
+      ? Math.max(0, Math.round(Number(formState.commissionMinimumFeeCents)))
+      : DEFAULT_SETTINGS.commissions.minimumFeeCents;
+    const defaultShareInput = Number(formState.commissionDefaultAffiliateSharePct);
+    const defaultAffiliateShareRatio = Number.isFinite(defaultShareInput)
+      ? clampShareRatio(defaultShareInput / 100, DEFAULT_SETTINGS.commissions.default.affiliateShare)
+      : DEFAULT_SETTINGS.commissions.default.affiliateShare;
+
+    const commissionCategoriesPayload = {};
+    (Array.isArray(formState.commissionCategories) ? formState.commissionCategories : []).forEach(
+      (category) => {
+        if (!category || !category.key) {
+          return;
+        }
+        const fallback =
+          DEFAULT_SETTINGS.commissions.categories[category.key] ?? DEFAULT_SETTINGS.commissions.default;
+        const rateBps = clampBasisPoints(category.rateBps, fallback.rateBps ?? commissionRateBps);
+        const minimumFee = Number.isFinite(Number(category.minimumFeeCents))
+          ? Math.max(0, Math.round(Number(category.minimumFeeCents)))
+          : fallback.minimumFeeCents ?? commissionMinimumFeeCents;
+        const shareInput = Number(category.affiliateSharePct);
+        const affiliateShareRatio = Number.isFinite(shareInput)
+          ? clampShareRatio(shareInput / 100, fallback.affiliateShare ?? defaultAffiliateShareRatio)
+          : clampShareRatio(fallback.affiliateShare ?? defaultAffiliateShareRatio, defaultAffiliateShareRatio);
+        commissionCategoriesPayload[category.key] = {
+          rateBps,
+          minimumFeeCents: minimumFee,
+          affiliateShare: affiliateShareRatio
+        };
+      }
+    );
+
     const payload = {
       commissions: {
         enabled: Boolean(formState.commissionsEnabled),
-        rateBps: Number.isFinite(formState.commissionRateBps)
-          ? Number(formState.commissionRateBps)
-          : DEFAULT_SETTINGS.commissions.rateBps,
-        minimumFeeCents: Number.isFinite(formState.commissionMinimumFeeCents)
-          ? Number(formState.commissionMinimumFeeCents)
-          : DEFAULT_SETTINGS.commissions.minimumFeeCents,
-        allowCommunityOverride: Boolean(formState.allowOverride)
+        rateBps: commissionRateBps,
+        minimumFeeCents: commissionMinimumFeeCents,
+        allowCommunityOverride: Boolean(formState.allowOverride),
+        default: {
+          rateBps: commissionRateBps,
+          minimumFeeCents: commissionMinimumFeeCents,
+          affiliateShare: defaultAffiliateShareRatio
+        },
+        categories: commissionCategoriesPayload
       },
       subscriptions: {
         enabled: Boolean(formState.subscriptionsEnabled),
@@ -592,6 +778,18 @@ export default function AdminMonetizationSettingsSection({
                 />
               </label>
             </div>
+            <label className="text-sm text-slate-600">
+              Affiliate share of platform commission (%)
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-900 focus:border-primary focus:outline-none"
+                value={formState.commissionDefaultAffiliateSharePct}
+                onChange={handleCommissionDefaultShareChange}
+              />
+            </label>
             <label className="flex items-center gap-3 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -601,6 +799,68 @@ export default function AdminMonetizationSettingsSection({
               />
               Allow communities to override commission rate
             </label>
+            <div className="rounded-2xl border border-slate-200 bg-white/60 p-4">
+              <p className="text-sm font-semibold text-slate-900">Channel-specific commission controls</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Adjust the retained commission and affiliate revenue share for each monetised product. Rates are
+                capped at 10% to keep creator payouts generous.
+              </p>
+              <div className="mt-4 space-y-3">
+                {(Array.isArray(formState.commissionCategories) ? formState.commissionCategories : []).map(
+                  (category, index) => {
+                    const label = COMMISSION_CATEGORY_LABELS[category.key] ?? category.key;
+                    return (
+                      <div
+                        key={category.key}
+                        className="grid gap-3 rounded-xl border border-slate-200 bg-white/90 p-3 sm:grid-cols-4"
+                      >
+                        <div className="sm:col-span-1">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {category.key in COMMISSION_CATEGORY_LABELS
+                              ? 'Applies automatically on checkout.'
+                              : 'Custom monetisation stream.'}
+                          </p>
+                        </div>
+                        <label className="text-xs text-slate-600 sm:col-span-1">
+                          Rate (bps)
+                          <input
+                            type="number"
+                            min="0"
+                            max="5000"
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                            value={category.rateBps}
+                            onChange={handleCommissionCategoryNumberChange(index, 'rateBps')}
+                          />
+                        </label>
+                        <label className="text-xs text-slate-600 sm:col-span-1">
+                          Minimum fee (¢)
+                          <input
+                            type="number"
+                            min="0"
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                            value={category.minimumFeeCents}
+                            onChange={handleCommissionCategoryNumberChange(index, 'minimumFeeCents')}
+                          />
+                        </label>
+                        <label className="text-xs text-slate-600 sm:col-span-1">
+                          Affiliate share (%)
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm text-slate-900 focus:border-primary focus:outline-none"
+                            value={category.affiliateSharePct}
+                            onChange={handleCommissionCategoryShareChange(index)}
+                          />
+                        </label>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

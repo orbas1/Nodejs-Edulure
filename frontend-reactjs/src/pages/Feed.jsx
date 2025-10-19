@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
-  fetchAggregatedFeed,
   fetchCommunities,
   fetchCommunityDetail,
-  fetchCommunityFeed,
   fetchCommunityResources,
+  createCommunityResource,
   joinCommunity,
   leaveCommunity,
   moderateCommunityPost,
   removeCommunityPost,
   fetchCommunitySponsorships,
-  updateCommunitySponsorships
+  updateCommunitySponsorships,
+  updateCommunityResource,
+  deleteCommunityResource
 } from '../api/communityApi.js';
+import { fetchLiveFeed } from '../api/feedApi.js';
 import TopBar from '../components/TopBar.jsx';
 import SkewedMenu from '../components/SkewedMenu.jsx';
 import FeedComposer from '../components/FeedComposer.jsx';
@@ -20,6 +22,7 @@ import FeedCard from '../components/FeedCard.jsx';
 import FeedSponsoredCard from '../components/FeedSponsoredCard.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import CommunityHero from '../components/CommunityHero.jsx';
+import CommunityResourceEditor from '../components/community/CommunityResourceEditor.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 
@@ -31,6 +34,13 @@ const ALL_COMMUNITIES_NODE = {
 };
 
 const DEFAULT_RESOURCES_META = { limit: 6, offset: 0, total: 0 };
+const FEED_RANGE_OPTIONS = [
+  { value: '7d', label: 'Last 7 days' },
+  { value: '30d', label: 'Last 30 days' },
+  { value: '90d', label: 'Last 90 days' },
+  { value: '180d', label: 'Last 180 days' },
+  { value: '365d', label: 'Last 12 months' }
+];
 
 const CURATED_HIGHLIGHTS = [
   {
@@ -78,6 +88,52 @@ const FEATURED_CREATORS = [
   { name: 'Leo Okafor', handle: '@buildwithleo', highlight: 'Scaled async micro-courses to $80k ARR', trust: 92 }
 ];
 
+const COUNT_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
+const DECIMAL_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0
+});
+
+function formatCount(value) {
+  const numeric = Number(value ?? 0);
+  if (Number.isNaN(numeric)) {
+    return '0';
+  }
+  if (numeric >= 1000000) {
+    return `${DECIMAL_FORMATTER.format(numeric / 1000000)}M`;
+  }
+  if (numeric >= 1000) {
+    return `${DECIMAL_FORMATTER.format(numeric / 1000)}K`;
+  }
+  return COUNT_FORMATTER.format(Math.round(numeric));
+}
+
+function formatCurrencyFromCents(value) {
+  const numeric = Number(value ?? 0) / 100;
+  return CURRENCY_FORMATTER.format(Number.isNaN(numeric) ? 0 : numeric);
+}
+
+function formatRelativeTimestamp(isoDate) {
+  if (!isoDate) {
+    return null;
+  }
+  const timestamp = new Date(isoDate);
+  if (Number.isNaN(timestamp.getTime())) {
+    return null;
+  }
+  const diffMs = Date.now() - timestamp.getTime();
+  const minute = 60 * 1000;
+  const hour = minute * 60;
+  const day = hour * 24;
+
+  if (diffMs < minute) return 'just now';
+  if (diffMs < hour) return `${Math.max(1, Math.round(diffMs / minute))}m ago`;
+  if (diffMs < day) return `${Math.max(1, Math.round(diffMs / hour))}h ago`;
+  return `${Math.max(1, Math.round(diffMs / day))}d ago`;
+}
+
 export default function Feed() {
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken;
@@ -91,6 +147,15 @@ export default function Feed() {
   const [feedItems, setFeedItems] = useState([]);
   const [feedMeta, setFeedMeta] = useState({ page: 1, perPage: 10, total: 0, pageCount: 0 });
   const [feedAdsMeta, setFeedAdsMeta] = useState(null);
+  const [feedRange, setFeedRange] = useState('30d');
+  const [feedInsights, setFeedInsights] = useState({
+    analytics: null,
+    highlights: [],
+    generatedAt: null,
+    context: 'global'
+  });
+  const [feedInsightsError, setFeedInsightsError] = useState(null);
+  const [isLoadingInsights, setIsLoadingInsights] = useState(false);
   const [isLoadingFeed, setIsLoadingFeed] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [feedError, setFeedError] = useState(null);
@@ -113,6 +178,13 @@ export default function Feed() {
   const [isLoadingSponsorships, setIsLoadingSponsorships] = useState(false);
   const [sponsorshipError, setSponsorshipError] = useState(null);
   const [isUpdatingSponsorship, setIsUpdatingSponsorship] = useState(false);
+  const [isResourceEditorOpen, setIsResourceEditorOpen] = useState(false);
+  const [resourceEditorMode, setResourceEditorMode] = useState('create');
+  const [resourceEditorInitial, setResourceEditorInitial] = useState(null);
+  const [resourceEditorError, setResourceEditorError] = useState(null);
+  const [isSavingResource, setIsSavingResource] = useState(false);
+  const [deletingResourceId, setDeletingResourceId] = useState(null);
+  const [resourceNotice, setResourceNotice] = useState(null);
 
   const updatePostActionState = useCallback((postId, updates) => {
     setPostActions((prev) => {
@@ -169,6 +241,10 @@ export default function Feed() {
       setFeedItems([]);
       setFeedMeta({ page: 1, perPage: 10, total: 0, pageCount: 0 });
       setFeedAdsMeta(null);
+      setFeedRange('30d');
+      setFeedInsights({ analytics: null, highlights: [], generatedAt: null, context: 'global' });
+      setFeedInsightsError(null);
+      setIsLoadingInsights(false);
       setFeedError(null);
       setCommunityDetail(null);
       setCommunityDetailError(null);
@@ -231,6 +307,8 @@ export default function Feed() {
     async ({ page = 1, append = false, queryOverride } = {}) => {
       if (!token || !canAccessCommunityFeed) return;
       const isAggregate = selectedCommunity?.id === 'all';
+      const context = isAggregate ? 'global' : 'community';
+      const communityId = !isAggregate ? selectedCommunity?.id : undefined;
       const setLoading = append ? setIsLoadingMore : setIsLoadingFeed;
       const queryTerm = queryOverride !== undefined ? queryOverride : searchQueryRef.current;
 
@@ -238,36 +316,71 @@ export default function Feed() {
       if (!append) {
         setFeedError(null);
         setPostActions({});
+        setIsLoadingInsights(true);
+        setFeedInsightsError(null);
       }
 
       try {
-        const request = isAggregate
-          ? fetchAggregatedFeed({ token, page, perPage: 6, query: queryTerm || undefined })
-          : fetchCommunityFeed({
-              communityId: selectedCommunity.id,
-              token,
-              page,
-              perPage: 6,
-              query: queryTerm || undefined
-            });
+        const response = await fetchLiveFeed({
+          token,
+          context,
+          community: communityId,
+          page,
+          perPage: 6,
+          range: feedRange,
+          search: queryTerm || undefined,
+          includeAnalytics: true,
+          includeHighlights: true
+        });
 
-        const response = await request;
-        const items = response.data ?? [];
-        const pagination = response.meta?.pagination ?? { page, perPage: 6, total: items.length, pageCount: 1 };
+        const payload = response.data ?? {};
+        const items = payload.items ?? [];
+        const pagination = payload.pagination ?? {};
+        const adsMeta = payload.ads ?? null;
 
         setFeedItems((prev) => (append ? [...prev, ...items] : items));
-        setFeedMeta(pagination);
-        setFeedAdsMeta(response.meta?.ads ?? null);
+        setFeedMeta((prev) => {
+          const prevTotal = append ? prev.total ?? 0 : 0;
+          const perPage = pagination.perPage ?? prev.perPage ?? 6;
+          const total = pagination.total ?? (append ? prevTotal + items.length : items.length);
+          const pageValue = pagination.page ?? page;
+          const pageCount = pagination.pageCount ?? (total ? Math.ceil(total / perPage) : 0);
+          return {
+            page: pageValue,
+            perPage,
+            total,
+            pageCount
+          };
+        });
+        setFeedAdsMeta(adsMeta);
+
+        if (!append) {
+          const nextRange = payload.range?.key ?? feedRange;
+          setFeedRange(nextRange);
+          setFeedInsights({
+            analytics: payload.analytics ?? null,
+            highlights: payload.highlights ?? [],
+            generatedAt: payload.generatedAt ?? null,
+            context: payload.context ?? context,
+            range: nextRange
+          });
+          setFeedInsightsError(null);
+        }
       } catch (error) {
         if (!append) {
           setFeedItems([]);
+          setFeedInsights((prev) => ({ ...prev, analytics: null, highlights: [], generatedAt: null }));
+          setFeedInsightsError(error.message ?? 'Unable to load feed insights');
         }
         setFeedError(error.message ?? 'Unable to load community feed');
       } finally {
+        if (!append) {
+          setIsLoadingInsights(false);
+        }
         setLoading(false);
       }
     },
-    [selectedCommunity, token, canAccessCommunityFeed]
+    [token, canAccessCommunityFeed, selectedCommunity, feedRange]
   );
 
   const loadCommunityDetail = useCallback(
@@ -374,6 +487,14 @@ export default function Feed() {
   }, [selectedCommunity?.id]);
 
   useEffect(() => {
+    setResourceNotice(null);
+    setResourceEditorError(null);
+    setResourceEditorInitial(null);
+    setIsResourceEditorOpen(false);
+    setDeletingResourceId(null);
+  }, [selectedCommunity?.id]);
+
+  useEffect(() => {
     if (!token || !communityDetail?.id || !communityDetail?.permissions?.canManageSponsorships) {
       setIsLoadingSponsorships(false);
       setSponsorshipError(null);
@@ -468,6 +589,8 @@ export default function Feed() {
       await leaveCommunity({ communityId: communityDetail.id, token });
 
       setCommunityDetail(null);
+      setResourceNotice(null);
+      setResourceEditorError(null);
       setCommunities((prev) =>
         prev.map((community) =>
           String(community.id) === String(communityDetail.id)
@@ -487,6 +610,85 @@ export default function Feed() {
       setLeaveError(error?.message ?? 'Unable to leave this community right now.');
     } finally {
       setIsLeavingCommunity(false);
+    }
+  };
+
+  const openCreateResourceEditor = useCallback(() => {
+    if (!communityDetail?.id) return;
+    setResourceEditorMode('create');
+    setResourceEditorInitial(null);
+    setResourceEditorError(null);
+    setIsResourceEditorOpen(true);
+  }, [communityDetail?.id]);
+
+  const openEditResourceEditor = useCallback(
+    (resource) => {
+      if (!communityDetail?.id || !resource) return;
+      setResourceEditorMode('edit');
+      setResourceEditorInitial(resource);
+      setResourceEditorError(null);
+      setIsResourceEditorOpen(true);
+    },
+    [communityDetail?.id]
+  );
+
+  const closeResourceEditor = useCallback(() => {
+    setIsResourceEditorOpen(false);
+    setResourceEditorInitial(null);
+    setResourceEditorError(null);
+  }, []);
+
+  const handleResourceSubmit = async (payload) => {
+    if (!token || !communityDetail?.id) return;
+    setResourceEditorError(null);
+    setResourceNotice(null);
+    setIsSavingResource(true);
+
+    try {
+      if (resourceEditorMode === 'edit' && resourceEditorInitial?.id) {
+        await updateCommunityResource({
+          communityId: communityDetail.id,
+          resourceId: resourceEditorInitial.id,
+          token,
+          payload
+        });
+        setResourceNotice('Resource updated successfully.');
+      } else {
+        await createCommunityResource({ communityId: communityDetail.id, token, payload });
+        setResourceNotice(
+          payload.status === 'published'
+            ? 'Resource published to the community library.'
+            : 'Resource draft saved for your community.'
+        );
+      }
+      closeResourceEditor();
+      await loadCommunityDetail(communityDetail.id);
+    } catch (error) {
+      setResourceEditorError(error?.message ?? 'Unable to save this resource right now.');
+    } finally {
+      setIsSavingResource(false);
+    }
+  };
+
+  const handleDeleteResource = async (resource) => {
+    if (!token || !communityDetail?.id || !resource?.id) return;
+    if (!window.confirm('Remove this resource from the community library? This action cannot be undone.')) {
+      return;
+    }
+
+    setResourcesError(null);
+    setResourceEditorError(null);
+    setResourceNotice(null);
+    setDeletingResourceId(resource.id);
+
+    try {
+      await deleteCommunityResource({ communityId: communityDetail.id, resourceId: resource.id, token });
+      setResourceNotice('Resource removed from the library.');
+      await loadCommunityDetail(communityDetail.id);
+    } catch (error) {
+      setResourcesError(error?.message ?? 'Unable to remove this resource right now.');
+    } finally {
+      setDeletingResourceId(null);
     }
   };
 
@@ -613,6 +815,85 @@ export default function Feed() {
   }, [token, selectedCommunity, resources.length, resourcesMeta, canAccessCommunityFeed]);
 
   const hasMoreResources = resourcesMeta.total > resources.length;
+  const highlightCards = useMemo(() => {
+    const highlights = Array.isArray(feedInsights.highlights) ? feedInsights.highlights : [];
+    if (highlights.length === 0) {
+      return CURATED_HIGHLIGHTS.map((highlight) => ({
+        key: highlight.title,
+        title: highlight.title,
+        description: highlight.description,
+        stats: highlight.stats,
+        timestamp: null,
+        variant: 'curated'
+      }));
+    }
+
+    return highlights.slice(0, 3).map((highlight) => {
+      if (highlight.type === 'campaign') {
+        const stats = [];
+        const performanceScore = Number(highlight.metrics?.performanceScore ?? 0);
+        if (performanceScore > 0) {
+          stats.push(`Score ${Math.round(performanceScore)}`);
+        }
+        const ctr = Number(highlight.metrics?.ctr ?? 0);
+        if (ctr > 0) {
+          stats.push(`${DECIMAL_FORMATTER.format(ctr * 100)}% CTR`);
+        }
+        const spend = Number(highlight.metrics?.spendCents ?? 0);
+        if (spend > 0) {
+          stats.push(`${formatCurrencyFromCents(spend)} spent`);
+        }
+        return {
+          key: `${highlight.type}-${highlight.id}`,
+          title: highlight.name ?? highlight.title ?? 'Campaign spotlight',
+          description: highlight.objective ?? highlight.summary ?? 'Campaign performance update.',
+          stats: stats.length ? stats : ['Active campaign'],
+          timestamp: highlight.timestamp ?? null,
+          variant: 'campaign'
+        };
+      }
+
+      const stats = [];
+      if (highlight.projectType) {
+        stats.push(highlight.projectType.replace(/[_-]+/g, ' '));
+      }
+      if (highlight.status) {
+        stats.push(highlight.status.replace(/[_-]+/g, ' '));
+      }
+      if (Array.isArray(highlight.analyticsTargets) && highlight.analyticsTargets.length) {
+        stats.push(`${highlight.analyticsTargets.length} KPIs`);
+      }
+
+      return {
+        key: `${highlight.type}-${highlight.id}`,
+        title: highlight.title ?? 'Creation highlight',
+        description: highlight.summary ?? 'Creation studio project update.',
+        stats: stats.length ? stats : ['Creation project'],
+        timestamp: highlight.timestamp ?? null,
+        variant: 'project'
+      };
+    });
+  }, [feedInsights.highlights]);
+
+  const resolvedTrendingTopics = useMemo(() => {
+    const tags = feedInsights.analytics?.engagement?.trendingTags;
+    if (Array.isArray(tags) && tags.length > 0) {
+      return tags.map((entry) => ({
+        tag: entry.tag?.startsWith('#') ? entry.tag : `#${entry.tag ?? ''}`,
+        delta: `${formatCount(entry.count)} posts`,
+        description: 'Trending across your active communities.'
+      }));
+    }
+    return TRENDING_TOPICS;
+  }, [feedInsights.analytics]);
+
+  const engagementSummary = feedInsights.analytics?.engagement ?? null;
+  const adsSummary = feedInsights.analytics?.ads ?? null;
+  const feedGeneratedAtLabel = useMemo(
+    () => (feedInsights.generatedAt ? formatRelativeTimestamp(feedInsights.generatedAt) : null),
+    [feedInsights.generatedAt]
+  );
+  const isRangeControlDisabled = isLoadingFeed || isLoadingInsights;
 
   if (!canAccessCommunityFeed) {
     return (
@@ -631,6 +912,15 @@ export default function Feed() {
   const joinDisabledReason = canJoinCommunities
     ? null
     : 'Your current role is limited to read-only access. Contact an administrator to manage membership changes.';
+
+  const canManageCommunityResources = useMemo(() => {
+    if (!communityDetail) return false;
+    if (communityDetail.permissions?.canManageResources) return true;
+    const role = communityDetail.membership?.role;
+    return role ? ['owner', 'admin', 'moderator'].includes(role) : false;
+  }, [communityDetail]);
+
+  const isManagingResources = isResourceEditorOpen || isSavingResource || Boolean(deletingResourceId);
 
   return (
     <div className="bg-slate-50/70 py-16">
@@ -657,6 +947,28 @@ export default function Feed() {
               <p className="text-sm text-slate-600">
                 Follow top communities, spotlight your wins, and unlock curated playbooks across Edulure. Verified instructors surface here when their learners rave.
               </p>
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <label className="flex items-center gap-2">
+                  <span>Time range</span>
+                  <select
+                    value={feedRange}
+                    onChange={(event) => setFeedRange(event.target.value)}
+                    disabled={isRangeControlDisabled}
+                    className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-60"
+                  >
+                    {FEED_RANGE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {feedGeneratedAtLabel && (
+                  <span className="rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold text-slate-500">
+                    Updated {feedGeneratedAtLabel}
+                  </span>
+                )}
+              </div>
               {!isAuthenticated && (
                 <div className="inline-flex flex-wrap items-center gap-3 rounded-full bg-white px-4 py-2 text-xs font-semibold text-primary shadow-sm">
                   Sign in with SSO or Google Authenticator to personalise this feed.
@@ -664,9 +976,21 @@ export default function Feed() {
               )}
             </div>
             <div className="grid gap-3">
-              {CURATED_HIGHLIGHTS.map((highlight) => (
-                <div key={highlight.title} className="rounded-3xl border border-white/60 bg-white/80 p-4 shadow-sm">
-                  <p className="text-sm font-semibold text-slate-900">{highlight.title}</p>
+              {highlightCards.map((highlight) => (
+                <div key={highlight.key} className="rounded-3xl border border-white/60 bg-white/80 p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-3 text-[11px] font-semibold text-slate-400">
+                    <span className="uppercase tracking-wide text-primary">
+                      {highlight.variant === 'campaign'
+                        ? 'Campaign spotlight'
+                        : highlight.variant === 'project'
+                          ? 'Creation highlight'
+                          : 'Platform highlight'}
+                    </span>
+                    {highlight.timestamp && (
+                      <span>Updated {formatRelativeTimestamp(highlight.timestamp)}</span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">{highlight.title}</p>
                   <p className="mt-1 text-xs text-slate-500">{highlight.description}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold text-primary">
                     {highlight.stats.map((stat) => (
@@ -701,6 +1025,98 @@ export default function Feed() {
         )}
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
           <div className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">Live analytics</p>
+                  <h2 className="text-lg font-semibold text-slate-900">
+                    {selectedCommunity?.id === 'all'
+                      ? 'Global community activity'
+                      : `${selectedCommunity?.name ?? 'Community'} activity`}
+                  </h2>
+                </div>
+                {isLoadingInsights ? (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">Refreshing…</span>
+                ) : feedGeneratedAtLabel ? (
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500">
+                    Synced {feedGeneratedAtLabel}
+                  </span>
+                ) : null}
+              </div>
+
+              {feedInsightsError && !isLoadingInsights ? (
+                <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600" role="alert">
+                  {feedInsightsError}
+                </div>
+              ) : engagementSummary ? (
+                <>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Posts analysed</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">
+                        {formatCount(engagementSummary.postsSampled)}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        of {formatCount(engagementSummary.postsTotal ?? engagementSummary.postsSampled)} posts this period
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Comments</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">{formatCount(engagementSummary.comments)}</p>
+                      <p className="mt-1 text-xs text-slate-500">Total replies and discussion threads logged</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reactions</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">{formatCount(engagementSummary.reactions)}</p>
+                      <p className="mt-1 text-xs text-slate-500">Pulse of lightweight engagement over the range</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Communities active</p>
+                      <p className="mt-2 text-xl font-semibold text-slate-900">{formatCount(engagementSummary.uniqueCommunities)}</p>
+                      <p className="mt-1 text-xs text-slate-500">Distinct communities with published updates</p>
+                    </div>
+                  </div>
+                  {engagementSummary.latestActivityAt && (
+                    <p className="mt-4 text-xs text-slate-500">
+                      Latest activity {formatRelativeTimestamp(engagementSummary.latestActivityAt)}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                  Insights will populate automatically as fresh activity flows into this feed.
+                </div>
+              )}
+
+              {adsSummary && (
+                <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50/70 p-4 text-xs text-amber-900">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
+                    <span>Sponsored performance</span>
+                    <span>
+                      {adsSummary.activeCampaigns} active · {adsSummary.scheduledCampaigns} scheduled
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 text-[11px] font-semibold">
+                    <div>
+                      <p className="text-amber-700">Impressions</p>
+                      <p>{formatCount(adsSummary.totals?.impressions)}</p>
+                    </div>
+                    <div>
+                      <p className="text-amber-700">Clicks</p>
+                      <p>{formatCount(adsSummary.totals?.clicks)}</p>
+                    </div>
+                    <div>
+                      <p className="text-amber-700">Conversions</p>
+                      <p>{formatCount(adsSummary.totals?.conversions)}</p>
+                    </div>
+                    <div>
+                      <p className="text-amber-700">Spend</p>
+                      <p>{formatCurrencyFromCents(adsSummary.totals?.spendCents)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             {isAuthenticated && canPostToCommunities && (
               <FeedComposer
                 communities={composerCommunities}
@@ -807,17 +1223,23 @@ export default function Feed() {
           <div className="space-y-6">
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-slate-900">Trending now</h2>
-              <div className="mt-4 space-y-4">
-                {TRENDING_TOPICS.map((topic) => (
-                  <div key={topic.tag} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-slate-900">{topic.tag}</span>
-                      <span className="text-xs font-semibold text-primary">{topic.delta}</span>
+              {isLoadingInsights ? (
+                <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                  Analysing tags from the latest community updates…
+                </div>
+              ) : (
+                <div className="mt-4 space-y-4">
+                  {resolvedTrendingTopics.map((topic) => (
+                    <div key={topic.tag} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-slate-900">{topic.tag}</span>
+                        <span className="text-xs font-semibold text-primary">{topic.delta}</span>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-500">{topic.description}</p>
                     </div>
-                    <p className="mt-2 text-xs text-slate-500">{topic.description}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
               <div className="mt-6 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-4 text-xs text-primary">
                 Verified instructors get featured when their trust scores stay above 90 and they publish weekly updates.
               </div>
@@ -849,10 +1271,57 @@ export default function Feed() {
               error={communityDetailError}
               resourcesError={resourcesError}
               onLoadMoreResources={hasMoreResources ? loadMoreResources : null}
+              onLeave={communityDetail?.permissions?.canLeave ? handleLeaveCommunity : null}
+              isLeaving={isLeavingCommunity}
+              canLeave={Boolean(communityDetail?.permissions?.canLeave)}
+              onAddResource={canManageCommunityResources ? openCreateResourceEditor : null}
+              onEditResource={canManageCommunityResources ? openEditResourceEditor : null}
+              onDeleteResource={canManageCommunityResources ? handleDeleteResource : null}
+              isManagingResource={isManagingResources}
+              resourceNotice={resourceNotice}
+              resourceActionId={deletingResourceId}
             />
           </div>
         </div>
       </div>
+      {isResourceEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-10 backdrop-blur-sm">
+          <div
+            className="absolute inset-0"
+            onClick={() => {
+              if (!isSavingResource) {
+                closeResourceEditor();
+              }
+            }}
+          />
+          <div
+            className="relative w-full max-w-3xl rounded-4xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                if (!isSavingResource) {
+                  closeResourceEditor();
+                }
+              }}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100"
+              aria-label="Close resource editor"
+              disabled={isSavingResource}
+            >
+              ×
+            </button>
+            <CommunityResourceEditor
+              mode={resourceEditorMode === 'edit' ? 'edit' : 'create'}
+              initialValue={resourceEditorMode === 'edit' ? resourceEditorInitial : null}
+              onSubmit={handleResourceSubmit}
+              onCancel={closeResourceEditor}
+              isSubmitting={isSavingResource}
+              error={resourceEditorError}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
