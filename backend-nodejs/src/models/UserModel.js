@@ -56,6 +56,38 @@ export default class UserModel {
     return connection('users').select(BASE_COLUMNS).whereIn('id', ids);
   }
 
+  static async updateById(id, updates, connection = db) {
+    const payload = {};
+    if (updates.firstName !== undefined) {
+      payload.first_name = updates.firstName ?? null;
+    }
+    if (updates.lastName !== undefined) {
+      payload.last_name = updates.lastName ?? null;
+    }
+    if (updates.email !== undefined) {
+      payload.email = updates.email ?? null;
+    }
+    if (updates.role !== undefined) {
+      payload.role = updates.role ?? 'user';
+    }
+    if (updates.age !== undefined) {
+      payload.age = updates.age ?? null;
+    }
+    if (updates.address !== undefined) {
+      payload.address =
+        updates.address && typeof updates.address === 'object'
+          ? JSON.stringify(updates.address)
+          : updates.address ?? null;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return this.findById(id, connection);
+    }
+
+    await connection('users').where({ id }).update(payload);
+    return this.findById(id, connection);
+  }
+
   static async list({ limit = 20, offset = 0 } = {}) {
     return db('users')
       .select(BASE_COLUMNS)

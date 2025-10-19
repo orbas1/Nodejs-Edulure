@@ -13,10 +13,21 @@ import {
   requestVerificationUpload,
   submitVerificationPackage
 } from '../api/verificationApi.js';
+import { fetchCurrentUser, updateCurrentUser } from '../api/userApi.js';
+import {
+  approveFollowRequest,
+  declineFollowRequest,
+  fetchFollowers,
+  fetchFollowing,
+  fetchFollowRecommendations,
+  followUser,
+  unfollowUser
+} from '../api/socialGraphApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
+import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
 
-const profileData = {
+const defaultProfile = {
   name: 'Alex Morgan',
   handle: '@alexmorgan',
   avatar: 'https://i.pravatar.cc/160?img=28',
@@ -201,6 +212,265 @@ const fallbackVerificationRequirements = [
   }
 ];
 
+const FOLLOW_PAGE_SIZE = 6;
+
+function formatPersonName(user) {
+  if (!user) {
+    return 'Unknown member';
+  }
+
+  const parts = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+  if (parts.length > 0) {
+    return parts;
+  }
+
+  if (typeof user.email === 'string' && user.email.length > 0) {
+    return user.email;
+  }
+
+  if (user.id) {
+    return `Member #${user.id}`;
+  }
+
+  return 'Community member';
+}
+
+function buildRoleLabel(user) {
+  if (!user?.role) {
+    return 'Member';
+  }
+  const role = user.role.toString();
+  return role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+function normaliseMetadataTagline(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return 'Edulure community member';
+  }
+
+  const preferredKey = ['context', 'note', 'message', 'reason', 'source'];
+  for (const key of preferredKey) {
+    if (typeof metadata[key] === 'string' && metadata[key].trim().length > 0) {
+      return metadata[key]
+        .trim()
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/^\w/, (char) => char.toUpperCase());
+    }
+  }
+
+  const firstEntry = Object.entries(metadata).find(([, value]) => typeof value === 'string' && value.trim().length > 0);
+  if (firstEntry) {
+    const [key, value] = firstEntry;
+    return `${key.replace(/[_-]+/g, ' ')}: ${value}`;
+  }
+
+  return 'Edulure community member';
+}
+
+function computeTrustScore(seed) {
+  const base = 72;
+  const spread = 24;
+  return Math.min(99, base + ((Math.abs(Number(seed) || 0) * 7) % spread));
+}
+
+function mapFollowerItem(item) {
+  const user = item?.user ?? {};
+  const relationship = item?.relationship ?? {};
+  return {
+    id: user.id ?? relationship.id ?? Math.random().toString(36).slice(2),
+    name: formatPersonName(user),
+    role: buildRoleLabel(user),
+    tagline: normaliseMetadataTagline(relationship.metadata),
+    trust: computeTrustScore(user.id ?? relationship.id ?? Date.now()),
+    relationship
+  };
+}
+
+function mapRecommendationItem(item) {
+  const user = item?.user ?? {};
+  const recommendation = item?.recommendation ?? {};
+  const metadataTagline = normaliseMetadataTagline(recommendation.metadata ?? {});
+  return {
+    id: user.id ?? recommendation.recommendedUserId,
+    name: formatPersonName(user),
+    role: buildRoleLabel(user),
+    tagline: metadataTagline,
+    score: recommendation.score ?? null,
+    mutualFollowers: recommendation.mutualFollowersCount ?? 0,
+    recommendation
+  };
+}
+
+function buildLocationFromAddress(address, fallback = 'Not specified') {
+  if (!address || typeof address !== 'object') {
+    return fallback;
+  }
+
+  const { city, town, country, state, region } = address;
+  const locality = city || town || region || state;
+  if (locality && country) {
+    return `${locality}, ${country}`;
+  }
+  if (locality) {
+    return locality;
+  }
+  if (country) {
+    return country;
+  }
+  return fallback;
+}
+
+function deriveSocialHandle(url) {
+  if (!url) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const path = parsed.pathname.replace(/\/+$/, '').replace(/^\/+/, '');
+    return path ? `${host}/${path}` : host;
+  } catch (_error) {
+    return url;
+  }
+}
+
+function normaliseAddressRecord(address) {
+  if (!address || typeof address !== 'object') {
+    return null;
+  }
+
+  return {
+    line1: address.line1 ?? address.addressLine1 ?? null,
+    line2: address.line2 ?? address.addressLine2 ?? null,
+    city: address.city ?? address.town ?? null,
+    region: address.region ?? address.state ?? null,
+    postalCode: address.postalCode ?? address.postcode ?? address.zip ?? null,
+    country: address.country ?? null,
+    formatted: address.formatted ?? address.formattedAddress ?? null
+  };
+}
+
+function normaliseSocialLinksForProfile(links, fallbackLinks = []) {
+  const safeLinks = Array.isArray(links) ? links : [];
+  const normalised = safeLinks
+    .filter((link) => link && link.url)
+    .map((link) => {
+      const handle = link.handle ?? deriveSocialHandle(link.url);
+      return {
+        id: link.id ?? link.url ?? handle,
+        label: link.label ?? handle,
+        url: link.url,
+        handle
+      };
+    });
+
+  if (normalised.length > 0) {
+    return normalised;
+  }
+
+  return (fallbackLinks ?? []).map((link) => ({
+    id: link.id ?? link.url ?? link.label,
+    label: link.label ?? deriveSocialHandle(link.url),
+    url: link.url,
+    handle: link.handle ?? deriveSocialHandle(link.url)
+  }));
+}
+
+function buildProfileStateFromUser(user) {
+  if (!user) {
+    return { ...defaultProfile };
+  }
+
+  const profileRecord = typeof user.profile === 'object' && user.profile !== null ? user.profile : {};
+  const addressRecord = normaliseAddressRecord(user.address);
+  const location = profileRecord.location ?? buildLocationFromAddress(addressRecord ?? user.address, defaultProfile.location);
+  const socialLinks = normaliseSocialLinksForProfile(profileRecord.socialLinks, defaultProfile.social);
+
+  return {
+    ...defaultProfile,
+    id: user.id ?? defaultProfile.id,
+    email: user.email ?? defaultProfile.email,
+    role: user.role ?? defaultProfile.role,
+    firstName: user.firstName ?? '',
+    lastName: user.lastName ?? '',
+    name:
+      profileRecord.displayName && profileRecord.displayName.trim().length > 0
+        ? profileRecord.displayName.trim()
+        : formatPersonName(user) || defaultProfile.name,
+    handle: user.email ? `@${user.email.split('@')[0]}` : defaultProfile.handle,
+    tagline: profileRecord.tagline ?? defaultProfile.tagline,
+    bio: profileRecord.bio ?? defaultProfile.bio,
+    avatar: profileRecord.avatarUrl ?? defaultProfile.avatar,
+    banner: profileRecord.bannerUrl ?? defaultProfile.banner,
+    location,
+    social: socialLinks,
+    address: addressRecord,
+    followers: user.followers ?? defaultProfile.followers,
+    following: user.following ?? defaultProfile.following,
+    profileRecord
+  };
+}
+
+function createProfileFormState(profileState) {
+  const address = profileState.address ?? {};
+  return {
+    firstName: profileState.firstName ?? '',
+    lastName: profileState.lastName ?? '',
+    displayName: profileState.name ?? '',
+    tagline: profileState.tagline ?? '',
+    location: profileState.location ?? '',
+    bio: profileState.bio ?? '',
+    avatarUrl: profileState.avatar ?? '',
+    bannerUrl: profileState.banner ?? '',
+    socialLinks: (profileState.social ?? []).map((link) => ({
+      label: link.label ?? '',
+      url: link.url ?? '',
+      handle: link.handle ?? ''
+    })),
+    address: {
+      line1: address.line1 ?? '',
+      line2: address.line2 ?? '',
+      city: address.city ?? '',
+      region: address.region ?? '',
+      country: address.country ?? '',
+      postalCode: address.postalCode ?? '',
+      formatted: address.formatted ?? ''
+    }
+  };
+}
+
+function cleanAddressForPayload(address) {
+  if (!address || typeof address !== 'object') {
+    return null;
+  }
+
+  const cleaned = {};
+  const fields = ['line1', 'line2', 'city', 'region', 'postalCode', 'country', 'formatted'];
+  fields.forEach((field) => {
+    if (address[field] !== undefined && address[field] !== null) {
+      const value = typeof address[field] === 'string' ? address[field].trim() : address[field];
+      if (value) {
+        cleaned[field] = value;
+      }
+    }
+  });
+
+  return Object.keys(cleaned).length > 0 ? cleaned : null;
+}
+
+function emptyToNull(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  return value;
+}
+
 function resolveStatusColour(status) {
   switch (status) {
     case 'approved':
@@ -217,7 +487,7 @@ function resolveStatusColour(status) {
 
 function formatStatusLabel(status) {
   if (!status) {
-    return profileData.verification.status;
+    return defaultProfile.verification.status;
   }
   return status
     .toString()
@@ -240,21 +510,61 @@ function formatCompactNumber(value) {
 }
 
 export default function Profile() {
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [selectedIdType, setSelectedIdType] = useState(profileData.verification.supported[0]);
   const { session } = useAuth();
   const userId = session?.user?.id ?? null;
   const token = session?.tokens?.accessToken ?? null;
-  const { consents, loading: consentLoading, error: consentError, revokeConsent: revokeConsentRecord } =
-    useConsentRecords(userId);
-  const [revokingConsentId, setRevokingConsentId] = useState(null);
+
+  const [profile, setProfile] = useState(defaultProfile);
+  const [profileForm, setProfileForm] = useState(() => createProfileFormState(defaultProfile));
+  const [profileFormDirty, setProfileFormDirty] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState(null);
+  const [profileSaveSuccess, setProfileSaveSuccess] = useState(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+  const [selectedIdType, setSelectedIdType] = useState(defaultProfile.verification.supported[0]);
   const [verificationSummary, setVerificationSummary] = useState(null);
   const [verificationLoading, setVerificationLoading] = useState(false);
   const [verificationError, setVerificationError] = useState(null);
   const [verificationSuccess, setVerificationSuccess] = useState(null);
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [documentStates, setDocumentStates] = useState({});
-  const affiliate = profileData.affiliate;
+  const [followers, setFollowers] = useState(() =>
+    (defaultProfile.followersList ?? []).map((follower) => ({
+      id: follower.name,
+      name: follower.name,
+      role: follower.role,
+      tagline: follower.tagline,
+      trust: follower.trust,
+      relationship: null
+    }))
+  );
+  const [followersMeta, setFollowersMeta] = useState({
+    total: defaultProfile.followers ?? (defaultProfile.followersList ?? []).length,
+    limit: FOLLOW_PAGE_SIZE,
+    offset: 0
+  });
+  const [isLoadingFollowers, setIsLoadingFollowers] = useState(false);
+  const [followersError, setFollowersError] = useState(null);
+  const [pendingFollowers, setPendingFollowers] = useState([]);
+  const [isLoadingPendingFollowers, setIsLoadingPendingFollowers] = useState(false);
+  const [pendingFollowersError, setPendingFollowersError] = useState(null);
+  const [following, setFollowing] = useState([]);
+  const [followingMeta, setFollowingMeta] = useState({
+    total: defaultProfile.following ?? 0,
+    limit: FOLLOW_PAGE_SIZE,
+    offset: 0
+  });
+  const [isLoadingFollowing, setIsLoadingFollowing] = useState(false);
+  const [followingError, setFollowingError] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [isLoadingRecommendations, setIsLoadingRecommendations] = useState(false);
+  const [recommendationsError, setRecommendationsError] = useState(null);
+  const [followActions, setFollowActions] = useState({});
+  const { consents, loading: consentLoading, error: consentError, revokeConsent: revokeConsentRecord } =
+    useConsentRecords(userId);
+  const [revokingConsentId, setRevokingConsentId] = useState(null);
+  const affiliate = profile.affiliate;
   const affiliateSummary = affiliate.summary;
   const affiliatePayouts = affiliate.payouts;
   const affiliateActions = affiliate.actions;
@@ -267,6 +577,75 @@ export default function Profile() {
     [consents]
   );
 
+  const resetProfileMessages = useCallback(() => {
+    setProfileSaveError(null);
+    setProfileSaveSuccess(null);
+  }, []);
+
+  const handleProfileFieldChange = useCallback((field, value) => {
+    setProfileForm((prev) => ({ ...prev, [field]: value }));
+    setProfileFormDirty(true);
+    resetProfileMessages();
+  }, [resetProfileMessages]);
+
+  const handleProfileAddressChange = useCallback((field, value) => {
+    setProfileForm((prev) => ({
+      ...prev,
+      address: { ...(prev.address ?? {}), [field]: value }
+    }));
+    setProfileFormDirty(true);
+    resetProfileMessages();
+  }, [resetProfileMessages]);
+
+  const handleSocialLinkChange = useCallback(
+    (index, nextLink) => {
+      setProfileForm((prev) => {
+        const currentLinks = Array.isArray(prev.socialLinks) ? prev.socialLinks : [];
+        const updated = currentLinks.map((link, idx) => (idx === index ? { ...link, ...nextLink } : link));
+        return { ...prev, socialLinks: updated };
+      });
+      setProfileFormDirty(true);
+      resetProfileMessages();
+    },
+    [resetProfileMessages]
+  );
+
+  const handleAddSocialLink = useCallback(() => {
+    setProfileForm((prev) => ({
+      ...prev,
+      socialLinks: [...(prev.socialLinks ?? []), { label: '', url: '', handle: '' }]
+    }));
+    setProfileFormDirty(true);
+    resetProfileMessages();
+  }, [resetProfileMessages]);
+
+  const handleRemoveSocialLink = useCallback(
+    (index) => {
+      setProfileForm((prev) => {
+        const currentLinks = Array.isArray(prev.socialLinks) ? prev.socialLinks : [];
+        if (currentLinks.length <= 1) {
+          return { ...prev, socialLinks: [{ label: '', url: '', handle: '' }] };
+        }
+        return { ...prev, socialLinks: currentLinks.filter((_, idx) => idx !== index) };
+      });
+      setProfileFormDirty(true);
+      resetProfileMessages();
+    },
+    [resetProfileMessages]
+  );
+
+  useEffect(() => {
+    if (!profile.verification?.supported?.length) {
+      return;
+    }
+    setSelectedIdType((prev) => {
+      if (profile.verification.supported.includes(prev)) {
+        return prev;
+      }
+      return profile.verification.supported[0];
+    });
+  }, [profile.verification?.supported]);
+
   const handleRevokeConsent = async (consentId) => {
     try {
       setRevokingConsentId(consentId);
@@ -277,11 +656,397 @@ export default function Profile() {
       setRevokingConsentId(null);
     }
   };
+  const profileOwnerId = profile?.id ?? userId ?? null;
 
-  const displayedFollowerCount = useMemo(
-    () => profileData.followers + (isFollowing ? 1 : 0),
-    [isFollowing]
+  const handleProfileSubmit = useCallback(async () => {
+    if (!token) {
+      setProfileSaveError('You need to be signed in to update your profile.');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileSaveError(null);
+    setProfileSaveSuccess(null);
+
+    try {
+      const socialLinksPayload = (profileForm.socialLinks ?? [])
+        .filter((link) => typeof link?.url === 'string' && link.url.trim().length > 0)
+        .map((link) => ({
+          label: emptyToNull(link.label),
+          url: link.url.trim(),
+          handle: emptyToNull(link.handle)
+        }));
+
+      const payload = {
+        firstName: emptyToNull(profileForm.firstName),
+        lastName: emptyToNull(profileForm.lastName),
+        profile: {
+          displayName: emptyToNull(profileForm.displayName),
+          tagline: emptyToNull(profileForm.tagline),
+          location: emptyToNull(profileForm.location),
+          bio: emptyToNull(profileForm.bio),
+          avatarUrl: emptyToNull(profileForm.avatarUrl),
+          bannerUrl: emptyToNull(profileForm.bannerUrl),
+          socialLinks: socialLinksPayload
+        },
+        address: cleanAddressForPayload(profileForm.address)
+      };
+
+      const response = await updateCurrentUser({ token, payload });
+      const updated = response?.data ?? null;
+      if (updated) {
+        const nextProfile = buildProfileStateFromUser(updated);
+        setProfile(nextProfile);
+        setProfileForm(createProfileFormState(nextProfile));
+        setProfileFormDirty(false);
+        setProfileSaveSuccess('Profile updated successfully.');
+      }
+    } catch (error) {
+      setProfileSaveError(error?.message ?? 'Unable to update profile at this time.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }, [profileForm, token]);
+
+  const loadProfile = useCallback(async () => {
+    if (!token) {
+      setProfile(defaultProfile);
+      setProfileForm(createProfileFormState(defaultProfile));
+      setProfileFormDirty(false);
+      resetProfileMessages();
+      setProfileError(null);
+      return;
+    }
+    setProfileLoading(true);
+    setProfileError(null);
+    try {
+      const response = await fetchCurrentUser({ token });
+      const user = response?.data ?? null;
+      if (user) {
+        const nextProfile = buildProfileStateFromUser(user);
+        setProfile(nextProfile);
+        setProfileForm(createProfileFormState(nextProfile));
+        setProfileFormDirty(false);
+        resetProfileMessages();
+      }
+    } catch (error) {
+      setProfileError(error?.message ?? 'Unable to load profile details.');
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [token, resetProfileMessages]);
+
+  const loadFollowers = useCallback(
+    async ({ append = false, offset = 0 } = {}) => {
+      if (!token || !profileOwnerId) {
+        return;
+      }
+      if (!append) {
+        setFollowersError(null);
+      }
+      setIsLoadingFollowers(true);
+      try {
+        const response = await fetchFollowers({
+          token,
+          userId: profileOwnerId,
+          limit: FOLLOW_PAGE_SIZE,
+          offset,
+          status: 'accepted'
+        });
+        const items = response?.data ?? [];
+        const mapped = items.map(mapFollowerItem);
+        const pagination = response?.meta?.pagination ?? {};
+        setFollowers((prev) => (append ? [...prev, ...mapped] : mapped));
+        const total = pagination.total ?? (append ? offset + mapped.length : mapped.length);
+        setFollowersMeta({
+          total,
+          limit: pagination.limit ?? FOLLOW_PAGE_SIZE,
+          offset: pagination.offset ?? offset
+        });
+        setProfile((prev) => ({ ...prev, followers: total }));
+      } catch (error) {
+        if (!append) {
+          setFollowers([]);
+        }
+        setFollowersError(error?.message ?? 'Unable to load followers.');
+      } finally {
+        setIsLoadingFollowers(false);
+      }
+    },
+    [token, profileOwnerId]
   );
+
+  const loadPendingFollowers = useCallback(async () => {
+    if (!token || !profileOwnerId) {
+      return;
+    }
+    setIsLoadingPendingFollowers(true);
+    setPendingFollowersError(null);
+    try {
+      const response = await fetchFollowers({
+        token,
+        userId: profileOwnerId,
+        limit: FOLLOW_PAGE_SIZE,
+        offset: 0,
+        status: 'pending'
+      });
+      const items = response?.data ?? [];
+      setPendingFollowers(items.map(mapFollowerItem));
+    } catch (error) {
+      setPendingFollowersError(error?.message ?? 'Unable to load pending follow requests.');
+    } finally {
+      setIsLoadingPendingFollowers(false);
+    }
+  }, [token, profileOwnerId]);
+
+  const loadFollowing = useCallback(
+    async ({ append = false, offset = 0 } = {}) => {
+      if (!token || !profileOwnerId) {
+        return;
+      }
+      if (!append) {
+        setFollowingError(null);
+      }
+      setIsLoadingFollowing(true);
+      try {
+        const response = await fetchFollowing({
+          token,
+          userId: profileOwnerId,
+          limit: FOLLOW_PAGE_SIZE,
+          offset,
+          status: 'accepted'
+        });
+        const items = response?.data ?? [];
+        const mapped = items.map(mapFollowerItem);
+        const pagination = response?.meta?.pagination ?? {};
+        setFollowing((prev) => (append ? [...prev, ...mapped] : mapped));
+        const total = pagination.total ?? (append ? offset + mapped.length : mapped.length);
+        setFollowingMeta({
+          total,
+          limit: pagination.limit ?? FOLLOW_PAGE_SIZE,
+          offset: pagination.offset ?? offset
+        });
+        setProfile((prev) => ({ ...prev, following: total }));
+      } catch (error) {
+        if (!append) {
+          setFollowing([]);
+        }
+        setFollowingError(error?.message ?? 'Unable to load following list.');
+      } finally {
+        setIsLoadingFollowing(false);
+      }
+    },
+    [token, profileOwnerId]
+  );
+
+  const loadRecommendations = useCallback(async () => {
+    if (!token || !profileOwnerId) {
+      return;
+    }
+    setIsLoadingRecommendations(true);
+    setRecommendationsError(null);
+    try {
+      const response = await fetchFollowRecommendations({ token, limit: 6 });
+      const items = response?.data ?? [];
+      setRecommendations(items.map(mapRecommendationItem));
+    } catch (error) {
+      setRecommendationsError(error?.message ?? 'Unable to load follow recommendations.');
+    } finally {
+      setIsLoadingRecommendations(false);
+    }
+  }, [token, profileOwnerId]);
+
+  const refreshSocialGraph = useCallback(async () => {
+    if (!token || !profileOwnerId) {
+      return;
+    }
+    await Promise.allSettled([
+      loadFollowers({ append: false, offset: 0 }),
+      loadPendingFollowers(),
+      loadFollowing({ append: false, offset: 0 }),
+      loadRecommendations()
+    ]);
+  }, [token, profileOwnerId, loadFollowers, loadPendingFollowers, loadFollowing, loadRecommendations]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
+
+  useEffect(() => {
+    if (!token) {
+      setFollowers(
+        (defaultProfile.followersList ?? []).map((follower) => ({
+          id: follower.name,
+          name: follower.name,
+          role: follower.role,
+          tagline: follower.tagline,
+          trust: follower.trust,
+          relationship: null
+        }))
+      );
+      setFollowersMeta({
+        total: defaultProfile.followers ?? (defaultProfile.followersList ?? []).length,
+        limit: FOLLOW_PAGE_SIZE,
+        offset: 0
+      });
+      setPendingFollowers([]);
+      setFollowing([]);
+      setFollowingMeta({ total: defaultProfile.following ?? 0, limit: FOLLOW_PAGE_SIZE, offset: 0 });
+      setRecommendations([]);
+      setFollowActions({});
+      return;
+    }
+    refreshSocialGraph();
+  }, [refreshSocialGraph, token]);
+
+  const followerCount = useMemo(
+    () => profile.followers ?? followersMeta.total ?? followers.length,
+    [profile.followers, followersMeta.total, followers.length]
+  );
+
+  const followingCount = useMemo(
+    () => profile.following ?? followingMeta.total ?? following.length,
+    [profile.following, followingMeta.total, following.length]
+  );
+
+  const hasMoreFollowers = followers.length < (followersMeta.total ?? followers.length);
+  const hasMoreFollowing = following.length < (followingMeta.total ?? following.length);
+  const hasPendingApprovals = pendingFollowers.length > 0;
+  const isOwnProfile = useMemo(
+    () => Boolean(token && profileOwnerId && userId && Number(profileOwnerId) === Number(userId)),
+    [token, profileOwnerId, userId]
+  );
+  const profileSettingsHref = session?.user?.role
+    ? `/dashboard/${session.user.role}/settings`
+    : '/dashboard/user/settings';
+  const canSubmitProfile = profileFormDirty && !isSavingProfile;
+
+  const updateFollowActionState = useCallback((targetId, updates) => {
+    if (!targetId) {
+      return;
+    }
+    setFollowActions((prev) => {
+      if (updates === null) {
+        if (!prev[targetId]) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[targetId];
+        return next;
+      }
+      const existing = prev[targetId] ?? {};
+      return { ...prev, [targetId]: { ...existing, ...updates } };
+    });
+  }, []);
+
+  const handleFollowUser = useCallback(
+    async (targetId, { source = 'profile.recommendation', reason = null } = {}) => {
+      if (!token || !targetId) {
+        return;
+      }
+      updateFollowActionState(targetId, { loading: true, error: null });
+      try {
+        const response = await followUser({
+          token,
+          userId: targetId,
+          payload: {
+            source,
+            reason,
+            metadata: { initiatedFrom: 'profile', originProfileId: profileOwnerId }
+          }
+        });
+        updateFollowActionState(targetId, { loading: false, status: response?.data?.status ?? 'accepted' });
+        await Promise.allSettled([
+          loadFollowers({ append: false, offset: 0 }),
+          loadFollowing({ append: false, offset: 0 }),
+          loadRecommendations()
+        ]);
+      } catch (error) {
+        updateFollowActionState(targetId, {
+          loading: false,
+          error: error?.message ?? 'Unable to follow this member right now.'
+        });
+      }
+    },
+    [token, profileOwnerId, updateFollowActionState, loadFollowers, loadFollowing, loadRecommendations]
+  );
+
+  const handleUnfollowUser = useCallback(
+    async (targetId) => {
+      if (!token || !targetId) {
+        return;
+      }
+      updateFollowActionState(targetId, { loading: true, error: null });
+      try {
+        await unfollowUser({ token, userId: targetId });
+        updateFollowActionState(targetId, { loading: false, status: 'unfollowed' });
+        await Promise.allSettled([
+          loadFollowers({ append: false, offset: 0 }),
+          loadFollowing({ append: false, offset: 0 }),
+          loadRecommendations()
+        ]);
+      } catch (error) {
+        updateFollowActionState(targetId, {
+          loading: false,
+          error: error?.message ?? 'Unable to update follow status.'
+        });
+      }
+    },
+    [token, updateFollowActionState, loadFollowers, loadFollowing, loadRecommendations]
+  );
+
+  const handleApproveFollow = useCallback(
+    async (followerId) => {
+      if (!token || !profileOwnerId || !followerId) {
+        return;
+      }
+      const stateKey = `pending:${followerId}`;
+      updateFollowActionState(stateKey, { loading: true, error: null });
+      try {
+        await approveFollowRequest({ token, userId: profileOwnerId, followerId });
+        updateFollowActionState(stateKey, { loading: false, status: 'accepted' });
+        await Promise.allSettled([
+          loadFollowers({ append: false, offset: 0 }),
+          loadPendingFollowers()
+        ]);
+      } catch (error) {
+        updateFollowActionState(stateKey, {
+          loading: false,
+          error: error?.message ?? 'Unable to approve follow request.'
+        });
+      }
+    },
+    [token, profileOwnerId, updateFollowActionState, loadFollowers, loadPendingFollowers]
+  );
+
+  const handleDeclineFollow = useCallback(
+    async (followerId) => {
+      if (!token || !profileOwnerId || !followerId) {
+        return;
+      }
+      const stateKey = `pending:${followerId}`;
+      updateFollowActionState(stateKey, { loading: true, error: null });
+      try {
+        await declineFollowRequest({ token, userId: profileOwnerId, followerId });
+        updateFollowActionState(stateKey, { loading: false, status: 'declined' });
+        await loadPendingFollowers();
+      } catch (error) {
+        updateFollowActionState(stateKey, {
+          loading: false,
+          error: error?.message ?? 'Unable to decline follow request.'
+        });
+      }
+    },
+    [token, profileOwnerId, updateFollowActionState, loadPendingFollowers]
+  );
+
+  const handleLoadMoreFollowers = useCallback(() => {
+    loadFollowers({ append: true, offset: followers.length });
+  }, [loadFollowers, followers.length]);
+
+  const handleLoadMoreFollowing = useCallback(() => {
+    loadFollowing({ append: true, offset: following.length });
+  }, [loadFollowing, following.length]);
   const documentRequirements = useMemo(() => {
     if (verificationSummary?.requiredDocuments?.length) {
       return verificationSummary.requiredDocuments.map((doc) => ({
@@ -452,10 +1217,6 @@ export default function Profile() {
     [affiliatePayouts]
   );
 
-  const handleFollowToggle = () => {
-    setIsFollowing((prev) => !prev);
-  };
-
   const handleVerificationUpload = (documentType) => async (event) => {
     const file = event.target.files?.[0];
     if (!file) {
@@ -576,17 +1337,17 @@ export default function Profile() {
   };
 
   const fallbackStatusColour =
-    profileData.verification.status === 'Submitted for review'
+    profile.verification.status === 'Submitted for review'
       ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
       : 'text-amber-600 bg-amber-50 border-amber-200';
 
   const statusColour = verificationSummary?.status ? resolveStatusColour(verificationSummary.status) : fallbackStatusColour;
   const verificationStatusLabel = verificationSummary?.status
     ? formatStatusLabel(verificationSummary.status)
-    : profileData.verification.status;
+    : profile.verification.status;
   const lastReviewed = useMemo(() => {
     if (!verificationSummary?.lastReviewedAt) {
-      return profileData.verification.lastReviewed;
+      return profile.verification.lastReviewed;
     }
     const parsed = new Date(verificationSummary.lastReviewedAt);
     if (Number.isNaN(parsed.getTime())) {
@@ -606,38 +1367,45 @@ export default function Profile() {
         <div className="overflow-hidden rounded-4xl border border-slate-200 bg-white shadow-card">
           <div
             className="h-48 w-full bg-cover bg-center"
-            style={{ backgroundImage: `url(${profileData.banner})` }}
+            style={{ backgroundImage: `url(${profile.banner})` }}
             aria-hidden="true"
           />
           <div className="grid gap-8 p-8 md:grid-cols-[auto_1fr_auto]">
             <div className="-mt-20 flex flex-col items-center gap-4 md:items-start">
               <img
-                src={profileData.avatar}
+                src={profile.avatar}
                 alt="Profile avatar"
                 className="h-32 w-32 rounded-full border-4 border-white object-cover shadow-xl"
               />
-              <button
-                type="button"
-                onClick={handleFollowToggle}
-                className={`w-full rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                  isFollowing
-                    ? 'border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    : 'border-primary bg-primary text-white shadow-lg hover:bg-primary-dark'
-                }`}
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </button>
+              {isOwnProfile ? (
+                <a
+                  href={profileSettingsHref}
+                  className="w-full rounded-full border border-primary/40 bg-white px-4 py-2 text-center text-sm font-semibold text-primary transition hover:bg-primary/10"
+                >
+                  Manage profile
+                </a>
+              ) : null}
             </div>
             <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl font-semibold text-slate-900">{profileData.name}</h1>
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Trust score {profileData.trustScores.instructor}%</span>
+                <h1 className="text-3xl font-semibold text-slate-900">{profile.name}</h1>
+                {profileLoading && (
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                    Refreshing…
+                  </span>
+                )}
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Trust score {profile.trustScores.instructor}%</span>
               </div>
-              <p className="text-sm text-slate-500">{profileData.handle} • {profileData.location}</p>
-              <p className="text-base text-slate-600">{profileData.tagline}</p>
-              <p className="text-sm text-slate-600">{profileData.bio}</p>
+              <p className="text-sm text-slate-500">{profile.handle} • {profile.location}</p>
+              <p className="text-base text-slate-600">{profile.tagline}</p>
+              <p className="text-sm text-slate-600">{profile.bio}</p>
+              {profileError && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700">
+                  {profileError}
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
-                {profileData.trustBadges.map((badge) => (
+                {profile.trustBadges.map((badge) => (
                   <span key={badge} className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
                       <path d="m10 1.5 6.5 3v5.31c0 4.03-2.5 7.73-6.24 9.12a.75.75 0 0 1-.52 0C5.5 17.54 3 13.84 3 9.81V4.5L10 1.5Zm1.72 6.53-2.47 2.47-1.0-1.0a.75.75 0 0 0-1.06 1.06l1.53 1.53a.75.75 0 0 0 1.06 0l3-3a.75.75 0 1 0-1.06-1.06Z" />
@@ -650,21 +1418,37 @@ export default function Profile() {
             <div className="flex flex-col gap-4 text-right text-sm text-slate-600">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Followers</p>
-                <p className="text-2xl font-semibold text-slate-900">{formatCompactNumber(displayedFollowerCount)}</p>
+                <p className="text-2xl font-semibold text-slate-900">{formatCompactNumber(followerCount)}</p>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Following</p>
-                <p className="text-2xl font-semibold text-slate-900">{formatCompactNumber(profileData.following)}</p>
+                <p className="text-2xl font-semibold text-slate-900">{formatCompactNumber(followingCount)}</p>
               </div>
               <div className="rounded-3xl bg-slate-50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Trust metrics</p>
-                <p className="mt-2 text-sm text-slate-600">Learner trust {profileData.trustScores.learner}%</p>
-                <p className="text-sm text-slate-600">Instructor trust {profileData.trustScores.instructor}%</p>
-                <p className="text-sm text-slate-600">Review grade {profileData.trustScores.reviewGrade}/5</p>
+                <p className="mt-2 text-sm text-slate-600">Learner trust {profile.trustScores.learner}%</p>
+                <p className="text-sm text-slate-600">Instructor trust {profile.trustScores.instructor}%</p>
+                <p className="text-sm text-slate-600">Review grade {profile.trustScores.reviewGrade}/5</p>
               </div>
             </div>
           </div>
         </div>
+
+        {isOwnProfile && (
+          <ProfileIdentityEditor
+            form={profileForm}
+            onFieldChange={handleProfileFieldChange}
+            onAddressChange={handleProfileAddressChange}
+            onSocialLinkChange={handleSocialLinkChange}
+            onAddSocialLink={handleAddSocialLink}
+            onRemoveSocialLink={handleRemoveSocialLink}
+            onSubmit={handleProfileSubmit}
+            isSaving={isSavingProfile}
+            canSubmit={canSubmitProfile}
+            error={profileSaveError}
+            success={profileSaveSuccess}
+          />
+        )}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
           <div className="space-y-8">
@@ -858,9 +1642,9 @@ export default function Profile() {
             </div>
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Qualifications & expertise</h2>
-              <p className="mt-2 text-sm text-slate-600">{profileData.expertise.join(' • ')}</p>
+              <p className="mt-2 text-sm text-slate-600">{profile.expertise.join(' • ')}</p>
               <ul className="mt-4 space-y-3 text-sm text-slate-600">
-                {profileData.qualifications.map((item) => (
+                {profile.qualifications.map((item) => (
                   <li key={item} className="flex items-start gap-2">
                     <span className="mt-1 inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">✔</span>
                     {item}
@@ -872,7 +1656,7 @@ export default function Profile() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Featured courses</h2>
               <div className="mt-4 grid gap-4 md:grid-cols-2">
-                {profileData.courses.map((course) => (
+                {profile.courses.map((course) => (
                   <div key={course.title} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                     <p className="text-sm font-semibold text-slate-900">{course.title}</p>
                     <p className="mt-1 text-xs text-slate-500">{course.status} • Next cohort {course.nextCohort}</p>
@@ -889,7 +1673,7 @@ export default function Profile() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Tutor session reviews</h2>
               <div className="mt-4 space-y-5">
-                {profileData.reviews.map((review) => (
+                {profile.reviews.map((review) => (
                   <div key={review.learner} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
                     <div className="flex flex-wrap items-center gap-3">
                       <p className="text-sm font-semibold text-slate-900">{review.learner}</p>
@@ -906,7 +1690,7 @@ export default function Profile() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Live feed</h2>
               <div className="mt-4 space-y-4">
-                {profileData.liveFeed.map((item) => (
+                {profile.liveFeed.map((item) => (
                   <div key={item.title} className="rounded-2xl border border-slate-200 bg-white/80 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm font-semibold text-slate-900">{item.title}</p>
@@ -947,7 +1731,7 @@ export default function Profile() {
                     onChange={(event) => setSelectedIdType(event.target.value)}
                     className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   >
-                    {profileData.verification.supported.map((type) => (
+                    {profile.verification.supported.map((type) => (
                       <option key={type} value={type}>
                         {type.replace('-', ' ')}
                       </option>
@@ -1002,7 +1786,7 @@ export default function Profile() {
                     );
                   })}
                 </div>
-                <p className="text-xs text-slate-500">{profileData.verification.note}</p>
+                <p className="text-xs text-slate-500">{profile.verification.note}</p>
                 <button
                   type="submit"
                   disabled={isSubmitDisabled}
@@ -1021,7 +1805,7 @@ export default function Profile() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Member of</p>
                   <ul className="mt-2 space-y-1">
-                    {profileData.communities.member.map((community) => (
+                    {profile.communities.member.map((community) => (
                       <li key={community} className="flex items-center justify-between">
                         <span>{community}</span>
                         <a href="/communities" className="text-xs font-semibold text-primary">View</a>
@@ -1032,7 +1816,7 @@ export default function Profile() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Communities owned</p>
                   <ul className="mt-2 space-y-1">
-                    {profileData.communities.owner.map((community) => (
+                    {profile.communities.owner.map((community) => (
                       <li key={community} className="flex items-center justify-between">
                         <span>{community}</span>
                         <a href="/communities/manage" className="text-xs font-semibold text-primary">Manage</a>
@@ -1043,7 +1827,7 @@ export default function Profile() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Moderator in</p>
                   <ul className="mt-2 space-y-1">
-                    {profileData.communities.moderator.map((community) => (
+                    {profile.communities.moderator.map((community) => (
                       <li key={community} className="flex items-center justify-between">
                         <span>{community}</span>
                         <a href="/communities" className="text-xs font-semibold text-primary">Toolkit</a>
@@ -1054,7 +1838,7 @@ export default function Profile() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Admin roles</p>
                   <ul className="mt-2 space-y-1">
-                    {profileData.communities.admin.map((community) => (
+                    {profile.communities.admin.map((community) => (
                       <li key={community} className="flex items-center justify-between">
                         <span>{community}</span>
                         <a href="/communities" className="text-xs font-semibold text-primary">Insights</a>
@@ -1066,41 +1850,244 @@ export default function Profile() {
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">Followers</h2>
-              <p className="mt-1 text-sm text-slate-500">High-trust operators already inside Alex’s orbit.</p>
-              <ul className="mt-4 space-y-3">
-                {profileData.followersList.map((follower) => (
-                  <li key={follower.name} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-900">{follower.name}</p>
-                        <p className="text-xs text-slate-500">{follower.role}</p>
-                      </div>
-                      <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Trust {follower.trust}%</span>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900">Community connections</h2>
+                  <p className="mt-1 text-sm text-slate-500">Manage your followers, approvals, and discovery feed.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshSocialGraph}
+                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary/40 hover:text-primary"
+                >
+                  Sync
+                </button>
+              </div>
+
+              <div className="mt-6 space-y-6">
+                <section>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-700">
+                      Followers <span className="ml-1 text-xs font-medium text-slate-400">{followersMeta.total ?? followers.length}</span>
+                    </h3>
+                    {isLoadingFollowers && <span className="text-xs text-slate-400">Refreshing…</span>}
+                  </div>
+                  {followersError && (
+                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-600">
+                      {followersError}
                     </div>
-                    <p className="mt-2 text-sm">{follower.tagline}</p>
-                  </li>
-                ))}
-              </ul>
+                  )}
+                  {followers.length === 0 && !isLoadingFollowers ? (
+                    <p className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      No followers yet. Share your classroom wins to grow trusted relationships.
+                    </p>
+                  ) : (
+                    <ul className="mt-4 space-y-3">
+                      {followers.map((follower) => {
+                        const action = followActions[follower.id] ?? {};
+                        return (
+                          <li key={follower.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-600">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">{follower.name}</p>
+                                <p className="text-xs text-slate-500">{follower.role}</p>
+                              </div>
+                              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">Trust {follower.trust}%</span>
+                            </div>
+                            <p className="mt-2 text-sm">{follower.tagline}</p>
+                            {action.error && <p className="mt-2 text-xs text-rose-600">{action.error}</p>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {hasMoreFollowers && (
+                    <button
+                      type="button"
+                      onClick={handleLoadMoreFollowers}
+                      disabled={isLoadingFollowers}
+                      className="mt-4 w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isLoadingFollowers ? 'Loading followers…' : 'Load more followers'}
+                    </button>
+                  )}
+                </section>
+
+                {hasPendingApprovals && (
+                  <section>
+                    <h3 className="text-sm font-semibold text-slate-700">Pending approvals</h3>
+                    {pendingFollowersError && (
+                      <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-600">
+                        {pendingFollowersError}
+                      </div>
+                    )}
+                    <ul className="mt-4 space-y-3">
+                      {pendingFollowers.map((pending) => {
+                        const action = followActions[`pending:${pending.id}`] ?? {};
+                        return (
+                          <li key={pending.id} className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 text-sm text-slate-700">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">{pending.name}</p>
+                                <p className="text-xs text-slate-500">{pending.tagline}</p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveFollow(pending.id)}
+                                  disabled={action.loading}
+                                  className="rounded-full border border-emerald-400 bg-emerald-500/10 px-3 py-1 font-semibold text-emerald-600 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeclineFollow(pending.id)}
+                                  disabled={action.loading}
+                                  className="rounded-full border border-rose-300 bg-white px-3 py-1 font-semibold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  Decline
+                                </button>
+                              </div>
+                            </div>
+                            {action.error && <p className="mt-2 text-xs text-rose-600">{action.error}</p>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                )}
+
+                <section>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-700">
+                      Following <span className="ml-1 text-xs font-medium text-slate-400">{followingMeta.total ?? following.length}</span>
+                    </h3>
+                    {isLoadingFollowing && <span className="text-xs text-slate-400">Refreshing…</span>}
+                  </div>
+                  {followingError && (
+                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-600">
+                      {followingError}
+                    </div>
+                  )}
+                  {following.length === 0 && !isLoadingFollowing ? (
+                    <p className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      You are not following anyone yet. Start with a recommendation below.
+                    </p>
+                  ) : (
+                    <ul className="mt-4 space-y-3">
+                      {following.map((entry) => {
+                        const action = followActions[entry.id] ?? {};
+                        return (
+                          <li key={entry.id} className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm text-slate-600">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">{entry.name}</p>
+                                <p className="text-xs text-slate-500">{entry.tagline}</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleUnfollowUser(entry.id)}
+                                disabled={action.loading}
+                                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-rose-400 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {action.loading ? 'Updating…' : 'Unfollow'}
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {hasMoreFollowing && (
+                    <button
+                      type="button"
+                      onClick={handleLoadMoreFollowing}
+                      disabled={isLoadingFollowing}
+                      className="mt-4 w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isLoadingFollowing ? 'Loading accounts…' : 'Load more accounts'}
+                    </button>
+                  )}
+                </section>
+
+                <section>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-700">Suggested operators</h3>
+                    {isLoadingRecommendations && <span className="text-xs text-slate-400">Refreshing…</span>}
+                  </div>
+                  {recommendationsError && (
+                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-600">
+                      {recommendationsError}
+                    </div>
+                  )}
+                  {recommendations.length === 0 && !isLoadingRecommendations ? (
+                    <p className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+                      Discovery feed is quiet right now. Check back after sharing new classroom updates.
+                    </p>
+                  ) : (
+                    <ul className="mt-4 space-y-3">
+                      {recommendations.map((recommendation) => {
+                        const action = followActions[recommendation.id] ?? {};
+                        return (
+                          <li key={recommendation.id} className="rounded-2xl border border-slate-200 bg-white/70 p-4 text-sm text-slate-600">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">{recommendation.name}</p>
+                                <p className="text-xs text-slate-500">{recommendation.tagline}</p>
+                                {recommendation.mutualFollowers ? (
+                                  <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-400">
+                                    {recommendation.mutualFollowers} mutual followers
+                                  </p>
+                                ) : null}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleFollowUser(recommendation.id)}
+                                disabled={action.loading}
+                                className="rounded-full border border-primary bg-primary px-3 py-1 text-xs font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+                              >
+                                {action.loading ? 'Following…' : 'Follow'}
+                              </button>
+                            </div>
+                            {action.error && <p className="mt-2 text-xs text-rose-600">{action.error}</p>}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </section>
+              </div>
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Social presence</h2>
               <ul className="mt-3 space-y-3 text-sm text-slate-600">
-                {profileData.social.map((socialLink) => (
-                  <li key={socialLink.label} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900">{socialLink.label}</p>
-                      <p className="text-xs text-slate-500">{socialLink.handle}</p>
-                    </div>
-                    <a href={socialLink.url} className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-                      Visit
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                        <path d="M5.75 4a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-1.5 0V6.56l-9.22 9.22a.75.75 0 1 1-1.06-1.06l9.22-9.22H5.75A.75.75 0 0 1 5 4.75.75.75 0 0 1 5.75 4Z" />
-                      </svg>
-                    </a>
-                  </li>
-                ))}
+                {profile.social
+                  .filter((socialLink) => socialLink?.url)
+                  .map((socialLink) => {
+                    const handle = socialLink.handle ?? deriveSocialHandle(socialLink.url);
+                    const key = socialLink.id ?? socialLink.url ?? socialLink.label;
+                    return (
+                      <li key={key} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900">{socialLink.label ?? handle}</p>
+                          <p className="text-xs text-slate-500">{handle}</p>
+                        </div>
+                        <a
+                          href={socialLink.url}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Visit
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                            <path d="M5.75 4a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-1.5 0V6.56l-9.22 9.22a.75.75 0 1 1-1.06-1.06l9.22-9.22H5.75A.75.75 0 0 1 5 4.75.75.75 0 0 1 5.75 4Z" />
+                          </svg>
+                        </a>
+                      </li>
+                    );
+                  })}
               </ul>
             </div>
           </div>

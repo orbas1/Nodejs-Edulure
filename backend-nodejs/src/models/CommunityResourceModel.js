@@ -16,7 +16,8 @@ const RESOURCE_COLUMNS = [
   'cr.status',
   'cr.published_at as publishedAt',
   'cr.created_at as createdAt',
-  'cr.updated_at as updatedAt'
+  'cr.updated_at as updatedAt',
+  'cr.deleted_at as deletedAt'
 ];
 
 export default class CommunityResourceModel {
@@ -97,5 +98,58 @@ export default class CommunityResourceModel {
       items,
       total: Number(totalRow?.count ?? 0)
     };
+  }
+
+  static async update(resourceId, updates, connection = db) {
+    const payload = {};
+
+    if (updates.title !== undefined) {
+      payload.title = updates.title;
+    }
+    if (updates.description !== undefined) {
+      payload.description = updates.description ?? null;
+    }
+    if (updates.resourceType !== undefined) {
+      payload.resource_type = updates.resourceType;
+    }
+    if (updates.assetId !== undefined) {
+      payload.asset_id = updates.assetId ?? null;
+    }
+    if (updates.linkUrl !== undefined) {
+      payload.link_url = updates.linkUrl ?? null;
+    }
+    if (updates.classroomReference !== undefined) {
+      payload.classroom_reference = updates.classroomReference ?? null;
+    }
+    if (updates.tags !== undefined) {
+      payload.tags = JSON.stringify(updates.tags ?? []);
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = JSON.stringify(updates.metadata ?? {});
+    }
+    if (updates.visibility !== undefined) {
+      payload.visibility = updates.visibility;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.publishedAt !== undefined) {
+      payload.published_at = updates.publishedAt;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return this.findById(resourceId, connection);
+    }
+
+    await connection('community_resources').where('id', resourceId).update(payload);
+    return this.findById(resourceId, connection);
+  }
+
+  static async markDeleted(resourceId, connection = db) {
+    const now = connection?.fn?.now ? connection.fn.now() : db.fn.now();
+    await connection('community_resources')
+      .where('id', resourceId)
+      .update({ deleted_at: now, status: 'archived' });
+    return this.findById(resourceId, connection);
   }
 }
