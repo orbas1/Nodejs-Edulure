@@ -1083,6 +1083,19 @@ class PaymentService {
           },
           trx
         );
+        await MonetizationFinanceService.handleRefundProcessed(
+          {
+            paymentIntentId: intent.id,
+            amountCents: refundAmount,
+            currency: refundCurrency,
+            tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
+            processedAt: refund.created ? new Date(refund.created * 1000).toISOString() : new Date().toISOString(),
+            reason: refund.reason ?? null,
+            refundReference: refund.id,
+            source: 'stripe-webhook'
+          },
+          trx
+        );
         await PaymentIntentModel.incrementRefundAmount(intent.id, refundAmount, trx);
 
         trackPaymentRefundMetrics({
@@ -1282,6 +1295,20 @@ class PaymentService {
             provider: intent.provider,
             reason: reason ?? null
           }
+        },
+        trx
+      );
+
+      await MonetizationFinanceService.handleRefundProcessed(
+        {
+          paymentIntentId: intent.id,
+          amountCents: refundAmount,
+          currency: intent.currency,
+          tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
+          processedAt: new Date().toISOString(),
+          reason: reason ?? null,
+          refundReference: providerRefundId,
+          source: 'payments-api'
         },
         trx
       );

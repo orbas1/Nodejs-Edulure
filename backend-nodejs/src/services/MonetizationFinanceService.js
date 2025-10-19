@@ -11,6 +11,7 @@ import {
   updateMonetizationCatalogMetrics,
   recordMonetizationUsage,
   recordRevenueRecognition,
+  recordRevenueReversal,
   updateDeferredRevenueBalance
 } from '../observability/metrics.js';
 
@@ -417,6 +418,204 @@ class MonetizationFinanceService {
 
     await refreshCatalogMetrics(connection);
     return { schedules };
+  }
+
+  static async handleRefundProcessed(
+    {
+      paymentIntentId,
+      amountCents,
+      currency,
+      tenantId,
+      processedAt,
+      reason,
+      refundReference,
+      source = 'unknown'
+    } = {},
+    connection = db
+  ) {
+    if (!paymentIntentId) {
+      throw new Error('paymentIntentId is required to process a monetization refund');
+    }
+
+    const refundAmount = coercePositiveInteger(amountCents ?? 0);
+    if (refundAmount <= 0) {
+      return { status: 'ignored', adjustments: { recognized: [], deferred: [] }, unappliedCents: 0 };
+    }
+
+    const normalizedTenant = normaliseTenantId(tenantId ?? 'global');
+    const normalizedCurrency = (currency ?? 'GBP').toUpperCase();
+    const appliedAt = toIsoDate(processedAt ?? new Date());
+
+    const schedules = await MonetizationRevenueScheduleModel.listByPaymentIntent(paymentIntentId, connection);
+
+    if (!Array.isArray(schedules) || schedules.length === 0) {
+      serviceLogger.warn({ paymentIntentId }, 'Refund processed without associated monetization schedules');
+      return {
+        status: 'no-schedules',
+        adjustments: { recognized: [], deferred: [] },
+        unappliedCents: refundAmount
+      };
+    }
+
+    let remaining = refundAmount;
+    const recognizedAdjustments = [];
+    const deferredAdjustments = [];
+    const adjustmentContext = {
+      appliedAt,
+      reason: reason ?? null,
+      source: source ?? null,
+      reference: refundReference ?? null
+    };
+
+    const recognizedSchedules = schedules
+      .filter((schedule) => schedule.status === 'recognized' && schedule.recognizedAmountCents > 0)
+      .sort((a, b) => {
+        const aTime = a.recognizedAt ? new Date(a.recognizedAt).getTime() : 0;
+        const bTime = b.recognizedAt ? new Date(b.recognizedAt).getTime() : 0;
+        return bTime - aTime;
+      });
+
+    for (const schedule of recognizedSchedules) {
+      if (remaining <= 0) {
+        break;
+      }
+
+      const reduction = Math.min(coercePositiveInteger(schedule.recognizedAmountCents), remaining);
+      if (reduction <= 0) {
+        continue; // eslint-disable-line no-continue
+      }
+
+      await MonetizationRevenueScheduleModel.reduceRecognizedAmount(
+        schedule.id,
+        reduction,
+        adjustmentContext,
+        connection
+      );
+
+      recognizedAdjustments.push({
+        scheduleId: schedule.id,
+        productCode: schedule.productCode,
+        amountCents: reduction
+      });
+
+      remaining -= reduction;
+
+      await PaymentLedgerEntryModel.record(
+        {
+          paymentIntentId,
+          entryType: 'revenue.refund-recognized',
+          amount: reduction,
+          currency: normalizedCurrency,
+          details: {
+            scheduleId: schedule.id,
+            productCode: schedule.productCode,
+            reason: reason ?? null,
+            processedAt: appliedAt,
+            refundReference: refundReference ?? null,
+            source: source ?? null
+          }
+        },
+        connection
+      );
+
+      recordRevenueReversal({
+        productCode: schedule.productCode,
+        currency: normalizedCurrency,
+        reason: reason ?? 'refund',
+        amountCents: reduction
+      });
+    }
+
+    const processedRecognizedIds = new Set(recognizedAdjustments.map((item) => item.scheduleId));
+
+    if (remaining > 0) {
+      const pendingSchedules = schedules
+        .filter((schedule) => !processedRecognizedIds.has(schedule.id))
+        .sort((a, b) => {
+          const aTime = a.recognitionStart ? new Date(a.recognitionStart).getTime() : 0;
+          const bTime = b.recognitionStart ? new Date(b.recognitionStart).getTime() : 0;
+          return aTime - bTime;
+        });
+
+      for (const schedule of pendingSchedules) {
+        if (remaining <= 0) {
+          break;
+        }
+
+        const openAmount = Math.max(
+          0,
+          coercePositiveInteger(schedule.amountCents) - coercePositiveInteger(schedule.recognizedAmountCents)
+        );
+        if (openAmount <= 0) {
+          continue; // eslint-disable-line no-continue
+        }
+
+        const reduction = Math.min(openAmount, remaining);
+
+        await MonetizationRevenueScheduleModel.reducePendingAmount(
+          schedule.id,
+          reduction,
+          adjustmentContext,
+          connection
+        );
+
+        deferredAdjustments.push({
+          scheduleId: schedule.id,
+          productCode: schedule.productCode,
+          amountCents: reduction
+        });
+
+        remaining -= reduction;
+
+        await PaymentLedgerEntryModel.record(
+          {
+            paymentIntentId,
+            entryType: 'revenue.refund-deferred',
+            amount: reduction,
+            currency: normalizedCurrency,
+            details: {
+              scheduleId: schedule.id,
+              productCode: schedule.productCode,
+              reason: reason ?? null,
+              processedAt: appliedAt,
+              refundReference: refundReference ?? null,
+              source: source ?? null
+            }
+          },
+          connection
+        );
+      }
+    }
+
+    if (remaining > 0) {
+      serviceLogger.warn(
+        { paymentIntentId, refundAmountCents: refundAmount, unappliedCents: remaining },
+        'Refund amount exceeded available monetization schedules'
+      );
+    }
+
+    await refreshDeferredBalance(normalizedTenant, connection);
+
+    serviceLogger.info(
+      {
+        paymentIntentId,
+        tenantId: normalizedTenant,
+        refundAmountCents: refundAmount,
+        recognizedAdjustments,
+        deferredAdjustments,
+        unappliedCents: remaining
+      },
+      'Processed monetization refund adjustments'
+    );
+
+    return {
+      status: 'processed',
+      adjustments: {
+        recognized: recognizedAdjustments,
+        deferred: deferredAdjustments
+      },
+      unappliedCents: remaining
+    };
   }
 
   static async recognizeDeferredRevenue({ tenantId = 'global', asOf = new Date().toISOString(), limit = 200 } = {}) {

@@ -175,6 +175,12 @@ const monetizationRevenueRecognizedCentsTotal = new promClient.Counter({
   labelNames: ['product_code', 'currency', 'method']
 });
 
+const monetizationRevenueReversedCentsTotal = new promClient.Counter({
+  name: 'edulure_monetization_revenue_reversed_cents_total',
+  help: 'Refund-driven revenue reversals (in cents) grouped by product code, currency, and reason',
+  labelNames: ['product_code', 'currency', 'reason']
+});
+
 const searchOperationDurationSeconds = new promClient.Histogram({
   name: 'edulure_search_operation_duration_seconds',
   help: 'Duration histogram for Meilisearch administrative operations',
@@ -272,6 +278,7 @@ registry.registerMetric(monetizationDeferredRevenueGauge);
 registry.registerMetric(monetizationUsageRecordedTotal);
 registry.registerMetric(monetizationUsageCentsTotal);
 registry.registerMetric(monetizationRevenueRecognizedCentsTotal);
+registry.registerMetric(monetizationRevenueReversedCentsTotal);
 registry.registerMetric(telemetryIngestionEventsTotal);
 registry.registerMetric(telemetryExportEventsTotal);
 registry.registerMetric(telemetryExportDurationSeconds);
@@ -652,6 +659,25 @@ export function recordRevenueRecognition({ productCode, currency, method, amount
 
   monetizationRevenueRecognizedCentsTotal.inc(
     { product_code: product, currency: normalizedCurrency, method: recognitionMethod },
+    amountCents
+  );
+}
+
+export function recordRevenueReversal({ productCode, currency, reason, amountCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    return;
+  }
+
+  const product = productCode ? String(productCode) : 'unclassified';
+  const normalizedCurrency = (currency ?? env.payments.defaultCurrency).toUpperCase();
+  const normalizedReason = reason ? String(reason).slice(0, 64) : 'unspecified';
+
+  monetizationRevenueReversedCentsTotal.inc(
+    { product_code: product, currency: normalizedCurrency, reason: normalizedReason },
     amountCents
   );
 }

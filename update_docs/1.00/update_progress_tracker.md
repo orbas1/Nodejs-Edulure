@@ -31,7 +31,7 @@ Progress is tracked per task and subtask across the required dimensions. Overall
 | **Task 5: Deliver analytics, monetisation, documentation, and stakeholder enablement** | 60% | 60% | 60% | 60% | 60% | 60% | 60% |
 | &nbsp;&nbsp;Telemetry and warehouse implementation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;BI and insight delivery | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
-| &nbsp;&nbsp;Monetisation and finance reconciliation | 70% | 70% | 70% | 70% | 70% | 70% | 70% |
+| &nbsp;&nbsp;Monetisation and finance reconciliation | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Documentation and enablement refresh | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 | &nbsp;&nbsp;Governance and stakeholder communications | 0% | 0% | 0% | 0% | 0% | 0% | 0% |
 

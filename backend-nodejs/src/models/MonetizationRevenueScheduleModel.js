@@ -31,6 +31,23 @@ function toNumber(value) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+function appendAdjustmentMetadata(row, adjustment = {}) {
+  const metadata = parseJson(row?.metadata);
+  const adjustments = Array.isArray(metadata.adjustments) ? metadata.adjustments : [];
+  const appliedAt = adjustment.appliedAt ?? new Date().toISOString();
+
+  adjustments.push({
+    type: adjustment.type ?? 'refund',
+    amountCents: toNumber(adjustment.amountCents ?? adjustment.amount ?? 0),
+    appliedAt,
+    reason: adjustment.reason ?? null,
+    source: adjustment.source ?? null,
+    reference: adjustment.reference ?? null
+  });
+
+  return { ...metadata, adjustments };
+}
+
 function mapRow(row) {
   if (!row) {
     return null;
@@ -129,6 +146,101 @@ export default class MonetizationRevenueScheduleModel {
       .where({ payment_intent_id: paymentIntentId })
       .orderBy('recognition_start', 'asc');
     return rows.map(mapRow);
+  }
+
+  static async reduceRecognizedAmount(id, reductionCents, adjustment = {}, connection = db) {
+    const amountToReduce = toNumber(reductionCents);
+    if (amountToReduce <= 0) {
+      const row = await connection(TABLE).where({ id }).first();
+      return mapRow(row);
+    }
+
+    const row = await connection(TABLE).where({ id }).first();
+    if (!row) {
+      return null;
+    }
+
+    const currentRecognized = toNumber(row.recognized_amount_cents);
+    if (currentRecognized <= 0) {
+      return mapRow(row);
+    }
+
+    const applied = Math.min(currentRecognized, amountToReduce);
+    if (applied <= 0) {
+      return mapRow(row);
+    }
+
+    const updatedMetadata = appendAdjustmentMetadata(row, {
+      ...adjustment,
+      type: adjustment.type ?? 'refund.recognized',
+      amountCents: applied
+    });
+
+    const currentTotal = toNumber(row.amount_cents);
+    const updatedTotal = Math.max(0, currentTotal - applied);
+    const updatedRecognized = Math.max(0, currentRecognized - applied);
+
+    await connection(TABLE)
+      .where({ id })
+      .update({
+        amount_cents: updatedTotal,
+        recognized_amount_cents: updatedRecognized,
+        recognized_at: updatedRecognized > 0 ? row.recognized_at : null,
+        status: updatedTotal > 0 ? row.status : 'recognized',
+        metadata: JSON.stringify(updatedMetadata),
+        updated_at: connection.fn.now()
+      });
+
+    const updatedRow = await connection(TABLE).where({ id }).first();
+    return mapRow(updatedRow);
+  }
+
+  static async reducePendingAmount(id, reductionCents, adjustment = {}, connection = db) {
+    const amountToReduce = toNumber(reductionCents);
+    if (amountToReduce <= 0) {
+      const row = await connection(TABLE).where({ id }).first();
+      return mapRow(row);
+    }
+
+    const row = await connection(TABLE).where({ id }).first();
+    if (!row) {
+      return null;
+    }
+
+    const currentTotal = toNumber(row.amount_cents);
+    const currentRecognized = toNumber(row.recognized_amount_cents);
+    const available = Math.max(0, currentTotal - currentRecognized);
+    if (available <= 0) {
+      return mapRow(row);
+    }
+
+    const applied = Math.min(available, amountToReduce);
+    if (applied <= 0) {
+      return mapRow(row);
+    }
+
+    const updatedMetadata = appendAdjustmentMetadata(row, {
+      ...adjustment,
+      type: adjustment.type ?? 'refund.deferred',
+      amountCents: applied
+    });
+
+    const updatedTotal = Math.max(0, currentTotal - applied);
+    const updatedRecognized = Math.min(currentRecognized, updatedTotal);
+    const updatedStatus = updatedTotal === 0 ? 'recognized' : row.status;
+
+    await connection(TABLE)
+      .where({ id })
+      .update({
+        amount_cents: updatedTotal,
+        recognized_amount_cents: updatedRecognized,
+        status: updatedStatus,
+        metadata: JSON.stringify(updatedMetadata),
+        updated_at: connection.fn.now()
+      });
+
+    const updatedRow = await connection(TABLE).where({ id }).first();
+    return mapRow(updatedRow);
   }
 
   static async sumDeferredBalance({ tenantId }, connection = db) {

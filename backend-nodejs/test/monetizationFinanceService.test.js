@@ -62,6 +62,7 @@ import {
   updateMonetizationCatalogMetrics,
   recordMonetizationUsage,
   recordRevenueRecognition,
+  recordRevenueReversal,
   updateDeferredRevenueBalance
 } from '../src/observability/metrics.js';
 
@@ -69,6 +70,7 @@ vi.mock('../src/observability/metrics.js', () => ({
   updateMonetizationCatalogMetrics: vi.fn(),
   recordMonetizationUsage: vi.fn(),
   recordRevenueRecognition: vi.fn(),
+  recordRevenueReversal: vi.fn(),
   updateDeferredRevenueBalance: vi.fn()
 }));
 
@@ -225,6 +227,89 @@ describe('MonetizationFinanceService', () => {
       expect.objectContaining({ productCode: 'growth', amountCents: 5000 })
     );
     expect(updateDeferredRevenueBalance).toHaveBeenCalledWith({ tenantId: 'global', balanceCents: 2000 });
+  });
+
+  it('processes refunds across recognized and deferred schedules', async () => {
+    const fakeTrx = {};
+    const recognizedSchedule = {
+      id: 41,
+      status: 'recognized',
+      recognizedAmountCents: 6000,
+      amountCents: 6000,
+      productCode: 'growth',
+      recognizedAt: '2025-03-04T00:00:00.000Z'
+    };
+    const pendingSchedule = {
+      id: 42,
+      status: 'pending',
+      recognizedAmountCents: 0,
+      amountCents: 4000,
+      productCode: 'starter',
+      recognitionStart: '2025-03-05T00:00:00.000Z'
+    };
+
+    vi.spyOn(MonetizationRevenueScheduleModel, 'listByPaymentIntent').mockResolvedValue([
+      recognizedSchedule,
+      pendingSchedule
+    ]);
+    vi.spyOn(MonetizationRevenueScheduleModel, 'reduceRecognizedAmount').mockResolvedValue({
+      ...recognizedSchedule,
+      amountCents: 0,
+      recognizedAmountCents: 0
+    });
+    vi.spyOn(MonetizationRevenueScheduleModel, 'reducePendingAmount').mockResolvedValue({
+      ...pendingSchedule,
+      amountCents: 3000
+    });
+    vi.spyOn(MonetizationRevenueScheduleModel, 'sumDeferredBalance').mockResolvedValue(3000);
+    vi.spyOn(PaymentLedgerEntryModel, 'record').mockResolvedValue();
+
+    const result = await MonetizationFinanceService.handleRefundProcessed(
+      {
+        paymentIntentId: 77,
+        amountCents: 7000,
+        currency: 'USD',
+        tenantId: 'tenant-a',
+        processedAt: '2025-03-10T00:00:00.000Z',
+        reason: 'customer_request',
+        refundReference: 're_123',
+        source: 'stripe-webhook'
+      },
+      fakeTrx
+    );
+
+    expect(MonetizationRevenueScheduleModel.reduceRecognizedAmount).toHaveBeenCalledWith(
+      41,
+      6000,
+      expect.objectContaining({ reason: 'customer_request', source: 'stripe-webhook' }),
+      fakeTrx
+    );
+    expect(MonetizationRevenueScheduleModel.reducePendingAmount).toHaveBeenCalledWith(
+      42,
+      1000,
+      expect.objectContaining({ reference: 're_123' }),
+      fakeTrx
+    );
+    expect(PaymentLedgerEntryModel.record).toHaveBeenCalledWith(
+      expect.objectContaining({ entryType: 'revenue.refund-recognized', amount: 6000 }),
+      fakeTrx
+    );
+    expect(PaymentLedgerEntryModel.record).toHaveBeenCalledWith(
+      expect.objectContaining({ entryType: 'revenue.refund-deferred', amount: 1000 }),
+      fakeTrx
+    );
+    expect(recordRevenueReversal).toHaveBeenCalledWith(
+      expect.objectContaining({ productCode: 'growth', amountCents: 6000 })
+    );
+    expect(updateDeferredRevenueBalance).toHaveBeenCalledWith({ tenantId: 'tenant-a', balanceCents: 3000 });
+    expect(result).toEqual({
+      status: 'processed',
+      adjustments: {
+        recognized: [{ scheduleId: 41, productCode: 'growth', amountCents: 6000 }],
+        deferred: [{ scheduleId: 42, productCode: 'starter', amountCents: 1000 }]
+      },
+      unappliedCents: 0
+    });
   });
 
   it('aggregates active tenants across monetization tables', async () => {

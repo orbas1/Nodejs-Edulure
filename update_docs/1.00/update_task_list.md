@@ -115,8 +115,8 @@ All tasks start at 0% completion and will be updated as implementation progresse
    Deploy ingestion pipelines, consent-aware schemas, dbt models, freshness monitoring, and lineage tracking.
 2. **BI and insight delivery** – 100%
    Rebuild dashboards, scorecards, experimentation tooling, and governance reviews for analytics accuracy.
-3. **Monetisation and finance reconciliation** – 70%
-   Complete payment/payout integrations, pricing catalogues, usage metering, and GAAP-compliant reporting pipelines.
+3. **Monetisation and finance reconciliation** – 100%
+   Completed payout integrations, catalog governance, refund-aware revenue recognition, ledger variance metrics, and automated GAAP reconciliation pipelines.
 4. **Documentation and enablement refresh** – 0%  
    Rewrite onboarding guides, API docs, support playbooks, training curricula, marketing collateral, and capability matrices.
 5. **Governance and stakeholder communications** – 0%  
