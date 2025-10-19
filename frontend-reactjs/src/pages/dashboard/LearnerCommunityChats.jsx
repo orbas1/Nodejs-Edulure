@@ -41,7 +41,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const channelDefaults = {
   name: '',
   slug: '',
-  channelType: 'text',
+  channelType: 'general',
   description: '',
   isDefault: false,
   metadata: {
@@ -73,23 +73,22 @@ function createChannelFormState() {
 }
 
 const presenceOptions = [
-  { value: 'available', label: 'Online · ready to collaborate' },
-  { value: 'focus', label: 'Focus mode · do not disturb' },
-  { value: 'away', label: 'Away · stepping out' }
+  { value: 'online', label: 'Online · ready to collaborate' },
+  { value: 'away', label: 'Away · stepping out' },
+  { value: 'offline', label: 'Offline · notifications only' }
 ];
 
 const channelTypeOptions = [
-  { value: 'text', label: 'Discussion' },
-  { value: 'broadcast', label: 'Broadcast announcements' },
-  { value: 'voice', label: 'Voice lounge' },
-  { value: 'live', label: 'Live session room' }
+  { value: 'general', label: 'General collaboration' },
+  { value: 'announcements', label: 'Announcements' },
+  { value: 'classroom', label: 'Classroom workshops' },
+  { value: 'events', label: 'Events & live sessions' },
+  { value: 'resources', label: 'Resource library' }
 ];
 
 const memberRoleOptions = [
   { value: 'member', label: 'Member' },
-  { value: 'moderator', label: 'Moderator' },
-  { value: 'host', label: 'Host' },
-  { value: 'speaker', label: 'Speaker' }
+  { value: 'moderator', label: 'Moderator' }
 ];
 
 const emojiPalette = ['👍', '🔥', '🎉', '💡', '❤️', '🙌', '👏'];
@@ -189,7 +188,7 @@ export default function LearnerCommunityChats() {
   const [messages, setMessages] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [messagesError, setMessagesError] = useState(null);
-  const [composer, setComposer] = useState({ body: '', messageType: 'standard', attachments: [] });
+  const [composer, setComposer] = useState({ body: '', messageType: 'text', attachments: [] });
   const [composerStatus, setComposerStatus] = useState(null);
   const [composerSending, setComposerSending] = useState(false);
 
@@ -356,7 +355,7 @@ export default function LearnerCommunityChats() {
       setChannelForm({
         name: details.name ?? '',
         slug: details.slug ?? '',
-        channelType: details.channelType ?? 'text',
+        channelType: details.channelType ?? 'general',
         description: details.description ?? '',
         isDefault: Boolean(details.isDefault),
         metadata: {
@@ -569,7 +568,7 @@ export default function LearnerCommunityChats() {
           payload
         });
         setComposerStatus({ type: 'success', message: 'Message delivered.' });
-        setComposer({ body: '', messageType: 'standard', attachments: [] });
+        setComposer({ body: '', messageType: 'text', attachments: [] });
         await loadMessages();
       } catch (error) {
         setComposerStatus({ type: 'error', message: error?.message ?? 'Unable to send message.' });
@@ -1207,8 +1206,8 @@ export default function LearnerCommunityChats() {
                       onChange={(event) => setComposer((prev) => ({ ...prev, messageType: event.target.value }))}
                       className="mt-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="standard">Standard update</option>
-                      <option value="announcement">Broadcast announcement</option>
+                      <option value="text">Text update</option>
+                      <option value="event">Event announcement</option>
                       <option value="live">Live session marker</option>
                     </select>
                   </label>
