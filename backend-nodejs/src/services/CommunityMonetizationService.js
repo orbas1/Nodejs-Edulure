@@ -10,6 +10,8 @@ import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
 import CommunityAffiliateModel from '../models/CommunityAffiliateModel.js';
 import CommunityAffiliatePayoutModel from '../models/CommunityAffiliatePayoutModel.js';
+import CommunityDonationModel from '../models/CommunityDonationModel.js';
+import CommunityEventModel from '../models/CommunityEventModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentService from './PaymentService.js';
@@ -290,7 +292,8 @@ export default class CommunityMonetizationService {
       metadata: {
         communityId: community.id,
         tierId: tier.id,
-        referralCode: affiliate?.referralCode ?? null
+        referralCode: affiliate?.referralCode ?? null,
+        affiliateId: affiliate?.id ?? null
       },
       entity: {
         id: subscriptionPublicId,
@@ -364,6 +367,140 @@ export default class CommunityMonetizationService {
     });
 
     return { payment, subscription };
+  }
+
+  static async createLiveDonation(communityIdentifier, userId, payload = {}) {
+    const community = await assertCommunity(communityIdentifier);
+    const membership = userId ? await CommunityMemberModel.findMembership(community.id, userId) : null;
+    if (community.visibility === 'private' && !membership) {
+      const error = new Error('Community is private');
+      error.status = 403;
+      throw error;
+    }
+
+    const provider = String(payload.provider ?? 'stripe').toLowerCase();
+    if (!['stripe', 'paypal'].includes(provider)) {
+      const error = new Error('Donations currently support Stripe or PayPal only');
+      error.status = 422;
+      throw error;
+    }
+
+    const amountCents = Number(payload.amountCents ?? payload.amount ?? 0);
+    if (!Number.isFinite(amountCents) || amountCents < 100) {
+      const error = new Error('A minimum donation of 100 cents is required');
+      error.status = 422;
+      throw error;
+    }
+
+    const currency = String(payload.currency ?? payload.currencyCode ?? 'USD').toUpperCase();
+
+    let event = null;
+    if (payload.eventId) {
+      event = await CommunityEventModel.findById(payload.eventId);
+      if (!event || event.communityId !== community.id) {
+        const error = new Error('Live event not found for this community');
+        error.status = 404;
+        throw error;
+      }
+    }
+
+    let affiliate = null;
+    if (payload.affiliateCode) {
+      affiliate = await CommunityAffiliateModel.findByReferralCode(payload.affiliateCode);
+      if (!affiliate || affiliate.communityId !== community.id || affiliate.status !== 'approved') {
+        const error = new Error('Affiliate code is invalid or inactive for this community');
+        error.status = 422;
+        throw error;
+      }
+    }
+
+    const donationReference = randomUUID();
+    const itemLabel = event ? `${event.title} Live Donation` : `${community.name} Live Donation`;
+    const description = event
+      ? `${community.name} • ${event.title}`
+      : `${community.name} community support`;
+    const donorName = payload.donorName ? String(payload.donorName).trim().slice(0, 120) : null;
+    const message = payload.message ? String(payload.message).trim().slice(0, 500) : null;
+
+    const payment = await PaymentService.createPaymentIntent({
+      userId,
+      provider,
+      currency,
+      items: [
+        {
+          id: `community-${community.id}-donation`,
+          name: itemLabel,
+          description,
+          unitAmount: amountCents,
+          quantity: 1,
+          metadata: {
+            communityId: community.id,
+            eventId: event?.id ?? null,
+            donationReference
+          }
+        }
+      ],
+      metadata: {
+        communityId: community.id,
+        eventId: event?.id ?? null,
+        referralCode: affiliate?.referralCode ?? null,
+        affiliateId: affiliate?.id ?? null,
+        donorId: userId ?? null,
+        donorName,
+        message,
+        donationReference
+      },
+      entity: {
+        id: donationReference,
+        type: 'community_live_donation',
+        name: itemLabel,
+        description
+      },
+      receiptEmail: payload.receiptEmail ?? null
+    });
+
+    const intent = await PaymentIntentModel.findByPublicId(payment.paymentId);
+
+    const donation = await CommunityDonationModel.create({
+      communityId: community.id,
+      eventId: event?.id ?? null,
+      paymentIntentId: intent.id,
+      userId: userId ?? null,
+      affiliateId: affiliate?.id ?? null,
+      amountCents,
+      currency,
+      status: 'pending',
+      referralCode: affiliate?.referralCode ?? (payload.affiliateCode ? String(payload.affiliateCode).toUpperCase() : null),
+      donorName,
+      message,
+      metadata: {
+        donationReference,
+        provider,
+        initiatedBy: userId ?? null
+      }
+    });
+
+    await DomainEventModel.record({
+      entityType: 'community_donation',
+      entityId: String(donation.id),
+      eventType: 'community.donation.initiated',
+      payload: {
+        communityId: community.id,
+        eventId: event?.id ?? null,
+        paymentIntentId: intent.id,
+        amountCents,
+        currency,
+        provider,
+        referralCode: donation.referralCode
+      },
+      performedBy: userId ?? null
+    });
+
+    return {
+      payment,
+      intent: intent ? PaymentService.toApiIntent(intent) : null,
+      donation
+    };
   }
 
   static async listSubscriptionsForUser(communityIdentifier, userId) {
