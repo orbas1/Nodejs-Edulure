@@ -13,12 +13,20 @@ const commissionTierSchema = Joi.object({
   rateBps: Joi.number().integer().min(0).max(5000)
 });
 
+const commissionCategorySchema = Joi.object({
+  rateBps: Joi.number().integer().min(0).max(5000),
+  minimumFeeCents: Joi.number().integer().min(0).max(10_000_000),
+  affiliateShare: Joi.number().min(0).max(1)
+});
+
 const monetizationUpdateSchema = Joi.object({
   commissions: Joi.object({
     enabled: Joi.boolean(),
     rateBps: Joi.number().integer().min(0).max(5000),
     minimumFeeCents: Joi.number().integer().min(0).max(10_000_000),
-    allowCommunityOverride: Joi.boolean()
+    allowCommunityOverride: Joi.boolean(),
+    default: commissionCategorySchema,
+    categories: Joi.object().pattern(Joi.string().max(60), commissionCategorySchema)
   }).optional(),
   subscriptions: Joi.object({
     enabled: Joi.boolean(),

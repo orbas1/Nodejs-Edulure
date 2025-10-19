@@ -10,6 +10,7 @@ import DomainEventModel from '../models/DomainEventModel.js';
 import AdsPlacementService from './AdsPlacementService.js';
 
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
+const RESOURCE_MANAGER_ROLES = new Set(['owner', 'admin', 'moderator']);
 const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 
 function isActiveMembership(membership) {
@@ -31,6 +32,13 @@ function canManageSponsorships(membership, actorRole) {
     isActiveMembership(membership) &&
     (membership?.role === 'owner' || membership?.role === 'admin' || membership?.role === 'moderator')
   );
+}
+
+function canManageResources(membership, actorRole) {
+  if (actorRole === 'admin') {
+    return true;
+  }
+  return isActiveMembership(membership) && RESOURCE_MANAGER_ROLES.has(membership?.role);
 }
 
 function normalisePlacementIds(value) {
@@ -344,7 +352,7 @@ export default class CommunityService {
     }
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
-    if (!isActiveMembership(membership) || !MODERATOR_ROLES.has(membership.role)) {
+    if (!canManageResources(membership, undefined)) {
       const error = new Error('You do not have permission to manage resources in this community');
       error.status = isActiveMembership(membership) ? 403 : 404;
       throw error;
@@ -400,6 +408,161 @@ export default class CommunityService {
     });
 
     return this.serializeResource(resource);
+  }
+
+  static async updateResource(communityIdentifier, resourceId, userId, payload) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!canManageResources(membership, undefined)) {
+      const error = new Error('You do not have permission to manage resources in this community');
+      error.status = isActiveMembership(membership) ? 403 : 404;
+      throw error;
+    }
+
+    const existing = await CommunityResourceModel.findById(resourceId);
+    if (!existing || existing.communityId !== community.id || existing.deletedAt) {
+      const error = new Error('Resource not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const nextStatus = payload.status ?? existing.status;
+    let nextPublishedAt = existing.publishedAt;
+    if (payload.publishedAt !== undefined) {
+      nextPublishedAt = payload.publishedAt;
+    } else if (payload.status && payload.status !== existing.status) {
+      nextPublishedAt = payload.status === 'published' ? existing.publishedAt ?? new Date() : null;
+    }
+
+    const updates = {};
+    if (payload.title !== undefined) {
+      updates.title = payload.title;
+    }
+    if (payload.description !== undefined) {
+      updates.description = payload.description;
+    }
+    if (payload.resourceType !== undefined) {
+      updates.resourceType = payload.resourceType;
+    }
+
+    const targetType = payload.resourceType ?? existing.resourceType;
+    if (payload.assetId !== undefined || payload.resourceType !== undefined) {
+      if (targetType === 'content_asset') {
+        updates.assetId = payload.assetId !== undefined ? payload.assetId : existing.assetId;
+      } else {
+        updates.assetId = null;
+      }
+    }
+    if (payload.linkUrl !== undefined || payload.resourceType !== undefined) {
+      if (targetType === 'content_asset') {
+        updates.linkUrl = null;
+      } else if (payload.linkUrl !== undefined) {
+        const trimmed = typeof payload.linkUrl === 'string' ? payload.linkUrl.trim() : payload.linkUrl;
+        updates.linkUrl = trimmed ? trimmed : null;
+      } else {
+        updates.linkUrl = existing.linkUrl;
+      }
+    }
+    if (payload.classroomReference !== undefined) {
+      const trimmed = typeof payload.classroomReference === 'string' ? payload.classroomReference.trim() : payload.classroomReference;
+      updates.classroomReference = trimmed || null;
+    }
+    if (payload.tags !== undefined) {
+      updates.tags = Array.isArray(payload.tags)
+        ? payload.tags.map((tag) => String(tag).trim()).filter(Boolean)
+        : [];
+    }
+    if (payload.metadata !== undefined) {
+      updates.metadata = typeof payload.metadata === 'object' && payload.metadata !== null ? payload.metadata : {};
+    }
+    if (payload.visibility !== undefined) {
+      updates.visibility = payload.visibility;
+    }
+
+    updates.status = nextStatus;
+    updates.publishedAt = nextPublishedAt;
+
+    const updated = await db.transaction(async (trx) => {
+      const saved = await CommunityResourceModel.update(resourceId, updates, trx);
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_resource',
+          entityId: saved.id,
+          eventType: 'community.resource.updated',
+          payload: { communityId: community.id, status: saved.status },
+          performedBy: userId
+        },
+        trx
+      );
+
+      if (existing.status !== saved.status) {
+        const eventType = saved.status === 'published'
+          ? 'community.resource.published'
+          : saved.status === 'archived'
+          ? 'community.resource.archived'
+          : 'community.resource.unpublished';
+        await DomainEventModel.record(
+          {
+            entityType: 'community_resource',
+            entityId: saved.id,
+            eventType,
+            payload: { communityId: community.id, previousStatus: existing.status, status: saved.status },
+            performedBy: userId
+          },
+          trx
+        );
+      }
+
+      return saved;
+    });
+
+    return this.serializeResource(updated);
+  }
+
+  static async deleteResource(communityIdentifier, resourceId, userId) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!canManageResources(membership, undefined)) {
+      const error = new Error('You do not have permission to manage resources in this community');
+      error.status = isActiveMembership(membership) ? 403 : 404;
+      throw error;
+    }
+
+    const existing = await CommunityResourceModel.findById(resourceId);
+    if (!existing || existing.communityId !== community.id || existing.deletedAt) {
+      const error = new Error('Resource not found');
+      error.status = 404;
+      throw error;
+    }
+
+    await db.transaction(async (trx) => {
+      await CommunityResourceModel.markDeleted(resourceId, trx);
+      await DomainEventModel.record(
+        {
+          entityType: 'community_resource',
+          entityId: resourceId,
+          eventType: 'community.resource.deleted',
+          payload: { communityId: community.id, previousStatus: existing.status },
+          performedBy: userId
+        },
+        trx
+      );
+    });
+
+    return { id: resourceId };
   }
 
   static async joinCommunity(communityIdentifier, userId) {
@@ -731,6 +894,7 @@ export default class CommunityService {
     const permissions = {
       canModeratePosts: canModerateMembership(membershipInfo, undefined),
       canManageSponsorships: canManageSponsorships(membershipInfo, undefined),
+      canManageResources: canManageResources(membershipInfo, undefined),
       canLeave: isActiveMembership(membershipInfo) && community.memberRole !== 'owner'
     };
 

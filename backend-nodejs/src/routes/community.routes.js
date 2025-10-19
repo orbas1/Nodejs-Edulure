@@ -23,6 +23,8 @@ router.get('/:communityId/sponsorships', auth(), CommunityController.listSponsor
 router.put('/:communityId/sponsorships', auth(), CommunityController.updateSponsorshipPlacements);
 router.get('/:communityId/resources', auth(), CommunityController.listResources);
 router.post('/:communityId/resources', auth(), CommunityController.createResource);
+router.put('/:communityId/resources/:resourceId', auth(), CommunityController.updateResource);
+router.delete('/:communityId/resources/:resourceId', auth(), CommunityController.deleteResource);
 
 router.get('/:communityId/chat/channels', auth(), CommunityChatController.listChannels);
 router.get(
@@ -109,6 +111,11 @@ router.post(
   '/:communityId/subscriptions/:subscriptionId/cancel',
   auth(),
   CommunityMonetizationController.cancelSubscription
+);
+router.post(
+  '/:communityId/live/donations',
+  auth(),
+  CommunityMonetizationController.createDonation
 );
 
 router.post(
