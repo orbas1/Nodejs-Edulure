@@ -15,6 +15,10 @@ import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import FeedCard from '../components/FeedCard.jsx';
 import CommunityInteractiveSuite from '../components/community/CommunityInteractiveSuite.jsx';
+import CommunityChatModule from '../components/community/CommunityChatModule.jsx';
+import CommunityMembersManager from '../components/community/CommunityMembersManager.jsx';
+import CommunityMap from '../components/community/CommunityMap.jsx';
+import CommunityAboutPanel from '../components/community/CommunityAboutPanel.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 
@@ -846,16 +850,6 @@ export default function Communities() {
   const communityPermissions = communityDetail?.permissions ?? {};
   const canLeaveCommunity = Boolean(communityPermissions.canLeave);
 
-  const joinCtaLabel = useMemo(() => {
-    if (resolvedDetail.membership?.status === 'active') {
-      return 'You are active in this community';
-    }
-    if (!canJoinCommunities) {
-      return 'Joining restricted by your role';
-    }
-    return 'Join this community';
-  }, [resolvedDetail.membership?.status, canJoinCommunities]);
-
   const liveClassroomSummary = resolvedDetail.classrooms.liveClassroom;
 
   if (!canAccessCommunityFeed) {
@@ -905,30 +899,9 @@ export default function Communities() {
                   onSelect={setSelectedCommunity}
                   disabled={isLoadingCommunities}
                 />
-                <button
-                  type="button"
-                  onClick={handleJoin}
-                  disabled={isJoining || resolvedDetail.membership?.status === 'active' || !canJoinCommunities}
-                  className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
-                >
-                  {isJoining ? 'Processing…' : joinCtaLabel}
-                </button>
-                {canLeaveCommunity && (
-                  <button
-                    type="button"
-                    onClick={handleLeave}
-                    disabled={isLeaving}
-                    className="inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-5 py-2 text-sm font-semibold text-rose-600 shadow-card transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
-                  >
-                    {isLeaving ? 'Leaving…' : 'Leave community'}
-                  </button>
-                )}
-                {joinError && (
-                  <p className="text-xs text-rose-600">{joinError}</p>
-                )}
-                {leaveError && (
-                  <p className="text-xs text-rose-600">{leaveError}</p>
-                )}
+                <p className="text-xs text-slate-500">
+                  Manage membership, joining, and community insights from the right-hand control panel.
+                </p>
               </div>
             </div>
             {communitiesError && (
@@ -942,8 +915,8 @@ export default function Communities() {
             )}
           </section>
 
-          <section className="grid gap-6 lg:grid-cols-5">
-            <div className="order-1 space-y-6 lg:order-none lg:col-span-3">
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),380px]">
+            <div className="space-y-6">
               <div className="rounded-4xl border border-slate-200 bg-white/80 p-6 shadow-xl">
                 <div className="flex flex-col gap-6 lg:flex-row">
                   <div className="lg:w-1/2">
@@ -1097,9 +1070,42 @@ export default function Communities() {
                 initialLeaderboard={interactiveSeeds.leaderboard}
                 initialEvents={interactiveSeeds.events}
               />
+
+              <CommunityChatModule
+                communityId={selectedCommunityId}
+                communityName={resolvedDetail.name}
+                viewerRole={resolvedDetail.membership?.role ?? role}
+                initialChannels={resolvedDetail.classrooms?.chatChannels}
+              />
+
+              <CommunityMembersManager
+                communityId={selectedCommunityId}
+                communityName={resolvedDetail.name}
+                initialMembers={communityDetail?.members}
+              />
+
+              <CommunityMap
+                communityId={selectedCommunityId}
+                communityName={resolvedDetail.name}
+                initialLocations={communityDetail?.locations}
+              />
             </div>
 
-            <aside className="space-y-6 lg:col-span-2">
+            <aside className="space-y-6 xl:w-[360px] xl:justify-self-end">
+              <CommunityAboutPanel
+                communityId={selectedCommunityId}
+                community={resolvedDetail}
+                leaderboard={resolvedDetail.leaderboard}
+                onJoin={handleJoin}
+                onLeave={canLeaveCommunity ? handleLeave : null}
+                isJoining={isJoining}
+                isLeaving={isLeaving}
+                joinError={joinError}
+                leaveError={leaveError}
+                canJoin={canJoinCommunities}
+                canLeave={canLeaveCommunity}
+              />
+
               <div
                 className="overflow-hidden rounded-4xl border border-slate-200 bg-cover bg-center shadow-xl"
                 style={{ backgroundImage: `url(${resolvedDetail.coverImageUrl})` }}
