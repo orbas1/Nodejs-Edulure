@@ -208,6 +208,18 @@ export const apiRouteMetadata = [
     disabledMessage: 'Governance APIs are restricted to programme administrators.'
   },
   {
+    name: 'release',
+    capability: 'release-management-automation',
+    description:
+      'Release readiness checklists, gate evaluations, and deployment dashboard APIs for platform operators.',
+    basePath: '/release',
+    flagKey: 'platform.api.v1.release',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Release orchestration APIs are restricted to platform operators.'
+  },
+  {
     name: 'dashboard',
     capability: 'operator-dashboard',
     description: 'Operational dashboards, incident insights, and governance endpoints.',

@@ -199,6 +199,24 @@ const governanceCommunicationScheduledCounter = new promClient.Counter({
   labelNames: ['audience', 'channel', 'status']
 });
 
+const releaseRunStatusGauge = new promClient.Gauge({
+  name: 'edulure_release_run_status',
+  help: 'Latest status flag for release readiness runs grouped by environment, status, and version tag',
+  labelNames: ['environment', 'status', 'version_tag']
+});
+
+const releaseReadinessScoreGauge = new promClient.Gauge({
+  name: 'edulure_release_readiness_score',
+  help: 'Readiness score for release runs grouped by environment and version tag',
+  labelNames: ['environment', 'version_tag']
+});
+
+const releaseGateEvaluationsTotal = new promClient.Counter({
+  name: 'edulure_release_gate_evaluations_total',
+  help: 'Release gate evaluation outcomes grouped by gate key, status, environment, and version tag',
+  labelNames: ['gate_key', 'status', 'environment', 'version_tag']
+});
+
 const governanceCommunicationStatusGauge = new promClient.Gauge({
   name: 'edulure_governance_communications_status',
   help: 'Governance communication totals grouped by status',
@@ -307,6 +325,9 @@ registry.registerMetric(governanceContractLifecycleGauge);
 registry.registerMetric(governanceVendorRiskGauge);
 registry.registerMetric(governanceCommunicationScheduledCounter);
 registry.registerMetric(governanceCommunicationStatusGauge);
+registry.registerMetric(releaseRunStatusGauge);
+registry.registerMetric(releaseReadinessScoreGauge);
+registry.registerMetric(releaseGateEvaluationsTotal);
 registry.registerMetric(telemetryIngestionEventsTotal);
 registry.registerMetric(telemetryExportEventsTotal);
 registry.registerMetric(telemetryExportDurationSeconds);
@@ -787,6 +808,53 @@ export function recordGovernanceCommunicationPerformance({ summary } = {}) {
       Number(summary.cancelledCommunications ?? 0)
     );
   }
+}
+
+const RELEASE_STATUSES = ['scheduled', 'in_progress', 'ready', 'blocked', 'cancelled', 'completed'];
+
+export function recordReleaseRunStatus({ status, environment, versionTag, readinessScore }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedEnvironment = environment ? String(environment) : env.environment?.name ?? 'unknown';
+  const normalizedVersion = versionTag ? String(versionTag) : 'unspecified';
+  const resolvedStatus = RELEASE_STATUSES.includes(status) ? status : 'scheduled';
+
+  for (const candidate of RELEASE_STATUSES) {
+    releaseRunStatusGauge.set(
+      { environment: normalizedEnvironment, status: candidate, version_tag: normalizedVersion },
+      candidate === resolvedStatus ? 1 : 0
+    );
+  }
+
+  if (Number.isFinite(readinessScore)) {
+    releaseReadinessScoreGauge.set(
+      { environment: normalizedEnvironment, version_tag: normalizedVersion },
+      Math.max(0, Math.min(100, readinessScore))
+    );
+  }
+}
+
+export function recordReleaseGateEvaluation({ gateKey, status, environment, versionTag }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedGate = gateKey ? String(gateKey) : 'unknown';
+  const normalizedStatus = status ?? 'pending';
+  const normalizedEnvironment = environment ? String(environment) : env.environment?.name ?? 'unknown';
+  const normalizedVersion = versionTag ? String(versionTag) : 'unspecified';
+
+  releaseGateEvaluationsTotal.inc(
+    {
+      gate_key: normalizedGate,
+      status: normalizedStatus,
+      environment: normalizedEnvironment,
+      version_tag: normalizedVersion
+    },
+    1
+  );
 }
 
 export function recordTelemetryIngestion({ scope, source, status }) {

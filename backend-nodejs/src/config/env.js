@@ -959,7 +959,15 @@ const envSchema = z
     ENVIRONMENT_ALLOWED_VPCS: z.string().optional(),
     ENVIRONMENT_ALLOWED_ACCOUNT_IDS: z.string().optional(),
     ENVIRONMENT_MANIFEST_PATH: z.string().optional(),
-    RELEASE_CHANNEL: z.string().min(3).default('rolling')
+    RELEASE_CHANNEL: z.string().min(3).default('rolling'),
+    RELEASE_REQUIRED_GATES: z.string().optional(),
+    RELEASE_MIN_COVERAGE: z.coerce.number().min(0).max(1).default(0.9),
+    RELEASE_MAX_TEST_FAILURE_RATE: z.coerce.number().min(0).max(1).default(0.02),
+    RELEASE_MAX_CRITICAL_VULNERABILITIES: z.coerce.number().int().min(0).default(0),
+    RELEASE_MAX_HIGH_VULNERABILITIES: z.coerce.number().int().min(0).default(5),
+    RELEASE_MAX_OPEN_INCIDENTS: z.coerce.number().int().min(0).default(0),
+    RELEASE_MAX_ERROR_RATE: z.coerce.number().min(0).max(1).default(0.01),
+    RELEASE_CHANGE_FREEZE_CRON: z.string().default('0 22 * * 5')
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -1146,6 +1154,31 @@ const environmentAllowedAccountIds = parseCsv(raw.ENVIRONMENT_ALLOWED_ACCOUNT_ID
 const environmentManifestPath = raw.ENVIRONMENT_MANIFEST_PATH
   ? path.resolve(projectRoot, raw.ENVIRONMENT_MANIFEST_PATH)
   : path.resolve(projectRoot, '..', 'infrastructure', 'environment-manifest.json');
+
+const releaseRequiredGates = (() => {
+  const gates = parseCsv(raw.RELEASE_REQUIRED_GATES ?? '');
+  if (gates.length) {
+    return gates;
+  }
+  return [
+    'quality-verification',
+    'security-review',
+    'observability-health',
+    'compliance-evidence',
+    'change-approval'
+  ];
+})();
+
+const releaseThresholds = {
+  minCoverage: raw.RELEASE_MIN_COVERAGE,
+  maxTestFailureRate: raw.RELEASE_MAX_TEST_FAILURE_RATE,
+  maxCriticalVulnerabilities: raw.RELEASE_MAX_CRITICAL_VULNERABILITIES,
+  maxHighVulnerabilities: raw.RELEASE_MAX_HIGH_VULNERABILITIES,
+  maxOpenIncidents: raw.RELEASE_MAX_OPEN_INCIDENTS,
+  maxErrorRate: raw.RELEASE_MAX_ERROR_RATE
+};
+
+const releaseChangeFreezeCron = raw.RELEASE_CHANGE_FREEZE_CRON;
 
 const dataEncryptionActiveKeyId = raw.DATA_ENCRYPTION_ACTIVE_KEY_ID ?? 'v1';
 const dataEncryptionPrimarySecret = raw.DATA_ENCRYPTION_PRIMARY_KEY ?? raw.JWT_REFRESH_SECRET;
@@ -1685,5 +1718,10 @@ export const env = {
       tool: raw.TELEMETRY_LINEAGE_TOOL,
       autoRecord: raw.TELEMETRY_LINEAGE_AUTO_RECORD
     }
+  },
+  release: {
+    requiredGates: releaseRequiredGates,
+    thresholds: releaseThresholds,
+    freezeWindowCron: releaseChangeFreezeCron
   }
 };

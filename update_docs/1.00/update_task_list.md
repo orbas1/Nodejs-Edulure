@@ -74,7 +74,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 5. **Mobile CI/CD and QA automation** – 100%
    Implement fastlane pipelines, automated screenshots, staged rollouts, widget/golden/integration tests, and rollback plans.
 
-## Task 4 (0%): Industrialise infrastructure, release management, and compliance operations
+## Task 4 (100%): Industrialise infrastructure, release management, and compliance operations
 
 #### Integration coverage
 - **Backend**: Enforce contract tests, observability, and deployment policies across services.
@@ -98,7 +98,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 5. **Security, compliance, and risk operations** – 100%
    Centralised the risk register, audit evidence lifecycle, continuity drills, and assessment scheduling with automated logging, analytics, and evidence capture to support compliance reviews.
 
-## Task 5 (60%): Deliver analytics, monetisation, documentation, and stakeholder enablement
+## Task 5 (100%): Deliver analytics, monetisation, documentation, and stakeholder enablement
 
 #### Integration coverage
 - **Backend**: Emit structured telemetry, monetisation events, and contract metadata for downstream analytics.

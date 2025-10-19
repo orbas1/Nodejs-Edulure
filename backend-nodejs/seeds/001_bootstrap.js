@@ -130,6 +130,9 @@ export async function seed(knex) {
     await trx('telemetry_events').del();
     await trx('telemetry_event_batches').del();
     await trx('telemetry_consent_ledger').del();
+    await trx('release_gate_results').del();
+    await trx('release_runs').del();
+    await trx('release_checklist_items').del();
     await trx('domain_event_dispatch_queue').del();
     await trx('domain_events').del();
     await trx('security_incidents').del();
@@ -3478,6 +3481,193 @@ export async function seed(knex) {
           { name: 'migration-checklist', url: 'https://cdn.edulure.com/providers/migration-checklist.pdf' }
         ]),
         metadata: JSON.stringify({ cadence: 'biweekly' })
+      }
+    ]);
+
+    const releaseChecklistEntries = [
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'quality-verification',
+        category: 'quality',
+        title: 'Quality assurance sign-off',
+        description:
+          'CI pipelines must report stable automated testing with coverage above 90% and failure rate below 2%.',
+        auto_evaluated: true,
+        weight: 3,
+        default_owner_email: 'qa@edulure.com',
+        success_criteria: JSON.stringify({ minCoverage: 0.9, maxFailureRate: 0.02 })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'security-review',
+        category: 'security',
+        title: 'Security review with zero critical findings',
+        description: 'Vulnerability scans must report zero critical issues and fewer than five high-severity findings.',
+        auto_evaluated: true,
+        weight: 3,
+        default_owner_email: 'security@edulure.com',
+        success_criteria: JSON.stringify({ maxCriticalVulnerabilities: 0, maxHighVulnerabilities: 5 })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'observability-health',
+        category: 'observability',
+        title: 'Observability and incident health check',
+        description: 'No live incidents may be open and error rate must remain below 1% across the change window.',
+        auto_evaluated: true,
+        weight: 2,
+        default_owner_email: 'sre@edulure.com',
+        success_criteria: JSON.stringify({ maxOpenIncidents: 0, maxErrorRate: 0.01 })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'compliance-evidence',
+        category: 'compliance',
+        title: 'Compliance evidence packaged',
+        description: 'SOC 2, ISO 27001, and privacy change reviews must be uploaded to the evidence vault.',
+        auto_evaluated: false,
+        weight: 2,
+        default_owner_email: 'compliance@edulure.com',
+        success_criteria: JSON.stringify({ requiredEvidence: ['soc2-signoff', 'privacy-review'] })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'change-approval',
+        category: 'change_management',
+        title: 'Change advisory board approval',
+        description:
+          'Change ticket must be approved, change review completed, and deployment must respect the freeze calendar.',
+        auto_evaluated: true,
+        weight: 2,
+        default_owner_email: 'release@edulure.com',
+        success_criteria: JSON.stringify({ changeReviewRequired: true, freezeWindowCheck: true })
+      }
+    ];
+
+    await trx('release_checklist_items').insert(releaseChecklistEntries);
+
+    const releaseChecklistSnapshot = releaseChecklistEntries.map((item) => ({
+      id: item.id ?? null,
+      publicId: item.public_id,
+      slug: item.slug,
+      category: item.category,
+      title: item.title,
+      description: item.description,
+      autoEvaluated: item.auto_evaluated,
+      weight: item.weight,
+      defaultOwnerEmail: item.default_owner_email,
+      successCriteria: JSON.parse(item.success_criteria)
+    }));
+
+    const releaseRunPublicId = crypto.randomUUID();
+    const releaseRunMetadata = {
+      requiredGates: [
+        'quality-verification',
+        'security-review',
+        'observability-health',
+        'compliance-evidence',
+        'change-approval'
+      ],
+      thresholds: {
+        minCoverage: 0.9,
+        maxTestFailureRate: 0.02,
+        maxCriticalVulnerabilities: 0,
+        maxHighVulnerabilities: 5,
+        maxOpenIncidents: 0,
+        maxErrorRate: 0.01
+      },
+      readinessScore: 68,
+      changeTicket: 'CHG-2048'
+    };
+
+    await trx('release_runs').insert({
+      public_id: releaseRunPublicId,
+      version_tag: 'v1.0.0-rc.5',
+      environment: 'staging',
+      status: 'in_progress',
+      initiated_by_email: 'helena.brooks@edulure.com',
+      initiated_by_name: 'Helena Brooks',
+      scheduled_at: trx.fn.now(),
+      started_at: trx.fn.now(),
+      completed_at: null,
+      change_window_start: '2025-04-18T18:00:00.000Z',
+      change_window_end: '2025-04-18T19:00:00.000Z',
+      summary_notes: 'Readiness rehearsal for Version 1.00 production cut-over.',
+      checklist_snapshot: JSON.stringify(releaseChecklistSnapshot),
+      metadata: JSON.stringify(releaseRunMetadata)
+    });
+
+    const releaseRun = await trx('release_runs')
+      .select('id')
+      .where({ public_id: releaseRunPublicId })
+      .first();
+
+    const releaseChecklistRows = await trx('release_checklist_items')
+      .select('id', 'slug')
+      .whereIn('slug', releaseRunMetadata.requiredGates);
+
+    const gateLookup = new Map(releaseChecklistRows.map((row) => [row.slug, row.id]));
+
+    await trx('release_gate_results').insert([
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('quality-verification'),
+        gate_key: 'quality-verification',
+        status: 'pass',
+        owner_email: 'qa@edulure.com',
+        metrics: JSON.stringify({ coverage: 0.92, testFailureRate: 0.01 }),
+        notes: 'Vitest, Cypress, and contract suites passed on the latest build.',
+        evidence_url: 'https://ci.edulure.com/jobs/qa/v1.0.0-rc.5',
+        last_evaluated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('security-review'),
+        gate_key: 'security-review',
+        status: 'in_progress',
+        owner_email: 'security@edulure.com',
+        metrics: JSON.stringify({ criticalVulnerabilities: 0, highVulnerabilities: 3 }),
+        notes: 'Awaiting verification that backlog high findings are mitigated.',
+        evidence_url: 'https://security.edulure.com/vuln/summary',
+        last_evaluated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('observability-health'),
+        gate_key: 'observability-health',
+        status: 'pass',
+        owner_email: 'sre@edulure.com',
+        metrics: JSON.stringify({ openIncidents: 0, errorRate: 0.004 }),
+        notes: 'SLO dashboards green for the last 24 hours.',
+        evidence_url: 'https://observability.edulure.com/releases/v1.0.0-rc.5',
+        last_evaluated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('compliance-evidence'),
+        gate_key: 'compliance-evidence',
+        status: 'pending',
+        owner_email: 'compliance@edulure.com',
+        metrics: JSON.stringify({ evidence: ['soc2-signoff'] }),
+        notes: 'Privacy review pending final DPO sign-off.',
+        evidence_url: 'https://compliance.edulure.com/evidence/v1.0.0-rc.5',
+        last_evaluated_at: null
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('change-approval'),
+        gate_key: 'change-approval',
+        status: 'in_progress',
+        owner_email: 'release@edulure.com',
+        metrics: JSON.stringify({ changeReviewCompleted: true, freezeWindowBypassed: false }),
+        notes: 'Change advisory board met, awaiting CAB minutes upload.',
+        evidence_url: 'https://change.edulure.com/tickets/CHG-2048',
+        last_evaluated_at: trx.fn.now()
       }
     ]);
 

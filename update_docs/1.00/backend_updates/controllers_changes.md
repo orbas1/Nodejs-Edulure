@@ -6,5 +6,6 @@
 - Added `BusinessIntelligenceController` to expose the `/analytics/bi/executive-overview` endpoint with tenant-aware range parsing and `StandardResponse` envelopes. 【F:backend-nodejs/src/controllers/BusinessIntelligenceController.js†L1-L26】
 - Added `EnablementController` with admin-authenticated article listing, detail, capability matrix, and reindex endpoints so programme owners and operator tooling can consume the refreshed enablement knowledge base over the API. 【F:backend-nodejs/src/controllers/EnablementController.js†L1-L78】
 - Added `GovernanceController` with admin-protected overview, contract lifecycle, vendor assessment, review cycle, and communication endpoints so programme owners can steer governance cadences and stakeholder messaging from the API surface. 【F:backend-nodejs/src/controllers/GovernanceController.js†L1-L164】
+- Added `ReleaseManagementController` to surface checklist listings, run scheduling, gate evaluation, readiness assessments, and dashboard payloads for release engineers with audited envelopes. 【F:backend-nodejs/src/controllers/ReleaseManagementController.js†L1-L139】
 
 - Wrapped `AdminMonetizationController` responses in the standard `{ success, message, data, meta }` envelope and enriched pagination metadata so operator tooling consumes consistent contracts across catalog, usage, schedules, and reconciliation APIs.
