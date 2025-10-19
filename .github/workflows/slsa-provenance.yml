@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-provenance:
     name: Build provenance attestation
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
       base64-subject: true
       upload-assets: true
