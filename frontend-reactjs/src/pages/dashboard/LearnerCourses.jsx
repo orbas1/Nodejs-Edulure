@@ -1,11 +1,18 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { syncCourseGoal, syncCourseCalendar } from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerCourses() {
-  const { isLearner, section: data, refresh } = useLearnerDashboardSection('courses');
+  const { isLearner, section: data, refresh, refreshAfterAction } = useLearnerDashboardSection('courses');
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
   const navigate = useNavigate();
+  const [status, setStatus] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
 
   if (!isLearner) {
     return (
@@ -31,6 +38,62 @@ export default function LearnerCourses() {
   const active = data.active ?? [];
   const recommendations = data.recommendations ?? [];
 
+  const handleAddGoal = async () => {
+    if (!token) {
+      setStatus({ type: 'error', message: 'Sign in to add a personalised learning goal.' });
+      return;
+    }
+    setPendingAction('goal');
+    setStatus({ type: 'pending', message: 'Syncing your learning goal…' });
+    try {
+      const result = await refreshAfterAction(() =>
+        syncCourseGoal({
+          token,
+          payload: {
+            title: 'Stay on pace for graduation',
+            description: 'Complete current cohort milestones on schedule',
+            targetDate: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString()
+          }
+        })
+      );
+      const goalTitle = result?.goal?.title ?? 'Learning goal';
+      setStatus({ type: 'success', message: `${goalTitle} synced successfully.` });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to sync your goal right now.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
+  const handleSyncCalendar = async () => {
+    if (!token) {
+      setStatus({ type: 'error', message: 'Sign in to sync your learning calendar.' });
+      return;
+    }
+    setPendingAction('calendar');
+    setStatus({ type: 'pending', message: 'Connecting your learning calendar…' });
+    try {
+      const result = await refreshAfterAction(() =>
+        syncCourseCalendar({
+          token,
+          payload: { provider: 'google', calendarId: 'primary' }
+        })
+      );
+      const provider = result?.provider ?? 'calendar';
+      setStatus({ type: 'success', message: `Calendar synced with ${provider}.` });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to sync your calendar right now.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -41,14 +104,42 @@ export default function LearnerCourses() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button type="button" className="dashboard-primary-pill">
-            Add learning goal
+          <button
+            type="button"
+            className="dashboard-primary-pill"
+            onClick={handleAddGoal}
+            disabled={pendingAction === 'goal'}
+            aria-busy={pendingAction === 'goal'}
+          >
+            {pendingAction === 'goal' ? 'Syncing…' : 'Add learning goal'}
           </button>
-          <button type="button" className="dashboard-pill">
-            Sync calendar
+          <button
+            type="button"
+            className="dashboard-pill"
+            onClick={handleSyncCalendar}
+            disabled={pendingAction === 'calendar'}
+            aria-busy={pendingAction === 'calendar'}
+          >
+            {pendingAction === 'calendar' ? 'Connecting…' : 'Sync calendar'}
           </button>
         </div>
       </div>
+
+      {status ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            status.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : status.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {status.message}
+        </div>
+      ) : null}
 
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Active programs</h2>

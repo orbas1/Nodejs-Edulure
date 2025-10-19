@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { createEbookPurchaseIntent, listMarketplaceEbooks } from '../../api/ebookApi.js';
+import { resumeEbook, shareEbookHighlight } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
@@ -85,7 +86,7 @@ MarketplaceCard.defaultProps = {
 };
 
 export default function LearnerEbooks() {
-  const { isLearner, section: ebooks, refresh } = useLearnerDashboardSection('ebooks');
+  const { isLearner, section: ebooks, refresh, refreshAfterAction } = useLearnerDashboardSection('ebooks');
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
 
@@ -95,6 +96,8 @@ export default function LearnerEbooks() {
   const [marketplaceError, setMarketplaceError] = useState(null);
   const [purchaseStatus, setPurchaseStatus] = useState(null);
   const [pendingPurchaseId, setPendingPurchaseId] = useState(null);
+  const [libraryStatus, setLibraryStatus] = useState(null);
+  const [libraryPending, setLibraryPending] = useState({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -167,6 +170,74 @@ export default function LearnerEbooks() {
     [token]
   );
 
+  const handleResume = useCallback(
+    async (ebook) => {
+      if (!token) {
+        setLibraryStatus({ type: 'error', message: 'Sign in to continue this e-book.' });
+        return;
+      }
+      setLibraryPending((prev) => ({ ...prev, [ebook.id]: 'resume' }));
+      setLibraryStatus({ type: 'pending', message: `Reopening ${ebook.title}…` });
+      try {
+        const result = await refreshAfterAction(() =>
+          resumeEbook({
+            token,
+            ebookId: ebook.id,
+            payload: { chapter: 'latest', percentage: ebook.progress ?? 0 }
+          })
+        );
+        const chapter = result?.resumeFrom?.chapter ?? 'your latest spot';
+        setLibraryStatus({ type: 'success', message: `${ebook.title} ready from ${chapter}.` });
+      } catch (error) {
+        setLibraryStatus({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unable to resume your e-book right now.'
+        });
+      } finally {
+        setLibraryPending((prev) => {
+          const next = { ...prev };
+          delete next[ebook.id];
+          return next;
+        });
+      }
+    },
+    [token, refreshAfterAction]
+  );
+
+  const handleShare = useCallback(
+    async (ebook) => {
+      if (!token) {
+        setLibraryStatus({ type: 'error', message: 'Sign in to share highlights with your mentors.' });
+        return;
+      }
+      setLibraryPending((prev) => ({ ...prev, [ebook.id]: 'share' }));
+      setLibraryStatus({ type: 'pending', message: `Sharing highlights from ${ebook.title}…` });
+      try {
+        const result = await refreshAfterAction(() =>
+          shareEbookHighlight({
+            token,
+            ebookId: ebook.id,
+            payload: { recipients: ['mentor@edulure.com'] }
+          })
+        );
+        const link = result?.shareUrl ?? 'share link';
+        setLibraryStatus({ type: 'success', message: `Highlights shared. Send the recap using ${link}.` });
+      } catch (error) {
+        setLibraryStatus({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unable to share highlights right now.'
+        });
+      } finally {
+        setLibraryPending((prev) => {
+          const next = { ...prev };
+          delete next[ebook.id];
+          return next;
+        });
+      }
+    },
+    [token, refreshAfterAction]
+  );
+
   if (!isLearner) {
     return (
       <DashboardStateMessage
@@ -236,11 +307,23 @@ export default function LearnerEbooks() {
                   </div>
                   <p className="mt-3 text-xs text-slate-500">{ebook.progress}% complete</p>
                   <div className="mt-4 flex items-center gap-3 text-xs text-slate-600">
-                    <button type="button" className="dashboard-pill px-3 py-1">
-                      Continue reading
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handleResume(ebook)}
+                      disabled={libraryPending[ebook.id] === 'resume'}
+                      aria-busy={libraryPending[ebook.id] === 'resume'}
+                    >
+                      {libraryPending[ebook.id] === 'resume' ? 'Loading…' : 'Continue reading'}
                     </button>
-                    <button type="button" className="dashboard-pill px-3 py-1">
-                      Share highlight
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handleShare(ebook)}
+                      disabled={libraryPending[ebook.id] === 'share'}
+                      aria-busy={libraryPending[ebook.id] === 'share'}
+                    >
+                      {libraryPending[ebook.id] === 'share' ? 'Sharing…' : 'Share highlight'}
                     </button>
                   </div>
                 </div>
@@ -368,8 +451,24 @@ export default function LearnerEbooks() {
               {purchaseStatus.message}
             </div>
           ) : null}
+
         </section>
       )}
+      {libraryStatus ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            libraryStatus.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : libraryStatus.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {libraryStatus.message}
+        </div>
+      ) : null}
     </div>
   );
 }

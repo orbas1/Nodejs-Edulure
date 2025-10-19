@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 function normaliseOutletContext(context) {
@@ -11,6 +11,39 @@ function normaliseOutletContext(context) {
   const dashboard = context.dashboard && typeof context.dashboard === 'object' ? context.dashboard : null;
 
   return { role, dashboard, refresh };
+}
+
+function toPathSegments(sectionKey) {
+  if (!sectionKey && sectionKey !== 0) return [];
+  if (Array.isArray(sectionKey)) {
+    return sectionKey
+      .map((segment) => (typeof segment === 'string' ? segment.trim() : segment))
+      .filter((segment) => segment !== undefined && segment !== null && `${segment}`.length > 0);
+  }
+  if (typeof sectionKey === 'string') {
+    return sectionKey
+      .split('.')
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0);
+  }
+  return [`${sectionKey}`];
+}
+
+function resolveSectionValue(dashboard, sectionKey) {
+  if (!dashboard || !sectionKey) return dashboard ?? null;
+  const segments = toPathSegments(sectionKey);
+  if (segments.length === 0) {
+    return dashboard ?? null;
+  }
+  let value = dashboard;
+  for (const segment of segments) {
+    if (value && typeof value === 'object' && segment in value) {
+      value = value[segment];
+    } else {
+      return null;
+    }
+  }
+  return value ?? null;
 }
 
 export function useLearnerDashboardContext() {
@@ -33,13 +66,26 @@ export function useLearnerDashboardSection(sectionKey) {
   const { role, isLearner, dashboard, refresh } = useLearnerDashboardContext();
 
   const section = useMemo(() => {
-    if (!dashboard || !sectionKey) return dashboard;
-    const value = dashboard?.[sectionKey];
+    const value = resolveSectionValue(dashboard, sectionKey);
     if (Array.isArray(value)) {
       return value.length > 0 ? value : [];
     }
     return value ?? null;
   }, [dashboard, sectionKey]);
+
+  const refreshAfterAction = useCallback(
+    async (mutation) => {
+      if (typeof mutation !== 'function') {
+        throw new Error('A mutation callback is required to refresh learner data');
+      }
+      const result = await mutation();
+      if (typeof refresh === 'function') {
+        await Promise.resolve(refresh());
+      }
+      return result;
+    },
+    [refresh]
+  );
 
   return useMemo(
     () => ({
@@ -47,9 +93,10 @@ export function useLearnerDashboardSection(sectionKey) {
       isLearner,
       dashboard,
       section,
-      refresh
+      refresh,
+      refreshAfterAction
     }),
-    [role, isLearner, dashboard, section, refresh]
+    [role, isLearner, dashboard, section, refresh, refreshAfterAction]
   );
 }
 

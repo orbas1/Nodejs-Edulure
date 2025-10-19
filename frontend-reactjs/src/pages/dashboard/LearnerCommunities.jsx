@@ -1,9 +1,25 @@
+import { useState } from 'react';
+
 import DashboardSectionHeader from '../../components/dashboard/DashboardSectionHeader.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import {
+  createCommunityInitiative,
+  exportCommunityHealthReport,
+  createCommunityPipelineStage
+} from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerCommunities() {
-  const { isLearner, section: data, refresh } = useLearnerDashboardSection('communities');
+  const { isLearner, section: data, refresh, refreshAfterAction } = useLearnerDashboardSection('communities');
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+  const [status, setStatus] = useState(null);
+  const [pendingGlobal, setPendingGlobal] = useState(false);
+  const [communityStatus, setCommunityStatus] = useState({});
+  const [pendingCommunities, setPendingCommunities] = useState({});
+  const [pipelineStatus, setPipelineStatus] = useState(null);
+  const [pendingPipeline, setPendingPipeline] = useState(false);
 
   if (!isLearner) {
     return (
@@ -29,6 +45,109 @@ export default function LearnerCommunities() {
   const managed = data.managed ?? [];
   const pipelines = data.pipelines ?? [];
 
+  const handleCreateInitiative = async () => {
+    if (!token) {
+      setStatus({ type: 'error', message: 'Sign in to launch a new community initiative.' });
+      return;
+    }
+    if (managed.length === 0) {
+      setStatus({ type: 'error', message: 'You need at least one community to create initiatives.' });
+      return;
+    }
+    setPendingGlobal(true);
+    setStatus({ type: 'pending', message: 'Creating community initiative…' });
+    try {
+      const community = managed[0];
+      const result = await refreshAfterAction(() =>
+        createCommunityInitiative({
+          token,
+          communityId: community.id,
+          payload: { title: 'Learner-led spotlight series' }
+        })
+      );
+      const initiativeId = result?.initiative?.id ?? 'initiative';
+      setStatus({
+        type: 'success',
+        message: `Initiative ${initiativeId} created for ${community.name}.`
+      });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to create the initiative right now.'
+      });
+    } finally {
+      setPendingGlobal(false);
+    }
+  };
+
+  const handleExportHealth = async (community) => {
+    if (!token) {
+      setCommunityStatus((prev) => ({
+        ...prev,
+        [community.id]: { type: 'error', message: 'Sign in to export community health reports.' }
+      }));
+      return;
+    }
+    setPendingCommunities((prev) => ({ ...prev, [community.id]: true }));
+    setCommunityStatus((prev) => ({
+      ...prev,
+      [community.id]: { type: 'pending', message: 'Generating health report…' }
+    }));
+    try {
+      const result = await refreshAfterAction(() =>
+        exportCommunityHealthReport({ token, communityId: community.id })
+      );
+      const url = result?.exportUrl ?? 'report link';
+      setCommunityStatus((prev) => ({
+        ...prev,
+        [community.id]: { type: 'success', message: `Report ready: ${url}` }
+      }));
+    } catch (error) {
+      setCommunityStatus((prev) => ({
+        ...prev,
+        [community.id]: {
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unable to export the health report.'
+        }
+      }));
+    } finally {
+      setPendingCommunities((prev) => {
+        const next = { ...prev };
+        delete next[community.id];
+        return next;
+      });
+    }
+  };
+
+  const handleAddPipelineStage = async () => {
+    if (!token) {
+      setPipelineStatus({ type: 'error', message: 'Sign in to add pipeline stages.' });
+      return;
+    }
+    setPendingPipeline(true);
+    setPipelineStatus({ type: 'pending', message: 'Creating new pipeline stage…' });
+    try {
+      const result = await refreshAfterAction(() =>
+        createCommunityPipelineStage({
+          token,
+          payload: {
+            pipelineId: pipelines[0]?.id ?? 'pipeline-dashboard',
+            title: 'Learner advocacy push'
+          }
+        })
+      );
+      const stageId = result?.pipelineStage?.id ?? 'stage';
+      setPipelineStatus({ type: 'success', message: `Pipeline stage ${stageId} added.` });
+    } catch (error) {
+      setPipelineStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to create the pipeline stage right now.'
+      });
+    } finally {
+      setPendingPipeline(false);
+    }
+  };
+
   return (
     <div className="space-y-10">
       <DashboardSectionHeader
@@ -40,12 +159,34 @@ export default function LearnerCommunities() {
             <button type="button" className="dashboard-pill px-4 py-2">
               View playbooks
             </button>
-            <button type="button" className="dashboard-primary-pill">
-              Create new initiative
+            <button
+              type="button"
+              className="dashboard-primary-pill"
+              onClick={handleCreateInitiative}
+              disabled={pendingGlobal}
+              aria-busy={pendingGlobal}
+            >
+              {pendingGlobal ? 'Creating…' : 'Create new initiative'}
             </button>
           </>
         }
       />
+
+      {status ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            status.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : status.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {status.message}
+        </div>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-2">
         {managed.length === 0 ? (
@@ -83,10 +224,31 @@ export default function LearnerCommunities() {
               <button type="button" className="dashboard-pill px-3 py-1">
                 Automations
               </button>
-              <button type="button" className="dashboard-pill px-3 py-1">
-                Export health report
+              <button
+                type="button"
+                className="dashboard-pill px-3 py-1"
+                onClick={() => handleExportHealth(community)}
+                disabled={pendingCommunities[community.id]}
+                aria-busy={pendingCommunities[community.id]}
+              >
+                {pendingCommunities[community.id] ? 'Exporting…' : 'Export health report'}
               </button>
             </div>
+            {communityStatus[community.id] ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className={`rounded-2xl border px-4 py-3 text-xs ${
+                  communityStatus[community.id].type === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    : communityStatus[community.id].type === 'error'
+                      ? 'border-rose-200 bg-rose-50 text-rose-700'
+                      : 'border-primary/20 bg-primary/5 text-primary'
+                }`}
+              >
+                {communityStatus[community.id].message}
+              </div>
+            ) : null}
           </div>
         ))}
       </section>
@@ -99,10 +261,31 @@ export default function LearnerCommunities() {
               Every ongoing community operation with the current owner, risk posture, and execution velocity.
             </p>
           </div>
-          <button type="button" className="dashboard-primary-pill">
-            Add pipeline stage
+          <button
+            type="button"
+            className="dashboard-primary-pill"
+            onClick={handleAddPipelineStage}
+            disabled={pendingPipeline}
+            aria-busy={pendingPipeline}
+          >
+            {pendingPipeline ? 'Adding…' : 'Add pipeline stage'}
           </button>
         </div>
+        {pipelineStatus ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`rounded-3xl border px-5 py-4 text-sm ${
+              pipelineStatus.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : pipelineStatus.type === 'error'
+                  ? 'border-rose-200 bg-rose-50 text-rose-700'
+                  : 'border-primary/20 bg-primary/5 text-primary'
+            }`}
+          >
+            {pipelineStatus.message}
+          </div>
+        ) : null}
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {pipelines.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-6 text-sm text-slate-600">

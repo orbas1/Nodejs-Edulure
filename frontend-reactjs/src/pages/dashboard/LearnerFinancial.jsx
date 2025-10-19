@@ -1,8 +1,16 @@
+import { useMemo, useState } from 'react';
+
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { downloadBillingStatement } from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 export default function LearnerFinancial() {
-  const { isLearner, section: financial, refresh } = useLearnerDashboardSection('financial');
+  const { isLearner, section: financial, refresh, refreshAfterAction } = useLearnerDashboardSection('financial');
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+  const [status, setStatus] = useState(null);
+  const [pending, setPending] = useState(false);
 
   if (!isLearner) {
     return (
@@ -25,8 +33,39 @@ export default function LearnerFinancial() {
     );
   }
 
-  const summary = financial.summary ?? [];
-  const invoices = financial.invoices ?? [];
+  const summary = useMemo(() => financial.summary ?? [], [financial.summary]);
+  const invoices = useMemo(() => financial.invoices ?? [], [financial.invoices]);
+
+  const handleDownloadStatement = async () => {
+    if (!token) {
+      setStatus({ type: 'error', message: 'Sign in to download your billing statements.' });
+      return;
+    }
+    if (invoices.length === 0) {
+      setStatus({ type: 'error', message: 'No invoices available to download yet.' });
+      return;
+    }
+    const invoiceId = invoices[0]?.id;
+    setPending(true);
+    setStatus({ type: 'pending', message: 'Preparing your latest billing statement…' });
+    try {
+      const result = await refreshAfterAction(() =>
+        downloadBillingStatement({
+          token,
+          invoiceId
+        })
+      );
+      const url = result?.downloadUrl ?? 'your download link';
+      setStatus({ type: 'success', message: `Statement ready. Retrieve it from ${url}.` });
+    } catch (error) {
+      setStatus({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to download the statement right now.'
+      });
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -35,10 +74,32 @@ export default function LearnerFinancial() {
           <h1 className="dashboard-title">Financial overview</h1>
           <p className="dashboard-subtitle">Track course investments, mentorship credits, and scholarships.</p>
         </div>
-        <button type="button" className="dashboard-primary-pill">
-          Download statement
+        <button
+          type="button"
+          className="dashboard-primary-pill"
+          onClick={handleDownloadStatement}
+          disabled={pending}
+          aria-busy={pending}
+        >
+          {pending ? 'Preparing…' : 'Download statement'}
         </button>
       </div>
+
+      {status ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            status.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : status.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {status.message}
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         {summary.map((item) => (

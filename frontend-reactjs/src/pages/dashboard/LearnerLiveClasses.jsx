@@ -1,15 +1,10 @@
-import {
-  CalendarDaysIcon,
-  CheckCircleIcon,
-  ClockIcon,
-  ExclamationTriangleIcon,
-  ShieldCheckIcon,
-  SparklesIcon,
-  UsersIcon
-} from '@heroicons/react/24/outline';
-import { useOutletContext } from 'react-router-dom';
+import { ClockIcon, ShieldCheckIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { joinLiveSession, checkInLiveSession } from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
 function ReadinessBadge({ status }) {
   const base = 'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide';
@@ -22,7 +17,7 @@ function ReadinessBadge({ status }) {
   return <span className={`${base} bg-rose-100 text-rose-700`}>Action</span>;
 }
 
-function SessionCard({ session }) {
+function SessionCard({ session, onAction, pendingAction, statusMessage }) {
   const occupancy = session.occupancy ?? {};
   const occupancyLabel = occupancy.capacity
     ? `${occupancy.reserved ?? 0}/${occupancy.capacity} seats`
@@ -63,14 +58,16 @@ function SessionCard({ session }) {
           {action && (
             <button
               type="button"
-              disabled={action.enabled === false}
+              onClick={() => onAction?.(session)}
+              disabled={action.enabled === false || !!pendingAction}
+              aria-busy={!!pendingAction}
               className={`rounded-full px-4 py-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                 action.action === 'join' || action.action === 'check-in'
                   ? 'bg-primary text-white shadow-sm hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500'
                   : 'border border-slate-200 text-slate-700 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400'
               }`}
             >
-              {action.label}
+              {pendingAction ? `${action.label}…` : action.label}
             </button>
           )}
         </div>
@@ -137,13 +134,42 @@ function SessionCard({ session }) {
           </div>
         </div>
       )}
+
+      {statusMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-xl border px-4 py-3 text-sm ${
+            statusMessage.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : statusMessage.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {statusMessage.message}
+        </div>
+      ) : null}
     </article>
   );
 }
 
 export default function LearnerLiveClasses() {
-  const { dashboard, refresh } = useOutletContext();
-  const data = dashboard?.liveClassrooms;
+  const { isLearner, section: data, refresh, refreshAfterAction } = useLearnerDashboardSection('liveClassrooms');
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+  const [sessionStatus, setSessionStatus] = useState({});
+  const [pendingSessions, setPendingSessions] = useState({});
+
+  if (!isLearner) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Learner Learnspace required"
+        description="Switch to the learner dashboard to manage live classroom participation."
+      />
+    );
+  }
 
   if (!data) {
     return (
@@ -156,13 +182,69 @@ export default function LearnerLiveClasses() {
     );
   }
 
-  const metrics = Array.isArray(data.metrics) ? data.metrics : [];
-  const active = Array.isArray(data.active) ? data.active : [];
-  const upcoming = Array.isArray(data.upcoming) ? data.upcoming : [];
-  const completed = Array.isArray(data.completed) ? data.completed : [];
-  const groups = Array.isArray(data.groups) ? data.groups : [];
-  const whiteboardSnapshots = Array.isArray(data.whiteboard?.snapshots) ? data.whiteboard.snapshots : [];
-  const readiness = Array.isArray(data.whiteboard?.readiness) ? data.whiteboard.readiness : [];
+  const metrics = useMemo(() => (Array.isArray(data.metrics) ? data.metrics : []), [data.metrics]);
+  const active = useMemo(() => (Array.isArray(data.active) ? data.active : []), [data.active]);
+  const upcoming = useMemo(() => (Array.isArray(data.upcoming) ? data.upcoming : []), [data.upcoming]);
+  const completed = useMemo(() => (Array.isArray(data.completed) ? data.completed : []), [data.completed]);
+  const groups = useMemo(() => (Array.isArray(data.groups) ? data.groups : []), [data.groups]);
+  const whiteboardSnapshots = useMemo(
+    () => (Array.isArray(data.whiteboard?.snapshots) ? data.whiteboard.snapshots : []),
+    [data.whiteboard?.snapshots]
+  );
+  const readiness = useMemo(
+    () => (Array.isArray(data.whiteboard?.readiness) ? data.whiteboard.readiness : []),
+    [data.whiteboard?.readiness]
+  );
+
+  const handleSessionAction = async (sessionItem) => {
+    if (!token) {
+      setSessionStatus((prev) => ({
+        ...prev,
+        [sessionItem.id]: { type: 'error', message: 'Sign in to manage live sessions.' }
+      }));
+      return;
+    }
+    const action = sessionItem.callToAction?.action;
+    if (!action) return;
+    setPendingSessions((prev) => ({ ...prev, [sessionItem.id]: action }));
+    setSessionStatus((prev) => ({
+      ...prev,
+      [sessionItem.id]: {
+        type: 'pending',
+        message: action === 'check-in' ? 'Checking you in…' : 'Generating join link…'
+      }
+    }));
+    try {
+      const handler = action === 'check-in' ? checkInLiveSession : joinLiveSession;
+      const result = await refreshAfterAction(() =>
+        handler({ token, sessionId: sessionItem.id, payload: { location: 'dashboard' } })
+      );
+      const message =
+        action === 'check-in'
+          ? result?.message ?? 'Check-in complete.'
+          : result?.joinUrl
+            ? `Join link ready: ${result.joinUrl}`
+            : 'Join link ready.';
+      setSessionStatus((prev) => ({
+        ...prev,
+        [sessionItem.id]: { type: 'success', message }
+      }));
+    } catch (error) {
+      setSessionStatus((prev) => ({
+        ...prev,
+        [sessionItem.id]: {
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unable to process the session request.'
+        }
+      }));
+    } finally {
+      setPendingSessions((prev) => {
+        const next = { ...prev };
+        delete next[sessionItem.id];
+        return next;
+      });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -187,9 +269,7 @@ export default function LearnerLiveClasses() {
               <p className="mt-3 text-2xl font-semibold text-slate-900">{metric.value}</p>
               {metric.change && (
                 <p
-                  className={`mt-2 text-sm font-medium ${
-                    metric.trend === 'down' ? 'text-rose-500' : 'text-emerald-600'
-                  }`}
+                  className={`mt-2 text-sm font-medium ${metric.trend === 'down' ? 'text-rose-500' : 'text-emerald-600'}`}
                 >
                   {metric.change}
                 </p>
@@ -198,170 +278,128 @@ export default function LearnerLiveClasses() {
           ))}
           {metrics.length === 0 && (
             <p className="col-span-full text-sm text-slate-500">
-              Metrics will populate once your first live classroom is scheduled.
+              No live session telemetry available. Connect your classroom providers to populate this section.
             </p>
           )}
         </div>
       </section>
 
-      {active.length > 0 && (
-        <section className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Streaming now</h2>
-              <p className="text-sm text-slate-600">Jump straight into an active classroom or review in-flight participation.</p>
-            </div>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {active.map((session) => (
-              <SessionCard key={session.id} session={session} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Upcoming schedule</h2>
-            <p className="text-sm text-slate-600">Stay ahead of the next touchpoints across your communities.</p>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <CalendarDaysIcon className="h-4 w-4" aria-hidden="true" />
-            All times adjusted to your profile timezone
-          </div>
-        </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          {upcoming.length > 0 ? (
-            upcoming.map((session) => <SessionCard key={session.id} session={session} />)
-          ) : (
-            <div className="dashboard-card p-6 text-sm text-slate-500">
-              No live classrooms are scheduled yet. Add one to see the flow populate.
-            </div>
-          )}
-        </div>
-      </section>
-
-      {groups.length > 0 && (
-        <section className="dashboard-section">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Group breakouts</h2>
-              <p className="text-sm text-slate-600">Track collaborative rooms and facilitator coverage at a glance.</p>
-            </div>
-          </div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            {groups.map((group) => (
-              <div key={group.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="dashboard-kicker">{group.stage}</p>
-                    <p className="text-base font-semibold text-slate-900">{group.title}</p>
-                    <p className="mt-1 text-xs text-slate-600">{group.startLabel}</p>
-                  </div>
-                  <ReadinessBadge status={group.callToAction?.enabled === false ? 'attention' : 'ready'} />
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 shadow-sm">
-                    <UsersIcon className="h-4 w-4 text-primary" aria-hidden="true" />
-                    {group.occupancy?.reserved ?? 0}/{group.occupancy?.capacity ?? '∞'} seats
-                  </span>
-                  {Array.isArray(group.breakoutRooms) && group.breakoutRooms.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 shadow-sm">
-                      <SparklesIcon className="h-4 w-4 text-primary" aria-hidden="true" />
-                      {group.breakoutRooms.length} rooms
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="dashboard-section">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Whiteboard readiness & security</h2>
-            <p className="text-sm text-slate-600">Every board and safeguard preflighted before the room opens.</p>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
-          {readiness.length > 0 ? (
-            readiness.map((item) => (
-              <div key={item.id} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                {item.status === 'ready' ? (
-                  <CheckCircleIcon className="mt-0.5 h-5 w-5 text-emerald-500" aria-hidden="true" />
-                ) : (
-                  <ExclamationTriangleIcon className="mt-0.5 h-5 w-5 text-amber-500" aria-hidden="true" />
-                )}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{item.label}</p>
-                    <ReadinessBadge status={item.status} />
-                  </div>
-                  <p className="mt-1 text-sm text-slate-600">{item.detail}</p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-slate-500">No readiness insights yet—schedule a session to begin monitoring.</p>
-          )}
-        </div>
-      </section>
-
-      <section className="dashboard-section">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Whiteboard snapshots</h2>
-            <p className="text-sm text-slate-600">Quickly reopen canvases, templates, and collaborative boards.</p>
-          </div>
-        </div>
-        {whiteboardSnapshots.length > 0 ? (
-          <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {whiteboardSnapshots.map((snapshot) => (
-              <div
-                key={snapshot.id}
-                className="rounded-2xl border border-slate-200 bg-gradient-to-br from-primary/5 via-white to-white p-5 shadow-sm"
-              >
-                <p className="text-sm font-semibold text-slate-900">{snapshot.title}</p>
-                <p className="mt-1 text-xs text-slate-500">{snapshot.template}</p>
-                <div className="mt-3 flex items-center gap-2 text-xs text-slate-600">
-                  <SparklesIcon className={`h-4 w-4 ${snapshot.ready ? 'text-emerald-500' : 'text-amber-500'}`} aria-hidden="true" />
-                  {snapshot.ready ? 'Ready for launch' : 'Finishing touches needed'}
-                </div>
-                {snapshot.lastUpdatedLabel && (
-                  <p className="mt-2 text-xs text-slate-500">Updated {snapshot.lastUpdatedLabel}</p>
-                )}
-                {Array.isArray(snapshot.facilitators) && snapshot.facilitators.length > 0 && (
-                  <p className="mt-2 text-xs text-slate-500">
-                    Collaborators: {snapshot.facilitators.join(', ')}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-slate-500">Boards will appear here as soon as a live classroom is scheduled.</p>
+      <section className="grid gap-6 lg:grid-cols-2">
+        {active.map((session) => (
+          <SessionCard
+            key={session.id}
+            session={session}
+            onAction={handleSessionAction}
+            pendingAction={pendingSessions[session.id]}
+            statusMessage={sessionStatus[session.id]}
+          />
+        ))}
+        {active.length === 0 && (
+          <DashboardStateMessage
+            title="No active sessions"
+            description="You're not currently registered for any live classrooms. Review upcoming sessions to join the action."
+          />
         )}
       </section>
 
-      {completed.length > 0 && (
-        <section className="dashboard-section">
-          <h2 className="text-lg font-semibold text-slate-900">Recently completed</h2>
-          <div className="mt-4 space-y-3">
-            {completed.map((session) => (
-              <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+      <section className="dashboard-section">
+        <h2 className="text-lg font-semibold text-slate-900">Upcoming live classrooms</h2>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          {upcoming.map((session) => (
+            <div key={session.id} className="rounded-2xl border border-slate-200 bg-white/90 p-5 shadow-sm">
+              <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">{session.title}</p>
-                  <p className="text-xs text-slate-500">Wrapped {session.endLabel ?? session.startLabel}</p>
+                  <p className="dashboard-kicker">{session.startLabel}</p>
+                  <p className="mt-1 text-base font-semibold text-slate-900">{session.title}</p>
                 </div>
-                <ReadinessBadge status={session.whiteboard?.ready ? 'ready' : 'attention'} />
+                <ReadinessBadge status={session.readiness} />
               </div>
-            ))}
+              <p className="mt-3 text-sm text-slate-600">{session.summary}</p>
+            </div>
+          ))}
+          {upcoming.length === 0 && (
+            <DashboardStateMessage
+              title="No upcoming sessions"
+              description="Great news – you have breathing room. Use this time to review replays or prep your next cohort."
+            />
+          )}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <h2 className="text-lg font-semibold text-slate-900">Completed experiences</h2>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          {completed.map((session) => (
+            <div key={session.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              <p className="font-semibold text-slate-900">{session.title}</p>
+              <p className="mt-1 text-xs">Facilitated by {session.facilitator}</p>
+              <p className="mt-2 text-xs text-slate-500">Recording ready · {session.recordingStatus}</p>
+            </div>
+          ))}
+          {completed.length === 0 && (
+            <p className="col-span-full text-sm text-slate-500">No recent live classrooms have wrapped yet.</p>
+          )}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <h2 className="text-lg font-semibold text-slate-900">Breakout pods</h2>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {groups.map((group) => (
+            <div key={group.id} className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+              <p className="dashboard-kicker">{group.label}</p>
+              <p className="mt-1 text-sm text-slate-600">Moderator {group.moderator}</p>
+              <p className="mt-2 text-xs text-slate-500">{group.description}</p>
+            </div>
+          ))}
+          {groups.length === 0 && (
+            <p className="col-span-full text-sm text-slate-500">
+              No breakout pods configured yet. Add pods to orchestrate smaller cohort experiences.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Whiteboard readiness</h2>
+            <p className="text-sm text-slate-600">Live whiteboards that need action before your next sessions go live.</p>
           </div>
-        </section>
-      )}
+          <button type="button" className="dashboard-pill" onClick={() => refresh?.()}>
+            Refresh snapshots
+          </button>
+        </div>
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          {whiteboardSnapshots.map((snapshot) => (
+            <div key={snapshot.id} className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+              <p className="dashboard-kicker">{snapshot.template}</p>
+              <p className="mt-1 text-sm text-slate-600">{snapshot.updatedAt}</p>
+              <p className="mt-2 text-xs text-slate-500">Maintainer {snapshot.owner}</p>
+            </div>
+          ))}
+          {whiteboardSnapshots.length === 0 && (
+            <p className="col-span-full text-sm text-slate-500">
+              Whiteboard snapshots look good! Automations will populate this space if changes are required.
+            </p>
+          )}
+        </div>
+
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          {readiness.map((item) => (
+            <div key={item.id} className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                <ReadinessBadge status={item.status} />
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Owner {item.owner}</p>
+            </div>
+          ))}
+          {readiness.length === 0 && (
+            <p className="col-span-full text-sm text-slate-500">All set! No readiness actions pending.</p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }
