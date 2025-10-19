@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  buildCommunityDashboard,
   buildAffiliateOverview,
   buildInstructorDashboard,
+  buildLearnerDashboard,
   buildLearningPace,
   calculateLearningStreak,
   humanizeRelativeTime
@@ -48,6 +50,286 @@ describe('DashboardService helpers', () => {
 
     expect(sameHour).toBe('45m ago');
     expect(daysAgo).toBe('5d ago');
+  });
+});
+
+describe('buildLearnerDashboard', () => {
+  it('returns null when there are no learner signals', () => {
+    const snapshot = buildLearnerDashboard({ enrollments: [], tutorBookings: [], ebookProgress: [], paymentIntents: [] });
+
+    expect(snapshot).toBeNull();
+  });
+
+  it('assembles learner dashboard signals from enrollments, bookings, and ebooks', () => {
+    const now = new Date('2024-11-08T12:00:00Z');
+    const user = { id: 101, firstName: 'Noemi', lastName: 'Carvalho', email: 'noemi@test.local' };
+    const enrollments = [
+      {
+        id: 501,
+        publicId: 'enrol-ops-1',
+        courseId: 9001,
+        userId: 101,
+        status: 'active',
+        progressPercent: 42,
+        metadata: { cohort: 'Ops-Launch', badges: ['Launch ready'] },
+        startedAt: '2024-10-20T09:00:00Z',
+        updatedAt: '2024-11-07T18:00:00Z'
+      }
+    ];
+    const courses = [
+      {
+        id: 9001,
+        publicId: 'course-ops-launch',
+        title: 'Automation Launch Blueprint',
+        instructorId: 77,
+        summary: 'Launch automation rituals and playbooks.',
+        metadata: { syllabus: [{ title: 'Kick-off briefing' }, { title: 'Automation pods' }] }
+      },
+      {
+        id: 9002,
+        publicId: 'course-ops-advanced',
+        title: 'Advanced LiveOps',
+        instructorId: 78,
+        ratingAverage: 4.9,
+        tags: ['Ops', 'Automation']
+      }
+    ];
+    const instructorDirectory = new Map([
+      [77, { id: 77, firstName: 'Kai', lastName: 'Watanabe', email: 'kai@ops.test' }],
+      [78, { id: 78, firstName: 'Mira', lastName: 'Mentor', email: 'mira@ops.test' }]
+    ]);
+    const courseProgress = [
+      {
+        id: 1001,
+        enrollmentId: 501,
+        lessonId: 3001,
+        completed: true,
+        completedAt: '2024-11-05T08:00:00Z',
+        metadata: { lessonTitle: 'Kick-off briefing', durationMinutes: 45 }
+      }
+    ];
+    const tutorBookings = [
+      {
+        id: 701,
+        publicId: 'booking-701',
+        tutorId: 501,
+        learnerId: 101,
+        requestedAt: '2024-11-06T09:15:00Z',
+        confirmedAt: '2024-11-06T09:30:00Z',
+        scheduledStart: '2024-11-09T15:00:00Z',
+        scheduledEnd: '2024-11-09T16:00:00Z',
+        status: 'confirmed',
+        metadata: { topic: 'Mentorship sprint prep' },
+        tutorProfile: { displayName: 'Mira Mentor' }
+      },
+      {
+        id: 702,
+        publicId: 'booking-702',
+        tutorId: 501,
+        learnerId: 101,
+        scheduledStart: '2024-10-28T15:00:00Z',
+        scheduledEnd: '2024-10-28T16:00:00Z',
+        completedAt: '2024-10-28T16:15:00Z',
+        status: 'completed',
+        metadata: { topic: 'Playback review', rating: '4.8' },
+        tutorProfile: { displayName: 'Mira Mentor' }
+      }
+    ];
+    const liveClassrooms = [
+      {
+        id: 8801,
+        publicId: 'class-8801',
+        title: 'Automation Command Simulation',
+        communityId: 55,
+        communityName: 'DesignOps Collective',
+        status: 'scheduled',
+        startAt: '2024-11-10T17:00:00Z',
+        endAt: '2024-11-10T18:30:00Z',
+        capacity: 120,
+        reservedSeats: 64,
+        timezone: 'Etc/UTC',
+        metadata: { whiteboard: { template: 'Launch desk', ready: true } }
+      }
+    ];
+    const ebookProgress = [
+      {
+        id: 9901,
+        assetId: 4401,
+        userId: 101,
+        progressPercent: 60,
+        updatedAt: '2024-11-07T13:00:00Z'
+      }
+    ];
+    const ebookLibrary = [
+      {
+        id: 4401,
+        assetId: 4401,
+        publicId: 'ebook-ops',
+        title: 'Ops War Room Playbook',
+        metadata: { format: 'Guidebook' },
+        tags: ['Ops', 'Playbook']
+      }
+    ];
+    const paymentIntents = [
+      {
+        id: 1201,
+        publicId: 'pay-intent-1201',
+        status: 'succeeded',
+        currency: 'USD',
+        amountTotal: 12900,
+        amountRefunded: 0,
+        capturedAt: '2024-11-03T10:00:00Z',
+        metadata: { label: 'Ops Launch tuition', courseTitle: 'Automation Launch Blueprint' },
+        createdAt: '2024-10-30T10:00:00Z'
+      }
+    ];
+    const communities = [
+      {
+        id: 55,
+        name: 'DesignOps Collective',
+        slug: 'designops-collective',
+        stats: { members: 2400, posts: 820, resources: 58, lastActivityAt: '2024-11-07T20:00:00Z' },
+        metadata: { health: 'Healthy', pipelines: [{ title: 'Launch prep', progress: 65 }] },
+        membership: { role: 'member', status: 'active' }
+      }
+    ];
+    const communityPipelines = [
+      { id: '55-pipeline-0', title: 'Launch prep', owner: 'Community ops', progress: 65 }
+    ];
+
+    const snapshot = buildLearnerDashboard({
+      user,
+      now,
+      enrollments,
+      courses,
+      courseProgress,
+      instructorDirectory,
+      tutorBookings,
+      liveClassrooms,
+      ebookLibrary,
+      ebookProgress,
+      paymentIntents,
+      communities,
+      communityPipelines
+    });
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot.dashboard.metrics[0]).toMatchObject({ label: 'Active programmes', value: '1' });
+    expect(snapshot.dashboard.courses.active[0]).toMatchObject({
+      title: 'Automation Launch Blueprint',
+      progress: expect.any(Number),
+      instructor: 'Kai Watanabe'
+    });
+    expect(snapshot.dashboard.tutorBookings.active).toHaveLength(1);
+    expect(snapshot.dashboard.ebooks.library[0]).toMatchObject({ title: 'Ops War Room Playbook', progress: 60 });
+    expect(snapshot.profileStats[0].label).toBe('Learning streak');
+  });
+});
+
+describe('buildCommunityDashboard', () => {
+  it('returns null when no community signals are present', () => {
+    const snapshot = buildCommunityDashboard({ communities: [] });
+
+    expect(snapshot).toBeNull();
+  });
+
+  it('constructs community operations overview from runbooks, events, and monetisation data', () => {
+    const now = new Date('2024-11-08T12:00:00Z');
+    const communities = [
+      {
+        id: 55,
+        name: 'DesignOps Collective',
+        stats: { members: 2400 },
+        metadata: {
+          health: 'Healthy',
+          moderators: [
+            { role: 'Lead moderator', timezone: 'UTC', coverage: 'Follow-the-sun' },
+            { role: 'Ops analyst', timezone: 'PST', coverage: 'North America' }
+          ],
+          communications: { cadence: 'Weekly', openRate: '62%', clickRate: '19%' },
+          pipelines: [{ title: 'Launch campaign', progress: 70 }],
+          escalations: [{ title: 'Moderation backlog review', status: 'Open', due: '2024-11-12T00:00:00Z', owner: 'Ops Lead' }]
+        },
+        membership: { role: 'owner', status: 'active' }
+      }
+    ];
+
+    const runbooks = new Map([
+      [
+        55,
+        [
+          {
+            id: 9901,
+            title: 'Community launch checklist',
+            tags: ['Launch', 'Checklist'],
+            updatedAt: '2024-11-07T14:00:00Z',
+            metadata: { owner: 'Operations', automationReady: true }
+          }
+        ]
+      ]
+    ]);
+
+    const events = new Map([
+      [
+        55,
+        [
+          {
+            id: 801,
+            title: 'Automation Live Lab',
+            startAt: '2024-11-10T17:00:00Z',
+            attendanceLimit: 120,
+            attendanceCount: 64,
+            status: 'scheduled',
+            metadata: { facilitator: 'Kai Watanabe' }
+          }
+        ]
+      ]
+    ]);
+
+    const paywallTiers = new Map([[55, [{ id: 301, name: 'Pro Circle', priceCents: 2900, currency: 'USD', billingInterval: 'monthly' }]]]);
+    const subscriptions = new Map([[55, [{ id: 401, status: 'active', metadata: { priceCents: 2900 } }]]]);
+    const safetyIncidents = new Map([
+      [
+        55,
+        [
+          {
+            id: 601,
+            incidentUuid: 'incident-601',
+            category: 'Safety',
+            severity: 'medium',
+            status: 'triaged',
+            reportedAt: '2024-11-06T09:00:00Z',
+            acknowledgement: { ackBreached: false },
+            resolution: { resolutionBreached: false }
+          }
+        ]
+      ]
+    ]);
+
+    const snapshot = buildCommunityDashboard({
+      now,
+      communities,
+      runbooks,
+      events,
+      paywallTiers,
+      subscriptions,
+      safetyIncidents,
+      communications: new Map([
+        [
+          55,
+          [
+            { title: 'Weekly broadcast', type: 'broadcast', status: 'Scheduled', audience: 'All members', sendAt: '2024-11-09T12:00:00Z' }
+          ]
+        ]
+      ])
+    });
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot.dashboard.metrics[0]).toMatchObject({ label: 'Active members', value: '2400' });
+    expect(snapshot.dashboard.operations.runbooks[0]).toMatchObject({ title: 'Community launch checklist', automationReady: true });
+    expect(snapshot.dashboard.programming.upcomingEvents[0]).toMatchObject({ title: 'Automation Live Lab', status: 'scheduled' });
+    expect(snapshot.dashboard.monetisation.tiers[0]).toMatchObject({ name: 'Pro Circle', price: '$29.00' });
+    expect(snapshot.dashboard.safety.incidents[0]).toMatchObject({ severity: 'medium', status: 'triaged' });
   });
 });
 

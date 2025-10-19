@@ -14,6 +14,17 @@ const BASE_COLUMNS = [
 ];
 
 export default class EbookProgressModel {
+  static async listByUser(userId, connection = db) {
+    if (!userId) {
+      return [];
+    }
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where({ user_id: userId })
+      .orderBy('updated_at', 'desc');
+    return rows.map((row) => this.deserialize(row));
+  }
+
   static async upsert({ assetId, userId, progressPercent, lastLocation, timeSpentSeconds }, connection = db) {
     const payload = {
       asset_id: assetId,
