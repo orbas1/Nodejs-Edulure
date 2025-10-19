@@ -8,6 +8,7 @@ const buildRepositoryMock = () => ({
   fetchRiskSummary: vi.fn(),
   getRiskById: vi.fn(),
   updateRisk: vi.fn(),
+  deleteRisk: vi.fn(),
   createRiskReview: vi.fn(),
   listEvidence: vi.fn(),
   createEvidence: vi.fn(),
@@ -232,5 +233,90 @@ describe('SecurityOperationsService', () => {
     expect(payload.pagination.total).toBe(1);
     expect(repository.listRisks).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 'tenant-ops' }));
     expect(repository.fetchRiskSummary).toHaveBeenCalledWith({ tenantId: 'tenant-ops' });
+  });
+
+  it('deletes a risk and records audit plus cdc events', async () => {
+    const risk = {
+      id: 77,
+      riskUuid: 'risk-uuid-77',
+      tenantId: 'tenant-ops',
+      title: 'Expired TLS certificates',
+      status: 'identified',
+      residualRiskScore: 9
+    };
+
+    repository.getRiskById.mockResolvedValue(risk);
+
+    const result = await service.deleteRisk({
+      riskId: 77,
+      tenantId: 'tenant-ops',
+      actor: { id: 'admin-1', role: 'admin', type: 'user' },
+      requestContext: { requestId: 'req-risk-delete' }
+    });
+
+    expect(repository.deleteRisk).toHaveBeenCalledWith(77);
+    expect(auditLogger.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'risk.register.deleted',
+        metadata: expect.objectContaining({ title: 'Expired TLS certificates', residualRiskScore: 9 })
+      })
+    );
+    expect(changeDataCapture.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ entityName: 'security_risk_register', operation: 'DELETE' })
+    );
+    expect(result).toEqual({ success: true });
+  });
+
+  it('records audit evidence with normalised sources and timestamps', async () => {
+    const capturedAt = '2024-11-18T12:00:00.000Z';
+    const evidence = {
+      evidenceUuid: 'evidence-uuid-1',
+      riskId: 55,
+      framework: 'SOC2',
+      controlReference: 'CC1.1',
+      status: 'submitted',
+      sources: ['jira-123', 'confluence-9'],
+      capturedAt: new Date(capturedAt)
+    };
+
+    repository.createEvidence.mockResolvedValue(evidence);
+
+    const result = await service.recordAuditEvidence({
+      tenantId: 'tenant-ops',
+      riskId: 55,
+      framework: 'SOC2',
+      controlReference: 'CC1.1',
+      evidenceType: 'report',
+      storagePath: 's3://evidence/cc1.1.pdf',
+      checksum: 'sha256:abcd',
+      sources: 'jira-123, confluence-9',
+      capturedAt,
+      status: 'submitted',
+      submittedBy: 'compliance-bot',
+      submittedByEmail: 'compliance@edulure.com',
+      description: 'Quarterly evidence package',
+      metadata: { quarter: 'Q4' },
+      actor: { id: 'auditor-1', role: 'admin', type: 'user' },
+      requestContext: { requestId: 'req-evidence-1' }
+    });
+
+    expect(repository.createEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'tenant-ops',
+        storagePath: 's3://evidence/cc1.1.pdf',
+        sources: ['jira-123', 'confluence-9'],
+        capturedAt: expect.any(Date),
+        status: 'submitted'
+      })
+    );
+    const [createArgs] = repository.createEvidence.mock.calls;
+    expect(createArgs[0].capturedAt.toISOString()).toBe(capturedAt);
+    expect(auditLogger.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'risk.evidence.recorded', metadata: expect.objectContaining({ framework: 'SOC2' }) })
+    );
+    expect(changeDataCapture.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ entityName: 'security_audit_evidence', operation: 'INSERT' })
+    );
+    expect(result).toEqual(evidence);
   });
 });

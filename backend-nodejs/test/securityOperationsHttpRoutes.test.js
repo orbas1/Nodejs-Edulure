@@ -1,3 +1,4 @@
+import express from 'express';
 import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +9,7 @@ vi.mock('../src/middleware/auth.js', () => ({
 const listRiskRegister = vi.fn();
 const createRiskEntry = vi.fn();
 const updateRiskStatus = vi.fn();
+const deleteRisk = vi.fn();
 const recordRiskReview = vi.fn();
 const listAuditEvidence = vi.fn();
 const recordAuditEvidence = vi.fn();
@@ -22,6 +24,7 @@ vi.mock('../src/services/SecurityOperationsService.js', () => ({
     listRiskRegister,
     createRiskEntry,
     updateRiskStatus,
+    deleteRisk,
     recordRiskReview,
     listAuditEvidence,
     recordAuditEvidence,
@@ -36,7 +39,10 @@ let app;
 
 describe('Security operations HTTP routes', () => {
   beforeAll(async () => {
-    ({ default: app } = await import('../src/app.js'));
+    const { default: securityRouter } = await import('../src/routes/security.routes.js');
+    app = express();
+    app.use(express.json());
+    app.use('/api/v1/security', securityRouter);
   });
 
   beforeEach(() => {
@@ -93,6 +99,46 @@ describe('Security operations HTTP routes', () => {
     expect(response.status).toBe(200);
     expect(updateRiskStatus).toHaveBeenCalledWith(
       expect.objectContaining({ riskId: 99, status: 'accepted' })
+    );
+  });
+
+  it('deletes risks from the register', async () => {
+    deleteRisk.mockResolvedValue({ success: true });
+
+    const response = await request(app)
+      .delete('/api/v1/security/risk-register/23')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual({ success: true });
+    expect(deleteRisk).toHaveBeenCalledWith(expect.objectContaining({ riskId: 23 }));
+  });
+
+  it('lists audit evidence with filtering', async () => {
+    listAuditEvidence.mockResolvedValue({
+      items: [],
+      pagination: { total: 0, limit: 20, offset: 0 }
+    });
+
+    const response = await request(app)
+      .get('/api/v1/security/audit-evidence?framework=SOC2&limit=5')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(listAuditEvidence).toHaveBeenCalledWith(expect.objectContaining({ framework: 'SOC2', limit: 5 }));
+  });
+
+  it('records audit evidence submissions', async () => {
+    recordAuditEvidence.mockResolvedValue({ evidenceUuid: 'evidence-uuid-1' });
+
+    const response = await request(app)
+      .post('/api/v1/security/audit-evidence')
+      .send({ storagePath: 's3://evidence/path.pdf' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(201);
+    expect(recordAuditEvidence).toHaveBeenCalledWith(
+      expect.objectContaining({ storagePath: 's3://evidence/path.pdf' })
     );
   });
 
