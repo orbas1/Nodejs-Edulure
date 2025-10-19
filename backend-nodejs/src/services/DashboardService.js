@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 
+import logger from '../config/logger.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
 
 function safeJsonParse(value, fallback) {
@@ -14,6 +15,7 @@ function safeJsonParse(value, fallback) {
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 let operatorDashboardService;
+const log = logger.child({ service: 'DashboardService' });
 
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
@@ -390,6 +392,554 @@ function aggregateTutorAvailability({ availability = [], bookings = [], now }) {
   }));
 }
 
+const RTL_LANGUAGES = new Set(['ar', 'fa', 'he', 'ku', 'ps', 'ur']);
+
+function createLanguageDisplay() {
+  try {
+    const display = new Intl.DisplayNames(['en'], { type: 'language' });
+    return (code) => {
+      if (!code) return 'Unknown';
+      return display.of(code) ?? code;
+    };
+  } catch (_error) {
+    return (code) => code ?? 'Unknown';
+  }
+}
+
+function isRightToLeft(code) {
+  if (!code) return false;
+  const normalised = String(code).toLowerCase();
+  return RTL_LANGUAGES.has(normalised);
+}
+
+function ensureMap(value) {
+  if (!value) return new Map();
+  if (value instanceof Map) return value;
+  if (Array.isArray(value)) {
+    return new Map(value);
+  }
+  return new Map(Object.entries(value));
+}
+
+function resolveAssignmentDueDate(assignment, course) {
+  const releaseAt = course?.releaseAt ? new Date(course.releaseAt) : null;
+  if (!releaseAt || Number.isNaN(releaseAt.getTime())) {
+    return null;
+  }
+  const offsetDays = Number(assignment.dueOffsetDays ?? 0);
+  if (!Number.isFinite(offsetDays)) {
+    return null;
+  }
+  return new Date(releaseAt.getTime() + offsetDays * DAY_IN_MS);
+}
+
+function resolveNextLesson(lessons = [], stats = {}) {
+  if (!lessons.length) return null;
+  const completed = Number(stats.completedLessons ?? 0);
+  const index = Math.min(completed, lessons.length - 1);
+  const lesson = lessons[index];
+  if (!lesson) return null;
+  return lesson.title ?? null;
+}
+
+function determineRiskLevel(enrollment, stats, now) {
+  if (enrollment.status !== 'active') {
+    return 'low';
+  }
+  const startedAt = enrollment.startedAt ? new Date(enrollment.startedAt) : null;
+  const progressPercent = Number(enrollment.progressPercent ?? (stats?.completionRatio ?? 0) * 100);
+  if (!startedAt || Number.isNaN(startedAt.getTime())) {
+    return progressPercent < 20 ? 'medium' : 'low';
+  }
+  const daysSinceStart = Math.floor((now.getTime() - startedAt.getTime()) / DAY_IN_MS);
+  if (daysSinceStart >= 21 && progressPercent < 30) {
+    return 'critical';
+  }
+  if (daysSinceStart >= 14 && progressPercent < 40) {
+    return 'high';
+  }
+  if (daysSinceStart >= 7 && progressPercent < 50) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+function buildCourseWorkspace({
+  courses = [],
+  modules = [],
+  lessons = [],
+  assignments = [],
+  enrollments = [],
+  courseProgress = [],
+  creationProjects = [],
+  creationCollaborators = new Map(),
+  creationSessions = new Map(),
+  collaboratorDirectory = new Map(),
+  now = new Date()
+} = {}) {
+  const workspace = {
+    pipeline: [],
+    production: [],
+    catalogue: [],
+    analytics: { cohortHealth: [], velocity: { averageCompletion: 0, trending: [] } },
+    assignments: {
+      summary: { total: 0, dueThisWeek: 0, requiresReview: 0 },
+      queues: { upcoming: [], review: [], automation: [] }
+    },
+    authoring: {
+      drafts: [],
+      activeSessions: [],
+      localisationCoverage: { totalLanguages: 0, publishedLanguages: 0, missing: [] }
+    },
+    learners: { roster: [], riskAlerts: [] }
+  };
+
+  if (!courses.length) {
+    return workspace;
+  }
+
+  const languageLabel = createLanguageDisplay();
+  const courseById = new Map();
+  courses.forEach((course) => {
+    const metadata = safeJsonParse(course.metadata, {});
+    courseById.set(course.id, { ...course, metadata });
+  });
+
+  const modulesByCourse = new Map();
+  modules.forEach((module) => {
+    const list = modulesByCourse.get(module.courseId) ?? [];
+    list.push({ ...module, metadata: safeJsonParse(module.metadata, {}) });
+    modulesByCourse.set(module.courseId, list);
+  });
+  modulesByCourse.forEach((list) => {
+    list.sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  });
+
+  const lessonsByCourse = new Map();
+  lessons.forEach((lesson) => {
+    const list = lessonsByCourse.get(lesson.courseId) ?? [];
+    list.push({ ...lesson, metadata: safeJsonParse(lesson.metadata, {}) });
+    lessonsByCourse.set(lesson.courseId, list);
+  });
+  lessonsByCourse.forEach((list) => {
+    list.sort((a, b) => {
+      const moduleOrder = (a.moduleId ?? 0) - (b.moduleId ?? 0);
+      if (moduleOrder !== 0) return moduleOrder;
+      return (a.position ?? 0) - (b.position ?? 0);
+    });
+  });
+
+  const assignmentsByCourse = new Map();
+  assignments.forEach((assignment) => {
+    const list = assignmentsByCourse.get(assignment.courseId) ?? [];
+    list.push({ ...assignment, metadata: safeJsonParse(assignment.metadata, {}) });
+    assignmentsByCourse.set(assignment.courseId, list);
+  });
+
+  const enrollmentsByCourse = new Map();
+  enrollments.forEach((enrollment) => {
+    const list = enrollmentsByCourse.get(enrollment.courseId) ?? [];
+    list.push({ ...enrollment, metadata: safeJsonParse(enrollment.metadata, {}) });
+    enrollmentsByCourse.set(enrollment.courseId, list);
+  });
+
+  const progressByEnrollment = new Map();
+  courseProgress.forEach((entry) => {
+    const stats = progressByEnrollment.get(entry.enrollmentId) ?? {
+      totalLessons: 0,
+      completedLessons: 0,
+      lastCompletedAt: null,
+      notes: [],
+      lastLocation: null
+    };
+    stats.totalLessons += 1;
+    if (entry.completed) {
+      stats.completedLessons += 1;
+      const completedAt = entry.completedAt ? new Date(entry.completedAt) : null;
+      if (completedAt && (!stats.lastCompletedAt || completedAt > stats.lastCompletedAt)) {
+        stats.lastCompletedAt = completedAt;
+      }
+    }
+    const metadata = safeJsonParse(entry.metadata, {});
+    if (metadata.note) {
+      stats.notes.push(metadata.note);
+    }
+    if (metadata.lastLocation && !stats.lastLocation) {
+      stats.lastLocation = metadata.lastLocation;
+    }
+    progressByEnrollment.set(entry.enrollmentId, stats);
+  });
+  progressByEnrollment.forEach((stats) => {
+    stats.completionRatio = stats.totalLessons > 0 ? stats.completedLessons / stats.totalLessons : 0;
+  });
+
+  const catalogue = courses.map((course) => {
+    const modulesForCourse = modulesByCourse.get(course.id) ?? [];
+    const lessonsForCourse = lessonsByCourse.get(course.id) ?? [];
+    const courseEnrollments = enrollmentsByCourse.get(course.id) ?? [];
+    const activeEnrollments = courseEnrollments.filter((enrollment) => enrollment.status === 'active');
+    const completedEnrollments = courseEnrollments.filter((enrollment) => enrollment.status === 'completed');
+    const totalEnrollments = courseEnrollments.length;
+    const averageProgress = totalEnrollments
+      ? Math.round(
+          courseEnrollments.reduce((sum, enrollment) => sum + Number(enrollment.progressPercent ?? 0), 0) /
+            totalEnrollments
+        )
+      : 0;
+    const languages = Array.isArray(course.languages) ? course.languages : [];
+    const publishedLocales = Array.isArray(course.metadata?.publishedLocales)
+      ? course.metadata.publishedLocales
+      : [];
+
+    const languageEntries = languages.map((code) => {
+      const lower = String(code).toLowerCase();
+      const published = publishedLocales.includes(code) || publishedLocales.includes(lower);
+      return {
+        code: lower,
+        label: languageLabel(lower),
+        direction: isRightToLeft(lower) ? 'rtl' : 'ltr',
+        published
+      };
+    });
+
+    return {
+      id: course.publicId ?? `course-${course.id}`,
+      courseId: course.id,
+      title: course.title,
+      summary: course.summary,
+      status: course.status,
+      format: course.deliveryFormat ?? course.metadata?.format ?? 'cohort',
+      languages: languageEntries,
+      price: {
+        currency: course.priceCurrency,
+        amountCents: Number(course.priceAmount ?? 0),
+        formatted: formatCurrency(course.priceAmount ?? 0, course.priceCurrency)
+      },
+      rating: {
+        average: Number(course.ratingAverage ?? 0),
+        count: Number(course.ratingCount ?? 0)
+      },
+      learners: {
+        total: Number(course.enrolmentCount ?? totalEnrollments),
+        active: activeEnrollments.length,
+        completed: completedEnrollments.length
+      },
+      modules: modulesForCourse.length,
+      lessons: lessonsForCourse.length,
+      averageProgress,
+      releaseAt: course.releaseAt ? course.releaseAt.toISOString() : null,
+      updatedAt: course.updatedAt ? course.updatedAt.toISOString() : null,
+      localisation: {
+        totalLanguages: languageEntries.length,
+        published: languageEntries.filter((entry) => entry.published).length,
+        missing: languageEntries.filter((entry) => !entry.published).map((entry) => entry.code)
+      },
+      automation: course.metadata?.dripCampaign ?? null,
+      refresherLessons: Array.isArray(course.metadata?.refresherLessons) ? course.metadata.refresherLessons : []
+    };
+  });
+
+  workspace.catalogue = catalogue;
+
+  const cohortMap = new Map();
+  enrollments.forEach((enrollment) => {
+    const course = courseById.get(enrollment.courseId);
+    if (!course) return;
+    const cohortLabel = enrollment.metadata?.cohort ?? 'General';
+    const key = `${enrollment.courseId}:${cohortLabel}`;
+    let record = cohortMap.get(key);
+    if (!record) {
+      record = {
+        id: `cohort-${enrollment.courseId}-${cohortLabel}`.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase(),
+        courseId: enrollment.courseId,
+        courseTitle: course.title,
+        label: cohortLabel,
+        enrollments: [],
+        firstStartAt: null,
+        releaseAt: course.releaseAt ?? null
+      };
+      cohortMap.set(key, record);
+    }
+    record.enrollments.push(enrollment);
+    if (enrollment.startedAt) {
+      if (!record.firstStartAt || enrollment.startedAt < record.firstStartAt) {
+        record.firstStartAt = enrollment.startedAt;
+      }
+    }
+  });
+
+  const pipeline = [];
+  const cohortHealth = [];
+  cohortMap.forEach((cohort) => {
+    const total = cohort.enrollments.length;
+    const activeCount = cohort.enrollments.filter((enr) => enr.status === 'active').length;
+    const completedCount = cohort.enrollments.filter((enr) => enr.status === 'completed').length;
+    const invitedCount = cohort.enrollments.filter((enr) => enr.status === 'invited').length;
+    const averageProgress = total
+      ? Math.round(
+          cohort.enrollments.reduce((sum, enr) => sum + Number(enr.progressPercent ?? 0), 0) / total
+        )
+      : 0;
+    const startDate = cohort.firstStartAt ?? cohort.releaseAt;
+    const stage = completedCount === total && total > 0 ? 'Completed' : activeCount > 0 ? 'In flight' : 'Scheduled';
+    pipeline.push({
+      id: cohort.id,
+      name: `${cohort.courseTitle} · ${cohort.label}`,
+      stage,
+      startDate: startDate ? formatDateTime(startDate, { dateStyle: 'medium', timeStyle: undefined }) : 'TBD',
+      learners: activeCount + invitedCount
+    });
+
+    const atRiskLearners = cohort.enrollments.filter((enr) => {
+      const stats = progressByEnrollment.get(enr.id);
+      return determineRiskLevel(enr, stats, now) !== 'low';
+    });
+
+    const lastActivityAt = cohort.enrollments.reduce((latest, enr) => {
+      const stats = progressByEnrollment.get(enr.id);
+      if (stats?.lastCompletedAt && (!latest || stats.lastCompletedAt > latest)) {
+        return stats.lastCompletedAt;
+      }
+      return latest;
+    }, null);
+
+    cohortHealth.push({
+      id: cohort.id,
+      courseId: cohort.courseId,
+      courseTitle: cohort.courseTitle,
+      cohort: cohort.label,
+      stage,
+      activeLearners: activeCount,
+      completionRate: total ? Number((completedCount / total).toFixed(2)) : 0,
+      averageProgress,
+      atRiskLearners: atRiskLearners.length,
+      lastActivityAt: lastActivityAt ? lastActivityAt.toISOString() : null,
+      launchAt: startDate ? startDate.toISOString() : null
+    });
+  });
+
+  workspace.pipeline = pipeline;
+  workspace.analytics.cohortHealth = cohortHealth;
+
+  const averageCompletion = cohortHealth.length
+    ? Math.round(
+        (cohortHealth.reduce((sum, entry) => sum + entry.completionRate, 0) / cohortHealth.length) * 100
+      )
+    : 0;
+  const trending = [...catalogue]
+    .sort((a, b) => b.averageProgress - a.averageProgress)
+    .slice(0, 3)
+    .map((entry) => ({
+      id: entry.id,
+      title: entry.title,
+      averageProgress: entry.averageProgress,
+      learners: entry.learners.active + entry.learners.completed,
+      localisation: entry.localisation
+    }));
+  workspace.analytics.velocity = { averageCompletion, trending };
+
+  const production = [];
+  modulesByCourse.forEach((moduleList, courseId) => {
+    const course = courseById.get(courseId);
+    moduleList.forEach((module) => {
+      const creationMeta = safeJsonParse(module.metadata?.creation, {});
+      production.push({
+        id: `module-${module.id}`,
+        asset: `${course?.title ?? 'Course'} · ${module.title}`,
+        status: creationMeta.status ?? 'Backlog',
+        owner: creationMeta.owner ?? resolveName(course?.instructorFirstName, course?.instructorLastName, 'Owner'),
+        gating: module.metadata?.drip?.gating ?? null,
+        updatedAt: module.updatedAt ? module.updatedAt.toISOString() : null
+      });
+    });
+  });
+  assignments.forEach((assignment) => {
+    const course = courseById.get(assignment.courseId);
+    const metadata = safeJsonParse(assignment.metadata, {});
+    const dueDate = resolveAssignmentDueDate(assignment, course);
+    production.push({
+      id: `assignment-${assignment.id}`,
+      asset: `${course?.title ?? 'Course'} · ${assignment.title}`,
+      status: metadata.requiresReview ? 'Awaiting review' : 'Scheduled',
+      owner: metadata.owner ?? 'Curriculum',
+      dueDate: dueDate ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }) : 'TBD'
+    });
+  });
+  workspace.production = production;
+
+  const assignmentEntries = assignments.map((assignment) => {
+    const course = courseById.get(assignment.courseId);
+    const metadata = safeJsonParse(assignment.metadata, {});
+    const dueDate = resolveAssignmentDueDate(assignment, course);
+    return {
+      id: assignment.id,
+      courseId: assignment.courseId,
+      courseTitle: course?.title ?? 'Course',
+      title: assignment.title,
+      dueDate,
+      dueLabel: dueDate ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }) : 'TBD',
+      requiresReview: Boolean(metadata.requiresReview),
+      workflow: metadata.workflow ?? metadata.automation?.mode ?? 'manual',
+      owner: metadata.owner ?? null
+    };
+  });
+  const upcomingAssignments = assignmentEntries.filter(
+    (entry) => entry.dueDate && entry.dueDate >= now && entry.dueDate.getTime() - now.getTime() <= 7 * DAY_IN_MS
+  );
+  const reviewQueue = assignmentEntries.filter((entry) => entry.requiresReview);
+  const automationQueue = assignmentEntries.filter((entry) => String(entry.workflow).includes('automation'));
+  workspace.assignments = {
+    summary: {
+      total: assignmentEntries.length,
+      dueThisWeek: upcomingAssignments.length,
+      requiresReview: reviewQueue.length
+    },
+    queues: {
+      upcoming: upcomingAssignments.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        courseTitle: entry.courseTitle,
+        dueAt: entry.dueDate ? entry.dueDate.toISOString() : null,
+        owner: entry.owner
+      })),
+      review: reviewQueue.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        courseTitle: entry.courseTitle,
+        owner: entry.owner
+      })),
+      automation: automationQueue.map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        courseTitle: entry.courseTitle,
+        mode: entry.workflow
+      }))
+    }
+  };
+
+  const collaboratorMap = ensureMap(creationCollaborators);
+  const sessionMap = ensureMap(creationSessions);
+  const drafts = creationProjects.map((project) => {
+    const collaborators = collaboratorMap.get(project.id) ?? [];
+    const sessions = sessionMap.get(project.id) ?? [];
+    const collaboratorEntries = collaborators.map((collaborator) => {
+      const user = collaboratorDirectory.get(collaborator.userId);
+      return {
+        id: collaborator.userId,
+        role: collaborator.role ?? 'editor',
+        displayName: user ? resolveName(user.firstName, user.lastName, user.email) : `User ${collaborator.userId}`,
+        permissions: Array.isArray(collaborator.permissions) ? collaborator.permissions : []
+      };
+    });
+    const sessionEntries = sessions.map((session) => {
+      const user = collaboratorDirectory.get(session.participantId);
+      return {
+        id: session.publicId ?? session.id,
+        participantId: session.participantId,
+        participant: user ? resolveName(user.firstName, user.lastName, user.email) : `User ${session.participantId}`,
+        role: session.role ?? 'viewer',
+        capabilities: Array.isArray(session.capabilities) ? session.capabilities : [],
+        joinedAt: session.joinedAt ? new Date(session.joinedAt).toISOString() : null
+      };
+    });
+    return {
+      id: project.publicId ?? `project-${project.id}`,
+      projectId: project.id,
+      courseId: project.metadata?.courseId ?? null,
+      title: project.title,
+      status: project.status,
+      updatedAt: project.updatedAt ? project.updatedAt.toISOString?.() ?? new Date(project.updatedAt).toISOString() : null,
+      outlineCount: Array.isArray(project.contentOutline) ? project.contentOutline.length : 0,
+      collaborators: collaboratorEntries,
+      activeSessions: sessionEntries,
+      locales: Array.isArray(project.metadata?.locales) ? project.metadata.locales : [],
+      complianceNotes: Array.isArray(project.complianceNotes) ? project.complianceNotes : [],
+      publishingChannels: Array.isArray(project.publishingChannels) ? project.publishingChannels : [],
+      analyticsTargets: project.analyticsTargets ?? {}
+    };
+  });
+
+  const activeSessions = [];
+  drafts.forEach((draft) => {
+    draft.activeSessions.forEach((session) => {
+      activeSessions.push({
+        ...session,
+        projectId: draft.projectId,
+        projectPublicId: draft.id,
+        projectTitle: draft.title
+      });
+    });
+  });
+
+  const languageUniverse = new Set();
+  const publishedUniverse = new Set();
+  catalogue.forEach((entry) => {
+    entry.languages.forEach((language) => {
+      languageUniverse.add(language.code);
+      if (language.published) {
+        publishedUniverse.add(language.code);
+      }
+    });
+  });
+  drafts.forEach((draft) => {
+    draft.locales.forEach((locale) => {
+      const code = String(locale).toLowerCase();
+      languageUniverse.add(code);
+      if (draft.status === 'published' || draft.status === 'approved') {
+        publishedUniverse.add(code);
+      }
+    });
+  });
+  const missingLanguages = Array.from(languageUniverse).filter((code) => !publishedUniverse.has(code));
+  workspace.authoring = {
+    drafts,
+    activeSessions,
+    localisationCoverage: {
+      totalLanguages: languageUniverse.size,
+      publishedLanguages: publishedUniverse.size,
+      missing: missingLanguages
+    }
+  };
+
+  const roster = enrollments.map((enrollment) => {
+    const stats = progressByEnrollment.get(enrollment.id) ?? { completionRatio: 0, lastCompletedAt: null };
+    const course = courseById.get(enrollment.courseId);
+    const user = collaboratorDirectory.get(enrollment.userId);
+    const lessonsForCourse = lessonsByCourse.get(enrollment.courseId) ?? [];
+    return {
+      id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
+      learnerId: enrollment.userId,
+      name: user ? resolveName(user.firstName, user.lastName, user.email) : `Learner ${enrollment.userId}`,
+      courseId: enrollment.courseId,
+      courseTitle: course?.title ?? 'Course',
+      status: enrollment.status,
+      progressPercent: Number.isFinite(Number(enrollment.progressPercent))
+        ? Number(enrollment.progressPercent)
+        : Math.round((stats.completionRatio ?? 0) * 100),
+      cohort: enrollment.metadata?.cohort ?? 'General',
+      lastActivityAt: stats.lastCompletedAt ? stats.lastCompletedAt.toISOString() : null,
+      nextLesson: resolveNextLesson(lessonsForCourse, stats),
+      riskLevel: determineRiskLevel(enrollment, stats, now),
+      notes: stats.notes ?? [],
+      lastLocation: stats.lastLocation ?? null
+    };
+  });
+
+  const riskPriority = { critical: 0, high: 1, medium: 2, low: 3 };
+  const riskAlerts = roster
+    .filter((entry) => entry.riskLevel === 'critical' || entry.riskLevel === 'high')
+    .sort((a, b) => {
+      const riskDelta = (riskPriority[a.riskLevel] ?? 3) - (riskPriority[b.riskLevel] ?? 3);
+      if (riskDelta !== 0) return riskDelta;
+      return (a.progressPercent ?? 0) - (b.progressPercent ?? 0);
+    })
+    .slice(0, 10);
+
+  workspace.learners = { roster, riskAlerts };
+
+  return workspace;
+}
+
 function buildTutorNotifications({ bookings = [], now }) {
   const notifications = [];
   bookings
@@ -449,6 +999,11 @@ export function buildInstructorDashboard({
   modules = [],
   lessons = [],
   assignments = [],
+  courseProgress = [],
+  creationProjects = [],
+  creationCollaborators = new Map(),
+  creationSessions = new Map(),
+  collaboratorDirectory = new Map(),
   tutorProfiles = [],
   tutorAvailability = [],
   tutorBookings = [],
@@ -713,6 +1268,20 @@ export function buildInstructorDashboard({
     now
   );
 
+  const coursesWorkspace = buildCourseWorkspace({
+    courses,
+    modules,
+    lessons,
+    assignments,
+    enrollments: courseEnrollments,
+    courseProgress,
+    creationProjects,
+    creationCollaborators,
+    creationSessions,
+    collaboratorDirectory,
+    now
+  });
+
   const searchIndex = [
     ...courses.map((course) => ({
       id: `search-course-${course.id}`,
@@ -744,6 +1313,7 @@ export function buildInstructorDashboard({
     role: { id: 'instructor', label: 'Instructor' },
     dashboard: {
       metrics,
+      courses: coursesWorkspace,
       bookings: {
         pipeline: pipelineBookings
       },
@@ -803,7 +1373,151 @@ export default class DashboardService {
       throw error;
     }
 
-    const instructorSnapshot = buildInstructorDashboard({ user, now: referenceDate }) ?? undefined;
+    let courseWorkspaceInput = {
+      courses: [],
+      modules: [],
+      lessons: [],
+      assignments: [],
+      enrollments: [],
+      courseProgress: [],
+      creationProjects: [],
+      creationCollaborators: new Map(),
+      creationSessions: new Map(),
+      collaboratorDirectory: new Map()
+    };
+
+    try {
+      const { default: CourseModel } = await import('../models/CourseModel.js');
+      const courses = await CourseModel.listByInstructor(user.id, {
+        includeArchived: false,
+        includeDrafts: true,
+        limit: 50
+      });
+      courseWorkspaceInput.courses = courses;
+
+      if (courses.length) {
+        const courseIds = courses.map((course) => course.id);
+        const [
+          { default: CourseModuleModel },
+          { default: CourseLessonModel },
+          { default: CourseAssignmentModel },
+          { default: CourseEnrollmentModel },
+          { default: CourseProgressModel }
+        ] = await Promise.all([
+          import('../models/CourseModuleModel.js'),
+          import('../models/CourseLessonModel.js'),
+          import('../models/CourseAssignmentModel.js'),
+          import('../models/CourseEnrollmentModel.js'),
+          import('../models/CourseProgressModel.js')
+        ]);
+
+        const [modules, lessons, assignments, enrollments] = await Promise.all([
+          CourseModuleModel.listByCourseIds(courseIds),
+          CourseLessonModel.listByCourseIds(courseIds),
+          CourseAssignmentModel.listByCourseIds(courseIds),
+          CourseEnrollmentModel.listByCourseIds(courseIds)
+        ]);
+
+        const enrollmentIds = enrollments.map((enrollment) => enrollment.id);
+        const progress = enrollmentIds.length
+          ? await CourseProgressModel.listByEnrollmentIds(enrollmentIds)
+          : [];
+
+        courseWorkspaceInput = {
+          ...courseWorkspaceInput,
+          modules,
+          lessons,
+          assignments,
+          enrollments,
+          courseProgress: progress
+        };
+      }
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load instructor course catalogue data');
+    }
+
+    try {
+      const [
+        { default: CreationProjectModel },
+        { default: CreationProjectCollaboratorModel },
+        { default: CreationCollaborationSessionModel }
+      ] = await Promise.all([
+        import('../models/CreationProjectModel.js'),
+        import('../models/CreationProjectCollaboratorModel.js'),
+        import('../models/CreationCollaborationSessionModel.js')
+      ]);
+
+      const projects = await CreationProjectModel.list({
+        ownerId: user.id,
+        type: ['course'],
+        includeArchived: false,
+        limit: 25
+      });
+
+      const collaboratorMap = new Map();
+      const sessionMap = new Map();
+      if (projects.length) {
+        const [collaboratorLists, sessionLists] = await Promise.all([
+          Promise.all(projects.map((project) => CreationProjectCollaboratorModel.listByProject(project.id))),
+          Promise.all(projects.map((project) => CreationCollaborationSessionModel.listActiveByProject(project.id)))
+        ]);
+        projects.forEach((project, index) => {
+          collaboratorMap.set(project.id, collaboratorLists[index] ?? []);
+          sessionMap.set(project.id, sessionLists[index] ?? []);
+        });
+      }
+
+      courseWorkspaceInput = {
+        ...courseWorkspaceInput,
+        creationProjects: projects,
+        creationCollaborators: collaboratorMap,
+        creationSessions: sessionMap
+      };
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load instructor authoring workspace data');
+    }
+
+    try {
+      const collaboratorIds = new Set();
+      courseWorkspaceInput.enrollments.forEach((enrollment) => collaboratorIds.add(enrollment.userId));
+      courseWorkspaceInput.creationCollaborators.forEach((collaborators) => {
+        collaborators.forEach((collaborator) => collaboratorIds.add(collaborator.userId));
+      });
+      courseWorkspaceInput.creationSessions.forEach((sessions) => {
+        sessions.forEach((session) => collaboratorIds.add(session.participantId));
+      });
+      collaboratorIds.add(user.id);
+
+      if (collaboratorIds.size) {
+        const collaboratorRecords = await UserModel.findByIds(Array.from(collaboratorIds));
+        const directory = new Map();
+        collaboratorRecords.forEach((record) => {
+          directory.set(record.id, record);
+        });
+        courseWorkspaceInput = {
+          ...courseWorkspaceInput,
+          collaboratorDirectory: directory
+        };
+      }
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load collaborator directory for course workspace');
+    }
+
+    const instructorSnapshot =
+      buildInstructorDashboard({
+        user,
+        now: referenceDate,
+        courses: courseWorkspaceInput?.courses ?? [],
+        courseEnrollments: courseWorkspaceInput?.enrollments ?? [],
+        modules: courseWorkspaceInput?.modules ?? [],
+        lessons: courseWorkspaceInput?.lessons ?? [],
+        assignments: courseWorkspaceInput?.assignments ?? [],
+        courseProgress: courseWorkspaceInput?.courseProgress ?? [],
+        creationProjects: courseWorkspaceInput?.creationProjects ?? [],
+        creationCollaborators: courseWorkspaceInput?.creationCollaborators ?? new Map(),
+        creationSessions: courseWorkspaceInput?.creationSessions ?? new Map(),
+        collaboratorDirectory: courseWorkspaceInput?.collaboratorDirectory ?? new Map()
+      }) ?? undefined;
     let operatorSnapshot;
     if (['admin', 'operator'].includes(user.role)) {
       operatorSnapshot = await getOperatorDashboardService().build({ user, now: referenceDate });

@@ -14,12 +14,17 @@
 - Initiated build and test verification runs (backend unit suite, frontend production bundle) to validate the documentation against actual project health, capturing failures for engineering follow-up.
 
 ## Backend Stabilisation
+- Delivered the instructor course workspace domain models (`CourseModel`, `CourseModuleModel`, `CourseLessonModel`,
+  `CourseAssignmentModel`, `CourseEnrollmentModel`, `CourseProgressModel`) and wired `DashboardService.getDashboardForUser`
+  to lazily hydrate catalogue, cohort analytics, assignments, authoring drafts, and learner risk signals only when instructors
+  actually own courses, cutting unnecessary imports while returning a production-ready `coursesWorkspace` payload for the API.
 - Implemented a production-grade domain event dispatch pipeline powered by a persistent queue, exponential backoff, jitter, and Prometheus metrics so domain events now flow reliably to webhook subscribers instead of remaining passive audit rows.
 - Registered the dispatcher with the worker service readiness probes to ensure background automation boots alongside existing schedulers and surfaces health in probes and logs.
 - Hardened the domain event model with JSON normalisation, transaction-aware dispatch enqueueing, and backward-compatible options so existing services transparently gain outbox support.
 - Delivered manifest-driven feature flag governance with bootstrap synchronisation, tenant override storage, and admin APIs so operators can activate capabilities safely across tenants without database changes or engineer intervention.
 - Wrapped Stripe, PayPal, CloudConvert, and Twilio integrations with sandbox-aware gateways, Redis-backed circuit breakers, idempotent webhook receipts, and retry/backoff orchestration while updating payment flows and community reminders to consume the new abstractions.
 - Centralised compliance evidence capture with a dedicated audit event service that encrypts IP telemetry, enforces metadata retention limits, and wires controller request context into every DSR and consent lifecycle change.
+- Expanded the compliance stack with attestation analytics, evidence archive discovery, and risk heatmap builders powering the operator dashboard, including database accessors for archive listings and policy coverage summaries.
 
 ## Data & Infrastructure Updates
 - Added a managed migration that creates the `domain_event_dispatch_queue` table with status tracking, lock metadata, and retry scheduling to persist event delivery state across restarts.
@@ -33,9 +38,14 @@
 - Added coverage for tenant override evaluation and governance sync workflows, exercising the new manifest automation and admin endpoints through Vitest to prevent regressions.
 - Added unit coverage for the schema guard diff engine to ensure drift detection logic remains stable as new tables and indexes are added.
 - Authored dedicated tests for the audit event service validating IP encryption, request-context enrichment, and metadata truncation so the new compliance telemetry remains deterministic.
+- Introduced regression coverage for the compliance console tab switching and evidence export rendering to guard the new admin UI from state-management regressions.
 
 ## Operator Experience Modernisation
+- Completed the instructor learning workspace by surfacing catalogue analytics, assignment pipelines, authoring drafts with
+  localisation coverage, and learner management tables in `InstructorCourseManage`, adding persistence-backed modals and new
+  vitest coverage for the sections to guarantee production behaviour.
 - Rebuilt the executive operator overview into a production-grade command centre that surfaces live KPIs, consolidated incident metrics, release readiness, and cross-tenant status from service health feeds with responsive layouts tuned for desktop and tablet operators.
 - Added a persistent executive dashboard data orchestration layer that coordinates tenant-aware API calls, caches results in IndexedDB for offline fallback, auto-refreshes while the tab is visible, and exposes manual refresh plus connectivity banners to operators.
 - Extended the dashboard shell to route admin users through the new experience while preserving existing learner and instructor journeys, ensuring role-aware navigation stays intact even when the admin payload is unavailable.
 - Shipped targeted Vitest coverage for the executive data hook to validate happy-path loading, caching, and degradation behaviour so operators always see deterministic data during network turbulence.
+- Delivered the admin compliance console experience with audits, attestation coverage, framework trackers, incident response queues, risk heatmaps, and evidence export management wired to the new backend analytics and secure download controls.

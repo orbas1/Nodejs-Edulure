@@ -103,6 +103,20 @@ function sanitizePrimitive(value) {
   return String(value);
 }
 
+function ensureJson(value, fallback = {}) {
+  if (!value) {
+    return fallback;
+  }
+  if (typeof value === 'object') {
+    return value;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
 export default class AuditEventService {
   constructor({
     connection = db,
@@ -114,6 +128,102 @@ export default class AuditEventService {
     this.encryptionService = encryptionService;
     this.logger = ensureLogger(loggerInstance);
     this.config = buildConfig(config);
+  }
+
+  async summariseRecent({
+    tenantId = this.config.tenantId,
+    since,
+    limit = 50,
+    severityFloor = 'info'
+  } = {}) {
+    const severities = ['info', 'notice', 'warning', 'error', 'critical'];
+    const severityIndex = severities.indexOf(String(severityFloor).toLowerCase());
+
+    const filteredSeverities = severityIndex === -1 ? severities : severities.slice(severityIndex);
+
+    const query = this.connection(COMPLIANCE_TABLES.AUDIT_EVENTS)
+      .where({ tenant_id: tenantId ?? this.config.tenantId })
+      .modify((builder) => {
+        if (since) {
+          builder.andWhere('occurred_at', '>=', since instanceof Date ? since.toISOString() : since);
+        }
+        if (filteredSeverities.length && filteredSeverities.length !== severities.length) {
+          builder.andWhereIn('event_severity', filteredSeverities);
+        }
+      })
+      .orderBy('occurred_at', 'desc')
+      .limit(limit);
+
+    const rows = await query;
+
+    const countsBySeverity = severities.reduce((acc, severity) => ({ ...acc, [severity]: 0 }), {});
+    const eventTypeCounts = new Map();
+    const actorCounts = new Map();
+
+    const latestEvents = rows.map((row) => {
+      const payload = ensureJson(row.payload);
+      const metadata = ensureJson(row.metadata);
+
+      const severity = (row.event_severity ?? '').toLowerCase();
+      if (countsBySeverity[severity] !== undefined) {
+        countsBySeverity[severity] += 1;
+      }
+
+      const eventType = row.event_type ?? 'unknown';
+      eventTypeCounts.set(eventType, (eventTypeCounts.get(eventType) ?? 0) + 1);
+
+      const actorKey = `${row.actor_type ?? 'system'}:${row.actor_role ?? 'system'}`;
+      actorCounts.set(actorKey, (actorCounts.get(actorKey) ?? 0) + 1);
+
+      return {
+        id: row.id,
+        eventUuid: row.event_uuid,
+        eventType,
+        severity,
+        entityType: row.entity_type,
+        entityId: row.entity_id,
+        occurredAt: row.occurred_at,
+        actor: {
+          id: row.actor_id,
+          type: row.actor_type,
+          role: row.actor_role
+        },
+        metadata,
+        payload,
+        requestId: row.request_id ?? null
+      };
+    });
+
+    const controlsTested = latestEvents.filter((event) => event.eventType.startsWith('control.')).length;
+    const policyUpdates = latestEvents.filter((event) => event.eventType.startsWith('policy.')).length;
+    const investigations = latestEvents.filter((event) => ['warning', 'error', 'critical'].includes(event.severity)).length;
+
+    const mostRecent = latestEvents[0]?.occurredAt ?? null;
+
+    const breakdown = Array.from(eventTypeCounts.entries())
+      .map(([eventType, count]) => ({ eventType, count }))
+      .sort((a, b) => b.count - a.count);
+
+    const actors = Array.from(actorCounts.entries())
+      .map(([composite, count]) => {
+        const [type, role] = composite.split(':');
+        return { type, role, count };
+      })
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      totals: {
+        events: latestEvents.length,
+        investigations,
+        controlsTested,
+        policyUpdates
+      },
+      countsBySeverity,
+      eventTypeBreakdown: breakdown,
+      actorBreakdown: actors,
+      latestEvents,
+      lastEventAt: mostRecent
+    };
   }
 
   async record({

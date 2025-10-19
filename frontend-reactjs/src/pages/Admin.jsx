@@ -164,6 +164,12 @@ export default function Admin() {
   const complianceSlaBreaches = compliance.slaBreaches ?? 0;
   const complianceManualReview = compliance.manualReviewQueue ?? 0;
   const complianceGdprProfile = compliance.gdpr ?? EMPTY_OBJECT;
+  const complianceAudits = compliance.audits ?? EMPTY_OBJECT;
+  const complianceAttestations = compliance.attestations ?? EMPTY_OBJECT;
+  const complianceFrameworks = compliance.frameworks ?? EMPTY_ARRAY;
+  const complianceRisk = compliance.risk ?? EMPTY_OBJECT;
+  const complianceIncidentResponse = compliance.incidentResponse ?? EMPTY_OBJECT;
+  const complianceEvidence = compliance.evidence ?? EMPTY_OBJECT;
 
   const activity = adminData.activity ?? EMPTY_OBJECT;
   const alerts = activity.alerts ?? EMPTY_ARRAY;
@@ -528,6 +534,12 @@ export default function Admin() {
               slaBreaches={complianceSlaBreaches}
               manualReviewQueue={complianceManualReview}
               gdprProfile={complianceGdprProfile}
+              audits={complianceAudits}
+              attestations={complianceAttestations}
+              frameworks={complianceFrameworks}
+              risk={complianceRisk}
+              incidentResponse={complianceIncidentResponse}
+              evidence={complianceEvidence}
               onReview={handleVerificationReview}
             />
 
