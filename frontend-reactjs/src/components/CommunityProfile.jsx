@@ -59,7 +59,13 @@ export default function CommunityProfile({
   onLoadMoreResources,
   onLeave,
   isLeaving = false,
-  canLeave = false
+  canLeave = false,
+  onAddResource,
+  onEditResource,
+  onDeleteResource,
+  isManagingResource = false,
+  resourceNotice,
+  resourceActionId
 }) {
   if (isAggregate) {
     return (
@@ -103,6 +109,11 @@ export default function CommunityProfile({
   const totalResources = resourcesMeta?.total ?? resourceItems.length;
   const showLoadMore = typeof onLoadMoreResources === 'function';
   const showingCount = resourceItems.length;
+  const canManageResources = Boolean(
+    community.permissions?.canManageResources ??
+      (community.membership?.role &&
+        ['owner', 'admin', 'moderator'].includes(community.membership.role))
+  );
 
   return (
     <div className="space-y-6">
@@ -154,10 +165,32 @@ export default function CommunityProfile({
         </div>
       </div>
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Latest resources</h4>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Latest resources</h4>
+            <p className="mt-1 text-xs text-slate-500">
+              Share playbooks, external articles, or classroom replays curated for this community.
+            </p>
+          </div>
+          {canManageResources && typeof onAddResource === 'function' && (
+            <button
+              type="button"
+              onClick={onAddResource}
+              disabled={isManagingResource}
+              className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isManagingResource ? 'Opening…' : 'Add resource'}
+            </button>
+          )}
+        </div>
         {resourcesError && (
           <div className="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600" role="alert">
             {resourcesError}
+          </div>
+        )}
+        {resourceNotice && (
+          <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700" role="status">
+            {resourceNotice}
           </div>
         )}
         {isLoadingResources && resourceItems.length === 0 ? (
@@ -169,25 +202,71 @@ export default function CommunityProfile({
             <ul className="mt-4 space-y-3 text-sm text-slate-600">
               {resourceItems.map((resource) => (
                 <li key={resource.id} className="rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="space-y-1">
                       <div className="text-sm font-semibold text-slate-900">{resource.title}</div>
-                      <p className="mt-1 text-xs text-slate-500">{resource.description ?? 'No description provided.'}</p>
-                      <div className="mt-1 flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                      <p className="text-xs text-slate-500">{resource.description ?? 'No description provided.'}</p>
+                      <div className="flex flex-wrap gap-2 text-[11px] font-medium uppercase tracking-wide text-slate-400">
                         <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-slate-600">{resource.resourceType}</span>
                         <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-slate-600">{formatDate(resource.publishedAt)}</span>
+                        {Array.isArray(resource.tags) &&
+                          resource.tags.slice(0, 3).map((tag) => (
+                            <span key={tag} className="rounded-full bg-slate-200/50 px-2 py-0.5 text-slate-500">
+                              #{tag}
+                            </span>
+                          ))}
                       </div>
+                      {resource.metadata?.embedUrl && (
+                        <div className="aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-900/5">
+                          <iframe
+                            title={`${resource.title} preview`}
+                            src={resource.metadata.embedUrl}
+                            className="h-full w-full"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            loading="lazy"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+                            allowFullScreen
+                          />
+                        </div>
+                      )}
                     </div>
-                    {resource.linkUrl && (
-                      <a
-                        href={resource.linkUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-semibold text-primary hover:underline"
-                      >
-                        Open
-                      </a>
-                    )}
+                    <div className="flex flex-col items-end gap-2">
+                      {resource.linkUrl && (
+                        <a
+                          href={resource.linkUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
+                        >
+                          Open link
+                        </a>
+                      )}
+                      {canManageResources && (
+                        <div className="flex gap-2">
+                          {typeof onEditResource === 'function' && (
+                            <button
+                              type="button"
+                              onClick={() => onEditResource(resource)}
+                              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-white"
+                              disabled={isManagingResource}
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {typeof onDeleteResource === 'function' && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteResource(resource)}
+                              className="inline-flex items-center justify-center rounded-full border border-rose-200 px-3 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-50"
+                              disabled={isManagingResource}
+                            >
+                              {resourceActionId === resource.id && isManagingResource ? 'Removing…' : 'Remove'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}
@@ -273,5 +352,11 @@ CommunityProfile.propTypes = {
   onLoadMoreResources: PropTypes.func,
   onLeave: PropTypes.func,
   isLeaving: PropTypes.bool,
-  canLeave: PropTypes.bool
+  canLeave: PropTypes.bool,
+  onAddResource: PropTypes.func,
+  onEditResource: PropTypes.func,
+  onDeleteResource: PropTypes.func,
+  isManagingResource: PropTypes.bool,
+  resourceNotice: PropTypes.string,
+  resourceActionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
 };

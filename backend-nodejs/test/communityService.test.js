@@ -37,7 +37,10 @@ const communityPostModelMock = vi.hoisted(() => ({
 
 const communityResourceModelMock = vi.hoisted(() => ({
   create: vi.fn(),
-  listForCommunity: vi.fn()
+  listForCommunity: vi.fn(),
+  findById: vi.fn(),
+  update: vi.fn(),
+  markDeleted: vi.fn()
 }));
 
 const domainEventModelMock = vi.hoisted(() => ({
@@ -140,7 +143,8 @@ describe('CommunityService', () => {
           channels: 3,
           lastActivityAt: expect.any(String)
         },
-        membership: { role: 'admin', status: 'active' }
+        membership: { role: 'admin', status: 'active' },
+        permissions: expect.objectContaining({ canManageResources: true })
       })
     ]);
   });
@@ -323,6 +327,98 @@ describe('CommunityService', () => {
       expect.any(Object)
     );
     expect(response).toEqual(expect.objectContaining({ id: 222, status: 'archived' }));
+  });
+
+  it('updates a community resource and records events', async () => {
+    const existingResource = {
+      id: 501,
+      communityId: baseCommunity.id,
+      title: 'Launch checklist',
+      description: 'Version 1',
+      resourceType: 'content_asset',
+      assetId: 303,
+      linkUrl: null,
+      classroomReference: null,
+      tags: JSON.stringify(['launch']),
+      metadata: JSON.stringify({ difficulty: 'beginner' }),
+      visibility: 'members',
+      status: 'published',
+      publishedAt: new Date('2024-01-01T00:00:00Z').toISOString()
+    };
+
+    communityModelMock.findById.mockResolvedValue(baseCommunity);
+    communityMemberModelMock.findMembership.mockResolvedValue({ role: 'admin', status: 'active' });
+    communityResourceModelMock.findById.mockResolvedValue(existingResource);
+    communityResourceModelMock.update.mockResolvedValue({
+      ...existingResource,
+      resourceType: 'external_link',
+      assetId: null,
+      linkUrl: 'https://edulure.com/playbook',
+      status: 'draft',
+      publishedAt: null,
+      description: 'Version 2',
+      tags: JSON.stringify(['launch', 'ops'])
+    });
+
+    const resource = await CommunityService.updateResource('42', 501, 7, {
+      resourceType: 'external_link',
+      linkUrl: 'https://edulure.com/playbook',
+      status: 'draft',
+      description: 'Version 2',
+      tags: ['launch', 'ops']
+    });
+
+    expect(transactionSpy).toHaveBeenCalled();
+    expect(communityResourceModelMock.update).toHaveBeenCalledWith(
+      501,
+      expect.objectContaining({
+        resourceType: 'external_link',
+        assetId: null,
+        linkUrl: 'https://edulure.com/playbook',
+        status: 'draft',
+        publishedAt: null
+      }),
+      expect.any(Object)
+    );
+    expect(domainEventModelMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'community.resource.updated' }),
+      expect.any(Object)
+    );
+    expect(domainEventModelMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'community.resource.unpublished' }),
+      expect.any(Object)
+    );
+    expect(resource).toEqual(
+      expect.objectContaining({
+        id: 501,
+        resourceType: 'external_link',
+        linkUrl: 'https://edulure.com/playbook',
+        description: 'Version 2'
+      })
+    );
+  });
+
+  it('soft deletes a community resource', async () => {
+    const existingResource = {
+      id: 777,
+      communityId: baseCommunity.id,
+      status: 'draft'
+    };
+
+    communityModelMock.findById.mockResolvedValue(baseCommunity);
+    communityMemberModelMock.findMembership.mockResolvedValue({ role: 'moderator', status: 'active' });
+    communityResourceModelMock.findById.mockResolvedValue(existingResource);
+    communityResourceModelMock.markDeleted.mockResolvedValue({ ...existingResource, status: 'archived' });
+
+    const result = await CommunityService.deleteResource('42', 777, 11);
+
+    expect(transactionSpy).toHaveBeenCalled();
+    expect(communityResourceModelMock.markDeleted).toHaveBeenCalledWith(777, expect.any(Object));
+    expect(domainEventModelMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: 'community.resource.deleted' }),
+      expect.any(Object)
+    );
+    expect(result).toEqual({ id: 777 });
   });
 
   it('updates sponsorship placement preferences', async () => {

@@ -89,6 +89,36 @@ export async function fetchCommunityResources({ communityId, token, limit = 6, o
   return mapResponse(response);
 }
 
+export async function createCommunityResource({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/resources`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:resources`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunityResource({ communityId, resourceId, token, payload }) {
+  const response = await httpClient.put(`/communities/${communityId}/resources/${resourceId}`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:resources`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function deleteCommunityResource({ communityId, resourceId, token }) {
+  const response = await httpClient.delete(`/communities/${communityId}/resources/${resourceId}`, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:resources`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
 export async function createCommunityPost({ communityId, token, payload }) {
   const response = await httpClient.post(`/communities/${communityId}/posts`, payload, {
     token,

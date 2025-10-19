@@ -4,12 +4,15 @@ import {
   fetchCommunities,
   fetchCommunityDetail,
   fetchCommunityResources,
+  createCommunityResource,
   joinCommunity,
   leaveCommunity,
   moderateCommunityPost,
   removeCommunityPost,
   fetchCommunitySponsorships,
-  updateCommunitySponsorships
+  updateCommunitySponsorships,
+  updateCommunityResource,
+  deleteCommunityResource
 } from '../api/communityApi.js';
 import { fetchLiveFeed } from '../api/feedApi.js';
 import TopBar from '../components/TopBar.jsx';
@@ -19,6 +22,7 @@ import FeedCard from '../components/FeedCard.jsx';
 import FeedSponsoredCard from '../components/FeedSponsoredCard.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import CommunityHero from '../components/CommunityHero.jsx';
+import CommunityResourceEditor from '../components/community/CommunityResourceEditor.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
 
@@ -174,6 +178,13 @@ export default function Feed() {
   const [isLoadingSponsorships, setIsLoadingSponsorships] = useState(false);
   const [sponsorshipError, setSponsorshipError] = useState(null);
   const [isUpdatingSponsorship, setIsUpdatingSponsorship] = useState(false);
+  const [isResourceEditorOpen, setIsResourceEditorOpen] = useState(false);
+  const [resourceEditorMode, setResourceEditorMode] = useState('create');
+  const [resourceEditorInitial, setResourceEditorInitial] = useState(null);
+  const [resourceEditorError, setResourceEditorError] = useState(null);
+  const [isSavingResource, setIsSavingResource] = useState(false);
+  const [deletingResourceId, setDeletingResourceId] = useState(null);
+  const [resourceNotice, setResourceNotice] = useState(null);
 
   const updatePostActionState = useCallback((postId, updates) => {
     setPostActions((prev) => {
@@ -476,6 +487,14 @@ export default function Feed() {
   }, [selectedCommunity?.id]);
 
   useEffect(() => {
+    setResourceNotice(null);
+    setResourceEditorError(null);
+    setResourceEditorInitial(null);
+    setIsResourceEditorOpen(false);
+    setDeletingResourceId(null);
+  }, [selectedCommunity?.id]);
+
+  useEffect(() => {
     if (!token || !communityDetail?.id || !communityDetail?.permissions?.canManageSponsorships) {
       setIsLoadingSponsorships(false);
       setSponsorshipError(null);
@@ -570,6 +589,8 @@ export default function Feed() {
       await leaveCommunity({ communityId: communityDetail.id, token });
 
       setCommunityDetail(null);
+      setResourceNotice(null);
+      setResourceEditorError(null);
       setCommunities((prev) =>
         prev.map((community) =>
           String(community.id) === String(communityDetail.id)
@@ -589,6 +610,85 @@ export default function Feed() {
       setLeaveError(error?.message ?? 'Unable to leave this community right now.');
     } finally {
       setIsLeavingCommunity(false);
+    }
+  };
+
+  const openCreateResourceEditor = useCallback(() => {
+    if (!communityDetail?.id) return;
+    setResourceEditorMode('create');
+    setResourceEditorInitial(null);
+    setResourceEditorError(null);
+    setIsResourceEditorOpen(true);
+  }, [communityDetail?.id]);
+
+  const openEditResourceEditor = useCallback(
+    (resource) => {
+      if (!communityDetail?.id || !resource) return;
+      setResourceEditorMode('edit');
+      setResourceEditorInitial(resource);
+      setResourceEditorError(null);
+      setIsResourceEditorOpen(true);
+    },
+    [communityDetail?.id]
+  );
+
+  const closeResourceEditor = useCallback(() => {
+    setIsResourceEditorOpen(false);
+    setResourceEditorInitial(null);
+    setResourceEditorError(null);
+  }, []);
+
+  const handleResourceSubmit = async (payload) => {
+    if (!token || !communityDetail?.id) return;
+    setResourceEditorError(null);
+    setResourceNotice(null);
+    setIsSavingResource(true);
+
+    try {
+      if (resourceEditorMode === 'edit' && resourceEditorInitial?.id) {
+        await updateCommunityResource({
+          communityId: communityDetail.id,
+          resourceId: resourceEditorInitial.id,
+          token,
+          payload
+        });
+        setResourceNotice('Resource updated successfully.');
+      } else {
+        await createCommunityResource({ communityId: communityDetail.id, token, payload });
+        setResourceNotice(
+          payload.status === 'published'
+            ? 'Resource published to the community library.'
+            : 'Resource draft saved for your community.'
+        );
+      }
+      closeResourceEditor();
+      await loadCommunityDetail(communityDetail.id);
+    } catch (error) {
+      setResourceEditorError(error?.message ?? 'Unable to save this resource right now.');
+    } finally {
+      setIsSavingResource(false);
+    }
+  };
+
+  const handleDeleteResource = async (resource) => {
+    if (!token || !communityDetail?.id || !resource?.id) return;
+    if (!window.confirm('Remove this resource from the community library? This action cannot be undone.')) {
+      return;
+    }
+
+    setResourcesError(null);
+    setResourceEditorError(null);
+    setResourceNotice(null);
+    setDeletingResourceId(resource.id);
+
+    try {
+      await deleteCommunityResource({ communityId: communityDetail.id, resourceId: resource.id, token });
+      setResourceNotice('Resource removed from the library.');
+      await loadCommunityDetail(communityDetail.id);
+    } catch (error) {
+      setResourcesError(error?.message ?? 'Unable to remove this resource right now.');
+    } finally {
+      setDeletingResourceId(null);
     }
   };
 
@@ -812,6 +912,15 @@ export default function Feed() {
   const joinDisabledReason = canJoinCommunities
     ? null
     : 'Your current role is limited to read-only access. Contact an administrator to manage membership changes.';
+
+  const canManageCommunityResources = useMemo(() => {
+    if (!communityDetail) return false;
+    if (communityDetail.permissions?.canManageResources) return true;
+    const role = communityDetail.membership?.role;
+    return role ? ['owner', 'admin', 'moderator'].includes(role) : false;
+  }, [communityDetail]);
+
+  const isManagingResources = isResourceEditorOpen || isSavingResource || Boolean(deletingResourceId);
 
   return (
     <div className="bg-slate-50/70 py-16">
@@ -1162,10 +1271,57 @@ export default function Feed() {
               error={communityDetailError}
               resourcesError={resourcesError}
               onLoadMoreResources={hasMoreResources ? loadMoreResources : null}
+              onLeave={communityDetail?.permissions?.canLeave ? handleLeaveCommunity : null}
+              isLeaving={isLeavingCommunity}
+              canLeave={Boolean(communityDetail?.permissions?.canLeave)}
+              onAddResource={canManageCommunityResources ? openCreateResourceEditor : null}
+              onEditResource={canManageCommunityResources ? openEditResourceEditor : null}
+              onDeleteResource={canManageCommunityResources ? handleDeleteResource : null}
+              isManagingResource={isManagingResources}
+              resourceNotice={resourceNotice}
+              resourceActionId={deletingResourceId}
             />
           </div>
         </div>
       </div>
+      {isResourceEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-10 backdrop-blur-sm">
+          <div
+            className="absolute inset-0"
+            onClick={() => {
+              if (!isSavingResource) {
+                closeResourceEditor();
+              }
+            }}
+          />
+          <div
+            className="relative w-full max-w-3xl rounded-4xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                if (!isSavingResource) {
+                  closeResourceEditor();
+                }
+              }}
+              className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:bg-slate-100"
+              aria-label="Close resource editor"
+              disabled={isSavingResource}
+            >
+              ×
+            </button>
+            <CommunityResourceEditor
+              mode={resourceEditorMode === 'edit' ? 'edit' : 'create'}
+              initialValue={resourceEditorMode === 'edit' ? resourceEditorInitial : null}
+              onSubmit={handleResourceSubmit}
+              onCancel={closeResourceEditor}
+              isSubmitting={isSavingResource}
+              error={resourceEditorError}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
