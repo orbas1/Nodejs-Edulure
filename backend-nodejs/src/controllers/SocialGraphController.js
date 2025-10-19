@@ -98,6 +98,22 @@ export default class SocialGraphController {
     }
   }
 
+  static async removeFollower(req, res, next) {
+    try {
+      const result = await SocialGraphService.removeFollower(
+        req.params.userId,
+        req.params.followerId,
+        req.user.id
+      );
+      return success(res, {
+        data: result,
+        message: 'Follower removed'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async unfollow(req, res, next) {
     try {
       const result = await SocialGraphService.unfollowUser(req.user.id, req.params.userId);

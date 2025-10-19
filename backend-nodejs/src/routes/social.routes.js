@@ -25,6 +25,11 @@ router.post(
   auth(),
   SocialGraphController.declineFollow
 );
+router.delete(
+  '/users/:userId/followers/:followerId',
+  auth(),
+  SocialGraphController.removeFollower
+);
 
 router.get('/privacy', auth(), SocialGraphController.getPrivacy);
 router.get('/users/:userId/privacy', auth(), SocialGraphController.getPrivacy);

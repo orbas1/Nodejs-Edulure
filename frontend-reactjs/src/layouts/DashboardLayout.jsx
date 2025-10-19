@@ -12,6 +12,7 @@ import {
   ChatBubbleLeftEllipsisIcon,
   ChartBarIcon,
   ChatBubbleBottomCenterTextIcon,
+  CheckBadgeIcon,
   ChevronRightIcon,
   ClipboardDocumentListIcon,
   CommandLineIcon,
@@ -189,6 +190,7 @@ const navigationByRole = {
         { id: 'admin-control-centre', name: 'Control centre', to: `${basePath}/control`, icon: CommandLineIcon },
         { id: 'admin-command', name: 'Command', to: `${basePath}/operator`, icon: ShieldExclamationIcon },
         { id: 'admin-integrations', name: 'Integrations', to: `${basePath}/integrations`, icon: PuzzlePieceIcon },
+        { id: 'admin-trust-safety', name: 'Trust & safety', to: `${basePath}/trust-safety`, icon: CheckBadgeIcon },
         { id: 'admin-governance', name: 'Governance', to: `${basePath}/governance`, icon: ShieldCheckIcon }
       ]
     },

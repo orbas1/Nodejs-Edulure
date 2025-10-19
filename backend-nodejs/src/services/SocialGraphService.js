@@ -353,6 +353,64 @@ export default class SocialGraphService {
     });
   }
 
+  static async removeFollower(targetUserId, followerId, actorId) {
+    if (actorId !== Number(targetUserId)) {
+      const error = new Error('Only the target user can remove followers');
+      error.status = 403;
+      throw error;
+    }
+
+    await ensureUserExists(followerId);
+
+    return db.transaction(async (trx) => {
+      const relationship = await UserFollowModel.findRelationship(followerId, targetUserId, trx);
+      if (!relationship) {
+        const error = new Error('Follower relationship not found');
+        error.status = 404;
+        throw error;
+      }
+
+      await UserFollowModel.deleteRelationship(followerId, targetUserId, trx);
+
+      await SocialAuditLogModel.record(
+        {
+          userId: targetUserId,
+          targetUserId: followerId,
+          action: 'follow.removed',
+          metadata: { previousStatus: relationship.status, removedBy: 'target_user' }
+        },
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'user',
+          entityId: targetUserId,
+          eventType: 'social.follower.removed',
+          payload: {
+            followerId,
+            previousStatus: relationship.status,
+            removedBy: actorId
+          },
+          performedBy: actorId
+        },
+        trx
+      );
+
+      logger.info(
+        {
+          followerId,
+          targetUserId,
+          actorId,
+          previousStatus: relationship.status
+        },
+        'Follower removed by target user'
+      );
+
+      return relationship;
+    });
+  }
+
   static async unfollowUser(actorId, targetUserId) {
     if (actorId === Number(targetUserId)) {
       const error = new Error('You cannot unfollow yourself');

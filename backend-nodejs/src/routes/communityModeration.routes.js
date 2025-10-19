@@ -33,6 +33,11 @@ router.post(
 
 router.post('/scam-reports', auth(), CommunityModerationController.submitScamReport);
 router.get('/scam-reports', auth(), CommunityModerationController.listScamReports);
+router.patch(
+  '/scam-reports/:reportId',
+  auth('admin'),
+  CommunityModerationController.updateScamReport
+);
 
 router.post('/analytics/events', auth(), CommunityModerationController.recordAnalyticsEvent);
 router.get('/analytics/summary', auth(), CommunityModerationController.getAnalyticsSummary);
