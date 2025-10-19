@@ -206,6 +206,20 @@ function pickSensitiveUpdates(updates) {
 }
 
 export default class PaymentIntentModel {
+  static async listByUser(userId, { limit = 25 } = {}, connection = db) {
+    if (!userId) {
+      return [];
+    }
+
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where({ user_id: userId })
+      .orderBy('created_at', 'desc')
+      .limit(limit);
+
+    return rows.map((row) => deserialize(row));
+  }
+
   static async create(intent, connection = db) {
     const payload = toDbPayload(intent);
     const [id] = await connection(TABLE).insert(payload);
