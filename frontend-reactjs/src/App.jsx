@@ -33,6 +33,7 @@ import DashboardAffiliate from './pages/dashboard/DashboardAffiliate.jsx';
 import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
 import InstructorCommunityCreate from './pages/dashboard/InstructorCommunityCreate.jsx';
 import InstructorCommunityManage from './pages/dashboard/InstructorCommunityManage.jsx';
+import InstructorCommunityChats from './pages/dashboard/InstructorCommunityChats.jsx';
 import InstructorCommunityWebinars from './pages/dashboard/InstructorCommunityWebinars.jsx';
 import InstructorCommunityPodcasts from './pages/dashboard/InstructorCommunityPodcasts.jsx';
 import InstructorCourseCreate from './pages/dashboard/InstructorCourseCreate.jsx';
@@ -197,6 +198,7 @@ function App() {
         />
         <Route path="communities/create" element={<InstructorCommunityCreate />} />
         <Route path="communities/manage" element={<InstructorCommunityManage />} />
+        <Route path="communities/chats" element={<InstructorCommunityChats />} />
         <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />
         <Route path="communities/podcasts" element={<InstructorCommunityPodcasts />} />
         <Route
