@@ -25,6 +25,18 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
     _HubTab('Scoreboard', Icons.emoji_events_outlined),
     _HubTab('Events', Icons.event_available_outlined),
   ];
+  static const String _allHostsLabel = 'All hosts';
+
+  String _feedQuery = '';
+  final Set<String> _selectedFeedTags = <String>{};
+  bool _includePastClassrooms = false;
+  bool _includePastCalendarItems = false;
+  bool _includePastLivestreams = false;
+  bool _includePastEvents = false;
+  final Set<String> _selectedLivestreamStatuses = <String>{};
+  String _selectedPodcastHost = _allHostsLabel;
+  bool _showLongFormPodcasts = false;
+  String _leaderboardSort = 'rank';
 
   @override
   void initState() {
@@ -162,33 +174,103 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
     CommunityHubState state,
     CommunityHubController controller,
   ) {
-    final posts = List<CommunityFeedPost>.from(state.snapshot.feed)
+    final posts = List<CommunityFeedPost>.from(state.snapshot.feed);
+    final availableTags = posts
+        .expand((post) => post.tags)
+        .where((tag) => tag.trim().isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    final query = _feedQuery.trim().toLowerCase();
+    final filteredPosts = posts
+        .where((post) {
+          final matchesQuery = query.isEmpty ||
+              post.title.toLowerCase().contains(query) ||
+              post.body.toLowerCase().contains(query) ||
+              post.author.toLowerCase().contains(query);
+          final matchesTags = _selectedFeedTags.isEmpty ||
+              _selectedFeedTags.every((tag) => post.tags.contains(tag));
+          return matchesQuery && matchesTags;
+        })
+        .toList()
       ..sort((a, b) {
         if (a.pinned != b.pinned) {
           return a.pinned ? -1 : 1;
         }
         return b.updatedAt.compareTo(a.updatedAt);
       });
+
+    final showEmpty = filteredPosts.isEmpty && !state.loading;
+    final totalCount = 1 + filteredPosts.length + (showEmpty ? 1 : 0) + (state.loading ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: posts.length + (state.loading ? 1 : 0),
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        if (index >= posts.length) {
+        if (index == 0) {
+          return _FeedFiltersCard(
+            query: _feedQuery,
+            availableTags: availableTags,
+            selectedTags: _selectedFeedTags,
+            totalCount: posts.length,
+            visibleCount: filteredPosts.length,
+            onQueryChanged: (value) {
+              setState(() {
+                _feedQuery = value;
+              });
+            },
+            onClearFilters: () {
+              setState(() {
+                _feedQuery = '';
+                _selectedFeedTags.clear();
+              });
+            },
+            onTagToggled: (tag, isSelected) {
+              setState(() {
+                if (isSelected) {
+                  _selectedFeedTags.add(tag);
+                } else {
+                  _selectedFeedTags.remove(tag);
+                }
+              });
+            },
+          );
+        }
+
+        var offset = 1;
+        if (index < offset + filteredPosts.length) {
+          final post = filteredPosts[index - offset];
+          return _FeedCard(
+            post: post,
+            onEdit: () => _openFeedComposer(context, controller, initial: post),
+            onDelete: () => controller.deleteFeedPost(post.id),
+            onTogglePin: () => controller.togglePostPin(post.id),
+            onShare: () => _launchUrl(post.attachmentUrls.isNotEmpty
+                ? Uri.parse(post.attachmentUrls.first)
+                : Uri.parse('https://share.example.com/posts/${post.id}')),
+          );
+        }
+
+        offset += filteredPosts.length;
+        if (showEmpty && index == offset) {
+          return _buildPlaceholderCard(
+            context,
+            icon: Icons.dynamic_feed_outlined,
+            title: 'No posts match your filters',
+            subtitle:
+                'Adjust your search or tags to find the conversations you are looking for.',
+          );
+        }
+
+        offset += showEmpty ? 1 : 0;
+        if (state.loading && index == offset) {
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(child: CircularProgressIndicator()),
           );
         }
-        final post = posts[index];
-        return _FeedCard(
-          post: post,
-          onEdit: () => _openFeedComposer(context, controller, initial: post),
-          onDelete: () => controller.deleteFeedPost(post.id),
-          onTogglePin: () => controller.togglePostPin(post.id),
-          onShare: () => _launchUrl(post.attachmentUrls.isNotEmpty
-              ? Uri.parse(post.attachmentUrls.first)
-              : Uri.parse('https://share.example.com/posts/${post.id}')),
-        );
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -200,19 +282,65 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
   ) {
     final classrooms = List<CommunityClassroom>.from(state.snapshot.classrooms)
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final now = DateTime.now();
+    final filteredClassrooms = classrooms
+        .where((classroom) =>
+            _includePastClassrooms || classroom.endTime.isAfter(now))
+        .toList();
+    final showEmpty = filteredClassrooms.isEmpty;
+    final totalCount =
+        1 + filteredClassrooms.length + (showEmpty ? 1 : 0) + (state.loading ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: classrooms.length,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final classroom = classrooms[index];
-        return _ClassroomCard(
-          classroom: classroom,
-          onEdit: () => _openClassroomComposer(context, controller, initial: classroom),
-          onDelete: () => controller.deleteClassroom(classroom.id),
-          onEnroll: () => _promptEnrollment(context, classroom, controller),
-          onCancelEnrollment: (member) =>
-              controller.cancelClassroomEnrollment(classroom.id, member),
-        );
+        if (index == 0) {
+          return _ClassroomFilterCard(
+            includePast: _includePastClassrooms,
+            upcomingCount: classrooms.where((c) => c.endTime.isAfter(now)).length,
+            totalCount: classrooms.length,
+            onIncludePastChanged: (value) {
+              setState(() {
+                _includePastClassrooms = value;
+              });
+            },
+          );
+        }
+
+        var offset = 1;
+        if (index < offset + filteredClassrooms.length) {
+          final classroom = filteredClassrooms[index - offset];
+          return _ClassroomCard(
+            classroom: classroom,
+            onEdit: () => _openClassroomComposer(context, controller, initial: classroom),
+            onDelete: () => controller.deleteClassroom(classroom.id),
+            onEnroll: () => _promptEnrollment(context, classroom, controller),
+            onCancelEnrollment: (member) =>
+                controller.cancelClassroomEnrollment(classroom.id, member),
+          );
+        }
+
+        offset += filteredClassrooms.length;
+        if (showEmpty && index == offset) {
+          return _buildPlaceholderCard(
+            context,
+            icon: Icons.class_outlined,
+            title: 'No sessions in this view',
+            subtitle:
+                'Toggle past sessions or add a new one to keep your classroom calendar full.',
+          );
+        }
+
+        offset += showEmpty ? 1 : 0;
+        if (state.loading && index == offset) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -224,17 +352,66 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
   ) {
     final entries = List<CommunityCalendarEntry>.from(state.snapshot.calendarEntries)
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
-    return ListView.separated(
+    final now = DateTime.now();
+    final filteredEntries = entries
+        .where((entry) =>
+            _includePastCalendarItems || entry.endTime.isAfter(now))
+        .toList();
+    final showEmpty = filteredEntries.isEmpty;
+    final totalCount =
+        1 + filteredEntries.length + (showEmpty ? 1 : 0) + (state.loading ? 1 : 0);
+
+    return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: entries.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final entry = entries[index];
-        return _CalendarCard(
-          entry: entry,
-          onEdit: () => _openCalendarComposer(context, controller, initial: entry),
-          onDelete: () => controller.deleteCalendarEntry(entry.id),
-        );
+        if (index == 0) {
+          return _CalendarFilterCard(
+            includePast: _includePastCalendarItems,
+            upcomingCount: entries.where((entry) => entry.endTime.isAfter(now)).length,
+            totalCount: entries.length,
+            onIncludePastChanged: (value) {
+              setState(() {
+                _includePastCalendarItems = value;
+              });
+            },
+          );
+        }
+
+        var offset = 1;
+        if (index < offset + filteredEntries.length) {
+          final entry = filteredEntries[index - offset];
+          final isLast = index - offset == filteredEntries.length - 1;
+          return Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+            child: _CalendarCard(
+              entry: entry,
+              onEdit: () => _openCalendarComposer(context, controller, initial: entry),
+              onDelete: () => controller.deleteCalendarEntry(entry.id),
+            ),
+          );
+        }
+
+        offset += filteredEntries.length;
+        if (showEmpty && index == offset) {
+          return _buildPlaceholderCard(
+            context,
+            icon: Icons.event_note_outlined,
+            title: 'Your calendar is clear',
+            subtitle:
+                'Add upcoming touchpoints or include completed entries to review past impact.',
+          );
+        }
+
+        offset += showEmpty ? 1 : 0;
+        if (state.loading && index == offset) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -246,17 +423,85 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
   ) {
     final streams = List<CommunityLivestream>.from(state.snapshot.livestreams)
       ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+    final now = DateTime.now();
+    final availableStatuses = streams
+        .map((stream) => stream.status)
+        .where((status) => status.trim().isNotEmpty)
+        .toSet()
+        .toList()
+      ..sort();
+    final filteredStreams = streams
+        .where((stream) {
+          final matchesStatus = _selectedLivestreamStatuses.isEmpty ||
+              _selectedLivestreamStatuses.contains(stream.status);
+          final matchesTime =
+              _includePastLivestreams || stream.scheduledAt.isAfter(now);
+          return matchesStatus && matchesTime;
+        })
+        .toList();
+    final showEmpty = filteredStreams.isEmpty;
+    final totalCount =
+        1 + filteredStreams.length + (showEmpty ? 1 : 0) + (state.loading ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: streams.length,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final stream = streams[index];
-        return _LivestreamCard(
-          stream: stream,
-          onEdit: () => _openLivestreamComposer(context, controller, initial: stream),
-          onDelete: () => controller.deleteLivestream(stream.id),
-          onOpen: () => _launchUrl(Uri.parse(stream.streamUrl)),
-        );
+        if (index == 0) {
+          return _LivestreamFilterCard(
+            availableStatuses: availableStatuses,
+            selectedStatuses: _selectedLivestreamStatuses,
+            includePast: _includePastLivestreams,
+            onIncludePastChanged: (value) {
+              setState(() {
+                _includePastLivestreams = value;
+              });
+            },
+            onStatusToggled: (status, selected) {
+              setState(() {
+                if (selected) {
+                  _selectedLivestreamStatuses.add(status);
+                } else {
+                  _selectedLivestreamStatuses.remove(status);
+                }
+              });
+            },
+            totalCount: streams.length,
+            visibleCount: filteredStreams.length,
+          );
+        }
+
+        var offset = 1;
+        if (index < offset + filteredStreams.length) {
+          final stream = filteredStreams[index - offset];
+          return _LivestreamCard(
+            stream: stream,
+            onEdit: () => _openLivestreamComposer(context, controller, initial: stream),
+            onDelete: () => controller.deleteLivestream(stream.id),
+            onOpen: () => _launchUrl(Uri.parse(stream.streamUrl)),
+          );
+        }
+
+        offset += filteredStreams.length;
+        if (showEmpty && index == offset) {
+          return _buildPlaceholderCard(
+            context,
+            icon: Icons.videocam_outlined,
+            title: 'No live streams scheduled',
+            subtitle:
+                'Adjust the filters or schedule your next broadcast to energize the community.',
+          );
+        }
+
+        offset += showEmpty ? 1 : 0;
+        if (state.loading && index == offset) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -268,17 +513,76 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
   ) {
     final episodes = List<CommunityPodcastEpisode>.from(state.snapshot.podcasts)
       ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+    final hosts = <String>{for (final episode in episodes) episode.host}.toList()
+      ..sort();
+    final hostOptions = <String>[_allHostsLabel, ...hosts];
+    final filteredEpisodes = episodes
+        .where((episode) {
+          final matchesHost =
+              _selectedPodcastHost == _allHostsLabel || episode.host == _selectedPodcastHost;
+          final matchesDuration = !_showLongFormPodcasts || episode.duration.inMinutes >= 30;
+          return matchesHost && matchesDuration;
+        })
+        .toList();
+    final showEmpty = filteredEpisodes.isEmpty;
+    final totalCount =
+        1 + filteredEpisodes.length + (showEmpty ? 1 : 0) + (state.loading ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: episodes.length,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final episode = episodes[index];
-        return _PodcastCard(
-          episode: episode,
-          onEdit: () => _openPodcastComposer(context, controller, initial: episode),
-          onDelete: () => controller.deletePodcastEpisode(episode.id),
-          onPlay: () => _launchUrl(Uri.parse(episode.audioUrl)),
-        );
+        if (index == 0) {
+          return _PodcastFilterCard(
+            hosts: hostOptions,
+            selectedHost: _selectedPodcastHost,
+            showLongFormOnly: _showLongFormPodcasts,
+            totalCount: episodes.length,
+            visibleCount: filteredEpisodes.length,
+            onHostChanged: (value) {
+              setState(() {
+                _selectedPodcastHost = value;
+              });
+            },
+            onLongFormChanged: (value) {
+              setState(() {
+                _showLongFormPodcasts = value;
+              });
+            },
+          );
+        }
+
+        var offset = 1;
+        if (index < offset + filteredEpisodes.length) {
+          final episode = filteredEpisodes[index - offset];
+          return _PodcastCard(
+            episode: episode,
+            onEdit: () => _openPodcastComposer(context, controller, initial: episode),
+            onDelete: () => controller.deletePodcastEpisode(episode.id),
+            onPlay: () => _launchUrl(Uri.parse(episode.audioUrl)),
+          );
+        }
+
+        offset += filteredEpisodes.length;
+        if (showEmpty && index == offset) {
+          return _buildPlaceholderCard(
+            context,
+            icon: Icons.podcasts_outlined,
+            title: 'No episodes match the filters',
+            subtitle:
+                'Try another host or duration to keep your learning playlist flowing.',
+          );
+        }
+
+        offset += showEmpty ? 1 : 0;
+        if (state.loading && index == offset) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -289,10 +593,22 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
     CommunityHubController controller,
   ) {
     final leaders = List<CommunityLeaderboardEntry>.from(state.snapshot.leaderboard)
-      ..sort((a, b) => a.rank.compareTo(b.rank));
+      ..sort((a, b) => _leaderboardSort == 'points'
+          ? b.points.compareTo(a.points)
+          : a.rank.compareTo(b.rank));
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
+        _LeaderboardFilterCard(
+          sortMode: _leaderboardSort,
+          onSortModeChanged: (mode) {
+            setState(() {
+              _leaderboardSort = mode;
+            });
+          },
+          totalCount: state.snapshot.leaderboard.length,
+        ),
+        const SizedBox(height: 16),
         if (leaders.isEmpty)
           _buildPlaceholderCard(
             context,
@@ -324,19 +640,64 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
   ) {
     final events = List<CommunityEvent>.from(state.snapshot.events)
       ..sort((a, b) => a.startTime.compareTo(b.startTime));
+    final now = DateTime.now();
+    final filteredEvents = events
+        .where((event) => _includePastEvents || event.endTime.isAfter(now))
+        .toList();
+    final showEmpty = filteredEvents.isEmpty;
+    final totalCount =
+        1 + filteredEvents.length + (showEmpty ? 1 : 0) + (state.loading ? 1 : 0);
+
     return ListView.builder(
       padding: const EdgeInsets.all(20),
-      itemCount: events.length,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
-        final event = events[index];
-        return _EventCard(
-          event: event,
-          onEdit: () => _openEventComposer(context, controller, initial: event),
-          onDelete: () => controller.deleteEvent(event.id),
-          onOpenRegistration: event.registrationUrl != null
-              ? () => _launchUrl(Uri.parse(event.registrationUrl!))
-              : null,
-        );
+        if (index == 0) {
+          return _EventFilterCard(
+            includePast: _includePastEvents,
+            upcomingCount: events.where((event) => event.endTime.isAfter(now)).length,
+            totalCount: events.length,
+            onIncludePastChanged: (value) {
+              setState(() {
+                _includePastEvents = value;
+              });
+            },
+          );
+        }
+
+        var offset = 1;
+        if (index < offset + filteredEvents.length) {
+          final event = filteredEvents[index - offset];
+          return _EventCard(
+            event: event,
+            onEdit: () => _openEventComposer(context, controller, initial: event),
+            onDelete: () => controller.deleteEvent(event.id),
+            onOpenRegistration: event.registrationUrl != null
+                ? () => _launchUrl(Uri.parse(event.registrationUrl!))
+                : null,
+          );
+        }
+
+        offset += filteredEvents.length;
+        if (showEmpty && index == offset) {
+          return _buildPlaceholderCard(
+            context,
+            icon: Icons.event_available_outlined,
+            title: 'No events to show',
+            subtitle:
+                'Create your next gathering or include past events to review attendance.',
+          );
+        }
+
+        offset += showEmpty ? 1 : 0;
+        if (state.loading && index == offset) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return const SizedBox.shrink();
       },
     );
   }
@@ -1826,6 +2187,540 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
                 const SizedBox(height: 8),
                 Text(subtitle, style: Theme.of(context).textTheme.bodyMedium),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedFiltersCard extends StatelessWidget {
+  const _FeedFiltersCard({
+    required this.query,
+    required this.availableTags,
+    required this.selectedTags,
+    required this.onQueryChanged,
+    required this.onClearFilters,
+    required this.onTagToggled,
+    required this.totalCount,
+    required this.visibleCount,
+  });
+
+  final String query;
+  final List<String> availableTags;
+  final Set<String> selectedTags;
+  final ValueChanged<String> onQueryChanged;
+  final VoidCallback onClearFilters;
+  final void Function(String tag, bool isSelected) onTagToggled;
+  final int totalCount;
+  final int visibleCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasFilters = query.trim().isNotEmpty || selectedTags.isNotEmpty;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: theme.colorScheme.primary.withOpacity(0.05),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Feed controls',
+                    style:
+                        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _SummaryChip(
+                  icon: Icons.article_outlined,
+                  label: '$visibleCount of $totalCount stories',
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: ValueKey(query),
+              initialValue: query,
+              decoration: const InputDecoration(
+                prefixIcon: Icon(Icons.search),
+                labelText: 'Search posts',
+                hintText: 'Search by title, author or topic',
+              ),
+              onChanged: onQueryChanged,
+            ),
+            if (availableTags.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                'Filter by tags',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final tag in availableTags)
+                    FilterChip(
+                      label: Text(tag),
+                      selected: selectedTags.contains(tag),
+                      onSelected: (selected) => onTagToggled(tag, selected),
+                    ),
+                ],
+              ),
+            ],
+            if (hasFilters) ...[
+              const SizedBox(height: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onClearFilters,
+                  icon: const Icon(Icons.clear_all),
+                  label: const Text('Clear filters'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassroomFilterCard extends StatelessWidget {
+  const _ClassroomFilterCard({
+    required this.includePast,
+    required this.upcomingCount,
+    required this.totalCount,
+    required this.onIncludePastChanged,
+  });
+
+  final bool includePast;
+  final int upcomingCount;
+  final int totalCount;
+  final ValueChanged<bool> onIncludePastChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: theme.colorScheme.secondary.withOpacity(0.05),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Classroom schedule',
+                    style:
+                        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _SummaryChip(
+                  icon: Icons.class_outlined,
+                  label: '$upcomingCount upcoming · $totalCount total',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              value: includePast,
+              onChanged: onIncludePastChanged,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Show completed classroom sessions'),
+              subtitle: const Text('Review graduate cohorts and coaching archive.'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CalendarFilterCard extends StatelessWidget {
+  const _CalendarFilterCard({
+    required this.includePast,
+    required this.upcomingCount,
+    required this.totalCount,
+    required this.onIncludePastChanged,
+  });
+
+  final bool includePast;
+  final int upcomingCount;
+  final int totalCount;
+  final ValueChanged<bool> onIncludePastChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: theme.colorScheme.primaryContainer.withOpacity(0.18),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Calendar overview',
+                    style:
+                        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _SummaryChip(
+                  icon: Icons.event_note_outlined,
+                  label: '$upcomingCount upcoming · $totalCount total',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              value: includePast,
+              onChanged: onIncludePastChanged,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Include completed calendar entries'),
+              subtitle: const Text('Study cadence and follow-up moments.'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LivestreamFilterCard extends StatelessWidget {
+  const _LivestreamFilterCard({
+    required this.availableStatuses,
+    required this.selectedStatuses,
+    required this.includePast,
+    required this.onIncludePastChanged,
+    required this.onStatusToggled,
+    required this.totalCount,
+    required this.visibleCount,
+  });
+
+  final List<String> availableStatuses;
+  final Set<String> selectedStatuses;
+  final bool includePast;
+  final ValueChanged<bool> onIncludePastChanged;
+  final void Function(String status, bool isSelected) onStatusToggled;
+  final int totalCount;
+  final int visibleCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: theme.colorScheme.secondaryContainer.withOpacity(0.2),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Live stream lineup',
+                    style:
+                        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _SummaryChip(
+                  icon: Icons.videocam_outlined,
+                  label: '$visibleCount of $totalCount scheduled',
+                ),
+              ],
+            ),
+            if (availableStatuses.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Statuses',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final status in availableStatuses)
+                    FilterChip(
+                      label: Text(status[0].toUpperCase() + status.substring(1)),
+                      selected: selectedStatuses.contains(status),
+                      onSelected: (selected) => onStatusToggled(status, selected),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 12),
+            SwitchListTile.adaptive(
+              value: includePast,
+              onChanged: onIncludePastChanged,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Include past broadcasts'),
+              subtitle: const Text('Show recordings for on-demand engagement.'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PodcastFilterCard extends StatelessWidget {
+  const _PodcastFilterCard({
+    required this.hosts,
+    required this.selectedHost,
+    required this.showLongFormOnly,
+    required this.onHostChanged,
+    required this.onLongFormChanged,
+    required this.totalCount,
+    required this.visibleCount,
+  });
+
+  final List<String> hosts;
+  final String selectedHost;
+  final bool showLongFormOnly;
+  final ValueChanged<String> onHostChanged;
+  final ValueChanged<bool> onLongFormChanged;
+  final int totalCount;
+  final int visibleCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: theme.colorScheme.tertiaryContainer.withOpacity(0.25),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Podcast curation',
+                    style:
+                        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _SummaryChip(
+                  icon: Icons.podcasts_outlined,
+                  label: '$visibleCount of $totalCount episodes',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedHost,
+              decoration: const InputDecoration(
+                labelText: 'Host',
+                prefixIcon: Icon(Icons.person_outline),
+              ),
+              items: hosts
+                  .map(
+                    (host) => DropdownMenuItem<String>(
+                      value: host,
+                      child: Text(host),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  onHostChanged(value);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              value: showLongFormOnly,
+              onChanged: onLongFormChanged,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Highlight deep-dive episodes (30+ minutes)'),
+              subtitle: const Text('Perfect for mastermind replays and workshops.'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LeaderboardFilterCard extends StatelessWidget {
+  const _LeaderboardFilterCard({
+    required this.sortMode,
+    required this.onSortModeChanged,
+    required this.totalCount,
+  });
+
+  final String sortMode;
+  final ValueChanged<String> onSortModeChanged;
+  final int totalCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: theme.colorScheme.primary.withOpacity(0.04),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Leaderboard insights',
+                    style:
+                        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _SummaryChip(
+                  icon: Icons.people_alt_outlined,
+                  label: '$totalCount members ranked',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment<String>(
+                  value: 'rank',
+                  label: Text('By rank'),
+                  icon: Icon(Icons.format_list_numbered),
+                ),
+                ButtonSegment<String>(
+                  value: 'points',
+                  label: Text('By points'),
+                  icon: Icon(Icons.bolt_outlined),
+                ),
+              ],
+              selected: {sortMode},
+              onSelectionChanged: (selection) {
+                if (selection.isNotEmpty) {
+                  onSortModeChanged(selection.first);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EventFilterCard extends StatelessWidget {
+  const _EventFilterCard({
+    required this.includePast,
+    required this.upcomingCount,
+    required this.totalCount,
+    required this.onIncludePastChanged,
+  });
+
+  final bool includePast;
+  final int upcomingCount;
+  final int totalCount;
+  final ValueChanged<bool> onIncludePastChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      color: theme.colorScheme.surfaceVariant.withOpacity(0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Events pipeline',
+                    style:
+                        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                _SummaryChip(
+                  icon: Icons.event_available_outlined,
+                  label: '$upcomingCount upcoming · $totalCount total',
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile.adaptive(
+              value: includePast,
+              onChanged: onIncludePastChanged,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Include concluded events'),
+              subtitle: const Text('Review turnout trends and follow-up actions.'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SummaryChip extends StatelessWidget {
+  const _SummaryChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        color: theme.colorScheme.onPrimary.withOpacity(0.08),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.primary,
             ),
           ),
         ],
