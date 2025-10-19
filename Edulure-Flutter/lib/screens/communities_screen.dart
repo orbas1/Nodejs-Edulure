@@ -245,6 +245,11 @@ class _CommunitiesScreenState extends ConsumerState<CommunitiesScreen> {
           icon: const Icon(Icons.analytics_outlined),
           label: const Text('Community analytics'),
         ),
+        OutlinedButton.icon(
+          onPressed: () => Navigator.of(context).pushNamed('/community/hub'),
+          icon: const Icon(Icons.workspace_premium_outlined),
+          label: const Text('Engagement hub'),
+        ),
       ],
     );
   }

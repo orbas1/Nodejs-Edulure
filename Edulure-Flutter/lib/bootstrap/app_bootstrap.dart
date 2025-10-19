@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
 import '../core/state/provider_logger.dart';
@@ -28,6 +29,7 @@ class AppBootstrap {
   }
 
   Future<void> _initialize() async {
+    await Hive.initFlutter();
     await SessionManager.init();
     await LanguageService.init();
     await container.read(telemetryServiceProvider).prepare();
