@@ -12,13 +12,14 @@ import { useOutletContext } from 'react-router-dom';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 
 const STORAGE_KEY = 'edulure:tutor-schedule';
+const TAG_DELIMITERS = /(?:\r?\n|[•,])/u;
 
 function normaliseTags(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value.filter(Boolean);
   if (typeof value === 'string') {
     return value
-      .split(/[\n,•]/)
+      .split(TAG_DELIMITERS)
       .map((item) => item.trim())
       .filter(Boolean);
   }
