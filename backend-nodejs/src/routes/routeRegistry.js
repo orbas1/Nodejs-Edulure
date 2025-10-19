@@ -3,6 +3,7 @@ import adsRoutes from './ads.routes.js';
 import analyticsRoutes from './analytics.routes.js';
 import authRoutes from './auth.routes.js';
 import blogRoutes from './blog.routes.js';
+import providerTransitionRoutes from './providerTransition.routes.js';
 import chatRoutes from './chat.routes.js';
 import complianceRoutes from './compliance.routes.js';
 import communityRoutes from './community.routes.js';
@@ -20,6 +21,8 @@ import runtimeConfigRoutes from './runtimeConfig.routes.js';
 import socialRoutes from './social.routes.js';
 import userRoutes from './user.routes.js';
 import verificationRoutes from './verification.routes.js';
+import observabilityRoutes from './observability.routes.js';
+import environmentParityRoutes from './environmentParity.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 
 const routerMap = {
@@ -44,7 +47,10 @@ const routerMap = {
   admin: adminRoutes,
   verification: verificationRoutes,
   ebooks: ebookRoutes,
-  blog: blogRoutes
+  blog: blogRoutes,
+  'provider-transition': providerTransitionRoutes,
+  observability: observabilityRoutes,
+  environment: environmentParityRoutes
 };
 
 export const apiRouteRegistry = apiRouteMetadata.map((descriptor) => ({

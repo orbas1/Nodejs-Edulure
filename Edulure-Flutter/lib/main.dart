@@ -26,6 +26,7 @@ import 'screens/settings_screen.dart';
 import 'screens/tutor_booking_screen.dart';
 import 'screens/mobile_creation_companion_screen.dart';
 import 'screens/mobile_ads_governance_screen.dart';
+import 'screens/provider_transition_center_screen.dart';
 import 'services/language_service.dart';
 import 'widgets/capability_status_banner.dart';
 
@@ -72,6 +73,7 @@ class EdulureApp extends ConsumerWidget {
           '/blog': (_) => const BlogScreen(),
           '/settings': (_) => const SettingsScreen(),
           '/creation/companion': (_) => const MobileCreationCompanionScreen(),
+          '/provider-transition': (_) => const ProviderTransitionCenterScreen(),
         };
 
         if (featureFlags['mobile.serviceSuite'] != false) {

@@ -34,7 +34,8 @@ import {
 import { recordExplorerInteraction } from '../api/analyticsApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import worldMap from '../data/world-110m.json';
-import { ComposableMap, Geographies, Geography, Marker } from 'react-simple-maps';
+import { geoMercator, geoPath } from 'd3-geo';
+import { feature as topojsonFeature } from 'topojson-client';
 
 const ENTITY_META = [
   {
@@ -303,8 +304,55 @@ function formatDuration(minutes) {
   return `${Math.round(hours)} hr`;
 }
 
+const MAP_WIDTH = 960;
+const MAP_HEIGHT = 420;
+
+const WORLD_FEATURE_COLLECTION = topojsonFeature(worldMap, worldMap.objects.countries);
+
 function ExplorerMap({ markers, bounds }) {
-  if (!markers?.length) {
+  const mapFeatures = useMemo(() => WORLD_FEATURE_COLLECTION.features ?? [], []);
+
+  const projection = useMemo(() => {
+    const proj = geoMercator();
+    proj.fitSize([MAP_WIDTH, MAP_HEIGHT], WORLD_FEATURE_COLLECTION);
+
+    if (bounds) {
+      const longitude = (bounds.minLng + bounds.maxLng) / 2;
+      const latitude = (bounds.minLat + bounds.maxLat) / 2;
+      const projectedCenter = proj([longitude, latitude]);
+      if (projectedCenter) {
+        const [cx, cy] = projectedCenter;
+        const [tx, ty] = proj.translate();
+        const offsetX = MAP_WIDTH / 2 - cx;
+        const offsetY = MAP_HEIGHT / 2 - cy;
+        proj.translate([tx + offsetX, ty + offsetY]);
+      }
+    }
+
+    return proj;
+  }, [bounds]);
+
+  const pathGenerator = useMemo(() => geoPath(projection), [projection]);
+
+  const projectedMarkers = useMemo(
+    () =>
+      (markers ?? [])
+        .map((marker, index) => {
+          const coordinates = projection([marker.longitude, marker.latitude]);
+          if (!coordinates) {
+            return null;
+          }
+          return {
+            key: `${marker.context ?? 'marker'}-${marker.label ?? 'unknown'}-${index}`,
+            coordinates,
+            label: marker.label
+          };
+        })
+        .filter(Boolean),
+    [markers, projection]
+  );
+
+  if (!projectedMarkers.length) {
     return (
       <div className="rounded-3xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
         <MapPinIcon className="mx-auto mb-3 h-6 w-6 text-slate-400" />
@@ -313,38 +361,40 @@ function ExplorerMap({ markers, bounds }) {
     );
   }
 
-  const projectionConfig = bounds
-    ? {
-        scale: 120,
-        center: [
-          (bounds.minLng + bounds.maxLng) / 2,
-          (bounds.minLat + bounds.maxLat) / 2
-        ]
-      }
-    : { scale: 120 };
-
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white">
-      <ComposableMap projectionConfig={projectionConfig} style={{ width: '100%', height: '320px' }}>
-        <Geographies geography={worldMap}>
-          {({ geographies }) =>
-            geographies.map((geo) => (
-              <Geography
-                key={geo.rsmKey}
-                geography={geo}
+      <svg viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`} className="h-[320px] w-full">
+        <g>
+          {mapFeatures.map((feature, index) => {
+            const path = pathGenerator(feature);
+            if (!path) {
+              return null;
+            }
+            return (
+              <path
+                key={feature.id ?? feature.properties?.name ?? `country-${index}`}
+                d={path}
+                fill="#F8FAFC"
                 stroke="#CBD5F5"
                 strokeWidth={0.3}
-                fill="#F8FAFC"
               />
-            ))
-          }
-        </Geographies>
-        {markers.map((marker, index) => (
-          <Marker key={`${marker.context}-${marker.label}-${index}`} coordinates={[marker.longitude, marker.latitude]}>
-            <circle r={4} fill="#6366f1" stroke="#fff" strokeWidth={1} />
-          </Marker>
-        ))}
-      </ComposableMap>
+            );
+          })}
+        </g>
+        <g>
+          {projectedMarkers.map((marker) => (
+            <circle
+              key={marker.key}
+              cx={marker.coordinates[0]}
+              cy={marker.coordinates[1]}
+              r={4}
+              fill="#6366f1"
+              stroke="#ffffff"
+              strokeWidth={1}
+            />
+          ))}
+        </g>
+      </svg>
     </div>
   );
 }

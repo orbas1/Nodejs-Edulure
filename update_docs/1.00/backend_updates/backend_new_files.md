@@ -32,3 +32,15 @@
 - `src/models/CourseEnrollmentModel.js` — enrollment model providing cohort segmentation and learner status context for risk scoring.
 - `src/models/CourseProgressModel.js` — lesson progress aggregator fuelling learner risk detection and pacing metrics within the
   dashboard workspace.
+- `src/observability/sloRegistry.js` — maintains rolling SLO state, burn-rate calculations, and latency samples for HTTP routes.
+- `src/controllers/ObservabilityController.js` — admin controller exposing SLO snapshot list/detail endpoints with logging.
+- `src/routes/observability.routes.js` — wires observability endpoints into the versioned API registry behind admin auth.
+- `test/observabilitySloRegistry.test.js` — validates SLO aggregation logic, burn-rate calculations, and latency summaries.
+- `test/observabilityHttpRoutes.test.js` — exercises the observability HTTP endpoints for access control and payload structure.
+- `test/observabilityContracts.test.js` — Ajv-powered contract tests that assert runtime responses match the OpenAPI schema.
+- `src/services/EnvironmentParityService.js` — assembles environment parity reports by hashing Terraform/Docker artefacts and executing dependency probes for the `/environment/health` surface. 【F:backend-nodejs/src/services/EnvironmentParityService.js†L1-L217】
+- `src/controllers/EnvironmentParityController.js` — minimal controller that maps parity service responses onto HTTP semantics. 【F:backend-nodejs/src/controllers/EnvironmentParityController.js†L1-L13】
+- `src/routes/environmentParity.routes.js` — Express router exposing the new admin `/environment/health` endpoint. 【F:backend-nodejs/src/routes/environmentParity.routes.js†L1-L9】
+- `test/environmentParityService.test.js` — Vitest coverage validating manifest hashing, drift detection, and dependency probing logic. 【F:backend-nodejs/test/environmentParityService.test.js†L1-L97】
+- `test/environmentParityHttpRoutes.test.js` — Vitest coverage confirming the admin route status codes reflect parity state. 【F:backend-nodejs/test/environmentParityHttpRoutes.test.js†L1-L99】
+- `scripts/wait-for-db.js` — lightweight bootstrap helper invoked by Docker compose to block until Postgres is ready before running migrations. 【F:backend-nodejs/scripts/wait-for-db.js†L1-L36】

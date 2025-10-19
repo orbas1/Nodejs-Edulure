@@ -1,24 +1,54 @@
 version: 2
 updates:
   - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    allow:
+      - dependency-type: "all"
+    ignore:
+      - dependency-name: "npm"
+    groups:
+      tooling:
+        patterns:
+          - "eslint*"
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+      runtime:
+        patterns:
+          - "@aws-sdk/*"
+          - "@headlessui/*"
+          - "@heroicons/*"
+          - "socket.io*"
+  - package-ecosystem: "npm"
     directory: "/backend-nodejs"
     schedule:
-      interval: "weekly"
-    allow:
-      - dependency-type: "direct"
+      interval: "daily"
     open-pull-requests-limit: 10
-    reviewers:
-      - "edulure-devops"
   - package-ecosystem: "npm"
     directory: "/frontend-reactjs"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     open-pull-requests-limit: 10
+  - package-ecosystem: "npm"
+    directory: "/sdk-typescript"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
   - package-ecosystem: "pub"
     directory: "/Edulure-Flutter"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
+  - package-ecosystem: "terraform"
+    directory: "/infrastructure/terraform"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "daily"
+    open-pull-requests-limit: 10

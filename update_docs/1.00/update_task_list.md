@@ -50,7 +50,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 5. **Support, communications, and settings hub** – 100%
    Launch support ticketing, announcements, in-app chat, notification centre, onboarding wizard, tenant settings, and knowledge base experiences with guided tours, contextual help, and RBAC-controlled admin modals.
 
-## Task 3 (0%): Reintroduce provider value and harden learner mobile app
+## Task 3 (100%): Reintroduce provider value and harden learner mobile app
 
 #### Integration coverage
 - **Backend**: Provide mobile-ready APIs, feature flag manifests, and push/notification services.
@@ -63,15 +63,15 @@ All tasks start at 0% completion and will be updated as implementation progresse
 - **Design**: Provide mobile UX guidelines, localisation, theming, and accessibility artefacts.
 
 #### Subtasks
-1. **Provider transition and communications** – 0%  
+1. **Provider transition and communications** – 100%
    Publish EOL statements, migration workflows, partner comms, and updated OKRs/SLAs for provider experiences.
-2. **Learner app service integration** – 0%  
+2. **Learner app service integration** – 100%
    Connect feature flags, background isolates, downloads, chat, calendar sync, and adaptive recommendations to live APIs.
-3. **Mobile UX and accessibility improvements** – 0%  
+3. **Mobile UX and accessibility improvements** – 100%
    Add deep-links, adaptive layouts, localisation, accessibility audits, and deterministic fixtures.
-4. **Security and telemetry hardening** – 0%  
+4. **Security and telemetry hardening** – 100%
    Enforce token refresh/device binding, secure storage fallbacks, SSL pinning, jailbreak detection, Crashlytics/Sentry.
-5. **Mobile CI/CD and QA automation** – 0%  
+5. **Mobile CI/CD and QA automation** – 100%
    Implement fastlane pipelines, automated screenshots, staged rollouts, widget/golden/integration tests, and rollback plans.
 
 ## Task 4 (0%): Industrialise infrastructure, release management, and compliance operations
@@ -87,12 +87,12 @@ All tasks start at 0% completion and will be updated as implementation progresse
 - **Design**: Support design QA in release checklists, accessibility audits, and UI regression baselines.
 
 #### Subtasks
-1. **Contract testing and observability fabric** – 0%  
-   Implement consumer contract tests, schema diff gates, structured logs, metrics, traces, SLO dashboards, and alert routing.
-2. **Environment parity and IaC consolidation** – 0%  
-   Standardise Terraform modules, Docker images, bootstrap scripts, policy checks, and environment health probes.
-3. **Dependency and supply-chain governance** – 0%  
-   Enable Renovate/Dependabot, SBOM/licence scans, vulnerability remediation workflows, and provenance signing.
+1. **Contract testing and observability fabric** – 100%
+   Delivered automated OpenAPI contract validation for observability endpoints, rolled out SLO aggregation/alerting middleware, published `/observability/slos` APIs with governance metadata, and wired Prometheus + SLO telemetry into the runtime logger.
+2. **Environment parity and IaC consolidation** – 100%
+   Standardised Terraform modules across dev/staging/prod, added Docker/Docker Compose parity images, wired GitHub policy checks, and exposed `/environment/health` parity reporting with dependency probes.
+3. **Dependency and supply-chain governance** – 100%
+   Enabled Dependabot coverage across workspaces, wired dependency-governance and provenance workflows, delivered npm audit/licence tooling, refreshed backend/frontend runtime dependencies, and replaced the Explorer map implementation with D3/topojson.
 4. **Release management and QA automation** – 0%  
    Establish release checklists, automated test suites (unit/e2e/load/accessibility/security), and go/no-go sign-offs.
 5. **Security, compliance, and risk operations** – 0%  

@@ -1,0 +1,95 @@
+name: Dependency Governance
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  schedule:
+    - cron: '15 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  id-token: write
+
+jobs:
+  supply-chain-audit:
+    name: Supply chain audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.12.2'
+          cache: 'npm'
+
+      - name: Install workspace dependencies
+        run: npm install --include-workspace-root
+
+      - name: Prepare report directories
+        run: mkdir -p reports
+
+      - name: Run npm audit across workspaces
+        run: npm run audit:ci
+
+      - name: Generate license compliance report
+        run: npm run license:report
+
+      - name: Upload license reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-reports
+          path: reports/licenses
+
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          output-file: sbom/edulure-cyclonedx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyclonedx-sbom
+          path: sbom/edulure-cyclonedx.json
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'HIGH,CRITICAL'
+          format: 'sarif'
+          output: 'reports/trivy-results.sarif'
+
+      - name: Upload Trivy results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scan
+          path: reports/trivy-results.sarif
+
+      - name: Publish Trivy SARIF to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: reports/trivy-results.sarif
+
+      - name: Run OSSF Scorecard analysis
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: reports/scorecard-results.json
+          publish_results: true
+
+      - name: Upload Scorecard report
+        uses: actions/upload-artifact@v4
+        with:
+          name: scorecard-report
+          path: reports/scorecard-results.json

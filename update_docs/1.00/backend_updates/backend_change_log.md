@@ -8,3 +8,5 @@
 - Finalised the instructor dashboard workspace API by layering course, cohort, assignment, authoring, and learner aggregation
   logic behind lazily-imported course models, ensuring `DashboardService.getDashboardForUser` returns a full `coursesWorkspace`
   envelope without incurring database overhead for instructors that have not yet launched a programme.
+- Added an observability SLO registry, HTTP exposure layer, and Prometheus-aware middleware so operators receive real-time error budget burn alerts and latency summaries without shipping bespoke dashboards.
+- Delivered an environment parity service and `/environment/health` endpoint that assembles Terraform/Docker manifest fingerprints, runs dependency probes, and surfaces drift status to admins, giving release managers a deterministic parity report before promoting builds. 【F:backend-nodejs/src/services/EnvironmentParityService.js†L1-L217】【F:backend-nodejs/src/controllers/EnvironmentParityController.js†L1-L13】【F:backend-nodejs/src/routes/environmentParity.routes.js†L1-L9】

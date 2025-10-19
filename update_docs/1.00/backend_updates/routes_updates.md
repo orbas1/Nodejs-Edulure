@@ -1,1 +1,3 @@
 - Extended `admin.routes.js` with `/feature-flags` routes that expose manifest sync, tenant snapshot, and override CRUD endpoints guarded by the admin auth middleware.
+- Registered `observability.routes.js` to expose `/observability/slos` list/detail endpoints behind admin auth, publishing burn-rate telemetry and metadata for SRE dashboards.
+- Registered `environmentParity.routes.js` under `/environment/health` so admins can retrieve infrastructure parity reports without loading the entire operator app. 【F:backend-nodejs/src/routes/environmentParity.routes.js†L1-L9】

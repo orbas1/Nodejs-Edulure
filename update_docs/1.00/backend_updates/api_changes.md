@@ -3,3 +3,5 @@
   queues, authoring drafts, and learner risk signals, enabling the new course management experience to render without additional
   round trips.
 - Augmented `/dashboard/admin` compliance payloads with audit summaries, attestation analytics, framework snapshots, risk heatmaps, incident response queues, and evidence archive metadata so the operator console can render without follow-up requests.
+- Published `/observability/slos` list and detail APIs returning burn-rate analytics, latency percentiles, and definition metadata so operations tooling can query SLO health without bespoke dashboards.
+- Added `/environment/health` behind admin auth to return infrastructure manifest fingerprints, dependency probe outcomes, and overall parity status so release engineering can block promotions when drift or degraded dependencies are detected. 【F:backend-nodejs/src/routes/environmentParity.routes.js†L1-L9】【F:backend-nodejs/src/controllers/EnvironmentParityController.js†L1-L13】【F:backend-nodejs/src/docs/openapi.json†L8328-L8373】

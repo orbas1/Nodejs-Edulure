@@ -1,1 +1,3 @@
 - Added `AdminFeatureFlagController` with endpoints for manifest synchronisation, tenant snapshot retrieval, and override management so platform operators can govern capability exposure without database access.
+- Introduced `ObservabilityController` to expose SLO list/detail endpoints with optional definition metadata and audit logging so operators can inspect burn rate health programmatically.
+- Created `EnvironmentParityController` to surface parity reports that combine manifest fingerprints, dependency probes, and drift classifications for release engineers. 【F:backend-nodejs/src/controllers/EnvironmentParityController.js†L1-L13】

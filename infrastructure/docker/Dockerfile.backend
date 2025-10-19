@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1.6
+
+ARG NODE_VERSION=20.11.1
+
+FROM node:${NODE_VERSION}-bookworm-slim AS base
+WORKDIR /app
+ENV NODE_ENV=production \
+    PNPM_HOME=/usr/local/share/pnpm \
+    PATH="$PNPM_HOME:$PATH"
+RUN corepack enable && corepack prepare pnpm@9.10.0 --activate
+
+FROM base AS deps
+COPY backend-nodejs/package.json backend-nodejs/pnpm-lock.yaml ./
+RUN pnpm fetch
+
+FROM base AS builder
+COPY --from=deps /app/node_modules /.pnpm-store
+COPY backend-nodejs ./backend-nodejs
+WORKDIR /app/backend-nodejs
+RUN pnpm install --offline --frozen-lockfile && \
+    pnpm run build && \
+    pnpm prune --prod
+
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+WORKDIR /srv/app
+ENV NODE_ENV=production
+RUN apt-get update && apt-get install -y --no-install-recommends curl tini && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/backend-nodejs/dist ./dist
+COPY --from=builder /app/backend-nodejs/node_modules ./node_modules
+COPY backend-nodejs/package.json backend-nodejs/knexfile.cjs backend-nodejs/vitest.config.mjs ./
+COPY backend-nodejs/scripts ./scripts
+COPY backend-nodejs/src/config ./src/config
+
+USER node
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "dist/index.js"]
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://localhost:8080/environment/health || exit 1

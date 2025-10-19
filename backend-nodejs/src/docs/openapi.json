@@ -8004,6 +8004,563 @@
             ]
           }
         ]
+      },
+      "ObservabilitySloIndicator": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "http"
+            ]
+          },
+          "routePattern": {
+            "type": "string"
+          },
+          "routePatternFlags": {
+            "type": "string"
+          },
+          "methodWhitelist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "excludeRoutePatterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "treat4xxAsFailures": {
+            "type": "boolean"
+          },
+          "failureStatusCodes": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "default": []
+          },
+          "successStatusCodes": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "type",
+          "routePattern"
+        ]
+      },
+      "ObservabilitySloAlerting": {
+        "type": "object",
+        "properties": {
+          "burnRateWarning": {
+            "type": "number"
+          },
+          "burnRateCritical": {
+            "type": "number"
+          },
+          "minRequests": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "burnRateWarning",
+          "burnRateCritical",
+          "minRequests"
+        ]
+      },
+      "ObservabilitySloLatencySummary": {
+        "type": "object",
+        "properties": {
+          "p50Ms": {
+            "type": "number"
+          },
+          "p95Ms": {
+            "type": "number"
+          },
+          "p99Ms": {
+            "type": "number"
+          },
+          "averageMs": {
+            "type": "number"
+          },
+          "maxMs": {
+            "type": "number"
+          },
+          "minMs": {
+            "type": "number"
+          },
+          "sampleSize": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "p50Ms",
+          "p95Ms",
+          "p99Ms",
+          "averageMs",
+          "maxMs",
+          "minMs",
+          "sampleSize"
+        ]
+      },
+      "ObservabilitySloAnnotation": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "code",
+          "message"
+        ]
+      },
+      "ObservabilitySloDefinition": {
+        "type": "object",
+        "properties": {
+          "indicator": {
+            "$ref": "#/components/schemas/ObservabilitySloIndicator"
+          },
+          "alerting": {
+            "$ref": "#/components/schemas/ObservabilitySloAlerting"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "indicator",
+          "alerting",
+          "tags"
+        ]
+      },
+      "ObservabilitySloSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "targetAvailability": {
+            "type": "number"
+          },
+          "windowMinutes": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "breaching",
+              "insufficient_data",
+              "no_data"
+            ]
+          },
+          "measuredAvailability": {
+            "type": "number",
+            "nullable": true
+          },
+          "successCount": {
+            "type": "integer"
+          },
+          "errorCount": {
+            "type": "integer"
+          },
+          "totalRequests": {
+            "type": "integer"
+          },
+          "errorBudget": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorBudgetRemaining": {
+            "type": "number",
+            "nullable": true
+          },
+          "burnRate": {
+            "type": "number"
+          },
+          "latency": {
+            "$ref": "#/components/schemas/ObservabilitySloLatencySummary",
+            "nullable": true
+          },
+          "windowStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "windowEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "observedMinutes": {
+            "type": "integer"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservabilitySloAnnotation"
+            },
+            "default": []
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ObservabilitySloDefinition",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "targetAvailability",
+          "windowMinutes",
+          "status",
+          "successCount",
+          "errorCount",
+          "totalRequests",
+          "burnRate",
+          "windowStart",
+          "windowEnd",
+          "observedMinutes",
+          "tags",
+          "annotations"
+        ]
+      },
+      "ObservabilitySloCollection": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "slo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservabilitySloSnapshot"
+            }
+          }
+        },
+        "required": [
+          "generatedAt",
+          "slo"
+        ]
+      },
+      "ObservabilitySloListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/ObservabilitySloCollection"
+              }
+            }
+          }
+        ]
+      },
+      "ObservabilitySloDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/ObservabilitySloSnapshot"
+              }
+            }
+          }
+        ]
+      },
+      "EnvironmentDependencyCheck": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string",
+            "description": "Name of the dependency that was evaluated."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "failed",
+              "skipped"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "component",
+          "status"
+        ]
+      },
+      "EnvironmentParityManifestEntry": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path to the artefact that was hashed."
+          },
+          "hash": {
+            "type": "string",
+            "description": "SHA-256 fingerprint of the artefact.",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "hash"
+        ]
+      },
+      "EnvironmentParityManifest": {
+        "type": "object",
+        "properties": {
+          "modules": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "environments": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "docker": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "scripts": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "root": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          }
+        },
+        "required": [
+          "modules",
+          "environments",
+          "docker",
+          "scripts",
+          "root"
+        ]
+      },
+      "EnvironmentParityMismatch": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "drifted",
+              "relocated",
+              "unexpected"
+            ]
+          },
+          "expected": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+              }
+            ],
+            "nullable": true
+          },
+          "observed": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "component",
+          "status"
+        ]
+      },
+      "EnvironmentParityReport": {
+        "type": "object",
+        "properties": {
+          "environment": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "string"
+              },
+              "deploymentStrategy": {
+                "type": "string"
+              },
+              "parityBudgetMinutes": {
+                "type": "integer"
+              },
+              "infrastructureOwner": {
+                "type": "string"
+              },
+              "gitSha": {
+                "type": "string",
+                "nullable": true
+              },
+              "releaseChannel": {
+                "type": "string"
+              },
+              "host": {
+                "type": "string"
+              },
+              "manifestVersion": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "provider",
+              "region",
+              "tier",
+              "deploymentStrategy",
+              "parityBudgetMinutes",
+              "infrastructureOwner",
+              "releaseChannel",
+              "host",
+              "manifestVersion"
+            ]
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentDependencyCheck"
+            }
+          },
+          "manifest": {
+            "type": "object",
+            "properties": {
+              "expected": {
+                "$ref": "#/components/schemas/EnvironmentParityManifest"
+              },
+              "observed": {
+                "$ref": "#/components/schemas/EnvironmentParityManifest"
+              }
+            },
+            "required": [
+              "expected",
+              "observed"
+            ]
+          },
+          "mismatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentParityMismatch"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "drifted",
+              "degraded"
+            ]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "environment",
+          "dependencies",
+          "manifest",
+          "mismatches",
+          "status",
+          "generatedAt"
+        ]
+      },
+      "EnvironmentParityResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/EnvironmentParityReport"
+              }
+            }
+          }
+        ]
       }
     }
   },
@@ -8024,6 +8581,43 @@
           },
           "503": {
             "description": "Downstream dependency failure"
+          }
+        }
+      }
+    },
+    "/environment/health": {
+      "get": {
+        "summary": "Environment parity report",
+        "description": "Returns the latest infrastructure parity evaluation, including manifest drift and dependency status.",
+        "operationId": "getEnvironmentParityReport",
+        "tags": [
+          "Environment"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Environment parity report generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentParityResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Parity drift detected or dependency check failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentParityResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -16207,6 +16801,106 @@
           },
           "422": {
             "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/observability/slos": {
+      "get": {
+        "summary": "Service level objectives",
+        "description": "Returns the most recent error budget and latency snapshots for registered SLOs.",
+        "tags": [
+          "Observability"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "includeDefinition",
+            "in": "query",
+            "required": false,
+            "description": "When true, include indicator and alert configuration with each snapshot.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current SLO snapshots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservabilitySloListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
+        }
+      }
+    },
+    "/observability/slos/{sloId}": {
+      "get": {
+        "summary": "Service level objective detail",
+        "description": "Returns the current snapshot for a specific service level objective.",
+        "tags": [
+          "Observability"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sloId",
+            "in": "path",
+            "required": true,
+            "description": "Identifier of the service level objective to inspect.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDefinition",
+            "in": "query",
+            "required": false,
+            "description": "When true, include indicator and alert configuration with the snapshot.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SLO snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservabilitySloDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "SLO not found"
           }
         }
       }

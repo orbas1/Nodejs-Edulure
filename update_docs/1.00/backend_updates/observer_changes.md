@@ -1,0 +1,1 @@
+- Extended the observability layer with an SLO registry, latency reservoir sampling, and error budget burn annotations feeding the new `/observability/slos` surface.
