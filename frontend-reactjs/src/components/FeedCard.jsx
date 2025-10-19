@@ -23,12 +23,17 @@ function formatRelativeTime(timestamp) {
   return date.toLocaleDateString();
 }
 
-export default function FeedCard({ post }) {
+export default function FeedCard({ post, onModerate, onRemove, actionState }) {
   const publishedLabel = formatRelativeTime(post.publishedAt);
   const communityName = post.community?.name;
   const tags = Array.isArray(post.tags) ? post.tags : [];
   const reactions = post.stats?.reactions ?? 0;
   const comments = post.stats?.comments ?? 0;
+  const canModerate = Boolean(post.permissions?.canModerate && typeof onModerate === 'function');
+  const canRemove = Boolean(post.permissions?.canRemove && typeof onRemove === 'function');
+  const isSuppressed = post.moderation?.state === 'suppressed';
+  const isProcessing = Boolean(actionState?.isProcessing);
+  const actionError = actionState?.error;
 
   return (
     <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -48,7 +53,33 @@ export default function FeedCard({ post }) {
                 {communityName && <span className="ml-1 text-slate-500">{communityName}</span>}
               </p>
             </div>
-            <span className="text-xs font-semibold uppercase tracking-wide text-primary">{publishedLabel}</span>
+            <div className="flex flex-col items-end gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-primary">{publishedLabel}</span>
+              {(canModerate || canRemove) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {canModerate && (
+                    <button
+                      type="button"
+                      onClick={() => onModerate(post, isSuppressed ? 'restore' : 'suppress')}
+                      disabled={isProcessing}
+                      className="rounded-full border border-primary/40 px-3 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isProcessing ? 'Updating…' : isSuppressed ? 'Restore' : 'Suppress'}
+                    </button>
+                  )}
+                  {canRemove && (
+                    <button
+                      type="button"
+                      onClick={() => onRemove(post)}
+                      disabled={isProcessing}
+                      className="rounded-full border border-red-300 px-3 py-1 text-[11px] font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isProcessing ? 'Removing…' : 'Remove'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           {post.title && <h4 className="mt-4 break-words text-sm font-semibold text-slate-900">{post.title}</h4>}
           <p className="mt-3 break-words text-sm leading-6 text-slate-700">{post.body}</p>
@@ -75,6 +106,11 @@ export default function FeedCard({ post }) {
               Comments
             </div>
           </div>
+          {actionError && (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-600" role="alert">
+              {actionError}
+            </div>
+          )}
         </div>
       </div>
     </article>
@@ -102,6 +138,16 @@ FeedCard.propTypes = {
     stats: PropTypes.shape({
       reactions: PropTypes.number,
       comments: PropTypes.number
+    }),
+    permissions: PropTypes.shape({
+      canModerate: PropTypes.bool,
+      canRemove: PropTypes.bool
     })
-  }).isRequired
+  }).isRequired,
+  onModerate: PropTypes.func,
+  onRemove: PropTypes.func,
+  actionState: PropTypes.shape({
+    isProcessing: PropTypes.bool,
+    error: PropTypes.string
+  })
 };

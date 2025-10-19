@@ -100,6 +100,21 @@ export default class CommunityPostModel {
     return this.findById(id, connection);
   }
 
+  static async archive(id, { metadata } = {}, connection = db) {
+    const payload = {
+      status: 'archived',
+      deleted_at: connection.fn.now(),
+      updated_at: connection.fn.now()
+    };
+
+    if (metadata !== undefined) {
+      payload.metadata = JSON.stringify(metadata ?? {});
+    }
+
+    await connection('community_posts').where({ id }).update(payload);
+    return this.findById(id, connection);
+  }
+
   static async paginateForCommunity(communityId, filters = {}, connection = db) {
     const { page = 1, perPage = 10, channelId, postType, visibility, query } = filters;
 
@@ -174,7 +189,8 @@ export default class CommunityPostModel {
         ...CHANNEL_COLUMNS,
         'c.id as communityId',
         'c.name as communityName',
-        'c.slug as communitySlug'
+        'c.slug as communitySlug',
+        'cm.role as viewerRole'
       ])
       .where('cm.status', 'active')
       .andWhere('cp.status', 'published')

@@ -32,7 +32,11 @@ export default function CommunityHero({
   isJoining,
   joinError,
   canJoin = true,
-  joinDisabledReason
+  joinDisabledReason,
+  onLeave,
+  isLeaving,
+  leaveError,
+  canLeave = false
 }) {
   if (isLoading) {
     return (
@@ -109,9 +113,9 @@ export default function CommunityHero({
             </span>
           )}
         </div>
-        {joinError && (
+        {(joinError || leaveError) && (
           <div className="rounded-2xl border border-red-300 bg-red-500/20 px-4 py-2 text-sm text-red-50" role="alert">
-            {joinError}
+            {leaveError ?? joinError}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-4">
@@ -136,10 +140,22 @@ export default function CommunityHero({
             <span className="text-xs font-medium text-amber-200">{joinDisabledReason}</span>
           )}
           {isMember && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold text-white/90">
-              <CheckCircleIcon className="h-4 w-4 text-emerald-200" />
-              You’re a member
-            </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1 text-xs font-semibold text-white/90">
+                <CheckCircleIcon className="h-4 w-4 text-emerald-200" />
+                You’re a member
+              </span>
+              {typeof onLeave === 'function' && canLeave && (
+                <button
+                  type="button"
+                  onClick={onLeave}
+                  disabled={isLeaving}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLeaving ? 'Leaving…' : 'Leave community'}
+                </button>
+              )}
+            </div>
           )}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -176,5 +192,9 @@ CommunityHero.propTypes = {
   isJoining: PropTypes.bool,
   joinError: PropTypes.string,
   canJoin: PropTypes.bool,
-  joinDisabledReason: PropTypes.string
+  joinDisabledReason: PropTypes.string,
+  onLeave: PropTypes.func,
+  isLeaving: PropTypes.bool,
+  leaveError: PropTypes.string,
+  canLeave: PropTypes.bool
 };

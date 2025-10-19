@@ -12,6 +12,34 @@ import AdsPlacementService from './AdsPlacementService.js';
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 
+function isActiveMembership(membership) {
+  return membership?.status === 'active';
+}
+
+function canModerateMembership(membership, actorRole) {
+  if (actorRole === 'admin') {
+    return true;
+  }
+  return isActiveMembership(membership) && MODERATOR_ROLES.has(membership?.role);
+}
+
+function canManageSponsorships(membership, actorRole) {
+  if (actorRole === 'admin') {
+    return true;
+  }
+  return (
+    isActiveMembership(membership) &&
+    (membership?.role === 'owner' || membership?.role === 'admin' || membership?.role === 'moderator')
+  );
+}
+
+function normalisePlacementIds(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return [...new Set(value.map((entry) => String(entry)).filter(Boolean))];
+}
+
 function parseJsonColumn(value, fallback) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;
@@ -47,7 +75,7 @@ export default class CommunityService {
     }
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
-    if (!membership && community.visibility === 'private') {
+    if (!isActiveMembership(membership) && community.visibility === 'private') {
       const error = new Error('Community is private');
       error.status = 403;
       throw error;
@@ -56,10 +84,10 @@ export default class CommunityService {
     const stats = await CommunityModel.getStats(community.id);
     const channels = await CommunityChannelModel.listByCommunity(community.id);
 
-    return this.serializeCommunityDetail(community, membership, stats, channels);
+    return this.serializeCommunityDetail(community, isActiveMembership(membership) ? membership : null, stats, channels);
   }
 
-  static async listFeed(communityIdentifier, userId, filters = {}) {
+  static async listFeed(communityIdentifier, userId, filters = {}, options = {}) {
     const community = await this.resolveCommunity(communityIdentifier);
     if (!community) {
       const error = new Error('Community not found');
@@ -68,11 +96,16 @@ export default class CommunityService {
     }
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
-    if (!membership && community.visibility === 'private') {
+    if (!isActiveMembership(membership) && community.visibility === 'private') {
       const error = new Error('Community is private');
       error.status = 403;
       throw error;
     }
+
+    const actor = { id: userId, role: options.actorRole };
+    const metadata = parseJsonColumn(community.metadata, {});
+    const sponsorships = metadata.sponsorships ?? {};
+    const blockedPlacementIds = normalisePlacementIds(sponsorships.blockedPlacementIds);
 
     const searchQuery =
       typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
@@ -80,13 +113,18 @@ export default class CommunityService {
       ...filters,
       query: searchQuery
     });
-    const serialised = items.map((item) => this.serializePost(item, community));
+    const serialised = items.map((item) =>
+      this.serializePost(item, community, {
+        membership,
+        actor
+      })
+    );
     const decorated = await AdsPlacementService.decorateFeed({
       posts: serialised,
       context: 'community_feed',
       page: filters.page,
       perPage: filters.perPage,
-      metadata: { communityId: community.id }
+      metadata: { communityId: community.id, blockedPlacementIds }
     });
     return {
       items: decorated.items,
@@ -95,14 +133,20 @@ export default class CommunityService {
     };
   }
 
-  static async listFeedForUser(userId, filters = {}) {
+  static async listFeedForUser(userId, filters = {}, options = {}) {
     const searchQuery =
       typeof filters.query === 'string' ? filters.query.trim().toLowerCase() : undefined;
     const { items, pagination } = await CommunityPostModel.paginateForUser(userId, {
       ...filters,
       query: searchQuery
     });
-    const serialised = items.map((item) => this.serializePost(item));
+    const actor = { id: userId, role: options.actorRole };
+    const serialised = items.map((item) =>
+      this.serializePost(item, undefined, {
+        membership: item.viewerRole ? { role: item.viewerRole, status: 'active' } : null,
+        actor
+      })
+    );
     const decorated = await AdsPlacementService.decorateFeed({
       posts: serialised,
       context: 'global_feed',
@@ -126,7 +170,7 @@ export default class CommunityService {
     }
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
-    if (!membership && community.visibility === 'private') {
+    if (!isActiveMembership(membership) && community.visibility === 'private') {
       const error = new Error('Community is private');
       error.status = 403;
       throw error;
@@ -225,7 +269,7 @@ export default class CommunityService {
       throw error;
     }
 
-    if (membership.status !== 'active') {
+    if (!isActiveMembership(membership)) {
       const error = new Error('Your membership is not active');
       error.status = 403;
       throw error;
@@ -300,9 +344,9 @@ export default class CommunityService {
     }
 
     const membership = await CommunityMemberModel.findMembership(community.id, userId);
-    if (!membership || !MODERATOR_ROLES.has(membership.role)) {
+    if (!isActiveMembership(membership) || !MODERATOR_ROLES.has(membership.role)) {
       const error = new Error('You do not have permission to manage resources in this community');
-      error.status = membership ? 403 : 404;
+      error.status = isActiveMembership(membership) ? 403 : 404;
       throw error;
     }
 
@@ -399,6 +443,254 @@ export default class CommunityService {
     return this.getCommunityDetail(community.id, userId);
   }
 
+  static async leaveCommunity(communityIdentifier, userId) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!isActiveMembership(membership)) {
+      const error = new Error('You are not an active member of this community');
+      error.status = 403;
+      throw error;
+    }
+
+    if (membership.role === 'owner') {
+      const error = new Error('Community owners cannot leave their own community');
+      error.status = 422;
+      throw error;
+    }
+
+    await db.transaction(async (trx) => {
+      await CommunityMemberModel.markLeft(community.id, userId, trx);
+      await DomainEventModel.record(
+        {
+          entityType: 'community_member',
+          entityId: `${community.id}:${userId}`,
+          eventType: 'community.member.left',
+          payload: { communityId: community.id },
+          performedBy: userId
+        },
+        trx
+      );
+    });
+
+    return this.serializeCommunity({ ...community, memberRole: null, memberStatus: null });
+  }
+
+  static async moderatePost(communityIdentifier, postId, userId, payload, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!canModerateMembership(membership, options.actorRole)) {
+      const error = new Error('You do not have permission to moderate posts in this community');
+      error.status = 403;
+      throw error;
+    }
+
+    return db.transaction(async (trx) => {
+      const post = await CommunityPostModel.findById(postId, trx);
+      if (!post || Number(post.communityId) !== Number(community.id)) {
+        const error = new Error('Post not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const existingMetadata = parseJsonColumn(post.moderationMetadata, {});
+      const now = new Date().toISOString();
+      const moderationNote = payload.reason
+        ? {
+            by: userId,
+            reason: payload.reason,
+            at: now
+          }
+        : null;
+
+      const metadata = {
+        ...existingMetadata,
+        notes: moderationNote
+          ? [...(Array.isArray(existingMetadata.notes) ? existingMetadata.notes : []), moderationNote]
+          : existingMetadata.notes
+      };
+
+      let nextState = post.moderationState ?? 'clean';
+      let nextStatus = post.status;
+
+      if (payload.action === 'suppress') {
+        nextState = 'suppressed';
+        nextStatus = post.status === 'published' ? 'archived' : post.status;
+      } else if (payload.action === 'restore') {
+        nextState = 'clean';
+        nextStatus = post.status === 'archived' ? 'published' : post.status;
+      }
+
+      const updated = await CommunityPostModel.updateModerationState(
+        post.id,
+        {
+          state: nextState,
+          metadata,
+          status: nextStatus
+        },
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_post',
+          entityId: post.id,
+          eventType: `community.post.${payload.action}`,
+          payload: { communityId: community.id, reason: payload.reason ?? null },
+          performedBy: userId
+        },
+        trx
+      );
+
+      return this.serializePost(updated, community, {
+        membership,
+        actor: { id: userId, role: options.actorRole }
+      });
+    });
+  }
+
+  static async removePost(communityIdentifier, postId, userId, payload = {}, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!canModerateMembership(membership, options.actorRole)) {
+      const error = new Error('You do not have permission to remove posts in this community');
+      error.status = 403;
+      throw error;
+    }
+
+    return db.transaction(async (trx) => {
+      const post = await CommunityPostModel.findById(postId, trx);
+      if (!post || Number(post.communityId) !== Number(community.id)) {
+        const error = new Error('Post not found');
+        error.status = 404;
+        throw error;
+      }
+
+      const metadata = parseJsonColumn(post.metadata, {});
+      const removalEntry = {
+        removedBy: userId,
+        removedAt: new Date().toISOString(),
+        reason: payload.reason ?? null
+      };
+
+      const updated = await CommunityPostModel.archive(
+        post.id,
+        {
+          metadata: {
+            ...metadata,
+            removalHistory: [...(Array.isArray(metadata.removalHistory) ? metadata.removalHistory : []), removalEntry]
+          }
+        },
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_post',
+          entityId: post.id,
+          eventType: 'community.post.archived',
+          payload: { communityId: community.id, reason: payload.reason ?? null },
+          performedBy: userId
+        },
+        trx
+      );
+
+      return this.serializePost(updated, community, {
+        membership,
+        actor: { id: userId, role: options.actorRole }
+      });
+    });
+  }
+
+  static async listSponsorshipPlacements(communityIdentifier, userId, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!canManageSponsorships(membership, options.actorRole)) {
+      const error = new Error('You do not have permission to manage sponsorships in this community');
+      error.status = 403;
+      throw error;
+    }
+
+    const metadata = parseJsonColumn(community.metadata, {});
+    const sponsorships = metadata.sponsorships ?? {};
+    return {
+      communityId: community.id,
+      blockedPlacementIds: normalisePlacementIds(sponsorships.blockedPlacementIds)
+    };
+  }
+
+  static async updateSponsorshipPlacements(communityIdentifier, userId, payload, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!canManageSponsorships(membership, options.actorRole)) {
+      const error = new Error('You do not have permission to manage sponsorships in this community');
+      error.status = 403;
+      throw error;
+    }
+
+    const blockedPlacementIds = normalisePlacementIds(payload.blockedPlacementIds);
+
+    const updated = await db.transaction(async (trx) => {
+      const metadata = parseJsonColumn(community.metadata, {});
+      const nextMetadata = {
+        ...metadata,
+        sponsorships: {
+          ...(metadata.sponsorships ?? {}),
+          blockedPlacementIds
+        }
+      };
+
+      const refreshed = await CommunityModel.updateMetadata(community.id, nextMetadata, trx);
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community',
+          entityId: community.id,
+          eventType: 'community.sponsorships.updated',
+          payload: { blockedPlacementIds },
+          performedBy: userId
+        },
+        trx
+      );
+
+      return refreshed;
+    });
+
+    return {
+      communityId: updated.id,
+      blockedPlacementIds
+    };
+  }
+
   static async resolveDefaultChannelId(communityId) {
     const channel = await CommunityChannelModel.findDefault(communityId);
     if (channel) {
@@ -433,6 +725,15 @@ export default class CommunityService {
       lastActivityAt: community.lastActivityAt ?? community.updatedAt
     };
 
+    const membershipInfo = community.memberRole
+      ? { role: community.memberRole, status: community.memberStatus }
+      : null;
+    const permissions = {
+      canModeratePosts: canModerateMembership(membershipInfo, undefined),
+      canManageSponsorships: canManageSponsorships(membershipInfo, undefined),
+      canLeave: isActiveMembership(membershipInfo) && community.memberRole !== 'owner'
+    };
+
     return {
       id: community.id,
       name: community.name,
@@ -449,13 +750,21 @@ export default class CommunityService {
             status: community.memberStatus
           }
         : undefined,
+      permissions,
       createdAt: community.createdAt,
       updatedAt: community.updatedAt
     };
   }
 
   static serializeCommunityDetail(community, membership, stats, channels) {
-    const summary = this.serializeCommunity({ ...community, ...stats, memberRole: membership?.role, memberStatus: membership?.status });
+    const summary = this.serializeCommunity({
+      ...community,
+      ...stats,
+      memberRole: membership?.role,
+      memberStatus: membership?.status
+    });
+    const metadata = parseJsonColumn(community.metadata, {});
+    const sponsorships = metadata.sponsorships ?? {};
     return {
       ...summary,
       channels: channels.map((channel) => ({
@@ -468,11 +777,14 @@ export default class CommunityService {
         metadata: parseJsonColumn(channel.metadata, {}),
         createdAt: channel.createdAt,
         updatedAt: channel.updatedAt
-      }))
+      })),
+      sponsorships: {
+        blockedPlacementIds: normalisePlacementIds(sponsorships.blockedPlacementIds)
+      }
     };
   }
 
-  static serializePost(post, communityOverride) {
+  static serializePost(post, communityOverride, context = {}) {
     const tags = toArray(post.tags);
     const reactionSummary = parseJsonColumn(post.reactionSummary, {});
     const metadata = parseJsonColumn(post.metadata, {});
@@ -488,6 +800,11 @@ export default class CommunityService {
       : post.communityId
       ? { id: post.communityId, name: post.communityName, slug: post.communitySlug }
       : undefined;
+
+    const membership = context.membership;
+    const actor = context.actor ?? {};
+    const canModerate = canModerateMembership(membership, actor.role);
+    const canRemove = canModerate || actor.id === post.authorId;
 
     return {
       id: post.id,
@@ -528,7 +845,11 @@ export default class CommunityService {
           : [],
         notes: moderationMetadata.notes ?? []
       },
-      metadata
+      metadata,
+      permissions: {
+        canModerate,
+        canRemove
+      }
     };
   }
 

@@ -156,7 +156,9 @@ export default class LiveFeedService {
         throw error;
       }
 
-      const result = await CommunityService.listFeed(community, actor.id, sharedFilters);
+      const result = await CommunityService.listFeed(community, actor.id, sharedFilters, {
+        actorRole: actor.role
+      });
       return {
         ...result,
         context: 'community',
@@ -164,7 +166,9 @@ export default class LiveFeedService {
       };
     }
 
-    const result = await CommunityService.listFeedForUser(actor.id, sharedFilters);
+    const result = await CommunityService.listFeedForUser(actor.id, sharedFilters, {
+      actorRole: actor.role
+    });
     return {
       ...result,
       context: 'global',
