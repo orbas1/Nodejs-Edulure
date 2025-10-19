@@ -1,3 +1,5 @@
+import slugify from 'slugify';
+
 import db from '../config/database.js';
 
 const TABLE = 'live_classrooms';
@@ -88,6 +90,57 @@ function deserialize(row) {
 }
 
 export default class LiveClassroomModel {
+  static normaliseSlug(value, fallback) {
+    const base = value || fallback;
+    if (!base) {
+      return null;
+    }
+    return slugify(base, { lower: true, strict: true });
+  }
+
+  static async listAll({ search, status, limit = 50, offset = 0 } = {}, connection = db) {
+    const query = connection(`${TABLE} as lc`)
+      .leftJoin('communities as comm', 'lc.community_id', 'comm.id')
+      .select(BASE_COLUMNS)
+      .orderBy('lc.updated_at', 'desc');
+
+    if (status) {
+      query.andWhere('lc.status', status);
+    }
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('lc.title', `%${search}%`)
+          .orWhereILike('lc.slug', `%${search}%`)
+          .orWhereILike('lc.summary', `%${search}%`);
+      });
+    }
+
+    const rows = await query.limit(limit).offset(offset);
+    return rows.map((row) => deserialize(row));
+  }
+
+  static async countAll({ search, status } = {}, connection = db) {
+    const query = connection(TABLE);
+
+    if (status) {
+      query.andWhere('status', status);
+    }
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('title', `%${search}%`)
+          .orWhereILike('slug', `%${search}%`)
+          .orWhereILike('summary', `%${search}%`);
+      });
+    }
+
+    const result = await query.count({ total: '*' }).first();
+    return Number(result?.total ?? 0);
+  }
+
   static async listForLearner(userId, { from, to, limit = 50 } = {}, connection = db) {
     const query = connection(`${TABLE} as lc`)
       .leftJoin('live_classroom_registrations as reg', function joinReg() {
@@ -116,5 +169,81 @@ export default class LiveClassroomModel {
 
     const rows = await query;
     return rows.map((row) => deserialize(row));
+  }
+
+  static async create(classroom, connection = db) {
+    const payload = {
+      public_id: classroom.publicId,
+      community_id: classroom.communityId ?? null,
+      instructor_id: classroom.instructorId ?? null,
+      title: classroom.title,
+      slug: this.normaliseSlug(classroom.slug, classroom.title),
+      summary: classroom.summary ?? null,
+      description: classroom.description ?? null,
+      type: classroom.type ?? 'workshop',
+      status: classroom.status ?? 'draft',
+      is_ticketed: classroom.isTicketed ?? false,
+      price_amount: classroom.priceAmount ?? 0,
+      price_currency: classroom.priceCurrency ?? 'USD',
+      capacity: classroom.capacity ?? 0,
+      reserved_seats: classroom.reservedSeats ?? 0,
+      timezone: classroom.timezone ?? 'Etc/UTC',
+      start_at: classroom.startAt,
+      end_at: classroom.endAt,
+      topics: JSON.stringify(classroom.topics ?? []),
+      metadata: JSON.stringify(classroom.metadata ?? {})
+    };
+
+    const [id] = await connection(TABLE).insert(payload);
+    return this.findById(id, connection);
+  }
+
+  static async findById(id, connection = db) {
+    const row = await connection(`${TABLE} as lc`)
+      .leftJoin('communities as comm', 'lc.community_id', 'comm.id')
+      .leftJoin('live_classroom_registrations as reg', function joinReg() {
+        this.on('reg.classroom_id', '=', 'lc.id');
+      })
+      .select(BASE_COLUMNS)
+      .where('lc.id', id)
+      .first();
+    return deserialize(row);
+  }
+
+  static async updateById(id, updates, connection = db) {
+    const payload = {};
+    if (updates.communityId !== undefined) payload.community_id = updates.communityId ?? null;
+    if (updates.instructorId !== undefined) payload.instructor_id = updates.instructorId ?? null;
+    if (updates.title !== undefined) payload.title = updates.title;
+    if (updates.slug !== undefined) payload.slug = this.normaliseSlug(updates.slug, updates.title);
+    if (updates.summary !== undefined) payload.summary = updates.summary ?? null;
+    if (updates.description !== undefined) payload.description = updates.description ?? null;
+    if (updates.type !== undefined) payload.type = updates.type ?? 'workshop';
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.isTicketed !== undefined) payload.is_ticketed = updates.isTicketed;
+    if (updates.priceAmount !== undefined) payload.price_amount = updates.priceAmount ?? 0;
+    if (updates.priceCurrency !== undefined) payload.price_currency = updates.priceCurrency ?? 'USD';
+    if (updates.capacity !== undefined) payload.capacity = updates.capacity ?? 0;
+    if (updates.reservedSeats !== undefined) payload.reserved_seats = updates.reservedSeats ?? 0;
+    if (updates.timezone !== undefined) payload.timezone = updates.timezone ?? 'Etc/UTC';
+    if (updates.startAt !== undefined) payload.start_at = updates.startAt;
+    if (updates.endAt !== undefined) payload.end_at = updates.endAt;
+    if (updates.topics !== undefined) payload.topics = JSON.stringify(updates.topics ?? []);
+    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
+
+    if (Object.keys(payload).length === 0) {
+      return this.findById(id, connection);
+    }
+
+    await connection(TABLE)
+      .where({ id })
+      .update({ ...payload, updated_at: connection.fn.now() });
+
+    return this.findById(id, connection);
+  }
+
+  static async deleteById(id, connection = db) {
+    await connection('live_classroom_registrations').where({ classroom_id: id }).del();
+    await connection(TABLE).where({ id }).del();
   }
 }
