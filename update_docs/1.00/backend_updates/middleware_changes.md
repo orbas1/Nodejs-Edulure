@@ -1,1 +1,0 @@
-- Updated `httpMetricsMiddleware` to record SLO observations for every request while respecting Prometheus gating so burn-rate analytics remain accurate even when metrics scraping is disabled.
