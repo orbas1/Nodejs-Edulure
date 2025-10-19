@@ -3529,6 +3529,332 @@
           "captured"
         ]
       },
+      "MonetizationCatalogItem": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "pricingModel": {
+            "type": "string"
+          },
+          "billingInterval": {
+            "type": "string"
+          },
+          "revenueRecognitionMethod": {
+            "type": "string"
+          },
+          "recognitionDurationDays": {
+            "type": "integer"
+          },
+          "unitAmountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "usageMetric": {
+            "type": "string",
+            "nullable": true
+          },
+          "revenueAccount": {
+            "type": "string"
+          },
+          "deferredRevenueAccount": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "status": {
+            "type": "string"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "tenantId",
+          "productCode",
+          "name",
+          "pricingModel",
+          "billingInterval",
+          "revenueRecognitionMethod",
+          "unitAmountCents",
+          "currency",
+          "metadata",
+          "status",
+          "effectiveFrom",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MonetizationUsageRecord": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "catalogItemId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "accountReference": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "usageDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitAmountCents": {
+            "type": "integer"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentIntentId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "tenantId",
+          "productCode",
+          "accountReference",
+          "usageDate",
+          "quantity",
+          "unitAmountCents",
+          "amountCents",
+          "currency",
+          "source",
+          "metadata",
+          "recordedAt"
+        ]
+      },
+      "MonetizationRevenueSchedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "paymentIntentId": {
+            "type": "integer"
+          },
+          "catalogItemId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "usageRecordId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "productCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "recognitionMethod": {
+            "type": "string"
+          },
+          "recognitionStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recognitionEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "recognizedAmountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "revenueAccount": {
+            "type": "string"
+          },
+          "deferredRevenueAccount": {
+            "type": "string"
+          },
+          "recognizedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "paymentIntentId",
+          "status",
+          "recognitionMethod",
+          "recognitionStart",
+          "recognitionEnd",
+          "amountCents",
+          "recognizedAmountCents",
+          "currency",
+          "revenueAccount",
+          "deferredRevenueAccount",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MonetizationReconciliationRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "windowStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "windowEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "invoicedCents": {
+            "type": "integer"
+          },
+          "usageCents": {
+            "type": "integer"
+          },
+          "recognizedCents": {
+            "type": "integer"
+          },
+          "deferredCents": {
+            "type": "integer"
+          },
+          "varianceCents": {
+            "type": "integer"
+          },
+          "varianceRatio": {
+            "type": "number"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "windowStart",
+          "windowEnd",
+          "status",
+          "invoicedCents",
+          "usageCents",
+          "recognizedCents",
+          "deferredCents",
+          "varianceCents",
+          "varianceRatio",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
       "CouponPublic": {
         "type": "object",
         "properties": {
@@ -9180,6 +9506,1969 @@
             "type": "integer"
           }
         }
+      },
+      "TelemetryEventIngestRequest": {
+        "type": "object",
+        "properties": {
+          "eventName": {
+            "type": "string"
+          },
+          "eventVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "eventSource": {
+            "type": "string"
+          },
+          "schemaVersion": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "tenantId": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "consentScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "payload": {
+            "type": "object"
+          },
+          "context": {
+            "type": "object"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "eventName",
+          "eventSource"
+        ]
+      },
+      "TelemetryEventIngestResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "suppressed": {
+            "type": "boolean"
+          },
+          "consentStatus": {
+            "type": "string"
+          },
+          "event": {
+            "type": "object",
+            "properties": {
+              "eventUuid": {
+                "type": "string"
+              },
+              "eventName": {
+                "type": "string"
+              },
+              "eventSource": {
+                "type": "string"
+              },
+              "consentScope": {
+                "type": "string"
+              },
+              "consentStatus": {
+                "type": "string"
+              },
+              "ingestionStatus": {
+                "type": "string"
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "receivedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "required": [
+          "status",
+          "duplicate",
+          "suppressed",
+          "consentStatus",
+          "event"
+        ]
+      },
+      "TelemetryConsentRequest": {
+        "type": "object",
+        "properties": {
+          "consentScope": {
+            "type": "string"
+          },
+          "consentVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "revoked",
+              "expired"
+            ]
+          },
+          "tenantId": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "evidence": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "consentScope"
+        ]
+      },
+      "TelemetryConsentRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "consentScope": {
+            "type": "string"
+          },
+          "consentVersion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "evidence": {
+            "type": "object"
+          }
+        }
+      },
+      "TelemetryFreshnessMonitor": {
+        "type": "object",
+        "properties": {
+          "pipelineKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "noop"
+            ]
+          },
+          "lagSeconds": {
+            "type": "integer"
+          },
+          "thresholdMinutes": {
+            "type": "integer"
+          },
+          "lastEventAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "TelemetryExportSummary": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "exported",
+              "noop",
+              "disabled"
+            ]
+          },
+          "exported": {
+            "type": "integer"
+          },
+          "batchId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "fileKey": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "BiExecutiveOverview": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "timeframe": {
+            "type": "object",
+            "properties": {
+              "range": {
+                "type": "string"
+              },
+              "days": {
+                "type": "integer"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "comparisonStart": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "comparisonEnd": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "scorecard": {
+            "type": "object",
+            "properties": {
+              "enrollments": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "completionRate": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "recognisedRevenue": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "netRevenue": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "averageProgressPercent": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "communityEngagement": {
+                "type": "object",
+                "properties": {
+                  "posts": {
+                    "$ref": "#/components/schemas/ScorecardMetric"
+                  },
+                  "comments": {
+                    "$ref": "#/components/schemas/ScorecardMetric"
+                  },
+                  "events": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "enrollmentTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "enrollments": {
+                  "type": "integer"
+                },
+                "completions": {
+                  "type": "integer"
+                },
+                "recognisedRevenueCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "revenueTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "grossVolumeCents": {
+                  "type": "integer"
+                },
+                "recognisedVolumeCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "revenueByCurrency": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "grossVolumeCents": {
+                  "type": "integer"
+                },
+                "recognisedVolumeCents": {
+                  "type": "integer"
+                },
+                "discountCents": {
+                  "type": "integer"
+                },
+                "taxCents": {
+                  "type": "integer"
+                },
+                "refundedCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "communityTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "posts": {
+                  "type": "integer"
+                },
+                "comments": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "topCommunities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "communityId": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "posts": {
+                  "type": "integer"
+                },
+                "comments": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "categoryBreakdown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "deliveryFormat": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "string"
+                },
+                "enrollments": {
+                  "type": "integer"
+                },
+                "completions": {
+                  "type": "integer"
+                },
+                "recognisedRevenueCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "experiments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "experimentId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "rolloutPercentage": {
+                  "type": "number"
+                },
+                "owner": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "dataQuality": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "pipelines": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TelemetryFreshnessMonitor"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ScorecardMetric": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "cents": {
+            "type": "integer",
+            "nullable": true
+          },
+          "change": {
+            "type": "object",
+            "properties": {
+              "absolute": {
+                "type": "number"
+              },
+              "percentage": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      },
+      "EnablementArticleListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EnablementArticleSummary"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "limit",
+              "offset",
+              "items"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "EnablementArticleSummary": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string"
+          },
+          "deliverables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeToCompleteMinutes": {
+            "type": "integer"
+          },
+          "readingTimeMinutes": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wordCount": {
+            "type": "integer"
+          },
+          "contentHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "audience",
+          "products",
+          "tags",
+          "capabilities",
+          "owner"
+        ]
+      },
+      "EnablementArticleResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EnablementArticleDetail"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "EnablementArticleDetail": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "html"
+            ]
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string"
+          },
+          "deliverables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeToCompleteMinutes": {
+            "type": "integer"
+          },
+          "readingTimeMinutes": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wordCount": {
+            "type": "integer"
+          },
+          "contentHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "content",
+          "format",
+          "audience",
+          "products",
+          "tags",
+          "capabilities",
+          "owner"
+        ]
+      },
+      "EnablementCapabilityMatrixResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EnablementCapabilityMatrix"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "EnablementCapabilityMatrix": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "audiences": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "products": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "owners": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "totalTimeToCompleteMinutes": {
+            "type": "integer"
+          },
+          "lastUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "total",
+          "audiences",
+          "products",
+          "tags",
+          "capabilities",
+          "owners"
+        ]
+      },
+      "EnablementReindexResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "articles": {
+                "type": "integer"
+              },
+              "lastUpdatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "articles"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "GovernanceContract": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "vendorName": {
+            "type": "string"
+          },
+          "contractType": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "riskTier": {
+            "type": "string"
+          },
+          "contractValueCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "effectiveDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "renewalDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "terminationNoticeDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "obligations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "dueAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "description",
+                "owner",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "lastRenewalEvaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextGovernanceCheckAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "daysUntilRenewal": {
+            "type": "integer",
+            "nullable": true
+          },
+          "renewalStatus": {
+            "type": "string",
+            "nullable": true
+          },
+          "openObligations": {
+            "type": "integer",
+            "nullable": true
+          },
+          "terminationNoticeDueInDays": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "vendorName",
+          "contractType",
+          "status",
+          "ownerEmail",
+          "riskTier",
+          "contractValueCents",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceContractListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceContract"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceVendorAssessment": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "vendorName": {
+            "type": "string"
+          },
+          "assessmentType": {
+            "type": "string"
+          },
+          "riskScore": {
+            "type": "number"
+          },
+          "riskLevel": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "lastAssessedAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "nextReviewAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "remediationPlan": {
+            "type": "object"
+          },
+          "evidenceLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "publicId",
+          "vendorName",
+          "assessmentType",
+          "riskScore",
+          "riskLevel",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceVendorAssessmentListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceVendorAssessment"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceReviewCycle": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "cycleName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "endDate": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "nextMilestoneAt": {
+            "type": "string",
+            "format": "date",
+            "nullable": true
+          },
+          "focusAreas": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "participants": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "actionItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "dueAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "completedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                },
+                "status": {
+                  "type": "string"
+                },
+                "recordedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "nullable": true
+                }
+              },
+              "required": [
+                "id",
+                "summary",
+                "owner",
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "outcomeNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "readinessScore": {
+            "type": "integer"
+          },
+          "openActionItems": {
+            "type": "integer",
+            "nullable": true
+          },
+          "milestoneStatus": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "cycleName",
+          "status",
+          "startDate",
+          "focusAreas",
+          "participants",
+          "actionItems",
+          "readinessScore"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceReviewCycleListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceReviewCycle"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceCommunication": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "scheduleAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sentAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ownerEmail": {
+            "type": "string"
+          },
+          "metrics": {
+            "type": "object"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "deliveryProgress": {
+            "type": "number",
+            "nullable": true
+          },
+          "engagementRate": {
+            "type": "number",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "audience",
+          "channel",
+          "subject",
+          "status"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceCommunicationListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/GovernanceCommunication"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "items"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "GovernanceOverviewResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "contracts": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "object"
+                  },
+                  "upcomingRenewals": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/GovernanceContract"
+                    }
+                  }
+                }
+              },
+              "vendorAssessments": {
+                "type": "object"
+              },
+              "reviewCycles": {
+                "type": "object"
+              },
+              "communications": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "contracts",
+              "vendorAssessments",
+              "reviewCycles",
+              "communications"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseChecklistItem": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "quality-verification"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "quality",
+              "security",
+              "observability",
+              "compliance",
+              "change_management"
+            ],
+            "example": "quality"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "autoEvaluated": {
+            "type": "boolean"
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "defaultOwnerEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "successCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "slug",
+          "category",
+          "title",
+          "description",
+          "autoEvaluated",
+          "weight",
+          "successCriteria"
+        ]
+      },
+      "ReleaseChecklistListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseChecklistItem"
+                }
+              },
+              "thresholds": {
+                "type": "object",
+                "properties": {
+                  "minCoverage": {
+                    "type": "number",
+                    "format": "float"
+                  },
+                  "maxTestFailureRate": {
+                    "type": "number",
+                    "format": "float"
+                  },
+                  "maxCriticalVulnerabilities": {
+                    "type": "integer"
+                  },
+                  "maxHighVulnerabilities": {
+                    "type": "integer"
+                  },
+                  "maxOpenIncidents": {
+                    "type": "integer"
+                  },
+                  "maxErrorRate": {
+                    "type": "number",
+                    "format": "float"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "requiredGates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "limit",
+              "offset",
+              "items",
+              "thresholds",
+              "requiredGates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseRun": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "versionTag": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "in_progress",
+              "ready",
+              "blocked",
+              "cancelled",
+              "completed"
+            ]
+          },
+          "initiatedByEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "initiatedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "changeWindowStart": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "changeWindowEnd": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "summaryNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "publicId",
+          "versionTag",
+          "environment",
+          "status",
+          "initiatedByEmail",
+          "scheduledAt",
+          "metadata"
+        ]
+      },
+      "ReleaseGateResult": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "gateKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "pass",
+              "fail",
+              "waived"
+            ]
+          },
+          "ownerEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "lastEvaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "gateKey",
+          "status",
+          "metrics"
+        ]
+      },
+      "ReleaseGateWithSnapshot": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "gateKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "pass",
+              "fail",
+              "waived"
+            ]
+          },
+          "ownerEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "lastEvaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ReleaseChecklistItem"
+          }
+        },
+        "required": [
+          "publicId",
+          "gateKey",
+          "status",
+          "metrics"
+        ]
+      },
+      "ReleaseRunListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseRun"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "limit",
+              "offset",
+              "items"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseRunCreateResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "run": {
+                "$ref": "#/components/schemas/ReleaseRun"
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseGateResult"
+                }
+              }
+            },
+            "required": [
+              "run",
+              "gates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseRunDetailResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "run": {
+                "$ref": "#/components/schemas/ReleaseRun"
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseGateWithSnapshot"
+                }
+              }
+            },
+            "required": [
+              "run",
+              "gates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseGateEvaluationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReleaseGateResult"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseRunEvaluationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "run": {
+                "$ref": "#/components/schemas/ReleaseRun"
+              },
+              "readinessScore": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "blockingGates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "gateKey": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "ownerEmail": {
+                      "type": "string",
+                      "format": "email",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "gateKey",
+                    "status"
+                  ]
+                }
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseGateWithSnapshot"
+                }
+              },
+              "requiredGates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "recommendedStatus": {
+                "type": "string",
+                "enum": [
+                  "ready",
+                  "in_progress",
+                  "blocked"
+                ]
+              }
+            },
+            "required": [
+              "run",
+              "readinessScore",
+              "blockingGates",
+              "gates",
+              "requiredGates",
+              "recommendedStatus"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseDashboardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "breakdown": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "publicId": {
+                      "type": "string"
+                    },
+                    "versionTag": {
+                      "type": "string"
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "changeWindowStart": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "changeWindowEnd": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "readinessScore": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "publicId",
+                    "versionTag",
+                    "environment",
+                    "status"
+                  ]
+                }
+              },
+              "recent": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseRun"
+                }
+              },
+              "requiredGates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "breakdown",
+              "upcoming",
+              "recent",
+              "requiredGates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
       }
     }
   },
@@ -9234,6 +11523,570 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EnvironmentParityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/monetization/catalog": {
+      "get": {
+        "summary": "List monetization catalog items",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "global"
+            },
+            "description": "Tenant scope for catalog lookup"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional status filter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            },
+            "description": "Maximum number of records to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            },
+            "description": "Offset for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog items fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MonetizationCatalogItem"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "tenantId": {
+                          "type": "string"
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "offset": {
+                              "type": "integer"
+                            },
+                            "count": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create or update a monetization catalog item",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tenantId": {
+                    "type": "string",
+                    "default": "global"
+                  },
+                  "productCode": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "pricingModel": {
+                    "type": "string"
+                  },
+                  "billingInterval": {
+                    "type": "string"
+                  },
+                  "revenueRecognitionMethod": {
+                    "type": "string"
+                  },
+                  "recognitionDurationDays": {
+                    "type": "integer"
+                  },
+                  "unitAmountCents": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  },
+                  "usageMetric": {
+                    "type": "string"
+                  },
+                  "revenueAccount": {
+                    "type": "string"
+                  },
+                  "deferredRevenueAccount": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "productCode",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catalog item persisted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MonetizationCatalogItem"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          }
+        }
+      }
+    },
+    "/admin/monetization/usage": {
+      "post": {
+        "summary": "Record monetization usage",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tenantId": {
+                    "type": "string",
+                    "default": "global"
+                  },
+                  "productCode": {
+                    "type": "string"
+                  },
+                  "accountReference": {
+                    "type": "string"
+                  },
+                  "userId": {
+                    "type": "integer"
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "unitAmountCents": {
+                    "type": "integer"
+                  },
+                  "amountCents": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "usageDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "externalReference": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "productCode",
+                  "accountReference",
+                  "quantity"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usage recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MonetizationUsageRecord"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          }
+        }
+      }
+    },
+    "/admin/monetization/revenue-schedules": {
+      "get": {
+        "summary": "List revenue schedules",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "global"
+            }
+          },
+          {
+            "name": "paymentIntentId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revenue schedules fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MonetizationRevenueSchedule"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "tenantId": {
+                          "type": "string"
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "offset": {
+                              "type": "integer"
+                            },
+                            "count": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/monetization/reconciliations/run": {
+      "post": {
+        "summary": "Trigger monetization reconciliation",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tenantId": {
+                    "type": "string",
+                    "default": "global"
+                  },
+                  "start": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "end": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Reconciliation run accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MonetizationReconciliationRun"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/monetization/reconciliations": {
+      "get": {
+        "summary": "List reconciliation runs",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "global"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reconciliation runs fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MonetizationReconciliationRun"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "tenantId": {
+                          "type": "string"
+                        }
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
                 }
               }
             }
@@ -18522,6 +21375,1807 @@
           }
         }
       }
+    },
+    "/telemetry/events": {
+      "post": {
+        "summary": "Ingest telemetry event",
+        "description": "Registers a telemetry event for downstream export while enforcing consent and deduplication policies.",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryEventIngestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Duplicate telemetry event acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryEventIngestResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Telemetry event accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryEventIngestResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Telemetry source not authorised"
+          },
+          "422": {
+            "description": "Invalid telemetry payload"
+          },
+          "503": {
+            "description": "Telemetry pipeline disabled"
+          }
+        }
+      }
+    },
+    "/telemetry/consents": {
+      "post": {
+        "summary": "Record telemetry consent decision",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryConsentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Consent decision recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consent": {
+                      "$ref": "#/components/schemas/TelemetryConsentRecord"
+                    }
+                  },
+                  "required": [
+                    "consent"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User context missing"
+          },
+          "422": {
+            "description": "Invalid consent payload"
+          }
+        }
+      }
+    },
+    "/telemetry/freshness": {
+      "get": {
+        "summary": "List telemetry freshness monitors",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Maximum number of freshness monitors to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Telemetry freshness monitors retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monitors": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TelemetryFreshnessMonitor"
+                      }
+                    }
+                  },
+                  "required": [
+                    "monitors"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/telemetry/export": {
+      "post": {
+        "summary": "Trigger telemetry warehouse export",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No telemetry events pending export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryExportSummary"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Telemetry export started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryExportSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "503": {
+            "description": "Telemetry export disabled"
+          }
+        }
+      }
+    },
+    "/analytics/bi/executive-overview": {
+      "get": {
+        "summary": "Executive analytics overview",
+        "description": "Returns aggregated KPIs, trends, and telemetry health indicators for the executive dashboard.",
+        "tags": [
+          "Analytics"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "14d",
+                "30d",
+                "90d"
+              ],
+              "default": "30d"
+            },
+            "description": "Time window used when calculating KPI deltas and trend lines."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Executive overview generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/BiExecutiveOverview"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
+        }
+      }
+    },
+    "/enablement/articles": {
+      "get": {
+        "summary": "List enablement articles",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "audience",
+            "in": "query",
+            "description": "Filter by audience codes (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "product",
+            "in": "query",
+            "description": "Filter by product identifiers (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "description": "Filter by tag (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Full text search across title, summary, and body.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return (1-100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset into the result set.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enablement articles retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementArticleListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/enablement/articles/{slug}": {
+      "get": {
+        "summary": "Retrieve enablement article",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Article slug identifier."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format for content.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "html"
+              ],
+              "default": "markdown"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enablement article returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementArticleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          },
+          "404": {
+            "description": "Enablement article not found"
+          }
+        }
+      }
+    },
+    "/enablement/capability-matrix": {
+      "get": {
+        "summary": "Fetch enablement capability matrix",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capability matrix returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementCapabilityMatrixResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/enablement/reindex": {
+      "post": {
+        "summary": "Force enablement index refresh",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Reindex triggered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementReindexResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/overview": {
+      "get": {
+        "summary": "Governance overview",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Governance overview retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceOverviewResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/contracts": {
+      "get": {
+        "summary": "List governance contracts",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by contract status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "vendorName",
+            "in": "query",
+            "description": "Filter by vendor name search term.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "riskTier",
+            "in": "query",
+            "description": "Filter by risk tier (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ownerEmail",
+            "in": "query",
+            "description": "Filter by contract owner email.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "renewalWithinDays",
+            "in": "query",
+            "description": "Return contracts with renewals within the provided day window.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "description": "Return only overdue or escalated contracts when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of contracts to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the contract result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Contracts retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceContractListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/contracts/{contractId}": {
+      "patch": {
+        "summary": "Update governance contract",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "contractId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Public contract identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "ownerEmail": {
+                    "type": "string"
+                  },
+                  "riskTier": {
+                    "type": "string"
+                  },
+                  "renewalDate": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "terminationNoticeDate": {
+                    "type": "string",
+                    "format": "date",
+                    "nullable": true
+                  },
+                  "obligations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "owner": {
+                          "type": "string"
+                        },
+                        "dueAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "completedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        },
+                        "status": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "description",
+                        "owner",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Contract updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceContract"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Contract not found"
+          }
+        }
+      }
+    },
+    "/governance/vendor-assessments": {
+      "get": {
+        "summary": "List vendor assessments",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vendorName",
+            "in": "query",
+            "description": "Filter by vendor name search term.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "assessmentType",
+            "in": "query",
+            "description": "Filter by assessment type (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "riskLevel",
+            "in": "query",
+            "description": "Filter by risk level (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by assessment status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nextReviewBefore",
+            "in": "query",
+            "description": "Return assessments with next review before the provided date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "description": "Only return overdue or remediation assessments when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of assessments to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the assessment result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Assessments retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceVendorAssessmentListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/vendor-assessments/{assessmentId}/decisions": {
+      "post": {
+        "summary": "Record vendor assessment decision",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "assessmentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Vendor assessment identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "riskLevel": {
+                    "type": "string"
+                  },
+                  "riskScore": {
+                    "type": "number"
+                  },
+                  "nextReviewAt": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "findings": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "remediationPlan": {
+                    "type": "object"
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Assessment updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceVendorAssessment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Assessment not found"
+          }
+        }
+      }
+    },
+    "/governance/review-cycles": {
+      "get": {
+        "summary": "List governance review cycles",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by review cycle status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cycleName",
+            "in": "query",
+            "description": "Filter by review cycle name search term.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startAfter",
+            "in": "query",
+            "description": "Return cycles starting on or after the provided date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "endBefore",
+            "in": "query",
+            "description": "Return cycles ending on or before the provided date (YYYY-MM-DD).",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "onlyUpcoming",
+            "in": "query",
+            "description": "Only include upcoming or in-progress cycles when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "overdue",
+            "in": "query",
+            "description": "Only include cycles with overdue milestones when true.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of review cycles to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the review cycle result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Review cycles retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceReviewCycleListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/review-cycles/{reviewId}/action-items": {
+      "post": {
+        "summary": "Record review cycle action",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "reviewId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Review cycle identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "owner": {
+                    "type": "string"
+                  },
+                  "dueAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "readinessScore": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "summary"
+                ],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action item recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceReviewCycle"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Review cycle not found"
+          }
+        }
+      }
+    },
+    "/governance/communications": {
+      "get": {
+        "summary": "List governance communications",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by communication status (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "audience",
+            "in": "query",
+            "description": "Filter by communication audience (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "description": "Filter by communication channel (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scheduledBefore",
+            "in": "query",
+            "description": "Return communications scheduled before the provided date-time (ISO 8601).",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "ownerEmail",
+            "in": "query",
+            "description": "Filter by owner email.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            },
+            "description": "Maximum number of communications to return (1-100)."
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            },
+            "description": "Offset into the communication result set."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Communications retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceCommunicationListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      },
+      "post": {
+        "summary": "Schedule governance communication",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audience": {
+                    "type": "string"
+                  },
+                  "channel": {
+                    "type": "string"
+                  },
+                  "subject": {
+                    "type": "string"
+                  },
+                  "body": {
+                    "type": "string"
+                  },
+                  "scheduleAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "nullable": true
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "audience",
+                  "channel",
+                  "subject"
+                ],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Communication scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceCommunication"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/governance/communications/{communicationId}/metrics": {
+      "post": {
+        "summary": "Record communication metrics",
+        "tags": [
+          "Governance"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Communication identifier."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "delivered": {
+                    "type": "integer"
+                  },
+                  "engagementRate": {
+                    "type": "number"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "sentAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Communication metrics recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GovernanceCommunication"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Governance APIs disabled for this role"
+          },
+          "404": {
+            "description": "Communication not found"
+          }
+        }
+      }
+    },
+    "/release/checklist": {
+      "get": {
+        "summary": "List release readiness checklist items",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by checklist category (comma separated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return (1-200).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset into the result set.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checklist items retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseChecklistListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/release/runs": {
+      "get": {
+        "summary": "List release runs",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environment",
+            "in": "query",
+            "description": "Filter by deployment environment (comma separated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by release status (comma separated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionTag",
+            "in": "query",
+            "description": "Filter by version tag prefix.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of runs to return (1-200).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset into the result set.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release runs retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      },
+      "post": {
+        "summary": "Schedule a release run",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "versionTag": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "type": "string"
+                  },
+                  "initiatedByEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "initiatedByName": {
+                    "type": "string"
+                  },
+                  "changeWindowStart": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "changeWindowEnd": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "summaryNotes": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "changeTicket": {
+                    "type": "string"
+                  },
+                  "scheduledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "initialGates": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string"
+                        },
+                        "ownerEmail": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "notes": {
+                          "type": "string"
+                        },
+                        "evidenceUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "lastEvaluatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "versionTag",
+                  "environment",
+                  "initiatedByEmail"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Release run scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid release payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/release/runs/{publicId}": {
+      "get": {
+        "summary": "Retrieve release run detail",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "Release run identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release run detail retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          },
+          "404": {
+            "description": "Release run not found"
+          }
+        }
+      }
+    },
+    "/release/runs/{publicId}/gates/{gateKey}/evaluations": {
+      "post": {
+        "summary": "Record release gate evaluation",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "Release run identifier.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gateKey",
+            "in": "path",
+            "required": true,
+            "description": "Gate key from the release checklist.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "ownerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "evidenceUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "lastEvaluatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gate evaluation recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseGateEvaluationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          },
+          "404": {
+            "description": "Release run not found"
+          }
+        }
+      }
+    },
+    "/release/runs/{publicId}/evaluate": {
+      "post": {
+        "summary": "Evaluate release readiness",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "Release run identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Readiness evaluation complete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunEvaluationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          },
+          "404": {
+            "description": "Release run not found"
+          }
+        }
+      }
+    },
+    "/release/dashboard": {
+      "get": {
+        "summary": "Summarise release readiness dashboard data",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environment",
+            "in": "query",
+            "description": "Optional environment filter (e.g., production, staging).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release dashboard summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      }
     }
-  }
+  },
+  "tags": [
+    {
+      "name": "Enablement",
+      "description": "Enablement knowledge base and training APIs."
+    },
+    {
+      "name": "Governance",
+      "description": "Governance cadences, vendor assessments, contract lifecycle, and stakeholder communication APIs."
+    },
+    {
+      "name": "Release",
+      "description": "Release readiness orchestration APIs."
+    }
+  ]
 }

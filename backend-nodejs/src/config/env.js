@@ -618,6 +618,25 @@ const envSchema = z
     SLO_CRITICAL_BURN_RATE: z.coerce.number().min(0.1).max(100).default(10),
     SLO_MIN_REQUESTS: z.coerce.number().int().min(1).max(1000000).default(200),
     SLO_DEFAULT_TREAT_4XX_AS_FAILURE: z.coerce.boolean().default(false),
+    TELEMETRY_INGESTION_ENABLED: z.coerce.boolean().default(true),
+    TELEMETRY_ALLOWED_SOURCES: z.string().optional(),
+    TELEMETRY_STRICT_SOURCE_ENFORCEMENT: z.coerce.boolean().default(false),
+    TELEMETRY_DEFAULT_SCOPE: z.string().min(3).default('product.analytics'),
+    TELEMETRY_CONSENT_DEFAULT_VERSION: z.string().min(1).default('v1'),
+    TELEMETRY_CONSENT_HARD_BLOCK: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_ENABLED: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_DESTINATION: z.string().min(2).default('s3'),
+    TELEMETRY_EXPORT_BUCKET: z.string().optional(),
+    TELEMETRY_EXPORT_PREFIX: z.string().optional(),
+    TELEMETRY_EXPORT_BATCH_SIZE: z.coerce.number().int().min(100).max(50000).default(5000),
+    TELEMETRY_EXPORT_COMPRESS: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_RUN_ON_STARTUP: z.coerce.boolean().default(true),
+    TELEMETRY_EXPORT_CRON: z.string().default('*/5 * * * *'),
+    TELEMETRY_EXPORT_TIMEZONE: z.string().default('Etc/UTC'),
+    TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(15),
+    TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
+    TELEMETRY_LINEAGE_TOOL: z.string().default('dbt'),
+    TELEMETRY_LINEAGE_AUTO_RECORD: z.coerce.boolean().default(true),
     R2_ACCOUNT_ID: z.string().min(1),
     R2_ACCESS_KEY_ID: z.string().min(1),
     R2_SECRET_ACCESS_KEY: z.string().min(1),
@@ -742,6 +761,18 @@ const envSchema = z
     PAYMENTS_MINIMUM_TAX_RATE: z.coerce.number().min(0).max(1).default(0),
     PAYMENTS_MAX_COUPON_PERCENTAGE: z.coerce.number().min(0).max(100).default(80),
     PAYMENTS_REPORTING_TIMEZONE: z.string().default('Etc/UTC'),
+    MONETIZATION_RECONCILIATION_ENABLED: z.coerce.boolean().default(true),
+    MONETIZATION_RECONCILIATION_CRON: z.string().default('5 * * * *'),
+    MONETIZATION_RECONCILIATION_TIMEZONE: z.string().default('Etc/UTC'),
+    MONETIZATION_RECONCILIATION_RUN_ON_STARTUP: z.coerce.boolean().default(true),
+    MONETIZATION_RECOGNITION_WINDOW_DAYS: z.coerce.number().int().min(1).max(120).default(30),
+    MONETIZATION_RECONCILIATION_TENANTS: z.string().optional(),
+    MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .default(30),
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_SECURE: z.coerce.boolean().default(false),
@@ -928,7 +959,15 @@ const envSchema = z
     ENVIRONMENT_ALLOWED_VPCS: z.string().optional(),
     ENVIRONMENT_ALLOWED_ACCOUNT_IDS: z.string().optional(),
     ENVIRONMENT_MANIFEST_PATH: z.string().optional(),
-    RELEASE_CHANNEL: z.string().min(3).default('rolling')
+    RELEASE_CHANNEL: z.string().min(3).default('rolling'),
+    RELEASE_REQUIRED_GATES: z.string().optional(),
+    RELEASE_MIN_COVERAGE: z.coerce.number().min(0).max(1).default(0.9),
+    RELEASE_MAX_TEST_FAILURE_RATE: z.coerce.number().min(0).max(1).default(0.02),
+    RELEASE_MAX_CRITICAL_VULNERABILITIES: z.coerce.number().int().min(0).default(0),
+    RELEASE_MAX_HIGH_VULNERABILITIES: z.coerce.number().int().min(0).default(5),
+    RELEASE_MAX_OPEN_INCIDENTS: z.coerce.number().int().min(0).default(0),
+    RELEASE_MAX_ERROR_RATE: z.coerce.number().min(0).max(1).default(0.01),
+    RELEASE_CHANGE_FREEZE_CRON: z.string().default('0 22 * * 5')
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -1094,9 +1133,19 @@ const sloConfig = buildSloConfiguration({
   latencySampleSize: raw.SLO_LATENCY_SAMPLE_SIZE,
   defaults: sloDefaults
 });
+const telemetryAllowedSources = parseCsv(raw.TELEMETRY_ALLOWED_SOURCES ?? '');
+const telemetryExportBucket = raw.TELEMETRY_EXPORT_BUCKET ?? raw.R2_PRIVATE_BUCKET;
+const telemetryExportPrefix = normalizePrefix(raw.TELEMETRY_EXPORT_PREFIX, 'warehouse/telemetry');
 const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRESH_SECRET;
 const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
 const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
+const monetizationTenantAllowlist = Array.from(
+  new Set(
+    parseCsv(raw.MONETIZATION_RECONCILIATION_TENANTS ?? '')
+      .map((tenant) => tenant.trim().toLowerCase())
+      .filter(Boolean)
+  )
+);
 
 const environmentRequiredTags = parseCsv(raw.ENVIRONMENT_REQUIRED_TAGS ?? 'environment,project');
 const environmentDependencies = parseCsv(raw.ENVIRONMENT_DEPENDENCIES ?? 'database,redis');
@@ -1105,6 +1154,31 @@ const environmentAllowedAccountIds = parseCsv(raw.ENVIRONMENT_ALLOWED_ACCOUNT_ID
 const environmentManifestPath = raw.ENVIRONMENT_MANIFEST_PATH
   ? path.resolve(projectRoot, raw.ENVIRONMENT_MANIFEST_PATH)
   : path.resolve(projectRoot, '..', 'infrastructure', 'environment-manifest.json');
+
+const releaseRequiredGates = (() => {
+  const gates = parseCsv(raw.RELEASE_REQUIRED_GATES ?? '');
+  if (gates.length) {
+    return gates;
+  }
+  return [
+    'quality-verification',
+    'security-review',
+    'observability-health',
+    'compliance-evidence',
+    'change-approval'
+  ];
+})();
+
+const releaseThresholds = {
+  minCoverage: raw.RELEASE_MIN_COVERAGE,
+  maxTestFailureRate: raw.RELEASE_MAX_TEST_FAILURE_RATE,
+  maxCriticalVulnerabilities: raw.RELEASE_MAX_CRITICAL_VULNERABILITIES,
+  maxHighVulnerabilities: raw.RELEASE_MAX_HIGH_VULNERABILITIES,
+  maxOpenIncidents: raw.RELEASE_MAX_OPEN_INCIDENTS,
+  maxErrorRate: raw.RELEASE_MAX_ERROR_RATE
+};
+
+const releaseChangeFreezeCron = raw.RELEASE_CHANGE_FREEZE_CRON;
 
 const dataEncryptionActiveKeyId = raw.DATA_ENCRYPTION_ACTIVE_KEY_ID ?? 'v1';
 const dataEncryptionPrimarySecret = raw.DATA_ENCRYPTION_PRIMARY_KEY ?? raw.JWT_REFRESH_SECRET;
@@ -1315,6 +1389,17 @@ export const env = {
       maxBackoffSeconds: raw.WEBHOOK_BUS_MAX_BACKOFF_SECONDS,
       deliveryTimeoutMs: raw.WEBHOOK_BUS_DELIVERY_TIMEOUT_MS,
       recoverAfterMs: raw.WEBHOOK_BUS_RECOVER_AFTER_MS
+    }
+  },
+  monetization: {
+    reconciliation: {
+      enabled: raw.MONETIZATION_RECONCILIATION_ENABLED,
+      cronExpression: raw.MONETIZATION_RECONCILIATION_CRON,
+      timezone: raw.MONETIZATION_RECONCILIATION_TIMEZONE,
+      runOnStartup: raw.MONETIZATION_RECONCILIATION_RUN_ON_STARTUP,
+      recognitionWindowDays: raw.MONETIZATION_RECOGNITION_WINDOW_DAYS,
+      tenants: monetizationTenantAllowlist,
+      tenantCacheMinutes: raw.MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES
     }
   },
   domainEvents: {
@@ -1602,5 +1687,41 @@ export const env = {
       allowedIps: metricsAllowedIps
     },
     slo: sloConfig
+  },
+  telemetry: {
+    ingestion: {
+      enabled: raw.TELEMETRY_INGESTION_ENABLED,
+      allowedSources: telemetryAllowedSources,
+      strictSourceEnforcement: raw.TELEMETRY_STRICT_SOURCE_ENFORCEMENT,
+      defaultScope: raw.TELEMETRY_DEFAULT_SCOPE,
+      consent: {
+        defaultVersion: raw.TELEMETRY_CONSENT_DEFAULT_VERSION,
+        hardBlockWithoutConsent: raw.TELEMETRY_CONSENT_HARD_BLOCK
+      }
+    },
+    export: {
+      enabled: raw.TELEMETRY_EXPORT_ENABLED,
+      destination: raw.TELEMETRY_EXPORT_DESTINATION,
+      bucket: telemetryExportBucket,
+      prefix: telemetryExportPrefix,
+      batchSize: raw.TELEMETRY_EXPORT_BATCH_SIZE,
+      compress: raw.TELEMETRY_EXPORT_COMPRESS,
+      cronExpression: raw.TELEMETRY_EXPORT_CRON,
+      timezone: raw.TELEMETRY_EXPORT_TIMEZONE,
+      runOnStartup: raw.TELEMETRY_EXPORT_RUN_ON_STARTUP
+    },
+    freshness: {
+      ingestionThresholdMinutes: raw.TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES,
+      warehouseThresholdMinutes: raw.TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES
+    },
+    lineage: {
+      tool: raw.TELEMETRY_LINEAGE_TOOL,
+      autoRecord: raw.TELEMETRY_LINEAGE_AUTO_RECORD
+    }
+  },
+  release: {
+    requiredGates: releaseRequiredGates,
+    thresholds: releaseThresholds,
+    freezeWindowCron: releaseChangeFreezeCron
   }
 };

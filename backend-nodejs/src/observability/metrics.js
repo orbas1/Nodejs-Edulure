@@ -96,6 +96,31 @@ const unhandledExceptionsTotal = new promClient.Counter({
   labelNames: ['type']
 });
 
+const telemetryIngestionEventsTotal = new promClient.Counter({
+  name: 'edulure_telemetry_ingestion_events_total',
+  help: 'Count of telemetry events processed grouped by scope, source, and status',
+  labelNames: ['scope', 'source', 'status']
+});
+
+const telemetryExportEventsTotal = new promClient.Counter({
+  name: 'edulure_telemetry_export_events_total',
+  help: 'Count of telemetry events exported grouped by destination and result',
+  labelNames: ['destination', 'result']
+});
+
+const telemetryExportDurationSeconds = new promClient.Histogram({
+  name: 'edulure_telemetry_export_duration_seconds',
+  help: 'Histogram of telemetry export durations in seconds grouped by destination and result',
+  labelNames: ['destination', 'result'],
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 20, 60, 120]
+});
+
+const telemetryFreshnessLagSeconds = new promClient.Gauge({
+  name: 'edulure_telemetry_pipeline_lag_seconds',
+  help: 'Current telemetry pipeline lag in seconds grouped by pipeline and status',
+  labelNames: ['pipeline', 'status']
+});
+
 const paymentsProcessedTotal = new promClient.Counter({
   name: 'edulure_payments_processed_total',
   help: 'Count of payment intents processed grouped by provider, status, and currency',
@@ -118,6 +143,84 @@ const paymentsRefundCentsTotal = new promClient.Counter({
   name: 'edulure_payments_refund_cents_total',
   help: 'Total refund volume issued (in cents) grouped by provider and currency',
   labelNames: ['provider', 'currency']
+});
+
+const monetizationCatalogGauge = new promClient.Gauge({
+  name: 'edulure_monetization_catalog_items',
+  help: 'Number of monetization catalog items grouped by status',
+  labelNames: ['status']
+});
+
+const monetizationDeferredRevenueGauge = new promClient.Gauge({
+  name: 'edulure_monetization_deferred_revenue_cents',
+  help: 'Deferred revenue balance in cents grouped by tenant',
+  labelNames: ['tenant_id']
+});
+
+const monetizationUsageRecordedTotal = new promClient.Counter({
+  name: 'edulure_monetization_usage_recorded_total',
+  help: 'Count of monetization usage records captured grouped by product code, source, and currency',
+  labelNames: ['product_code', 'source', 'currency']
+});
+
+const monetizationUsageCentsTotal = new promClient.Counter({
+  name: 'edulure_monetization_usage_cents_total',
+  help: 'Total monetization usage amount recorded (in cents) grouped by product code and currency',
+  labelNames: ['product_code', 'currency']
+});
+
+const monetizationRevenueRecognizedCentsTotal = new promClient.Counter({
+  name: 'edulure_monetization_revenue_recognized_cents_total',
+  help: 'Recognized revenue amounts (in cents) grouped by product code, currency, and recognition method',
+  labelNames: ['product_code', 'currency', 'method']
+});
+
+const monetizationRevenueReversedCentsTotal = new promClient.Counter({
+  name: 'edulure_monetization_revenue_reversed_cents_total',
+  help: 'Refund-driven revenue reversals (in cents) grouped by product code, currency, and reason',
+  labelNames: ['product_code', 'currency', 'reason']
+});
+
+const governanceContractLifecycleGauge = new promClient.Gauge({
+  name: 'edulure_governance_contracts_lifecycle',
+  help: 'Governance contract counts grouped by lifecycle bucket',
+  labelNames: ['bucket']
+});
+
+const governanceVendorRiskGauge = new promClient.Gauge({
+  name: 'edulure_governance_vendor_risk',
+  help: 'Vendor assessment distribution grouped by risk level',
+  labelNames: ['risk_level']
+});
+
+const governanceCommunicationScheduledCounter = new promClient.Counter({
+  name: 'edulure_governance_communications_scheduled_total',
+  help: 'Count of roadmap communications scheduled grouped by audience, channel, and status',
+  labelNames: ['audience', 'channel', 'status']
+});
+
+const releaseRunStatusGauge = new promClient.Gauge({
+  name: 'edulure_release_run_status',
+  help: 'Latest status flag for release readiness runs grouped by environment, status, and version tag',
+  labelNames: ['environment', 'status', 'version_tag']
+});
+
+const releaseReadinessScoreGauge = new promClient.Gauge({
+  name: 'edulure_release_readiness_score',
+  help: 'Readiness score for release runs grouped by environment and version tag',
+  labelNames: ['environment', 'version_tag']
+});
+
+const releaseGateEvaluationsTotal = new promClient.Counter({
+  name: 'edulure_release_gate_evaluations_total',
+  help: 'Release gate evaluation outcomes grouped by gate key, status, environment, and version tag',
+  labelNames: ['gate_key', 'status', 'environment', 'version_tag']
+});
+
+const governanceCommunicationStatusGauge = new promClient.Gauge({
+  name: 'edulure_governance_communications_status',
+  help: 'Governance communication totals grouped by status',
+  labelNames: ['status']
 });
 
 const searchOperationDurationSeconds = new promClient.Histogram({
@@ -212,6 +315,23 @@ registry.registerMetric(paymentsProcessedTotal);
 registry.registerMetric(paymentsRevenueCentsTotal);
 registry.registerMetric(paymentsTaxCentsTotal);
 registry.registerMetric(paymentsRefundCentsTotal);
+registry.registerMetric(monetizationCatalogGauge);
+registry.registerMetric(monetizationDeferredRevenueGauge);
+registry.registerMetric(monetizationUsageRecordedTotal);
+registry.registerMetric(monetizationUsageCentsTotal);
+registry.registerMetric(monetizationRevenueRecognizedCentsTotal);
+registry.registerMetric(monetizationRevenueReversedCentsTotal);
+registry.registerMetric(governanceContractLifecycleGauge);
+registry.registerMetric(governanceVendorRiskGauge);
+registry.registerMetric(governanceCommunicationScheduledCounter);
+registry.registerMetric(governanceCommunicationStatusGauge);
+registry.registerMetric(releaseRunStatusGauge);
+registry.registerMetric(releaseReadinessScoreGauge);
+registry.registerMetric(releaseGateEvaluationsTotal);
+registry.registerMetric(telemetryIngestionEventsTotal);
+registry.registerMetric(telemetryExportEventsTotal);
+registry.registerMetric(telemetryExportDurationSeconds);
+registry.registerMetric(telemetryFreshnessLagSeconds);
 registry.registerMetric(searchOperationDurationSeconds);
 registry.registerMetric(searchNodeHealthGauge);
 registry.registerMetric(searchNodeLastCheckGauge);
@@ -544,6 +664,255 @@ export function trackPaymentRefundMetrics({ provider, currency, amount }) {
     },
     amount
   );
+}
+
+export function updateMonetizationCatalogMetrics(counts = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const statuses = ['draft', 'active', 'retired'];
+  statuses.forEach((status) => {
+    const value = Number(counts[status] ?? 0);
+    monetizationCatalogGauge.set({ status }, value);
+  });
+}
+
+export function recordMonetizationUsage({ productCode, source, currency, amountCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const product = productCode ? String(productCode) : 'unclassified';
+  const origin = source ? String(source) : 'unknown';
+  const normalizedCurrency = (currency ?? env.payments.defaultCurrency).toUpperCase();
+
+  monetizationUsageRecordedTotal.inc({ product_code: product, source: origin, currency: normalizedCurrency }, 1);
+  if (Number.isFinite(amountCents) && amountCents > 0) {
+    monetizationUsageCentsTotal.inc({ product_code: product, currency: normalizedCurrency }, amountCents);
+  }
+}
+
+export function recordRevenueRecognition({ productCode, currency, method, amountCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    return;
+  }
+
+  const product = productCode ? String(productCode) : 'unclassified';
+  const recognitionMethod = method ? String(method) : 'immediate';
+  const normalizedCurrency = (currency ?? env.payments.defaultCurrency).toUpperCase();
+
+  monetizationRevenueRecognizedCentsTotal.inc(
+    { product_code: product, currency: normalizedCurrency, method: recognitionMethod },
+    amountCents
+  );
+}
+
+export function recordRevenueReversal({ productCode, currency, reason, amountCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    return;
+  }
+
+  const product = productCode ? String(productCode) : 'unclassified';
+  const normalizedCurrency = (currency ?? env.payments.defaultCurrency).toUpperCase();
+  const normalizedReason = reason ? String(reason).slice(0, 64) : 'unspecified';
+
+  monetizationRevenueReversedCentsTotal.inc(
+    { product_code: product, currency: normalizedCurrency, reason: normalizedReason },
+    amountCents
+  );
+}
+
+export function updateDeferredRevenueBalance({ tenantId = 'global', balanceCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedTenant = tenantId ? String(tenantId) : 'global';
+  monetizationDeferredRevenueGauge.set({ tenant_id: normalizedTenant }, Math.max(balanceCents, 0));
+}
+
+export function updateGovernanceContractHealthMetrics(summary = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const total = Number(summary.totalContracts ?? 0);
+  const active = Number(summary.activeContracts ?? 0);
+  const renewals = Number(summary.renewalsWithinWindow ?? 0);
+  const overdue = Number(summary.overdueRenewals ?? 0);
+  const escalated = Number(summary.escalatedContracts ?? 0);
+
+  governanceContractLifecycleGauge.set({ bucket: 'total' }, Math.max(total, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'active' }, Math.max(active, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'renewal_window' }, Math.max(renewals, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'overdue' }, Math.max(overdue, 0));
+  governanceContractLifecycleGauge.set({ bucket: 'escalated' }, Math.max(escalated, 0));
+}
+
+export function updateVendorAssessmentRiskMetrics(summary = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const total = Number(summary.totalAssessments ?? 0);
+  const high = Number(summary.highRiskAssessments ?? 0);
+  const critical = Number(summary.criticalRiskAssessments ?? 0);
+  const remediation = Number(summary.remediationInProgress ?? 0);
+  const medium = Math.max(total - high - critical, 0);
+
+  governanceVendorRiskGauge.set({ risk_level: 'total' }, Math.max(total, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'high' }, Math.max(high, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'critical' }, Math.max(critical, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'medium' }, Math.max(medium, 0));
+  governanceVendorRiskGauge.set({ risk_level: 'remediation' }, Math.max(remediation, 0));
+}
+
+export function recordGovernanceCommunicationScheduled({ audience, channel, status } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedAudience = audience ? String(audience) : 'unspecified';
+  const normalizedChannel = channel ? String(channel) : 'email';
+  const normalizedStatus = status ? String(status) : 'scheduled';
+
+  governanceCommunicationScheduledCounter.inc(
+    { audience: normalizedAudience, channel: normalizedChannel, status: normalizedStatus },
+    1
+  );
+}
+
+export function recordGovernanceCommunicationPerformance({ summary } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  if (summary) {
+    governanceCommunicationStatusGauge.set({ status: 'total' }, Number(summary.totalCommunications ?? 0));
+    governanceCommunicationStatusGauge.set(
+      { status: 'scheduled' },
+      Number(summary.scheduledCommunications ?? 0)
+    );
+    governanceCommunicationStatusGauge.set({ status: 'sent' }, Number(summary.sentCommunications ?? 0));
+    governanceCommunicationStatusGauge.set(
+      { status: 'cancelled' },
+      Number(summary.cancelledCommunications ?? 0)
+    );
+  }
+}
+
+const RELEASE_STATUSES = ['scheduled', 'in_progress', 'ready', 'blocked', 'cancelled', 'completed'];
+
+export function recordReleaseRunStatus({ status, environment, versionTag, readinessScore }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedEnvironment = environment ? String(environment) : env.environment?.name ?? 'unknown';
+  const normalizedVersion = versionTag ? String(versionTag) : 'unspecified';
+  const resolvedStatus = RELEASE_STATUSES.includes(status) ? status : 'scheduled';
+
+  for (const candidate of RELEASE_STATUSES) {
+    releaseRunStatusGauge.set(
+      { environment: normalizedEnvironment, status: candidate, version_tag: normalizedVersion },
+      candidate === resolvedStatus ? 1 : 0
+    );
+  }
+
+  if (Number.isFinite(readinessScore)) {
+    releaseReadinessScoreGauge.set(
+      { environment: normalizedEnvironment, version_tag: normalizedVersion },
+      Math.max(0, Math.min(100, readinessScore))
+    );
+  }
+}
+
+export function recordReleaseGateEvaluation({ gateKey, status, environment, versionTag }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedGate = gateKey ? String(gateKey) : 'unknown';
+  const normalizedStatus = status ?? 'pending';
+  const normalizedEnvironment = environment ? String(environment) : env.environment?.name ?? 'unknown';
+  const normalizedVersion = versionTag ? String(versionTag) : 'unspecified';
+
+  releaseGateEvaluationsTotal.inc(
+    {
+      gate_key: normalizedGate,
+      status: normalizedStatus,
+      environment: normalizedEnvironment,
+      version_tag: normalizedVersion
+    },
+    1
+  );
+}
+
+export function recordTelemetryIngestion({ scope, source, status }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  telemetryIngestionEventsTotal.inc({
+    scope: scope ?? 'unknown',
+    source: source ?? 'unknown',
+    status: status ?? 'unknown'
+  });
+}
+
+export function recordTelemetryExport({ destination, result, eventCount = 0, durationSeconds }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const labels = {
+    destination: destination ?? 'unknown',
+    result: result ?? 'success'
+  };
+
+  const count = Number.isFinite(eventCount) && eventCount > 0 ? eventCount : 0;
+  telemetryExportEventsTotal.inc(labels, count);
+
+  if (Number.isFinite(durationSeconds) && durationSeconds >= 0) {
+    telemetryExportDurationSeconds.observe(labels, durationSeconds);
+  }
+}
+
+export function recordTelemetryFreshness({ pipeline, status, lastEventAt, thresholdMinutes }) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const pipelineKey = pipeline ?? 'unknown';
+  const now = Date.now();
+  const occurred = lastEventAt ? new Date(lastEventAt).getTime() : now;
+  const lagSeconds = Math.max(0, Math.round((now - occurred) / 1000));
+
+  const severityThresholdSeconds = Number.isFinite(thresholdMinutes)
+    ? Math.max(60, Math.round(thresholdMinutes * 60))
+    : 900;
+
+  let severity = 'healthy';
+  if (lagSeconds > severityThresholdSeconds * 3) {
+    severity = 'critical';
+  } else if (lagSeconds > severityThresholdSeconds) {
+    severity = 'warning';
+  }
+
+  telemetryFreshnessLagSeconds.set({ pipeline: pipelineKey, status: severity }, lagSeconds);
+
+  if (status && status !== severity) {
+    telemetryFreshnessLagSeconds.set({ pipeline: pipelineKey, status }, lagSeconds);
+  }
 }
 
 export function recordUnhandledException(error) {

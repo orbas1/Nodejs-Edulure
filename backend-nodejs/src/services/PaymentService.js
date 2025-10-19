@@ -17,6 +17,7 @@ import PlatformSettingsService from './PlatformSettingsService.js';
 import EscrowService from './EscrowService.js';
 import webhookEventBusService from './WebhookEventBusService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
+import MonetizationFinanceService from './MonetizationFinanceService.js';
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
 
 function centsToCurrencyString(amount) {
@@ -805,6 +806,7 @@ class PaymentService {
       });
 
       await handleCommunityPaymentSucceeded(updatedIntent, trx);
+      await MonetizationFinanceService.handlePaymentCaptured(updatedIntent, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.succeeded',
@@ -976,6 +978,7 @@ class PaymentService {
       });
 
       await handleCommunityPaymentSucceeded(updated, trx);
+      await MonetizationFinanceService.handlePaymentCaptured(updated, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.succeeded',
@@ -1077,6 +1080,19 @@ class PaymentService {
               provider: 'stripe',
               refundId: refund.id
             }
+          },
+          trx
+        );
+        await MonetizationFinanceService.handleRefundProcessed(
+          {
+            paymentIntentId: intent.id,
+            amountCents: refundAmount,
+            currency: refundCurrency,
+            tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
+            processedAt: refund.created ? new Date(refund.created * 1000).toISOString() : new Date().toISOString(),
+            reason: refund.reason ?? null,
+            refundReference: refund.id,
+            source: 'stripe-webhook'
           },
           trx
         );
@@ -1279,6 +1295,20 @@ class PaymentService {
             provider: intent.provider,
             reason: reason ?? null
           }
+        },
+        trx
+      );
+
+      await MonetizationFinanceService.handleRefundProcessed(
+        {
+          paymentIntentId: intent.id,
+          amountCents: refundAmount,
+          currency: intent.currency,
+          tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
+          processedAt: new Date().toISOString(),
+          reason: reason ?? null,
+          refundReference: providerRefundId,
+          source: 'payments-api'
         },
         trx
       );

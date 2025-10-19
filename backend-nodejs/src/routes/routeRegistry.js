@@ -12,6 +12,7 @@ import contentRoutes from './content.routes.js';
 import creationRoutes from './creation.routes.js';
 import courseRoutes from './course.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
+import enablementRoutes from './enablement.routes.js';
 import ebookRoutes from './ebook.routes.js';
 import explorerRoutes from './explorer.routes.js';
 import feedRoutes from './feed.routes.js';
@@ -24,6 +25,9 @@ import verificationRoutes from './verification.routes.js';
 import observabilityRoutes from './observability.routes.js';
 import environmentParityRoutes from './environmentParity.routes.js';
 import securityRoutes from './security.routes.js';
+import telemetryRoutes from './telemetry.routes.js';
+import governanceRoutes from './governance.routes.js';
+import releaseRoutes from './release.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 
 const routerMap = {
@@ -52,7 +56,11 @@ const routerMap = {
   blog: blogRoutes,
   'provider-transition': providerTransitionRoutes,
   observability: observabilityRoutes,
-  environment: environmentParityRoutes
+  environment: environmentParityRoutes,
+  telemetry: telemetryRoutes,
+  enablement: enablementRoutes,
+  governance: governanceRoutes,
+  release: releaseRoutes
 };
 
 export const apiRouteRegistry = apiRouteMetadata.map((descriptor) => ({

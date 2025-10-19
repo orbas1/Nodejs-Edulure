@@ -87,6 +87,17 @@ export const apiRouteMetadata = [
     disabledMessage: 'Environment parity APIs are restricted to platform administrators.'
   },
   {
+    name: 'telemetry',
+    capability: 'telemetry-pipeline',
+    description: 'Telemetry ingestion, consent governance, and warehouse export endpoints for platform services.',
+    basePath: '/telemetry',
+    flagKey: 'platform.api.v1.telemetry',
+    defaultState: 'enabled',
+    audience: 'service',
+    fallbackStatus: 503,
+    disabledMessage: 'Telemetry APIs are currently paused while pipelines are offline.'
+  },
+  {
     name: 'payments',
     capability: 'payments-and-payouts',
     description: 'Payments, escrow, and billing orchestration endpoints.',
@@ -166,10 +177,47 @@ export const apiRouteMetadata = [
   {
     name: 'analytics',
     capability: 'analytics-insights',
-    description: 'Reporting, dashboards, and analytics export APIs.',
+    description:
+      'Reporting, dashboards, and analytics export APIs including executive BI overviews.',
     basePath: '/analytics',
     flagKey: 'platform.api.v1.analytics',
     defaultState: 'enabled'
+  },
+  {
+    name: 'enablement',
+    capability: 'enablement-documentation',
+    description:
+      'Knowledge base, training curriculum, and stakeholder communications APIs for operators and go-to-market teams.',
+    basePath: '/enablement',
+    flagKey: 'platform.api.v1.enablement',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Enablement documentation APIs are restricted for your role.'
+  },
+  {
+    name: 'governance',
+    capability: 'stakeholder-governance',
+    description:
+      'Contract lifecycle, vendor risk assessments, cross-functional review cadences, and roadmap communication APIs for programme owners.',
+    basePath: '/governance',
+    flagKey: 'platform.api.v1.governance',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Governance APIs are restricted to programme administrators.'
+  },
+  {
+    name: 'release',
+    capability: 'release-management-automation',
+    description:
+      'Release readiness checklists, gate evaluations, and deployment dashboard APIs for platform operators.',
+    basePath: '/release',
+    flagKey: 'platform.api.v1.release',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Release orchestration APIs are restricted to platform operators.'
   },
   {
     name: 'dashboard',

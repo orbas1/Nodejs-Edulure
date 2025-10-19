@@ -76,6 +76,56 @@ The following additional variables configure the asset workflow:
 When running locally without CloudConvert the ingestion worker will mark PowerPoint jobs as failed. Other formats (EPUB, PDF) are
 processed entirely within the service and will continue to function.
 
+### Telemetry pipeline
+
+Version 1.50 introduces a governed telemetry pipeline spanning consent capture, event ingestion, freshness monitoring, and warehouse exports. Configure the following variables when enabling telemetry in any environment:
+
+- `TELEMETRY_INGESTION_ENABLED` – master switch for the ingestion API. Disable to prevent writes during maintenance windows.
+- `TELEMETRY_ALLOWED_SOURCES` / `TELEMETRY_STRICT_SOURCE_ENFORCEMENT` – whitelist authorised producers (for example, `web,backend,worker`) and hard-block unknown sources in production.
+- `TELEMETRY_DEFAULT_SCOPE` / `TELEMETRY_CONSENT_DEFAULT_VERSION` / `TELEMETRY_CONSENT_HARD_BLOCK` – control consent scoping and enforcement. When `HARD_BLOCK` is `true` events without active consent are persisted with an ingestion status of `suppressed` and excluded from export.
+- `TELEMETRY_EXPORT_ENABLED`, `TELEMETRY_EXPORT_DESTINATION`, `TELEMETRY_EXPORT_BUCKET`, `TELEMETRY_EXPORT_PREFIX`, `TELEMETRY_EXPORT_BATCH_SIZE`, `TELEMETRY_EXPORT_COMPRESS`, `TELEMETRY_EXPORT_RUN_ON_STARTUP`, `TELEMETRY_EXPORT_CRON`, `TELEMETRY_EXPORT_TIMEZONE` – configure warehouse exports. The default settings batch 5,000 events, compress JSONL payloads, and run every ten minutes in UTC.
+- `TELEMETRY_FRESHNESS_INGESTION_THRESHOLD_MINUTES` / `TELEMETRY_FRESHNESS_WAREHOUSE_THRESHOLD_MINUTES` – thresholds surfaced in Prometheus metrics and the `/telemetry/freshness` endpoint so operators can detect pipeline drift.
+- `TELEMETRY_LINEAGE_TOOL` / `TELEMETRY_LINEAGE_AUTO_RECORD` – annotate exports with lineage metadata (defaults to `dbt`).
+
+Operational endpoints:
+
+- `POST /api/v1/telemetry/events` ingests a single event, enforces consent, and records deduplicated payloads for export. A `202` response indicates the event will flow to the warehouse.
+- `POST /api/v1/telemetry/consents` records or revokes consent for a user and scope combination, versioning entries in the consent ledger.
+- `GET /api/v1/telemetry/freshness` lists ingestion and export checkpoints with computed lag so operators can validate pipeline health.
+- `POST /api/v1/telemetry/export` triggers an immediate warehouse export in addition to the scheduled cron execution.
+- `GET /api/v1/analytics/bi/executive-overview` returns aggregated KPIs, revenue trends, community metrics, experiments, and telemetry health powering the operator dashboards. Use the optional `range` query parameter (`7d`, `14d`, `30d`, `90d`) to control KPI deltas.
+
+Exports stream to Cloudflare R2 (or the configured destination) using the background worker. The telemetry warehouse job is registered in `src/jobs/telemetryWarehouseJob.js` and honours the configured cron as well as manual triggers. Freshness checkpoints feed Prometheus metrics (`edulure_telemetry_ingestion_events_total`, `edulure_telemetry_export_lag_seconds`) so alerting can detect stale pipelines.
+
+### Release readiness orchestration
+
+Platform operators gain a dedicated release management surface that consolidates readiness checklists, gate outcomes, and deployment dashboards. Configure the new environment variables to tune thresholds and governance:
+
+- `RELEASE_REQUIRED_GATES` – comma-separated list of gate slugs that must succeed before a run is marked `ready`. Defaults match the seeded quality, security, observability, compliance, and change gates.
+- `RELEASE_MIN_COVERAGE` / `RELEASE_MAX_TEST_FAILURE_RATE` – automated quality thresholds applied to auto-evaluated gates.
+- `RELEASE_MAX_CRITICAL_VULNERABILITIES` / `RELEASE_MAX_HIGH_VULNERABILITIES` – security thresholds emitted by nightly scans.
+- `RELEASE_MAX_OPEN_INCIDENTS` / `RELEASE_MAX_ERROR_RATE` – observability guardrails ensuring production health is stable through the change window.
+- `RELEASE_CHANGE_FREEZE_CRON` – cron expression representing enterprise freeze windows. Evaluations warn when runs overlap the freeze schedule.
+
+Core APIs:
+
+- `GET /api/v1/release/checklist` – list the active readiness gates, success criteria, and default owners for operator playbooks.
+- `POST /api/v1/release/runs` – schedule a release run. Stores a point-in-time checklist snapshot, owner assignments, and optional seed metrics for auto-evaluated gates.
+- `GET /api/v1/release/runs` / `GET /api/v1/release/runs/:publicId` – inspect historical runs, change windows, readiness scores, and gate-level evidence.
+- `POST /api/v1/release/runs/:publicId/gates/:gateKey/evaluations` – record manual or automated gate outcomes with metrics, notes, and evidence links.
+- `POST /api/v1/release/runs/:publicId/evaluate` – recompute readiness status using the latest metrics, update Prometheus gauges, and surface blocking gates.
+- `GET /api/v1/release/dashboard` – summarise upcoming releases, status breakdowns, and aggregated readiness scores for programme reviews.
+
+Prometheus now publishes `edulure_release_gate_evaluations_total`, `edulure_release_run_status`, and `edulure_release_readiness_score` so runbooks and alerts can track the health of deployment pipelines in real time.
+
+### Monetisation reconciliation
+
+The worker now also schedules `MonetizationReconciliationJob` (`src/jobs/monetizationReconciliationJob.js`). The job recognises deferred revenue, reconciles captured payments with usage metering, and persists GAAP-friendly summaries. Configuration lives under the new `MONETIZATION_*` environment variables in `.env.example`; by default the job runs every five minutes, emits Prometheus metrics (`edulure_monetization_usage_recorded_total`, `edulure_monetization_revenue_recognized_cents_total`, `edulure_monetization_deferred_revenue_cents`), and produces detailed rows in `monetization_reconciliation_runs` for finance review.
+
+#### Multi-tenant scheduling
+
+Set `MONETIZATION_RECONCILIATION_TENANTS` to a comma-separated allow list when only certain tenants should be reconciled. When the allow list is omitted the job auto-discovers tenants across catalog, usage, schedule, and reconciliation tables; the discovered list is cached for `MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES` (default 30) to avoid excessive polling but refreshes automatically when the cache expires.
+
 ### Explorer search environment
 
 The explorer, recommendation, and ads surfaces rely on a hardened Meilisearch cluster. Configure the following variables to

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 import { generateConsentPolicyChecksum } from '../src/database/domains/compliance.js';
+import { TABLES as TELEMETRY_TABLES } from '../src/database/domains/telemetry.js';
 import DataEncryptionService from '../src/services/DataEncryptionService.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import CommunityAffiliatePayoutModel from '../src/models/CommunityAffiliatePayoutModel.js';
@@ -124,6 +125,14 @@ export async function seed(knex) {
     await trx('content_asset_events').del();
     await trx('content_audit_logs').del();
     await trx('content_assets').del();
+    await trx('telemetry_lineage_runs').del();
+    await trx('telemetry_freshness_monitors').del();
+    await trx('telemetry_events').del();
+    await trx('telemetry_event_batches').del();
+    await trx('telemetry_consent_ledger').del();
+    await trx('release_gate_results').del();
+    await trx('release_runs').del();
+    await trx('release_checklist_items').del();
     await trx('domain_event_dispatch_queue').del();
     await trx('domain_events').del();
     await trx('security_incidents').del();
@@ -1244,6 +1253,80 @@ export async function seed(knex) {
         paymentMethod: ['card'],
         statementDescriptor: 'EDULURE INSIDER'
       })
+    });
+
+    const [catalogItemId] = await trx('monetization_catalog_items').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      product_code: 'growth-insiders-annual',
+      name: 'Growth Insiders Annual',
+      description: 'Annual enablement subscription covering growth analytics workshops and concierge support.',
+      pricing_model: 'flat_fee',
+      billing_interval: 'annual',
+      revenue_recognition_method: 'deferred',
+      recognition_duration_days: 365,
+      unit_amount_cents: 189900,
+      currency: 'USD',
+      usage_metric: 'seats',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      metadata: JSON.stringify({ seed: true, owner: 'finance-ops' }),
+      status: 'active',
+      effective_from: trx.fn.now()
+    });
+
+    const [usageRecordId] = await trx('monetization_usage_records').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      catalog_item_id: catalogItemId,
+      product_code: 'growth-insiders-annual',
+      account_reference: 'ops-guild',
+      user_id: learnerId,
+      usage_date: subscriptionTimestamp,
+      quantity: 1,
+      unit_amount_cents: 189900,
+      amount_cents: 189900,
+      currency: 'USD',
+      source: 'seed-data',
+      external_reference: `seed-usage-${subscriptionPublicId}`,
+      payment_intent_id: subscriptionPaymentId,
+      metadata: JSON.stringify({ cohort: 'alpha', recordedBy: 'seed-script' }),
+      recorded_at: subscriptionTimestamp,
+      processed_at: subscriptionTimestamp
+    });
+
+    const [scheduleId] = await trx('monetization_revenue_schedules').insert({
+      tenant_id: 'global',
+      payment_intent_id: subscriptionPaymentId,
+      catalog_item_id: catalogItemId,
+      usage_record_id: usageRecordId,
+      product_code: 'growth-insiders-annual',
+      status: 'pending',
+      recognition_method: 'deferred',
+      recognition_start: subscriptionTimestamp,
+      recognition_end: nextYear,
+      amount_cents: 205092,
+      recognized_amount_cents: 0,
+      currency: 'USD',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      metadata: JSON.stringify({ source: 'seed-data', schedule: 'annual' }),
+      created_at: subscriptionTimestamp
+    });
+
+    await trx('monetization_reconciliation_runs').insert({
+      tenant_id: 'global',
+      window_start: subscriptionTimestamp,
+      window_end: nextYear,
+      status: 'completed',
+      invoiced_cents: 205092,
+      usage_cents: 189900,
+      recognized_cents: 0,
+      deferred_cents: 205092,
+      variance_cents: -189900,
+      variance_ratio: 0,
+      metadata: JSON.stringify({ seed: true, scheduleId, usageRecordId }),
+      created_at: subscriptionTimestamp
     });
 
     const subscriptionTimestamp = new Date();
@@ -3082,3 +3165,518 @@ export async function seed(knex) {
     });
   });
 }
+    await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert([
+      {
+        user_id: adminId,
+        tenant_id: 'global',
+        consent_scope: 'product.analytics',
+        consent_version: 'v1',
+        status: 'granted',
+        is_active: true,
+        recorded_at: trx.fn.now(),
+        effective_at: trx.fn.now(),
+        metadata: JSON.stringify({ capturedBy: 'seed', channel: 'bootstrap' }),
+        evidence: JSON.stringify({ method: 'policy-acceptance', version: '2025-03' })
+      },
+      {
+        user_id: instructorId,
+        tenant_id: 'global',
+        consent_scope: 'product.analytics',
+        consent_version: 'v1',
+        status: 'granted',
+        is_active: true,
+        recorded_at: trx.fn.now(),
+        effective_at: trx.fn.now(),
+        metadata: JSON.stringify({ capturedBy: 'seed', channel: 'bootstrap' }),
+        evidence: JSON.stringify({ method: 'policy-acceptance', version: '2025-03' })
+      },
+      {
+        user_id: learnerId,
+        tenant_id: 'global',
+        consent_scope: 'product.analytics',
+        consent_version: 'v1',
+        status: 'granted',
+        is_active: true,
+        recorded_at: trx.fn.now(),
+        effective_at: trx.fn.now(),
+        metadata: JSON.stringify({ capturedBy: 'seed', channel: 'bootstrap' }),
+        evidence: JSON.stringify({ method: 'policy-acceptance', version: '2025-03' })
+      }
+    ]);
+
+    await trx(TELEMETRY_TABLES.FRESHNESS_MONITORS).insert([
+      {
+        pipeline_key: 'ingestion.raw',
+        status: 'healthy',
+        threshold_minutes: 15,
+        last_event_at: trx.fn.now(),
+        lag_seconds: 0,
+        metadata: JSON.stringify({ seeded: true })
+      },
+      {
+        pipeline_key: 'warehouse.export',
+        status: 'healthy',
+        threshold_minutes: 30,
+        last_event_at: trx.fn.now(),
+        lag_seconds: 0,
+        metadata: JSON.stringify({ seeded: true })
+      }
+    ]);
+
+    const vendorContractPublicId = crypto.randomUUID();
+    const dataProcessingContractPublicId = crypto.randomUUID();
+    const communicationsContractPublicId = crypto.randomUUID();
+
+    const vendorContractObligations = [
+      {
+        id: crypto.randomUUID(),
+        description: 'Provide quarterly penetration test summary and remediation status.',
+        owner: 'security@edulure.com',
+        dueAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+        completedAt: null,
+        status: 'open'
+      },
+      {
+        id: crypto.randomUUID(),
+        description: 'Refresh incident response contact roster within 5 business days of staff turnover.',
+        owner: 'security@edulure.com',
+        dueAt: null,
+        completedAt: null,
+        status: 'monitor'
+      }
+    ];
+
+    const dataProcessingObligations = [
+      {
+        id: crypto.randomUUID(),
+        description: 'Publish annual GDPR Article 28 addendum update for customer signature.',
+        owner: 'legal@edulure.com',
+        dueAt: '2025-05-15T00:00:00.000Z',
+        completedAt: null,
+        status: 'open'
+      }
+    ];
+
+    const communicationsObligations = [
+      {
+        id: crypto.randomUUID(),
+        description: 'Distribute roadmap summary to executive sponsors within two weeks of review cycle.',
+        owner: 'enablement@edulure.com',
+        dueAt: '2025-04-29T00:00:00.000Z',
+        completedAt: null,
+        status: 'planned'
+      }
+    ];
+
+    await trx('governance_contracts').insert([
+      {
+        public_id: vendorContractPublicId,
+        vendor_name: 'ShieldGuard Security',
+        contract_type: 'penetration-testing',
+        status: 'active',
+        owner_email: 'security@edulure.com',
+        risk_tier: 'high',
+        contract_value_cents: 1800000,
+        currency: 'USD',
+        effective_date: '2024-07-01',
+        renewal_date: '2025-07-01',
+        termination_notice_date: '2025-04-01',
+        obligations: JSON.stringify(vendorContractObligations),
+        metadata: JSON.stringify({ classification: 'critical', regions: ['US', 'EU'] }),
+        last_renewal_evaluated_at: trx.fn.now(),
+        next_governance_check_at: trx.fn.now()
+      },
+      {
+        public_id: dataProcessingContractPublicId,
+        vendor_name: 'CloudSignal Data Platform',
+        contract_type: 'data-processing-addendum',
+        status: 'pending_renewal',
+        owner_email: 'legal@edulure.com',
+        risk_tier: 'medium',
+        contract_value_cents: 960000,
+        currency: 'USD',
+        effective_date: '2023-10-01',
+        renewal_date: '2025-04-15',
+        termination_notice_date: '2025-03-01',
+        obligations: JSON.stringify(dataProcessingObligations),
+        metadata: JSON.stringify({ classification: 'sensitive', processorType: 'CDP' }),
+        last_renewal_evaluated_at: trx.fn.now(),
+        next_governance_check_at: trx.fn.now()
+      },
+      {
+        public_id: communicationsContractPublicId,
+        vendor_name: 'Brightwave Communications',
+        contract_type: 'strategic-communications',
+        status: 'active',
+        owner_email: 'enablement@edulure.com',
+        risk_tier: 'low',
+        contract_value_cents: 420000,
+        currency: 'USD',
+        effective_date: '2024-01-05',
+        renewal_date: '2025-01-05',
+        termination_notice_date: '2024-11-01',
+        obligations: JSON.stringify(communicationsObligations),
+        metadata: JSON.stringify({ deliverables: ['roadmap-briefings', 'executive-townhalls'] }),
+        last_renewal_evaluated_at: trx.fn.now(),
+        next_governance_check_at: trx.fn.now()
+      }
+    ]);
+
+    const shieldGuardContract = await trx('governance_contracts')
+      .select('id')
+      .where({ public_id: vendorContractPublicId })
+      .first();
+    const cdpContract = await trx('governance_contracts')
+      .select('id')
+      .where({ public_id: dataProcessingContractPublicId })
+      .first();
+
+    await trx('governance_vendor_assessments').insert([
+      {
+        public_id: crypto.randomUUID(),
+        contract_id: shieldGuardContract.id,
+        vendor_name: 'ShieldGuard Security',
+        assessment_type: 'security',
+        risk_score: 7.8,
+        risk_level: 'high',
+        status: 'remediation',
+        last_assessed_at: '2025-03-15',
+        next_review_at: '2025-05-01',
+        owner_email: 'security@edulure.com',
+        findings: JSON.stringify([
+          {
+            id: crypto.randomUUID(),
+            category: 'vulnerability-management',
+            severity: 'high',
+            description: 'Missed SLA for patching critical findings during February engagement.'
+          }
+        ]),
+        remediation_plan: JSON.stringify({
+          status: 'in_progress',
+          targetDate: '2025-04-12',
+          owner: 'ShieldGuard TAM'
+        }),
+        evidence_links: JSON.stringify([
+          'https://ops.edulure.com/compliance/shieldguard-feb-2025-report.pdf'
+        ]),
+        metadata: JSON.stringify({ cadence: 'quarterly' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        contract_id: cdpContract.id,
+        vendor_name: 'CloudSignal Data Platform',
+        assessment_type: 'privacy',
+        risk_score: 4.2,
+        risk_level: 'medium',
+        status: 'approved',
+        last_assessed_at: '2025-02-28',
+        next_review_at: '2025-08-31',
+        owner_email: 'legal@edulure.com',
+        findings: JSON.stringify([
+          {
+            id: crypto.randomUUID(),
+            category: 'data-retention',
+            severity: 'medium',
+            description: 'Customer deletion SLA improved to 14 days but requires quarterly attestation.'
+          }
+        ]),
+        remediation_plan: JSON.stringify({
+          status: 'monitor',
+          nextCheckpoint: '2025-06-01',
+          notes: 'Request automated retention evidence feed.'
+        }),
+        evidence_links: JSON.stringify([
+          'https://ops.edulure.com/legal/cloudsignal-art28-2025.pdf'
+        ]),
+        metadata: JSON.stringify({ cadence: 'biannual' })
+      }
+    ]);
+
+    await trx('governance_review_cycles').insert([
+      {
+        public_id: crypto.randomUUID(),
+        cycle_name: 'Quarterly Trust Review Q2 FY25',
+        status: 'in_progress',
+        start_date: '2025-04-01',
+        end_date: '2025-04-30',
+        next_milestone_at: '2025-04-15',
+        focus_areas: JSON.stringify(['security', 'privacy', 'resilience']),
+        participants: JSON.stringify([
+          { name: 'Tara Singh', role: 'CISO' },
+          { name: 'Miguel Rosa', role: 'Head of Data Governance' },
+          { name: 'Dana Ellis', role: 'VP Product' }
+        ]),
+        action_items: JSON.stringify([
+          {
+            id: crypto.randomUUID(),
+            summary: 'Finalize FY25 breach notification runbook refresh.',
+            owner: 'security@edulure.com',
+            dueAt: '2025-04-12T00:00:00.000Z',
+            status: 'open'
+          }
+        ]),
+        outcome_notes: null,
+        readiness_score: 62
+      },
+      {
+        public_id: crypto.randomUUID(),
+        cycle_name: 'Stakeholder Steering Committee – April 2025',
+        status: 'planned',
+        start_date: '2025-04-18',
+        end_date: '2025-04-18',
+        next_milestone_at: '2025-04-16',
+        focus_areas: JSON.stringify(['roadmap', 'enablement', 'customer-advisory']),
+        participants: JSON.stringify([
+          { name: 'Iris Akintola', role: 'Chief Customer Officer' },
+          { name: 'Kenji Morita', role: 'VP Enablement' },
+          { name: 'Lauren Patel', role: 'Head of Partnerships' }
+        ]),
+        action_items: JSON.stringify([]),
+        outcome_notes: null,
+        readiness_score: 48
+      }
+    ]);
+
+    await trx('governance_roadmap_communications').insert([
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'fy25-trust-roadmap-briefing',
+        audience: 'executive-sponsors',
+        channel: 'webinar',
+        subject: 'FY25 Trust & Compliance Roadmap Briefing',
+        body:
+          'Walk executive sponsors through the FY25 security, privacy, and resilience initiatives with clear risk posture updates and request for prioritisation feedback.',
+        status: 'scheduled',
+        schedule_at: '2025-04-22T16:00:00.000Z',
+        sent_at: null,
+        owner_email: 'enablement@edulure.com',
+        metrics: JSON.stringify({
+          targetAudience: 32,
+          expectedRecipients: 32,
+          delivered: 0,
+          engagementRate: 0
+        }),
+        attachments: JSON.stringify([
+          {
+            name: 'briefing-deck',
+            url: 'https://cdn.edulure.com/roadmap/fy25-trust-briefing.pdf'
+          }
+        ]),
+        metadata: JSON.stringify({ cadence: 'quarterly' })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'provider-migration-update-apr-2025',
+        audience: 'provider-partners',
+        channel: 'newsletter',
+        subject: 'Provider Migration Update – April 2025',
+        body:
+          'Summarise milestone burn-down, highlight enablement resources, and flag required actions ahead of the May cut-over.',
+        status: 'draft',
+        schedule_at: '2025-04-10T12:00:00.000Z',
+        sent_at: null,
+        owner_email: 'partners@edulure.com',
+        metrics: JSON.stringify({ targetAudience: 640, delivered: 0, expectedRecipients: 640 }),
+        attachments: JSON.stringify([
+          { name: 'migration-checklist', url: 'https://cdn.edulure.com/providers/migration-checklist.pdf' }
+        ]),
+        metadata: JSON.stringify({ cadence: 'biweekly' })
+      }
+    ]);
+
+    const releaseChecklistEntries = [
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'quality-verification',
+        category: 'quality',
+        title: 'Quality assurance sign-off',
+        description:
+          'CI pipelines must report stable automated testing with coverage above 90% and failure rate below 2%.',
+        auto_evaluated: true,
+        weight: 3,
+        default_owner_email: 'qa@edulure.com',
+        success_criteria: JSON.stringify({ minCoverage: 0.9, maxFailureRate: 0.02 })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'security-review',
+        category: 'security',
+        title: 'Security review with zero critical findings',
+        description: 'Vulnerability scans must report zero critical issues and fewer than five high-severity findings.',
+        auto_evaluated: true,
+        weight: 3,
+        default_owner_email: 'security@edulure.com',
+        success_criteria: JSON.stringify({ maxCriticalVulnerabilities: 0, maxHighVulnerabilities: 5 })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'observability-health',
+        category: 'observability',
+        title: 'Observability and incident health check',
+        description: 'No live incidents may be open and error rate must remain below 1% across the change window.',
+        auto_evaluated: true,
+        weight: 2,
+        default_owner_email: 'sre@edulure.com',
+        success_criteria: JSON.stringify({ maxOpenIncidents: 0, maxErrorRate: 0.01 })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'compliance-evidence',
+        category: 'compliance',
+        title: 'Compliance evidence packaged',
+        description: 'SOC 2, ISO 27001, and privacy change reviews must be uploaded to the evidence vault.',
+        auto_evaluated: false,
+        weight: 2,
+        default_owner_email: 'compliance@edulure.com',
+        success_criteria: JSON.stringify({ requiredEvidence: ['soc2-signoff', 'privacy-review'] })
+      },
+      {
+        public_id: crypto.randomUUID(),
+        slug: 'change-approval',
+        category: 'change_management',
+        title: 'Change advisory board approval',
+        description:
+          'Change ticket must be approved, change review completed, and deployment must respect the freeze calendar.',
+        auto_evaluated: true,
+        weight: 2,
+        default_owner_email: 'release@edulure.com',
+        success_criteria: JSON.stringify({ changeReviewRequired: true, freezeWindowCheck: true })
+      }
+    ];
+
+    await trx('release_checklist_items').insert(releaseChecklistEntries);
+
+    const releaseChecklistSnapshot = releaseChecklistEntries.map((item) => ({
+      id: item.id ?? null,
+      publicId: item.public_id,
+      slug: item.slug,
+      category: item.category,
+      title: item.title,
+      description: item.description,
+      autoEvaluated: item.auto_evaluated,
+      weight: item.weight,
+      defaultOwnerEmail: item.default_owner_email,
+      successCriteria: JSON.parse(item.success_criteria)
+    }));
+
+    const releaseRunPublicId = crypto.randomUUID();
+    const releaseRunMetadata = {
+      requiredGates: [
+        'quality-verification',
+        'security-review',
+        'observability-health',
+        'compliance-evidence',
+        'change-approval'
+      ],
+      thresholds: {
+        minCoverage: 0.9,
+        maxTestFailureRate: 0.02,
+        maxCriticalVulnerabilities: 0,
+        maxHighVulnerabilities: 5,
+        maxOpenIncidents: 0,
+        maxErrorRate: 0.01
+      },
+      readinessScore: 68,
+      changeTicket: 'CHG-2048'
+    };
+
+    await trx('release_runs').insert({
+      public_id: releaseRunPublicId,
+      version_tag: 'v1.0.0-rc.5',
+      environment: 'staging',
+      status: 'in_progress',
+      initiated_by_email: 'helena.brooks@edulure.com',
+      initiated_by_name: 'Helena Brooks',
+      scheduled_at: trx.fn.now(),
+      started_at: trx.fn.now(),
+      completed_at: null,
+      change_window_start: '2025-04-18T18:00:00.000Z',
+      change_window_end: '2025-04-18T19:00:00.000Z',
+      summary_notes: 'Readiness rehearsal for Version 1.00 production cut-over.',
+      checklist_snapshot: JSON.stringify(releaseChecklistSnapshot),
+      metadata: JSON.stringify(releaseRunMetadata)
+    });
+
+    const releaseRun = await trx('release_runs')
+      .select('id')
+      .where({ public_id: releaseRunPublicId })
+      .first();
+
+    const releaseChecklistRows = await trx('release_checklist_items')
+      .select('id', 'slug')
+      .whereIn('slug', releaseRunMetadata.requiredGates);
+
+    const gateLookup = new Map(releaseChecklistRows.map((row) => [row.slug, row.id]));
+
+    await trx('release_gate_results').insert([
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('quality-verification'),
+        gate_key: 'quality-verification',
+        status: 'pass',
+        owner_email: 'qa@edulure.com',
+        metrics: JSON.stringify({ coverage: 0.92, testFailureRate: 0.01 }),
+        notes: 'Vitest, Cypress, and contract suites passed on the latest build.',
+        evidence_url: 'https://ci.edulure.com/jobs/qa/v1.0.0-rc.5',
+        last_evaluated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('security-review'),
+        gate_key: 'security-review',
+        status: 'in_progress',
+        owner_email: 'security@edulure.com',
+        metrics: JSON.stringify({ criticalVulnerabilities: 0, highVulnerabilities: 3 }),
+        notes: 'Awaiting verification that backlog high findings are mitigated.',
+        evidence_url: 'https://security.edulure.com/vuln/summary',
+        last_evaluated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('observability-health'),
+        gate_key: 'observability-health',
+        status: 'pass',
+        owner_email: 'sre@edulure.com',
+        metrics: JSON.stringify({ openIncidents: 0, errorRate: 0.004 }),
+        notes: 'SLO dashboards green for the last 24 hours.',
+        evidence_url: 'https://observability.edulure.com/releases/v1.0.0-rc.5',
+        last_evaluated_at: trx.fn.now()
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('compliance-evidence'),
+        gate_key: 'compliance-evidence',
+        status: 'pending',
+        owner_email: 'compliance@edulure.com',
+        metrics: JSON.stringify({ evidence: ['soc2-signoff'] }),
+        notes: 'Privacy review pending final DPO sign-off.',
+        evidence_url: 'https://compliance.edulure.com/evidence/v1.0.0-rc.5',
+        last_evaluated_at: null
+      },
+      {
+        public_id: crypto.randomUUID(),
+        run_id: releaseRun.id,
+        checklist_item_id: gateLookup.get('change-approval'),
+        gate_key: 'change-approval',
+        status: 'in_progress',
+        owner_email: 'release@edulure.com',
+        metrics: JSON.stringify({ changeReviewCompleted: true, freezeWindowBypassed: false }),
+        notes: 'Change advisory board met, awaiting CAB minutes upload.',
+        evidence_url: 'https://change.edulure.com/tickets/CHG-2048',
+        last_evaluated_at: trx.fn.now()
+      }
+    ]);
+
+    await trx(TELEMETRY_TABLES.LINEAGE_RUNS).insert({
+      tool: 'dbt',
+      model_name: 'telemetry_events_rollup',
+      status: 'success',
+      started_at: trx.fn.now(),
+      completed_at: trx.fn.now(),
+      input: JSON.stringify({ source: 'telemetry_events', range: 'seed' }),
+      output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' })
+    });

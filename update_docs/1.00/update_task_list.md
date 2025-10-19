@@ -74,7 +74,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 5. **Mobile CI/CD and QA automation** – 100%
    Implement fastlane pipelines, automated screenshots, staged rollouts, widget/golden/integration tests, and rollback plans.
 
-## Task 4 (0%): Industrialise infrastructure, release management, and compliance operations
+## Task 4 (100%): Industrialise infrastructure, release management, and compliance operations
 
 #### Integration coverage
 - **Backend**: Enforce contract tests, observability, and deployment policies across services.
@@ -98,7 +98,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 5. **Security, compliance, and risk operations** – 100%
    Centralised the risk register, audit evidence lifecycle, continuity drills, and assessment scheduling with automated logging, analytics, and evidence capture to support compliance reviews.
 
-## Task 5 (0%): Deliver analytics, monetisation, documentation, and stakeholder enablement
+## Task 5 (100%): Deliver analytics, monetisation, documentation, and stakeholder enablement
 
 #### Integration coverage
 - **Backend**: Emit structured telemetry, monetisation events, and contract metadata for downstream analytics.
@@ -111,13 +111,13 @@ All tasks start at 0% completion and will be updated as implementation progresse
 - **Design**: Produce enablement materials, updated collateral, and documentation templates consistent with new capabilities.
 
 #### Subtasks
-1. **Telemetry and warehouse implementation** – 0%  
+1. **Telemetry and warehouse implementation** – 100%
    Deploy ingestion pipelines, consent-aware schemas, dbt models, freshness monitoring, and lineage tracking.
-2. **BI and insight delivery** – 0%  
+2. **BI and insight delivery** – 100%
    Rebuild dashboards, scorecards, experimentation tooling, and governance reviews for analytics accuracy.
-3. **Monetisation and finance reconciliation** – 0%  
-   Complete payment/payout integrations, pricing catalogues, usage metering, and GAAP-compliant reporting pipelines.
-4. **Documentation and enablement refresh** – 0%  
-   Rewrite onboarding guides, API docs, support playbooks, training curricula, marketing collateral, and capability matrices.
-5. **Governance and stakeholder communications** – 0%  
-   Stand up contract lifecycle management, vendor risk assessments, cross-functional reviews, and proactive roadmap comms.
+3. **Monetisation and finance reconciliation** – 100%
+   Completed payout integrations, catalog governance, refund-aware revenue recognition, ledger variance metrics, and automated GAAP reconciliation pipelines.
+4. **Documentation and enablement refresh** – 100%
+   Published a production-ready enablement knowledge base (operator onboarding playbook, analytics curriculum, stakeholder communications kit) with `/enablement` APIs, capability matrices, reindex automation, and OpenAPI coverage so operator tooling and downstream portals consume curated training content from the platform.
+5. **Governance and stakeholder communications** – 100%
+   Stood up governance migrations, seeds, Prometheus metrics, `/governance` APIs, and automated tests covering contract lifecycle management, vendor risk assessments, cross-functional reviews, and roadmap communications so programme owners can steer enterprise cadences from production tooling.

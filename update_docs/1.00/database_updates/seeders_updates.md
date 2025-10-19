@@ -3,3 +3,6 @@
 - Hardened `001_bootstrap` to clear and repopulate `feature_flag_tenant_states`, inserting production-like overrides for internal, learning, and creator tenants with explicit rollout notes and guardrails.
 - Seeded `domain_event_dispatch_queue` with representative pending, delivering, delivered, and failed entries to exercise the new outbox pipeline and smoke the DLQ monitoring dashboards.
 - Added integrity assertions to the bootstrap transaction to fail fast when tenant overrides or dispatch queue rows are not created, preventing partially seeded environments.
+- Extended `001_bootstrap.js` to clear telemetry domain tables and seed baseline consent, freshness, and lineage entries so local
+ environments and automated tests start with valid telemetry checkpoints. 【F:backend-nodejs/seeds/001_bootstrap.js†L63-L132】
+- Seeded release readiness checklists, an in-progress release run, and gate evaluations in `001_bootstrap.js` so QA and operator tooling can exercise the new orchestration APIs with production-like data. 【F:backend-nodejs/seeds/001_bootstrap.js†L3487-L3672】
