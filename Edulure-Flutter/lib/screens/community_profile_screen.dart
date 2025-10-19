@@ -44,7 +44,9 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
     });
     try {
       final detail = await ref.read(communitiesControllerProvider.notifier).getDetail(widget.communityId, forceRefresh: true);
-      await ref.read(communityEngagementControllerProvider.notifier).bootstrap(detail);
+      await ref
+          .read(communityEngagementControllerProvider.notifier)
+          .bootstrap(detail, forceRefresh: true);
       final feed = await ref
           .read(communitiesControllerProvider.notifier)
           .fetchFeed(widget.communityId, page: 1, perPage: 10);
@@ -917,7 +919,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
               ),
               IconButton(
                 tooltip: 'Refresh modules',
-                onPressed: () => controller.bootstrap(widget.detail),
+                onPressed: () => controller.bootstrap(widget.detail, forceRefresh: true),
                 icon: const Icon(Icons.sync_outlined),
               )
             ],

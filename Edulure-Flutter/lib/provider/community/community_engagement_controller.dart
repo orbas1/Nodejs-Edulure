@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../services/community_chat_service.dart';
+import '../../services/community_engagement_storage.dart';
 import '../../services/community_hub_models.dart';
 import '../../services/community_service.dart';
 
@@ -46,17 +48,34 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
 
   final Random _random = Random();
   final CommunityChatService _chatService = CommunityChatService();
+  final CommunityEngagementStorage _storage = CommunityEngagementStorage();
 
-  Future<void> bootstrap(CommunityDetail detail) async {
-    if (state.snapshots.containsKey(detail.id)) {
+  Future<void> bootstrap(CommunityDetail detail, {bool forceRefresh = false}) async {
+    if (!forceRefresh && state.snapshots.containsKey(detail.id)) {
       return;
     }
 
     final loading = {...state.loadingCommunities, detail.id};
     state = state.copyWith(loadingCommunities: loading);
 
+    CommunityEngagementSnapshot? cachedSnapshot;
     try {
-      final snapshot = await _buildSnapshot(detail);
+      final cached = await _storage.readSnapshot(detail.id);
+      if (cached != null) {
+        cachedSnapshot = CommunityEngagementSnapshot.fromJson(Map<String, dynamic>.from(cached));
+        final snapshots = Map<String, CommunityEngagementSnapshot>.from(state.snapshots)
+          ..[detail.id] = cachedSnapshot;
+        state = state.copyWith(
+          snapshots: snapshots,
+          errors: {...state.errors}..remove(detail.id),
+        );
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Failed to restore cached engagement snapshot: $error\n$stackTrace');
+    }
+
+    try {
+      final snapshot = await _buildSnapshot(detail, existing: cachedSnapshot);
       final snapshots = Map<String, CommunityEngagementSnapshot>.from(state.snapshots)
         ..[detail.id] = snapshot;
       state = state.copyWith(
@@ -64,6 +83,7 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         loadingCommunities: {...loading}..remove(detail.id),
         errors: {...state.errors}..remove(detail.id),
       );
+      unawaited(_storage.writeSnapshot(detail.id, snapshot.toJson()));
     } catch (error, stackTrace) {
       debugPrint('Failed to bootstrap engagement suite: $error\n$stackTrace');
       final loadingCommunities = {...state.loadingCommunities}..remove(detail.id);
@@ -328,9 +348,11 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
   }
 
   void _updateSnapshot(String communityId, CommunityEngagementSnapshot snapshot) {
+    final updatedSnapshot = snapshot.copyWith(lastUpdatedAt: DateTime.now());
     final snapshots = Map<String, CommunityEngagementSnapshot>.from(state.snapshots)
-      ..[communityId] = snapshot.copyWith(lastUpdatedAt: DateTime.now());
+      ..[communityId] = updatedSnapshot;
     state = state.copyWith(snapshots: snapshots);
+    unawaited(_storage.writeSnapshot(communityId, updatedSnapshot.toJson()));
   }
 
   Future<CommunityEngagementSnapshot> _buildSnapshot(
@@ -863,6 +885,67 @@ class CommunityEngagementSnapshot {
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'channels': channels.map((channel) => channel.toJson()).toList(),
+      'messages': messages.map(
+        (key, value) => MapEntry(key, value.map((message) => message.toJson()).toList()),
+      ),
+      'members': members.map((member) => member.toJson()).toList(),
+      'leaderboard': leaderboard.map((entry) => entry.toJson()).toList(),
+      'about': about.toJson(),
+      'lastSyncedAt': lastSyncedAt.toIso8601String(),
+      'lastUpdatedAt': lastUpdatedAt.toIso8601String(),
+    };
+  }
+
+  factory CommunityEngagementSnapshot.fromJson(Map<String, dynamic> json) {
+    final channels = (json['channels'] as List?)
+            ?.whereType<Map>()
+            .map((entry) => CommunityChatChannel.fromJson(Map<String, dynamic>.from(entry as Map)))
+            .toList() ??
+        const <CommunityChatChannel>[];
+    final rawMessages = json['messages'];
+    final messages = <String, List<CommunityChatMessage>>{};
+    if (rawMessages is Map) {
+      rawMessages.forEach((key, value) {
+        if (value is List) {
+          messages[key.toString()] = value
+              .whereType<Map>()
+              .map((entry) =>
+                  CommunityChatMessage.fromJson(Map<String, dynamic>.from(entry as Map)))
+              .toList();
+        }
+      });
+    }
+    final members = (json['members'] as List?)
+            ?.whereType<Map>()
+            .map((entry) => CommunityMemberProfile.fromJson(Map<String, dynamic>.from(entry as Map)))
+            .toList() ??
+        const <CommunityMemberProfile>[];
+    final leaderboard = (json['leaderboard'] as List?)
+            ?.whereType<Map>()
+            .map((entry) =>
+                CommunityLeaderboardEntry.fromJson(Map<String, dynamic>.from(entry as Map)))
+            .toList() ??
+        const <CommunityLeaderboardEntry>[];
+    final aboutJson = json['about'];
+    final about = aboutJson is Map
+        ? CommunityAbout.fromJson(Map<String, dynamic>.from(aboutJson as Map))
+        : CommunityAbout.empty();
+    final lastSyncedAt = DateTime.tryParse(json['lastSyncedAt']?.toString() ?? '');
+    final lastUpdatedAt = DateTime.tryParse(json['lastUpdatedAt']?.toString() ?? '');
+    return CommunityEngagementSnapshot(
+      channels: channels,
+      messages: messages,
+      members: members,
+      leaderboard: leaderboard,
+      about: about,
+      lastSyncedAt: lastSyncedAt ?? DateTime.now(),
+      lastUpdatedAt: lastUpdatedAt ?? DateTime.now(),
+    );
+  }
 }
 
 enum CommunityChatChannelType { text, broadcast, voice, stage, event }
@@ -883,6 +966,15 @@ extension CommunityChatChannelTypeX on CommunityChatChannelType {
       default:
         return CommunityChatChannelType.text;
     }
+  }
+
+  static CommunityChatChannelType fromStorage(String value) {
+    for (final type in CommunityChatChannelType.values) {
+      if (type.name == value) {
+        return type;
+      }
+    }
+    return fromApi(value);
   }
 
   String get displayName {
@@ -1026,6 +1118,64 @@ class CommunityChatChannel {
       isDefault: isDefault ?? this.isDefault,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'name': name,
+      'description': description,
+      'type': type.name,
+      'createdAt': createdAt.toIso8601String(),
+      'isPrivate': isPrivate,
+      'allowsThreads': allowsThreads,
+      'allowsVoiceSessions': allowsVoiceSessions,
+      'allowsBroadcasts': allowsBroadcasts,
+      'slowModeSeconds': slowModeCooldown.inSeconds,
+      'moderators': moderators.toList(),
+      'tags': tags,
+      'archived': archived,
+      'unreadCount': unreadCount,
+      if (membership != null) 'membership': membership!.toJson(),
+      'metadata': metadata,
+      'slug': slug,
+      'isDefault': isDefault,
+    };
+  }
+
+  factory CommunityChatChannel.fromJson(Map<String, dynamic> json) {
+    final moderators = (json['moderators'] as List?)
+            ?.whereType<String>()
+            .toSet() ??
+        <String>{};
+    final tags = (json['tags'] as List?)?.whereType<String>().toList() ?? const <String>[];
+    final metadata = json['metadata'] is Map
+        ? Map<String, dynamic>.from(json['metadata'] as Map)
+        : const <String, dynamic>{};
+    return CommunityChatChannel(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Channel',
+      description: json['description']?.toString() ?? '',
+      type: CommunityChatChannelTypeX.fromStorage(json['type']?.toString() ?? 'text'),
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      isPrivate: json['isPrivate'] == true,
+      allowsThreads: json['allowsThreads'] != false,
+      allowsVoiceSessions: json['allowsVoiceSessions'] == true,
+      allowsBroadcasts: json['allowsBroadcasts'] == true,
+      slowModeCooldown: Duration(seconds: _asInt(json['slowModeSeconds']) ?? 0),
+      moderators: moderators,
+      tags: tags,
+      archived: json['archived'] == true,
+      unreadCount: _asInt(json['unreadCount']) ?? 0,
+      membership: json['membership'] is Map
+          ? CommunityChannelMembership.fromJson(
+              Map<String, dynamic>.from(json['membership'] as Map),
+            )
+          : null,
+      metadata: metadata,
+      slug: json['slug']?.toString() ?? '',
+      isDefault: json['isDefault'] == true,
+    );
+  }
 }
 
 class CommunityChannelMembership {
@@ -1040,6 +1190,24 @@ class CommunityChannelMembership {
   final String role;
   final bool notificationsEnabled;
   final DateTime? lastReadAt;
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'role': role,
+      'notificationsEnabled': notificationsEnabled,
+      if (lastReadAt != null) 'lastReadAt': lastReadAt!.toIso8601String(),
+    };
+  }
+
+  factory CommunityChannelMembership.fromJson(Map<String, dynamic> json) {
+    return CommunityChannelMembership(
+      id: json['id']?.toString() ?? '',
+      role: json['role']?.toString() ?? '',
+      notificationsEnabled: json['notificationsEnabled'] == true,
+      lastReadAt: DateTime.tryParse(json['lastReadAt']?.toString() ?? ''),
+    );
+  }
 }
 
 class CommunityChatChannelInput {
@@ -1069,6 +1237,26 @@ class CommunityChatChannelInput {
 }
 
 enum CommunityMediaType { image, video, file, link }
+
+extension CommunityMediaTypeX on CommunityMediaType {
+  static CommunityMediaType fromName(String value) {
+    for (final type in CommunityMediaType.values) {
+      if (type.name == value) {
+        return type;
+      }
+    }
+    switch (value.toLowerCase()) {
+      case 'image':
+        return CommunityMediaType.image;
+      case 'video':
+        return CommunityMediaType.video;
+      case 'file':
+        return CommunityMediaType.file;
+      default:
+        return CommunityMediaType.link;
+    }
+  }
+}
 
 class CommunityMediaAttachment {
   const CommunityMediaAttachment({
@@ -1105,6 +1293,14 @@ class CommunityMediaAttachment {
       case CommunityMediaType.link:
         return Colors.green;
     }
+  }
+
+  factory CommunityMediaAttachment.fromJson(Map<String, dynamic> json) {
+    return CommunityMediaAttachment(
+      type: CommunityMediaTypeX.fromName(json['type']?.toString() ?? 'link'),
+      url: json['url']?.toString() ?? '',
+      description: json['description']?.toString(),
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -1193,6 +1389,73 @@ class CommunityChatMessage {
       pinned: pinned ?? this.pinned,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'channelId': channelId,
+      'authorName': authorName,
+      'authorRole': authorRole,
+      'authorAvatarUrl': authorAvatarUrl,
+      'content': content,
+      'attachments': attachments.map((attachment) => attachment.toJson()).toList(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+      'reactions': reactions,
+      'isThreaded': isThreaded,
+      'isPriority': isPriority,
+      'viewerReactions': viewerReactions,
+      'messageType': messageType,
+      'metadata': metadata,
+      if (threadRootId != null) 'threadRootId': threadRootId,
+      if (replyToMessageId != null) 'replyToMessageId': replyToMessageId,
+      'status': status,
+      'pinned': pinned,
+    };
+  }
+
+  factory CommunityChatMessage.fromJson(Map<String, dynamic> json) {
+    final attachments = (json['attachments'] as List?)
+            ?.whereType<Map>()
+            .map((entry) => CommunityMediaAttachment.fromJson(Map<String, dynamic>.from(entry as Map)))
+            .toList() ??
+        const <CommunityMediaAttachment>[];
+    final reactions = <String, int>{};
+    final rawReactions = json['reactions'];
+    if (rawReactions is Map) {
+      rawReactions.forEach((key, value) {
+        final parsed = _asInt(value);
+        if (parsed != null) {
+          reactions[key.toString()] = parsed;
+        }
+      });
+    }
+    final metadata = json['metadata'] is Map
+        ? Map<String, dynamic>.from(json['metadata'] as Map)
+        : const <String, dynamic>{};
+    return CommunityChatMessage(
+      id: json['id']?.toString() ?? '',
+      channelId: json['channelId']?.toString() ?? '',
+      authorName: json['authorName']?.toString() ?? 'Member',
+      authorRole: json['authorRole']?.toString() ?? 'Member',
+      authorAvatarUrl: json['authorAvatarUrl']?.toString() ?? '',
+      content: json['content']?.toString() ?? '',
+      attachments: attachments,
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      updatedAt: DateTime.tryParse(json['updatedAt']?.toString() ?? '') ?? DateTime.now(),
+      reactions: reactions,
+      isThreaded: json['isThreaded'] == true,
+      isPriority: json['isPriority'] == true,
+      viewerReactions:
+          (json['viewerReactions'] as List?)?.map((entry) => entry.toString()).toList() ?? const <String>[],
+      messageType: json['messageType']?.toString() ?? 'text',
+      metadata: metadata,
+      threadRootId: _asInt(json['threadRootId']),
+      replyToMessageId: _asInt(json['replyToMessageId']),
+      status: json['status']?.toString() ?? 'visible',
+      pinned: json['pinned'] == true,
+    );
+  }
 }
 
 class CommunityChatMessageInput {
@@ -1269,6 +1532,18 @@ extension CommunityMemberStatusX on CommunityMemberStatus {
         return Colors.redAccent;
     }
   }
+
+  static CommunityMemberStatus fromName(String value) {
+    switch (value.toLowerCase()) {
+      case 'pending':
+        return CommunityMemberStatus.pending;
+      case 'suspended':
+        return CommunityMemberStatus.suspended;
+      case 'active':
+      default:
+        return CommunityMemberStatus.active;
+    }
+  }
 }
 
 class CommunityMemberLocation {
@@ -1285,6 +1560,26 @@ class CommunityMemberLocation {
   final String country;
 
   LatLng toLatLng() => LatLng(latitude, longitude);
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'latitude': latitude,
+      'longitude': longitude,
+      'city': city,
+      'country': country,
+    };
+  }
+
+  factory CommunityMemberLocation.fromJson(Map<String, dynamic> json) {
+    final lat = json['latitude'];
+    final lng = json['longitude'];
+    return CommunityMemberLocation(
+      latitude: lat is num ? lat.toDouble() : double.tryParse(lat?.toString() ?? '0') ?? 0,
+      longitude: lng is num ? lng.toDouble() : double.tryParse(lng?.toString() ?? '0') ?? 0,
+      city: json['city']?.toString() ?? '',
+      country: json['country']?.toString() ?? '',
+    );
+  }
 }
 
 class CommunityMemberProfile {
@@ -1352,6 +1647,47 @@ class CommunityMemberProfile {
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'id': id,
+      'name': name,
+      'email': email,
+      'role': role,
+      'status': status.name,
+      'isModerator': isModerator,
+      'avatarUrl': avatarUrl,
+      'biography': biography,
+      'location': location.toJson(),
+      'joinedAt': joinedAt.toIso8601String(),
+      'expertise': expertise,
+      'availability': availability,
+      'isOnline': isOnline,
+      if (lastActiveAt != null) 'lastActiveAt': lastActiveAt!.toIso8601String(),
+    };
+  }
+
+  factory CommunityMemberProfile.fromJson(Map<String, dynamic> json) {
+    final expertise = (json['expertise'] as List?)?.map((entry) => entry.toString()).toList() ?? const <String>[];
+    return CommunityMemberProfile(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      role: json['role']?.toString() ?? '',
+      status: CommunityMemberStatusX.fromName(json['status']?.toString() ?? 'active'),
+      isModerator: json['isModerator'] == true,
+      avatarUrl: json['avatarUrl']?.toString() ?? '',
+      biography: json['biography']?.toString() ?? '',
+      location: json['location'] is Map
+          ? CommunityMemberLocation.fromJson(Map<String, dynamic>.from(json['location'] as Map))
+          : const CommunityMemberLocation(latitude: 0, longitude: 0, city: '', country: ''),
+      joinedAt: DateTime.tryParse(json['joinedAt']?.toString() ?? '') ?? DateTime.now(),
+      expertise: expertise,
+      availability: json['availability']?.toString() ?? '',
+      isOnline: json['isOnline'] == true,
+      lastActiveAt: DateTime.tryParse(json['lastActiveAt']?.toString() ?? ''),
+    );
+  }
 }
 
 class CommunityAbout {
@@ -1416,6 +1752,77 @@ class CommunityAbout {
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'mission': mission,
+      'vision': vision,
+      'values': values,
+      'onboardingSteps': onboardingSteps,
+      'codeOfConductUrl': codeOfConductUrl,
+      'partnerDeckUrl': partnerDeckUrl,
+      'contactEmail': contactEmail,
+      'website': website,
+      'pressKitUrl': pressKitUrl,
+      'timeZone': timeZone,
+      'livestreamPreset': livestreamPreset.toJson(),
+      'lastUpdatedBy': lastUpdatedBy,
+      'lastUpdatedAt': lastUpdatedAt.toIso8601String(),
+    };
+  }
+
+  factory CommunityAbout.fromJson(Map<String, dynamic> json) {
+    final values = (json['values'] as List?)?.map((entry) => entry.toString()).toList() ?? const <String>[];
+    final onboarding =
+        (json['onboardingSteps'] as List?)?.map((entry) => entry.toString()).toList() ?? const <String>[];
+    final presetJson = json['livestreamPreset'];
+    final preset = presetJson is Map
+        ? CommunityLivestreamPreset.fromJson(Map<String, dynamic>.from(presetJson as Map))
+        : const CommunityLivestreamPreset(
+            platform: '',
+            latencyMode: 'Normal',
+            enableDvr: false,
+            autoArchive: false,
+          );
+    return CommunityAbout(
+      mission: json['mission']?.toString() ?? '',
+      vision: json['vision']?.toString() ?? '',
+      values: values,
+      onboardingSteps: onboarding,
+      codeOfConductUrl: json['codeOfConductUrl']?.toString() ?? '',
+      partnerDeckUrl: json['partnerDeckUrl']?.toString() ?? '',
+      contactEmail: json['contactEmail']?.toString() ?? '',
+      website: json['website']?.toString() ?? '',
+      pressKitUrl: json['pressKitUrl']?.toString() ?? '',
+      timeZone: json['timeZone']?.toString() ?? 'UTC',
+      livestreamPreset: preset,
+      lastUpdatedBy: json['lastUpdatedBy']?.toString() ?? 'Unknown steward',
+      lastUpdatedAt: DateTime.tryParse(json['lastUpdatedAt']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
+
+  static CommunityAbout empty() {
+    return CommunityAbout(
+      mission: '',
+      vision: '',
+      values: const <String>[],
+      onboardingSteps: const <String>[],
+      codeOfConductUrl: '',
+      partnerDeckUrl: '',
+      contactEmail: '',
+      website: '',
+      pressKitUrl: '',
+      timeZone: 'UTC',
+      livestreamPreset: const CommunityLivestreamPreset(
+        platform: '',
+        latencyMode: 'Normal',
+        enableDvr: false,
+        autoArchive: false,
+      ),
+      lastUpdatedBy: 'Unknown steward',
+      lastUpdatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
 }
 
 class CommunityLivestreamPreset {
@@ -1442,6 +1849,24 @@ class CommunityLivestreamPreset {
       latencyMode: latencyMode ?? this.latencyMode,
       enableDvr: enableDvr ?? this.enableDvr,
       autoArchive: autoArchive ?? this.autoArchive,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'platform': platform,
+      'latencyMode': latencyMode,
+      'enableDvr': enableDvr,
+      'autoArchive': autoArchive,
+    };
+  }
+
+  factory CommunityLivestreamPreset.fromJson(Map<String, dynamic> json) {
+    return CommunityLivestreamPreset(
+      platform: json['platform']?.toString() ?? '',
+      latencyMode: json['latencyMode']?.toString() ?? 'Normal',
+      enableDvr: json['enableDvr'] == true,
+      autoArchive: json['autoArchive'] == true,
     );
   }
 }
@@ -1521,4 +1946,17 @@ class _CityLocation {
   final double longitude;
   final String city;
   final String country;
+}
+
+int? _asInt(dynamic value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is double) {
+    return value.round();
+  }
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
 }
