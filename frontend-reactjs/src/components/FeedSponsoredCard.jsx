@@ -10,7 +10,7 @@ function formatUrl(url) {
   }
 }
 
-export default function FeedSponsoredCard({ ad }) {
+export default function FeedSponsoredCard({ ad, canManage = false, onDismiss, isProcessing = false }) {
   const advertiser = ad.advertiser ?? 'Edulure Partner';
   const description = ad.description || 'Discover how operators are scaling with Edulure Ads.';
   const targetLabel = formatUrl(ad.ctaUrl);
@@ -43,6 +43,16 @@ export default function FeedSponsoredCard({ ad }) {
             Visit {targetLabel}
           </a>
         )}
+        {canManage && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            disabled={isProcessing}
+            className="inline-flex items-center gap-2 rounded-full border border-amber-400 bg-amber-100 px-4 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isProcessing ? 'Updating…' : 'Hide placement'}
+          </button>
+        )}
       </div>
     </article>
   );
@@ -58,6 +68,9 @@ FeedSponsoredCard.propTypes = {
     ctaUrl: PropTypes.string,
     disclosure: PropTypes.string,
     position: PropTypes.number
-  }).isRequired
+  }).isRequired,
+  canManage: PropTypes.bool,
+  onDismiss: PropTypes.func,
+  isProcessing: PropTypes.bool
 };
 

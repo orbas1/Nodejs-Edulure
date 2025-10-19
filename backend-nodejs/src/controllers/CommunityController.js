@@ -61,6 +61,19 @@ const createResourceSchema = Joi.object({
   metadata: Joi.object().default({})
 });
 
+const moderatePostSchema = Joi.object({
+  action: Joi.string().valid('suppress', 'restore').required(),
+  reason: Joi.string().max(500).allow('', null)
+});
+
+const removePostSchema = Joi.object({
+  reason: Joi.string().max(500).allow('', null)
+});
+
+const sponsorshipUpdateSchema = Joi.object({
+  blockedPlacementIds: Joi.array().items(Joi.string().max(120)).default([])
+});
+
 export default class CommunityController {
   static async listForUser(req, res, next) {
     try {
@@ -107,7 +120,9 @@ export default class CommunityController {
   static async listFeed(req, res, next) {
     try {
       const query = await feedQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
-      const result = await CommunityService.listFeed(req.params.communityId, req.user.id, query);
+      const result = await CommunityService.listFeed(req.params.communityId, req.user.id, query, {
+        actorRole: req.user.role
+      });
       return paginated(res, {
         data: result.items,
         pagination: result.pagination,
@@ -126,7 +141,9 @@ export default class CommunityController {
   static async listUserFeed(req, res, next) {
     try {
       const query = await feedQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
-      const result = await CommunityService.listFeedForUser(req.user.id, query);
+      const result = await CommunityService.listFeedForUser(req.user.id, query, {
+        actorRole: req.user.role
+      });
       return paginated(res, {
         data: result.items,
         pagination: result.pagination,
@@ -168,6 +185,111 @@ export default class CommunityController {
         message: 'Joined community'
       });
     } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async leave(req, res, next) {
+    try {
+      const summary = await CommunityService.leaveCommunity(req.params.communityId, req.user.id);
+      return success(res, {
+        data: summary,
+        message: 'Left community'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async moderatePost(req, res, next) {
+    try {
+      const payload = await moderatePostSchema.validateAsync(req.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const post = await CommunityService.moderatePost(
+        req.params.communityId,
+        req.params.postId,
+        req.user.id,
+        payload,
+        { actorRole: req.user.role }
+      );
+      return success(res, {
+        data: post,
+        message: `Post ${payload.action === 'restore' ? 'restored' : 'suppressed'}`
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async removePost(req, res, next) {
+    try {
+      const payload = await removePostSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const post = await CommunityService.removePost(
+        req.params.communityId,
+        req.params.postId,
+        req.user.id,
+        payload,
+        { actorRole: req.user.role }
+      );
+      return success(res, {
+        data: post,
+        message: 'Post removed'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async listSponsorshipPlacements(req, res, next) {
+    try {
+      const sponsorships = await CommunityService.listSponsorshipPlacements(
+        req.params.communityId,
+        req.user.id,
+        { actorRole: req.user.role }
+      );
+      return success(res, {
+        data: sponsorships,
+        message: 'Sponsorship placements fetched'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateSponsorshipPlacements(req, res, next) {
+    try {
+      const payload = await sponsorshipUpdateSchema.validateAsync(req.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const sponsorships = await CommunityService.updateSponsorshipPlacements(
+        req.params.communityId,
+        req.user.id,
+        payload,
+        { actorRole: req.user.role }
+      );
+      return success(res, {
+        data: sponsorships,
+        message: 'Sponsorship placements updated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((d) => d.message);
+      }
       return next(error);
     }
   }

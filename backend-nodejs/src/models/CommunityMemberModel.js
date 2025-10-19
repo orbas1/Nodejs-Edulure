@@ -73,9 +73,16 @@ export default class CommunityMemberModel {
   }
 
   static async updateStatus(communityId, userId, status, connection = db) {
-    await connection('community_members')
-      .where({ community_id: communityId, user_id: userId })
-      .update({ status, updated_at: connection.fn.now() });
+    const payload = {
+      status,
+      updated_at: connection.fn.now()
+    };
+
+    if (status === 'active') {
+      payload.left_at = null;
+    }
+
+    await connection('community_members').where({ community_id: communityId, user_id: userId }).update(payload);
     return this.findMembership(communityId, userId, connection);
   }
 
@@ -83,6 +90,18 @@ export default class CommunityMemberModel {
     await connection('community_members')
       .where({ community_id: communityId, user_id: userId })
       .update({ metadata: JSON.stringify(metadata ?? {}), updated_at: connection.fn.now() });
+    return this.findMembership(communityId, userId, connection);
+  }
+
+  static async markLeft(communityId, userId, connection = db) {
+    await connection('community_members')
+      .where({ community_id: communityId, user_id: userId })
+      .update({
+        status: 'pending',
+        left_at: connection.fn.now(),
+        updated_at: connection.fn.now()
+      });
+
     return this.findMembership(communityId, userId, connection);
   }
 

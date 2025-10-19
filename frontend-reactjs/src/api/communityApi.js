@@ -117,3 +117,68 @@ export async function joinCommunity({ communityId, token }) {
   });
   return mapResponse(response);
 }
+
+export async function leaveCommunity({ communityId, token }) {
+  const response = await httpClient.post(`/communities/${communityId}/leave`, {}, {
+    token,
+    cache: {
+      invalidateTags: [
+        'communities:list',
+        `community:${communityId}:detail`,
+        `community:${communityId}:feed`,
+        'communities:aggregatedFeed'
+      ]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function moderateCommunityPost({ communityId, postId, token, action, reason }) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/posts/${postId}/moderate`,
+    { action, reason },
+    {
+      token,
+      cache: {
+        invalidateTags: [`community:${communityId}:feed`, 'communities:aggregatedFeed']
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function removeCommunityPost({ communityId, postId, token, reason }) {
+  const response = await httpClient.delete(`/communities/${communityId}/posts/${postId}`, {
+    token,
+    data: { reason },
+    cache: {
+      invalidateTags: [`community:${communityId}:feed`, 'communities:aggregatedFeed']
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function fetchCommunitySponsorships({ communityId, token }) {
+  const response = await httpClient.get(`/communities/${communityId}/sponsorships`, {
+    token,
+    cache: {
+      ttl: 1000 * 60 * 5,
+      tags: [`community:${communityId}:sponsorships`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunitySponsorships({ communityId, token, blockedPlacementIds }) {
+  const response = await httpClient.put(
+    `/communities/${communityId}/sponsorships`,
+    { blockedPlacementIds },
+    {
+      token,
+      cache: {
+        invalidateTags: [`community:${communityId}:sponsorships`, `community:${communityId}:feed`]
+      }
+    }
+  );
+  return mapResponse(response);
+}

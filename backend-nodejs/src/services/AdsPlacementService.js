@@ -146,7 +146,15 @@ export default class AdsPlacementService {
       metadata
     });
 
-    if (!placements.length) {
+    const blockedIds = Array.isArray(metadata.blockedPlacementIds)
+      ? new Set(metadata.blockedPlacementIds.map((entry) => String(entry)))
+      : new Set();
+
+    const filteredPlacements = placements.filter(
+      (placement) => !blockedIds.has(String(placement.placementId))
+    );
+
+    if (!filteredPlacements.length) {
       return {
         items: posts.map((post) => ({ kind: 'post', post })),
         ads: { count: 0, placements: [] }
@@ -158,18 +166,18 @@ export default class AdsPlacementService {
     for (let index = 0; index < posts.length; index += 1) {
       entries.push({ kind: 'post', post: posts[index] });
       if (
-        placementCursor < placements.length &&
+        placementCursor < filteredPlacements.length &&
         (shouldInsertAfter(index, config.interval) ||
           (index === posts.length - 1 && page === 1))
       ) {
-        const placement = placements[placementCursor];
+        const placement = filteredPlacements[placementCursor];
         entries.push({ kind: 'ad', ad: { ...placement, position: placementCursor + 1 } });
         placementCursor += 1;
       }
     }
 
-    while (placementCursor < placements.length) {
-      const placement = placements[placementCursor];
+    while (placementCursor < filteredPlacements.length) {
+      const placement = filteredPlacements[placementCursor];
       entries.push({ kind: 'ad', ad: { ...placement, position: placementCursor + 1 } });
       placementCursor += 1;
     }
@@ -177,8 +185,8 @@ export default class AdsPlacementService {
     return {
       items: entries,
       ads: {
-        count: placements.length,
-        placements: placements.map((placement, index) => ({
+        count: filteredPlacements.length,
+        placements: filteredPlacements.map((placement, index) => ({
           placementId: placement.placementId,
           campaignId: placement.campaignId,
           slot: placement.slot,
