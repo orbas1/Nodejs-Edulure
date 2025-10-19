@@ -28,6 +28,8 @@ dependencies:
   flutter_markdown: ^0.6.18
   intl: ^0.18.1
   uuid: ^4.4.0
+  flutter_map: ^6.1.0
+  latlong2: ^0.9.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
