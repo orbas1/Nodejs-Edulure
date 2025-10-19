@@ -1,20 +1,23 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../provider/feed/explorer_saved_search_controller.dart';
+import '../services/explorer_saved_search_service.dart';
 import '../services/explorer_service.dart';
 import '../services/session_manager.dart';
 
 const Set<String> _allowedExplorerRoles = {'user', 'instructor', 'admin'};
 
-class ExplorerScreen extends StatefulWidget {
+class ExplorerScreen extends ConsumerStatefulWidget {
   const ExplorerScreen({super.key});
 
   @override
-  State<ExplorerScreen> createState() => _ExplorerScreenState();
+  ConsumerState<ExplorerScreen> createState() => _ExplorerScreenState();
 }
 
-class _ExplorerScreenState extends State<ExplorerScreen> {
+class _ExplorerScreenState extends ConsumerState<ExplorerScreen> {
   final ExplorerService _service = ExplorerService();
   final TextEditingController _searchController =
       TextEditingController(text: 'automation launch');
@@ -186,6 +189,70 @@ class _ExplorerScreenState extends State<ExplorerScreen> {
     _performSearch();
   }
 
+  Future<void> _saveCurrentSearch(BuildContext context) async {
+    final nameController = TextEditingController(
+      text: _searchController.text.trim().isEmpty
+          ? 'Explorer search'
+          : _searchController.text.trim(),
+    );
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save search'),
+        content: TextField(
+          controller: nameController,
+          decoration: const InputDecoration(
+            labelText: 'Name',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Save')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await ref.read(explorerSavedSearchesProvider.notifier).add(
+            name: nameController.text.trim().isEmpty
+                ? 'Explorer search'
+                : nameController.text.trim(),
+            query: _searchController.text.trim(),
+            entities: _enabledEntities.toList(),
+            sort: Map<String, String>.from(_sortSelections),
+            languages: _languageFilters.toList(),
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Search saved')));
+    }
+  }
+
+  void _applySavedSearch(ExplorerSavedSearch search) {
+    setState(() {
+      _searchController.text = search.query;
+      _enabledEntities
+        ..clear()
+        ..addAll(search.entities.where((entity) =>
+            _entityDefinitions.any((definition) => definition.key == entity)));
+      if (_enabledEntities.isEmpty) {
+        _enabledEntities.add(_entityDefinitions.first.key);
+      }
+      _activeEntity = _enabledEntities.first;
+      _sortSelections
+        ..clear()
+        ..addAll({
+          for (final definition in _entityDefinitions)
+            definition.key:
+                search.sort?[definition.key] ?? definition.sortOptions.first.value,
+        });
+      _languageFilters
+        ..clear()
+        ..addAll(search.languages);
+    });
+    _performSearch();
+  }
+
   Future<void> _handleAction(ExplorerHit hit, ExplorerAction action) async {
     if (action.href.isEmpty) {
       _showMessage('This action is not available right now.');
@@ -347,44 +414,86 @@ class _ExplorerScreenState extends State<ExplorerScreen> {
   }
 
   Widget _buildSearchBar(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        border: Border.all(color: Colors.blue.shade100),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.shade50,
-            offset: const Offset(0, 12),
-            blurRadius: 24,
-            spreadRadius: -8,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              onSubmitted: (_) => _onSubmitSearch(),
-              decoration: InputDecoration(
-                icon: Icon(Icons.search,
-                    color: Theme.of(context).colorScheme.primary),
-                border: InputBorder.none,
-                hintText:
-                    'Search for automation cohorts, tutors, or campaigns',
+    final savedSearches = ref.watch(explorerSavedSearchesProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(32),
+            border: Border.all(color: Colors.blue.shade100),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.shade50,
+                offset: const Offset(0, 12),
+                blurRadius: 24,
+                spreadRadius: -8,
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 12),
-          FilledButton.icon(
-            onPressed: _loading ? null : _onSubmitSearch,
-            icon: const Icon(Icons.search),
-            label: const Text('Search'),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onSubmitted: (_) => _onSubmitSearch(),
+                  decoration: InputDecoration(
+                    icon: Icon(Icons.search,
+                        color: Theme.of(context).colorScheme.primary),
+                    border: InputBorder.none,
+                    hintText:
+                        'Search for automation cohorts, tutors, or campaigns',
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Wrap(
+                spacing: 8,
+                children: [
+                  FilledButton.icon(
+                    onPressed: _loading ? null : _onSubmitSearch,
+                    icon: const Icon(Icons.search),
+                    label: const Text('Search'),
+                  ),
+                  FilledButton.tonal(
+                    onPressed: _loading ? null : () => _saveCurrentSearch(context),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.bookmark_add_outlined),
+                        SizedBox(width: 6),
+                        Text('Save'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (savedSearches.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Text('Saved searches', style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: savedSearches
+                .map(
+                  (search) => InputChip(
+                    label: Text(search.name),
+                    onPressed: () => _applySavedSearch(search),
+                    onDeleted: () => ref
+                        .read(explorerSavedSearchesProvider.notifier)
+                        .delete(search.id),
+                  ),
+                )
+                .toList(),
           ),
         ],
-      ),
+      ],
     );
   }
 

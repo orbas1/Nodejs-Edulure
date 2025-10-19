@@ -9,6 +9,7 @@ import 'screens/assessments_screen.dart';
 import 'screens/blog_screen.dart';
 import 'screens/communities_screen.dart';
 import 'screens/community_dashboard_screen.dart';
+import 'screens/community_profile_screen.dart';
 import 'screens/content_library_screen.dart';
 import 'screens/course_management_screen.dart';
 import 'screens/course_purchase_screen.dart';
@@ -58,6 +59,16 @@ class EdulureApp extends ConsumerWidget {
           '/login': (_) => const LoginScreen(),
           '/register': (_) => const RegisterScreen(),
           '/communities': (_) => const CommunitiesScreen(),
+          '/communities/profile': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            final communityId = args?.toString();
+            if (communityId == null || communityId.isEmpty) {
+              return const Scaffold(
+                body: Center(child: Text('Missing community identifier')),
+              );
+            }
+            return CommunityProfileScreen(communityId: communityId);
+          },
           '/feed': (_) => const FeedScreen(),
           '/explorer': (_) => const ExplorerScreen(),
           '/inbox': (_) => const InboxScreen(),
