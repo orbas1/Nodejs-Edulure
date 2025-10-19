@@ -42,10 +42,25 @@ export default function usePersistentCollection(storageKey, initialValue = []) {
   }, [storageKey]);
 
   const [items, setItems] = useState(resolvedInitial);
+  const previousKeyRef = useRef(storageKey);
 
   useEffect(() => {
     savePersistentState(storageKey, items);
   }, [items, storageKey]);
+
+  useEffect(() => {
+    if (previousKeyRef.current === storageKey) {
+      return;
+    }
+
+    previousKeyRef.current = storageKey;
+    const persisted = loadPersistentState(storageKey, null);
+    if (Array.isArray(persisted)) {
+      setItems(persisted);
+      return;
+    }
+    setItems(fallbackRef.current);
+  }, [storageKey]);
 
   useEffect(() => {
     const nextFallback = toArray(normalise(initialValue), []);
