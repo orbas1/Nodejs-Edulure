@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types';
 
-export default function PricingHeader({ onExportFinanceReport, onConfigureRules }) {
+export default function PricingHeader({ onExportFinanceReport, onConfigureRules, isExporting }) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -10,8 +10,14 @@ export default function PricingHeader({ onExportFinanceReport, onConfigureRules 
         </p>
       </div>
       <div className="flex gap-3">
-        <button type="button" className="dashboard-primary-pill" onClick={onExportFinanceReport}>
-          Export finance report
+        <button
+          type="button"
+          className="dashboard-primary-pill disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onExportFinanceReport}
+          disabled={isExporting}
+          aria-busy={isExporting}
+        >
+          {isExporting ? 'Exporting…' : 'Export finance report'}
         </button>
         <button type="button" className="dashboard-pill" onClick={onConfigureRules}>
           Configure pricing rules
@@ -23,10 +29,12 @@ export default function PricingHeader({ onExportFinanceReport, onConfigureRules 
 
 PricingHeader.propTypes = {
   onExportFinanceReport: PropTypes.func,
-  onConfigureRules: PropTypes.func
+  onConfigureRules: PropTypes.func,
+  isExporting: PropTypes.bool
 };
 
 PricingHeader.defaultProps = {
   onExportFinanceReport: undefined,
-  onConfigureRules: undefined
+  onConfigureRules: undefined,
+  isExporting: false
 };
