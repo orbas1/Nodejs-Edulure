@@ -24,6 +24,8 @@ const RISK_CATEGORIES = [
   { id: 'critical', label: 'Critical (75 – 100)', min: 75, max: 101 }
 ];
 
+const INCIDENT_SEVERITIES = ['critical', 'high', 'medium', 'low'];
+
 function getRiskCategory(score) {
   if (score >= 75) return 'critical';
   if (score >= 40) return 'high';
@@ -39,7 +41,7 @@ function formatHours(hours) {
   return `${rounded}h`;
 }
 
-function MetricCard({ metric }) {
+function MetricCard({ metric = null }) {
   if (!metric) return null;
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -65,11 +67,7 @@ MetricCard.propTypes = {
   })
 };
 
-MetricCard.defaultProps = {
-  metric: null
-};
-
-function StatusBadge({ status }) {
+function StatusBadge({ status = null }) {
   if (!status) return null;
   const key = status.toLowerCase();
   const label = STATUS_LABELS[key] ?? status.replace(/_/g, ' ');
@@ -86,11 +84,7 @@ StatusBadge.propTypes = {
   status: PropTypes.string
 };
 
-StatusBadge.defaultProps = {
-  status: null
-};
-
-function RiskBadge({ score }) {
+function RiskBadge({ score = 0 }) {
   const numeric = Number(score ?? 0);
   const category = getRiskCategory(numeric);
   const tone =
@@ -116,11 +110,12 @@ RiskBadge.propTypes = {
   score: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
 };
 
-RiskBadge.defaultProps = {
-  score: 0
-};
-
-function ReviewNotesField({ value, onChange, placeholder, disabled }) {
+function ReviewNotesField({
+  value = '',
+  onChange,
+  placeholder = 'Detail why the case requires intervention',
+  disabled = false
+}) {
   return (
     <textarea
       className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:bg-slate-100"
@@ -140,11 +135,31 @@ ReviewNotesField.propTypes = {
   disabled: PropTypes.bool
 };
 
-ReviewNotesField.defaultProps = {
-  value: '',
-  placeholder: 'Detail why the case requires intervention',
-  disabled: false
-};
+function humanizeAuditEventType(eventType) {
+  if (!eventType) {
+    return 'Unknown event';
+  }
+
+  const segments = String(eventType)
+    .split('.')
+    .flatMap((part) => part.split('/'))
+    .map((part) => part.replace(/[_-]+/g, ' ').trim())
+    .filter(Boolean);
+
+  if (!segments.length) {
+    return 'Unknown event';
+  }
+
+  return segments
+    .map((segment) =>
+      segment
+        .split(' ')
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ')
+    )
+    .join(' · ');
+}
 
 function EmptyState() {
   return (
@@ -276,7 +291,12 @@ MobileQueueCard.propTypes = {
 function ComplianceTabNavigation({ activeTab, onSelect }) {
   const tabs = [
     { id: 'queue', label: 'Identity verification queue' },
-    { id: 'gdpr', label: 'UK GDPR & ICO oversight' }
+    { id: 'gdpr', label: 'UK GDPR & ICO oversight' },
+    { id: 'audits', label: 'Audit & attestations' },
+    { id: 'frameworks', label: 'Frameworks' },
+    { id: 'risk', label: 'Risk heatmap' },
+    { id: 'incidents', label: 'Incident response' },
+    { id: 'evidence', label: 'Evidence exports' }
   ];
 
   return (
@@ -308,13 +328,19 @@ ComplianceTabNavigation.propTypes = {
 };
 
 export default function AdminComplianceSection({
-  sectionId,
-  metrics,
-  queue,
-  slaBreaches,
-  manualReviewQueue,
-  gdprProfile,
-  onReview
+  sectionId = 'compliance',
+  metrics = [],
+  queue = [],
+  slaBreaches = 0,
+  manualReviewQueue = 0,
+  gdprProfile = {},
+  audits = {},
+  attestations = {},
+  frameworks = [],
+  risk = {},
+  incidentResponse = {},
+  evidence = {},
+  onReview = () => {}
 }) {
   const [riskOverrides, setRiskOverrides] = useState({});
   const [notes, setNotes] = useState({});
@@ -672,6 +698,19 @@ export default function AdminComplianceSection({
     );
   };
 
+  const severityPalette = {
+    passing: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    watch: 'bg-amber-50 text-amber-700 ring-amber-200',
+    attention: 'bg-rose-50 text-rose-700 ring-rose-200'
+  };
+
+  const auditSummary = useMemo(() => audits ?? {}, [audits]);
+  const attestationSummary = useMemo(() => attestations ?? {}, [attestations]);
+  const frameworkItems = useMemo(() => frameworks ?? [], [frameworks]);
+  const riskSummary = useMemo(() => risk ?? {}, [risk]);
+  const incidentSummary = useMemo(() => incidentResponse ?? {}, [incidentResponse]);
+  const evidenceSummary = useMemo(() => evidence ?? {}, [evidence]);
+
   const renderGdprSummary = () => {
     const dsar = gdpr.dsar ?? {};
     const registers = Array.isArray(gdpr.registers) ? gdpr.registers : [];
@@ -886,6 +925,461 @@ export default function AdminComplianceSection({
     );
   };
 
+  const renderAuditSummary = () => {
+    const severityCounts = auditSummary.countsBySeverity ?? {};
+    const totals = auditSummary.totals ?? {};
+    const latestEvents = Array.isArray(auditSummary.latestEvents) ? auditSummary.latestEvents.slice(0, 8) : [];
+    const attestationPolicies = Array.isArray(attestationSummary.policies) ? attestationSummary.policies : [];
+    const coverage = Number(attestationSummary.totals?.coverage ?? 0).toFixed(1);
+
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <MetricCard metric={{ label: 'Critical audit events', value: String(severityCounts.critical ?? 0) }} />
+          <MetricCard metric={{ label: 'High severity', value: String(severityCounts.error ?? 0) }} />
+          <MetricCard metric={{ label: 'Investigations', value: String(totals.investigations ?? 0) }} />
+          <MetricCard metric={{ label: 'Controls tested (30d)', value: String(totals.controlsTested ?? 0) }} />
+          <MetricCard metric={{ label: 'Policy updates', value: String(totals.policyUpdates ?? 0) }} />
+          <MetricCard
+            metric={{
+              label: 'Attestation coverage',
+              value: `${coverage}%`,
+              helper: `${attestationSummary.totals?.outstanding ?? 0} outstanding` 
+            }}
+          />
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-slate-900">Recent audit trail</h4>
+          <p className="mt-2 text-sm text-slate-600">Events resolved via automation and manual review over the last 30 days.</p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">Event</th>
+                  <th className="px-4 py-3 text-left">Severity</th>
+                  <th className="px-4 py-3 text-left">Entity</th>
+                  <th className="px-4 py-3 text-left">Actor</th>
+                  <th className="px-4 py-3 text-left">Occurred</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {latestEvents.map((event) => (
+                  <tr key={event.eventUuid}>
+                    <td className="px-4 py-3 font-medium text-slate-700">{humanizeAuditEventType(event.eventType)}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset ${
+                          event.severity === 'critical'
+                            ? 'bg-rose-50 text-rose-700 ring-rose-200'
+                            : event.severity === 'error'
+                              ? 'bg-amber-50 text-amber-700 ring-amber-200'
+                              : 'bg-slate-100 text-slate-700 ring-slate-200'
+                        }`}
+                      >
+                        {event.severity}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <div className="font-medium text-slate-700">{event.entityType}</div>
+                      <div className="text-xs text-slate-400">{event.entityId}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <div className="font-medium text-slate-700">{event.actor?.role ?? 'system'}</div>
+                      <div className="text-xs text-slate-400">{event.actor?.type ?? 'system'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{new Date(event.occurredAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {latestEvents.length === 0 ? (
+                  <tr>
+                    <td className="px-4 py-4 text-sm text-slate-500" colSpan={5}>
+                      No audit events recorded within the selected window.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-slate-900">Policy attestations</h4>
+          <p className="mt-2 text-sm text-slate-600">
+            Track consent and policy acknowledgements by role to ensure operating procedures stay enforceable.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">Policy</th>
+                  <th className="px-4 py-3 text-left">Coverage</th>
+                  <th className="px-4 py-3 text-left">Required</th>
+                  <th className="px-4 py-3 text-left">Outstanding</th>
+                  <th className="px-4 py-3 text-left">Last granted</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {attestationPolicies.map((policy) => (
+                  <tr key={policy.consentType}>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-slate-700">{policy.policy?.title ?? policy.consentType}</div>
+                      <div className="text-xs text-slate-400">Audience: {policy.audience?.join(', ') ?? 'All'}</div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{policy.coverage}%</td>
+                    <td className="px-4 py-3 text-slate-600">{policy.required}</td>
+                    <td className="px-4 py-3 text-slate-600">{policy.outstanding}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {policy.lastGrantedAt ? new Date(policy.lastGrantedAt).toLocaleString() : '—'}
+                    </td>
+                  </tr>
+                ))}
+                {attestationPolicies.length === 0 ? (
+                  <tr>
+                    <td className="px-4 py-4 text-sm text-slate-500" colSpan={5}>
+                      No attestation activity recorded. Capture consent records to unlock coverage reporting.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderFrameworkSummary = () => {
+    if (!frameworkItems.length) {
+      return (
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500">
+          Add compliance framework metadata to surface accreditation owners, renewal dates, and readiness metrics.
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {frameworkItems.map((framework) => {
+          const tone = severityPalette[framework.status] ?? 'bg-slate-100 text-slate-700 ring-slate-200';
+          return (
+            <article key={framework.id} className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-slate-900">{framework.name}</h4>
+                  <p className="mt-1 text-sm text-slate-600">{framework.description}</p>
+                </div>
+                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${tone}`}>
+                  Status: {framework.status?.replace(/_/g, ' ')}
+                </span>
+              </div>
+              <dl className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Owner</dt>
+                  <dd className="mt-1 text-slate-700">{framework.owner ?? 'Assigned'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Renewal due</dt>
+                  <dd className="mt-1 text-slate-700">{framework.renewalDue ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Outstanding actions</dt>
+                  <dd className="mt-1 text-slate-700">{framework.outstandingActions ?? 0}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Controls tested</dt>
+                  <dd className="mt-1 text-slate-700">{framework.controlsTested ?? 0}</dd>
+                </div>
+                {framework.coverage !== undefined ? (
+                  <div>
+                    <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Coverage</dt>
+                    <dd className="mt-1 text-slate-700">{framework.coverage}%</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </article>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderRiskOverview = () => {
+    const heatmap = Array.isArray(riskSummary.heatmap) ? riskSummary.heatmap : [];
+    const severityTotals = riskSummary.severityTotals ?? {};
+    const exposures = Array.isArray(riskSummary.exposures) ? riskSummary.exposures : [];
+
+    return (
+      <div className="grid gap-6 xl:grid-cols-[2fr,1fr]">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-slate-900">Incident heatmap</h4>
+          <p className="mt-2 text-sm text-slate-600">Distribution of open incidents by category and severity.</p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">Category</th>
+                  {INCIDENT_SEVERITIES.map((severity) => (
+                    <th key={severity} className="px-4 py-3 text-left capitalize">
+                      {severity}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-left">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {heatmap.map((row) => (
+                  <tr key={row.category}>
+                    <td className="px-4 py-3 font-medium text-slate-700">{row.label}</td>
+                    {row.severities.map((severity) => (
+                      <td key={severity.severity} className="px-4 py-3 text-slate-600">
+                        {severity.count}
+                      </td>
+                    ))}
+                    <td className="px-4 py-3 font-semibold text-slate-700">{row.total}</td>
+                  </tr>
+                ))}
+                {heatmap.length === 0 ? (
+                  <tr>
+                    <td className="px-4 py-4 text-sm text-slate-500" colSpan={INCIDENT_SEVERITIES.length + 2}>
+                      No active incidents recorded.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h4 className="text-base font-semibold text-slate-900">Severity distribution</h4>
+            <ul className="mt-3 space-y-2 text-sm text-slate-600">
+              {INCIDENT_SEVERITIES.map((severity) => (
+                <li key={severity} className="flex items-center justify-between">
+                  <span className="capitalize">{severity}</span>
+                  <span className="font-semibold">{severityTotals[severity] ?? 0}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h4 className="text-base font-semibold text-slate-900">Top exposures</h4>
+            <ul className="mt-3 space-y-3 text-sm text-slate-600">
+              {exposures.map((exposure) => (
+                <li key={exposure.category} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-800">{exposure.label}</span>
+                    <span className="text-xs uppercase tracking-wide text-slate-500">{exposure.dominantSeverity}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">{exposure.total} open · {exposure.watchers} watchers engaged</p>
+                </li>
+              ))}
+              {exposures.length === 0 ? (
+                <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500">
+                  No exposures surfaced. Heatmap will populate as incidents are recorded.
+                </li>
+              ) : null}
+            </ul>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderIncidentResponse = () => {
+    const summary = incidentSummary.queueSummary ?? {};
+    const flows = Array.isArray(incidentSummary.flows) ? incidentSummary.flows : [];
+    const recentResolved = Array.isArray(incidentSummary.recentResolved) ? incidentSummary.recentResolved : [];
+
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <MetricCard
+            metric={{
+              label: 'Median acknowledgement',
+              value: summary.medianAckMinutes ? `${summary.medianAckMinutes} mins` : '—',
+              helper: `${summary.ackBreaches ?? 0} SLA breaches`
+            }}
+          />
+          <MetricCard
+            metric={{
+              label: 'Resolution breaches',
+              value: String(summary.resolutionBreaches ?? 0)
+            }}
+          />
+          <MetricCard metric={{ label: 'Watchers engaged', value: String(summary.watchers ?? 0) }} />
+          <MetricCard metric={{ label: 'Oldest incident', value: summary.oldestOpenAt ? new Date(summary.oldestOpenAt).toLocaleString() : '—' }} />
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-slate-900">Active incident runbooks</h4>
+          <p className="mt-2 text-sm text-slate-600">Runbook execution state and escalation points for each open incident.</p>
+          <div className="mt-4 space-y-3">
+            {flows.map((flow) => (
+              <article key={flow.incidentUuid} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h5 className="text-sm font-semibold text-slate-900">{flow.reference}</h5>
+                    <p className="text-xs text-slate-500">{flow.detectionChannel}</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-rose-50 px-3 py-1 text-rose-600">
+                      {flow.severity}
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full bg-slate-200 px-3 py-1 text-slate-700">
+                      {flow.status}
+                    </span>
+                  </div>
+                </div>
+                <dl className="mt-3 grid gap-3 text-xs text-slate-500 sm:grid-cols-3">
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide">Reported</dt>
+                    <dd className="mt-1 text-sm text-slate-700">{flow.reportedAt ? new Date(flow.reportedAt).toLocaleString() : '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide">Watchers</dt>
+                    <dd className="mt-1 text-sm text-slate-700">{flow.watchers}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-semibold uppercase tracking-wide">Recommended actions</dt>
+                    <dd className="mt-1 text-sm text-slate-700">{flow.recommendedActions.join(', ') || 'No runbook actions captured'}</dd>
+                  </div>
+                </dl>
+                {flow.timeline.length ? (
+                  <ul className="mt-3 space-y-2 text-xs text-slate-500">
+                    {flow.timeline.map((event) => (
+                      <li key={event.id} className="flex items-center gap-3">
+                        <span className="inline-flex h-2 w-2 flex-none rounded-full bg-primary" aria-hidden="true" />
+                        <span className="font-semibold text-slate-700">{event.type}</span>
+                        <span>{new Date(event.occurredAt).toLocaleString()}</span>
+                        <span className="text-slate-400">{event.actor?.role ?? 'system'}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            ))}
+            {flows.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-sm text-slate-500">
+                No active incident runbooks. New incidents will populate here automatically.
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-slate-900">Recently resolved</h4>
+          <p className="mt-2 text-sm text-slate-600">Resolution timing and follow-up tasks for the latest closed incidents.</p>
+          <ul className="mt-4 space-y-3 text-sm text-slate-600">
+            {recentResolved.map((incident) => (
+              <li key={incident.incidentUuid} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                <div className="flex flex-wrap items-center justify-between">
+                  <span className="font-semibold text-slate-800">{incident.reference}</span>
+                  <span className="text-xs uppercase tracking-wide text-slate-500">{incident.severity}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Resolved {incident.resolvedAt ? new Date(incident.resolvedAt).toLocaleString() : '—'} ·
+                  Time to resolution {incident.resolutionMinutes ?? '—'} mins
+                </p>
+                {incident.followUp ? <p className="mt-2 text-xs text-slate-500">{incident.followUp}</p> : null}
+              </li>
+            ))}
+            {recentResolved.length === 0 ? (
+              <li className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-sm text-slate-500">
+                No recently resolved incidents documented.
+              </li>
+            ) : null}
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
+  const renderEvidenceExports = () => {
+    const exports = Array.isArray(evidenceSummary.exports) ? evidenceSummary.exports : [];
+    const permissions = evidenceSummary.permissions ?? {};
+    const storageInfo = evidenceSummary.storage ?? {};
+
+    return (
+      <div className="space-y-6">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-slate-900">Access controls</h4>
+          <dl className="mt-3 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Permitted roles</dt>
+              <dd className="mt-1 text-slate-700">{(permissions.roles ?? []).join(', ') || 'Admin only'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Request channel</dt>
+              <dd className="mt-1 text-slate-700">{permissions.requestChannel ?? 'Contact security operations'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Archive bucket</dt>
+              <dd className="mt-1 text-slate-700">{storageInfo.bucket ?? '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Prefix</dt>
+              <dd className="mt-1 text-slate-700">{storageInfo.prefix ?? '—'}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h4 className="text-lg font-semibold text-slate-900">Evidence exports</h4>
+          <p className="mt-2 text-sm text-slate-600">Partitioned exports ready for external audit or regulatory submission.</p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3 text-left">Dataset</th>
+                  <th className="px-4 py-3 text-left">Partition</th>
+                  <th className="px-4 py-3 text-left">Rows</th>
+                  <th className="px-4 py-3 text-left">Size</th>
+                  <th className="px-4 py-3 text-left">Archived</th>
+                  <th className="px-4 py-3 text-left">Download</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {exports.map((archive) => (
+                  <tr key={archive.id}>
+                    <td className="px-4 py-3 font-medium text-slate-700">{archive.tableName}</td>
+                    <td className="px-4 py-3 text-slate-600">{archive.partitionName}</td>
+                    <td className="px-4 py-3 text-slate-600">{archive.rowCount.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-slate-600">{archive.sizeLabel}</td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {archive.archivedAt ? new Date(archive.archivedAt).toLocaleString() : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {archive.downloadUrl ? (
+                        <a
+                          href={archive.downloadUrl}
+                          className="inline-flex items-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow hover:bg-primary/90"
+                        >
+                          Download
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">Request secure link</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {exports.length === 0 ? (
+                  <tr>
+                    <td className="px-4 py-4 text-sm text-slate-500" colSpan={6}>
+                      No evidence exports recorded. Trigger a partition rotation or archive export to populate this list.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <section id={sectionId} className="dashboard-section">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -1021,9 +1515,13 @@ export default function AdminComplianceSection({
               </div>
             </div>
           </Fragment>
-        ) : (
-          renderGdprSummary()
-        )}
+        ) : null}
+        {activeTab === 'gdpr' ? renderGdprSummary() : null}
+        {activeTab === 'audits' ? renderAuditSummary() : null}
+        {activeTab === 'frameworks' ? renderFrameworkSummary() : null}
+        {activeTab === 'risk' ? renderRiskOverview() : null}
+        {activeTab === 'incidents' ? renderIncidentResponse() : null}
+        {activeTab === 'evidence' ? renderEvidenceExports() : null}
       </div>
 
       {error ? <p className="mt-4 text-sm text-rose-600">{error}</p> : null}
@@ -1108,15 +1606,143 @@ AdminComplianceSection.propTypes = {
       reportingOwner: PropTypes.string
     })
   }),
+  audits: PropTypes.shape({
+    totals: PropTypes.shape({
+      events: PropTypes.number,
+      investigations: PropTypes.number,
+      controlsTested: PropTypes.number,
+      policyUpdates: PropTypes.number
+    }),
+    countsBySeverity: PropTypes.object,
+    latestEvents: PropTypes.arrayOf(
+      PropTypes.shape({
+        eventUuid: PropTypes.string,
+        eventType: PropTypes.string,
+        severity: PropTypes.string,
+        entityType: PropTypes.string,
+        entityId: PropTypes.string,
+        occurredAt: PropTypes.string,
+        actor: PropTypes.shape({
+          id: PropTypes.number,
+          type: PropTypes.string,
+          role: PropTypes.string
+        })
+      })
+    )
+  }),
+  attestations: PropTypes.shape({
+    totals: PropTypes.shape({
+      required: PropTypes.number,
+      granted: PropTypes.number,
+      outstanding: PropTypes.number,
+      coverage: PropTypes.number
+    }),
+    policies: PropTypes.arrayOf(
+      PropTypes.shape({
+        consentType: PropTypes.string,
+        policy: PropTypes.shape({
+          title: PropTypes.string
+        }),
+        audience: PropTypes.arrayOf(PropTypes.string),
+        required: PropTypes.number,
+        outstanding: PropTypes.number,
+        coverage: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+        lastGrantedAt: PropTypes.string
+      })
+    )
+  }),
+  frameworks: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      name: PropTypes.string.isRequired,
+      status: PropTypes.string,
+      owner: PropTypes.string,
+      renewalDue: PropTypes.string,
+      outstandingActions: PropTypes.number,
+      controlsTested: PropTypes.number,
+      coverage: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+      description: PropTypes.string
+    })
+  ),
+  risk: PropTypes.shape({
+    heatmap: PropTypes.arrayOf(
+      PropTypes.shape({
+        category: PropTypes.string,
+        label: PropTypes.string,
+        total: PropTypes.number,
+        severities: PropTypes.arrayOf(
+          PropTypes.shape({ severity: PropTypes.string, count: PropTypes.number })
+        )
+      })
+    ),
+    severityTotals: PropTypes.object,
+    exposures: PropTypes.arrayOf(
+      PropTypes.shape({
+        category: PropTypes.string,
+        label: PropTypes.string,
+        total: PropTypes.number,
+        dominantSeverity: PropTypes.string,
+        watchers: PropTypes.number
+      })
+    )
+  }),
+  incidentResponse: PropTypes.shape({
+    queueSummary: PropTypes.object,
+    flows: PropTypes.arrayOf(
+      PropTypes.shape({
+        incidentUuid: PropTypes.string,
+        reference: PropTypes.string,
+        severity: PropTypes.string,
+        status: PropTypes.string,
+        reportedAt: PropTypes.string,
+        watchers: PropTypes.number,
+        recommendedActions: PropTypes.arrayOf(PropTypes.string),
+        timeline: PropTypes.arrayOf(
+          PropTypes.shape({
+            id: PropTypes.string,
+            type: PropTypes.string,
+            occurredAt: PropTypes.string,
+            severity: PropTypes.string,
+            actor: PropTypes.shape({
+              id: PropTypes.number,
+              type: PropTypes.string,
+              role: PropTypes.string
+            })
+          })
+        )
+      })
+    ),
+    recentResolved: PropTypes.arrayOf(
+      PropTypes.shape({
+        incidentUuid: PropTypes.string,
+        reference: PropTypes.string,
+        severity: PropTypes.string,
+        resolvedAt: PropTypes.string,
+        resolutionMinutes: PropTypes.number,
+        followUp: PropTypes.string
+      })
+    )
+  }),
+  evidence: PropTypes.shape({
+    exports: PropTypes.arrayOf(
+      PropTypes.shape({
+        id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+        tableName: PropTypes.string,
+        partitionName: PropTypes.string,
+        rowCount: PropTypes.number,
+        sizeLabel: PropTypes.string,
+        archivedAt: PropTypes.string,
+        downloadUrl: PropTypes.string
+      })
+    ),
+    permissions: PropTypes.shape({
+      roles: PropTypes.arrayOf(PropTypes.string),
+      requestChannel: PropTypes.string
+    }),
+    storage: PropTypes.shape({
+      bucket: PropTypes.string,
+      prefix: PropTypes.string
+    })
+  }),
   onReview: PropTypes.func
-};
-
-AdminComplianceSection.defaultProps = {
-  sectionId: 'compliance',
-  metrics: [],
-  queue: [],
-  slaBreaches: 0,
-  manualReviewQueue: 0,
-  gdprProfile: null,
-  onReview: null
 };

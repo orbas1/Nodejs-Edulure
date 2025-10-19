@@ -7,3 +7,4 @@
 - Expanded Vitest coverage to validate the executive data hook’s load, refresh, and cached fallback behaviour to guard against regressions in degraded network conditions.
 - Completed the instructor course management workspace by introducing catalogue, analytics, assignment pipeline, authoring, and
   learner management sections with persistent modals and Vitest coverage to protect the new UI surface.
+- Replaced the placeholder compliance tile with a full admin compliance console that renders audits, attestation coverage, frameworks, risk heatmaps, incident response queues, and evidence export controls backed by new Vitest coverage.

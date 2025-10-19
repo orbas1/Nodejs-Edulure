@@ -7,7 +7,7 @@ import {
   calculateLearningStreak,
   humanizeRelativeTime
 } from '../src/services/DashboardService.js';
-import { buildScamSummary, summariseIncidentQueue } from '../src/services/OperatorDashboardService.js';
+import { buildComplianceRiskHeatmap, buildScamSummary, summariseIncidentQueue } from '../src/services/OperatorDashboardService.js';
 import { normaliseMonetization, resolveDefaultMonetization } from '../src/services/PlatformSettingsService.js';
 
 describe('DashboardService helpers', () => {
@@ -227,6 +227,30 @@ describe('Operator dashboard summaries', () => {
     );
     expect(summary.medianAckMinutes).toBe(14);
     expect(summary.oldestOpenAt).toBe('2025-02-02T19:22:00.000Z');
+  });
+
+  it('builds a compliance risk heatmap across incident categories', () => {
+    const incidents = [
+      { category: 'scam', severity: 'critical' },
+      { category: 'scam', severity: 'high' },
+      { category: 'data_breach', severity: 'critical' },
+      { category: 'data_breach', severity: 'medium' },
+      { category: 'abuse', severity: 'low' }
+    ];
+
+    const heatmap = buildComplianceRiskHeatmap(incidents);
+
+    expect(heatmap[0]).toMatchObject({ category: 'scam', total: 2 });
+    expect(heatmap).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: 'data_breach',
+          severities: expect.arrayContaining([
+            expect.objectContaining({ severity: 'critical', count: 1 })
+          ])
+        })
+      ])
+    );
   });
 
   it('builds scam alert summary with aggregated metrics', () => {

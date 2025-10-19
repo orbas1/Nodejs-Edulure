@@ -173,6 +173,43 @@ export class DataPartitionService {
     this.enabled = Boolean(this.config.enabled);
   }
 
+  async listArchives({ tableName, limit = 25, includeDropped = false } = {}) {
+    const rows = await this.knex('data_partition_archives')
+      .select(
+        'id',
+        'table_name as tableName',
+        'partition_name as partitionName',
+        'range_start as rangeStart',
+        'range_end as rangeEnd',
+        'retention_days as retentionDays',
+        'archived_at as archivedAt',
+        'dropped_at as droppedAt',
+        'storage_bucket as storageBucket',
+        'storage_key as storageKey',
+        'row_count as rowCount',
+        'byte_size as byteSize',
+        'checksum',
+        'metadata'
+      )
+      .modify((builder) => {
+        if (tableName) {
+          builder.where('table_name', tableName);
+        }
+        if (!includeDropped) {
+          builder.whereNull('dropped_at');
+        }
+      })
+      .orderBy('archived_at', 'desc')
+      .limit(limit);
+
+    return rows.map((row) => ({
+      ...row,
+      rowCount: Number(row.rowCount ?? 0),
+      byteSize: Number(row.byteSize ?? 0),
+      metadata: safeJsonParse(row.metadata)
+    }));
+  }
+
   async rotate({ dryRun = this.config.dryRun } = {}) {
     const runId = randomUUID();
 

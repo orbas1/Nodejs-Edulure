@@ -6,6 +6,12 @@ import AuditEventService from './AuditEventService.js';
 
 const defaultAuditLogger = new AuditEventService();
 
+const POLICY_AUDIENCE_DEFAULTS = {
+  'marketing.email': ['instructor', 'user'],
+  'data.analytics': ['admin', 'instructor'],
+  default: ['admin', 'instructor']
+};
+
 function normalizeUser(user) {
   if (!user) {
     return null;
@@ -92,6 +98,179 @@ export default class ComplianceService {
     this.connection = connection;
     this.logger = loggerInstance;
     this.auditLogger = auditLogger;
+  }
+
+  async summarisePolicyAttestations({
+    tenantId = 'global',
+    audienceOverrides = {},
+    now = new Date()
+  } = {}) {
+    const policyRows = await this.connection(COMPLIANCE_TABLES.CONSENT_POLICIES)
+      .select(
+        'id',
+        'policy_key as policyKey',
+        'version',
+        'status',
+        'title',
+        'summary',
+        'effective_at as effectiveAt',
+        'metadata'
+      )
+      .orderBy('effective_at', 'desc');
+
+    const policies = new Map(
+      policyRows.map((row) => [row.policyKey, { ...row, metadata: ensureJson(row.metadata) }])
+    );
+
+    const roleTotalsRows = await this.connection('users')
+      .select('role')
+      .count({ total: '*' })
+      .groupBy('role');
+
+    const roleTotals = roleTotalsRows.reduce((acc, row) => {
+      acc[row.role ?? 'user'] = Number(row.total ?? 0);
+      return acc;
+    }, {});
+
+    const consentRows = await this.connection({ cr: COMPLIANCE_TABLES.CONSENT_RECORDS })
+      .select(
+        'cr.*',
+        'users.role as user_role',
+        'cp.policy_key as policy_key',
+        'cp.title as policy_title',
+        'cp.version as policy_version',
+        'cp.status as policy_status',
+        'cp.summary as policy_summary',
+        'cp.effective_at as policy_effective_at',
+        'cp.metadata as policy_metadata'
+      )
+      .leftJoin('users', 'cr.user_id', 'users.id')
+      .leftJoin({ cp: COMPLIANCE_TABLES.CONSENT_POLICIES }, 'cr.policy_id', 'cp.id')
+      .where('cr.tenant_id', tenantId)
+      .orderBy('cr.granted_at', 'desc');
+
+    const summaryByPolicy = new Map();
+
+    consentRows.forEach((row) => {
+      const key = row.consent_type ?? row.policy_key ?? 'unknown';
+      if (!summaryByPolicy.has(key)) {
+        const policy = policies.get(key) ?? {
+          policyKey: key,
+          title: row.policy_title ?? key,
+          version: row.policy_version ?? 'current',
+          status: row.policy_status ?? 'published',
+          summary: row.policy_summary ?? '',
+          effectiveAt: row.policy_effective_at,
+          metadata: ensureJson(row.policy_metadata)
+        };
+        summaryByPolicy.set(key, {
+          policy,
+          granted: 0,
+          revoked: 0,
+          expired: 0,
+          active: 0,
+          channels: new Map(),
+          roles: new Map(),
+          lastGrantedAt: null,
+          lastRevokedAt: null,
+          expiringSoon: 0
+        });
+      }
+
+      const summary = summaryByPolicy.get(key);
+      const status = row.status ?? 'granted';
+      const isActive = row.active !== undefined ? Boolean(row.active) : status === 'granted';
+
+      if (status === 'granted') {
+        summary.granted += 1;
+        if (!summary.lastGrantedAt || new Date(row.granted_at) > new Date(summary.lastGrantedAt)) {
+          summary.lastGrantedAt = row.granted_at;
+        }
+      } else if (status === 'revoked') {
+        summary.revoked += 1;
+        if (!summary.lastRevokedAt || new Date(row.revoked_at) > new Date(summary.lastRevokedAt)) {
+          summary.lastRevokedAt = row.revoked_at;
+        }
+      } else if (status === 'expired') {
+        summary.expired += 1;
+      }
+
+      if (isActive) {
+        summary.active += 1;
+      }
+
+      const channel = row.channel ?? 'web';
+      summary.channels.set(channel, (summary.channels.get(channel) ?? 0) + 1);
+
+      const role = row.user_role ?? 'user';
+      summary.roles.set(role, (summary.roles.get(role) ?? 0) + 1);
+
+      if (row.expires_at) {
+        const expiresAt = new Date(row.expires_at);
+        const diffDays = Math.floor((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+        if (diffDays >= 0 && diffDays <= 30) {
+          summary.expiringSoon += 1;
+        }
+      }
+    });
+
+    const attestationSummaries = Array.from(summaryByPolicy.entries()).map(([key, summary]) => {
+      const policy = summary.policy;
+      const metadata = policy.metadata ?? {};
+      const explicitRoles = Array.isArray(audienceOverrides[key]) && audienceOverrides[key].length
+        ? audienceOverrides[key]
+        : Array.isArray(metadata.requiredRoles) && metadata.requiredRoles.length
+          ? metadata.requiredRoles
+          : POLICY_AUDIENCE_DEFAULTS[key] ?? POLICY_AUDIENCE_DEFAULTS.default;
+
+      const uniqueRoles = Array.from(new Set(explicitRoles));
+      const required = uniqueRoles.reduce((acc, role) => acc + (roleTotals[role] ?? 0), 0);
+      const coverage = required > 0 ? Number(((summary.active / required) * 100).toFixed(1)) : 100;
+      const outstanding = Math.max(0, required - summary.active);
+
+      const channels = Array.from(summary.channels.entries()).map(([channel, count]) => ({ channel, count }));
+      const roles = Array.from(summary.roles.entries()).map(([role, count]) => ({ role, count }));
+
+      return {
+        consentType: key,
+        policy,
+        required,
+        granted: summary.granted,
+        revoked: summary.revoked,
+        expired: summary.expired,
+        active: summary.active,
+        outstanding,
+        coverage,
+        channels,
+        roles,
+        lastGrantedAt: summary.lastGrantedAt,
+        lastRevokedAt: summary.lastRevokedAt,
+        expiringSoon: summary.expiringSoon,
+        audience: uniqueRoles
+      };
+    });
+
+    attestationSummaries.sort((a, b) => b.coverage - a.coverage);
+
+    const totals = attestationSummaries.reduce(
+      (acc, item) => {
+        acc.required += item.required;
+        acc.granted += item.active;
+        acc.outstanding += item.outstanding;
+        return acc;
+      },
+      { required: 0, granted: 0, outstanding: 0 }
+    );
+
+    const overallCoverage = totals.required > 0 ? Number(((totals.granted / totals.required) * 100).toFixed(1)) : 100;
+
+    return {
+      policies: attestationSummaries,
+      totals: {
+        ...totals,
+        coverage: overallCoverage
+      }
+    };
   }
 
   async listDsrRequests({ status, dueBefore, limit = 25, offset = 0 } = {}) {

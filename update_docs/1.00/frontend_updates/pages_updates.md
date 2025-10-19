@@ -6,3 +6,4 @@
 - Relaxed the dashboard layout guard so admins can load the executive overview even when legacy admin payloads are not returned by `/dashboard/me`, preventing unnecessary empty-state messaging during rollout.
 - Expanded `InstructorCourseManage` to render the production-ready learning workspace, wiring in catalogue analytics, assignment
   queues, authoring drafts with modal inspection, and learner risk tables sourced from the `coursesWorkspace` API payload.
+- Rebuilt `AdminComplianceSection` within `src/pages/admin/sections/` to surface audit summaries, attestation analytics, framework trackers, risk heatmaps, incident response flows, and evidence exports with accessible tab navigation and defensive state management.

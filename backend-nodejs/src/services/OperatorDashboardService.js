@@ -1,9 +1,154 @@
 import logger from '../config/logger.js';
+import { env } from '../config/env.js';
 import CapabilityManifestService from './CapabilityManifestService.js';
 import IntegrationDashboardService from './IntegrationDashboardService.js';
 import SecurityIncidentModel from '../models/SecurityIncidentModel.js';
+import IdentityVerificationService from './IdentityVerificationService.js';
+import ComplianceService from './ComplianceService.js';
+import AuditEventService from './AuditEventService.js';
+import dataPartitionService from './DataPartitionService.js';
+import storageService from './StorageService.js';
 
 const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+const INCIDENT_SEVERITIES = ['critical', 'high', 'medium', 'low'];
+const INCIDENT_CATEGORY_LABELS = {
+  scam: 'Marketplace scams',
+  fraud: 'Payments & fraud',
+  account_takeover: 'Account takeover',
+  abuse: 'Platform abuse',
+  data_breach: 'Data breach',
+  other: 'Other incidents'
+};
+
+const evidenceRoleOverrides = (process.env.COMPLIANCE_EVIDENCE_ROLES ?? '')
+  .split(',')
+  .map((role) => role.trim())
+  .filter(Boolean);
+
+const EVIDENCE_ACCESS_ROLES = evidenceRoleOverrides.length
+  ? evidenceRoleOverrides
+  : ['admin', 'compliance_manager', 'legal'];
+
+function formatBytes(value) {
+  const bytes = Number(value ?? 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const sized = bytes / 1024 ** exponent;
+  return `${sized.toFixed(exponent === 0 ? 0 : 1)} ${units[exponent]}`;
+}
+
+export function buildComplianceRiskHeatmap(incidents = []) {
+  const categoryBuckets = new Map();
+
+  incidents.forEach((incident) => {
+    const category = incident.category ?? 'other';
+    const severity = (incident.severity ?? 'medium').toLowerCase();
+
+    if (!categoryBuckets.has(category)) {
+      categoryBuckets.set(
+        category,
+        INCIDENT_SEVERITIES.reduce((acc, key) => acc.set(key, 0), new Map())
+      );
+    }
+
+    const severityCounts = categoryBuckets.get(category);
+    const severityKey = INCIDENT_SEVERITIES.includes(severity) ? severity : 'medium';
+    severityCounts.set(severityKey, (severityCounts.get(severityKey) ?? 0) + 1);
+  });
+
+  return Array.from(categoryBuckets.entries())
+    .map(([category, severityCounts]) => ({
+      category,
+      label: INCIDENT_CATEGORY_LABELS[category] ?? category.replace(/_/g, ' '),
+      total: INCIDENT_SEVERITIES.reduce(
+        (acc, severity) => acc + (severityCounts.get(severity) ?? 0),
+        0
+      ),
+      severities: INCIDENT_SEVERITIES.map((severity) => ({
+        severity,
+        count: severityCounts.get(severity) ?? 0
+      }))
+    }))
+    .sort((a, b) => b.total - a.total);
+}
+
+function buildIncidentResponseFlows(activeIncidents = [], auditSummary = {}) {
+  const eventsByIncident = new Map();
+  (auditSummary.latestEvents ?? []).forEach((event) => {
+    if (event.entityType !== 'security_incident' || !event.entityId) {
+      return;
+    }
+    const key = event.entityId;
+    if (!eventsByIncident.has(key)) {
+      eventsByIncident.set(key, []);
+    }
+    eventsByIncident.get(key).push({
+      id: event.eventUuid,
+      type: event.eventType,
+      occurredAt: event.occurredAt,
+      severity: event.severity,
+      actor: event.actor
+    });
+  });
+
+  return activeIncidents.map((incident) => ({
+    incidentUuid: incident.incidentUuid,
+    reference: incident.metadata?.reference ?? incident.incidentUuid,
+    severity: incident.severity,
+    status: incident.status,
+    reportedAt: incident.reportedAt,
+    acknowledgement: incident.acknowledgement ?? {},
+    resolution: incident.resolution ?? {},
+    detectionChannel: incident.metadata?.detectionChannel ?? incident.source ?? 'unknown',
+    recommendedActions: incident.metadata?.recommendedActions ?? [],
+    watchers: Number(incident.metadata?.watchers ?? 0),
+    timeline: (eventsByIncident.get(incident.incidentUuid) ?? []).sort((a, b) =>
+      new Date(a.occurredAt) - new Date(b.occurredAt)
+    )
+  }));
+}
+
+function buildComplianceSearchIndex({ frameworks = [], audits, evidence }) {
+  const entries = [];
+
+  frameworks.forEach((framework) => {
+    entries.push({
+      id: `compliance-framework-${framework.id}`,
+      role: 'admin',
+      type: 'Compliance framework',
+      title: `${framework.name} status`,
+      url: '/dashboard/admin/operator#compliance',
+      category: 'compliance'
+    });
+  });
+
+  (audits?.eventTypeBreakdown ?? []).slice(0, 5).forEach((event) => {
+    entries.push({
+      id: `audit-${event.eventType}`,
+      role: 'admin',
+      type: 'Audit event',
+      title: `Audit trail: ${event.eventType}`,
+      url: '/dashboard/admin/operator#compliance',
+      category: 'compliance'
+    });
+  });
+
+  (evidence?.exports ?? []).forEach((archive) => {
+    entries.push({
+      id: `evidence-${archive.id}`,
+      role: 'admin',
+      type: 'Evidence export',
+      title: `Evidence export ${archive.tableName} ${archive.partitionName}`,
+      url: '/dashboard/admin/operator#compliance',
+      category: 'compliance'
+    });
+  });
+
+  return entries;
+}
 
 function minutesBetween(start, end) {
   if (!start || !end) {
@@ -420,7 +565,7 @@ function buildSearchIndex(activeIncidents, runbooks) {
   ];
 }
 
-function buildProfileStats(queueSummary, scamSummary, integrationSnapshot) {
+function buildProfileStats(queueSummary, scamSummary, integrationSnapshot, complianceSnapshot) {
   const stats = [
     {
       label: 'Open incidents',
@@ -447,15 +592,34 @@ function buildProfileStats(queueSummary, scamSummary, integrationSnapshot) {
     });
   }
 
+  if (complianceSnapshot) {
+    stats.push({
+      label: 'KYC queue',
+      value: `${complianceSnapshot.queue.length} queued`
+    });
+    stats.push({
+      label: 'Attestation coverage',
+      value: `${Number(complianceSnapshot.attestations?.totals?.coverage ?? 0).toFixed(1)}%`
+    });
+  }
+
   return stats;
 }
 
-function buildProfileBio(queueSummary, scamSummary, healthSummary) {
+function buildProfileBio(queueSummary, scamSummary, healthSummary, complianceSnapshot) {
   const impacted = healthSummary.impactedServices;
   const watchers = healthSummary.watchers;
-  return `Monitoring ${queueSummary.totalOpen} live incidents (${queueSummary.severityCounts.critical} critical) with ${
+  const dsarOutstanding = complianceSnapshot?.gdpr?.dsar?.overdue ?? 0;
+  const attestationCoverage = complianceSnapshot
+    ? Number(complianceSnapshot.attestations?.totals?.coverage ?? 0).toFixed(1)
+    : null;
+  const base = `Monitoring ${queueSummary.totalOpen} live incidents (${queueSummary.severityCounts.critical} critical) with ${
     watchers ?? 0
   } watchers engaged across ${impacted} impacted services.`;
+  if (complianceSnapshot) {
+    return `${base} Tracking ${dsarOutstanding} overdue DSARs with ${attestationCoverage}% policy attestation coverage.`;
+  }
+  return base;
 }
 
 export default class OperatorDashboardService {
@@ -463,14 +627,239 @@ export default class OperatorDashboardService {
     manifestService = new CapabilityManifestService(),
     incidentsModel = SecurityIncidentModel,
     integrationDashboardService = new IntegrationDashboardService(),
+    complianceService = new ComplianceService(),
+    auditEventService = new AuditEventService(),
+    identityVerificationService = IdentityVerificationService,
+    partitionService = dataPartitionService,
+    storage = storageService,
     nowProvider = () => new Date(),
     loggerInstance = logger.child({ service: 'OperatorDashboardService' })
   } = {}) {
     this.manifestService = manifestService;
     this.incidentsModel = incidentsModel;
     this.integrationDashboardService = integrationDashboardService;
+    this.complianceService = complianceService;
+    this.auditEventService = auditEventService;
+    this.identityVerificationService = identityVerificationService;
+    this.partitionService = partitionService;
+    this.storage = storage;
     this.nowProvider = nowProvider;
     this.logger = loggerInstance;
+  }
+
+  async #buildComplianceSnapshot({ tenantId, now, activeIncidents, resolvedIncidents }) {
+    let kycOverview = {
+      metrics: [],
+      queue: [],
+      slaBreaches: 0,
+      manualReviewQueue: 0,
+      gdpr: {}
+    };
+
+    try {
+      kycOverview = await this.identityVerificationService.getAdminOverview({ now, limit: 25 });
+    } catch (error) {
+      this.logger.error({ err: error }, 'Failed to load identity verification overview for compliance dashboard');
+    }
+
+    let auditSummary = {
+      totals: { events: 0, investigations: 0, controlsTested: 0, policyUpdates: 0 },
+      countsBySeverity: { info: 0, notice: 0, warning: 0, error: 0, critical: 0 },
+      eventTypeBreakdown: [],
+      actorBreakdown: [],
+      latestEvents: [],
+      lastEventAt: null
+    };
+    try {
+      auditSummary = await this.auditEventService.summariseRecent({
+        tenantId,
+        since: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      });
+    } catch (error) {
+      this.logger.error({ err: error }, 'Failed to summarise recent audit events');
+    }
+
+    let attestationSummary = { policies: [], totals: { required: 0, granted: 0, outstanding: 0, coverage: 100 } };
+    try {
+      attestationSummary = await this.complianceService.summarisePolicyAttestations({ tenantId, now });
+    } catch (error) {
+      this.logger.error({ err: error }, 'Failed to summarise policy attestations for compliance console');
+    }
+
+    const archiveTables = ['audit_events', 'dsr_requests', 'consent_records'];
+    let archives = [];
+    try {
+      const archiveResults = await Promise.all(
+        archiveTables.map((tableName) =>
+          this.partitionService.listArchives({ tableName, limit: 4 }).catch((error) => {
+            this.logger.warn({ err: error, tableName }, 'Failed to fetch evidence archives for table');
+            return [];
+          })
+        )
+      );
+      archives = archiveResults.flat().slice(0, 10);
+    } catch (error) {
+      this.logger.warn({ err: error }, 'Unable to compile compliance evidence archives');
+    }
+
+    const riskHeatmap = buildComplianceRiskHeatmap(activeIncidents);
+    const severityTotals = INCIDENT_SEVERITIES.reduce((acc, severity) => {
+      acc[severity] = riskHeatmap.reduce((total, row) => {
+        const bucket = row.severities.find((entry) => entry.severity === severity);
+        return total + (bucket?.count ?? 0);
+      }, 0);
+      return acc;
+    }, {});
+
+    const exposures = riskHeatmap.slice(0, 3).map((row) => {
+      const dominant = row.severities.reduce(
+        (prev, current) => (current.count > prev.count ? current : prev),
+        { severity: 'low', count: 0 }
+      );
+      const watcherTotal = activeIncidents
+        .filter((incident) => (incident.category ?? 'other') === row.category)
+        .reduce((sum, incident) => sum + Number(incident.metadata?.watchers ?? 0), 0);
+      return {
+        category: row.category,
+        label: row.label,
+        total: row.total,
+        dominantSeverity: dominant.severity,
+        watchers: watcherTotal
+      };
+    });
+
+    const incidentResponse = {
+      flows: buildIncidentResponseFlows(activeIncidents, auditSummary),
+      recentResolved: resolvedIncidents.slice(0, 5).map((incident) => ({
+        incidentUuid: incident.incidentUuid,
+        reference: incident.metadata?.reference ?? incident.incidentUuid,
+        severity: incident.severity,
+        status: incident.status,
+        resolvedAt: incident.resolution?.resolvedAt ?? incident.resolvedAt,
+        resolutionMinutes: minutesBetween(incident.reportedAt, incident.resolution?.resolvedAt ?? incident.resolvedAt),
+        followUp: incident.resolution?.followUp ?? null
+      })),
+      queueSummary: summariseIncidentQueue(activeIncidents, { now })
+    };
+
+    const evidenceExports = await Promise.all(
+      archives.map(async (archive) => {
+        let downloadUrl = null;
+        let downloadExpiresAt = null;
+        if (archive.storageBucket && archive.storageKey) {
+          try {
+            const download = await this.storage.createDownloadUrl({
+              bucket: archive.storageBucket,
+              key: archive.storageKey,
+              visibility: 'workspace',
+              responseContentDisposition: `attachment; filename="${archive.tableName}-${archive.partitionName}.parquet"`
+            });
+            downloadUrl = download.url;
+            downloadExpiresAt = download.expiresAt instanceof Date ? download.expiresAt.toISOString() : null;
+          } catch (error) {
+            this.logger.warn({ err: error, archiveId: archive.id }, 'Failed to generate evidence download URL');
+          }
+        }
+
+        return {
+          id: archive.id,
+          tableName: archive.tableName,
+          partitionName: archive.partitionName,
+          rangeStart: archive.rangeStart,
+          rangeEnd: archive.rangeEnd,
+          retentionDays: archive.retentionDays,
+          archivedAt: archive.archivedAt,
+          droppedAt: archive.droppedAt,
+          byteSize: archive.byteSize,
+          sizeLabel: formatBytes(archive.byteSize),
+          rowCount: archive.rowCount,
+          checksum: archive.checksum,
+          metadata: archive.metadata,
+          storageBucket: archive.storageBucket,
+          storageKey: archive.storageKey,
+          downloadUrl,
+          downloadExpiresAt
+        };
+      })
+    );
+
+    const frameworkSummaries = (() => {
+      const dsar = kycOverview.gdpr?.dsar ?? {};
+      const ico = kycOverview.gdpr?.ico ?? {};
+      const criticalIncidents = severityTotals.critical ?? 0;
+      const auditCritical = auditSummary.countsBySeverity?.critical ?? 0;
+      const auditErrors = auditSummary.countsBySeverity?.error ?? 0;
+      const overdueDsar = dsar.overdue ?? 0;
+      const kycBreaches = kycOverview.slaBreaches ?? 0;
+      const complianceCoverage = attestationSummary.totals.coverage ?? 100;
+
+      const deriveStatus = (score) => {
+        if (score >= 3) return 'attention';
+        if (score === 2) return 'watch';
+        return 'passing';
+      };
+
+      const soc2Score = auditCritical > 0 || criticalIncidents > 0 ? 3 : auditErrors > 0 ? 2 : 1;
+      const isoScore = criticalIncidents > 0 ? 3 : severityTotals.high > 2 ? 2 : 1;
+      const gdprScore = overdueDsar + kycBreaches > 0 ? 2 : 1;
+
+      return [
+        {
+          id: 'soc2',
+          name: 'SOC 2 Type II',
+          status: deriveStatus(soc2Score),
+          owner: process.env.SOC2_OWNER ?? 'Security & Compliance Lead',
+          renewalDue: process.env.SOC2_RENEWAL_DUE ?? null,
+          controlsTested: auditSummary.totals.controlsTested ?? 0,
+          outstandingActions: auditSummary.totals.investigations ?? 0,
+          description: 'Trust service criteria coverage and automated audit trail integrity.'
+        },
+        {
+          id: 'iso27001',
+          name: 'ISO 27001',
+          status: deriveStatus(isoScore),
+          owner: process.env.ISO27001_OWNER ?? 'Infrastructure & Security',
+          renewalDue: process.env.ISO27001_RENEWAL_DUE ?? null,
+          outstandingActions: severityTotals.high + severityTotals.critical,
+          description: 'Operational security controls and incident management maturity.'
+        },
+        {
+          id: 'uk-gdpr',
+          name: 'UK GDPR & ICO',
+          status: deriveStatus(gdprScore),
+          owner: dsar.owner ?? process.env.GDPR_DATA_PROTECTION_OFFICER ?? 'Data Protection Officer',
+          renewalDue: ico.renewalDue ?? null,
+          outstandingActions: overdueDsar,
+          coverage: complianceCoverage,
+          description: 'Data subject rights, consent attestation, and ICO registration cadence.'
+        }
+      ];
+    })();
+
+    return {
+      metrics: kycOverview.metrics ?? [],
+      queue: kycOverview.queue ?? [],
+      slaBreaches: kycOverview.slaBreaches ?? 0,
+      manualReviewQueue: kycOverview.manualReviewQueue ?? 0,
+      gdpr: kycOverview.gdpr ?? {},
+      audits: auditSummary,
+      attestations: attestationSummary,
+      frameworks: frameworkSummaries,
+      risk: {
+        heatmap: riskHeatmap,
+        severityTotals,
+        exposures
+      },
+      incidentResponse,
+      evidence: {
+        exports: evidenceExports,
+        permissions: {
+          roles: EVIDENCE_ACCESS_ROLES,
+          requestChannel: process.env.COMPLIANCE_EVIDENCE_REQUEST_CHANNEL ?? '#security-compliance'
+        },
+        storage: env.partitioning?.archive ?? {}
+      }
+    };
   }
 
   async build({ user, tenantId = 'global', now = this.nowProvider() } = {}) {
@@ -511,6 +900,12 @@ export default class OperatorDashboardService {
     const serviceHealth = normaliseServiceHealth(manifest, activeIncidents);
     const runbooks = buildRunbookShortcuts(activeIncidents, resolvedIncidents);
     const timeline = buildTimeline(activeIncidents, resolvedIncidents);
+    const complianceSnapshot = await this.#buildComplianceSnapshot({
+      tenantId,
+      now,
+      activeIncidents,
+      resolvedIncidents
+    });
 
     return {
       dashboard: {
@@ -522,7 +917,12 @@ export default class OperatorDashboardService {
         metrics: {
           serviceHealth: serviceHealth.summary,
           incidents: queueSummary,
-          scams: scamSummary
+          scams: scamSummary,
+          compliance: {
+            kycQueue: complianceSnapshot.queue.length,
+            dsarOutstanding: complianceSnapshot.gdpr?.dsar?.overdue ?? 0,
+            attestationCoverage: complianceSnapshot.attestations.totals.coverage ?? 100
+          }
         },
         serviceHealth,
         incidents: {
@@ -531,15 +931,21 @@ export default class OperatorDashboardService {
         },
         runbooks,
         timeline,
-        integrations: integrationSnapshot
+        integrations: integrationSnapshot,
+        compliance: complianceSnapshot
       },
       searchIndex: [
         ...buildSearchIndex(activeIncidents, runbooks),
+        ...buildComplianceSearchIndex({
+          frameworks: complianceSnapshot.frameworks,
+          audits: complianceSnapshot.audits,
+          evidence: complianceSnapshot.evidence
+        }),
         ...(integrationSnapshot?.searchIndex ?? [])
       ],
-      profileStats: buildProfileStats(queueSummary, scamSummary, integrationSnapshot),
+      profileStats: buildProfileStats(queueSummary, scamSummary, integrationSnapshot, complianceSnapshot),
       profileTitleSegment: 'Platform operations overview',
-      profileBio: buildProfileBio(queueSummary, scamSummary, serviceHealth.summary)
+      profileBio: buildProfileBio(queueSummary, scamSummary, serviceHealth.summary, complianceSnapshot)
     };
   }
 }
