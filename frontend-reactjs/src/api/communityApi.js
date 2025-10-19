@@ -248,32 +248,71 @@ export async function resolveCommunityIncident({ communityId, incidentId, token,
   return mapResponse(response);
 }
 
-export async function moderateCommunityPost({ communityId, postId, token, action, reason }) {
-  const response = await httpClient.post(
-    `/communities/${communityId}/posts/${postId}/moderate`,
-    { action, reason },
-    {
-      token,
-      cache: {
-        invalidateTags: [
-          `community:${communityId}:feed`,
-          'communities:aggregatedFeed'
-        ]
-      }
+export async function listCommunityRoles({ communityId, token, signal }) {
+  const response = await httpClient.get(`/communities/${communityId}/roles`, {
+    token,
+    signal,
+    cache: {
+      ttl: 1000 * 30,
+      tags: [`community:${communityId}:roles`]
     }
-  );
+  });
   return mapResponse(response);
 }
 
-export async function removeCommunityPost({ communityId, postId, token, reason }) {
-  const response = await httpClient.delete(`/communities/${communityId}/posts/${postId}`, {
+export async function createCommunityRole({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/roles`, payload, {
     token,
-    body: { reason },
     cache: {
-      invalidateTags: [
-        `community:${communityId}:feed`,
-        'communities:aggregatedFeed'
-      ]
+      invalidateTags: [`community:${communityId}:roles`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function assignCommunityRole({ communityId, userId, token, payload }) {
+  const response = await httpClient.patch(`/communities/${communityId}/members/${userId}/role`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:roles`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function listCommunityEvents({ communityId, token, params = {}, signal }) {
+  const response = await httpClient.get(`/communities/${communityId}/events`, {
+    token,
+    signal,
+    params: {
+      limit: params.limit ?? 20,
+      offset: params.offset ?? 0,
+      status: params.status ?? 'scheduled',
+      order: params.order ?? 'asc'
+    },
+    cache: {
+      ttl: 1000 * 30,
+      tags: [`community:${communityId}:events`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function createCommunityEvent({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/events`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:events`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function createCommunityResource({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/resources`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:resources`]
     }
   });
   return mapResponse(response);
