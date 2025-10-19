@@ -2,9 +2,7 @@ import db from '../config/database.js';
 import CommunityMemberModel from '../models/CommunityMemberModel.js';
 import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
-import CommunityAffiliateModel from '../models/CommunityAffiliateModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
-import PlatformSettingsService from './PlatformSettingsService.js';
 
 function addInterval(startDate, interval) {
   if (!startDate) return null;
@@ -30,46 +28,6 @@ function addInterval(startDate, interval) {
 
 function ensureArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-async function updateAffiliateEarnings(subscription, intent, connection) {
-  if (!subscription.affiliateId) {
-    return;
-  }
-  const affiliate = await CommunityAffiliateModel.findById(subscription.affiliateId, connection);
-  if (!affiliate || affiliate.status !== 'approved') {
-    return;
-  }
-  const monetizationSettings = await PlatformSettingsService.getMonetizationSettings(connection);
-  const breakdown = PlatformSettingsService.calculateCommission(
-    intent.amountTotal ?? 0,
-    monetizationSettings.commissions,
-    { category: 'community_subscription' }
-  );
-  const commission = breakdown.affiliateAmountCents;
-  if (commission <= 0) {
-    return;
-  }
-  await CommunityAffiliateModel.incrementEarnings(
-    affiliate.id,
-    { amountEarnedCents: commission, amountPaidCents: 0 },
-    connection
-  );
-  await DomainEventModel.record(
-    {
-      entityType: 'community_affiliate',
-      entityId: String(affiliate.id),
-      eventType: 'community.affiliate.earning-recorded',
-      payload: {
-        subscriptionId: subscription.id,
-        paymentIntentId: intent.id,
-        amountCents: commission,
-        platformShareCents: breakdown.platformAmountCents,
-        commissionCategory: breakdown.category ?? 'community_subscription'
-      }
-    },
-    connection
-  );
 }
 
 export async function onPaymentSucceeded(intent, connection = db) {
@@ -120,8 +78,6 @@ export async function onPaymentSucceeded(intent, connection = db) {
       await CommunityMemberModel.updateStatus(subscription.communityId, subscription.userId, 'active', connection);
     }
   }
-
-  await updateAffiliateEarnings(subscription, intent, connection);
 
   await DomainEventModel.record(
     {

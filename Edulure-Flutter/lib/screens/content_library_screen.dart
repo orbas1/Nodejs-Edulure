@@ -348,6 +348,46 @@ class _ContentLibraryScreenState extends State<ContentLibraryScreen> {
             'Every checkout is powered by Stripe so learners can tip, donate, or enrol without leaving the app.',
             style: theme.textTheme.bodySmall?.copyWith(color: Colors.blueGrey.shade600),
           ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.favorite_outline),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Live donation checkout opens a secure Stripe payment flow.'),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _brandPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                ),
+                label: const Text('Send a live donation'),
+              ),
+              OutlinedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Share your affiliate code to capture 25% of platform fees.'),
+                    ),
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _brandPrimaryDark,
+                  side: BorderSide(color: _brandPrimary.withOpacity(0.4)),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                ),
+                child: const Text('Affiliate share breakdown'),
+              )
+            ],
+          )
         ],
       ),
     );

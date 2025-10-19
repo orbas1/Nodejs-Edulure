@@ -110,6 +110,11 @@ router.post(
   auth(),
   CommunityMonetizationController.cancelSubscription
 );
+router.post(
+  '/:communityId/live/donations',
+  auth(),
+  CommunityMonetizationController.createDonation
+);
 
 router.post(
   '/:communityId/operations/runbooks',

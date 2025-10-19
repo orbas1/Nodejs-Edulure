@@ -173,3 +173,13 @@ export async function resolveCommunityIncident({ communityId, incidentId, token,
   );
   return mapResponse(response);
 }
+
+export async function createCommunityLiveDonation({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/live/donations`, payload ?? {}, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:detail`, `community:${communityId}:events`]
+    }
+  });
+  return mapResponse(response);
+}

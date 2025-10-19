@@ -13,11 +13,17 @@ import {
   onPaymentFailed as handleCommunityPaymentFailed,
   onPaymentRefunded as handleCommunityPaymentRefunded
 } from './CommunitySubscriptionLifecycle.js';
+import {
+  onPaymentSucceeded as handleDonationPaymentSucceeded,
+  onPaymentFailed as handleDonationPaymentFailed,
+  onPaymentRefunded as handleDonationPaymentRefunded
+} from './CommunityDonationLifecycle.js';
 import PlatformSettingsService from './PlatformSettingsService.js';
 import EscrowService from './EscrowService.js';
 import webhookEventBusService from './WebhookEventBusService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
 import MonetizationFinanceService from './MonetizationFinanceService.js';
+import CommunityAffiliateCommissionService from './CommunityAffiliateCommissionService.js';
 
 const COMMISSION_CATEGORY_MAP = Object.freeze({
   community_subscription: 'community_subscription',
@@ -825,7 +831,9 @@ class PaymentService {
       });
 
       await handleCommunityPaymentSucceeded(updatedIntent, trx);
+      await handleDonationPaymentSucceeded(updatedIntent, trx);
       await MonetizationFinanceService.handlePaymentCaptured(updatedIntent, trx);
+      await CommunityAffiliateCommissionService.handlePaymentCaptured(updatedIntent, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.succeeded',
@@ -997,7 +1005,9 @@ class PaymentService {
       });
 
       await handleCommunityPaymentSucceeded(updated, trx);
+      await handleDonationPaymentSucceeded(updated, trx);
       await MonetizationFinanceService.handlePaymentCaptured(updated, trx);
+      await CommunityAffiliateCommissionService.handlePaymentCaptured(updated, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.succeeded',
@@ -1037,6 +1047,7 @@ class PaymentService {
       }, trx);
 
       await handleCommunityPaymentFailed(updatedIntent, trx);
+      await handleDonationPaymentFailed(updatedIntent, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.failed',
@@ -1125,6 +1136,7 @@ class PaymentService {
 
         const updatedIntent = await PaymentIntentModel.findById(intent.id, trx);
         await handleCommunityPaymentRefunded(updatedIntent, refundAmount, trx);
+        await handleDonationPaymentRefunded(updatedIntent, refundAmount, trx);
 
         await webhookEventBusService.publish(
           'payments.intent.refunded',
@@ -1340,6 +1352,7 @@ class PaymentService {
 
       const finalIntent = await PaymentIntentModel.findById(intent.id, trx);
       await handleCommunityPaymentRefunded(finalIntent, refundAmount, trx);
+      await handleDonationPaymentRefunded(finalIntent, refundAmount, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.refunded',
