@@ -1,9 +1,13 @@
+import { useCallback, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 
 export default function InstructorTutorBookings() {
-  const { dashboard, refresh } = useOutletContext();
+  const { dashboard, refresh, instructorOrchestration } = useOutletContext();
+  const [pending, setPending] = useState(false);
+  const [feedback, setFeedback] = useState(null);
   const bookings = dashboard?.bookings;
 
   if (!bookings) {
@@ -34,14 +38,53 @@ export default function InstructorTutorBookings() {
     notification.id?.includes('-due')
   );
 
+  const triggerRouting = useCallback(
+    async (overrides = {}) => {
+      if (!instructorOrchestration?.routeTutorRequest) {
+        return;
+      }
+      setPending(true);
+      setFeedback(null);
+      try {
+        const payload = {
+          pendingCount: pipeline.length,
+          rulesetId: dashboard?.tutors?.activeRuleset,
+          ...overrides
+        };
+        const result = await instructorOrchestration.routeTutorRequest(payload);
+        setFeedback({
+          tone: 'success',
+          message: 'Tutor routing recalibrated.',
+          detail: result?.summary ?? 'New matching rules will apply to incoming requests.'
+        });
+        await refresh?.();
+      } catch (error) {
+        setFeedback({
+          tone: 'error',
+          message: error.message ?? 'Unable to update tutor routing.'
+        });
+      } finally {
+        setPending(false);
+      }
+    },
+    [dashboard, instructorOrchestration, pipeline.length, refresh]
+  );
+
   return (
     <div className="space-y-8">
+      <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Tutor bookings</h1>
           <p className="mt-2 text-sm text-slate-600">Manage inbound requests and confirm upcoming mentorship sessions.</p>
         </div>
-        <button type="button" className="dashboard-primary-pill">
+        <button
+          type="button"
+          className="dashboard-primary-pill disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={() => triggerRouting()}
+          disabled={pending}
+          aria-busy={pending}
+        >
           Open routing rules
         </button>
       </div>
@@ -102,7 +145,19 @@ export default function InstructorTutorBookings() {
                 </div>
                 <div className="text-right text-xs text-slate-600">
                   <p>Requested {item.requested}</p>
-                  <button type="button" className="mt-2 dashboard-pill px-3 py-1 hover:border-primary/50">
+                  <button
+                    type="button"
+                    className="mt-2 dashboard-pill px-3 py-1 hover:border-primary/50 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() =>
+                      triggerRouting({
+                        pendingCount: pipeline.length,
+                        rulesetId: item.id,
+                        learner: item.learner
+                      })
+                    }
+                    disabled={pending}
+                    aria-busy={pending}
+                  >
                     Assign mentor
                   </button>
                 </div>

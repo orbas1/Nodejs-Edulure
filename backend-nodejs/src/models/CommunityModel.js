@@ -104,4 +104,15 @@ export default class CommunityModel {
       .where('c.id', communityId)
       .first();
   }
+
+  static async updateMetadata(id, metadata, connection = db) {
+    await connection('communities')
+      .where({ id })
+      .update({
+        metadata: JSON.stringify(metadata ?? {}),
+        updated_at: connection.fn.now()
+      });
+
+    return this.findById(id, connection);
+  }
 }

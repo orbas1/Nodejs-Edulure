@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import {
   CheckCircleIcon,
@@ -6,6 +7,7 @@ import {
 } from '@heroicons/react/20/solid';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 
 const severityStyles = {
   success: {
@@ -34,7 +36,9 @@ const statusToneStyles = {
 };
 
 export default function InstructorTutorManagement() {
-  const { role, dashboard, refresh } = useOutletContext();
+  const { role, dashboard, refresh, instructorOrchestration } = useOutletContext();
+  const [pendingAction, setPendingAction] = useState(null);
+  const [feedback, setFeedback] = useState(null);
 
   if (role !== 'instructor') {
     return (
@@ -65,6 +69,62 @@ export default function InstructorTutorManagement() {
       ? dashboard.schedules.tutor
       : [];
 
+  const handleInviteMentor = useCallback(async () => {
+    if (!instructorOrchestration?.inviteMentor) {
+      return;
+    }
+    setPendingAction('invite');
+    setFeedback(null);
+    try {
+      const payload = {
+        email: roster[0]?.email ?? 'mentor@edulure.com',
+        name: roster[0]?.name ?? 'New Mentor'
+      };
+      const result = await instructorOrchestration.inviteMentor(payload);
+      setFeedback({
+        tone: 'success',
+        message: 'Mentor invite sent.',
+        detail: result?.summary ?? 'We emailed the mentor with next steps.'
+      });
+      await refresh?.();
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error.message ?? 'Unable to send mentor invite.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [instructorOrchestration, refresh, roster]);
+
+  const handleRouting = useCallback(async () => {
+    if (!instructorOrchestration?.routeTutorRequest) {
+      return;
+    }
+    setPendingAction('routing');
+    setFeedback(null);
+    try {
+      const payload = {
+        pendingCount: notifications.filter((item) => item.severity === 'warning').length,
+        rulesetId: dashboard?.tutors?.activeRuleset
+      };
+      const result = await instructorOrchestration.routeTutorRequest(payload);
+      setFeedback({
+        tone: 'success',
+        message: 'Tutor routing recalibrated.',
+        detail: result?.summary ?? 'Routing updates will propagate to mentor pods.'
+      });
+      await refresh?.();
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error.message ?? 'Unable to open routing rules.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [dashboard, instructorOrchestration, notifications, refresh]);
+
   if (roster.length === 0 && availability.length === 0) {
     return (
       <DashboardStateMessage
@@ -78,6 +138,7 @@ export default function InstructorTutorManagement() {
 
   return (
     <div className="space-y-8">
+      <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Tutor management &amp; hiring</h1>
@@ -86,7 +147,13 @@ export default function InstructorTutorManagement() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" className="dashboard-primary-pill px-5">
+          <button
+            type="button"
+            className="dashboard-primary-pill px-5 disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleInviteMentor}
+            disabled={pendingAction === 'invite'}
+            aria-busy={pendingAction === 'invite'}
+          >
             Invite mentor
           </button>
           <button type="button" className="dashboard-pill px-4 py-2">
@@ -151,7 +218,13 @@ export default function InstructorTutorManagement() {
                 Track performance, availability, and focus areas for every mentor supporting your learners.
               </p>
             </div>
-            <button type="button" className="dashboard-pill">
+            <button
+              type="button"
+              className="dashboard-pill disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleRouting}
+              disabled={pendingAction === 'routing'}
+              aria-busy={pendingAction === 'routing'}
+            >
               Open routing rules
             </button>
           </div>

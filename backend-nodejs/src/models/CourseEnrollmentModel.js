@@ -37,6 +37,15 @@ function toDate(value) {
 }
 
 export default class CourseEnrollmentModel {
+  static async listByUserId(userId, connection = db) {
+    if (!userId) return [];
+    const rows = await connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where('user_id', userId)
+      .orderBy('created_at', 'desc');
+    return rows.map((row) => this.deserialize(row));
+  }
+
   static async listByCourseIds(courseIds, connection = db) {
     if (!courseIds?.length) return [];
     const rows = await connection(TABLE)

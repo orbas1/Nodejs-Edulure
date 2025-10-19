@@ -1,11 +1,35 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
+import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function LearnerCourses() {
-  const { isLearner, section: data, refresh } = useLearnerDashboardSection('courses');
+  const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('courses');
   const navigate = useNavigate();
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+
+  const [activeCourses, setActiveCourses] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  useEffect(() => {
+    setActiveCourses(Array.isArray(data?.active) ? data.active : []);
+    setRecommendations(Array.isArray(data?.recommendations) ? data.recommendations : []);
+  }, [data]);
+
+  useEffect(() => {
+    if (error) {
+      setStatusMessage({
+        type: 'error',
+        message: error.message ?? 'We were unable to load your course workspace.'
+      });
+    }
+  }, [error]);
 
   if (!isLearner) {
     return (
@@ -13,6 +37,15 @@ export default function LearnerCourses() {
         variant="error"
         title="Learner Learnspace required"
         description="Switch to your learner dashboard to manage active programs and personalised course recommendations."
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <DashboardStateMessage
+        title="Loading learner courses"
+        description="We are pulling your programmes, cohorts, and personalised recommendations."
       />
     );
   }
@@ -28,8 +61,75 @@ export default function LearnerCourses() {
     );
   }
 
-  const active = data.active ?? [];
-  const recommendations = data.recommendations ?? [];
+  const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
+
+  const handleCreateGoal = useCallback(async () => {
+    if (!token) {
+      setStatusMessage({ type: 'error', message: 'Sign in again to create a new learning goal.' });
+      return;
+    }
+
+    const [primaryCourse] = activeCourses;
+    if (!primaryCourse) {
+      setStatusMessage({ type: 'error', message: 'Enroll in a course to create a learning goal.' });
+      return;
+    }
+
+    setPendingAction('goal');
+    setStatusMessage({ type: 'pending', message: 'Creating learning goal…' });
+    try {
+      const response = await createCourseGoal({
+        token,
+        courseId: primaryCourse.id ?? primaryCourse.slug ?? 'course',
+        payload: { target: 'Complete next module', dueDate: new Date().toISOString() }
+      });
+      setStatusMessage({
+        type: 'success',
+        message: response?.message ?? 'Learning goal created.'
+      });
+      setActiveCourses((current) =>
+        current.map((course) =>
+          course.id === primaryCourse.id
+            ? { ...course, goalStatus: 'In progress', goalReference: response?.data?.reference }
+            : course
+        )
+      );
+    } catch (goalError) {
+      setStatusMessage({
+        type: 'error',
+        message:
+          goalError instanceof Error ? goalError.message : 'We were unable to create your learning goal.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [activeCourses, token]);
+
+  const handleSyncCalendar = useCallback(async () => {
+    if (!token) {
+      setStatusMessage({ type: 'error', message: 'Sign in again to sync your course calendar.' });
+      return;
+    }
+
+    setPendingAction('calendar');
+    setStatusMessage({ type: 'pending', message: 'Preparing calendar sync…' });
+    try {
+      const response = await exportTutorSchedule({ token });
+      const url = response?.data?.meta?.downloadUrl ?? null;
+      setStatusMessage({
+        type: 'success',
+        message: url ? `Calendar export ready. Download from ${url}.` : 'Calendar sync prepared.'
+      });
+    } catch (calendarError) {
+      setStatusMessage({
+        type: 'error',
+        message:
+          calendarError instanceof Error ? calendarError.message : 'We were unable to prepare your calendar sync.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [token]);
 
   return (
     <div className="space-y-8">
@@ -41,10 +141,20 @@ export default function LearnerCourses() {
           </p>
         </div>
         <div className="flex gap-3">
-          <button type="button" className="dashboard-primary-pill">
+          <button
+            type="button"
+            className="dashboard-primary-pill"
+            onClick={handleCreateGoal}
+            disabled={disableActions}
+          >
             Add learning goal
           </button>
-          <button type="button" className="dashboard-pill">
+          <button
+            type="button"
+            className="dashboard-pill"
+            onClick={handleSyncCalendar}
+            disabled={disableActions}
+          >
             Sync calendar
           </button>
         </div>
@@ -53,7 +163,7 @@ export default function LearnerCourses() {
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Active programs</h2>
         <div className="mt-5 space-y-4">
-          {active.map((course) => (
+          {activeCourses.map((course) => (
             <button
               key={course.id}
               type="button"
@@ -66,6 +176,11 @@ export default function LearnerCourses() {
                     <p className="dashboard-kicker">{course.status}</p>
                     <p className="mt-1 text-lg font-semibold text-slate-900">{course.title}</p>
                     <p className="text-xs text-slate-600">With {course.instructor}</p>
+                    {course.goalStatus ? (
+                      <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                        Goal · {course.goalStatus}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="text-right text-sm text-slate-600">
                     <p>{course.progress}% complete</p>
@@ -112,6 +227,22 @@ export default function LearnerCourses() {
           ))}
         </div>
       </section>
+
+      {statusMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            statusMessage.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : statusMessage.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {statusMessage.message}
+        </div>
+      ) : null}
     </div>
   );
 }

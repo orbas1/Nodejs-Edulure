@@ -39,6 +39,14 @@ import DashboardNavigation from '../components/dashboard/DashboardNavigation.jsx
 import UserMenu from '../components/navigation/UserMenu.jsx';
 import ServiceHealthBanner from '../components/status/ServiceHealthBanner.jsx';
 import { useServiceHealth } from '../context/ServiceHealthContext.jsx';
+import {
+  generateCourseOutline,
+  importFromNotion,
+  syncFromLms,
+  routeTutorRequest,
+  sendMentorInvite,
+  exportPricing
+} from '../api/instructorOrchestrationApi.js';
 
 const navigationByRole = {
   learner: (basePath) => [
@@ -258,6 +266,7 @@ export default function DashboardLayout() {
   const { session, logout } = useAuth();
   const { activeRole, setActiveRole, roles, dashboards, searchIndex, loading, error, refresh } = useDashboard();
   const { alerts, manifest } = useServiceHealth();
+  const token = session?.tokens?.accessToken;
 
   const allowedRoles = useMemo(() => roles.map((r) => r.id), [roles]);
   const resolvedRole = useMemo(() => {
@@ -345,6 +354,29 @@ export default function DashboardLayout() {
     return builder ? builder(basePath) : [];
   }, [resolvedRole, basePath]);
 
+  const instructorOrchestration = useMemo(() => {
+    const unauthenticated = () =>
+      Promise.reject(new Error('Authentication required to perform this action.'));
+    if (!token) {
+      return {
+        generateCourseOutline: unauthenticated,
+        importFromNotion: unauthenticated,
+        syncFromLms: unauthenticated,
+        routeTutorRequest: unauthenticated,
+        inviteMentor: unauthenticated,
+        exportPricing: unauthenticated
+      };
+    }
+    return {
+      generateCourseOutline: (payload) => generateCourseOutline({ token, payload }),
+      importFromNotion: (payload) => importFromNotion({ token, payload }),
+      syncFromLms: (payload) => syncFromLms({ token, payload }),
+      routeTutorRequest: (payload) => routeTutorRequest({ token, payload }),
+      inviteMentor: (payload) => sendMentorInvite({ token, payload }),
+      exportPricing: (payload) => exportPricing({ token, payload })
+    };
+  }, [token]);
+
   const breadcrumbs = useMemo(() => {
     if (!resolvedRole) {
       return [];
@@ -418,7 +450,16 @@ export default function DashboardLayout() {
       />
     );
   } else {
-    mainContent = <Outlet context={{ role: resolvedRole, dashboard: currentDashboard, refresh }} />;
+    mainContent = (
+      <Outlet
+        context={{
+          role: resolvedRole,
+          dashboard: currentDashboard,
+          refresh,
+          instructorOrchestration
+        }}
+      />
+    );
   }
 
   return (

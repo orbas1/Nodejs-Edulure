@@ -6,7 +6,12 @@ import {
   fetchCommunityDetail,
   fetchCommunityFeed,
   fetchCommunityResources,
-  joinCommunity
+  joinCommunity,
+  leaveCommunity,
+  moderateCommunityPost,
+  removeCommunityPost,
+  fetchCommunitySponsorships,
+  updateCommunitySponsorships
 } from '../api/communityApi.js';
 import TopBar from '../components/TopBar.jsx';
 import SkewedMenu from '../components/SkewedMenu.jsx';
@@ -101,6 +106,59 @@ export default function Feed() {
   const searchQueryRef = useRef('');
   const [isJoiningCommunity, setIsJoiningCommunity] = useState(false);
   const [joinError, setJoinError] = useState(null);
+  const [isLeavingCommunity, setIsLeavingCommunity] = useState(false);
+  const [leaveError, setLeaveError] = useState(null);
+  const [postActions, setPostActions] = useState(() => ({}));
+  const [sponsorships, setSponsorships] = useState({ blockedPlacementIds: [] });
+  const [isLoadingSponsorships, setIsLoadingSponsorships] = useState(false);
+  const [sponsorshipError, setSponsorshipError] = useState(null);
+  const [isUpdatingSponsorship, setIsUpdatingSponsorship] = useState(false);
+
+  const updatePostActionState = useCallback((postId, updates) => {
+    setPostActions((prev) => {
+      if (updates === null) {
+        const nextState = { ...prev };
+        delete nextState[postId];
+        return nextState;
+      }
+      const current = prev[postId] ?? {};
+      return {
+        ...prev,
+        [postId]: { ...current, ...updates }
+      };
+    });
+  }, []);
+
+  const updateFeedPost = useCallback((postId, updater) => {
+    setFeedItems((prev) =>
+      prev
+        .map((entry) => {
+          if (entry?.kind === 'post' && entry.post?.id === postId) {
+            const nextPost = updater(entry.post);
+            if (!nextPost) {
+              return null;
+            }
+            return { ...entry, post: nextPost };
+          }
+          if (!entry?.kind && entry?.id === postId) {
+            const nextPost = updater(entry);
+            return nextPost || null;
+          }
+          return entry;
+        })
+        .filter(Boolean)
+    );
+  }, []);
+
+  const resolvePostCommunityId = useCallback(
+    (post) => {
+      if (selectedCommunity?.id && selectedCommunity.id !== 'all') {
+        return communityDetail?.id ?? selectedCommunity.id;
+      }
+      return post?.community?.id ?? communityDetail?.id ?? null;
+    },
+    [selectedCommunity?.id, communityDetail?.id]
+  );
 
   const menuState = useMemo(() => (selectedCommunity?.id === 'all' ? 'all' : 'community'), [selectedCommunity]);
 
@@ -122,6 +180,14 @@ export default function Feed() {
       setSearchValue('');
       setSearchQuery('');
       setJoinError(null);
+      setIsJoiningCommunity(false);
+      setIsLeavingCommunity(false);
+      setLeaveError(null);
+      setPostActions({});
+      setSponsorships({ blockedPlacementIds: [] });
+      setIsLoadingSponsorships(false);
+      setSponsorshipError(null);
+      setIsUpdatingSponsorship(false);
       return;
     }
 
@@ -171,6 +237,7 @@ export default function Feed() {
       setLoading(true);
       if (!append) {
         setFeedError(null);
+        setPostActions({});
       }
 
       try {
@@ -241,10 +308,12 @@ export default function Feed() {
         if (detailResult.status === 'fulfilled') {
           setCommunityDetail(detailResult.value.data);
           setCommunityDetailError(null);
+          setSponsorships(detailResult.value.data?.sponsorships ?? { blockedPlacementIds: [] });
         } else {
           const detailError = detailResult.reason;
           setCommunityDetail(null);
           setCommunityDetailError(detailError?.message ?? 'Unable to load community details');
+          setSponsorships({ blockedPlacementIds: [] });
         }
 
         if (resourcesResult.status === 'fulfilled') {
@@ -300,7 +369,42 @@ export default function Feed() {
   useEffect(() => {
     setJoinError(null);
     setIsJoiningCommunity(false);
+    setLeaveError(null);
+    setIsLeavingCommunity(false);
   }, [selectedCommunity?.id]);
+
+  useEffect(() => {
+    if (!token || !communityDetail?.id || !communityDetail?.permissions?.canManageSponsorships) {
+      setIsLoadingSponsorships(false);
+      setSponsorshipError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingSponsorships(true);
+    setSponsorshipError(null);
+
+    fetchCommunitySponsorships({ communityId: communityDetail.id, token })
+      .then((response) => {
+        if (cancelled) return;
+        setSponsorships(response.data ?? { blockedPlacementIds: [] });
+        setSponsorshipError(null);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setSponsorshipError(error.message ?? 'Unable to load sponsorship preferences');
+        setSponsorships((prev) => prev ?? { blockedPlacementIds: [] });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingSponsorships(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, communityDetail?.id, communityDetail?.permissions?.canManageSponsorships]);
 
   useEffect(() => {
     searchQueryRef.current = searchQuery;
@@ -352,6 +456,40 @@ export default function Feed() {
     }
   };
 
+  const handleLeaveCommunity = async () => {
+    if (!token || !communityDetail?.id) return;
+    if (!window.confirm('Are you sure you want to leave this community?')) {
+      return;
+    }
+    setLeaveError(null);
+    setIsLeavingCommunity(true);
+
+    try {
+      await leaveCommunity({ communityId: communityDetail.id, token });
+
+      setCommunityDetail(null);
+      setCommunities((prev) =>
+        prev.map((community) =>
+          String(community.id) === String(communityDetail.id)
+            ? { ...community, membership: null, permissions: community.permissions ? { ...community.permissions, canLeave: false } : community.permissions }
+            : community
+        )
+      );
+      setSelectedCommunity(ALL_COMMUNITIES_NODE);
+      setFeedItems([]);
+      setFeedMeta({ page: 1, perPage: 10, total: 0, pageCount: 0 });
+      setFeedAdsMeta(null);
+      setSponsorships({ blockedPlacementIds: [] });
+      setResources([]);
+      setResourcesMeta({ ...DEFAULT_RESOURCES_META });
+      setResourcesError(null);
+    } catch (error) {
+      setLeaveError(error?.message ?? 'Unable to leave this community right now.');
+    } finally {
+      setIsLeavingCommunity(false);
+    }
+  };
+
   const handlePostCreated = async () => {
     if (!canPostToCommunities) {
       return;
@@ -359,6 +497,89 @@ export default function Feed() {
     await loadFeed({ page: 1, append: false, queryOverride: searchQuery });
     if (selectedCommunity?.id && selectedCommunity.id !== 'all') {
       await loadCommunityDetail(selectedCommunity.id);
+    }
+  };
+
+  const handleModeratePost = async (post, action) => {
+    if (!token || !post?.id) return;
+    const communityId = resolvePostCommunityId(post);
+    if (!communityId) return;
+
+    if (action === 'suppress' && !window.confirm('Suppress this post from the feed?')) {
+      return;
+    }
+
+    updatePostActionState(post.id, { isProcessing: true, error: null });
+
+    try {
+      const response = await moderateCommunityPost({
+        communityId,
+        postId: post.id,
+        token,
+        action,
+        reason: undefined
+      });
+      const updatedPost = response?.data;
+      updateFeedPost(post.id, () => (updatedPost?.status === 'archived' ? null : updatedPost));
+      updatePostActionState(post.id, null);
+    } catch (error) {
+      updatePostActionState(post.id, { isProcessing: false, error: error?.message ?? 'Unable to update moderation state.' });
+    }
+  };
+
+  const handleRemovePost = async (post) => {
+    if (!token || !post?.id) return;
+    const communityId = resolvePostCommunityId(post);
+    if (!communityId) return;
+
+    if (!window.confirm('Remove this post from the community feed? This cannot be undone.')) {
+      return;
+    }
+
+    updatePostActionState(post.id, { isProcessing: true, error: null });
+
+    try {
+      await removeCommunityPost({ communityId, postId: post.id, token, reason: undefined });
+      updateFeedPost(post.id, () => null);
+      updatePostActionState(post.id, null);
+    } catch (error) {
+      updatePostActionState(post.id, { isProcessing: false, error: error?.message ?? 'Unable to remove this post.' });
+    }
+  };
+
+  const handleDismissPlacement = async (placement) => {
+    if (!token || !communityDetail?.id) return;
+    const placementId = placement?.placementId ?? placement?.id;
+    if (!placementId) return;
+
+    setSponsorshipError(null);
+    setIsUpdatingSponsorship(true);
+
+    try {
+      const nextBlocked = Array.from(new Set([...(sponsorships?.blockedPlacementIds ?? []), placementId]));
+      const response = await updateCommunitySponsorships({
+        communityId: communityDetail.id,
+        token,
+        blockedPlacementIds: nextBlocked
+      });
+      const saved = response?.data ?? { blockedPlacementIds: nextBlocked };
+      setSponsorships(saved);
+      setFeedItems((prev) =>
+        prev.filter((entry) => !(entry?.kind === 'ad' && entry.ad?.placementId === placementId))
+      );
+      setFeedAdsMeta((prev) => {
+        if (!prev) return prev;
+        const remainingPlacements = (prev.placements ?? []).filter((item) => item.placementId !== placementId);
+        return {
+          ...prev,
+          count: remainingPlacements.length,
+          placements: remainingPlacements
+        };
+      });
+    } catch (error) {
+      setSponsorshipError(error?.message ?? 'Unable to update sponsorship preferences.');
+    } finally {
+      setIsUpdatingSponsorship(false);
     }
   };
 
@@ -472,6 +693,10 @@ export default function Feed() {
             joinError={joinError}
             canJoin={canJoinCommunities}
             joinDisabledReason={joinDisabledReason}
+            onLeave={communityDetail?.permissions?.canLeave ? handleLeaveCommunity : null}
+            isLeaving={isLeavingCommunity}
+            leaveError={leaveError}
+            canLeave={communityDetail?.permissions?.canLeave}
           />
         )}
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
@@ -504,15 +729,42 @@ export default function Feed() {
                       {feedAdsMeta.count === 1 ? 'campaign' : 'campaigns'} matched for your feed.
                     </div>
                   )}
+                  {sponsorshipError && (
+                    <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600" role="alert">
+                      {sponsorshipError}
+                    </div>
+                  )}
                   {feedItems.map((item) => {
                     if (item?.kind === 'ad' && item.ad) {
-                      return <FeedSponsoredCard key={`ad-${item.ad.placementId}`} ad={item.ad} />;
+                      return (
+                        <FeedSponsoredCard
+                          key={`ad-${item.ad.placementId}`}
+                          ad={item.ad}
+                          canManage={Boolean(
+                            selectedCommunity?.id !== 'all' && communityDetail?.permissions?.canManageSponsorships
+                          )}
+                          onDismiss={
+                            selectedCommunity?.id !== 'all' && communityDetail?.permissions?.canManageSponsorships
+                              ? () => handleDismissPlacement(item.ad)
+                              : undefined
+                          }
+                          isProcessing={isUpdatingSponsorship || isLoadingSponsorships}
+                        />
+                      );
                     }
                     const post = item?.kind === 'post' ? item.post : item;
                     if (!post) {
                       return null;
                     }
-                    return <FeedCard key={`post-${post.id}`} post={post} />;
+                    return (
+                      <FeedCard
+                        key={`post-${post.id}`}
+                        post={post}
+                        onModerate={handleModeratePost}
+                        onRemove={handleRemovePost}
+                        actionState={postActions[post.id]}
+                      />
+                    );
                   })}
                   {feedItems.length === 0 && (
                     <div className="space-y-4">

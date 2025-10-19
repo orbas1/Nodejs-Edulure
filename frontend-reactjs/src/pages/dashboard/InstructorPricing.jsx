@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import PricingHeader from './instructor/pricing/PricingHeader.jsx';
 import PricingSummaryMetrics from './instructor/pricing/PricingSummaryMetrics.jsx';
 import PricingRevenueMix from './instructor/pricing/PricingRevenueMix.jsx';
@@ -55,7 +56,9 @@ export default function InstructorPricing({
   onEditSessions,
   onRefreshRevenue
 }) {
-  const { dashboard, refresh } = useOutletContext();
+  const { dashboard, refresh, instructorOrchestration } = useOutletContext();
+  const [pendingExport, setPendingExport] = useState(false);
+  const [feedback, setFeedback] = useState(null);
   const pricing = dashboard?.pricing;
   const revenueStreams = dashboard?.analytics?.revenueStreams ?? [];
 
@@ -138,11 +141,43 @@ export default function InstructorPricing({
     }
   ];
 
+  const defaultExportFinanceReport = useCallback(async () => {
+    if (!instructorOrchestration?.exportPricing) {
+      return;
+    }
+    setPendingExport(true);
+    setFeedback(null);
+    try {
+      const payload = {
+        format: 'csv',
+        revenueStreams: revenueStreams.length
+      };
+      const result = await instructorOrchestration.exportPricing(payload);
+      setFeedback({
+        tone: 'success',
+        message: 'Pricing export scheduled.',
+        detail: result?.summary ?? 'Download links will appear once the export is ready.'
+      });
+      await refresh?.();
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error.message ?? 'Unable to export pricing data.'
+      });
+    } finally {
+      setPendingExport(false);
+    }
+  }, [instructorOrchestration, refresh, revenueStreams.length]);
+
+  const handleExportFinanceReport = onExportFinanceReport ?? defaultExportFinanceReport;
+
   return (
     <div className="space-y-8">
+      <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
       <PricingHeader
-        onExportFinanceReport={onExportFinanceReport}
+        onExportFinanceReport={handleExportFinanceReport}
         onConfigureRules={onConfigureRules}
+        isExporting={pendingExport}
       />
       <PricingSummaryMetrics metrics={summaryMetrics} />
       <PricingRevenueMix streams={revenueStreams} onRefresh={onRefreshRevenue} />

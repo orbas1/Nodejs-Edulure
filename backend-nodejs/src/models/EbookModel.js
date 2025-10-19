@@ -179,6 +179,14 @@ export default class EbookModel {
     return rows.map((row) => this.deserialize(row));
   }
 
+  static async listByAssetIds(assetIds, connection = db) {
+    if (!assetIds?.length) {
+      return [];
+    }
+    const rows = await connection(TABLE).select(BASE_COLUMNS).whereIn('asset_id', assetIds);
+    return rows.map((row) => this.deserialize(row));
+  }
+
   static async listByPublicIds(publicIds, connection = db) {
     if (!publicIds?.length) {
       return [];

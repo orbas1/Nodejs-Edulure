@@ -4,6 +4,10 @@ import { Link } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { createEbookPurchaseIntent, listMarketplaceEbooks } from '../../api/ebookApi.js';
+import {
+  resumeEbook,
+  shareEbookHighlight
+} from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 
@@ -85,7 +89,7 @@ MarketplaceCard.defaultProps = {
 };
 
 export default function LearnerEbooks() {
-  const { isLearner, section: ebooks, refresh } = useLearnerDashboardSection('ebooks');
+  const { isLearner, section: ebooks, refresh, loading, error } = useLearnerDashboardSection('ebooks');
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
 
@@ -95,6 +99,8 @@ export default function LearnerEbooks() {
   const [marketplaceError, setMarketplaceError] = useState(null);
   const [purchaseStatus, setPurchaseStatus] = useState(null);
   const [pendingPurchaseId, setPendingPurchaseId] = useState(null);
+  const [libraryStatus, setLibraryStatus] = useState(null);
+  const [pendingLibraryId, setPendingLibraryId] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -118,6 +124,12 @@ export default function LearnerEbooks() {
       });
     return () => controller.abort();
   }, []);
+
+  useEffect(() => {
+    if (error) {
+      setLibraryStatus({ type: 'error', message: error.message ?? 'Unable to load your library.' });
+    }
+  }, [error]);
 
   const library = ebooks?.library ?? [];
   const recommendations = useMemo(() => (ebooks?.recommendations ?? []).slice(0, 3), [ebooks?.recommendations]);
@@ -177,6 +189,15 @@ export default function LearnerEbooks() {
     );
   }
 
+  if (loading) {
+    return (
+      <DashboardStateMessage
+        title="Loading learner library"
+        description="We are pulling your saved e-books and recommendations."
+      />
+    );
+  }
+
   if (!ebooks) {
     return (
       <DashboardStateMessage
@@ -221,6 +242,20 @@ export default function LearnerEbooks() {
 
       {activeTab === 'library' ? (
         <section className="space-y-6">
+          {libraryStatus ? (
+            <div
+              className={`rounded-3xl border px-5 py-4 text-sm ${
+                libraryStatus.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : libraryStatus.type === 'error'
+                    ? 'border-rose-200 bg-rose-50 text-rose-700'
+                    : 'border-primary/20 bg-primary/5 text-primary'
+              }`}
+            >
+              {libraryStatus.message}
+            </div>
+          ) : null}
+
           <div className="grid gap-4 md:grid-cols-3">
             {library.length > 0 ? (
               library.map((ebook) => (
@@ -236,11 +271,79 @@ export default function LearnerEbooks() {
                   </div>
                   <p className="mt-3 text-xs text-slate-500">{ebook.progress}% complete</p>
                   <div className="mt-4 flex items-center gap-3 text-xs text-slate-600">
-                    <button type="button" className="dashboard-pill px-3 py-1">
-                      Continue reading
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={async () => {
+                        if (!token) {
+                          setLibraryStatus({
+                            type: 'error',
+                            message: 'Sign in again to resume your reading session.'
+                          });
+                          return;
+                        }
+                        setPendingLibraryId(ebook.id);
+                        setLibraryStatus({ type: 'pending', message: `Reopening ${ebook.title}…` });
+                        try {
+                          const response = await resumeEbook({ token, ebookId: ebook.id });
+                          setLibraryStatus({
+                            type: 'success',
+                            message: response?.message ?? `${ebook.title} is ready to continue.`
+                          });
+                        } catch (resumeError) {
+                          setLibraryStatus({
+                            type: 'error',
+                            message:
+                              resumeError instanceof Error
+                                ? resumeError.message
+                                : 'We were unable to resume your e-book.'
+                          });
+                        } finally {
+                          setPendingLibraryId(null);
+                        }
+                      }}
+                      disabled={pendingLibraryId === ebook.id}
+                    >
+                      {pendingLibraryId === ebook.id ? 'Resuming…' : 'Continue reading'}
                     </button>
-                    <button type="button" className="dashboard-pill px-3 py-1">
-                      Share highlight
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={async () => {
+                        if (!token) {
+                          setLibraryStatus({
+                            type: 'error',
+                            message: 'Sign in again to share highlights.'
+                          });
+                          return;
+                        }
+                        setPendingLibraryId(ebook.id);
+                        setLibraryStatus({ type: 'pending', message: `Sharing highlights from ${ebook.title}…` });
+                        try {
+                          const response = await shareEbookHighlight({
+                            token,
+                            ebookId: ebook.id,
+                            payload: { action: 'share', recipients: [] }
+                          });
+                          setLibraryStatus({
+                            type: 'success',
+                            message: response?.message ?? `${ebook.title} highlight shared.`
+                          });
+                        } catch (shareError) {
+                          setLibraryStatus({
+                            type: 'error',
+                            message:
+                              shareError instanceof Error
+                                ? shareError.message
+                                : 'We were unable to share your highlight.'
+                          });
+                        } finally {
+                          setPendingLibraryId(null);
+                        }
+                      }}
+                      disabled={pendingLibraryId === ebook.id}
+                    >
+                      {pendingLibraryId === ebook.id ? 'Sharing…' : 'Share highlight'}
                     </button>
                   </div>
                 </div>

@@ -1,8 +1,26 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
+import { downloadInvoice, updateBillingPreferences } from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function LearnerFinancial() {
-  const { isLearner, section: financial, refresh } = useLearnerDashboardSection('financial');
+  const { isLearner, section: financial, refresh, loading, error } = useLearnerDashboardSection('financial');
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+
+  useEffect(() => {
+    if (error) {
+      setStatusMessage({
+        type: 'error',
+        message: error.message ?? 'We were unable to load billing insights.'
+      });
+    }
+  }, [error]);
 
   if (!isLearner) {
     return (
@@ -10,6 +28,15 @@ export default function LearnerFinancial() {
         variant="error"
         title="Learner Learnspace required"
         description="Switch to the learner dashboard to access tuition insights and invoice history."
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <DashboardStateMessage
+        title="Loading billing overview"
+        description="We are synchronising invoices, scholarships, and mentorship credits."
       />
     );
   }
@@ -27,6 +54,95 @@ export default function LearnerFinancial() {
 
   const summary = financial.summary ?? [];
   const invoices = financial.invoices ?? [];
+  const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
+
+  const handleDownloadStatement = useCallback(async () => {
+    if (!token) {
+      setStatusMessage({ type: 'error', message: 'Sign in again to download your statement.' });
+      return;
+    }
+    const [latest] = invoices;
+    if (!latest) {
+      setStatusMessage({ type: 'error', message: 'No invoices available to download yet.' });
+      return;
+    }
+
+    setPendingAction('statement');
+    setStatusMessage({ type: 'pending', message: 'Preparing your latest invoice download…' });
+    try {
+      const response = await downloadInvoice({ token, invoiceId: latest.id });
+      const url = response?.data?.meta?.downloadUrl ?? null;
+      setStatusMessage({
+        type: 'success',
+        message: url ? `Statement download ready at ${url}.` : response?.message ?? 'Statement download prepared.'
+      });
+    } catch (downloadError) {
+      setStatusMessage({
+        type: 'error',
+        message:
+          downloadError instanceof Error ? downloadError.message : 'We were unable to prepare your statement download.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [invoices, token]);
+
+  const handleUpdateBilling = useCallback(async () => {
+    if (!token) {
+      setStatusMessage({ type: 'error', message: 'Sign in again to update billing preferences.' });
+      return;
+    }
+
+    setPendingAction('billing');
+    setStatusMessage({ type: 'pending', message: 'Saving billing preferences…' });
+    try {
+      const response = await updateBillingPreferences({
+        token,
+        payload: { autoRenew: true, paymentMethod: 'primary-card' }
+      });
+      setStatusMessage({
+        type: 'success',
+        message: response?.message ?? 'Billing preferences updated.'
+      });
+    } catch (updateError) {
+      setStatusMessage({
+        type: 'error',
+        message:
+          updateError instanceof Error ? updateError.message : 'We were unable to update your billing preferences.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [token]);
+
+  const handleInvoiceDownload = useCallback(
+    async (invoice) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to download invoices.' });
+        return;
+      }
+
+      setPendingAction(invoice.id);
+      setStatusMessage({ type: 'pending', message: `Preparing download for ${invoice.label}…` });
+      try {
+        const response = await downloadInvoice({ token, invoiceId: invoice.id });
+        const url = response?.data?.meta?.downloadUrl ?? null;
+        setStatusMessage({
+          type: 'success',
+          message: url ? `Invoice ready at ${url}.` : response?.message ?? 'Invoice download prepared.'
+        });
+      } catch (downloadError) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            downloadError instanceof Error ? downloadError.message : 'We were unable to download this invoice.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [token]
+  );
 
   return (
     <div className="space-y-8">
@@ -35,7 +151,12 @@ export default function LearnerFinancial() {
           <h1 className="dashboard-title">Financial overview</h1>
           <p className="dashboard-subtitle">Track course investments, mentorship credits, and scholarships.</p>
         </div>
-        <button type="button" className="dashboard-primary-pill">
+        <button
+          type="button"
+          className="dashboard-primary-pill"
+          onClick={handleDownloadStatement}
+          disabled={disableActions}
+        >
           Download statement
         </button>
       </div>
@@ -56,7 +177,12 @@ export default function LearnerFinancial() {
             <h2 className="text-lg font-semibold text-slate-900">Invoices & renewals</h2>
             <p className="text-sm text-slate-600">Manage receipts, payment statuses, and auto-renew preferences.</p>
           </div>
-          <button type="button" className="dashboard-pill">
+          <button
+            type="button"
+            className="dashboard-pill"
+            onClick={handleUpdateBilling}
+            disabled={disableActions}
+          >
             Update billing
           </button>
         </div>
@@ -68,6 +194,7 @@ export default function LearnerFinancial() {
                 <th className="px-4 py-3">Amount</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -77,12 +204,38 @@ export default function LearnerFinancial() {
                   <td className="px-4 py-3 text-slate-600">{invoice.amount}</td>
                   <td className="px-4 py-3 text-slate-600">{invoice.status}</td>
                   <td className="px-4 py-3 text-slate-600">{invoice.date}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handleInvoiceDownload(invoice)}
+                      disabled={disableActions && pendingAction !== invoice.id}
+                    >
+                      {pendingAction === invoice.id ? 'Preparing…' : 'Download'}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      {statusMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            statusMessage.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : statusMessage.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {statusMessage.message}
+        </div>
+      ) : null}
     </div>
   );
 }
