@@ -1252,6 +1252,80 @@ export async function seed(knex) {
       })
     });
 
+    const [catalogItemId] = await trx('monetization_catalog_items').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      product_code: 'growth-insiders-annual',
+      name: 'Growth Insiders Annual',
+      description: 'Annual enablement subscription covering growth analytics workshops and concierge support.',
+      pricing_model: 'flat_fee',
+      billing_interval: 'annual',
+      revenue_recognition_method: 'deferred',
+      recognition_duration_days: 365,
+      unit_amount_cents: 189900,
+      currency: 'USD',
+      usage_metric: 'seats',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      metadata: JSON.stringify({ seed: true, owner: 'finance-ops' }),
+      status: 'active',
+      effective_from: trx.fn.now()
+    });
+
+    const [usageRecordId] = await trx('monetization_usage_records').insert({
+      public_id: crypto.randomUUID(),
+      tenant_id: 'global',
+      catalog_item_id: catalogItemId,
+      product_code: 'growth-insiders-annual',
+      account_reference: 'ops-guild',
+      user_id: learnerId,
+      usage_date: subscriptionTimestamp,
+      quantity: 1,
+      unit_amount_cents: 189900,
+      amount_cents: 189900,
+      currency: 'USD',
+      source: 'seed-data',
+      external_reference: `seed-usage-${subscriptionPublicId}`,
+      payment_intent_id: subscriptionPaymentId,
+      metadata: JSON.stringify({ cohort: 'alpha', recordedBy: 'seed-script' }),
+      recorded_at: subscriptionTimestamp,
+      processed_at: subscriptionTimestamp
+    });
+
+    const [scheduleId] = await trx('monetization_revenue_schedules').insert({
+      tenant_id: 'global',
+      payment_intent_id: subscriptionPaymentId,
+      catalog_item_id: catalogItemId,
+      usage_record_id: usageRecordId,
+      product_code: 'growth-insiders-annual',
+      status: 'pending',
+      recognition_method: 'deferred',
+      recognition_start: subscriptionTimestamp,
+      recognition_end: nextYear,
+      amount_cents: 205092,
+      recognized_amount_cents: 0,
+      currency: 'USD',
+      revenue_account: '4000-education-services',
+      deferred_revenue_account: '2050-deferred-revenue',
+      metadata: JSON.stringify({ source: 'seed-data', schedule: 'annual' }),
+      created_at: subscriptionTimestamp
+    });
+
+    await trx('monetization_reconciliation_runs').insert({
+      tenant_id: 'global',
+      window_start: subscriptionTimestamp,
+      window_end: nextYear,
+      status: 'completed',
+      invoiced_cents: 205092,
+      usage_cents: 189900,
+      recognized_cents: 0,
+      deferred_cents: 205092,
+      variance_cents: -189900,
+      variance_ratio: 0,
+      metadata: JSON.stringify({ seed: true, scheduleId, usageRecordId }),
+      created_at: subscriptionTimestamp
+    });
+
     const subscriptionTimestamp = new Date();
     const nextYear = new Date(subscriptionTimestamp.getTime());
     nextYear.setFullYear(nextYear.getFullYear() + 1);

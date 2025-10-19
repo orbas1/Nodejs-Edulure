@@ -761,6 +761,18 @@ const envSchema = z
     PAYMENTS_MINIMUM_TAX_RATE: z.coerce.number().min(0).max(1).default(0),
     PAYMENTS_MAX_COUPON_PERCENTAGE: z.coerce.number().min(0).max(100).default(80),
     PAYMENTS_REPORTING_TIMEZONE: z.string().default('Etc/UTC'),
+    MONETIZATION_RECONCILIATION_ENABLED: z.coerce.boolean().default(true),
+    MONETIZATION_RECONCILIATION_CRON: z.string().default('5 * * * *'),
+    MONETIZATION_RECONCILIATION_TIMEZONE: z.string().default('Etc/UTC'),
+    MONETIZATION_RECONCILIATION_RUN_ON_STARTUP: z.coerce.boolean().default(true),
+    MONETIZATION_RECOGNITION_WINDOW_DAYS: z.coerce.number().int().min(1).max(120).default(30),
+    MONETIZATION_RECONCILIATION_TENANTS: z.string().optional(),
+    MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 60)
+      .default(30),
     SMTP_HOST: z.string().min(1),
     SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(587),
     SMTP_SECURE: z.coerce.boolean().default(false),
@@ -1119,6 +1131,13 @@ const telemetryExportPrefix = normalizePrefix(raw.TELEMETRY_EXPORT_PREFIX, 'ware
 const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRESH_SECRET;
 const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
 const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
+const monetizationTenantAllowlist = Array.from(
+  new Set(
+    parseCsv(raw.MONETIZATION_RECONCILIATION_TENANTS ?? '')
+      .map((tenant) => tenant.trim().toLowerCase())
+      .filter(Boolean)
+  )
+);
 
 const environmentRequiredTags = parseCsv(raw.ENVIRONMENT_REQUIRED_TAGS ?? 'environment,project');
 const environmentDependencies = parseCsv(raw.ENVIRONMENT_DEPENDENCIES ?? 'database,redis');
@@ -1337,6 +1356,17 @@ export const env = {
       maxBackoffSeconds: raw.WEBHOOK_BUS_MAX_BACKOFF_SECONDS,
       deliveryTimeoutMs: raw.WEBHOOK_BUS_DELIVERY_TIMEOUT_MS,
       recoverAfterMs: raw.WEBHOOK_BUS_RECOVER_AFTER_MS
+    }
+  },
+  monetization: {
+    reconciliation: {
+      enabled: raw.MONETIZATION_RECONCILIATION_ENABLED,
+      cronExpression: raw.MONETIZATION_RECONCILIATION_CRON,
+      timezone: raw.MONETIZATION_RECONCILIATION_TIMEZONE,
+      runOnStartup: raw.MONETIZATION_RECONCILIATION_RUN_ON_STARTUP,
+      recognitionWindowDays: raw.MONETIZATION_RECOGNITION_WINDOW_DAYS,
+      tenants: monetizationTenantAllowlist,
+      tenantCacheMinutes: raw.MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES
     }
   },
   domainEvents: {

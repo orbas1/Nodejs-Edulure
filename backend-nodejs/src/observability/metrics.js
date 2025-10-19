@@ -145,6 +145,36 @@ const paymentsRefundCentsTotal = new promClient.Counter({
   labelNames: ['provider', 'currency']
 });
 
+const monetizationCatalogGauge = new promClient.Gauge({
+  name: 'edulure_monetization_catalog_items',
+  help: 'Number of monetization catalog items grouped by status',
+  labelNames: ['status']
+});
+
+const monetizationDeferredRevenueGauge = new promClient.Gauge({
+  name: 'edulure_monetization_deferred_revenue_cents',
+  help: 'Deferred revenue balance in cents grouped by tenant',
+  labelNames: ['tenant_id']
+});
+
+const monetizationUsageRecordedTotal = new promClient.Counter({
+  name: 'edulure_monetization_usage_recorded_total',
+  help: 'Count of monetization usage records captured grouped by product code, source, and currency',
+  labelNames: ['product_code', 'source', 'currency']
+});
+
+const monetizationUsageCentsTotal = new promClient.Counter({
+  name: 'edulure_monetization_usage_cents_total',
+  help: 'Total monetization usage amount recorded (in cents) grouped by product code and currency',
+  labelNames: ['product_code', 'currency']
+});
+
+const monetizationRevenueRecognizedCentsTotal = new promClient.Counter({
+  name: 'edulure_monetization_revenue_recognized_cents_total',
+  help: 'Recognized revenue amounts (in cents) grouped by product code, currency, and recognition method',
+  labelNames: ['product_code', 'currency', 'method']
+});
+
 const searchOperationDurationSeconds = new promClient.Histogram({
   name: 'edulure_search_operation_duration_seconds',
   help: 'Duration histogram for Meilisearch administrative operations',
@@ -237,6 +267,11 @@ registry.registerMetric(paymentsProcessedTotal);
 registry.registerMetric(paymentsRevenueCentsTotal);
 registry.registerMetric(paymentsTaxCentsTotal);
 registry.registerMetric(paymentsRefundCentsTotal);
+registry.registerMetric(monetizationCatalogGauge);
+registry.registerMetric(monetizationDeferredRevenueGauge);
+registry.registerMetric(monetizationUsageRecordedTotal);
+registry.registerMetric(monetizationUsageCentsTotal);
+registry.registerMetric(monetizationRevenueRecognizedCentsTotal);
 registry.registerMetric(telemetryIngestionEventsTotal);
 registry.registerMetric(telemetryExportEventsTotal);
 registry.registerMetric(telemetryExportDurationSeconds);
@@ -573,6 +608,61 @@ export function trackPaymentRefundMetrics({ provider, currency, amount }) {
     },
     amount
   );
+}
+
+export function updateMonetizationCatalogMetrics(counts = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const statuses = ['draft', 'active', 'retired'];
+  statuses.forEach((status) => {
+    const value = Number(counts[status] ?? 0);
+    monetizationCatalogGauge.set({ status }, value);
+  });
+}
+
+export function recordMonetizationUsage({ productCode, source, currency, amountCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const product = productCode ? String(productCode) : 'unclassified';
+  const origin = source ? String(source) : 'unknown';
+  const normalizedCurrency = (currency ?? env.payments.defaultCurrency).toUpperCase();
+
+  monetizationUsageRecordedTotal.inc({ product_code: product, source: origin, currency: normalizedCurrency }, 1);
+  if (Number.isFinite(amountCents) && amountCents > 0) {
+    monetizationUsageCentsTotal.inc({ product_code: product, currency: normalizedCurrency }, amountCents);
+  }
+}
+
+export function recordRevenueRecognition({ productCode, currency, method, amountCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  if (!Number.isFinite(amountCents) || amountCents <= 0) {
+    return;
+  }
+
+  const product = productCode ? String(productCode) : 'unclassified';
+  const recognitionMethod = method ? String(method) : 'immediate';
+  const normalizedCurrency = (currency ?? env.payments.defaultCurrency).toUpperCase();
+
+  monetizationRevenueRecognizedCentsTotal.inc(
+    { product_code: product, currency: normalizedCurrency, method: recognitionMethod },
+    amountCents
+  );
+}
+
+export function updateDeferredRevenueBalance({ tenantId = 'global', balanceCents = 0 } = {}) {
+  if (!env.observability.metrics.enabled) {
+    return;
+  }
+
+  const normalizedTenant = tenantId ? String(tenantId) : 'global';
+  monetizationDeferredRevenueGauge.set({ tenant_id: normalizedTenant }, Math.max(balanceCents, 0));
 }
 
 export function recordTelemetryIngestion({ scope, source, status }) {

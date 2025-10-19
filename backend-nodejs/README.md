@@ -97,6 +97,14 @@ Operational endpoints:
 
 Exports stream to Cloudflare R2 (or the configured destination) using the background worker. The telemetry warehouse job is registered in `src/jobs/telemetryWarehouseJob.js` and honours the configured cron as well as manual triggers. Freshness checkpoints feed Prometheus metrics (`edulure_telemetry_ingestion_events_total`, `edulure_telemetry_export_lag_seconds`) so alerting can detect stale pipelines.
 
+### Monetisation reconciliation
+
+The worker now also schedules `MonetizationReconciliationJob` (`src/jobs/monetizationReconciliationJob.js`). The job recognises deferred revenue, reconciles captured payments with usage metering, and persists GAAP-friendly summaries. Configuration lives under the new `MONETIZATION_*` environment variables in `.env.example`; by default the job runs every five minutes, emits Prometheus metrics (`edulure_monetization_usage_recorded_total`, `edulure_monetization_revenue_recognized_cents_total`, `edulure_monetization_deferred_revenue_cents`), and produces detailed rows in `monetization_reconciliation_runs` for finance review.
+
+#### Multi-tenant scheduling
+
+Set `MONETIZATION_RECONCILIATION_TENANTS` to a comma-separated allow list when only certain tenants should be reconciled. When the allow list is omitted the job auto-discovers tenants across catalog, usage, schedule, and reconciliation tables; the discovered list is cached for `MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES` (default 30) to avoid excessive polling but refreshes automatically when the cache expires.
+
 ### Explorer search environment
 
 The explorer, recommendation, and ads surfaces rely on a hardened Meilisearch cluster. Configure the following variables to

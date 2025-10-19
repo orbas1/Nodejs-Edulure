@@ -5,3 +5,5 @@
 - Added `TelemetryController` with authenticated endpoints for event ingestion, consent registration, freshness inspection, and manual export triggers powering the telemetry pipeline. 【F:backend-nodejs/src/controllers/TelemetryController.js†L1-L115】
 - Added `BusinessIntelligenceController` to expose the `/analytics/bi/executive-overview` endpoint with tenant-aware range parsi
 ng and `StandardResponse` envelopes. 【F:backend-nodejs/src/controllers/BusinessIntelligenceController.js†L1-L26】
+
+- Wrapped `AdminMonetizationController` responses in the standard `{ success, message, data, meta }` envelope and enriched pagination metadata so operator tooling consumes consistent contracts across catalog, usage, schedules, and reconciliation APIs.

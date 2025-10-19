@@ -11,3 +11,5 @@
 - Updated `.env.example` and the Vitest `test/setupEnv.js` harness with the telemetry pipeline variables (`TELEMETRY_*`) so operat
 ions can configure ingestion/exports consistently across environments and tests inherit safe defaults. 【F:backend-nodejs/.env.ex
 ample†L101-L121】【F:backend-nodejs/test/setupEnv.js†L155-L194】
+
+- Added `MONETIZATION_RECONCILIATION_TENANTS` and `MONETIZATION_RECONCILIATION_TENANT_CACHE_MINUTES` to control allow-listed tenants and cache refresh cadence for the monetisation reconciliation job.

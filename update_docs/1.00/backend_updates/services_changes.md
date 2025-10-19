@@ -23,3 +23,5 @@
 - Introduced `BusinessIntelligenceService` to aggregate reporting views, compute KPI deltas, surface experiment metadata, and en
 rich executive dashboards with telemetry freshness and currency breakdowns. 【F:backend-nodejs/src/services/BusinessIntelligence
 Service.js†L1-L265】
+
+- Updated `MonetizationFinanceService` with client-aware metadata scoping, reusable revenue schedule hydration, tenant discovery helpers, and aggregation utilities so reconciliation runs operate consistently across MySQL, PostgreSQL, and SQLite targets while surfacing tenant-specific metrics. The service now delegates tenant metadata filtering to the shared `tenantMetadataScope` helper to guarantee consistent SQL fragments across dialects. 【F:backend-nodejs/src/services/MonetizationFinanceService.js†L1-L653】【F:backend-nodejs/src/database/utils/tenantMetadataScope.js†L1-L48】

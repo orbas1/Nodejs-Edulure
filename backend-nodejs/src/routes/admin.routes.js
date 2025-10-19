@@ -4,12 +4,19 @@ import AdminBlogController from '../controllers/AdminBlogController.js';
 import AdminFeatureFlagController from '../controllers/AdminFeatureFlagController.js';
 import AdminIntegrationsController from '../controllers/AdminIntegrationsController.js';
 import AdminSettingsController from '../controllers/AdminSettingsController.js';
+import AdminMonetizationController from '../controllers/AdminMonetizationController.js';
 import auth from '../middleware/auth.js';
 
 const router = Router();
 
 router.get('/monetization/settings', auth('admin'), AdminSettingsController.getMonetizationSettings);
 router.put('/monetization/settings', auth('admin'), AdminSettingsController.updateMonetizationSettings);
+router.get('/monetization/catalog', auth('admin'), AdminMonetizationController.listCatalogItems);
+router.post('/monetization/catalog', auth('admin'), AdminMonetizationController.upsertCatalogItem);
+router.post('/monetization/usage', auth('admin'), AdminMonetizationController.recordUsage);
+router.get('/monetization/revenue-schedules', auth('admin'), AdminMonetizationController.listRevenueSchedules);
+router.post('/monetization/reconciliations/run', auth('admin'), AdminMonetizationController.triggerReconciliation);
+router.get('/monetization/reconciliations', auth('admin'), AdminMonetizationController.listReconciliationRuns);
 
 router.get('/blog/posts', auth('admin'), AdminBlogController.list);
 router.post('/blog/posts', auth('admin'), AdminBlogController.create);

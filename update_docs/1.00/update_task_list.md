@@ -98,7 +98,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
 5. **Security, compliance, and risk operations** – 100%
    Centralised the risk register, audit evidence lifecycle, continuity drills, and assessment scheduling with automated logging, analytics, and evidence capture to support compliance reviews.
 
-## Task 5 (40%): Deliver analytics, monetisation, documentation, and stakeholder enablement
+## Task 5 (60%): Deliver analytics, monetisation, documentation, and stakeholder enablement
 
 #### Integration coverage
 - **Backend**: Emit structured telemetry, monetisation events, and contract metadata for downstream analytics.
@@ -115,7 +115,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
    Deploy ingestion pipelines, consent-aware schemas, dbt models, freshness monitoring, and lineage tracking.
 2. **BI and insight delivery** – 100%
    Rebuild dashboards, scorecards, experimentation tooling, and governance reviews for analytics accuracy.
-3. **Monetisation and finance reconciliation** – 0%  
+3. **Monetisation and finance reconciliation** – 70%
    Complete payment/payout integrations, pricing catalogues, usage metering, and GAAP-compliant reporting pipelines.
 4. **Documentation and enablement refresh** – 0%  
    Rewrite onboarding guides, API docs, support playbooks, training curricula, marketing collateral, and capability matrices.

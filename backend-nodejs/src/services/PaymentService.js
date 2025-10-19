@@ -17,6 +17,7 @@ import PlatformSettingsService from './PlatformSettingsService.js';
 import EscrowService from './EscrowService.js';
 import webhookEventBusService from './WebhookEventBusService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
+import MonetizationFinanceService from './MonetizationFinanceService.js';
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
 
 function centsToCurrencyString(amount) {
@@ -805,6 +806,7 @@ class PaymentService {
       });
 
       await handleCommunityPaymentSucceeded(updatedIntent, trx);
+      await MonetizationFinanceService.handlePaymentCaptured(updatedIntent, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.succeeded',
@@ -976,6 +978,7 @@ class PaymentService {
       });
 
       await handleCommunityPaymentSucceeded(updated, trx);
+      await MonetizationFinanceService.handlePaymentCaptured(updated, trx);
 
       await webhookEventBusService.publish(
         'payments.intent.succeeded',

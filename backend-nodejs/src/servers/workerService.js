@@ -10,6 +10,7 @@ import dataRetentionJob from '../jobs/dataRetentionJob.js';
 import communityReminderJob from '../jobs/communityReminderJob.js';
 import dataPartitionJob from '../jobs/dataPartitionJob.js';
 import telemetryWarehouseJob from '../jobs/telemetryWarehouseJob.js';
+import monetizationReconciliationJob from '../jobs/monetizationReconciliationJob.js';
 import integrationOrchestratorService from '../services/IntegrationOrchestratorService.js';
 import webhookEventBusService from '../services/WebhookEventBusService.js';
 import domainEventDispatcherService from '../services/DomainEventDispatcherService.js';
@@ -28,6 +29,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'data-partitioning',
     'integration-orchestrator',
     'telemetry-warehouse',
+    'monetization-reconciliation',
     'webhook-event-bus',
     'domain-event-dispatcher',
     'probe-server'
@@ -112,6 +114,19 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
   }
 
+  readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
+  try {
+    monetizationReconciliationJob.start();
+    if (!env.monetization.reconciliation.enabled) {
+      readiness.markDegraded('monetization-reconciliation', 'Monetization reconciliation disabled by configuration');
+    } else {
+      readiness.markReady('monetization-reconciliation', 'Monetization reconciliation scheduler active');
+    }
+  } catch (error) {
+    readiness.markFailed('monetization-reconciliation', error);
+    serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
+  }
+
   readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
   try {
     integrationOrchestratorService.start();
@@ -193,6 +208,7 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   dataPartitionJob.stop();
   communityReminderJob.stop();
   telemetryWarehouseJob.stop();
+  monetizationReconciliationJob.stop();
   integrationOrchestratorService.stop();
   webhookEventBusService.stop();
   domainEventDispatcherService.stop();

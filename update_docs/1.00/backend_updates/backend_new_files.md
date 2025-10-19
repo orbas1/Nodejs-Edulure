@@ -61,3 +61,7 @@
 - `test/businessIntelligenceService.test.js` — Vitest coverage validating BI aggregation, delta calculations, experiment enrichment, and freshness wiring. 【F:backend-nodejs/test/businessIntelligenceService.test.js†L1-L112】
 - `test/analyticsBiHttpRoutes.test.js` — Supertest coverage confirming `/analytics/bi/executive-overview` authentication, tenant scoping, and payload shape. 【F:backend-nodejs/test/analyticsBiHttpRoutes.test.js†L1-L64】
 - `test/telemetryHttpRoutes.test.js` — Integration coverage for the telemetry ingest, consent, freshness, and export HTTP routes ensuring controllers surface deterministic payloads. 【F:backend-nodejs/test/telemetryHttpRoutes.test.js†L1-L118】
+
+- `test/monetizationReconciliationJob.test.js` — Vitest coverage validating multi-tenant scheduling, cache refresh behaviour, and aggregate failure handling for the monetisation reconciliation job.
+- `src/database/utils/tenantMetadataScope.js` — shared helper that builds cross-dialect JSON expressions for tenant metadata scoping used across monetisation queries. 【F:backend-nodejs/src/database/utils/tenantMetadataScope.js†L1-L48】
+- `test/tenantMetadataScope.test.js` — Vitest coverage asserting the tenant metadata scope helper emits the expected SQL fragments and applies default scoping for the global tenant. 【F:backend-nodejs/test/tenantMetadataScope.test.js†L1-L63】

@@ -10,3 +10,5 @@
 - Documented the telemetry pipeline endpoints (`/telemetry/events`, `/telemetry/consents`, `/telemetry/freshness`, `/telemetry/ex
 port`) and the executive BI overview route in the OpenAPI specification, ensuring SDK consumers receive payload contracts for in
 gestion, consent, freshness reporting, exports, and analytics. 【F:backend-nodejs/src/docs/openapi.json†L8800-L9560】
+
+- Updated admin monetisation paths in `openapi.json` to describe the standard success envelope, tenant metadata, and pagination payloads so the contract matches the hardened controller responses.
