@@ -120,6 +120,101 @@ const DEFAULT_EVENTS = [
   }
 ];
 
+const DEFAULT_MEDIA_ASSETS = [
+  {
+    id: 'asset-launch-intro',
+    name: 'Launch intro bumper.mp4',
+    type: 'Video',
+    duration: '00:45',
+    size: '148 MB',
+    owner: 'Studio Team',
+    status: 'Ready',
+    assignedTo: ['broadcast-center'],
+    notes: 'ProRes 422 master with alpha matte'
+  },
+  {
+    id: 'asset-chill-bed',
+    name: 'Focus lounge loop.aiff',
+    type: 'Audio',
+    duration: '15:00',
+    size: '102 MB',
+    owner: 'Audio Ops',
+    status: 'Published',
+    assignedTo: ['live-lab'],
+    notes: 'Seamless loop, normalised to −14 LUFS'
+  },
+  {
+    id: 'asset-runbook',
+    name: 'Weekly ritual runbook.pdf',
+    type: 'Document',
+    duration: '—',
+    size: '2.4 MB',
+    owner: 'Community Leads',
+    status: 'Ready',
+    assignedTo: ['general-lounge', 'live-lab'],
+    notes: 'Updated with 2024 OKRs'
+  }
+];
+
+const DEFAULT_INCIDENTS = [
+  {
+    id: 'incident-flagged-post',
+    channelId: 'general-lounge',
+    severity: 'Medium',
+    type: 'Content flag',
+    status: 'Open',
+    reportedBy: 'Community Crew',
+    openedAt: '2024-03-11T14:20:00.000Z',
+    notes: 'Automated filter caught promotional link. Awaiting moderator review.'
+  },
+  {
+    id: 'incident-audio',
+    channelId: 'live-lab',
+    severity: 'Low',
+    type: 'Audio quality',
+    status: 'Investigating',
+    reportedBy: 'Studio Hosts',
+    openedAt: '2024-03-11T13:05:00.000Z',
+    notes: 'Participants reported echo during breakout handoff.'
+  }
+];
+
+const DEFAULT_CHECKS = [
+  {
+    id: 'permissions-sync',
+    label: 'Verify permission sync',
+    description: 'Confirm channel permission updates propagated to Discord and the LMS webhooks.',
+    status: 'Pending'
+  },
+  {
+    id: 'stage-audio',
+    label: 'Stage audio test',
+    description: 'Run 30-second latency and clipping test on the Live Lab stage.',
+    status: 'Pending'
+  },
+  {
+    id: 'broadcast-failover',
+    label: 'Broadcast failover',
+    description: 'Switch ingest node to secondary encoder and confirm stream continuity.',
+    status: 'Pending'
+  }
+];
+
+const DEFAULT_ACTIVITY = [
+  {
+    id: 'activity-webinar',
+    scope: 'events',
+    message: 'Launch Room: AI Accelerators marked as preparing by Community Leads.',
+    timestamp: '2024-03-11T12:30:00.000Z'
+  },
+  {
+    id: 'activity-role-update',
+    scope: 'roles',
+    message: 'Community Crew permissions updated – reactions enabled.',
+    timestamp: '2024-03-11T11:10:00.000Z'
+  }
+];
+
 const PERMISSION_OPTIONS = [
   { id: 'threads', label: 'Threads & replies' },
   { id: 'reactions', label: 'Reactions & polls' },
@@ -147,6 +242,8 @@ const EVENT_TYPES = [
   { id: 'voice-panel', label: 'Voice panel' },
   { id: 'roundtable', label: 'Roundtable discussion' }
 ];
+
+const MEDIA_STATUS_FLOW = ['Staging', 'Ready', 'Published'];
 
 function generateId(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -206,6 +303,89 @@ function normaliseEvents(payload) {
     }));
 }
 
+function normaliseMediaAssets(payload) {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .filter((item) => item && (item.id || item.name))
+    .map((item) => ({
+      id: item.id ?? generateId('asset'),
+      name: item.name ?? 'Untitled asset',
+      type: item.type ?? 'Document',
+      duration: item.duration ?? '—',
+      size: item.size ?? '—',
+      owner: item.owner ?? 'Community Ops',
+      status: item.status ?? 'Staging',
+      assignedTo: Array.isArray(item.assignedTo) ? item.assignedTo : [],
+      notes: item.notes ?? ''
+    }));
+}
+
+function normaliseIncidents(payload) {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .filter((item) => item && (item.id || item.channelId))
+    .map((item) => ({
+      id: item.id ?? generateId('incident'),
+      channelId: item.channelId ?? 'general-lounge',
+      severity: item.severity ?? 'Low',
+      type: item.type ?? 'Content flag',
+      status: item.status ?? 'Open',
+      reportedBy: item.reportedBy ?? 'Community Ops',
+      openedAt: item.openedAt ?? new Date().toISOString(),
+      resolvedAt: item.resolvedAt ?? null,
+      resolution: item.resolution ?? null,
+      notes: item.notes ?? ''
+    }));
+}
+
+function normaliseChecks(payload) {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .filter((item) => item && (item.id || item.label))
+    .map((item) => ({
+      id: item.id ?? generateId('check'),
+      label: item.label ?? 'Operational check',
+      description: item.description ?? '',
+      status: item.status ?? 'Pending'
+    }));
+}
+
+function normaliseActivity(payload) {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .filter((item) => item && (item.id || item.message))
+    .map((item) => ({
+      id: item.id ?? generateId('activity'),
+      scope: item.scope ?? 'system',
+      message: item.message ?? 'Activity logged',
+      timestamp: item.timestamp ?? new Date().toISOString()
+    }));
+}
+
+function determineAssetType(fileName, mimeType) {
+  if (mimeType?.startsWith('video')) return 'Video';
+  if (mimeType?.startsWith('audio')) return 'Audio';
+  if (mimeType?.includes('pdf')) return 'Document';
+  if (mimeType?.includes('presentation')) return 'Slides';
+  const extension = fileName?.split('.').pop()?.toLowerCase();
+  if (['mp4', 'mov', 'webm'].includes(extension)) return 'Video';
+  if (['mp3', 'wav', 'aiff', 'aac'].includes(extension)) return 'Audio';
+  if (['pdf', 'doc', 'docx'].includes(extension)) return 'Document';
+  if (['ppt', 'pptx', 'key'].includes(extension)) return 'Slides';
+  return 'Document';
+}
+
+function formatTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+}
+
 const EMPTY_FORM = {
   name: '',
   type: 'discussion',
@@ -257,6 +437,25 @@ export default function InstructorCommunityChats() {
     const normalised = normaliseEvents(seed.events);
     return normalised.length ? normalised : DEFAULT_EVENTS;
   });
+  const [mediaAssets, setMediaAssets] = useState(() => {
+    const normalised = normaliseMediaAssets(seed.mediaAssets);
+    return normalised.length ? normalised : DEFAULT_MEDIA_ASSETS;
+  });
+  const [incidents, setIncidents] = useState(() => {
+    const normalised = normaliseIncidents(seed.incidents);
+    return normalised.length ? normalised : DEFAULT_INCIDENTS;
+  });
+  const [qualityChecks, setQualityChecks] = useState(() => {
+    const normalised = normaliseChecks(seed.checks);
+    return normalised.length ? normalised : DEFAULT_CHECKS;
+  });
+  const [activityLog, setActivityLog] = useState(() => {
+    const normalised = normaliseActivity(seed.activity);
+    const baseline = normalised.length ? normalised : DEFAULT_ACTIVITY;
+    return baseline
+      .slice()
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  });
 
   const [selectedChannelId, setSelectedChannelId] = useState(() => channels[0]?.id ?? '__new');
   const [channelForm, setChannelForm] = useState(EMPTY_FORM);
@@ -293,10 +492,50 @@ export default function InstructorCommunityChats() {
     }
   }, [seed.events]);
 
+  useEffect(() => {
+    const normalisedAssets = normaliseMediaAssets(seed.mediaAssets);
+    if (normalisedAssets.length) {
+      setMediaAssets(normalisedAssets);
+    }
+  }, [seed.mediaAssets]);
+
+  useEffect(() => {
+    const normalisedIncidents = normaliseIncidents(seed.incidents);
+    if (normalisedIncidents.length) {
+      setIncidents(normalisedIncidents);
+    }
+  }, [seed.incidents]);
+
+  useEffect(() => {
+    const normalisedChecks = normaliseChecks(seed.checks);
+    if (normalisedChecks.length) {
+      setQualityChecks(normalisedChecks);
+    }
+  }, [seed.checks]);
+
+  useEffect(() => {
+    const normalisedActivity = normaliseActivity(seed.activity);
+    if (normalisedActivity.length) {
+      setActivityLog(
+        normalisedActivity
+          .slice()
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      );
+    }
+  }, [seed.activity]);
+
   const selectedChannel = useMemo(
     () => channels.find((channel) => channel.id === selectedChannelId) ?? null,
     [channels, selectedChannelId]
   );
+
+  const channelLookup = useMemo(() => {
+    const map = new Map();
+    channels.forEach((channel) => {
+      map.set(channel.id, channel.name);
+    });
+    return map;
+  }, [channels]);
 
   const filteredChannels = useMemo(() => {
     const term = channelFilter.trim().toLowerCase();
@@ -318,6 +557,54 @@ export default function InstructorCommunityChats() {
       mediaEnabled
     };
   }, [channels]);
+
+  const stagedAssets = useMemo(() => mediaAssets.filter((asset) => asset.status === 'Staging'), [mediaAssets]);
+  const readyAssets = useMemo(() => mediaAssets.filter((asset) => asset.status === 'Ready'), [mediaAssets]);
+  const displayedActivity = useMemo(() => activityLog.slice(0, 12), [activityLog]);
+  const openIncidents = useMemo(() => incidents.filter((incident) => incident.status !== 'Resolved'), [incidents]);
+
+  const severityBadge = useMemo(
+    () => ({
+      Low: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      Medium: 'border-amber-200 bg-amber-50 text-amber-700',
+      High: 'border-rose-200 bg-rose-50 text-rose-700'
+    }),
+    []
+  );
+
+  const checkBadge = useMemo(
+    () => ({
+      Pending: 'border-slate-200 bg-slate-50 text-slate-600',
+      Passed: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      Blocked: 'border-rose-200 bg-rose-50 text-rose-700'
+    }),
+    []
+  );
+
+  const assetStatusTone = useMemo(
+    () => ({
+      Staging: 'border-amber-200 bg-amber-50 text-amber-700',
+      Ready: 'border-sky-200 bg-sky-50 text-sky-700',
+      Published: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+      Archived: 'border-slate-200 bg-slate-50 text-slate-500'
+    }),
+    []
+  );
+
+  const assetAdvanceLabel = (status) => {
+    if (status === 'Staging') return 'Mark ready';
+    if (status === 'Ready') return 'Publish';
+    if (status === 'Published') return 'Restage';
+    if (status === 'Archived') return 'Restore';
+    return 'Advance state';
+  };
+
+  const logActivity = (message, scope = 'system') => {
+    setActivityLog((previous) => [
+      { id: generateId('activity'), scope, message, timestamp: new Date().toISOString() },
+      ...previous
+    ].slice(0, 40));
+  };
 
   useEffect(() => {
     if (selectedChannelId === '__new' || !selectedChannel) {
@@ -400,6 +687,7 @@ export default function InstructorCommunityChats() {
 
   const handleChannelSubmit = (event) => {
     event.preventDefault();
+    const isNewChannel = selectedChannelId === '__new' || !channels.some((channel) => channel.id === selectedChannelId);
     const payload = {
       id: selectedChannelId === '__new' ? generateId('channel') : selectedChannelId,
       name: channelForm.name.trim() || 'Untitled channel',
@@ -431,9 +719,14 @@ export default function InstructorCommunityChats() {
     });
 
     setSelectedChannelId(payload.id);
+    logActivity(
+      `${isNewChannel ? 'Created' : 'Updated'} #${payload.name} ${payload.type.replace('-', ' ')} channel`,
+      'channels'
+    );
   };
 
   const handleChannelDelete = (id) => {
+    const target = channels.find((channel) => channel.id === id);
     setChannels((previous) => {
       const next = previous.filter((channel) => channel.id !== id);
       setSelectedChannelId((current) => {
@@ -444,6 +737,9 @@ export default function InstructorCommunityChats() {
       });
       return next;
     });
+    if (target) {
+      logActivity(`Deleted #${target.name} channel`, 'channels');
+    }
   };
 
   const handleChannelDuplicate = (id) => {
@@ -457,6 +753,7 @@ export default function InstructorCommunityChats() {
     };
     setChannels((previous) => [...previous, duplicate]);
     setSelectedChannelId(duplicate.id);
+    logActivity(`Duplicated #${source.name} into ${duplicate.name}`, 'channels');
   };
 
   const handleRoleFormChange = (field, value) => {
@@ -477,6 +774,7 @@ export default function InstructorCommunityChats() {
 
   const handleRoleSubmit = (event) => {
     event.preventDefault();
+    const isNewRole = !selectedRoleId || !roles.some((role) => role.id === selectedRoleId);
     const payload = {
       id: selectedRoleId ?? generateId('role'),
       name: roleForm.name.trim() || 'New role',
@@ -497,11 +795,16 @@ export default function InstructorCommunityChats() {
     });
 
     setSelectedRoleId(payload.id);
+    logActivity(`${isNewRole ? 'Created' : 'Updated'} ${payload.name} role`, 'roles');
   };
 
   const handleRoleDelete = (id) => {
+    const target = roles.find((role) => role.id === id);
     setRoles((previous) => previous.filter((role) => role.id !== id));
     setSelectedRoleId((current) => (current === id ? null : current));
+    if (target) {
+      logActivity(`Removed ${target.name} role`, 'roles');
+    }
   };
 
   const handleEventFormChange = (field, value) => {
@@ -510,6 +813,7 @@ export default function InstructorCommunityChats() {
 
   const handleEventSubmit = (event) => {
     event.preventDefault();
+    const isNewEvent = !selectedEventId || !events.some((item) => item.id === selectedEventId);
     const payload = {
       id: selectedEventId ?? generateId('event'),
       title: eventForm.title.trim() || 'Untitled event',
@@ -534,11 +838,136 @@ export default function InstructorCommunityChats() {
     });
 
     setSelectedEventId(payload.id);
+    logActivity(`${isNewEvent ? 'Scheduled' : 'Updated'} ${payload.title}`, 'events');
   };
 
   const handleEventDelete = (id) => {
+    const target = events.find((item) => item.id === id);
     setEvents((previous) => previous.filter((item) => item.id !== id));
     setSelectedEventId((current) => (current === id ? null : current));
+    if (target) {
+      logActivity(`Cancelled ${target.title}`, 'events');
+    }
+  };
+
+  const handleMediaUpload = (event) => {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) return;
+    const uploads = files.map((file) => ({
+      id: generateId('asset'),
+      name: file.name,
+      type: determineAssetType(file.name, file.type),
+      duration: file.type.startsWith('audio') ? '03:00' : file.type.startsWith('video') ? '00:30' : '—',
+      size: file.size ? `${Math.max(file.size / (1024 * 1024), 0.1).toFixed(1)} MB` : '—',
+      owner: 'You',
+      status: 'Staging',
+      assignedTo: [],
+      notes: 'Uploaded from dashboard'
+    }));
+    setMediaAssets((previous) => [...uploads, ...previous]);
+    logActivity(`Uploaded ${uploads.length} asset${uploads.length > 1 ? 's' : ''} to staging`, 'media');
+    event.target.value = '';
+  };
+
+  const handleMediaAdvance = (id) => {
+    const asset = mediaAssets.find((item) => item.id === id);
+    if (!asset) return;
+    const currentIndex = MEDIA_STATUS_FLOW.indexOf(asset.status);
+    let nextStatus;
+    if (asset.status === 'Published' || asset.status === 'Archived') {
+      nextStatus = 'Staging';
+    } else {
+      nextStatus = MEDIA_STATUS_FLOW[Math.min(currentIndex + 1, MEDIA_STATUS_FLOW.length - 1)] ?? 'Published';
+    }
+    if (asset.status === nextStatus) return;
+    setMediaAssets((previous) =>
+      previous.map((item) => (item.id === id ? { ...item, status: nextStatus } : item))
+    );
+    logActivity(`Advanced ${asset.name} to ${nextStatus.toLowerCase()} state`, 'media');
+  };
+
+  const handleMediaArchive = (id) => {
+    const asset = mediaAssets.find((item) => item.id === id);
+    if (!asset) return;
+    setMediaAssets((previous) =>
+      previous.map((item) => (item.id === id ? { ...item, status: 'Archived' } : item))
+    );
+    logActivity(`Archived ${asset.name}`, 'media');
+  };
+
+  const handleMediaAssign = (assetId, channelId) => {
+    if (!channelId) return;
+    setMediaAssets((previous) =>
+      previous.map((asset) => {
+        if (asset.id !== assetId || asset.assignedTo.includes(channelId)) return asset;
+        return { ...asset, assignedTo: [...asset.assignedTo, channelId] };
+      })
+    );
+    const channelName = channelLookup.get(channelId) ?? channelId;
+    const asset = mediaAssets.find((item) => item.id === assetId);
+    if (asset) {
+      logActivity(`Assigned ${asset.name} to #${channelName}`, 'media');
+    }
+  };
+
+  const handleMediaRemoveAssignment = (assetId, channelId) => {
+    const asset = mediaAssets.find((item) => item.id === assetId);
+    if (!asset) return;
+    setMediaAssets((previous) =>
+      previous.map((item) =>
+        item.id === assetId
+          ? { ...item, assignedTo: item.assignedTo.filter((entry) => entry !== channelId) }
+          : item
+      )
+    );
+    const channelName = channelLookup.get(channelId) ?? channelId;
+    logActivity(`Unassigned ${asset.name} from #${channelName}`, 'media');
+  };
+
+  const handleMediaDelete = (id) => {
+    const asset = mediaAssets.find((item) => item.id === id);
+    setMediaAssets((previous) => previous.filter((item) => item.id !== id));
+    if (asset) {
+      logActivity(`Removed ${asset.name} from library`, 'media');
+    }
+  };
+
+  const handleLibrarySync = () => {
+    logActivity('Triggered cloud library sync', 'media');
+  };
+
+  const handleIncidentResolve = (id, resolution) => {
+    const incident = incidents.find((item) => item.id === id);
+    if (!incident) return;
+    setIncidents((previous) =>
+      previous.map((item) =>
+        item.id === id
+          ? { ...item, status: 'Resolved', resolution, resolvedAt: new Date().toISOString() }
+          : item
+      )
+    );
+    const channelName = channelLookup.get(incident.channelId) ?? incident.channelId;
+    logActivity(`Resolved ${incident.type.toLowerCase()} in #${channelName}`, 'moderation');
+  };
+
+  const handleChecklistPass = (id) => {
+    setQualityChecks((previous) =>
+      previous.map((item) => (item.id === id ? { ...item, status: 'Passed' } : item))
+    );
+    const check = qualityChecks.find((item) => item.id === id);
+    if (check) {
+      logActivity(`Passed check: ${check.label}`, 'qa');
+    }
+  };
+
+  const handleChecklistBlock = (id) => {
+    setQualityChecks((previous) =>
+      previous.map((item) => (item.id === id ? { ...item, status: 'Blocked' } : item))
+    );
+    const check = qualityChecks.find((item) => item.id === id);
+    if (check) {
+      logActivity(`Flagged blocker on ${check.label}`, 'qa');
+    }
   };
 
   const activeVoiceRooms = useMemo(
@@ -587,7 +1016,7 @@ export default function InstructorCommunityChats() {
           </div>
         </div>
 
-        <dl className="mt-8 grid gap-4 md:grid-cols-3">
+        <dl className="mt-8 grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
             <dt className="flex items-center gap-2 text-sm font-semibold text-slate-600">
               <ChatBubbleBottomCenterTextIcon className="h-5 w-5 text-primary" />
@@ -611,6 +1040,14 @@ export default function InstructorCommunityChats() {
             </dt>
             <dd className="mt-2 text-3xl font-semibold text-slate-900">{channelMetrics.mediaEnabled}</dd>
             <p className="mt-1 text-xs text-slate-500">Spaces with screen share and asset libraries activated.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <dt className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+              <MusicalNoteIcon className="h-5 w-5 text-primary" />
+              Assets staging
+            </dt>
+            <dd className="mt-2 text-3xl font-semibold text-slate-900">{stagedAssets.length}</dd>
+            <p className="mt-1 text-xs text-slate-500">{readyAssets.length} ready · {mediaAssets.length} total assets.</p>
           </div>
         </dl>
       </section>
@@ -1196,28 +1633,267 @@ export default function InstructorCommunityChats() {
           </div>
 
           <div className="dashboard-section">
-            <h2 className="text-lg font-semibold text-slate-900">Media staging</h2>
-            <p className="mt-2 text-sm text-slate-600">
-              Upload intro bumpers, looped ambience, and presentation decks. Assigned assets are instantly synced to the
-              selected channels.
-            </p>
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <VideoCameraIcon className="h-6 w-6 text-primary" />
-                <p className="mt-2 text-sm font-semibold text-slate-900">Scene switcher</p>
-                <p className="text-xs text-slate-500">Preload camera layouts and macros for live broadcasts.</p>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Media staging &amp; asset ops</h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  Upload bumpers, ambience loops, and runbooks. Ready assets sync instantly to the channels you assign.
+                </p>
               </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <MusicalNoteIcon className="h-6 w-6 text-primary" />
-                <p className="mt-2 text-sm font-semibold text-slate-900">Soundboard</p>
-                <p className="text-xs text-slate-500">Drop intro music, transitions, and applause cues.</p>
-              </div>
-              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                <PencilSquareIcon className="h-6 w-6 text-primary" />
-                <p className="mt-2 text-sm font-semibold text-slate-900">Resource library</p>
-                <p className="text-xs text-slate-500">Link decks, templates, and handouts to publish alongside live events.</p>
+              <div className="flex flex-wrap gap-3">
+                <label className="dashboard-primary-pill cursor-pointer">
+                  <PlusIcon className="mr-2 h-4 w-4" />
+                  Upload media
+                  <input
+                    type="file"
+                    multiple
+                    accept="video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx"
+                    onChange={handleMediaUpload}
+                    className="sr-only"
+                  />
+                </label>
+                <button type="button" className="dashboard-pill px-4 py-2" onClick={handleLibrarySync}>
+                  <ArrowPathIcon className="mr-2 h-4 w-4" />
+                  Sync cloud drive
+                </button>
               </div>
             </div>
+
+            <div className="mt-6 overflow-hidden rounded-2xl border border-slate-100">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th scope="col" className="px-4 py-3">Asset</th>
+                    <th scope="col" className="px-4 py-3">Assigned to</th>
+                    <th scope="col" className="px-4 py-3">Status</th>
+                    <th scope="col" className="px-4 py-3">Owner</th>
+                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {mediaAssets.map((asset) => {
+                    const statusTone = assetStatusTone[asset.status] ?? 'border-slate-200 bg-slate-50 text-slate-500';
+                    return (
+                      <tr key={asset.id} className="align-top">
+                        <td className="px-4 py-4">
+                          <p className="font-semibold text-slate-900">{asset.name}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {asset.type} · {asset.duration} · {asset.size}
+                          </p>
+                          {asset.notes && <p className="mt-2 text-xs text-slate-500">{asset.notes}</p>}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            {asset.assignedTo.length > 0 ? (
+                              asset.assignedTo.map((channelId) => (
+                                <span
+                                  key={channelId}
+                                  className="flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-600"
+                                >
+                                  #{channelLookup.get(channelId) ?? channelId}
+                                  <button
+                                    type="button"
+                                    className="ml-1 text-slate-400 transition hover:text-rose-500"
+                                    onClick={() => handleMediaRemoveAssignment(asset.id, channelId)}
+                                    aria-label={`Remove ${channelLookup.get(channelId) ?? channelId}`}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-xs text-slate-400">Not assigned</span>
+                            )}
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <select
+                              defaultValue=""
+                              className="w-44 rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600 focus:border-primary focus:outline-none"
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                handleMediaAssign(asset.id, value);
+                                event.target.value = '';
+                              }}
+                            >
+                              <option value="">Assign channel…</option>
+                              {channels.map((channel) => (
+                                <option key={channel.id} value={channel.id}>
+                                  {channel.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${statusTone}`}
+                          >
+                            {asset.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <p className="text-sm font-medium text-slate-700">{asset.owner}</p>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="flex flex-col items-end gap-2 text-xs">
+                            <button
+                              type="button"
+                              className="dashboard-pill px-3 py-1"
+                              onClick={() => handleMediaAdvance(asset.id)}
+                            >
+                              {assetAdvanceLabel(asset.status)}
+                            </button>
+                            <button
+                              type="button"
+                              className="dashboard-pill px-3 py-1"
+                              onClick={() => handleMediaArchive(asset.id)}
+                              disabled={asset.status === 'Archived'}
+                            >
+                              Archive
+                            </button>
+                            <button
+                              type="button"
+                              className="dashboard-pill px-3 py-1 text-red-600 hover:border-red-200"
+                              onClick={() => handleMediaDelete(asset.id)}
+                            >
+                              <TrashIcon className="mr-1 h-3 w-3" />
+                              Remove
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {mediaAssets.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-6 text-center text-sm text-slate-500">
+                        Upload media to build your staging library.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <section className="grid gap-6 lg:grid-cols-2">
+            <div className="dashboard-section">
+              <h2 className="text-lg font-semibold text-slate-900">Moderation &amp; safety</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Track escalations and document how each case was resolved to maintain community trust.
+              </p>
+              <div className="mt-4 space-y-3">
+                {incidents.map((incident) => {
+                  const severityTone = severityBadge[incident.severity] ?? severityBadge.Medium;
+                  const channelName = channelLookup.get(incident.channelId) ?? incident.channelId;
+                  return (
+                    <article key={incident.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          <span className={`rounded-full border px-2 py-1 text-[11px] ${severityTone}`}>
+                            {incident.severity}
+                          </span>
+                          <span>#{channelName}</span>
+                        </div>
+                        <p className="text-xs text-slate-400">Opened {formatTimestamp(incident.openedAt)}</p>
+                      </div>
+                      <h3 className="mt-2 text-sm font-semibold text-slate-900">{incident.type}</h3>
+                      <p className="mt-1 text-sm text-slate-600">{incident.notes}</p>
+                      {incident.resolution && (
+                        <p className="mt-2 text-xs text-emerald-600">
+                          Resolved {formatTimestamp(incident.resolvedAt)} · {incident.resolution}
+                        </p>
+                      )}
+                      <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                        <button
+                          type="button"
+                          className="dashboard-pill px-3 py-1"
+                          onClick={() => handleIncidentResolve(incident.id, 'Muted user for 24h')}
+                          disabled={incident.status === 'Resolved'}
+                        >
+                          Close &amp; mute
+                        </button>
+                        <button
+                          type="button"
+                          className="dashboard-pill px-3 py-1"
+                          onClick={() => handleIncidentResolve(incident.id, 'Escalated to safety team')}
+                          disabled={incident.status === 'Resolved'}
+                        >
+                          Escalate
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              {openIncidents.length === 0 && (
+                <p className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+                  All incidents cleared. Keep proactive monitoring enabled during live launches.
+                </p>
+              )}
+            </div>
+
+            <div className="dashboard-section">
+              <h2 className="text-lg font-semibold text-slate-900">Operational readiness</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Run pre-flight QA before major streams so production teams have absolute confidence.
+              </p>
+              <ul className="mt-4 space-y-3">
+                {qualityChecks.map((check) => (
+                  <li key={check.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">{check.label}</p>
+                        <p className="mt-1 text-sm text-slate-600">{check.description}</p>
+                      </div>
+                      <span
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                          checkBadge[check.status] ?? checkBadge.Pending
+                        }`}
+                      >
+                        {check.status}
+                      </span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1"
+                        onClick={() => handleChecklistPass(check.id)}
+                      >
+                        Mark passed
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1 text-amber-600 hover:border-amber-200"
+                        onClick={() => handleChecklistBlock(check.id)}
+                      >
+                        Flag blocker
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+
+          <div className="dashboard-section">
+            <h2 className="text-lg font-semibold text-slate-900">Activity feed</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Every change is tracked for audit trails so operations and compliance can review quickly.
+            </p>
+            <ul className="mt-4 space-y-3">
+              {displayedActivity.map((entry) => (
+                <li key={entry.id} className="flex items-start justify-between gap-4 rounded-2xl border border-slate-100 bg-white p-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{entry.message}</p>
+                    <p className="text-xs uppercase tracking-wide text-slate-500">{entry.scope}</p>
+                  </div>
+                  <time dateTime={entry.timestamp} className="text-xs text-slate-400">
+                    {formatTimestamp(entry.timestamp)}
+                  </time>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
