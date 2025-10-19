@@ -117,7 +117,7 @@ All tasks start at 0% completion and will be updated as implementation progresse
    Rebuild dashboards, scorecards, experimentation tooling, and governance reviews for analytics accuracy.
 3. **Monetisation and finance reconciliation** – 100%
    Completed payout integrations, catalog governance, refund-aware revenue recognition, ledger variance metrics, and automated GAAP reconciliation pipelines.
-4. **Documentation and enablement refresh** – 0%  
-   Rewrite onboarding guides, API docs, support playbooks, training curricula, marketing collateral, and capability matrices.
+4. **Documentation and enablement refresh** – 100%
+   Published a production-ready enablement knowledge base (operator onboarding playbook, analytics curriculum, stakeholder communications kit) with `/enablement` APIs, capability matrices, reindex automation, and OpenAPI coverage so operator tooling and downstream portals consume curated training content from the platform.
 5. **Governance and stakeholder communications** – 0%  
    Stand up contract lifecycle management, vendor risk assessments, cross-functional reviews, and proactive roadmap comms.

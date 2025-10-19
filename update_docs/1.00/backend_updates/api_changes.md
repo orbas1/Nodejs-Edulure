@@ -12,3 +12,4 @@ port`) and the executive BI overview route in the OpenAPI specification, ensurin
 gestion, consent, freshness reporting, exports, and analytics. 【F:backend-nodejs/src/docs/openapi.json†L8800-L9560】
 
 - Updated admin monetisation paths in `openapi.json` to describe the standard success envelope, tenant metadata, and pagination payloads so the contract matches the hardened controller responses.
+- Added `/enablement/articles`, `/enablement/articles/{slug}`, `/enablement/capability-matrix`, and `/enablement/reindex` endpoints returning curated enablement content, capability matrices, and index refresh summaries with admin RBAC. The OpenAPI spec documents query filters, slug path params, HTML/markdown formats, and response schemas for downstream portals. 【F:backend-nodejs/src/docs/openapi.json†L9050-L9225】【F:backend-nodejs/src/routes/enablement.routes.js†L1-L11】

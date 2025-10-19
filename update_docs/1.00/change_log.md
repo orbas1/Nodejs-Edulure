@@ -1,6 +1,7 @@
 # Version 1.00 Update Change Log
 
 ## Documentation & Evaluation Additions
+- Published an enablement knowledge base package with production-ready operator onboarding, analytics curriculum, and communications kit guides plus `/enablement` APIs that expose searchable content, capability matrices, and reindex hooks for downstream portals. 【F:backend-nodejs/src/enablement/content/operator-onboarding-playbook.md†L1-L98】【F:backend-nodejs/src/enablement/content/analytics-revenue-enablement.md†L1-L90】【F:backend-nodejs/src/enablement/content/stakeholder-communications-kit.md†L1-L87】【F:backend-nodejs/src/controllers/EnablementController.js†L1-L78】
 - Established the Version 1.00 update documentation workspace derived from the base template so the team can track change requests, testing, and rollout tasks in a consistent format.
 - Authored deeply critical pre-update evaluations for backend, database, dependency, front-end, and learner mobile app surfaces to surface high-risk gaps across functionality, usability, error handling, integration, security, and roadmap alignment.
 - Added a provider operations app evaluation to capture regressions that remain after retiring the legacy mobile experience and to ensure any successor tooling is reviewed before reintroduction.

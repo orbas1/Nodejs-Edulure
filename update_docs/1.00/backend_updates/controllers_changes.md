@@ -3,7 +3,7 @@
 - Created `EnvironmentParityController` to surface parity reports that combine manifest fingerprints, dependency probes, and drift classifications for release engineers. 【F:backend-nodejs/src/controllers/EnvironmentParityController.js†L1-L13】
 - Added `SecurityOperationsController` with admin-authenticated handlers for risk register listings, status updates, audit evidence capture, continuity drill logging, and assessment scheduling so compliance teams can orchestrate governance workflows from the API. 【F:backend-nodejs/src/controllers/SecurityOperationsController.js†L1-L199】
 - Added `TelemetryController` with authenticated endpoints for event ingestion, consent registration, freshness inspection, and manual export triggers powering the telemetry pipeline. 【F:backend-nodejs/src/controllers/TelemetryController.js†L1-L115】
-- Added `BusinessIntelligenceController` to expose the `/analytics/bi/executive-overview` endpoint with tenant-aware range parsi
-ng and `StandardResponse` envelopes. 【F:backend-nodejs/src/controllers/BusinessIntelligenceController.js†L1-L26】
+- Added `BusinessIntelligenceController` to expose the `/analytics/bi/executive-overview` endpoint with tenant-aware range parsing and `StandardResponse` envelopes. 【F:backend-nodejs/src/controllers/BusinessIntelligenceController.js†L1-L26】
+- Added `EnablementController` with admin-authenticated article listing, detail, capability matrix, and reindex endpoints so programme owners and operator tooling can consume the refreshed enablement knowledge base over the API. 【F:backend-nodejs/src/controllers/EnablementController.js†L1-L78】
 
 - Wrapped `AdminMonetizationController` responses in the standard `{ success, message, data, meta }` envelope and enriched pagination metadata so operator tooling consumes consistent contracts across catalog, usage, schedules, and reconciliation APIs.

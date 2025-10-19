@@ -12,6 +12,7 @@ import contentRoutes from './content.routes.js';
 import creationRoutes from './creation.routes.js';
 import courseRoutes from './course.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
+import enablementRoutes from './enablement.routes.js';
 import ebookRoutes from './ebook.routes.js';
 import explorerRoutes from './explorer.routes.js';
 import feedRoutes from './feed.routes.js';
@@ -54,7 +55,8 @@ const routerMap = {
   'provider-transition': providerTransitionRoutes,
   observability: observabilityRoutes,
   environment: environmentParityRoutes,
-  telemetry: telemetryRoutes
+  telemetry: telemetryRoutes,
+  enablement: enablementRoutes
 };
 
 export const apiRouteRegistry = apiRouteMetadata.map((descriptor) => ({

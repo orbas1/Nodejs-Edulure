@@ -184,6 +184,18 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'enablement',
+    capability: 'enablement-documentation',
+    description:
+      'Knowledge base, training curriculum, and stakeholder communications APIs for operators and go-to-market teams.',
+    basePath: '/enablement',
+    flagKey: 'platform.api.v1.enablement',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Enablement documentation APIs are restricted for your role.'
+  },
+  {
     name: 'dashboard',
     capability: 'operator-dashboard',
     description: 'Operational dashboards, incident insights, and governance endpoints.',

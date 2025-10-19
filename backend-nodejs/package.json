@@ -58,6 +58,7 @@
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
+    "marked": "^16.4.1",
     "meilisearch": "^0.37.0",
     "mime-types": "^2.1.35",
     "mysql2": "^3.9.7",
@@ -76,8 +77,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",
-    "autocannon": "^8.0.0",
     "ajv": "^8.17.1",
+    "autocannon": "^8.0.0",
     "eslint": "^9.14.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
