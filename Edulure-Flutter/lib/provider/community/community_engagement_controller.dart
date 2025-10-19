@@ -525,6 +525,8 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         joinedAt: DateTime.now().subtract(const Duration(days: 420)),
         expertise: const ['Ops', 'Product experimentation', 'Systems thinking'],
         availability: 'Mon-Fri · 9am-5pm WAT',
+        isOnline: true,
+        lastActiveAt: DateTime.now().subtract(const Duration(minutes: 8)),
       ),
       CommunityMemberProfile(
         id: 'm-${communityId}-mentor',
@@ -544,6 +546,8 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         joinedAt: DateTime.now().subtract(const Duration(days: 512)),
         expertise: const ['Product discovery', 'Workshops', 'Mentorship'],
         availability: 'Tues-Sat · 10am-4pm PST',
+        isOnline: true,
+        lastActiveAt: DateTime.now().subtract(const Duration(minutes: 25)),
       ),
       CommunityMemberProfile(
         id: 'm-${communityId}-creator',
@@ -563,6 +567,8 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         joinedAt: DateTime.now().subtract(const Duration(days: 210)),
         expertise: const ['Storytelling', 'Sustainability', 'Design'],
         availability: 'Flexible · async-first collaborator',
+        isOnline: false,
+        lastActiveAt: DateTime.now().subtract(const Duration(hours: 5)),
       ),
       CommunityMemberProfile(
         id: 'm-${communityId}-partner',
@@ -582,6 +588,8 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         joinedAt: DateTime.now().subtract(const Duration(days: 32)),
         expertise: const ['Partnerships', 'Ecosystem design'],
         availability: 'Wed-Fri · 1pm-7pm IST',
+        isOnline: false,
+        lastActiveAt: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
       ),
       CommunityMemberProfile(
         id: 'm-${communityId}-alumni',
@@ -601,6 +609,8 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         joinedAt: DateTime.now().subtract(const Duration(days: 720)),
         expertise: const ['Growth', 'AMAs', 'Community building'],
         availability: 'Mon-Thu · 2pm-6pm GMT',
+        isOnline: true,
+        lastActiveAt: DateTime.now().subtract(const Duration(minutes: 3)),
       ),
     ];
 
@@ -631,6 +641,8 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
     final location = cities[index % cities.length];
     final role = roles[index % roles.length];
     final status = CommunityMemberStatus.values[index % CommunityMemberStatus.values.length];
+    final isOnline = _random.nextBool();
+    final lastActive = DateTime.now().subtract(Duration(minutes: 15 + _random.nextInt(480)));
     return CommunityMemberProfile(
       id: 'm-$communityId-${_generateId('mb')}',
       name: 'Community Member ${index + 1}',
@@ -649,6 +661,8 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
       joinedAt: DateTime.now().subtract(Duration(days: 60 + index * 12)),
       expertise: const ['Workshops', 'Project delivery', 'Peer reviews'],
       availability: 'Flexible availability · async updates every 48h',
+      isOnline: isOnline,
+      lastActiveAt: isOnline ? DateTime.now().subtract(Duration(minutes: _random.nextInt(12))) : lastActive,
     );
   }
 
@@ -1166,6 +1180,8 @@ class CommunityMemberProfile {
     required this.joinedAt,
     required this.expertise,
     required this.availability,
+    required this.isOnline,
+    this.lastActiveAt,
   });
 
   final String id;
@@ -1180,6 +1196,8 @@ class CommunityMemberProfile {
   final DateTime joinedAt;
   final List<String> expertise;
   final String availability;
+  final bool isOnline;
+  final DateTime? lastActiveAt;
 
   CommunityMemberProfile copyWith({
     String? name,
@@ -1193,6 +1211,8 @@ class CommunityMemberProfile {
     DateTime? joinedAt,
     List<String>? expertise,
     String? availability,
+    bool? isOnline,
+    DateTime? lastActiveAt,
   }) {
     return CommunityMemberProfile(
       id: id,
@@ -1207,6 +1227,8 @@ class CommunityMemberProfile {
       joinedAt: joinedAt ?? this.joinedAt,
       expertise: expertise ?? this.expertise,
       availability: availability ?? this.availability,
+      isOnline: isOnline ?? this.isOnline,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );
   }
 }
@@ -1320,7 +1342,9 @@ class CommunityMemberDraft {
     this.joinedAt,
     this.expertise = const <String>[],
     this.availability = '',
-  });
+    this.isOnline = true,
+    DateTime? lastActiveAt,
+  }) : lastActiveAt = lastActiveAt ?? DateTime.now();
 
   final String? id;
   String name;
@@ -1337,6 +1361,8 @@ class CommunityMemberDraft {
   DateTime? joinedAt;
   List<String> expertise;
   String availability;
+  bool isOnline;
+  DateTime? lastActiveAt;
 
   CommunityMemberProfile toProfile() {
     final lat = latitude ?? 0;
@@ -1361,6 +1387,8 @@ class CommunityMemberDraft {
       joinedAt: joinedAt ?? DateTime.now(),
       expertise: expertise.isEmpty ? const ['Generalist'] : expertise,
       availability: availability.isNotEmpty ? availability : 'Flexible',
+      isOnline: isOnline,
+      lastActiveAt: lastActiveAt ?? DateTime.now(),
     );
   }
 }

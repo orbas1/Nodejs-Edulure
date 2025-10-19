@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:intl/intl.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/community/communities_controller.dart';
 import '../provider/community/community_engagement_controller.dart';
@@ -85,6 +86,9 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
   Widget build(BuildContext context) {
     final detail = _detail;
     final loading = _loading;
+    final engagementState = ref.watch(communityEngagementControllerProvider);
+    final communitySnapshot =
+        detail == null ? null : engagementState.snapshotFor(detail.id) ?? engagementState.snapshotFor(widget.communityId);
     return Scaffold(
       body: loading
           ? const Center(child: CircularProgressIndicator())
@@ -133,11 +137,11 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                         sliver: SliverList(
                           delegate: SliverChildListDelegate([
-                            _buildSummary(context, detail),
+                            _buildSummary(context, detail, communitySnapshot),
                             const SizedBox(height: 24),
                             _buildActionBar(context, detail),
                             const SizedBox(height: 24),
-                            _buildStatsGrid(context, detail),
+                            _buildStatsGrid(context, detail, communitySnapshot),
                             const SizedBox(height: 24),
                             Text(
                               'Community collaborations',
@@ -215,17 +219,186 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
     );
   }
 
-  Widget _buildSummary(BuildContext context, CommunityDetail detail) {
+  Widget _buildSummary(
+    BuildContext context,
+    CommunityDetail detail,
+    CommunityEngagementSnapshot? snapshot,
+  ) {
     final formatter = DateFormat('MMM d, yyyy');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(detail.description ?? 'No description provided',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.4)),
-        const SizedBox(height: 8),
-        Text('Visibility: ${detail.visibility} • Created ${formatter.format(detail.createdAt ?? DateTime.now())}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
-      ],
+    final members = snapshot?.members ?? const <CommunityMemberProfile>[];
+    final memberCount = members.isEmpty ? detail.stats.members : members.length;
+    final onlineCount = members.where((member) => member.isOnline).length;
+    final moderatorCount = members.where((member) => member.isModerator).length;
+    final pendingInvites = members.where((member) => member.status == CommunityMemberStatus.pending).length;
+    final about = snapshot?.about;
+    final metadata = detail.metadata;
+    final website = about?.website.isNotEmpty == true
+        ? about!.website
+        : metadata['website']?.toString() ?? '';
+    final contactEmail = about?.contactEmail.isNotEmpty == true
+        ? about!.contactEmail
+        : metadata['contactEmail']?.toString() ?? '';
+    final codeOfConduct = about?.codeOfConductUrl ?? metadata['codeOfConduct']?.toString() ?? '';
+    final partnerDeck = about?.partnerDeckUrl ?? metadata['partnerDeck']?.toString() ?? '';
+    final pressKit = about?.pressKitUrl ?? metadata['pressKit']?.toString() ?? '';
+    final highlightMembers = members.take(8).toList();
+    final lastUpdated = snapshot?.lastUpdatedAt ?? detail.updatedAt ?? detail.createdAt ?? DateTime.now();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.indigo.shade100),
+        boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 24, offset: Offset(0, 10))],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: detail.coverImageUrl != null && detail.coverImageUrl!.isNotEmpty
+                      ? Image.network(
+                          detail.coverImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(color: Colors.indigo.shade200),
+                        )
+                      : Container(
+                          alignment: Alignment.center,
+                          color: Colors.indigo.shade200,
+                          child: Text(
+                            detail.name.isNotEmpty ? detail.name[0].toUpperCase() : '?',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(color: Colors.white, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      detail.name,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      detail.description ?? 'No description provided yet. Use the about tab to craft a compelling story.',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(height: 1.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(
+                          avatar: const Icon(Icons.lock_open_outlined),
+                          label: Text('${detail.visibility} community'),
+                        ),
+                        Chip(
+                          avatar: const Icon(Icons.calendar_month_outlined),
+                          label: Text('Founded ${formatter.format(detail.createdAt ?? DateTime.now())}'),
+                        ),
+                        Chip(
+                          avatar: const Icon(Icons.people_alt_outlined),
+                          label: Text('$memberCount members'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _ProfileMetricPill(
+                icon: Icons.people_outline,
+                label: 'Members',
+                value: memberCount.toString(),
+              ),
+              _ProfileMetricPill(
+                icon: Icons.wifi_tethering,
+                label: 'Online now',
+                value: onlineCount.toString(),
+                accentColor: Colors.green,
+              ),
+              _ProfileMetricPill(
+                icon: Icons.shield_outlined,
+                label: 'Community admins',
+                value: moderatorCount.toString(),
+              ),
+              _ProfileMetricPill(
+                icon: Icons.hourglass_top_outlined,
+                label: 'Pending invites',
+                value: pendingInvites.toString(),
+                accentColor: Colors.orange,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              if (website.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.public),
+                  label: const Text('Visit website'),
+                  onPressed: () => _launchExternal(website),
+                ),
+              if (contactEmail.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.mail_outline),
+                  label: const Text('Contact team'),
+                  onPressed: () => _launchEmail(contactEmail),
+                ),
+              if (codeOfConduct.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.rule_folder_outlined),
+                  label: const Text('Code of conduct'),
+                  onPressed: () => _launchExternal(codeOfConduct),
+                ),
+              if (partnerDeck.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.slideshow_outlined),
+                  label: const Text('Partner deck'),
+                  onPressed: () => _launchExternal(partnerDeck),
+                ),
+              if (pressKit.isNotEmpty)
+                ActionChip(
+                  avatar: const Icon(Icons.collections_bookmark_outlined),
+                  label: const Text('Press kit'),
+                  onPressed: () => _launchExternal(pressKit),
+                ),
+            ],
+          ),
+          if (highlightMembers.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('Recently active members', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            _MemberAvatarStack(members: highlightMembers),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            'Last updated ${DateFormat('MMM d, h:mm a').format(lastUpdated)}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.indigo.shade700),
+          ),
+        ],
+      ),
     );
   }
 
@@ -253,12 +426,29 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
     );
   }
 
-  Widget _buildStatsGrid(BuildContext context, CommunityDetail detail) {
+  Widget _buildStatsGrid(
+    BuildContext context,
+    CommunityDetail detail,
+    CommunityEngagementSnapshot? snapshot,
+  ) {
+    final members = snapshot?.members ?? const <CommunityMemberProfile>[];
+    final memberCount = members.isEmpty ? detail.stats.members : members.length;
+    final online = members.where((member) => member.isOnline).length;
+    final moderators = members.where((member) => member.isModerator).length;
+    final pending = members.where((member) => member.status == CommunityMemberStatus.pending).length;
+    final lastActivity = detail.stats.lastActivityAt ?? snapshot?.lastUpdatedAt;
+    final lastActivityLabel = lastActivity != null
+        ? DateFormat('MMM d, h:mm a').format(lastActivity)
+        : 'No recent activity';
     final tiles = [
-      _StatTile(label: 'Members', value: detail.stats.members.toString(), icon: Icons.people_alt_outlined),
+      _StatTile(label: 'Members', value: memberCount.toString(), icon: Icons.people_alt_outlined),
       _StatTile(label: 'Posts', value: detail.stats.posts.toString(), icon: Icons.post_add_outlined),
       _StatTile(label: 'Resources', value: detail.stats.resources.toString(), icon: Icons.library_books_outlined),
       _StatTile(label: 'Channels', value: detail.stats.channels.toString(), icon: Icons.hub_outlined),
+      _StatTile(label: 'Online now', value: online.toString(), icon: Icons.online_prediction_outlined),
+      _StatTile(label: 'Admins', value: moderators.toString(), icon: Icons.shield_moon_outlined),
+      _StatTile(label: 'Pending', value: pending.toString(), icon: Icons.hourglass_bottom_outlined),
+      _StatTile(label: 'Last activity', value: lastActivityLabel, icon: Icons.timeline_outlined),
     ];
     return GridView.builder(
       shrinkWrap: true,
@@ -363,6 +553,19 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
       await _bootstrap();
     }
   }
+
+  Future<void> _launchExternal(String url) async {
+    if (url.isEmpty) return;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _launchEmail(String email) async {
+    if (email.isEmpty) return;
+    final uri = Uri(scheme: 'mailto', path: email);
+    await launchUrl(uri);
+  }
 }
 
 class _StatTile extends StatelessWidget {
@@ -399,6 +602,104 @@ class _StatTile extends StatelessWidget {
   }
 }
 
+class _ProfileMetricPill extends StatelessWidget {
+  const _ProfileMetricPill({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.accentColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? accentColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = accentColor ?? Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700, color: color),
+              ),
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberAvatarStack extends StatelessWidget {
+  const _MemberAvatarStack({required this.members});
+
+  final List<CommunityMemberProfile> members;
+
+  @override
+  Widget build(BuildContext context) {
+    final display = members.take(8).toList();
+    final overflow = members.length - display.length;
+    final width = 48 + (display.length > 1 ? (display.length - 1) * 28 : 0) + (overflow > 0 ? 40 : 0);
+    return SizedBox(
+      height: 48,
+      width: width.toDouble(),
+      child: Stack(
+        children: [
+          for (var i = 0; i < display.length; i++)
+            Positioned(
+              left: (i * 28).toDouble(),
+              child: Tooltip(
+                message: '${display[i].name}\n${display[i].role}',
+                child: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: Colors.white,
+                  child: CircleAvatar(
+                    radius: 22,
+                    backgroundImage: NetworkImage(display[i].avatarUrl),
+                  ),
+                ),
+              ),
+            ),
+          if (overflow > 0)
+            Positioned(
+              left: (display.length * 28).toDouble(),
+              child: CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.indigo.shade100,
+                child: Text(
+                  '+$overflow',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.bold, color: Colors.indigo.shade700),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 enum _EngagementTab { chats, members, map, about }
 class _CommunityEngagementArea extends ConsumerStatefulWidget {
   const _CommunityEngagementArea({required this.detail});
@@ -419,6 +720,8 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
   String _memberSort = 'name';
   String _mapRoleFilter = 'All roles';
   bool _showArchivedChannels = false;
+  bool _mapOnlyOnline = false;
+  final MapController _mapController = MapController();
 
   @override
   void initState() {
@@ -500,7 +803,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
               child: switch (_selection.first) {
                 _EngagementTab.chats => _buildChatsTab(context, controller, snapshot),
                 _EngagementTab.members => _buildMembersTab(context, controller, snapshot),
-                _EngagementTab.map => _buildMapTab(context, snapshot),
+                _EngagementTab.map => _buildMapTab(context, controller, snapshot),
                 _EngagementTab.about => _buildAboutTab(context, controller, snapshot),
               },
             )
@@ -573,6 +876,8 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
           joinedAt: DateTime.now(),
           expertise: const ['Automation'],
           availability: '24/7',
+          isOnline: true,
+          lastActiveAt: DateTime.now(),
         );
 
     return Column(
@@ -773,6 +1078,19 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
                         onEdit: () => _openMemberComposer(context, controller, existing: member),
                         onRemove: () => controller.removeMember(widget.detail.id, member.id),
                         onToggleModerator: () => controller.toggleModerator(widget.detail.id, member.id),
+                        onTogglePresence: () {
+                          controller
+                              .upsertMember(
+                                widget.detail.id,
+                                member.copyWith(
+                                  isOnline: !member.isOnline,
+                                  lastActiveAt: DateTime.now(),
+                                ),
+                              )
+                              .then((_) {
+                            if (mounted) setState(() {});
+                          });
+                        },
                       ),
                     ))
                 .toList(),
@@ -782,9 +1100,9 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
   }
 
   Map<String, _MemberStatSummary> _memberStats(List<CommunityMemberProfile> members) {
-    final summary = <String, _MemberStatSummary>{};
+    final roleSummary = <String, _MemberStatSummary>{};
     for (final member in members) {
-      summary.update(
+      roleSummary.update(
         member.role,
         (value) => value.copyWith(count: value.count + 1),
         ifAbsent: () => _MemberStatSummary(
@@ -794,6 +1112,27 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
         ),
       );
     }
+    final online = members.where((member) => member.isOnline).length;
+    final moderators = members.where((member) => member.isModerator).length;
+    final pending = members.where((member) => member.status == CommunityMemberStatus.pending).length;
+    final summary = <String, _MemberStatSummary>{
+      'Online now': _MemberStatSummary(
+        count: online,
+        icon: Icons.wifi_tethering_outlined,
+        color: Colors.green,
+      ),
+      'Moderators': _MemberStatSummary(
+        count: moderators,
+        icon: Icons.shield_outlined,
+        color: Colors.indigo,
+      ),
+      'Pending invites': _MemberStatSummary(
+        count: pending,
+        icon: Icons.hourglass_top_outlined,
+        color: Colors.orange,
+      ),
+      ...roleSummary,
+    };
     return summary;
   }
 
@@ -818,16 +1157,29 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
         break;
       case 'name':
       default:
-        filtered.sort((a, b) => a.name.compareTo(b.name));
+        filtered.sort((a, b) {
+          if (a.isOnline != b.isOnline) {
+            return a.isOnline ? -1 : 1;
+          }
+          return a.name.compareTo(b.name);
+        });
         break;
     }
     return filtered;
   }
-  Widget _buildMapTab(BuildContext context, CommunityEngagementSnapshot snapshot) {
+  Widget _buildMapTab(
+    BuildContext context,
+    CommunityEngagementController controller,
+    CommunityEngagementSnapshot snapshot,
+  ) {
     final members = snapshot.members;
-    final filtered = _mapRoleFilter == 'All roles'
-        ? members
-        : members.where((member) => member.role == _mapRoleFilter).toList();
+    final filtered = members
+        .where((member) {
+          final matchesRole = _mapRoleFilter == 'All roles' || member.role == _mapRoleFilter;
+          final matchesPresence = !_mapOnlyOnline || member.isOnline;
+          return matchesRole && matchesPresence;
+        })
+        .toList();
     final center = _averageLatLng(filtered.isEmpty ? members : filtered);
     final markers = filtered
         .map(
@@ -835,11 +1187,24 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
             point: LatLng(member.location.latitude, member.location.longitude),
             width: 44,
             height: 44,
-            builder: (_) => Tooltip(
-              message: '${member.name}\n${member.location.city}, ${member.location.country}',
-              triggerMode: TooltipTriggerMode.tap,
-              child: CircleAvatar(
-                backgroundImage: NetworkImage(member.avatarUrl),
+            builder: (_) => GestureDetector(
+              onTap: () => _showMapMemberActions(context, controller, member),
+              child: Tooltip(
+                message:
+                    '${member.name}\n${member.location.city}, ${member.location.country}\n${member.isOnline ? 'Online' : 'Last active ${_relativePresence(member.lastActiveAt)} ago'}',
+                triggerMode: TooltipTriggerMode.tap,
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: member.isOnline ? Colors.greenAccent : Colors.indigo.shade200,
+                      width: 3,
+                    ),
+                  ),
+                  child: CircleAvatar(
+                    backgroundImage: NetworkImage(member.avatarUrl),
+                  ),
+                ),
               ),
             ),
           ),
@@ -850,6 +1215,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
       ...members.map((member) => member.role).toSet(),
     }.toList()
       ..sort();
+    final onlineCount = filtered.where((member) => member.isOnline).length;
 
     return Column(
       key: const ValueKey('map'),
@@ -867,9 +1233,23 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
                   .toList(),
               onChanged: (value) => setState(() => _mapRoleFilter = value ?? 'All roles'),
             ),
+            FilterChip(
+              label: const Text('Online only'),
+              selected: _mapOnlyOnline,
+              onSelected: (value) => setState(() => _mapOnlyOnline = value),
+            ),
             Chip(
               avatar: const Icon(Icons.place_outlined),
               label: Text('${filtered.length} people visualised'),
+            ),
+            Chip(
+              avatar: const Icon(Icons.wifi_tethering),
+              label: Text('$onlineCount online now'),
+            ),
+            FilledButton.icon(
+              onPressed: () => _openMemberComposer(context, controller),
+              icon: const Icon(Icons.person_pin_circle_outlined),
+              label: const Text('Invite or add member'),
             ),
           ],
         ),
@@ -879,6 +1259,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
           child: SizedBox(
             height: 320,
             child: FlutterMap(
+              mapController: _mapController,
               options: MapOptions(
                 initialCenter: center,
                 initialZoom: 2.8,
@@ -897,19 +1278,101 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
           ),
         ),
         const SizedBox(height: 16),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: filtered
-              .take(6)
-              .map(
-                (member) => Chip(
-                  avatar: CircleAvatar(backgroundImage: NetworkImage(member.avatarUrl)),
-                  label: Text('${member.name.split(' ').first} · ${member.location.city}'),
+        if (filtered.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.indigo.shade100),
+            ),
+            child: const Text('No members match the current filters yet. Adjust filters or invite teammates.'),
+          )
+        else ...[
+          Text('Location roster', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 12),
+          ...filtered.take(6).map(
+                (member) => Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: ListTile(
+                    leading: CircleAvatar(backgroundImage: NetworkImage(member.avatarUrl)),
+                    title: Text(member.name),
+                    subtitle: Text('${member.role} • ${member.location.city}, ${member.location.country}'),
+                    trailing: Wrap(
+                      spacing: 0,
+                      children: [
+                        IconButton(
+                          tooltip: 'Focus on map',
+                          icon: const Icon(Icons.navigation_outlined),
+                          onPressed: () => _focusOnMember(member),
+                        ),
+                        IconButton(
+                          tooltip: 'Edit location',
+                          icon: const Icon(Icons.edit_location_alt_outlined),
+                          onPressed: () => _openLocationEditor(context, controller, member),
+                        ),
+                      ],
+                    ),
+                    onTap: () => _showMapMemberActions(context, controller, member),
+                  ),
                 ),
-              )
-              .toList(),
-        ),
+              ),
+          if (filtered.length > 6)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (context) {
+                    final height = MediaQuery.of(context).size.height * 0.6;
+                    return SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('All mapped members',
+                                style: Theme.of(context).textTheme.titleMedium),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: height,
+                              child: ListView(
+                                children: filtered
+                                    .map(
+                                      (member) => ListTile(
+                                        leading: CircleAvatar(
+                                            backgroundImage: NetworkImage(member.avatarUrl)),
+                                        title: Text(member.name),
+                                        subtitle: Text(
+                                            '${member.location.city}, ${member.location.country} • ${member.role}'),
+                                        trailing: Text(
+                                          member.isOnline
+                                              ? 'Online'
+                                              : 'Active ${_relativePresence(member.lastActiveAt)} ago',
+                                        ),
+                                        onTap: () {
+                                          Navigator.of(context).pop();
+                                          _focusOnMember(member);
+                                          _showMapMemberActions(context, controller, member);
+                                        },
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                icon: const Icon(Icons.list_alt_outlined),
+                label: const Text('View full list'),
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -921,6 +1384,195 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
     final sumLat = members.fold<double>(0, (value, member) => value + member.location.latitude);
     final sumLng = members.fold<double>(0, (value, member) => value + member.location.longitude);
     return LatLng(sumLat / members.length, sumLng / members.length);
+  }
+
+  void _focusOnMember(CommunityMemberProfile member) {
+    _mapController.move(member.location.toLatLng(), 5.6);
+  }
+
+  Future<void> _openLocationEditor(
+    BuildContext context,
+    CommunityEngagementController controller,
+    CommunityMemberProfile member,
+  ) async {
+    final formKey = GlobalKey<FormState>();
+    final latController = TextEditingController(text: member.location.latitude.toStringAsFixed(4));
+    final lngController = TextEditingController(text: member.location.longitude.toStringAsFixed(4));
+    final cityController = TextEditingController(text: member.location.city);
+    final countryController = TextEditingController(text: member.location.country);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Update ${member.name}\'s location'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: latController,
+                decoration: const InputDecoration(labelText: 'Latitude'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                validator: (value) => double.tryParse(value ?? '') == null ? 'Enter a valid latitude' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: lngController,
+                decoration: const InputDecoration(labelText: 'Longitude'),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                validator: (value) => double.tryParse(value ?? '') == null ? 'Enter a valid longitude' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: cityController,
+                decoration: const InputDecoration(labelText: 'City'),
+                validator: (value) => value == null || value.trim().isEmpty ? 'City is required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: countryController,
+                decoration: const InputDecoration(labelText: 'Country'),
+                validator: (value) => value == null || value.trim().isEmpty ? 'Country is required' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(context).pop(true);
+              }
+            },
+            child: const Text('Save location'),
+          )
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final updated = member.copyWith(
+        location: CommunityMemberLocation(
+          latitude: double.parse(latController.text.trim()),
+          longitude: double.parse(lngController.text.trim()),
+          city: cityController.text.trim(),
+          country: countryController.text.trim(),
+        ),
+      );
+      await controller.upsertMember(widget.detail.id, updated);
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  Future<void> _showMapMemberActions(
+    BuildContext context,
+    CommunityEngagementController controller,
+    CommunityMemberProfile member,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: CircleAvatar(backgroundImage: NetworkImage(member.avatarUrl)),
+                title: Text(member.name),
+                subtitle: Text('${member.role} • ${member.location.city}, ${member.location.country}'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.navigation_outlined),
+                title: const Text('Focus on map'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _focusOnMember(member);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.edit_location_alt_outlined),
+                title: const Text('Edit location'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openLocationEditor(context, controller, member);
+                },
+              ),
+              ListTile(
+                leading: Icon(member.isOnline ? Icons.toggle_on : Icons.toggle_off_outlined),
+                title: Text(member.isOnline ? 'Mark offline' : 'Mark online'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  controller
+                      .upsertMember(
+                        widget.detail.id,
+                        member.copyWith(
+                          isOnline: !member.isOnline,
+                          lastActiveAt: DateTime.now(),
+                        ),
+                      )
+                      .then((_) {
+                    if (mounted) setState(() {});
+                  });
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: const Text('Edit member profile'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _openMemberComposer(context, controller, existing: member);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_remove_alt_1_outlined, color: Colors.redAccent),
+                title: const Text('Remove from community'),
+                textColor: Colors.redAccent,
+                onTap: () {
+                  Navigator.of(context).pop();
+                  controller.removeMember(widget.detail.id, member.id).then((_) {
+                    if (mounted) setState(() {});
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _relativePresence(DateTime? timestamp) {
+    if (timestamp == null) {
+      return 'unknown';
+    }
+    final diff = DateTime.now().difference(timestamp);
+    if (diff.inMinutes < 1) {
+      return 'just now';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes}m';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours}h';
+    }
+    if (diff.inDays < 7) {
+      return '${diff.inDays}d';
+    }
+    final weeks = (diff.inDays / 7).floor();
+    if (weeks < 5) {
+      return '${weeks}w';
+    }
+    final months = (diff.inDays / 30).floor();
+    if (months < 12) {
+      return '${months}mo';
+    }
+    final years = (diff.inDays / 365).floor();
+    return '${years}y';
   }
 
   Widget _buildAboutTab(
@@ -1200,6 +1852,8 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
       joinedAt: existing?.joinedAt,
       expertise: existing?.expertise ?? const <String>[],
       availability: existing?.availability ?? '',
+      isOnline: existing?.isOnline ?? true,
+      lastActiveAt: existing?.lastActiveAt,
     );
     final formKey = GlobalKey<FormState>();
     final expertiseController = TextEditingController(text: draft.expertise.join(', '));
@@ -1260,6 +1914,83 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
                         value: draft.isModerator,
                         onChanged: (value) => setModalState(() => draft.isModerator = value),
                         title: const Text('Grant moderator permissions'),
+                      ),
+                      SwitchListTile(
+                        value: draft.isOnline,
+                        onChanged: (value) => setModalState(() => draft.isOnline = value),
+                        title: const Text('Show as online now'),
+                        subtitle:
+                            const Text('Toggle presence for the leaderboard, map highlights, and quick filters.'),
+                      ),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.schedule_outlined),
+                        title: const Text('Last active'),
+                        subtitle: Text(
+                          draft.lastActiveAt != null
+                              ? DateFormat('MMM d, h:mm a').format(draft.lastActiveAt!)
+                              : 'No recent activity recorded',
+                        ),
+                        trailing: TextButton(
+                          onPressed: () async {
+                            final initial = draft.lastActiveAt ?? DateTime.now();
+                            final date = await showDatePicker(
+                              context: context,
+                              initialDate: initial,
+                              firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
+                              lastDate: DateTime.now(),
+                            );
+                            if (date != null) {
+                              final time = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.fromDateTime(initial),
+                              );
+                              if (time != null) {
+                                final combined = DateTime(
+                                  date.year,
+                                  date.month,
+                                  date.day,
+                                  time.hour,
+                                  time.minute,
+                                );
+                                setModalState(() => draft.lastActiveAt = combined);
+                              }
+                            }
+                          },
+                          child: const Text('Change'),
+                        ),
+                        onTap: () async {
+                          final initial = draft.lastActiveAt ?? DateTime.now();
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: initial,
+                            firstDate: DateTime.now().subtract(const Duration(days: 365 * 5)),
+                            lastDate: DateTime.now(),
+                          );
+                          if (date != null) {
+                            final time = await showTimePicker(
+                              context: context,
+                              initialTime: TimeOfDay.fromDateTime(initial),
+                            );
+                            if (time != null) {
+                              final combined = DateTime(
+                                date.year,
+                                date.month,
+                                date.day,
+                                time.hour,
+                                time.minute,
+                              );
+                              setModalState(() => draft.lastActiveAt = combined);
+                            }
+                          }
+                        },
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () => setModalState(() => draft.lastActiveAt = DateTime.now()),
+                          child: const Text('Set to now'),
+                        ),
                       ),
                       TextFormField(
                         initialValue: draft.avatarUrl,
@@ -2308,6 +3039,7 @@ class _MemberCard extends StatelessWidget {
     required this.onEdit,
     required this.onRemove,
     required this.onToggleModerator,
+    required this.onTogglePresence,
   });
 
   final String communityId;
@@ -2315,6 +3047,7 @@ class _MemberCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onRemove;
   final VoidCallback onToggleModerator;
+  final VoidCallback onTogglePresence;
 
   @override
   Widget build(BuildContext context) {
@@ -2374,6 +3107,22 @@ class _MemberCard extends StatelessWidget {
                       runSpacing: 8,
                       children: [
                         Chip(
+                          avatar: Icon(
+                            member.isOnline ? Icons.circle : Icons.schedule_outlined,
+                            color: member.isOnline ? Colors.green : Colors.blueGrey,
+                          ),
+                          label: Text(
+                            member.isOnline
+                                ? 'Online now'
+                                : 'Active ${_relativeTime(member.lastActiveAt)} ago',
+                          ),
+                          backgroundColor:
+                              (member.isOnline ? Colors.green : Colors.blueGrey).withOpacity(0.12),
+                          labelStyle: TextStyle(
+                            color: member.isOnline ? Colors.green.shade800 : Colors.blueGrey.shade700,
+                          ),
+                        ),
+                        Chip(
                           avatar: Icon(member.status.badgeColor == Colors.green
                               ? Icons.verified_user
                               : member.status == CommunityMemberStatus.pending
@@ -2390,6 +3139,14 @@ class _MemberCard extends StatelessWidget {
                     ),
                     Row(
                       children: [
+                        TextButton.icon(
+                          onPressed: onTogglePresence,
+                          icon: Icon(
+                            member.isOnline ? Icons.toggle_on : Icons.toggle_off_outlined,
+                            color: member.isOnline ? Colors.green : null,
+                          ),
+                          label: Text(member.isOnline ? 'Mark offline' : 'Mark online'),
+                        ),
                         TextButton.icon(
                           onPressed: onToggleModerator,
                           icon: Icon(member.isModerator ? Icons.shield : Icons.shield_outlined),
@@ -2436,6 +3193,35 @@ class _MemberCard extends StatelessWidget {
     if (confirmed == true) {
       onRemove();
     }
+  }
+
+  String _relativeTime(DateTime? timestamp) {
+    if (timestamp == null) {
+      return 'unknown';
+    }
+    final diff = DateTime.now().difference(timestamp);
+    if (diff.inMinutes < 1) {
+      return 'just now';
+    }
+    if (diff.inMinutes < 60) {
+      return '${diff.inMinutes}m';
+    }
+    if (diff.inHours < 24) {
+      return '${diff.inHours}h';
+    }
+    if (diff.inDays < 7) {
+      return '${diff.inDays}d';
+    }
+    final weeks = (diff.inDays / 7).floor();
+    if (weeks < 5) {
+      return '${weeks}w';
+    }
+    final months = (diff.inDays / 30).floor();
+    if (months < 12) {
+      return '${months}mo';
+    }
+    final years = (diff.inDays / 365).floor();
+    return '${years}y';
   }
 }
 
