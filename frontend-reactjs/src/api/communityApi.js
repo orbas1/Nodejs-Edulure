@@ -117,3 +117,59 @@ export async function joinCommunity({ communityId, token }) {
   });
   return mapResponse(response);
 }
+
+export async function publishCommunityRunbook({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/operations/runbooks`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:detail`, `community:${communityId}:resources`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function acknowledgeCommunityEscalation({ communityId, escalationId, token, payload }) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/operations/escalations/${escalationId}/acknowledge`,
+    payload ?? {},
+    {
+      token
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function scheduleCommunityEvent({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/operations/events`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:events`, `community:${communityId}:feed`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunityTier({ communityId, tierId, token, payload }) {
+  const response = await httpClient.patch(
+    `/communities/${communityId}/operations/paywall/tiers/${tierId}`,
+    payload,
+    {
+      token,
+      cache: {
+        invalidateTags: [`community:${communityId}:paywall`, `community:${communityId}:detail`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function resolveCommunityIncident({ communityId, incidentId, token, payload }) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/operations/safety/${incidentId}/resolve`,
+    payload ?? {},
+    {
+      token
+    }
+  );
+  return mapResponse(response);
+}

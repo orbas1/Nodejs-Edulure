@@ -1,20 +1,71 @@
 import PropTypes from 'prop-types';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
+import { resolveCommunityIncident } from '../../../api/communityApi.js';
+import { useAuth } from '../../../context/AuthContext.jsx';
 
 export default function CommunitySafety({ dashboard, onRefresh }) {
-  const incidents = useMemo(
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken;
+  const initialIncidents = useMemo(
     () => (Array.isArray(dashboard?.safety?.incidents) ? dashboard.safety.incidents : []),
     [dashboard?.safety?.incidents]
   );
-  const backlog = useMemo(
+  const initialBacklog = useMemo(
     () => (Array.isArray(dashboard?.safety?.backlog) ? dashboard.safety.backlog : []),
     [dashboard?.safety?.backlog]
   );
   const moderators = useMemo(
     () => (Array.isArray(dashboard?.safety?.moderators) ? dashboard.safety.moderators : []),
     [dashboard?.safety?.moderators]
+  );
+  const [incidents, setIncidents] = useState(initialIncidents);
+  const [backlog, setBacklog] = useState(initialBacklog);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setIncidents(initialIncidents);
+  }, [initialIncidents]);
+
+  useEffect(() => {
+    setBacklog(initialBacklog);
+  }, [initialBacklog]);
+
+  const resolveTargetCommunity = (fallbackIncident) =>
+    dashboard?.safety?.targetCommunityId ??
+    fallbackIncident?.communityId ??
+    incidents[0]?.communityId ??
+    backlog[0]?.communityId ??
+    window.prompt('Target community ID');
+
+  const handleResolve = useCallback(
+    async (item) => {
+      if (!token) {
+        setError('You must be signed in to resolve incidents.');
+        return;
+      }
+      const communityId = resolveTargetCommunity(item);
+      if (!communityId) {
+        setError('Community identifier is required to resolve incidents.');
+        return;
+      }
+      setError(null);
+      const note = window.prompt('Resolution summary (optional)') ?? '';
+      try {
+        await resolveCommunityIncident({
+          communityId,
+          incidentId: item.id,
+          token,
+          payload: note ? { resolutionSummary: note } : {}
+        });
+        setIncidents((prev) => prev.filter((incident) => incident.id !== item.id));
+        setBacklog((prev) => prev.filter((task) => task.id !== item.id));
+      } catch (err) {
+        setError(err?.message || 'Failed to resolve incident.');
+      }
+    },
+    [backlog, incidents, token]
   );
 
   if (!dashboard) {
@@ -58,6 +109,13 @@ export default function CommunitySafety({ dashboard, onRefresh }) {
                 <div className="flex flex-wrap gap-2 text-xs text-rose-600">
                   <span className="dashboard-pill border-rose-200 px-3 py-1">Severity: {incident.severity}</span>
                   <span className="dashboard-pill border-rose-200 px-3 py-1">Owner: {incident.owner}</span>
+                  <button
+                    type="button"
+                    className="dashboard-pill border-rose-300 px-3 py-1 text-rose-700"
+                    onClick={() => handleResolve(incident)}
+                  >
+                    Resolve
+                  </button>
                 </div>
               </div>
               <p className="mt-2 text-xs text-rose-600">Opened {incident.openedAt ? new Date(incident.openedAt).toLocaleString() : 'Recently'}</p>
@@ -89,6 +147,13 @@ export default function CommunitySafety({ dashboard, onRefresh }) {
                   <span className="dashboard-pill border-amber-200 px-3 py-1">Owner: {task.owner}</span>
                   <span className="dashboard-pill border-amber-200 px-3 py-1">Status: {task.status}</span>
                   <span className="dashboard-pill border-amber-200 px-3 py-1">Due: {task.due}</span>
+                  <button
+                    type="button"
+                    className="dashboard-pill border-amber-300 px-3 py-1 text-amber-700"
+                    onClick={() => handleResolve(task)}
+                  >
+                    Resolve
+                  </button>
                 </div>
               </div>
             </li>
@@ -99,6 +164,14 @@ export default function CommunitySafety({ dashboard, onRefresh }) {
             title="No backlog"
             description="Escalations and operational tasks will appear here as workflows trigger."
           />
+        ) : null}
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 text-sm text-rose-700"
+          >
+            {error}
+          </div>
         ) : null}
       </section>
 

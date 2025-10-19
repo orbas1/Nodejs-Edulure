@@ -4,6 +4,7 @@ import CommunityController from '../controllers/CommunityController.js';
 import CommunityEngagementController from '../controllers/CommunityEngagementController.js';
 import CommunityChatController from '../controllers/CommunityChatController.js';
 import CommunityMonetizationController from '../controllers/CommunityMonetizationController.js';
+import CommunityOperationsController from '../controllers/CommunityOperationsController.js';
 import auth from '../middleware/auth.js';
 
 const router = Router();
@@ -103,6 +104,32 @@ router.post(
   '/:communityId/subscriptions/:subscriptionId/cancel',
   auth(),
   CommunityMonetizationController.cancelSubscription
+);
+
+router.post(
+  '/:communityId/operations/runbooks',
+  auth(),
+  CommunityOperationsController.publishRunbook
+);
+router.post(
+  '/:communityId/operations/escalations/:caseId/acknowledge',
+  auth(),
+  CommunityOperationsController.acknowledgeEscalation
+);
+router.post(
+  '/:communityId/operations/events',
+  auth(),
+  CommunityOperationsController.scheduleEvent
+);
+router.patch(
+  '/:communityId/operations/paywall/tiers/:tierId',
+  auth('instructor'),
+  CommunityOperationsController.manageTier
+);
+router.post(
+  '/:communityId/operations/safety/:caseId/resolve',
+  auth(),
+  CommunityOperationsController.resolveIncident
 );
 
 router.get('/:communityId/affiliates', auth('instructor'), CommunityMonetizationController.listAffiliates);

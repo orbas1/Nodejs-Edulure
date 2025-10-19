@@ -1,10 +1,14 @@
 import PropTypes from 'prop-types';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
+import { scheduleCommunityEvent } from '../../../api/communityApi.js';
+import { useAuth } from '../../../context/AuthContext.jsx';
 
 export default function CommunityProgramming({ dashboard, onRefresh }) {
-  const events = useMemo(
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken;
+  const initialEvents = useMemo(
     () => (Array.isArray(dashboard?.programming?.upcomingEvents) ? dashboard.programming.upcomingEvents : []),
     [dashboard?.programming?.upcomingEvents]
   );
@@ -16,6 +20,83 @@ export default function CommunityProgramming({ dashboard, onRefresh }) {
     () => (Array.isArray(dashboard?.programming?.broadcasts) ? dashboard.programming.broadcasts : []),
     [dashboard?.programming?.broadcasts]
   );
+  const [events, setEvents] = useState(initialEvents);
+  const [error, setError] = useState(null);
+  const [isScheduling, setIsScheduling] = useState(false);
+
+  useEffect(() => {
+    setEvents(initialEvents);
+  }, [initialEvents]);
+
+  const formatEvent = (event) => ({
+    ...event,
+    date: event.date ?? (event.startAt ? new Date(event.startAt).toLocaleString() : undefined),
+    status: event.status ?? 'scheduled',
+    facilitator: event.facilitator ?? event.owner ?? 'Community team',
+    seats: event.seats ?? (event.attendanceLimit ? `${event.attendanceLimit} seats` : 'Open seating')
+  });
+
+  const handleScheduleEvent = useCallback(async () => {
+    if (!token) {
+      setError('You must be signed in to schedule events.');
+      return;
+    }
+    setError(null);
+    const title = window.prompt('Event title');
+    if (!title) {
+      return;
+    }
+    const startAtInput = window.prompt('Start time (ISO)', new Date().toISOString());
+    const endAtInput = window.prompt(
+      'End time (ISO)',
+      new Date(Date.now() + 60 * 60 * 1000).toISOString()
+    );
+    const communityId =
+      dashboard?.programming?.targetCommunityId ??
+      events[0]?.communityId ??
+      window.prompt('Target community ID');
+    if (!communityId) {
+      setError('Community identifier is required to schedule an event.');
+      return;
+    }
+
+    const optimisticEvent = formatEvent({
+      id: `temp-${Date.now()}`,
+      title,
+      startAt: startAtInput,
+      endAt: endAtInput,
+      facilitator: 'Pending facilitator',
+      seats: 'Pending capacity',
+      status: 'scheduled',
+      communityId
+    });
+    setEvents((prev) => [optimisticEvent, ...prev]);
+    setIsScheduling(true);
+    try {
+      const response = await scheduleCommunityEvent({
+        communityId,
+        token,
+        payload: {
+          title,
+          summary: '',
+          description: '',
+          startAt: startAtInput,
+          endAt: endAtInput,
+          isOnline: true
+        }
+      });
+      if (response.data) {
+        setEvents((prev) =>
+          prev.map((event) => (event.id === optimisticEvent.id ? formatEvent(response.data) : event))
+        );
+      }
+    } catch (err) {
+      setEvents((prev) => prev.filter((event) => event.id !== optimisticEvent.id));
+      setError(err?.message || 'Failed to schedule event.');
+    } finally {
+      setIsScheduling(false);
+    }
+  }, [dashboard?.programming?.targetCommunityId, events, token]);
 
   if (!dashboard) {
     return (
@@ -41,9 +122,14 @@ export default function CommunityProgramming({ dashboard, onRefresh }) {
           <button type="button" className="dashboard-primary-pill" onClick={onRefresh}>
             Refresh agenda
           </button>
-          <a href="/dashboard/community/communications" className="dashboard-pill px-4 py-2">
-            Open communications hub
-          </a>
+          <button
+            type="button"
+            className="dashboard-pill px-4 py-2"
+            onClick={handleScheduleEvent}
+            disabled={isScheduling}
+          >
+            {isScheduling ? 'Scheduling…' : 'Schedule event'}
+          </button>
         </div>
       </header>
 
@@ -74,6 +160,14 @@ export default function CommunityProgramming({ dashboard, onRefresh }) {
             title="No rituals scheduled"
             description="Plan a live classroom or cohort ritual to populate the programming roadmap."
           />
+        ) : null}
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 text-sm text-rose-700"
+          >
+            {error}
+          </div>
         ) : null}
       </section>
 
