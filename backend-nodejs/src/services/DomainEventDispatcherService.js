@@ -7,12 +7,14 @@ import logger from '../config/logger.js';
 import { metricsRegistry } from '../observability/metrics.js';
 import DomainEventDispatchModel from '../models/DomainEventDispatchModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import DomainEventDeadLetterModel from '../models/DomainEventDeadLetterModel.js';
 import webhookEventBusService from './WebhookEventBusService.js';
 
 const ATTEMPTS_METRIC = 'edulure_domain_event_dispatch_attempts_total';
 const DURATION_METRIC = 'edulure_domain_event_dispatch_duration_seconds';
 const FAILURE_METRIC = 'edulure_domain_event_dispatch_failures_total';
 const QUEUE_GAUGE_METRIC = 'edulure_domain_event_dispatch_queue_depth';
+const DEAD_LETTER_GAUGE_METRIC = 'edulure_domain_event_dead_letters_total';
 
 let attemptCounter = metricsRegistry.getSingleMetric(ATTEMPTS_METRIC);
 if (!attemptCounter) {
@@ -55,6 +57,16 @@ if (!queueGauge) {
   metricsRegistry.registerMetric(queueGauge);
 }
 
+let deadLetterGauge = metricsRegistry.getSingleMetric(DEAD_LETTER_GAUGE_METRIC);
+if (!deadLetterGauge) {
+  deadLetterGauge = new promClient.Gauge({
+    name: DEAD_LETTER_GAUGE_METRIC,
+    help: 'Number of domain events stored in the dead-letter queue',
+    labelNames: ['status']
+  });
+  metricsRegistry.registerMetric(deadLetterGauge);
+}
+
 function resolveConfig(source = {}) {
   return {
     enabled: source.enabled !== false,
@@ -90,12 +102,14 @@ export class DomainEventDispatcherService {
     config = env.domainEvents?.dispatch ?? {},
     dispatchModel = DomainEventDispatchModel,
     eventModel = DomainEventModel,
+    deadLetterModel = DomainEventDeadLetterModel,
     webhookBus = webhookEventBusService,
     loggerInstance = logger.child({ service: 'domain-event-dispatcher' })
   } = {}) {
     this.config = resolveConfig(config);
     this.dispatchModel = dispatchModel;
     this.eventModel = eventModel;
+    this.deadLetterModel = deadLetterModel;
     this.webhookBus = webhookBus;
     this.logger = loggerInstance;
 
@@ -201,6 +215,15 @@ export class DomainEventDispatcherService {
     const queueDepth = await this.dispatchModel.countPending();
     queueGauge.set({ status: 'pending' }, queueDepth);
 
+    if (this.deadLetterModel?.count) {
+      try {
+        const deadLetters = await this.deadLetterModel.count();
+        deadLetterGauge.set({ status: 'dead_letter' }, deadLetters);
+      } catch (error) {
+        this.logger.error({ err: error }, 'Failed to record domain event dead-letter gauge');
+      }
+    }
+
     const claimed = await this.dispatchModel.takeBatch(
       { limit: this.batchSize, workerId: this.workerId },
       undefined
@@ -304,6 +327,32 @@ export class DomainEventDispatcherService {
           backoffSeconds
         }
       });
+
+      if (terminal && this.deadLetterModel?.record) {
+        const failureReason = error?.code || error?.name || 'dispatch_failed';
+        const failureMessage = error?.message || String(error);
+        const stack = typeof error?.stack === 'string' ? error.stack.slice(0, 4000) : null;
+        const deadLetterMetadata = {
+          entityType: event.entityType ?? null,
+          entityId: event.entityId ?? null,
+          performedBy: event.performedBy ?? null,
+          stack
+        };
+        try {
+          await this.deadLetterModel.record({
+            dispatchId: dispatch.id,
+            eventId: event.id,
+            eventType: event.eventType ?? 'unknown',
+            attemptCount: attemptNumber,
+            failureReason,
+            failureMessage,
+            eventPayload: event.payload ?? {},
+            metadata: deadLetterMetadata
+          });
+        } catch (deadLetterError) {
+          this.logger.error({ err: deadLetterError, dispatchId: dispatch.id }, 'Failed to persist domain event dead-letter entry');
+        }
+      }
 
       failureCounter.inc({ ...labels, terminal: terminal ? 'yes' : 'no' }, 1);
       attemptCounter.inc({ ...labels, outcome: terminal ? 'failed' : 'retry' }, 1);

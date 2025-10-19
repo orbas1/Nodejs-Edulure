@@ -35,3 +35,5 @@ Progress is tracked per task and subtask across the required dimensions. Overall
 | &nbsp;&nbsp;Documentation and enablement refresh | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 | &nbsp;&nbsp;Governance and stakeholder communications | 100% | 100% | 100% | 100% | 100% | 100% | 100% |
 
+
+_Last updated 2025-10-19: Domain event dead-letter instrumentation and metrics landed to keep Task 1 automation hardening at full compliance._

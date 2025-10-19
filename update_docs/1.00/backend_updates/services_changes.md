@@ -1,6 +1,7 @@
 # Service Changes – Version 1.00
 
 - Added `DomainEventDispatcherService` to orchestrate outbox processing with configurable polling, exponential backoff, jitter, stuck-job recovery, and Prometheus instrumentation. The service publishes dispatched events to the webhook bus using correlation-aware metadata so subscriber webhooks receive consistent payloads.
+- Layered a `DomainEventDeadLetterModel` and dispatcher integration that records terminal failures with payload context, stack metadata, and a Prometheus gauge so engineers can audit and replay problematic events without requeuing them blindly. 【F:backend-nodejs/src/models/DomainEventDeadLetterModel.js†L1-L128】【F:backend-nodejs/src/services/DomainEventDispatcherService.js†L1-L247】
 - Updated the worker bootstrap to register the dispatcher alongside existing schedulers. Readiness probes now expose a `domain-event-dispatcher` component that reports degraded state when the pipeline is disabled and surfaces start-up failures to logs.
 - Extended `DomainEventModel` so every recorded event can enqueue a dispatch entry within the same transaction while preserving backward compatibility for services that pass custom connections. JSON payloads are normalised to avoid parsing bugs during replay.
 - Introduced `FeatureFlagGovernanceService` to synchronise the new manifest catalogue, hydrate tenant overrides, emit audit records, and refresh the runtime cache so feature availability matches documented rollout plans.

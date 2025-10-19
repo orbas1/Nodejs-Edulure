@@ -20,6 +20,7 @@
   to lazily hydrate catalogue, cohort analytics, assignments, authoring drafts, and learner risk signals only when instructors
   actually own courses, cutting unnecessary imports while returning a production-ready `coursesWorkspace` payload for the API.
 - Implemented a production-grade domain event dispatch pipeline powered by a persistent queue, exponential backoff, jitter, and Prometheus metrics so domain events now flow reliably to webhook subscribers instead of remaining passive audit rows.
+- Added a hardened domain event dead-letter queue with dedicated migration, model, dispatcher integration, and Prometheus gauge coverage so exhausted retries are persisted for on-call triage without reprocessing the same payloads on every worker tick. 【F:backend-nodejs/migrations/20250318121500_domain_event_dead_letters.js†L1-L55】【F:backend-nodejs/src/models/DomainEventDeadLetterModel.js†L1-L128】【F:backend-nodejs/src/services/DomainEventDispatcherService.js†L1-L247】
 - Registered the dispatcher with the worker service readiness probes to ensure background automation boots alongside existing schedulers and surfaces health in probes and logs.
 - Hardened the domain event model with JSON normalisation, transaction-aware dispatch enqueueing, and backward-compatible options so existing services transparently gain outbox support.
 - Delivered manifest-driven feature flag governance with bootstrap synchronisation, tenant override storage, and admin APIs so operators can activate capabilities safely across tenants without database changes or engineer intervention.
