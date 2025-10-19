@@ -1,10 +1,14 @@
 import PropTypes from 'prop-types';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
+import { updateCommunityTier } from '../../../api/communityApi.js';
+import { useAuth } from '../../../context/AuthContext.jsx';
 
 export default function CommunityMonetisation({ dashboard, onRefresh }) {
-  const tiers = useMemo(
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken;
+  const initialTiers = useMemo(
     () => (Array.isArray(dashboard?.monetisation?.tiers) ? dashboard.monetisation.tiers : []),
     [dashboard?.monetisation?.tiers]
   );
@@ -15,6 +19,51 @@ export default function CommunityMonetisation({ dashboard, onRefresh }) {
   const insights = useMemo(
     () => (Array.isArray(dashboard?.monetisation?.insights) ? dashboard.monetisation.insights : []),
     [dashboard?.monetisation?.insights]
+  );
+  const [tiers, setTiers] = useState(initialTiers);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setTiers(initialTiers);
+  }, [initialTiers]);
+
+  const resolveCommunityId = () =>
+    dashboard?.monetisation?.targetCommunityId ??
+    tiers[0]?.communityId ??
+    window.prompt('Target community ID');
+
+  const handleToggleTier = useCallback(
+    async (tier) => {
+      if (!token) {
+        setError('You must be signed in to manage tiers.');
+        return;
+      }
+      const communityId = resolveCommunityId();
+      if (!communityId) {
+        setError('Community identifier is required to manage tiers.');
+        return;
+      }
+      setError(null);
+      const optimistic = tiers.map((entry) =>
+        entry.id === tier.id ? { ...entry, isActive: !entry.isActive } : entry
+      );
+      setTiers(optimistic);
+      try {
+        const response = await updateCommunityTier({
+          communityId,
+          tierId: tier.id,
+          token,
+          payload: { isActive: !tier.isActive }
+        });
+        if (response.data) {
+          setTiers((prev) => prev.map((entry) => (entry.id === tier.id ? response.data : entry)));
+        }
+      } catch (err) {
+        setTiers(initialTiers);
+        setError(err?.message || 'Failed to update tier.');
+      }
+    },
+    [initialTiers, tiers, token]
   );
 
   if (!dashboard) {
@@ -56,7 +105,17 @@ export default function CommunityMonetisation({ dashboard, onRefresh }) {
                 <span className="dashboard-pill px-3 py-1">{tier.members}</span>
                 <span className="dashboard-pill px-3 py-1">{tier.churn}</span>
                 <span className="dashboard-pill px-3 py-1">Next: {tier.renewal}</span>
+                <span className="dashboard-pill px-3 py-1">
+                  {tier.isActive === false ? 'Inactive' : 'Active'}
+                </span>
               </div>
+              <button
+                type="button"
+                className="mt-4 rounded-full border border-primary/20 px-4 py-2 text-xs font-semibold text-primary"
+                onClick={() => handleToggleTier(tier)}
+              >
+                {tier.isActive === false ? 'Activate tier' : 'Pause tier'}
+              </button>
             </div>
           ))}
           {tiers.length === 0 ? (
@@ -66,6 +125,14 @@ export default function CommunityMonetisation({ dashboard, onRefresh }) {
             />
           ) : null}
         </div>
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 text-sm text-rose-700"
+          >
+            {error}
+          </div>
+        ) : null}
       </section>
 
       <section className="dashboard-section space-y-4">
