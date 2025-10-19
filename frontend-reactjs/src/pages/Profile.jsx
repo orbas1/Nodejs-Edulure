@@ -13,7 +13,7 @@ import {
   requestVerificationUpload,
   submitVerificationPackage
 } from '../api/verificationApi.js';
-import { fetchCurrentUser } from '../api/userApi.js';
+import { fetchCurrentUser, updateCurrentUser } from '../api/userApi.js';
 import {
   approveFollowRequest,
   declineFollowRequest,
@@ -25,6 +25,7 @@ import {
 } from '../api/socialGraphApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
+import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
 
 const defaultProfile = {
   name: 'Alex Morgan',
@@ -320,6 +321,156 @@ function buildLocationFromAddress(address, fallback = 'Not specified') {
   return fallback;
 }
 
+function deriveSocialHandle(url) {
+  if (!url) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, '');
+    const path = parsed.pathname.replace(/\/+$/, '').replace(/^\/+/, '');
+    return path ? `${host}/${path}` : host;
+  } catch (_error) {
+    return url;
+  }
+}
+
+function normaliseAddressRecord(address) {
+  if (!address || typeof address !== 'object') {
+    return null;
+  }
+
+  return {
+    line1: address.line1 ?? address.addressLine1 ?? null,
+    line2: address.line2 ?? address.addressLine2 ?? null,
+    city: address.city ?? address.town ?? null,
+    region: address.region ?? address.state ?? null,
+    postalCode: address.postalCode ?? address.postcode ?? address.zip ?? null,
+    country: address.country ?? null,
+    formatted: address.formatted ?? address.formattedAddress ?? null
+  };
+}
+
+function normaliseSocialLinksForProfile(links, fallbackLinks = []) {
+  const safeLinks = Array.isArray(links) ? links : [];
+  const normalised = safeLinks
+    .filter((link) => link && link.url)
+    .map((link) => {
+      const handle = link.handle ?? deriveSocialHandle(link.url);
+      return {
+        id: link.id ?? link.url ?? handle,
+        label: link.label ?? handle,
+        url: link.url,
+        handle
+      };
+    });
+
+  if (normalised.length > 0) {
+    return normalised;
+  }
+
+  return (fallbackLinks ?? []).map((link) => ({
+    id: link.id ?? link.url ?? link.label,
+    label: link.label ?? deriveSocialHandle(link.url),
+    url: link.url,
+    handle: link.handle ?? deriveSocialHandle(link.url)
+  }));
+}
+
+function buildProfileStateFromUser(user) {
+  if (!user) {
+    return { ...defaultProfile };
+  }
+
+  const profileRecord = typeof user.profile === 'object' && user.profile !== null ? user.profile : {};
+  const addressRecord = normaliseAddressRecord(user.address);
+  const location = profileRecord.location ?? buildLocationFromAddress(addressRecord ?? user.address, defaultProfile.location);
+  const socialLinks = normaliseSocialLinksForProfile(profileRecord.socialLinks, defaultProfile.social);
+
+  return {
+    ...defaultProfile,
+    id: user.id ?? defaultProfile.id,
+    email: user.email ?? defaultProfile.email,
+    role: user.role ?? defaultProfile.role,
+    firstName: user.firstName ?? '',
+    lastName: user.lastName ?? '',
+    name:
+      profileRecord.displayName && profileRecord.displayName.trim().length > 0
+        ? profileRecord.displayName.trim()
+        : formatPersonName(user) || defaultProfile.name,
+    handle: user.email ? `@${user.email.split('@')[0]}` : defaultProfile.handle,
+    tagline: profileRecord.tagline ?? defaultProfile.tagline,
+    bio: profileRecord.bio ?? defaultProfile.bio,
+    avatar: profileRecord.avatarUrl ?? defaultProfile.avatar,
+    banner: profileRecord.bannerUrl ?? defaultProfile.banner,
+    location,
+    social: socialLinks,
+    address: addressRecord,
+    followers: user.followers ?? defaultProfile.followers,
+    following: user.following ?? defaultProfile.following,
+    profileRecord
+  };
+}
+
+function createProfileFormState(profileState) {
+  const address = profileState.address ?? {};
+  return {
+    firstName: profileState.firstName ?? '',
+    lastName: profileState.lastName ?? '',
+    displayName: profileState.name ?? '',
+    tagline: profileState.tagline ?? '',
+    location: profileState.location ?? '',
+    bio: profileState.bio ?? '',
+    avatarUrl: profileState.avatar ?? '',
+    bannerUrl: profileState.banner ?? '',
+    socialLinks: (profileState.social ?? []).map((link) => ({
+      label: link.label ?? '',
+      url: link.url ?? '',
+      handle: link.handle ?? ''
+    })),
+    address: {
+      line1: address.line1 ?? '',
+      line2: address.line2 ?? '',
+      city: address.city ?? '',
+      region: address.region ?? '',
+      country: address.country ?? '',
+      postalCode: address.postalCode ?? '',
+      formatted: address.formatted ?? ''
+    }
+  };
+}
+
+function cleanAddressForPayload(address) {
+  if (!address || typeof address !== 'object') {
+    return null;
+  }
+
+  const cleaned = {};
+  const fields = ['line1', 'line2', 'city', 'region', 'postalCode', 'country', 'formatted'];
+  fields.forEach((field) => {
+    if (address[field] !== undefined && address[field] !== null) {
+      const value = typeof address[field] === 'string' ? address[field].trim() : address[field];
+      if (value) {
+        cleaned[field] = value;
+      }
+    }
+  });
+
+  return Object.keys(cleaned).length > 0 ? cleaned : null;
+}
+
+function emptyToNull(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  return value;
+}
+
 function resolveStatusColour(status) {
   switch (status) {
     case 'approved':
@@ -364,6 +515,11 @@ export default function Profile() {
   const token = session?.tokens?.accessToken ?? null;
 
   const [profile, setProfile] = useState(defaultProfile);
+  const [profileForm, setProfileForm] = useState(() => createProfileFormState(defaultProfile));
+  const [profileFormDirty, setProfileFormDirty] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState(null);
+  const [profileSaveSuccess, setProfileSaveSuccess] = useState(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState(null);
   const [selectedIdType, setSelectedIdType] = useState(defaultProfile.verification.supported[0]);
@@ -421,6 +577,63 @@ export default function Profile() {
     [consents]
   );
 
+  const resetProfileMessages = useCallback(() => {
+    setProfileSaveError(null);
+    setProfileSaveSuccess(null);
+  }, []);
+
+  const handleProfileFieldChange = useCallback((field, value) => {
+    setProfileForm((prev) => ({ ...prev, [field]: value }));
+    setProfileFormDirty(true);
+    resetProfileMessages();
+  }, [resetProfileMessages]);
+
+  const handleProfileAddressChange = useCallback((field, value) => {
+    setProfileForm((prev) => ({
+      ...prev,
+      address: { ...(prev.address ?? {}), [field]: value }
+    }));
+    setProfileFormDirty(true);
+    resetProfileMessages();
+  }, [resetProfileMessages]);
+
+  const handleSocialLinkChange = useCallback(
+    (index, nextLink) => {
+      setProfileForm((prev) => {
+        const currentLinks = Array.isArray(prev.socialLinks) ? prev.socialLinks : [];
+        const updated = currentLinks.map((link, idx) => (idx === index ? { ...link, ...nextLink } : link));
+        return { ...prev, socialLinks: updated };
+      });
+      setProfileFormDirty(true);
+      resetProfileMessages();
+    },
+    [resetProfileMessages]
+  );
+
+  const handleAddSocialLink = useCallback(() => {
+    setProfileForm((prev) => ({
+      ...prev,
+      socialLinks: [...(prev.socialLinks ?? []), { label: '', url: '', handle: '' }]
+    }));
+    setProfileFormDirty(true);
+    resetProfileMessages();
+  }, [resetProfileMessages]);
+
+  const handleRemoveSocialLink = useCallback(
+    (index) => {
+      setProfileForm((prev) => {
+        const currentLinks = Array.isArray(prev.socialLinks) ? prev.socialLinks : [];
+        if (currentLinks.length <= 1) {
+          return { ...prev, socialLinks: [{ label: '', url: '', handle: '' }] };
+        }
+        return { ...prev, socialLinks: currentLinks.filter((_, idx) => idx !== index) };
+      });
+      setProfileFormDirty(true);
+      resetProfileMessages();
+    },
+    [resetProfileMessages]
+  );
+
   useEffect(() => {
     if (!profile.verification?.supported?.length) {
       return;
@@ -445,9 +658,62 @@ export default function Profile() {
   };
   const profileOwnerId = profile?.id ?? userId ?? null;
 
+  const handleProfileSubmit = useCallback(async () => {
+    if (!token) {
+      setProfileSaveError('You need to be signed in to update your profile.');
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileSaveError(null);
+    setProfileSaveSuccess(null);
+
+    try {
+      const socialLinksPayload = (profileForm.socialLinks ?? [])
+        .filter((link) => typeof link?.url === 'string' && link.url.trim().length > 0)
+        .map((link) => ({
+          label: emptyToNull(link.label),
+          url: link.url.trim(),
+          handle: emptyToNull(link.handle)
+        }));
+
+      const payload = {
+        firstName: emptyToNull(profileForm.firstName),
+        lastName: emptyToNull(profileForm.lastName),
+        profile: {
+          displayName: emptyToNull(profileForm.displayName),
+          tagline: emptyToNull(profileForm.tagline),
+          location: emptyToNull(profileForm.location),
+          bio: emptyToNull(profileForm.bio),
+          avatarUrl: emptyToNull(profileForm.avatarUrl),
+          bannerUrl: emptyToNull(profileForm.bannerUrl),
+          socialLinks: socialLinksPayload
+        },
+        address: cleanAddressForPayload(profileForm.address)
+      };
+
+      const response = await updateCurrentUser({ token, payload });
+      const updated = response?.data ?? null;
+      if (updated) {
+        const nextProfile = buildProfileStateFromUser(updated);
+        setProfile(nextProfile);
+        setProfileForm(createProfileFormState(nextProfile));
+        setProfileFormDirty(false);
+        setProfileSaveSuccess('Profile updated successfully.');
+      }
+    } catch (error) {
+      setProfileSaveError(error?.message ?? 'Unable to update profile at this time.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }, [profileForm, token]);
+
   const loadProfile = useCallback(async () => {
     if (!token) {
       setProfile(defaultProfile);
+      setProfileForm(createProfileFormState(defaultProfile));
+      setProfileFormDirty(false);
+      resetProfileMessages();
       setProfileError(null);
       return;
     }
@@ -457,23 +723,18 @@ export default function Profile() {
       const response = await fetchCurrentUser({ token });
       const user = response?.data ?? null;
       if (user) {
-        setProfile((prev) => ({
-          ...prev,
-          id: user.id,
-          name: formatPersonName(user),
-          handle: user.email ? `@${user.email.split('@')[0]}` : prev.handle,
-          location: buildLocationFromAddress(user.address, prev.location),
-          role: user.role ?? prev.role,
-          email: user.email ?? prev.email,
-          address: user.address ?? prev.address
-        }));
+        const nextProfile = buildProfileStateFromUser(user);
+        setProfile(nextProfile);
+        setProfileForm(createProfileFormState(nextProfile));
+        setProfileFormDirty(false);
+        resetProfileMessages();
       }
     } catch (error) {
       setProfileError(error?.message ?? 'Unable to load profile details.');
     } finally {
       setProfileLoading(false);
     }
-  }, [token]);
+  }, [token, resetProfileMessages]);
 
   const loadFollowers = useCallback(
     async ({ append = false, offset = 0 } = {}) => {
@@ -652,12 +913,13 @@ export default function Profile() {
   const hasMoreFollowing = following.length < (followingMeta.total ?? following.length);
   const hasPendingApprovals = pendingFollowers.length > 0;
   const isOwnProfile = useMemo(
-    () => (profileOwnerId && userId ? Number(profileOwnerId) === Number(userId) : true),
-    [profileOwnerId, userId]
+    () => Boolean(token && profileOwnerId && userId && Number(profileOwnerId) === Number(userId)),
+    [token, profileOwnerId, userId]
   );
   const profileSettingsHref = session?.user?.role
     ? `/dashboard/${session.user.role}/settings`
     : '/dashboard/user/settings';
+  const canSubmitProfile = profileFormDirty && !isSavingProfile;
 
   const updateFollowActionState = useCallback((targetId, updates) => {
     if (!targetId) {
@@ -1171,6 +1433,22 @@ export default function Profile() {
             </div>
           </div>
         </div>
+
+        {isOwnProfile && (
+          <ProfileIdentityEditor
+            form={profileForm}
+            onFieldChange={handleProfileFieldChange}
+            onAddressChange={handleProfileAddressChange}
+            onSocialLinkChange={handleSocialLinkChange}
+            onAddSocialLink={handleAddSocialLink}
+            onRemoveSocialLink={handleRemoveSocialLink}
+            onSubmit={handleProfileSubmit}
+            isSaving={isSavingProfile}
+            canSubmit={canSubmitProfile}
+            error={profileSaveError}
+            success={profileSaveSuccess}
+          />
+        )}
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,_2fr)_minmax(0,_1fr)]">
           <div className="space-y-8">
@@ -1785,20 +2063,31 @@ export default function Profile() {
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Social presence</h2>
               <ul className="mt-3 space-y-3 text-sm text-slate-600">
-                {profile.social.map((socialLink) => (
-                  <li key={socialLink.label} className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-slate-900">{socialLink.label}</p>
-                      <p className="text-xs text-slate-500">{socialLink.handle}</p>
-                    </div>
-                    <a href={socialLink.url} className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-                      Visit
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                        <path d="M5.75 4a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-1.5 0V6.56l-9.22 9.22a.75.75 0 1 1-1.06-1.06l9.22-9.22H5.75A.75.75 0 0 1 5 4.75.75.75 0 0 1 5.75 4Z" />
-                      </svg>
-                    </a>
-                  </li>
-                ))}
+                {profile.social
+                  .filter((socialLink) => socialLink?.url)
+                  .map((socialLink) => {
+                    const handle = socialLink.handle ?? deriveSocialHandle(socialLink.url);
+                    const key = socialLink.id ?? socialLink.url ?? socialLink.label;
+                    return (
+                      <li key={key} className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold text-slate-900">{socialLink.label ?? handle}</p>
+                          <p className="text-xs text-slate-500">{handle}</p>
+                        </div>
+                        <a
+                          href={socialLink.url}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Visit
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                            <path d="M5.75 4a.75.75 0 0 1 .75-.75h8.5a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-1.5 0V6.56l-9.22 9.22a.75.75 0 1 1-1.06-1.06l9.22-9.22H5.75A.75.75 0 0 1 5 4.75.75.75 0 0 1 5.75 4Z" />
+                          </svg>
+                        </a>
+                      </li>
+                    );
+                  })}
               </ul>
             </div>
           </div>
