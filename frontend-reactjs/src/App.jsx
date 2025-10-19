@@ -56,6 +56,7 @@ import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
 import AdminIntegrations from './pages/dashboard/AdminIntegrations.jsx';
 import AdminFinanceMonetisation from './pages/dashboard/admin/AdminFinanceMonetisation.jsx';
 import AdminSupportHub from './pages/dashboard/admin/AdminSupportHub.jsx';
+import AdminControl from './pages/dashboard/AdminControl.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
 import CommunityMonetisation from './pages/dashboard/community/CommunityMonetisation.jsx';
@@ -215,6 +216,14 @@ function App() {
         <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
         <Route path="tutor-management" element={<InstructorTutorManagement />} />
+        <Route
+          path="control"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminControl />
+            </ProtectedRoute>
+          )}
+        />
         <Route
           path="operator"
           element={(

@@ -72,6 +72,8 @@ export async function seed(knex) {
     await trx('explorer_search_events').del();
     await trx('ads_campaign_metrics_daily').del();
     await trx('ads_campaigns').del();
+    await trx('podcast_episodes').del();
+    await trx('podcast_shows').del();
     await trx('live_classroom_registrations').del();
     await trx('live_classrooms').del();
     await trx('tutor_bookings').del();
@@ -1531,6 +1533,58 @@ export async function seed(knex) {
       registered_at: trx.fn.now(),
       metadata: JSON.stringify({ bookingId: opsTutorBookingId, seat: 'A-14' })
     });
+
+    const [opsPodcastShowId] = await trx('podcast_shows').insert({
+      community_id: opsCommunityId,
+      owner_id: instructorId,
+      title: 'Ops Control Tower',
+      slug: 'ops-control-tower',
+      subtitle: 'War-room briefings and launch retrospectives with automation leads.',
+      description:
+        'Weekly debriefs with automation captains, discussing incident response drills, telemetry rollouts, and service desk upgrades.',
+      cover_image_url: 'https://cdn.edulure.test/podcasts/ops-control.jpg',
+      category: 'operations',
+      status: 'published',
+      is_public: true,
+      distribution_channels: 'Spotify, Apple Podcasts, RSS',
+      launch_at: trx.fn.now(),
+      metadata: JSON.stringify({ cadence: 'weekly', producer: 'Ops Enablement' })
+    });
+
+    await trx('podcast_episodes').insert([
+      {
+        show_id: opsPodcastShowId,
+        title: 'Incident Simulation Playbook',
+        slug: 'incident-simulation-playbook',
+        summary: 'Simulating escalation drills and telemetry guardrails for live classrooms.',
+        description:
+          'Breakdown of the automation rehearsal used in the latest live classroom, with mitigation timelines, tooling walkthroughs, and post-mortem highlights.',
+        audio_url: 'https://cdn.edulure.test/audio/ops-control/episode-1.mp3',
+        video_url: null,
+        duration_seconds: 1800,
+        season_number: 1,
+        episode_number: 1,
+        status: 'published',
+        publish_at: trx.fn.now(),
+        metadata: JSON.stringify({ guest: 'Kai Watanabe', topics: ['Automation', 'Telemetry'] })
+      },
+      {
+        show_id: opsPodcastShowId,
+        title: 'Service Desk Automation Matrix',
+        slug: 'service-desk-automation-matrix',
+        summary: 'Designing orchestration matrices for hybrid tutor and automation workflows.',
+        description:
+          'Discussion on blending tutor escalations with automation bots, featuring metrics from the service suite and updates on compliance guardrails.',
+        audio_url: 'https://cdn.edulure.test/audio/ops-control/episode-2.mp3',
+        video_url: 'https://cdn.edulure.test/video/ops-control/episode-2.mp4',
+        duration_seconds: 2100,
+        season_number: 1,
+        episode_number: 2,
+        status: 'scheduled',
+        publish_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        metadata: JSON.stringify({ guest: 'Amina Diallo', topics: ['Service Desk', 'Automation'] })
+      }
+    ]);
 
     const [directThreadId] = await trx('direct_message_threads').insert({
       subject: 'Launch Readiness Sync',

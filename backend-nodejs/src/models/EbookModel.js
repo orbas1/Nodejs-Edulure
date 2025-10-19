@@ -94,6 +94,48 @@ function sanitiseSlug(value) {
 }
 
 export default class EbookModel {
+  static async listAll({ search, status, limit = 50, offset = 0 } = {}, connection = db) {
+    const query = connection(TABLE)
+      .select(BASE_COLUMNS)
+      .orderBy('updated_at', 'desc');
+
+    if (status) {
+      query.andWhere('status', status);
+    }
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('title', `%${search}%`)
+          .orWhereILike('slug', `%${search}%`)
+          .orWhereILike('description', `%${search}%`);
+      });
+    }
+
+    const rows = await query.limit(limit).offset(offset);
+    return rows.map((row) => this.deserialize(row));
+  }
+
+  static async countAll({ search, status } = {}, connection = db) {
+    const query = connection(TABLE);
+
+    if (status) {
+      query.andWhere('status', status);
+    }
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('title', `%${search}%`)
+          .orWhereILike('slug', `%${search}%`)
+          .orWhereILike('description', `%${search}%`);
+      });
+    }
+
+    const result = await query.count({ total: '*' }).first();
+    return Number(result?.total ?? 0);
+  }
+
   static async create(ebook, connection = db) {
     const payload = {
       public_id: ebook.publicId,
@@ -298,5 +340,9 @@ export default class EbookModel {
       metadata: parseMetadata(row.metadata),
       isPublic: Boolean(row.isPublic)
     };
+  }
+
+  static async deleteById(id, connection = db) {
+    await connection(TABLE).where({ id }).del();
   }
 }

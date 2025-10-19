@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import AdminBlogController from '../controllers/AdminBlogController.js';
+import AdminControlController from '../controllers/AdminControlController.js';
 import AdminFeatureFlagController from '../controllers/AdminFeatureFlagController.js';
 import AdminIntegrationsController from '../controllers/AdminIntegrationsController.js';
 import AdminSettingsController from '../controllers/AdminSettingsController.js';
@@ -93,5 +94,40 @@ router.delete(
   auth('admin'),
   AdminFeatureFlagController.removeOverride
 );
+
+router.get('/control/communities', auth('admin'), AdminControlController.listCommunities);
+router.post('/control/communities', auth('admin'), AdminControlController.createCommunity);
+router.put('/control/communities/:communityId', auth('admin'), AdminControlController.updateCommunity);
+router.delete('/control/communities/:communityId', auth('admin'), AdminControlController.deleteCommunity);
+
+router.get('/control/courses', auth('admin'), AdminControlController.listCourses);
+router.post('/control/courses', auth('admin'), AdminControlController.createCourse);
+router.put('/control/courses/:courseId', auth('admin'), AdminControlController.updateCourse);
+router.delete('/control/courses/:courseId', auth('admin'), AdminControlController.deleteCourse);
+
+router.get('/control/tutors', auth('admin'), AdminControlController.listTutors);
+router.post('/control/tutors', auth('admin'), AdminControlController.createTutor);
+router.put('/control/tutors/:tutorId', auth('admin'), AdminControlController.updateTutor);
+router.delete('/control/tutors/:tutorId', auth('admin'), AdminControlController.deleteTutor);
+
+router.get('/control/ebooks', auth('admin'), AdminControlController.listEbooks);
+router.post('/control/ebooks', auth('admin'), AdminControlController.createEbook);
+router.put('/control/ebooks/:ebookId', auth('admin'), AdminControlController.updateEbook);
+router.delete('/control/ebooks/:ebookId', auth('admin'), AdminControlController.deleteEbook);
+
+router.get('/control/live-streams', auth('admin'), AdminControlController.listLiveStreams);
+router.post('/control/live-streams', auth('admin'), AdminControlController.createLiveStream);
+router.put('/control/live-streams/:streamId', auth('admin'), AdminControlController.updateLiveStream);
+router.delete('/control/live-streams/:streamId', auth('admin'), AdminControlController.deleteLiveStream);
+
+router.get('/control/podcasts', auth('admin'), AdminControlController.listPodcastShows);
+router.post('/control/podcasts', auth('admin'), AdminControlController.createPodcastShow);
+router.put('/control/podcasts/:showId', auth('admin'), AdminControlController.updatePodcastShow);
+router.delete('/control/podcasts/:showId', auth('admin'), AdminControlController.deletePodcastShow);
+
+router.get('/control/podcasts/:showId/episodes', auth('admin'), AdminControlController.listPodcastEpisodes);
+router.post('/control/podcasts/:showId/episodes', auth('admin'), AdminControlController.createPodcastEpisode);
+router.put('/control/podcasts/:showId/episodes/:episodeId', auth('admin'), AdminControlController.updatePodcastEpisode);
+router.delete('/control/podcasts/:showId/episodes/:episodeId', auth('admin'), AdminControlController.deletePodcastEpisode);
 
 export default router;

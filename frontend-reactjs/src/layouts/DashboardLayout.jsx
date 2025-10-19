@@ -12,6 +12,7 @@ import {
   ChartBarIcon,
   ChevronRightIcon,
   ClipboardDocumentListIcon,
+  CommandLineIcon,
   Cog6ToothIcon,
   DocumentTextIcon,
   IdentificationIcon,
@@ -180,6 +181,7 @@ const navigationByRole = {
       name: 'Control',
       icon: ShieldCheckIcon,
       children: [
+        { id: 'admin-control-centre', name: 'Control centre', to: `${basePath}/control`, icon: CommandLineIcon },
         { id: 'admin-command', name: 'Command', to: `${basePath}/operator`, icon: ShieldExclamationIcon },
         { id: 'admin-integrations', name: 'Integrations', to: `${basePath}/integrations`, icon: PuzzlePieceIcon },
         { id: 'admin-governance', name: 'Governance', to: `${basePath}/governance`, icon: ShieldCheckIcon }
