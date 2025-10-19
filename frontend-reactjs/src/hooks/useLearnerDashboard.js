@@ -32,13 +32,25 @@ export function useLearnerDashboardContext() {
 export function useLearnerDashboardSection(sectionKey) {
   const { role, isLearner, dashboard, refresh } = useLearnerDashboardContext();
 
-  const section = useMemo(() => {
-    if (!dashboard || !sectionKey) return dashboard;
-    const value = dashboard?.[sectionKey];
-    if (Array.isArray(value)) {
-      return value.length > 0 ? value : [];
+  const { section, loading, error } = useMemo(() => {
+    if (!dashboard || !sectionKey) {
+      return { section: dashboard, loading: false, error: null };
     }
-    return value ?? null;
+
+    const value = dashboard?.[sectionKey];
+    if (value && typeof value === 'object' && ('data' in value || 'loading' in value || 'error' in value)) {
+      return {
+        section: value.data ?? null,
+        loading: Boolean(value.loading ?? (value.status === 'loading')), // eslint-disable-line no-nested-ternary
+        error: value.error ?? null
+      };
+    }
+
+    if (Array.isArray(value)) {
+      return { section: value.length > 0 ? value : [], loading: false, error: null };
+    }
+
+    return { section: value ?? null, loading: false, error: null };
   }, [dashboard, sectionKey]);
 
   return useMemo(
@@ -47,9 +59,11 @@ export function useLearnerDashboardSection(sectionKey) {
       isLearner,
       dashboard,
       section,
+      loading,
+      error,
       refresh
     }),
-    [role, isLearner, dashboard, section, refresh]
+    [role, isLearner, dashboard, section, loading, error, refresh]
   );
 }
 
