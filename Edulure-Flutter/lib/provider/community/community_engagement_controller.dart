@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../services/community_chat_service.dart';
+import '../../services/community_hub_models.dart';
 import '../../services/community_service.dart';
 
 final communityEngagementControllerProvider =
@@ -267,6 +268,57 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
     _updateSnapshot(communityId, snapshot.copyWith(about: about));
   }
 
+  Future<void> upsertLeaderboardEntry(String communityId, CommunityLeaderboardEntry entry) async {
+    final snapshot = _requireSnapshot(communityId);
+    var leaderboard = [...snapshot.leaderboard];
+    CommunityLeaderboardEntry candidate = entry;
+    if (candidate.id.isEmpty) {
+      candidate = CommunityLeaderboardEntry(
+        id: _generateId('ldr'),
+        memberName: entry.memberName,
+        points: entry.points,
+        avatarUrl: entry.avatarUrl,
+        badges: entry.badges,
+        trend: entry.trend,
+      );
+    }
+    final index = leaderboard.indexWhere((existing) => existing.id == candidate.id);
+    if (index >= 0) {
+      leaderboard[index] = candidate;
+    } else {
+      leaderboard.add(candidate);
+    }
+    leaderboard = _rankLeaderboard(leaderboard);
+    _updateSnapshot(communityId, snapshot.copyWith(leaderboard: leaderboard));
+  }
+
+  Future<void> adjustLeaderboardPoints(String communityId, String entryId, int delta) async {
+    final snapshot = _requireSnapshot(communityId);
+    final leaderboard = snapshot.leaderboard
+        .map(
+          (entry) => entry.id == entryId
+              ? entry.copyWith(
+                  points: max(0, entry.points + delta),
+                  trend: entry.trend + delta,
+                )
+              : entry,
+        )
+        .toList();
+    _updateSnapshot(communityId, snapshot.copyWith(leaderboard: _rankLeaderboard(leaderboard)));
+  }
+
+  Future<void> removeLeaderboardEntry(String communityId, String entryId) async {
+    final snapshot = _requireSnapshot(communityId);
+    final leaderboard = snapshot.leaderboard.where((entry) => entry.id != entryId).toList();
+    _updateSnapshot(communityId, snapshot.copyWith(leaderboard: _rankLeaderboard(leaderboard)));
+  }
+
+  Future<void> resetLeaderboard(String communityId) async {
+    final snapshot = _requireSnapshot(communityId);
+    final leaderboard = _rankLeaderboard(_seedLeaderboard(communityId, snapshot.members));
+    _updateSnapshot(communityId, snapshot.copyWith(leaderboard: leaderboard));
+  }
+
   CommunityEngagementSnapshot _requireSnapshot(String communityId) {
     final snapshot = state.snapshots[communityId];
     if (snapshot == null) {
@@ -299,11 +351,13 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         }
         final members = existing?.members ?? _seedMembers(detail.id);
         final about = existing?.about ?? _seedAbout(detail);
+        final leaderboard = _rankLeaderboard(existing?.leaderboard ?? _seedLeaderboard(detail.id, members));
         return CommunityEngagementSnapshot(
           channels: channels,
           messages: messages,
           members: members,
           about: about,
+          leaderboard: leaderboard,
           lastSyncedAt: now,
           lastUpdatedAt: now,
         );
@@ -320,6 +374,7 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
         seededMessages[channel.id] = _seedMessages(channel, seededMembers);
       }
     }
+    final leaderboard = _rankLeaderboard(existing?.leaderboard ?? _seedLeaderboard(detail.id, seededMembers));
     final about = CommunityAbout(
       mission: detail.description?.isNotEmpty == true
           ? detail.description!
@@ -358,6 +413,7 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
       channels: seededChannels,
       messages: seededMessages,
       members: seededMembers,
+      leaderboard: leaderboard,
       about: about,
       lastSyncedAt: now,
       lastUpdatedAt: now,
@@ -706,6 +762,67 @@ class CommunityEngagementController extends StateNotifier<CommunityEngagementSta
   String _generateId(String prefix) {
     return '$prefix-${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(9999)}';
   }
+
+  List<CommunityLeaderboardEntry> _rankLeaderboard(List<CommunityLeaderboardEntry> entries) {
+    final sorted = List<CommunityLeaderboardEntry>.from(entries)
+      ..sort((a, b) => b.points.compareTo(a.points));
+    final ranked = <CommunityLeaderboardEntry>[];
+    var lastPoints = -1;
+    var currentRank = 0;
+    for (var i = 0; i < sorted.length; i++) {
+      final entry = sorted[i];
+      if (entry.points != lastPoints) {
+        currentRank = i + 1;
+        lastPoints = entry.points;
+      }
+      ranked.add(entry.copyWith(rank: currentRank));
+    }
+    return ranked;
+  }
+
+  List<CommunityLeaderboardEntry> _seedLeaderboard(String communityId, List<CommunityMemberProfile> members) {
+    final prioritized = List<CommunityMemberProfile>.from(members)
+      ..sort((a, b) {
+        final aActive = a.lastActiveAt ?? a.joinedAt;
+        final bActive = b.lastActiveAt ?? b.joinedAt;
+        return (bActive ?? DateTime.now()).compareTo(aActive ?? DateTime.now());
+      });
+    final top = prioritized.take(10).toList();
+    final entries = <CommunityLeaderboardEntry>[];
+    for (var i = 0; i < top.length; i++) {
+      final member = top[i];
+      final basePoints = 940 - (i * 60) + (member.isOnline ? 25 : 0) + (member.isModerator ? 40 : 0);
+      final points = max(120, basePoints);
+      final badges = <String>[];
+      if (member.isModerator) badges.add('Community Admin');
+      if (member.isOnline) badges.add('Presence Pro');
+      if (member.expertise.isNotEmpty) badges.add(member.expertise.first);
+      if (member.status == CommunityMemberStatus.pending) badges.add('Rising Star');
+      entries.add(
+        CommunityLeaderboardEntry(
+          id: 'ldr-${member.id}',
+          memberName: member.name,
+          points: points,
+          avatarUrl: member.avatarUrl,
+          badges: badges,
+          trend: _random.nextInt(31) - 10,
+        ),
+      );
+    }
+    if (entries.isEmpty) {
+      entries.add(
+        CommunityLeaderboardEntry(
+          id: _generateId('ldr'),
+          memberName: 'First milestone',
+          points: 200,
+          avatarUrl: 'https://i.pravatar.cc/150?img=5',
+          badges: const ['Trailblazer'],
+          trend: 6,
+        ),
+      );
+    }
+    return entries;
+  }
 }
 
 class CommunityEngagementSnapshot {
@@ -713,6 +830,7 @@ class CommunityEngagementSnapshot {
     required this.channels,
     required this.messages,
     required this.members,
+    required this.leaderboard,
     required this.about,
     required this.lastSyncedAt,
     required this.lastUpdatedAt,
@@ -721,6 +839,7 @@ class CommunityEngagementSnapshot {
   final List<CommunityChatChannel> channels;
   final Map<String, List<CommunityChatMessage>> messages;
   final List<CommunityMemberProfile> members;
+  final List<CommunityLeaderboardEntry> leaderboard;
   final CommunityAbout about;
   final DateTime lastSyncedAt;
   final DateTime lastUpdatedAt;
@@ -729,6 +848,7 @@ class CommunityEngagementSnapshot {
     List<CommunityChatChannel>? channels,
     Map<String, List<CommunityChatMessage>>? messages,
     List<CommunityMemberProfile>? members,
+    List<CommunityLeaderboardEntry>? leaderboard,
     CommunityAbout? about,
     DateTime? lastSyncedAt,
     DateTime? lastUpdatedAt,
@@ -737,6 +857,7 @@ class CommunityEngagementSnapshot {
       channels: channels ?? this.channels,
       messages: messages ?? this.messages,
       members: members ?? this.members,
+      leaderboard: leaderboard ?? this.leaderboard,
       about: about ?? this.about,
       lastSyncedAt: lastSyncedAt ?? this.lastSyncedAt,
       lastUpdatedAt: lastUpdatedAt ?? this.lastUpdatedAt,

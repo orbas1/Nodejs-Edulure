@@ -10,6 +10,7 @@ import '../provider/community/community_engagement_controller.dart';
 import '../provider/feed/live_feed_controller.dart';
 import '../services/community_service.dart';
 import '../services/live_feed_service.dart';
+import '../services/community_hub_models.dart';
 import '../widgets/feed_composer_sheet.dart';
 import '../widgets/feed_entry_card.dart';
 
@@ -242,6 +243,7 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
     final partnerDeck = about?.partnerDeckUrl ?? metadata['partnerDeck']?.toString() ?? '';
     final pressKit = about?.pressKitUrl ?? metadata['pressKit']?.toString() ?? '';
     final highlightMembers = members.take(8).toList();
+    final topLeaders = (snapshot?.leaderboard ?? const <CommunityLeaderboardEntry>[]).take(3).toList();
     final lastUpdated = snapshot?.lastUpdatedAt ?? detail.updatedAt ?? detail.createdAt ?? DateTime.now();
 
     return Container(
@@ -391,6 +393,12 @@ class _CommunityProfileScreenState extends ConsumerState<CommunityProfileScreen>
             Text('Recently active members', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             _MemberAvatarStack(members: highlightMembers),
+          ],
+          if (topLeaders.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('Leaderboard spotlight', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            _LeaderboardSpotlight(entries: topLeaders),
           ],
           const SizedBox(height: 20),
           Text(
@@ -700,7 +708,138 @@ class _MemberAvatarStack extends StatelessWidget {
   }
 }
 
-enum _EngagementTab { chats, members, map, about }
+class _LeaderboardSpotlight extends StatelessWidget {
+  const _LeaderboardSpotlight({required this.entries});
+
+  final List<CommunityLeaderboardEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth > 640;
+        final itemWidth = horizontal
+            ? (constraints.maxWidth - (entries.length - 1) * 12) / entries.length
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: entries.map((entry) {
+            final rank = entries.indexOf(entry) + 1;
+            final accent = switch (rank) {
+              1 => Colors.amber,
+              2 => Colors.blueGrey,
+              3 => Colors.deepOrange,
+              _ => Theme.of(context).colorScheme.primary,
+            };
+            final gradient = LinearGradient(
+              colors: [accent.withOpacity(0.16), Colors.white],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            );
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: horizontal ? itemWidth : constraints.maxWidth,
+                maxWidth: horizontal ? itemWidth : constraints.maxWidth,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: gradient,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: accent.withOpacity(0.4)),
+                  boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 14, offset: Offset(0, 6))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          backgroundImage:
+                              entry.avatarUrl.isNotEmpty ? NetworkImage(entry.avatarUrl) : null,
+                          child: entry.avatarUrl.isEmpty
+                              ? Text(
+                                  entry.memberName.trim().isNotEmpty
+                                      ? entry.memberName.trim()[0].toUpperCase()
+                                      : '?',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                entry.memberName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${entry.points} pts • rank $rank',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: accent.darken()),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Chip(
+                          label: Text('+${entry.trend.abs()} this week'),
+                          backgroundColor:
+                              entry.trend >= 0 ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+                          labelStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: entry.trend >= 0 ? Colors.green.shade800 : Colors.red.shade700,
+                              ),
+                        ),
+                      ],
+                    ),
+                    if (entry.badges.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: entry.badges
+                            .map(
+                              (badge) => Chip(
+                                avatar: const Icon(Icons.workspace_premium_outlined, size: 16),
+                                label: Text(badge),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+extension _ColorDarkener on Color {
+  Color darken([double amount = .2]) {
+    assert(amount >= 0 && amount <= 1);
+    final hsl = HSLColor.fromColor(this);
+    final hslDark = hsl.withLightness((hsl.lightness - amount).clamp(0.0, 1.0));
+    return hslDark.toColor();
+  }
+}
+
+enum _EngagementTab { chats, members, map, leaderboard, about }
 class _CommunityEngagementArea extends ConsumerStatefulWidget {
   const _CommunityEngagementArea({required this.detail});
 
@@ -714,6 +853,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
   Set<_EngagementTab> _selection = const {_EngagementTab.chats};
   final TextEditingController _channelSearchController = TextEditingController();
   final TextEditingController _memberSearchController = TextEditingController();
+  final TextEditingController _leaderboardSearchController = TextEditingController();
   final Set<CommunityChatChannelType> _channelTypeFilters = <CommunityChatChannelType>{};
   CommunityMemberStatus? _memberStatusFilter;
   bool _membersOnlyModerators = false;
@@ -721,6 +861,10 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
   String _mapRoleFilter = 'All roles';
   bool _showArchivedChannels = false;
   bool _mapOnlyOnline = false;
+  bool _leaderboardOnlineOnly = false;
+  bool _leaderboardAdminsOnly = false;
+  bool _leaderboardRisingOnly = false;
+  String _leaderboardView = 'All time';
   final MapController _mapController = MapController();
 
   @override
@@ -735,6 +879,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
   void dispose() {
     _channelSearchController.dispose();
     _memberSearchController.dispose();
+    _leaderboardSearchController.dispose();
     super.dispose();
   }
 
@@ -783,6 +928,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
               ButtonSegment(value: _EngagementTab.chats, label: Text('Chats'), icon: Icon(Icons.forum_outlined)),
               ButtonSegment(value: _EngagementTab.members, label: Text('Members'), icon: Icon(Icons.people_outline)),
               ButtonSegment(value: _EngagementTab.map, label: Text('Map'), icon: Icon(Icons.map_outlined)),
+              ButtonSegment(value: _EngagementTab.leaderboard, label: Text('Leaderboard'), icon: Icon(Icons.emoji_events_outlined)),
               ButtonSegment(value: _EngagementTab.about, label: Text('About'), icon: Icon(Icons.info_outline)),
             ],
             selected: _selection,
@@ -804,6 +950,7 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
                 _EngagementTab.chats => _buildChatsTab(context, controller, snapshot),
                 _EngagementTab.members => _buildMembersTab(context, controller, snapshot),
                 _EngagementTab.map => _buildMapTab(context, controller, snapshot),
+                _EngagementTab.leaderboard => _buildLeaderboardTab(context, controller, snapshot),
                 _EngagementTab.about => _buildAboutTab(context, controller, snapshot),
               },
             )
@@ -1167,6 +1314,202 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
     }
     return filtered;
   }
+
+  Widget _buildLeaderboardTab(
+    BuildContext context,
+    CommunityEngagementController controller,
+    CommunityEngagementSnapshot snapshot,
+  ) {
+    final rows = snapshot.leaderboard
+        .map(
+          (entry) => _LeaderboardRow(
+            entry: entry,
+            member: _memberForLeaderboard(snapshot.members, entry),
+            displayRank: entry.rank,
+          ),
+        )
+        .toList();
+
+    final search = _leaderboardSearchController.text.trim().toLowerCase();
+    var filtered = rows.where((row) {
+      final haystack = '${row.entry.memberName} ${row.entry.badges.join(' ')} ${(row.member?.role ?? '')}'.toLowerCase();
+      if (search.isNotEmpty && !haystack.contains(search)) {
+        return false;
+      }
+      if (_leaderboardOnlineOnly && !(row.member?.isOnline ?? false)) {
+        return false;
+      }
+      if (_leaderboardAdminsOnly && !(row.member?.isModerator ?? false)) {
+        return false;
+      }
+      if (_leaderboardRisingOnly && row.entry.trend < 0) {
+        return false;
+      }
+      return true;
+    }).toList();
+
+    switch (_leaderboardView) {
+      case 'This week':
+        filtered.sort((a, b) => b.entry.trend.compareTo(a.entry.trend));
+        break;
+      case 'This month':
+        filtered.sort(
+          (a, b) =>
+              (b.entry.points + (b.entry.trend * 2)).compareTo(a.entry.points + (a.entry.trend * 2)),
+        );
+        break;
+      case 'All time':
+      default:
+        filtered.sort((a, b) => b.entry.points.compareTo(a.entry.points));
+        break;
+    }
+
+    for (var i = 0; i < filtered.length; i++) {
+      filtered[i] = filtered[i].copyWith(displayRank: i + 1);
+    }
+
+    final totalPoints = filtered.fold<int>(0, (value, row) => value + row.entry.points);
+    final risingLeaders = filtered.where((row) => row.entry.trend > 0).length;
+    final onlineLeaders = filtered.where((row) => row.member?.isOnline ?? false).length;
+    final podium = filtered.take(3).toList();
+    final remainder = filtered.skip(3).toList();
+
+    return Column(
+      key: const ValueKey('leaderboard'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 260,
+              child: TextField(
+                controller: _leaderboardSearchController,
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Search contributors or badges',
+                  suffixIcon: _leaderboardSearchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _leaderboardSearchController.clear();
+                            setState(() {});
+                          },
+                        ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            DropdownButton<String>(
+              value: _leaderboardView,
+              onChanged: (value) => setState(() => _leaderboardView = value ?? 'All time'),
+              items: const [
+                DropdownMenuItem(value: 'All time', child: Text('All time')),
+                DropdownMenuItem(value: 'This week', child: Text('This week')),
+                DropdownMenuItem(value: 'This month', child: Text('This month')),
+              ],
+            ),
+            FilterChip(
+              label: const Text('Online only'),
+              selected: _leaderboardOnlineOnly,
+              onSelected: (value) => setState(() => _leaderboardOnlineOnly = value),
+            ),
+            FilterChip(
+              label: const Text('Admins only'),
+              selected: _leaderboardAdminsOnly,
+              onSelected: (value) => setState(() => _leaderboardAdminsOnly = value),
+            ),
+            FilterChip(
+              label: const Text('Rising this week'),
+              selected: _leaderboardRisingOnly,
+              onSelected: (value) => setState(() => _leaderboardRisingOnly = value),
+            ),
+            FilledButton.icon(
+              onPressed: () => _openLeaderboardComposer(context, controller, snapshot),
+              icon: const Icon(Icons.emoji_events),
+              label: const Text('Add recognition'),
+            ),
+            TextButton.icon(
+              onPressed: () => _confirmResetLeaderboard(context, controller),
+              icon: const Icon(Icons.refresh_outlined),
+              label: const Text('Rebuild leaderboard'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            Chip(
+              avatar: const Icon(Icons.stacked_bar_chart),
+              label: Text('${filtered.length} leaders'),
+            ),
+            Chip(
+              avatar: const Icon(Icons.scoreboard_outlined),
+              label: Text('$totalPoints pts cumulative'),
+            ),
+            Chip(
+              avatar: const Icon(Icons.trending_up_outlined),
+              label: Text('$risingLeaders trending up'),
+            ),
+            Chip(
+              avatar: const Icon(Icons.wifi_tethering),
+              label: Text('$onlineLeaders online now'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (filtered.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.indigo.shade100),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('No leaderboard entries match these filters yet.',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => _openLeaderboardComposer(context, controller, snapshot),
+                  icon: const Icon(Icons.emoji_events_outlined),
+                  label: const Text('Celebrate a contributor'),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          if (podium.isNotEmpty) ...[
+            Text('Podium', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            _LeaderboardPodium(rows: podium),
+            const SizedBox(height: 20),
+          ],
+          if (remainder.isNotEmpty)
+            Text('Leaderboard roster', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 12),
+          ...remainder.map(
+            (row) => _LeaderboardEntryTile(
+              row: row,
+              onEdit: () => _openLeaderboardComposer(context, controller, snapshot, existing: row.entry),
+              onDelete: () => _confirmRemoveLeaderboardEntry(context, controller, row.entry),
+              onAdjust: (delta) => _adjustLeaderboardPoints(controller, row.entry, delta),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildMapTab(
     BuildContext context,
     CommunityEngagementController controller,
@@ -1544,6 +1887,19 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
         );
       },
     );
+  }
+
+  CommunityMemberProfile? _memberForLeaderboard(
+    List<CommunityMemberProfile> members,
+    CommunityLeaderboardEntry entry,
+  ) {
+    final normalizedId = entry.id.startsWith('ldr-') ? entry.id.substring(4) : entry.id;
+    for (final member in members) {
+      if (member.id == entry.id || member.id == normalizedId || member.name == entry.memberName) {
+        return member;
+      }
+    }
+    return null;
   }
 
   String _relativePresence(DateTime? timestamp) {
@@ -2110,6 +2466,230 @@ class _CommunityEngagementAreaState extends ConsumerState<_CommunityEngagementAr
       setState(() {});
     }
   }
+  Future<void> _openLeaderboardComposer(
+    BuildContext context,
+    CommunityEngagementController controller,
+    CommunityEngagementSnapshot snapshot, {
+    CommunityLeaderboardEntry? existing,
+  }) async {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController(text: existing?.memberName ?? '');
+    final pointsController = TextEditingController(text: (existing?.points ?? 250).toString());
+    final avatarController = TextEditingController(text: existing?.avatarUrl ?? '');
+    final badgesController = TextEditingController(text: (existing?.badges ?? const <String>[]).join(', '));
+    final presetBadges = <String>['Momentum Maker', 'Top Mentor', 'Sprint Hero', 'Ops Champion', 'Community Admin'];
+    CommunityMemberProfile? selectedMember =
+        existing == null ? null : _memberForLeaderboard(snapshot.members, existing);
+    String selectedOption = selectedMember?.name ?? 'Custom contributor';
+    final memberOptions = <String>['Custom contributor', ...snapshot.members.map((member) => member.name)];
+    var trend = existing?.trend ?? 0;
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        existing == null ? 'Celebrate contributor' : 'Update recognition',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: selectedOption,
+                        decoration: const InputDecoration(labelText: 'Link to community member'),
+                        items: memberOptions
+                            .map((name) => DropdownMenuItem<String>(value: name, child: Text(name)))
+                            .toList(),
+                        onChanged: (value) {
+                          setModalState(() {
+                            selectedOption = value ?? 'Custom contributor';
+                            if (selectedOption == 'Custom contributor') {
+                              selectedMember = null;
+                            } else {
+                              selectedMember = snapshot.members
+                                  .firstWhere((member) => member.name == selectedOption);
+                              nameController.text = selectedMember!.name;
+                              if (avatarController.text.trim().isEmpty || existing == null) {
+                                avatarController.text = selectedMember!.avatarUrl;
+                              }
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Display name'),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty ? 'Name is required' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: pointsController,
+                        decoration: const InputDecoration(labelText: 'Points'),
+                        keyboardType: TextInputType.number,
+                        validator: (value) =>
+                            value == null || int.tryParse(value.trim()) == null ? 'Enter points' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: avatarController,
+                        decoration: const InputDecoration(labelText: 'Avatar URL (optional)'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: badgesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Badges',
+                          helperText: 'Comma separated achievements',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: presetBadges
+                            .map(
+                              (badge) => ActionChip(
+                                label: Text(badge),
+                                onPressed: () => setModalState(() {
+                                  final tokens = badgesController.text
+                                      .split(',')
+                                      .map((token) => token.trim())
+                                      .where((token) => token.isNotEmpty)
+                                      .toSet();
+                                  if (tokens.add(badge)) {
+                                    badgesController.text = tokens.join(', ');
+                                  }
+                                }),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Trend adjustment', style: Theme.of(context).textTheme.bodyMedium),
+                          Slider(
+                            value: trend.toDouble(),
+                            min: -50,
+                            max: 100,
+                            divisions: 30,
+                            label: trend >= 0 ? '+$trend' : '$trend',
+                            onChanged: (value) => setModalState(() => trend = value.round()),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: FilledButton(
+                          onPressed: () {
+                            if (formKey.currentState?.validate() ?? false) {
+                              if (avatarController.text.trim().isEmpty && selectedMember != null) {
+                                avatarController.text = selectedMember!.avatarUrl;
+                              }
+                              Navigator.of(context).pop(true);
+                            }
+                          },
+                          child: Text(existing == null ? 'Add to leaderboard' : 'Save changes'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true) {
+      final badges = badgesController.text
+          .split(',')
+          .map((badge) => badge.trim())
+          .where((badge) => badge.isNotEmpty)
+          .toList();
+      final id = existing?.id ?? (selectedMember != null ? 'ldr-${selectedMember!.id}' : '');
+      final points = int.tryParse(pointsController.text.trim()) ?? (existing?.points ?? 0);
+      final entry = CommunityLeaderboardEntry(
+        id: id,
+        memberName: nameController.text.trim(),
+        points: points,
+        avatarUrl: avatarController.text.trim(),
+        badges: badges,
+        trend: trend,
+      );
+      await controller.upsertLeaderboardEntry(widget.detail.id, entry);
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _confirmRemoveLeaderboardEntry(
+    BuildContext context,
+    CommunityEngagementController controller,
+    CommunityLeaderboardEntry entry,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove from leaderboard'),
+        content: Text('Remove ${entry.memberName} from the recognition board?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await controller.removeLeaderboardEntry(widget.detail.id, entry.id);
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _confirmResetLeaderboard(
+    BuildContext context,
+    CommunityEngagementController controller,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rebuild leaderboard'),
+        content: const Text('Recalculate the leaderboard from current members? This replaces existing entries.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Rebuild')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await controller.resetLeaderboard(widget.detail.id);
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _adjustLeaderboardPoints(
+    CommunityEngagementController controller,
+    CommunityLeaderboardEntry entry,
+    int delta,
+  ) async {
+    await controller.adjustLeaderboardPoints(widget.detail.id, entry.id, delta);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _openAboutEditor(
     BuildContext context,
     CommunityEngagementController controller,
@@ -2278,6 +2858,294 @@ class _MemberStatSummary {
       count: count ?? this.count,
       icon: icon ?? this.icon,
       color: color ?? this.color,
+    );
+  }
+}
+
+class _LeaderboardRow {
+  const _LeaderboardRow({
+    required this.entry,
+    required this.displayRank,
+    this.member,
+  });
+
+  final CommunityLeaderboardEntry entry;
+  final CommunityMemberProfile? member;
+  final int displayRank;
+
+  _LeaderboardRow copyWith({
+    CommunityLeaderboardEntry? entry,
+    CommunityMemberProfile? member,
+    int? displayRank,
+  }) {
+    return _LeaderboardRow(
+      entry: entry ?? this.entry,
+      member: member ?? this.member,
+      displayRank: displayRank ?? this.displayRank,
+    );
+  }
+}
+
+class _LeaderboardPodium extends StatelessWidget {
+  const _LeaderboardPodium({required this.rows});
+
+  final List<_LeaderboardRow> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth > 640;
+        final itemWidth = horizontal
+            ? (constraints.maxWidth - (rows.length - 1) * 12) / rows.length
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: rows.map((row) {
+            final accent = switch (row.displayRank) {
+              1 => Colors.amber,
+              2 => Colors.blueGrey,
+              3 => Colors.deepOrange,
+              _ => Theme.of(context).colorScheme.primary,
+            };
+            return ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: horizontal ? itemWidth : constraints.maxWidth,
+                maxWidth: horizontal ? itemWidth : constraints.maxWidth,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: accent.withOpacity(0.35)),
+                  boxShadow: const [BoxShadow(color: Color(0x11000000), blurRadius: 18, offset: Offset(0, 10))],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundImage: row.entry.avatarUrl.isNotEmpty
+                              ? NetworkImage(row.entry.avatarUrl)
+                              : null,
+                          child: row.entry.avatarUrl.isEmpty
+                              ? Text(
+                                  row.entry.memberName.trim().isNotEmpty
+                                      ? row.entry.memberName.trim()[0].toUpperCase()
+                                      : '?',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.bold),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                row.entry.memberName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${row.entry.points} pts • Rank ${row.displayRank}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: Colors.indigo.shade700),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Chip(
+                          label: Text(row.entry.trend >= 0 ? '+${row.entry.trend}' : row.entry.trend.toString()),
+                          backgroundColor: row.entry.trend >= 0
+                              ? Colors.green.withOpacity(0.15)
+                              : Colors.red.withOpacity(0.15),
+                          labelStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: row.entry.trend >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                              ),
+                        ),
+                      ],
+                    ),
+                    if (row.member != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        '${row.member!.role}${row.member!.isOnline ? ' • Online now' : ''}',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.grey.shade700),
+                      ),
+                    ],
+                    if (row.entry.badges.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: row.entry.badges
+                            .map((badge) => Chip(
+                                  avatar: const Icon(Icons.workspace_premium_outlined, size: 16),
+                                  label: Text(badge),
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+}
+
+class _LeaderboardEntryTile extends StatelessWidget {
+  const _LeaderboardEntryTile({
+    required this.row,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onAdjust,
+  });
+
+  final _LeaderboardRow row;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final void Function(int delta) onAdjust;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = row.displayRank == 1
+        ? Colors.amber
+        : row.displayRank == 2
+            ? Colors.blueGrey
+            : theme.colorScheme.primary;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        leading: Stack(
+          alignment: Alignment.bottomRight,
+          children: [
+            CircleAvatar(
+              radius: 26,
+              backgroundImage:
+                  row.entry.avatarUrl.isNotEmpty ? NetworkImage(row.entry.avatarUrl) : null,
+              child: row.entry.avatarUrl.isEmpty
+                  ? Text(
+                      row.entry.memberName.trim().isNotEmpty
+                          ? row.entry.memberName.trim()[0].toUpperCase()
+                          : '?',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    )
+                  : null,
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: CircleAvatar(
+                radius: 12,
+                backgroundColor: accent,
+                child: Text(
+                  row.displayRank.toString(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        title: Text(
+          row.entry.memberName,
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              '${row.entry.points} pts • ${row.entry.trend >= 0 ? '+' : ''}${row.entry.trend} trend',
+              style: theme.textTheme.bodySmall,
+            ),
+            if (row.member != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '${row.member!.role}${row.member!.isOnline ? ' • Online' : ''}',
+                  style: theme.textTheme.bodySmall?.copyWith(color: Colors.indigo.shade700),
+                ),
+              ),
+            if (row.entry.badges.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: row.entry.badges
+                      .map((badge) => Chip(
+                            label: Text(badge),
+                          ))
+                      .toList(),
+                ),
+              ),
+          ],
+        ),
+        isThreeLine: true,
+        trailing: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: 'Add 25 points',
+                  icon: const Icon(Icons.add_circle_outline),
+                  onPressed: () => onAdjust(25),
+                ),
+                IconButton(
+                  tooltip: 'Deduct 25 points',
+                  icon: const Icon(Icons.remove_circle_outline),
+                  onPressed: () => onAdjust(-25),
+                ),
+              ],
+            ),
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                switch (value) {
+                  case 'edit':
+                    onEdit();
+                    break;
+                  case 'remove':
+                    onDelete();
+                    break;
+                }
+              },
+              itemBuilder: (context) => const [
+                PopupMenuItem(value: 'edit', child: Text('Edit entry')),
+                PopupMenuItem(value: 'remove', child: Text('Remove')),
+              ],
+            ),
+          ],
+        ),
+        onTap: onEdit,
+      ),
     );
   }
 }
