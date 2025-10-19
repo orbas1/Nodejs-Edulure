@@ -64,6 +64,27 @@ const scamReportSchema = Joi.object({
   channel: Joi.string().max(60).default('in_app')
 });
 
+const scamReportStatusEnum = [
+  'pending',
+  'triage',
+  'investigating',
+  'escalated',
+  'action_required',
+  'resolved',
+  'dismissed',
+  'ignored'
+];
+
+const scamUpdateSchema = Joi.object({
+  status: Joi.string().valid(...scamReportStatusEnum).optional(),
+  riskScore: Joi.number().integer().min(0).max(100).optional(),
+  handledBy: Joi.number().integer().min(1).allow(null).optional(),
+  resolvedAt: Joi.date().iso().allow(null).optional(),
+  reason: Joi.string().max(500).optional(),
+  description: Joi.string().max(2000).allow('', null).optional(),
+  metadata: Joi.object().optional()
+}).min(1);
+
 const scamQuerySchema = Joi.object({
   status: Joi.alternatives().try(Joi.string(), Joi.array().items(Joi.string())),
   communityId: Joi.number().integer().min(1).optional(),
@@ -276,6 +297,33 @@ export default class CommunityModerationController {
         data: result.items,
         pagination: result.pagination,
         message: 'Scam reports fetched'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async updateScamReport(req, res, next) {
+    try {
+      const { reportId } = req.params;
+      const payload = await scamUpdateSchema.validateAsync(req.body, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+
+      const updated = await CommunityModerationService.updateScamReport(
+        { id: req.user.id, role: req.user.role },
+        reportId,
+        payload
+      );
+
+      return success(res, {
+        data: updated,
+        message: 'Scam report updated'
       });
     } catch (error) {
       if (error.isJoi) {

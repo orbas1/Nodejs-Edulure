@@ -57,6 +57,7 @@ import AdminGovernance from './pages/dashboard/AdminGovernance.jsx';
 import AdminIntegrations from './pages/dashboard/AdminIntegrations.jsx';
 import AdminFinanceMonetisation from './pages/dashboard/admin/AdminFinanceMonetisation.jsx';
 import AdminSupportHub from './pages/dashboard/admin/AdminSupportHub.jsx';
+import AdminTrustSafety from './pages/dashboard/admin/AdminTrustSafety.jsx';
 import AdminControl from './pages/dashboard/AdminControl.jsx';
 import CommunityOperations from './pages/dashboard/community/CommunityOperations.jsx';
 import CommunityProgramming from './pages/dashboard/community/CommunityProgramming.jsx';
@@ -247,6 +248,14 @@ function App() {
           element={(
             <ProtectedRoute allowedRoles={['admin']}>
               <AdminFinanceMonetisation />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="trust-safety"
+          element={(
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminTrustSafety />
             </ProtectedRoute>
           )}
         />

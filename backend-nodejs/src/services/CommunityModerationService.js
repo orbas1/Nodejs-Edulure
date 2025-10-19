@@ -590,6 +590,57 @@ export default class CommunityModerationService {
     return ScamReportModel.list(criteria, pagination, db);
   }
 
+  static async updateScamReport(actor, reportId, payload = {}) {
+    if (!reportId) {
+      const error = new Error('A scam report identifier is required');
+      error.status = 400;
+      throw error;
+    }
+
+    if (actor.role !== 'admin') {
+      const error = new Error('Only administrators can update scam reports');
+      error.status = 403;
+      throw error;
+    }
+
+    const report = await ScamReportModel.findByPublicId(reportId, db);
+    if (!report) {
+      const notFound = new Error('Scam report not found');
+      notFound.status = 404;
+      throw notFound;
+    }
+
+    const metadata = payload.metadata
+      ? mergeModerationMetadata(report.metadata, payload.metadata)
+      : undefined;
+
+    const updates = {
+      status: payload.status,
+      riskScore: payload.riskScore,
+      handledBy: payload.handledBy === null ? null : payload.handledBy,
+      resolvedAt: payload.resolvedAt ?? undefined,
+      reason: payload.reason,
+      description: payload.description,
+      metadata
+    };
+
+    const updated = await ScamReportModel.updateById(report.id, updates, db);
+
+    await DomainEventModel.record({
+      entityType: 'scam_report',
+      entityId: updated.id,
+      eventType: 'scam.report.updated',
+      payload: {
+        status: updated.status,
+        riskScore: updated.riskScore,
+        handledBy: updated.handledBy ?? null
+      },
+      performedBy: actor.id
+    });
+
+    return updated;
+  }
+
   static async recordAnalyticsEvent(actor, payload) {
     if (actor.role !== 'admin' && actor.role !== 'moderator') {
       const error = new Error('Only admins or moderators can record analytics events');

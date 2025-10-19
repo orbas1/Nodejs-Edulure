@@ -150,6 +150,19 @@ export async function declineFollowRequest({ token, userId, followerId, signal }
   });
 }
 
+export async function removeFollower({ token, userId, followerId, signal } = {}) {
+  if (!userId || !followerId) {
+    throw new Error('User and follower identifiers are required to remove a follower');
+  }
+
+  return httpClient.delete(`/social/users/${userId}/followers/${followerId}`, {
+    token,
+    signal,
+    cache: { enabled: false },
+    invalidateTags: [followersTag(userId, 'accepted')]
+  });
+}
+
 export const socialGraphCache = {
   followersTag,
   followingTag,
