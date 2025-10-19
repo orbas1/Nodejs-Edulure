@@ -56,7 +56,10 @@ export default function CommunityProfile({
   isLoadingResources,
   error,
   resourcesError,
-  onLoadMoreResources
+  onLoadMoreResources,
+  onLeave,
+  isLeaving = false,
+  canLeave = false
 }) {
   if (isAggregate) {
     return (
@@ -112,6 +115,16 @@ export default function CommunityProfile({
               <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 Your role: {community.membership.role}
               </span>
+            )}
+            {canLeave && typeof onLeave === 'function' && (
+              <button
+                type="button"
+                onClick={onLeave}
+                disabled={isLeaving}
+                className="mt-3 inline-flex items-center justify-center rounded-full border border-rose-200 bg-white px-4 py-1.5 text-xs font-semibold text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+              >
+                {isLeaving ? 'Leaving…' : 'Leave community'}
+              </button>
             )}
           </div>
           <div className="grid grid-cols-2 gap-4 text-sm text-slate-600">
@@ -257,5 +270,8 @@ CommunityProfile.propTypes = {
   isLoadingResources: PropTypes.bool,
   error: PropTypes.string,
   resourcesError: PropTypes.string,
-  onLoadMoreResources: PropTypes.func
+  onLoadMoreResources: PropTypes.func,
+  onLeave: PropTypes.func,
+  isLeaving: PropTypes.bool,
+  canLeave: PropTypes.bool
 };
