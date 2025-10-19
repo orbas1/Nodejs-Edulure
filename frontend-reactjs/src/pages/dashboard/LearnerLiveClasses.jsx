@@ -7,10 +7,11 @@ import {
   SparklesIcon,
   UsersIcon
 } from '@heroicons/react/24/outline';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { createCommunityLiveDonation } from '../../api/communityApi.js';
 import { checkInToLiveSession, joinLiveSession } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
@@ -25,7 +26,7 @@ function ReadinessBadge({ status }) {
   return <span className={`${base} bg-rose-100 text-rose-700`}>Action</span>;
 }
 
-function SessionCard({ session, onAction, pending }) {
+function SessionCard({ session, onAction, pending, onDonate }) {
   const occupancy = session.occupancy ?? {};
   const occupancyLabel = occupancy.capacity
     ? `${occupancy.reserved ?? 0}/${occupancy.capacity} seats`
@@ -63,20 +64,32 @@ function SessionCard({ session, onAction, pending }) {
               </span>
             )}
           </span>
-          {action && (
-            <button
-              type="button"
-              disabled={action.enabled === false || pending}
-              className={`rounded-full px-4 py-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
-                action.action === 'join' || action.action === 'check-in'
-                  ? 'bg-primary text-white shadow-sm hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500'
-                  : 'border border-slate-200 text-slate-700 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400'
-              }`}
-              onClick={() => onAction?.(session, action.action)}
-            >
-              {pending ? 'Processing…' : action.label}
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {action && (
+              <button
+                type="button"
+                disabled={action.enabled === false || pending}
+                className={`rounded-full px-4 py-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
+                  action.action === 'join' || action.action === 'check-in'
+                    ? 'bg-primary text-white shadow-sm hover:bg-primary-dark disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500'
+                    : 'border border-slate-200 text-slate-700 hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400'
+                }`}
+                onClick={() => onAction?.(session, action.action)}
+              >
+                {pending ? 'Processing…' : action.label}
+              </button>
+            )}
+            {session.communityId && (
+              <button
+                type="button"
+                className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                onClick={() => onDonate?.(session)}
+                disabled={pending}
+              >
+                Send donation
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -145,12 +158,187 @@ function SessionCard({ session, onAction, pending }) {
   );
 }
 
+function DonationDialog({ open, session, onClose, onSubmit, submitting, status }) {
+  const [amount, setAmount] = useState('20.00');
+  const [donorName, setDonorName] = useState('');
+  const [affiliateCode, setAffiliateCode] = useState('');
+  const [message, setMessage] = useState('');
+  const [formError, setFormError] = useState(null);
+
+  useEffect(() => {
+    if (open) {
+      setAmount('20.00');
+      setDonorName('');
+      setAffiliateCode('');
+      setMessage('');
+      setFormError(null);
+    }
+  }, [open, session]);
+
+  if (!open) {
+    return null;
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const numericAmount = Number.parseFloat(amount);
+    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+      setFormError('Enter a valid donation amount greater than zero.');
+      return;
+    }
+    setFormError(null);
+    const payload = {
+      amountCents: Math.round(numericAmount * 100),
+      currency: (session?.currency ?? 'USD').toUpperCase(),
+      provider: 'stripe',
+      donorName: donorName.trim() ? donorName.trim() : undefined,
+      affiliateCode: affiliateCode.trim() ? affiliateCode.trim().toUpperCase() : undefined,
+      message: message.trim() ? message.trim() : undefined,
+      eventId: session?.eventId ?? session?.id ?? null
+    };
+    await onSubmit?.(payload);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4 py-8">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Support the host</p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {session?.title ?? 'Live session'}
+            </h2>
+            {session?.community && (
+              <p className="text-sm text-slate-500">{session.community}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-400 hover:text-slate-800"
+            onClick={onClose}
+          >
+            Close
+          </button>
+        </div>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Donation amount
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {(session?.currency ?? 'USD').toUpperCase()}
+              </span>
+              <input
+                type="number"
+                min="1"
+                step="0.50"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+                className="flex-1 rounded-full border border-slate-200 px-4 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="20.00"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Display name (optional)
+              </label>
+              <input
+                type="text"
+                value={donorName}
+                maxLength={120}
+                onChange={(event) => setDonorName(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="How should we credit you?"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Affiliate code
+              </label>
+              <input
+                type="text"
+                value={affiliateCode}
+                maxLength={60}
+                onChange={(event) => setAffiliateCode(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="Optional"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Message to the host
+            </label>
+            <textarea
+              value={message}
+              maxLength={500}
+              onChange={(event) => setMessage(event.target.value)}
+              rows={3}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="Cheer them on with a note!"
+            />
+          </div>
+
+          {formError && (
+            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p>
+          )}
+
+          {status && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                status.type === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                  : 'border-rose-200 bg-rose-50 text-rose-700'
+              }`}
+            >
+              <p>{status.message}</p>
+              {status.payment?.paymentId && (
+                <p className="mt-1 text-xs text-slate-600">Payment reference: {status.payment.paymentId}</p>
+              )}
+              {status.intent?.status && (
+                <p className="mt-1 text-xs text-slate-500">Intent status: {status.intent.status}</p>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              className="rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:border-slate-400 hover:text-slate-900"
+              onClick={onClose}
+              disabled={submitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+              disabled={submitting}
+            >
+              {submitting ? 'Preparing checkout…' : 'Start checkout'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function LearnerLiveClasses() {
   const { dashboard, refresh } = useOutletContext();
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingSessionId, setPendingSessionId] = useState(null);
+  const [donationSession, setDonationSession] = useState(null);
+  const [donationSubmitting, setDonationSubmitting] = useState(false);
+  const [donationStatus, setDonationStatus] = useState(null);
 
   const { data, loading, error } = useMemo(() => {
     const section = dashboard?.liveClassrooms;
@@ -189,6 +377,59 @@ export default function LearnerLiveClasses() {
     },
     [token]
   );
+
+  const handleDonationOpen = useCallback((sessionItem) => {
+    if (!sessionItem?.communityId) {
+      setStatusMessage({ type: 'error', message: 'This session is not configured to receive donations yet.' });
+      return;
+    }
+    setDonationSession(sessionItem);
+    setDonationStatus(null);
+  }, []);
+
+  const handleDonationSubmit = useCallback(
+    async (payload) => {
+      if (!donationSession?.communityId) {
+        setDonationStatus({ type: 'error', message: 'Community information is missing for this donation.' });
+        return;
+      }
+      if (!token) {
+        setDonationStatus({ type: 'error', message: 'Sign in again to start a donation checkout.' });
+        return;
+      }
+      setDonationSubmitting(true);
+      try {
+        const response = await createCommunityLiveDonation({
+          communityId: donationSession.communityId,
+          token,
+          payload
+        });
+        setDonationStatus({
+          type: 'success',
+          message: response?.message ?? 'Donation checkout initiated.',
+          payment: response?.data?.payment ?? null,
+          intent: response?.data?.intent ?? null
+        });
+      } catch (error) {
+        setDonationStatus({
+          type: 'error',
+          message:
+            error instanceof Error
+              ? error.message
+              : 'We were unable to prepare the donation checkout.'
+        });
+      } finally {
+        setDonationSubmitting(false);
+      }
+    },
+    [donationSession?.communityId, token]
+  );
+
+  const handleDonationClose = useCallback(() => {
+    setDonationSession(null);
+    setDonationStatus(null);
+    setDonationSubmitting(false);
+  }, []);
 
   if (loading) {
     return (
@@ -231,7 +472,8 @@ export default function LearnerLiveClasses() {
   const readiness = Array.isArray(data.whiteboard?.readiness) ? data.whiteboard.readiness : [];
 
   return (
-    <div className="space-y-8">
+    <>
+      <div className="space-y-8">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="dashboard-title">Live classrooms</h1>
@@ -285,6 +527,7 @@ export default function LearnerLiveClasses() {
               session={sessionItem}
               onAction={handleSessionAction}
               pending={pendingSessionId === sessionItem.id}
+              onDonate={handleDonationOpen}
             />
           ))}
           {active.length === 0 && (
@@ -311,6 +554,7 @@ export default function LearnerLiveClasses() {
               session={sessionItem}
               onAction={handleSessionAction}
               pending={pendingSessionId === sessionItem.id}
+              onDonate={handleDonationOpen}
             />
           ))}
           {upcoming.length === 0 && (
@@ -332,7 +576,13 @@ export default function LearnerLiveClasses() {
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
           {completed.map((sessionItem) => (
-            <SessionCard key={sessionItem.id} session={sessionItem} onAction={handleSessionAction} pending={false} />
+            <SessionCard
+              key={sessionItem.id}
+              session={sessionItem}
+              onAction={handleSessionAction}
+              pending={false}
+              onDonate={handleDonationOpen}
+            />
           ))}
           {completed.length === 0 && (
             <DashboardStateMessage
@@ -420,6 +670,15 @@ export default function LearnerLiveClasses() {
           {statusMessage.message}
         </div>
       ) : null}
-    </div>
+      </div>
+      <DonationDialog
+        open={Boolean(donationSession)}
+        session={donationSession}
+        onClose={handleDonationClose}
+        onSubmit={handleDonationSubmit}
+        submitting={donationSubmitting}
+        status={donationStatus}
+      />
+    </>
   );
 }

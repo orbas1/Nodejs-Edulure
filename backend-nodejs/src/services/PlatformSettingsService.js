@@ -11,7 +11,19 @@ const DEFAULT_MONETIZATION = Object.freeze({
     enabled: true,
     rateBps: 250,
     minimumFeeCents: 0,
-    allowCommunityOverride: true
+    allowCommunityOverride: true,
+    default: {
+      rateBps: 250,
+      minimumFeeCents: 0,
+      affiliateShare: 0.25
+    },
+    categories: {
+      community_subscription: { rateBps: 250, minimumFeeCents: 0, affiliateShare: 0.25 },
+      community_live_donation: { rateBps: 1000, minimumFeeCents: 0, affiliateShare: 0.25 },
+      course_sale: { rateBps: 500, minimumFeeCents: 0, affiliateShare: 0.25 },
+      ebook_sale: { rateBps: 500, minimumFeeCents: 0, affiliateShare: 0.25 },
+      tutor_booking: { rateBps: 250, minimumFeeCents: 0, affiliateShare: 0.25 }
+    }
   },
   subscriptions: {
     enabled: true,
@@ -49,7 +61,7 @@ const DEFAULT_MONETIZATION = Object.freeze({
     recommendedServicemanShareBps: 7500,
     nonCustodialWallets: true,
     complianceNarrative:
-      'Platform commission remains at 2.5% and funds are routed directly between customers and providers; the platform operates a non-custodial ledger to avoid FCA regulated activity.'
+      'Platform commission remains capped at 2.5% for communities and mentoring (5% on digital catalogues and 10% on live donations) with funds routed directly between customers and providers; the platform operates a non-custodial ledger to avoid FCA regulated activity.'
   }
 });
 
@@ -93,6 +105,26 @@ function clampInt(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_
 
   const rounded = Math.round(numeric);
   return Math.min(Math.max(rounded, min), max);
+}
+
+function clampRatio(value, { min = 0, max = 1, fallback = 0 } = {}) {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+
+  if (numeric < min) {
+    return min;
+  }
+  if (numeric > max) {
+    return max;
+  }
+
+  return numeric;
 }
 
 function normalizeStringArray(value) {
@@ -206,6 +238,54 @@ function sanitizeMonetizationPayload(payload = {}) {
     }
     if (payload.commissions.allowCommunityOverride !== undefined) {
       commission.allowCommunityOverride = Boolean(payload.commissions.allowCommunityOverride);
+    }
+    if (payload.commissions.default && typeof payload.commissions.default === 'object') {
+      commission.default = {
+        rateBps: clampInt(payload.commissions.default.rateBps, {
+          min: 0,
+          max: 5000,
+          fallback: DEFAULT_MONETIZATION.commissions.default.rateBps
+        }),
+        minimumFeeCents: clampInt(payload.commissions.default.minimumFeeCents, {
+          min: 0,
+          max: 10_000_000,
+          fallback: DEFAULT_MONETIZATION.commissions.default.minimumFeeCents
+        }),
+        affiliateShare: clampRatio(payload.commissions.default.affiliateShare, {
+          min: 0,
+          max: 1,
+          fallback: DEFAULT_MONETIZATION.commissions.default.affiliateShare
+        })
+      };
+    }
+    if (payload.commissions.categories && typeof payload.commissions.categories === 'object') {
+      const categories = {};
+      Object.entries(payload.commissions.categories).forEach(([key, value]) => {
+        if (!value || typeof value !== 'object') {
+          return;
+        }
+        categories[String(key).trim()] = {
+          rateBps: clampInt(value.rateBps, {
+            min: 0,
+            max: 5000,
+            fallback: DEFAULT_MONETIZATION.commissions.categories[key]?.rateBps ??
+              DEFAULT_MONETIZATION.commissions.default.rateBps
+          }),
+          minimumFeeCents: clampInt(value.minimumFeeCents, {
+            min: 0,
+            max: 10_000_000,
+            fallback: DEFAULT_MONETIZATION.commissions.categories[key]?.minimumFeeCents ??
+              DEFAULT_MONETIZATION.commissions.default.minimumFeeCents
+          }),
+          affiliateShare: clampRatio(value.affiliateShare, {
+            min: 0,
+            max: 1,
+            fallback: DEFAULT_MONETIZATION.commissions.categories[key]?.affiliateShare ??
+              DEFAULT_MONETIZATION.commissions.default.affiliateShare
+          })
+        };
+      });
+      commission.categories = categories;
     }
     if (Object.keys(commission).length) {
       sanitized.commissions = commission;
@@ -360,6 +440,60 @@ function normaliseMonetization(rawSettings = {}) {
   merged.commissions.enabled = Boolean(merged.commissions.enabled);
   merged.commissions.allowCommunityOverride = Boolean(merged.commissions.allowCommunityOverride);
 
+  const defaultCommission = merged.commissions.default ?? {};
+  defaultCommission.rateBps = clampInt(defaultCommission.rateBps ?? merged.commissions.rateBps, {
+    min: 0,
+    max: 5000,
+    fallback: defaults.commissions.default.rateBps
+  });
+  defaultCommission.minimumFeeCents = clampInt(
+    defaultCommission.minimumFeeCents ?? merged.commissions.minimumFeeCents,
+    {
+      min: 0,
+      max: 10_000_000,
+      fallback: defaults.commissions.default.minimumFeeCents
+    }
+  );
+  defaultCommission.affiliateShare = clampRatio(
+    defaultCommission.affiliateShare ?? defaults.commissions.default.affiliateShare,
+    { fallback: defaults.commissions.default.affiliateShare }
+  );
+  merged.commissions.default = defaultCommission;
+  merged.commissions.rateBps = defaultCommission.rateBps;
+  merged.commissions.minimumFeeCents = defaultCommission.minimumFeeCents;
+
+  const categoryDefaults = defaults.commissions.categories ?? {};
+  const providedCategories = merged.commissions.categories ?? {};
+  const categoryKeys = new Set([
+    ...Object.keys(categoryDefaults),
+    ...Object.keys(providedCategories)
+  ]);
+  const normalisedCategories = {};
+  categoryKeys.forEach((key) => {
+    const base = providedCategories[key] ?? {};
+    const fallback = categoryDefaults[key] ?? defaultCommission;
+    normalisedCategories[key] = {
+      rateBps: clampInt(base.rateBps ?? fallback.rateBps ?? defaultCommission.rateBps, {
+        min: 0,
+        max: 5000,
+        fallback: fallback.rateBps ?? defaultCommission.rateBps
+      }),
+      minimumFeeCents: clampInt(
+        base.minimumFeeCents ?? fallback.minimumFeeCents ?? defaultCommission.minimumFeeCents,
+        {
+          min: 0,
+          max: 10_000_000,
+          fallback: fallback.minimumFeeCents ?? defaultCommission.minimumFeeCents
+        }
+      ),
+      affiliateShare: clampRatio(
+        base.affiliateShare ?? fallback.affiliateShare ?? defaultCommission.affiliateShare,
+        { fallback: fallback.affiliateShare ?? defaultCommission.affiliateShare }
+      )
+    };
+  });
+  merged.commissions.categories = normalisedCategories;
+
   merged.subscriptions.enabled = Boolean(merged.subscriptions.enabled);
   merged.subscriptions.restrictOnFailure = Boolean(merged.subscriptions.restrictOnFailure);
   merged.subscriptions.gracePeriodDays = clampInt(merged.subscriptions.gracePeriodDays, {
@@ -481,7 +615,9 @@ export default class PlatformSettingsService {
         enabled: merged.commissions.enabled,
         rateBps: merged.commissions.rateBps,
         minimumFeeCents: merged.commissions.minimumFeeCents,
-        allowCommunityOverride: merged.commissions.allowCommunityOverride
+        allowCommunityOverride: merged.commissions.allowCommunityOverride,
+        default: merged.commissions.default,
+        categories: merged.commissions.categories
       },
       subscriptions: {
         enabled: merged.subscriptions.enabled,
@@ -515,21 +651,50 @@ export default class PlatformSettingsService {
     return merged;
   }
 
-  static calculateCommission(amountCents, commissionConfig) {
+  static calculateCommission(amountCents, commissionConfig, { category } = {}) {
+    const fallback = {
+      platformAmountCents: 0,
+      affiliateAmountCents: 0,
+      appliedRateBps: 0,
+      affiliateShareRatio: 0,
+      appliedMinimumFeeCents: 0,
+      category: category ?? null
+    };
+
     if (!commissionConfig || !commissionConfig.enabled) {
-      return 0;
+      return fallback;
     }
 
     const amount = clampInt(amountCents, { min: 0, fallback: 0 });
-    const rate = clampInt(commissionConfig.rateBps, { min: 0, max: 5000, fallback: 0 });
-    const minimum = clampInt(commissionConfig.minimumFeeCents, { min: 0, max: 10_000_000, fallback: 0 });
+    const defaultCommission = commissionConfig.default ?? {};
+    const categoryConfig = category && commissionConfig.categories
+      ? commissionConfig.categories[category]
+      : undefined;
 
-    const calculated = Math.floor((amount * rate) / 10_000);
-    if (calculated <= 0) {
-      return minimum;
-    }
+    const rate = clampInt(
+      categoryConfig?.rateBps ?? defaultCommission.rateBps ?? commissionConfig.rateBps,
+      { min: 0, max: 5000, fallback: 0 }
+    );
+    const minimum = clampInt(
+      categoryConfig?.minimumFeeCents ?? defaultCommission.minimumFeeCents ?? commissionConfig.minimumFeeCents,
+      { min: 0, max: 10_000_000, fallback: 0 }
+    );
+    const affiliateShare = clampRatio(
+      categoryConfig?.affiliateShare ?? defaultCommission.affiliateShare ?? 0,
+      { fallback: 0 }
+    );
 
-    return Math.max(calculated, minimum);
+    const calculated = Math.max(Math.floor((amount * rate) / 10_000), minimum);
+    const affiliateAmount = Math.floor(calculated * affiliateShare);
+
+    return {
+      platformAmountCents: calculated,
+      affiliateAmountCents: affiliateAmount,
+      appliedRateBps: rate,
+      affiliateShareRatio: affiliateShare,
+      appliedMinimumFeeCents: minimum,
+      category: categoryConfig ? category : null
+    };
   }
 }
 
