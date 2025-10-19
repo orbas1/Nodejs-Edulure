@@ -6,7 +6,8 @@
   "packageManager": "npm@10.5.0",
   "workspaces": [
     "backend-nodejs",
-    "frontend-reactjs"
+    "frontend-reactjs",
+    "sdk-typescript"
   ],
   "engines": {
     "node": ">=20.12.2",
@@ -18,11 +19,27 @@
     "lint": "npm run lint --workspaces --if-present",
     "lint:fix": "npm run lint:fix --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "audit": "npm run audit:dependencies --workspaces --if-present",
-    "audit:ci": "npm run audit:dependencies --workspace backend-nodejs --if-present && npm run audit:dependencies --workspace frontend-reactjs --if-present"
+    "release:readiness": "node ./scripts/release/run-readiness.mjs",
+    "audit": "node ./scripts/security/run-npm-audit.mjs",
+    "audit:ci": "node ./scripts/security/run-npm-audit.mjs --workspace backend-nodejs && node ./scripts/security/run-npm-audit.mjs --workspace frontend-reactjs && npm --workspace sdk-typescript run audit:dependencies",
+    "license:report": "node ./scripts/security/generate-license-report.mjs"
   },
   "config": {
     "minimumNodeVersion": "20.12.2",
     "minimumNpmVersion": "10.5.0"
+  },
+  "devDependencies": {
+    "license-checker": "^25.0.1",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "esbuild": "0.25.11",
+    "fast-redact": "3.5.0",
+    "vite": "7.1.3",
+    "vite-node": "3.2.4",
+    "victory-vendor": {
+      "d3-color": "3.1.0",
+      "d3-interpolate": "3.0.1"
+    }
   }
 }

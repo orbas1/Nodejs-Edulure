@@ -65,6 +65,28 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'observability',
+    capability: 'operational-observability',
+    description: 'SLO snapshots, telemetry guardrails, and alert governance endpoints for platform operators.',
+    basePath: '/observability',
+    flagKey: 'platform.api.v1.observability',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Observability APIs are restricted to platform operators.'
+  },
+  {
+    name: 'environment',
+    capability: 'environment-parity',
+    description: 'Environment health, parity, and drift detection endpoints for infrastructure operators.',
+    basePath: '/environment',
+    flagKey: 'platform.api.v1.environment',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Environment parity APIs are restricted to platform administrators.'
+  },
+  {
     name: 'payments',
     capability: 'payments-and-payouts',
     description: 'Payments, escrow, and billing orchestration endpoints.',
@@ -84,6 +106,18 @@ export const apiRouteMetadata = [
     defaultState: 'enabled',
     fallbackStatus: 403,
     disabledMessage: 'Compliance endpoints are restricted in this environment.'
+  },
+  {
+    name: 'security',
+    capability: 'security-compliance-operations',
+    description:
+      'Risk register, audit evidence, continuity planning, and security assessment governance endpoints.',
+    basePath: '/security',
+    flagKey: 'platform.api.v1.security',
+    defaultState: 'enabled',
+    audience: 'admin',
+    fallbackStatus: 403,
+    disabledMessage: 'Security operations APIs are restricted to compliance administrators.'
   },
   {
     name: 'chat',
@@ -199,6 +233,17 @@ export const apiRouteMetadata = [
     defaultState: 'enabled',
     fallbackStatus: 404,
     disabledMessage: 'Marketing blog endpoints are not available for this deployment.'
+  },
+  {
+    name: 'provider-transition',
+    capability: 'provider-transition-program',
+    description: 'Provider transition announcements, acknowledgements, and migration status endpoints.',
+    basePath: '/provider-transition',
+    flagKey: 'platform.api.v1.providerTransition',
+    defaultState: 'enabled',
+    audience: 'partner',
+    fallbackStatus: 403,
+    disabledMessage: 'Provider migration communications are disabled for this tenant.'
   }
 ];
 

@@ -1,6 +1,10 @@
 # Node
 node_modules/
 
+# Reports and generated artefacts
+reports/
+sbom/
+
 # Build outputs
 frontend-reactjs/dist/
 backend-nodejs/dist/

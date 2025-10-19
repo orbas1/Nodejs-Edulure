@@ -201,12 +201,21 @@ const navigationByRole = {
     },
     {
       type: 'section',
-      id: 'admin-growth',
-      name: 'Growth',
-      icon: ChartBarIcon,
+      id: 'admin-finance',
+      name: 'Finance',
+      icon: BanknotesIcon,
       children: [
-        { id: 'admin-pricing', name: 'Revenue', to: `${basePath}/pricing`, icon: BanknotesIcon },
+        { id: 'admin-finance-centre', name: 'Finance centre', to: `${basePath}/finance`, icon: BanknotesIcon },
         { id: 'admin-ads', name: 'Ads', to: `${basePath}/ads`, icon: MegaphoneIcon }
+      ]
+    },
+    {
+      type: 'section',
+      id: 'admin-support',
+      name: 'Support & comms',
+      icon: InboxStackIcon,
+      children: [
+        { id: 'admin-support-hub', name: 'Support hub', to: `${basePath}/support`, icon: InboxStackIcon }
       ]
     }
   ],

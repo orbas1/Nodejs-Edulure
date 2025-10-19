@@ -1,0 +1,2 @@
+- Added `observability/sloRegistry.js` as the shared engine powering SLO aggregation, alert derivation, latency sampling, and reset helpers consumed by metrics middleware, controllers, and tests.
+- Created Terraform modules under `infrastructure/terraform/modules/*` (networking, postgres, backend_service) and environment compositions for dev/staging/prod to enforce parity across clusters. 【F:infrastructure/terraform/modules/networking/main.tf†L1-L113】【F:infrastructure/terraform/envs/prod/main.tf†L1-L102】

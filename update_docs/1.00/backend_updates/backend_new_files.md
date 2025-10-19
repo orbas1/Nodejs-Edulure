@@ -32,3 +32,24 @@
 - `src/models/CourseEnrollmentModel.js` — enrollment model providing cohort segmentation and learner status context for risk scoring.
 - `src/models/CourseProgressModel.js` — lesson progress aggregator fuelling learner risk detection and pacing metrics within the
   dashboard workspace.
+- `src/observability/sloRegistry.js` — maintains rolling SLO state, burn-rate calculations, and latency samples for HTTP routes.
+- `src/controllers/ObservabilityController.js` — admin controller exposing SLO snapshot list/detail endpoints with logging.
+- `src/routes/observability.routes.js` — wires observability endpoints into the versioned API registry behind admin auth.
+- `test/observabilitySloRegistry.test.js` — validates SLO aggregation logic, burn-rate calculations, and latency summaries.
+- `test/observabilityHttpRoutes.test.js` — exercises the observability HTTP endpoints for access control and payload structure.
+- `test/observabilityContracts.test.js` — Ajv-powered contract tests that assert runtime responses match the OpenAPI schema.
+- `src/services/EnvironmentParityService.js` — assembles environment parity reports by hashing Terraform/Docker artefacts and executing dependency probes for the `/environment/health` surface. 【F:backend-nodejs/src/services/EnvironmentParityService.js†L1-L217】
+- `src/controllers/EnvironmentParityController.js` — minimal controller that maps parity service responses onto HTTP semantics. 【F:backend-nodejs/src/controllers/EnvironmentParityController.js†L1-L13】
+- `src/routes/environmentParity.routes.js` — Express router exposing the new admin `/environment/health` endpoint. 【F:backend-nodejs/src/routes/environmentParity.routes.js†L1-L9】
+- `test/environmentParityService.test.js` — Vitest coverage validating manifest hashing, drift detection, and dependency probing logic. 【F:backend-nodejs/test/environmentParityService.test.js†L1-L97】
+- `test/environmentParityHttpRoutes.test.js` — Vitest coverage confirming the admin route status codes reflect parity state. 【F:backend-nodejs/test/environmentParityHttpRoutes.test.js†L1-L99】
+- `test/release/releaseReadiness.test.js` — Load, readiness, and security header regression covering the release readiness harness and `/health` gating.
+- `scripts/wait-for-db.js` — lightweight bootstrap helper invoked by Docker compose to block until Postgres is ready before running migrations. 【F:backend-nodejs/scripts/wait-for-db.js†L1-L36】
+- `migrations/20241122120000_security_compliance_risk_operations.js` — provisions risk register, audit evidence, continuity exercise, and security assessment tables with indexes and governance metadata to back the new security operations APIs. 【F:backend-nodejs/migrations/20241122120000_security_compliance_risk_operations.js†L1-L213】
+- `src/database/domains/security.js` — domain constant map for the new security operations tables consumed by repositories and services. 【F:backend-nodejs/src/database/domains/security.js†L1-L8】
+- `src/repositories/SecurityOperationsRepository.js` — data access layer handling filtering, pagination, aggregation, and inserts for risk registers, reviews, evidence, continuity drills, and assessments. 【F:backend-nodejs/src/repositories/SecurityOperationsRepository.js†L1-L452】
+- `src/services/SecurityOperationsService.js` — orchestrates scoring, audit logging, CDC events, and business workflows across the security operations domain for admin APIs. 【F:backend-nodejs/src/services/SecurityOperationsService.js†L1-L421】
+- `src/controllers/SecurityOperationsController.js` — admin controller exposing risk register, evidence, continuity, and assessment handlers with validation and context enrichment. 【F:backend-nodejs/src/controllers/SecurityOperationsController.js†L1-L199】
+- `src/routes/security.routes.js` — Express router wiring the new security operations endpoints behind admin auth. 【F:backend-nodejs/src/routes/security.routes.js†L1-L17】
+- `test/securityOperationsService.test.js` — Vitest coverage asserting scoring logic, CDC/audit side effects, and summary assembly for the security operations service. 【F:backend-nodejs/test/securityOperationsService.test.js†L1-L164】
+- `test/securityOperationsHttpRoutes.test.js` — Supertest coverage validating HTTP wiring, RBAC bypass for tests, and payload envelopes for the security operations API. 【F:backend-nodejs/test/securityOperationsHttpRoutes.test.js†L1-L108】

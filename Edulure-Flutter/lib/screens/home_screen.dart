@@ -198,6 +198,13 @@ class _PublicHomeView extends StatelessWidget {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => Navigator.pushNamed(context, '/courses/purchase'),
                   ),
+                  ListTile(
+                    leading: const Icon(Icons.swap_horiz_outlined),
+                    title: const Text('Provider transition hub'),
+                    subtitle: const Text('Coordinate migration milestones and readiness.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/provider-transition'),
+                  ),
                 ],
               );
             },

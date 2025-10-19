@@ -198,6 +198,263 @@ function maybeDecodeCertificate(value) {
   }
 }
 
+const DEFAULT_SLO_DEFINITIONS = [
+  {
+    id: 'api-http-availability',
+    name: 'Versioned REST availability',
+    description:
+      'Maintain 99.5% success rate across versioned REST endpoints (excluding docs, health, metrics, and GraphQL).',
+    indicator: {
+      type: 'http',
+      routePattern: '^/api/v1/(?!docs)',
+      routePatternFlags: 'i',
+      methodWhitelist: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      excludeRoutePatterns: [
+        '^/api/v1/docs',
+        '^/api/v1/live',
+        '^/api/v1/ready',
+        '^/api/v1/health',
+        '^/api/v1/metrics',
+        '^/api/v1/graphql'
+      ],
+      treat4xxAsFailures: false,
+      failureStatusCodes: [429, 499]
+    },
+    alerting: {
+      burnRateWarning: 4,
+      burnRateCritical: 10,
+      minRequests: 200
+    },
+    tags: ['api', 'platform']
+  },
+  {
+    id: 'graphql-gateway-availability',
+    name: 'GraphQL gateway availability',
+    description: 'Track GraphQL gateway error budgets and latency envelopes.',
+    targetAvailability: 0.99,
+    indicator: {
+      type: 'http',
+      routePattern: '^/api/v1/graphql',
+      routePatternFlags: 'i',
+      methodWhitelist: ['POST'],
+      treat4xxAsFailures: true,
+      failureStatusCodes: [400, 429]
+    },
+    alerting: {
+      burnRateWarning: 2.5,
+      burnRateCritical: 6,
+      minRequests: 100
+    },
+    tags: ['api', 'graphql']
+  },
+  {
+    id: 'provider-transition-availability',
+    name: 'Provider transition communications availability',
+    description: 'Ensure provider transition hub endpoints remain available for migration partners.',
+    indicator: {
+      type: 'http',
+      routePattern: '^/api/v1/provider-transition',
+      routePatternFlags: 'i',
+      methodWhitelist: ['GET', 'POST'],
+      treat4xxAsFailures: true,
+      failureStatusCodes: [429]
+    },
+    alerting: {
+      burnRateWarning: 2,
+      burnRateCritical: 5,
+      minRequests: 50
+    },
+    tags: ['providers', 'communications']
+  }
+];
+
+function sanitizeSloDefinition(definition, index, defaults) {
+  if (!definition || typeof definition !== 'object') {
+    throw new Error(`SLO definition at index ${index} must be an object.`);
+  }
+
+  const rawId = definition.id ?? definition.slug ?? definition.name ?? `slo-${index + 1}`;
+  const id = String(rawId)
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/--+/g, '-');
+
+  if (!id) {
+    throw new Error(`SLO definition at index ${index} must provide an identifier or name.`);
+  }
+
+  const name = String(definition.name ?? definition.title ?? id).trim() || `SLO ${index + 1}`;
+  const description = String(definition.description ?? name).trim();
+
+  const rawTarget =
+    typeof definition.targetAvailability === 'number'
+      ? definition.targetAvailability
+      : typeof definition.target === 'number'
+        ? definition.target
+        : defaults.targetAvailability;
+  const targetAvailability = Math.min(0.9999, Math.max(0.001, clampRate(rawTarget)));
+
+  const rawWindow = Number.isFinite(definition.windowMinutes)
+    ? definition.windowMinutes
+    : defaults.windowMinutes;
+  const windowMinutes = Math.max(5, Math.trunc(rawWindow));
+
+  const indicatorSource = definition.indicator ?? {};
+  const routePattern = indicatorSource.routePattern ?? indicatorSource.pattern;
+  if (typeof routePattern !== 'string' || !routePattern.trim()) {
+    throw new Error(`SLO ${id} must provide indicator.routePattern.`);
+  }
+
+  const routePatternFlags =
+    typeof indicatorSource.routePatternFlags === 'string' && indicatorSource.routePatternFlags.trim()
+      ? indicatorSource.routePatternFlags.trim()
+      : 'i';
+
+  const methodWhitelistSource = indicatorSource.methodWhitelist ?? indicatorSource.methods ?? [];
+  const methodWhitelist = Array.isArray(methodWhitelistSource)
+    ? Array.from(
+        new Set(
+          methodWhitelistSource
+            .map((method) => (typeof method === 'string' ? method.trim().toUpperCase() : null))
+            .filter(Boolean)
+        )
+      )
+    : [];
+
+  const excludePatternSource = indicatorSource.excludeRoutePatterns ?? indicatorSource.excludes ?? [];
+  const excludeRoutePatterns = Array.isArray(excludePatternSource)
+    ? Array.from(
+        new Set(
+          excludePatternSource
+            .map((entry) => (typeof entry === 'string' ? entry.trim() : null))
+            .filter(Boolean)
+        )
+      )
+    : [];
+
+  const failureSource = indicatorSource.failureStatusCodes ?? indicatorSource.failureCodes ?? [];
+  const failureStatusCodes = Array.isArray(failureSource)
+    ? Array.from(
+        new Set(
+          failureSource
+            .map((code) => Number.parseInt(code, 10))
+            .filter((code) => Number.isInteger(code) && code >= 100 && code <= 599)
+        )
+      )
+    : [];
+
+  const successSource = indicatorSource.successStatusCodes ?? indicatorSource.successCodes ?? [];
+  const successStatusCodes = Array.isArray(successSource)
+    ? Array.from(
+        new Set(
+          successSource
+            .map((code) => Number.parseInt(code, 10))
+            .filter((code) => Number.isInteger(code) && code >= 100 && code <= 599)
+        )
+      )
+    : [];
+
+  for (const code of failureStatusCodes) {
+    const indexOfCode = successStatusCodes.indexOf(code);
+    if (indexOfCode >= 0) {
+      successStatusCodes.splice(indexOfCode, 1);
+    }
+  }
+
+  const treat4xxAsFailures = Boolean(
+    indicatorSource.treat4xxAsFailures ??
+      indicatorSource.count4xxAsFailures ??
+      defaults.treat4xxAsFailures
+  );
+
+  const alertingSource = definition.alerting ?? {};
+  const burnRateWarning = Number.isFinite(alertingSource.burnRateWarning)
+    ? Number(alertingSource.burnRateWarning)
+    : defaults.warningBurnRate;
+  const burnRateCritical = Number.isFinite(alertingSource.burnRateCritical)
+    ? Number(alertingSource.burnRateCritical)
+    : defaults.criticalBurnRate;
+  const minRequests = Number.isFinite(alertingSource.minRequests)
+    ? Math.max(1, Math.trunc(alertingSource.minRequests))
+    : defaults.minRequests;
+
+  const alerting = {
+    burnRateWarning: Math.max(0.1, burnRateWarning),
+    burnRateCritical: Math.max(burnRateWarning, burnRateCritical),
+    minRequests
+  };
+
+  const tags = Array.isArray(definition.tags)
+    ? Array.from(
+        new Set(
+          definition.tags
+            .map((tag) => (typeof tag === 'string' ? tag.trim() : null))
+            .filter(Boolean)
+        )
+      )
+    : [];
+
+  const metadata = definition.metadata && typeof definition.metadata === 'object' ? definition.metadata : undefined;
+
+  return {
+    id,
+    name,
+    description,
+    targetAvailability,
+    windowMinutes,
+    indicator: {
+      type: 'http',
+      routePattern: routePattern.trim(),
+      routePatternFlags,
+      methodWhitelist,
+      excludeRoutePatterns,
+      treat4xxAsFailures,
+      failureStatusCodes,
+      successStatusCodes
+    },
+    alerting,
+    tags,
+    metadata
+  };
+}
+
+function buildSloConfiguration({ rawConfig, bucketMinutes, latencySampleSize, defaults }) {
+  const parsed = tryParseJson(rawConfig);
+  const parsedObject = parsed && !Array.isArray(parsed) ? parsed : {};
+  const definitionsSource = Array.isArray(parsedObject.definitions)
+    ? parsedObject.definitions
+    : Array.isArray(parsed)
+      ? parsed
+      : DEFAULT_SLO_DEFINITIONS;
+
+  const definitions = definitionsSource.map((definition, index) =>
+    sanitizeSloDefinition(definition, index, defaults)
+  );
+
+  const seen = new Set();
+  for (const definition of definitions) {
+    if (seen.has(definition.id)) {
+      throw new Error(`Duplicate SLO identifier "${definition.id}" detected in configuration.`);
+    }
+    seen.add(definition.id);
+  }
+
+  const resolvedBucketMinutes = Number.isFinite(parsedObject.bucketMinutes)
+    ? parsedObject.bucketMinutes
+    : bucketMinutes;
+  const resolvedLatencySampleSize = Number.isFinite(parsedObject.latencySampleSize)
+    ? parsedObject.latencySampleSize
+    : latencySampleSize;
+
+  return {
+    definitions,
+    bucketMinutes: Math.max(1, Math.trunc(resolvedBucketMinutes)),
+    latencySampleSize: Math.max(32, Math.trunc(resolvedLatencySampleSize)),
+    defaults
+  };
+}
+
 function normalizeRedisNamespace(value, fallback) {
   const source = (value ?? fallback ?? '').trim();
   if (!source) {
@@ -352,6 +609,15 @@ const envSchema = z
     METRICS_ALLOWED_IPS: z.string().optional(),
     TRACE_HEADER_NAME: z.string().min(3).default('x-request-id'),
     TRACING_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.25),
+    SLO_CONFIG: z.string().optional(),
+    SLO_BUCKET_MINUTES: z.coerce.number().int().min(1).max(120).default(1),
+    SLO_WINDOW_MINUTES: z.coerce.number().int().min(5).max(24 * 60).default(60),
+    SLO_LATENCY_SAMPLE_SIZE: z.coerce.number().int().min(32).max(5000).default(512),
+    SLO_DEFAULT_AVAILABILITY_TARGET: z.coerce.number().min(0.001).max(0.9999).default(0.995),
+    SLO_WARNING_BURN_RATE: z.coerce.number().min(0.1).max(50).default(4),
+    SLO_CRITICAL_BURN_RATE: z.coerce.number().min(0.1).max(100).default(10),
+    SLO_MIN_REQUESTS: z.coerce.number().int().min(1).max(1000000).default(200),
+    SLO_DEFAULT_TREAT_4XX_AS_FAILURE: z.coerce.boolean().default(false),
     R2_ACCOUNT_ID: z.string().min(1),
     R2_ACCESS_KEY_ID: z.string().min(1),
     R2_SECRET_ACCESS_KEY: z.string().min(1),
@@ -639,7 +905,30 @@ const envSchema = z
     SEARCH_INGESTION_CONCURRENCY: z.coerce.number().int().min(1).max(8).default(2),
     SEARCH_INGESTION_DELETE_BEFORE_REINDEX: z.coerce.boolean().default(true),
     BOOTSTRAP_MAX_RETRIES: z.coerce.number().int().min(1).max(10).default(5),
-    BOOTSTRAP_RETRY_DELAY_MS: z.coerce.number().int().min(100).max(60000).default(2000)
+    BOOTSTRAP_RETRY_DELAY_MS: z.coerce.number().int().min(100).max(60000).default(2000),
+    ENVIRONMENT_NAME: z.string().min(2).default(process.env.NODE_ENV ?? 'development'),
+    ENVIRONMENT_PROVIDER: z.string().min(2).default('aws'),
+    ENVIRONMENT_REGION: z.string().min(2).default(process.env.AWS_REGION ?? 'us-east-1'),
+    ENVIRONMENT_TIER: z
+      .string()
+      .regex(/^[a-z0-9-]+$/i, 'ENVIRONMENT_TIER may only include alphanumeric characters and dashes.')
+      .default('nonprod'),
+    ENVIRONMENT_DEPLOYMENT_STRATEGY: z
+      .enum(['rolling', 'blue-green', 'canary'])
+      .default('rolling'),
+    ENVIRONMENT_PARITY_BUDGET_MINUTES: z
+      .coerce.number()
+      .int()
+      .min(5)
+      .max(24 * 60)
+      .default(30),
+    ENVIRONMENT_INFRASTRUCTURE_OWNER: z.string().min(3).default('platform-team'),
+    ENVIRONMENT_REQUIRED_TAGS: z.string().optional(),
+    ENVIRONMENT_DEPENDENCIES: z.string().optional(),
+    ENVIRONMENT_ALLOWED_VPCS: z.string().optional(),
+    ENVIRONMENT_ALLOWED_ACCOUNT_IDS: z.string().optional(),
+    ENVIRONMENT_MANIFEST_PATH: z.string().optional(),
+    RELEASE_CHANNEL: z.string().min(3).default('rolling')
   })
   .superRefine((value, ctx) => {
     if (value.DB_POOL_MIN > value.DB_POOL_MAX) {
@@ -791,9 +1080,31 @@ const twoFactorRequiredRoles = (configuredTwoFactorRoles.length > 0
   ? configuredTwoFactorRoles
   : ['admin']
 ).map((role) => role.toLowerCase());
+const sloDefaults = {
+  targetAvailability: Math.min(0.9999, Math.max(0.001, clampRate(raw.SLO_DEFAULT_AVAILABILITY_TARGET))),
+  windowMinutes: Math.max(5, raw.SLO_WINDOW_MINUTES),
+  warningBurnRate: Math.max(0.1, raw.SLO_WARNING_BURN_RATE),
+  criticalBurnRate: Math.max(Math.max(0.1, raw.SLO_WARNING_BURN_RATE), raw.SLO_CRITICAL_BURN_RATE),
+  minRequests: Math.max(1, Math.trunc(raw.SLO_MIN_REQUESTS)),
+  treat4xxAsFailures: raw.SLO_DEFAULT_TREAT_4XX_AS_FAILURE
+};
+const sloConfig = buildSloConfiguration({
+  rawConfig: raw.SLO_CONFIG,
+  bucketMinutes: raw.SLO_BUCKET_MINUTES,
+  latencySampleSize: raw.SLO_LATENCY_SAMPLE_SIZE,
+  defaults: sloDefaults
+});
 const twoFactorEncryptionSource = raw.TWO_FACTOR_ENCRYPTION_KEY ?? raw.JWT_REFRESH_SECRET;
 const twoFactorEncryptionKey = crypto.createHash('sha256').update(twoFactorEncryptionSource).digest();
 const twoFactorIssuer = raw.TWO_FACTOR_ISSUER ?? raw.APP_NAME ?? 'Edulure';
+
+const environmentRequiredTags = parseCsv(raw.ENVIRONMENT_REQUIRED_TAGS ?? 'environment,project');
+const environmentDependencies = parseCsv(raw.ENVIRONMENT_DEPENDENCIES ?? 'database,redis');
+const environmentAllowedVpcIds = parseCsv(raw.ENVIRONMENT_ALLOWED_VPCS ?? '');
+const environmentAllowedAccountIds = parseCsv(raw.ENVIRONMENT_ALLOWED_ACCOUNT_IDS ?? '');
+const environmentManifestPath = raw.ENVIRONMENT_MANIFEST_PATH
+  ? path.resolve(projectRoot, raw.ENVIRONMENT_MANIFEST_PATH)
+  : path.resolve(projectRoot, '..', 'infrastructure', 'environment-manifest.json');
 
 const dataEncryptionActiveKeyId = raw.DATA_ENCRYPTION_ACTIVE_KEY_ID ?? 'v1';
 const dataEncryptionPrimarySecret = raw.DATA_ENCRYPTION_PRIMARY_KEY ?? raw.JWT_REFRESH_SECRET;
@@ -1262,6 +1573,22 @@ export const env = {
           : defaultSchemaGuardTables
     }
   },
+  environment: {
+    name: raw.ENVIRONMENT_NAME,
+    provider: raw.ENVIRONMENT_PROVIDER,
+    region: raw.ENVIRONMENT_REGION,
+    tier: raw.ENVIRONMENT_TIER,
+    deploymentStrategy: raw.ENVIRONMENT_DEPLOYMENT_STRATEGY,
+    parityBudgetMinutes: raw.ENVIRONMENT_PARITY_BUDGET_MINUTES,
+    infrastructureOwner: raw.ENVIRONMENT_INFRASTRUCTURE_OWNER,
+    requiredTags: environmentRequiredTags,
+    dependencies: environmentDependencies,
+    allowedVpcIds: environmentAllowedVpcIds,
+    allowedAccountIds: environmentAllowedAccountIds,
+    manifestPath: environmentManifestPath,
+    releaseChannel: raw.RELEASE_CHANNEL,
+    gitSha: process.env.GIT_SHA ?? null
+  },
   observability: {
     tracing: {
       headerName: raw.TRACE_HEADER_NAME.toLowerCase(),
@@ -1273,6 +1600,7 @@ export const env = {
       password: raw.METRICS_PASSWORD ?? null,
       bearerToken: raw.METRICS_BEARER_TOKEN ?? null,
       allowedIps: metricsAllowedIps
-    }
+    },
+    slo: sloConfig
   }
 };

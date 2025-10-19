@@ -17,6 +17,7 @@ class SessionManager {
   static const _adsActionBox = 'ads_governance_actions';
   static const _notificationPreferencesBox = 'notification_preferences';
   static const _notificationOutboxBox = 'notification_outbox';
+  static const _providerTransitionBox = 'provider_transition_announcements';
   static const _sessionKey = 'current';
   static const _activeRoleKey = 'active_role';
   static const _secureAccessTokenKey = 'session.accessToken';
@@ -24,22 +25,24 @@ class SessionManager {
 
   static String? _accessToken;
   static String? _refreshToken;
+  static final Set<String> _disabledCaches = <String>{};
 
   static Future<void> init() async {
     await Hive.initFlutter();
-    await Hive.openBox(_sessionBox);
-    await Hive.openBox(_assetsBox);
-    await Hive.openBox(_downloadsBox);
-    await Hive.openBox(_ebookProgressBox);
-    await Hive.openBox(_readerSettingsBox);
-    await Hive.openBox(_dashboardBox);
-    await Hive.openBox(_privacyBox);
-    await Hive.openBox(_creationProjectsBox);
-    await Hive.openBox(_creationActionBox);
-    await Hive.openBox(_adsGovernanceBox);
-    await Hive.openBox(_adsActionBox);
-    await Hive.openBox(_notificationPreferencesBox);
-    await Hive.openBox(_notificationOutboxBox);
+    await _openBox(_sessionBox);
+    await _openBox(_assetsBox, optional: true);
+    await _openBox(_downloadsBox, optional: true);
+    await _openBox(_ebookProgressBox, optional: true);
+    await _openBox(_readerSettingsBox, optional: true);
+    await _openBox(_dashboardBox);
+    await _openBox(_privacyBox, optional: true);
+    await _openBox(_creationProjectsBox, optional: true);
+    await _openBox(_creationActionBox, optional: true);
+    await _openBox(_adsGovernanceBox, optional: true);
+    await _openBox(_adsActionBox, optional: true);
+    await _openBox(_notificationPreferencesBox, optional: true);
+    await _openBox(_notificationOutboxBox, optional: true);
+    await _openBox(_providerTransitionBox, optional: true);
     _accessToken = await SecureStorageService.instance.read(key: _secureAccessTokenKey);
     _refreshToken = await SecureStorageService.instance.read(key: _secureRefreshTokenKey);
   }
@@ -58,6 +61,8 @@ class SessionManager {
   static Box get notificationPreferencesCache =>
       Hive.box(_notificationPreferencesBox);
   static Box get notificationOutbox => Hive.box(_notificationOutboxBox);
+  static Box? get providerTransitionCache =>
+      Hive.isBoxOpen(_providerTransitionBox) ? Hive.box(_providerTransitionBox) : null;
 
   static Future<void> saveSession(Map<String, dynamic> session) async {
     final sanitized = Map<String, dynamic>.from(session);
@@ -137,17 +142,18 @@ class SessionManager {
     await _session.delete(_sessionKey);
     await _session.delete(_activeRoleKey);
     await dashboardCache.clear();
-    await assetsCache.clear();
-    await downloadsCache.clear();
-    await ebookProgressCache.clear();
-    await readerSettingsCache.clear();
-    await privacyPreferences.clear();
-    await creationProjectsCache.clear();
-    await creationActionQueue.clear();
-    await adsGovernanceCache.clear();
-    await adsGovernanceActionQueue.clear();
-    await notificationPreferencesCache.clear();
-    await notificationOutbox.clear();
+    await _clearIfAvailable(_assetsBox);
+    await _clearIfAvailable(_downloadsBox);
+    await _clearIfAvailable(_ebookProgressBox);
+    await _clearIfAvailable(_readerSettingsBox);
+    await _clearIfAvailable(_privacyBox);
+    await _clearIfAvailable(_creationProjectsBox);
+    await _clearIfAvailable(_creationActionBox);
+    await _clearIfAvailable(_adsGovernanceBox);
+    await _clearIfAvailable(_adsActionBox);
+    await _clearIfAvailable(_notificationPreferencesBox);
+    await _clearIfAvailable(_notificationOutboxBox);
+    await _clearIfAvailable(_providerTransitionBox);
     await SecureStorageService.instance.deleteAll(
       keys: const {
         _secureAccessTokenKey,
@@ -168,5 +174,41 @@ class SessionManager {
       return Map<String, dynamic>.from(data as Map);
     }
     return null;
+  }
+
+  static Future<Box?> ensureProviderTransitionCache() async {
+    if (_disabledCaches.contains(_providerTransitionBox)) {
+      return null;
+    }
+    if (Hive.isBoxOpen(_providerTransitionBox)) {
+      return Hive.box(_providerTransitionBox);
+    }
+    try {
+      return await Hive.openBox(_providerTransitionBox);
+    } catch (error, stackTrace) {
+      debugPrint('Provider transition cache unavailable: $error');
+      _disabledCaches.add(_providerTransitionBox);
+      debugPrintStack(stackTrace: stackTrace);
+      return null;
+    }
+  }
+
+  static Future<void> _openBox(String name, {bool optional = false}) async {
+    try {
+      await Hive.openBox(name);
+    } catch (error, stackTrace) {
+      if (!optional) {
+        rethrow;
+      }
+      _disabledCaches.add(name);
+      debugPrint('Optional Hive cache "$name" disabled: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
+  static Future<void> _clearIfAvailable(String name) async {
+    if (Hive.isBoxOpen(name)) {
+      await Hive.box(name).clear();
+    }
   }
 }

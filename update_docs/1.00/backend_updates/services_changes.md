@@ -14,3 +14,7 @@
 - Rebuilt the instructor branch of `DashboardService.getDashboardForUser` to lazily import course domain models, hydrate the new
   `coursesWorkspace` payload (catalogue, cohorts, assignments, authoring, learners), and attach collaborator directories without
   penalising instructors that do not yet have active courses.
+- Created `sloRegistry` under the observability module to aggregate HTTP outcomes, maintain burn-rate budgets, compute latency percentiles, and expose helper APIs for HTTP instrumentation, controllers, and contract tests.
+- Added `EnvironmentParityService` to compute infrastructure manifest hashes, run dependency probes, and assemble parity reports consumed by the new admin health endpoint. 【F:backend-nodejs/src/services/EnvironmentParityService.js†L1-L217】
+- Created `SecurityOperationsService` backed by a repository layer to score risks, record reviews, log audit evidence, orchestrate continuity drills, and schedule assessments with automatic audit and CDC emissions so compliance workflows stay observable and automatable. 【F:backend-nodejs/src/services/SecurityOperationsService.js†L1-L421】【F:backend-nodejs/src/repositories/SecurityOperationsRepository.js†L1-L452】
+- Replaced the CloudConvert integration with a native `CloudConvertClient` that wraps fetch, retry, timeout, and circuit breaker controls so asset ingestion can operate without the deprecated SDK. 【F:backend-nodejs/src/integrations/CloudConvertClient.js†L1-L210】

@@ -4,6 +4,7 @@ import ipaddr from 'ipaddr.js';
 
 import { env } from '../config/env.js';
 import { getRequestContext } from './requestContext.js';
+import { recordHttpSloObservation } from './sloRegistry.js';
 
 const registry = new promClient.Registry();
 export const metricsRegistry = registry;
@@ -235,17 +236,20 @@ function normalizeRoute(req) {
 }
 
 export function httpMetricsMiddleware(req, res, next) {
-  if (!env.observability.metrics.enabled) {
-    return next();
+  const metricsEnabled = env.observability.metrics.enabled;
+  const startTime = process.hrtime.bigint();
+
+  const endTimer = metricsEnabled
+    ? httpRequestDurationSeconds.startTimer({
+        method: req.method,
+        route: 'pending',
+        status_code: 'pending'
+      })
+    : null;
+
+  if (metricsEnabled) {
+    httpActiveRequests.inc({ route: 'pending' });
   }
-
-  const endTimer = httpRequestDurationSeconds.startTimer({
-    method: req.method,
-    route: 'pending',
-    status_code: 'pending'
-  });
-
-  httpActiveRequests.inc({ route: 'pending' });
 
   onFinished(res, () => {
     const statusCode = res.statusCode || 500;
@@ -256,12 +260,24 @@ export function httpMetricsMiddleware(req, res, next) {
       status_code: String(statusCode)
     };
 
-    endTimer(labels);
-    httpRequestsTotal.inc(labels);
-    if (statusCode >= 500) {
-      httpRequestErrors.inc(labels);
+    if (metricsEnabled) {
+      endTimer?.(labels);
+      httpRequestsTotal.inc(labels);
+      if (statusCode >= 500) {
+        httpRequestErrors.inc(labels);
+      }
+      httpActiveRequests.dec({ route: 'pending' });
     }
-    httpActiveRequests.dec({ route: 'pending' });
+
+    const durationNs = process.hrtime.bigint() - startTime;
+    const durationMs = Number(durationNs) / 1e6;
+    recordHttpSloObservation({
+      route: resolvedRoute,
+      method: req.method,
+      statusCode,
+      durationMs,
+      timestamp: Date.now()
+    });
   });
 
   next();
