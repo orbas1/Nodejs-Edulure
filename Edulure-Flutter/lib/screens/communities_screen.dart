@@ -1,612 +1,419 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
-enum LiveFeedScope { global, community }
+import '../core/models/community_models.dart';
+import '../core/state/community/community_controllers.dart';
+import '../widgets/community_management_modals.dart';
+import 'community_profile_screen.dart';
+import 'community_switcher_screen.dart';
 
-enum CommunityRole { learner, instructor, admin, moderator }
+enum CommunityDirectoryFilter { joined, all, private }
 
-class _RolePolicy {
-  const _RolePolicy({
-    required this.label,
-    required this.summary,
-    required this.canViewFeed,
-    required this.canPost,
-    required this.canJoin,
-    required this.canModerate,
-    required this.canManageSubscriptions,
-    required this.canViewLocations,
-  });
-
-  final String label;
-  final String summary;
-  final bool canViewFeed;
-  final bool canPost;
-  final bool canJoin;
-  final bool canModerate;
-  final bool canManageSubscriptions;
-  final bool canViewLocations;
-}
-
-class CommunitiesScreen extends StatefulWidget {
+class CommunitiesScreen extends ConsumerStatefulWidget {
   const CommunitiesScreen({super.key});
 
   @override
-  State<CommunitiesScreen> createState() => _CommunitiesScreenState();
+  ConsumerState<CommunitiesScreen> createState() => _CommunitiesScreenState();
 }
 
-class _CommunitiesScreenState extends State<CommunitiesScreen> {
-  LiveFeedScope _selectedScope = LiveFeedScope.global;
-  CommunityRole _activeRole = CommunityRole.learner;
+class _CommunitiesScreenState extends ConsumerState<CommunitiesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  CommunityDirectoryFilter _filter = CommunityDirectoryFilter.joined;
 
-  static const Map<CommunityRole, _RolePolicy> _rolePolicies = {
-    CommunityRole.learner: _RolePolicy(
-      label: 'Learner Learnspace',
-      summary: 'Members participate in programming, follow communities, and manage subscriptions.',
-      canViewFeed: true,
-      canPost: true,
-      canJoin: true,
-      canModerate: false,
-      canManageSubscriptions: true,
-      canViewLocations: true,
-    ),
-    CommunityRole.instructor: _RolePolicy(
-      label: 'Instructor Learnspace',
-      summary: 'Creators orchestrate cohorts, publish playbooks, and unlock monetisation.',
-      canViewFeed: true,
-      canPost: true,
-      canJoin: true,
-      canModerate: true,
-      canManageSubscriptions: true,
-      canViewLocations: true,
-    ),
-    CommunityRole.admin: _RolePolicy(
-      label: 'Platform admin',
-      summary: 'Full governance across community operations, compliance, and security.',
-      canViewFeed: true,
-      canPost: true,
-      canJoin: true,
-      canModerate: true,
-      canManageSubscriptions: true,
-      canViewLocations: true,
-    ),
-    CommunityRole.moderator: _RolePolicy(
-      label: 'Community moderator',
-      summary: 'Trusted operators keeping engagement high and safeguarding spaces.',
-      canViewFeed: true,
-      canPost: true,
-      canJoin: true,
-      canModerate: true,
-      canManageSubscriptions: false,
-      canViewLocations: true,
-    ),
-  };
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
-  static const List<_Community> _communities = [
-    _Community(
-      name: 'RevOps Guild',
-      description: 'Revenue operators scaling GTM playbooks together.',
-      members: 2180,
-      health: 'Thriving',
-      accentColor: Color(0xFFEFF6FF),
-      bannerImage: 'https://images.unsplash.com/photo-1522202222400-95cb8671ee88?auto=format&fit=crop&w=900&q=80',
-      tags: ['Revenue', 'Lifecycle', 'Automation'],
-    ),
-    _Community(
-      name: 'Customer Education Collective',
-      description: 'Designing immersive customer education programmes.',
-      members: 1835,
-      health: 'Energised',
-      accentColor: Color(0xFFFFF7ED),
-      bannerImage: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80',
-      tags: ['CX', 'Learning', 'Advocacy'],
-    ),
-    _Community(
-      name: 'Community-Led Leaders',
-      description: 'Leaders building global community-led organisations.',
-      members: 2560,
-      health: 'Scaling',
-      accentColor: Color(0xFFF1F5F9),
-      bannerImage: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=900&q=80',
-      tags: ['Leadership', 'Strategy', 'Playbooks'],
-    ),
-  ];
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
-  static final List<_FeedPost> _globalFeed = [
-    _FeedPost(
-      authorName: 'Jordan Brooks',
-      authorRole: 'Head of Community',
-      communityName: 'Global broadcast',
-      body:
-          'We just published the Q2 community playbook with updated retention benchmarks and event templates. Dive in and share your feedback!',
-      tags: const ['Playbook', 'Retention'],
-    ),
-    _FeedPost(
-      authorName: 'Sasha Nwosu',
-      authorRole: 'Learning Experience Designer',
-      communityName: 'Global broadcast',
-      body:
-          'Next week we are running a live teardown of the new onboarding experience. RSVP if you want to join the working group.',
-      tags: const ['Live session', 'Design Review'],
-    ),
-  ];
+  void _openSwitcher() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const CommunitySwitcherScreen(),
+      ),
+    );
+  }
 
-  static final List<_FeedPost> _communityFeed = [
-    _FeedPost(
-      authorName: 'Luca Martins',
-      authorRole: 'Community Moderator',
-      communityName: 'RevOps Guild',
-      body:
-          'Kicked off a member-led pipeline automation clinic. Drop your toughest workflow question and we will cover it live tomorrow.',
-      tags: const ['Automation', 'Workshop'],
-    ),
-    _FeedPost(
-      authorName: 'Emily Tan',
-      authorRole: 'Programme Manager',
-      communityName: 'Customer Education Collective',
-      body:
-          'Shared the interview kit we used to map learner personas across APAC. Curious to hear how you structure your research panels.',
-      tags: const ['Research', 'Templates'],
-    ),
-    _FeedPost(
-      authorName: 'Noah Patel',
-      authorRole: 'Community Operations',
-      communityName: 'Community-Led Leaders',
-      body:
-          'We are prototyping a new ritual around cross-community mentorship. Sign up if you would like to exchange playbooks with another operator.',
-      tags: const ['Mentorship', 'Collaboration'],
-    ),
-  ];
+  List<CommunityModel> _filterCommunities(List<CommunityModel> communities) {
+    final search = _searchController.text.trim().toLowerCase();
+    return communities.where((community) {
+      if (_filter == CommunityDirectoryFilter.joined && !community.joined) {
+        return false;
+      }
+      if (_filter == CommunityDirectoryFilter.private && !community.isPrivate) {
+        return false;
+      }
+      if (search.isEmpty) return true;
+      final haystack = [
+        community.name.toLowerCase(),
+        community.description.toLowerCase(),
+        ...community.tags.map((tag) => tag.toLowerCase()),
+      ];
+      return haystack.any((entry) => entry.contains(search));
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+    final communitiesAsync = ref.watch(communityDirectoryControllerProvider);
+    final activeCommunityId = ref.watch(activeCommunityProvider);
+    final feedAsync = ref.watch(communityFeedControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Communities'),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCommunitiesHero(textTheme, colorScheme),
-            const SizedBox(height: 24),
-            _buildRoleAccessSection(textTheme, colorScheme),
-            const SizedBox(height: 32),
-            _buildManagementSection(textTheme, colorScheme),
-            const SizedBox(height: 32),
-            _buildDirectorySection(textTheme),
-            const SizedBox(height: 32),
-            _buildLiveFeedSection(textTheme),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCommunitiesHero(TextTheme textTheme, ColorScheme colorScheme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: LinearGradient(
-          colors: [colorScheme.primary.withOpacity(0.08), colorScheme.primary.withOpacity(0.03)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Community operating system',
-            style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.cached_outlined),
+            tooltip: 'Switch community',
+            onPressed: _openSwitcher,
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Launch, grow, and manage every member journey with unified tooling across mobile and web.',
-            style: textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: const [
-              _HeroChip(label: 'Member CRM'),
-              _HeroChip(label: 'Event engine'),
-              _HeroChip(label: 'Monetisation'),
-              _HeroChip(label: 'Insights'),
-            ],
+          IconButton(
+            icon: const Icon(Icons.add_home_work_outlined),
+            tooltip: 'Create community',
+            onPressed: () => showCommunityEditor(
+              context: context,
+              ref: ref,
+              onMessage: _showSnack,
+            ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildRoleAccessSection(TextTheme textTheme, ColorScheme colorScheme) {
-    final policy = _rolePolicies[_activeRole] ?? _rolePolicies[CommunityRole.learner]!;
-    final capabilities = _roleCapabilities(policy);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.12)),
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primary.withOpacity(0.06),
-            colorScheme.primary.withOpacity(0.02),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => showCommunityEditor(
+          context: context,
+          ref: ref,
+          onMessage: _showSnack,
         ),
+        icon: const Icon(Icons.add_chart_outlined),
+        label: const Text('New community'),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Role access governance', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text(policy.label, style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text(policy.summary, style: textTheme.bodySmall),
-          const SizedBox(height: 16),
-          SegmentedButton<CommunityRole>(
-            segments: CommunityRole.values
-                .map(
-                  (role) => ButtonSegment<CommunityRole>(
-                    value: role,
-                    label: Text(_roleLabel(role)),
-                    icon: Icon(_roleIcon(role)),
+      body: communitiesAsync.when(
+        data: (communities) {
+          final filtered = _filterCommunities(communities);
+          CommunityModel? activeCommunity;
+          if (communities.isNotEmpty) {
+            if (activeCommunityId == null) {
+              activeCommunity = communities.first;
+            } else {
+              activeCommunity = communities.firstWhere(
+                (element) => element.id == activeCommunityId,
+                orElse: () => communities.first,
+              );
+            }
+          }
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              if (activeCommunity != null)
+                _ActiveCommunityHeader(
+                  community: activeCommunity,
+                  onOpenProfile: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => CommunityProfileScreen(communityId: activeCommunity.id),
+                    ),
                   ),
-                )
-                .toList(),
-            selected: <CommunityRole>{_activeRole},
-            showSelectedIcon: false,
-            onSelectionChanged: (selection) {
-              if (selection.isEmpty) return;
-              setState(() {
-                _activeRole = selection.first;
-              });
-            },
-          ),
-          const SizedBox(height: 20),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: capabilities
-                .map((capability) => _CapabilityCard(
-                      capability: capability,
-                      colorScheme: colorScheme,
-                      textTheme: textTheme,
-                    ))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _roleLabel(CommunityRole role) {
-    switch (role) {
-      case CommunityRole.learner:
-        return 'Learner';
-      case CommunityRole.instructor:
-        return 'Instructor';
-      case CommunityRole.admin:
-        return 'Admin';
-      case CommunityRole.moderator:
-        return 'Moderator';
-    }
-  }
-
-  IconData _roleIcon(CommunityRole role) {
-    switch (role) {
-      case CommunityRole.learner:
-        return Icons.school_outlined;
-      case CommunityRole.instructor:
-        return Icons.auto_stories_outlined;
-      case CommunityRole.admin:
-        return Icons.shield_outlined;
-      case CommunityRole.moderator:
-        return Icons.verified_user_outlined;
-    }
-  }
-
-  List<_Capability> _roleCapabilities(_RolePolicy policy) {
-    return [
-      _Capability(
-        icon: Icons.dynamic_feed_outlined,
-        label: 'Live community feed',
-        description: 'Enterprise-grade feed with trust scoring and anomaly detection.',
-        enabled: policy.canViewFeed,
-      ),
-      _Capability(
-        icon: Icons.campaign_outlined,
-        label: 'Publish updates',
-        description: 'Compose posts, automate announcements, and syndicate to classrooms.',
-        enabled: policy.canPost,
-      ),
-      _Capability(
-        icon: Icons.group_add_outlined,
-        label: 'Join communities',
-        description: 'Request access to hubs, member-only classrooms, and live cohorts.',
-        enabled: policy.canJoin,
-      ),
-      _Capability(
-        icon: Icons.security_outlined,
-        label: 'Moderation controls',
-        description: 'Escalate incidents, manage trust queues, and enforce governance.',
-        enabled: policy.canModerate,
-      ),
-      _Capability(
-        icon: Icons.subscriptions_outlined,
-        label: 'Subscription management',
-        description: 'Adjust billing, follower tiers, and cross-community bundles.',
-        enabled: policy.canManageSubscriptions,
-      ),
-      _Capability(
-        icon: Icons.place_outlined,
-        label: 'Location intelligence',
-        description: 'Access community maps, check-in analytics, and campus logistics.',
-        enabled: policy.canViewLocations,
-      ),
-    ];
-  }
-
-  Widget _buildManagementSection(TextTheme textTheme, ColorScheme colorScheme) {
-    final stats = [
-      _ManagementStat(icon: Icons.person_add_alt_1_outlined, label: 'New members', value: '48 this week'),
-      _ManagementStat(icon: Icons.timelapse_outlined, label: 'Avg. response', value: '2h 14m'),
-      _ManagementStat(icon: Icons.auto_graph_outlined, label: 'Engagement lift', value: '+18% MoM'),
-    ];
-
-    final actions = [
-      'Schedule campaign',
-      'Publish announcement',
-      'Launch automation',
-      'Invite moderators',
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Community management', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            TextButton(
-              onPressed: () {},
-              child: const Text('View analytics'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth > 600;
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: stats
-                  .map(
-                    (stat) => SizedBox(
-                      width: isWide ? (constraints.maxWidth - 24) / 3 : (constraints.maxWidth - 12) / 2,
-                      child: _ManagementCard(stat: stat, colorScheme: colorScheme),
-                    ),
-                  )
-                  .toList(),
-            );
-          },
-        ),
-        const SizedBox(height: 16),
-        Text('Quick actions', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: actions
-              .map(
-                (action) => ActionChip(
-                  label: Text(action),
-                  avatar: const Icon(Icons.flash_on_outlined, size: 18),
-                  onPressed: () {},
                 ),
-              )
-              .toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDirectorySection(TextTheme textTheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Communities', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        ..._communities.map((community) => _CommunityCard(community: community)).toList(),
-      ],
-    );
-  }
-
-  Widget _buildLiveFeedSection(TextTheme textTheme) {
-    final selectedPosts = _selectedScope == LiveFeedScope.global ? _globalFeed : _communityFeed;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Live feed', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            SegmentedButton<LiveFeedScope>(
-              segments: const [
-                ButtonSegment(value: LiveFeedScope.global, label: Text('Global')),
-                ButtonSegment(value: LiveFeedScope.community, label: Text('Communities')),
-              ],
-              selected: <LiveFeedScope>{_selectedScope},
-              onSelectionChanged: (selection) {
-                final next = selection.firstOrNull ?? LiveFeedScope.global;
-                setState(() => _selectedScope = next);
-              },
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: selectedPosts.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final post = selectedPosts[index];
-            return Card(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=${(index + 5) * 3 % 70}'),
-                      ),
-                      title: Text(post.authorName),
-                      subtitle: Text(post.authorRole),
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        child: Text(
-                          post.communityName,
-                          style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(post.body, style: textTheme.bodyMedium),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      children: post.tags.map((tag) => Chip(label: Text('#$tag'))).toList(),
-                    ),
-                  ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  hintText: 'Search communities, tags or focus areas',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                 ),
               ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  const _HeroChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Chip(
-      label: Text(label),
-      avatar: const Icon(Icons.auto_awesome_outlined, size: 18),
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-  }
-}
-
-class _ManagementStat {
-  const _ManagementStat({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-}
-
-class _ManagementCard extends StatelessWidget {
-  const _ManagementCard({required this.stat, required this.colorScheme});
-
-  final _ManagementStat stat;
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      elevation: 0,
-      color: colorScheme.surfaceVariant.withOpacity(0.35),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(stat.icon, color: colorScheme.primary),
-            const SizedBox(height: 12),
-            Text(stat.value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(stat.label, style: Theme.of(context).textTheme.bodySmall),
-          ],
+              const SizedBox(height: 12),
+              SegmentedButton<CommunityDirectoryFilter>(
+                segments: const [
+                  ButtonSegment<CommunityDirectoryFilter>(
+                    value: CommunityDirectoryFilter.joined,
+                    label: Text('Joined'),
+                    icon: Icon(Icons.favorite_outline),
+                  ),
+                  ButtonSegment<CommunityDirectoryFilter>(
+                    value: CommunityDirectoryFilter.all,
+                    label: Text('All'),
+                    icon: Icon(Icons.public),
+                  ),
+                  ButtonSegment<CommunityDirectoryFilter>(
+                    value: CommunityDirectoryFilter.private,
+                    label: Text('Private'),
+                    icon: Icon(Icons.lock_outline),
+                  ),
+                ],
+                selected: {_filter},
+                onSelectionChanged: (selection) {
+                  setState(() {
+                    _filter = selection.first;
+                  });
+                },
+              ),
+              const SizedBox(height: 20),
+              if (filtered.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.1)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.sentiment_satisfied_alt_outlined, size: 48),
+                      const SizedBox(height: 12),
+                      Text(
+                        'No communities match your filters',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('Adjust filters or create a new space to get started.'),
+                    ],
+                  ),
+                ),
+              for (final community in filtered)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: _CommunityCard(
+                    community: community,
+                    onJoinToggle: (value) async {
+                      await ref
+                          .read(communityDirectoryControllerProvider.notifier)
+                          .toggleMembership(community.id, value);
+                      _showSnack(
+                        value ? 'Welcome to ${community.name}!' : 'You have left ${community.name}.',
+                      );
+                    },
+                    onOpenProfile: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => CommunityProfileScreen(communityId: community.id),
+                      ),
+                    ),
+                    onScheduleEvent: () => showCommunityEventPlanner(
+                      context: context,
+                      ref: ref,
+                      community: community,
+                      onMessage: _showSnack,
+                    ),
+                    onInviteMember: () => showCommunityMemberInvite(
+                      context: context,
+                      ref: ref,
+                      community: community,
+                      onMessage: _showSnack,
+                    ),
+                    onEdit: () => showCommunityEditor(
+                      context: context,
+                      ref: ref,
+                      community: community,
+                      onMessage: _showSnack,
+                    ),
+                    onDelete: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) {
+                          return AlertDialog(
+                            title: const Text('Archive community'),
+                            content: Text('This will remove ${community.name} from the directory for everyone.'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.of(context).maybePop(false),
+                                child: const Text('Cancel'),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.of(context).maybePop(true),
+                                child: const Text('Archive'),
+                              )
+                            ],
+                          );
+                        },
+                      );
+                      if (confirmed == true) {
+                        await ref
+                            .read(communityDirectoryControllerProvider.notifier)
+                            .deleteCommunity(community.id);
+                        _showSnack('${community.name} has been archived.');
+                      }
+                    },
+                    onRemoveEvent: (eventId) async {
+                      await ref
+                          .read(communityDirectoryControllerProvider.notifier)
+                          .removeEvent(community.id, eventId);
+                    },
+                  ),
+                ),
+              const SizedBox(height: 12),
+              if (feedAsync.hasValue && feedAsync.value!.isNotEmpty)
+                _FeedPreview(posts: feedAsync.value!.take(3).toList()),
+              const SizedBox(height: 80),
+            ],
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, stackTrace) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48),
+                const SizedBox(height: 12),
+                Text('Unable to load communities', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text('$error', textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () =>
+                      ref.read(communityDirectoryControllerProvider.notifier).refreshDirectory(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _Community {
-  const _Community({
-    required this.name,
-    required this.description,
-    required this.members,
-    required this.health,
-    required this.accentColor,
-    required this.bannerImage,
-    required this.tags,
+class _ActiveCommunityHeader extends StatelessWidget {
+  const _ActiveCommunityHeader({
+    required this.community,
+    required this.onOpenProfile,
   });
 
-  final String name;
-  final String description;
-  final int members;
-  final String health;
-  final Color accentColor;
-  final String bannerImage;
-  final List<String> tags;
+  final CommunityModel community;
+  final VoidCallback onOpenProfile;
+
+  Color _parseAccent(String hex) {
+    final value = int.tryParse(hex.replaceAll('#', ''), radix: 16);
+    if (value == null) return Colors.indigo.shade50;
+    return Color(0xFF000000 | value).withOpacity(0.12);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: LinearGradient(
+          colors: [
+            _parseAccent(community.accentColor),
+            Theme.of(context).colorScheme.primary.withOpacity(0.05),
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Active community',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(color: Theme.of(context).colorScheme.primary),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            community.name,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            community.description,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              Chip(label: Text('${community.memberCount} members')),
+              Chip(label: Text('${community.events.length} rituals scheduled')),
+              Chip(label: Text(community.isPrivate ? 'Private' : 'Open')), 
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: onOpenProfile,
+                icon: const Icon(Icons.dashboard_customize_outlined),
+                label: const Text('Open community workspace'),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => CommunitySwitcherScreen(initialCommunityId: community.id),
+                  ),
+                ),
+                icon: const Icon(Icons.swap_horiz_rounded),
+                label: const Text('Switch'),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
 }
 
 class _CommunityCard extends StatelessWidget {
-  const _CommunityCard({required this.community});
+  const _CommunityCard({
+    required this.community,
+    required this.onJoinToggle,
+    required this.onOpenProfile,
+    required this.onScheduleEvent,
+    required this.onInviteMember,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onRemoveEvent,
+  });
 
-  final _Community community;
+  final CommunityModel community;
+  final ValueChanged<bool> onJoinToggle;
+  final VoidCallback onOpenProfile;
+  final VoidCallback onScheduleEvent;
+  final VoidCallback onInviteMember;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final ValueChanged<String> onRemoveEvent;
+
+  Color _parseAccent(String hex) {
+    final value = int.tryParse(hex.replaceAll('#', ''), radix: 16);
+    if (value == null) return Colors.indigo.shade50;
+    return Color(0xFF000000 | value).withOpacity(0.08);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: community.accentColor,
         borderRadius: BorderRadius.circular(28),
+        color: _parseAccent(community.accentColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            child: Image.network(
-              community.bannerImage,
-              height: 160,
-              width: double.infinity,
-              fit: BoxFit.cover,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+            child: AspectRatio(
+              aspectRatio: 16 / 6,
+              child: Image.network(
+                community.bannerImage,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey.shade200),
+              ),
             ),
           ),
           Padding(
@@ -614,40 +421,158 @@ class _CommunityCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(community.name, style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Text(
-                  community.description,
-                  style: textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    CircleAvatar(
-                      backgroundImage:
-                          NetworkImage('https://i.pravatar.cc/150?img=${community.members % 70}'),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${community.members}+ members', style: textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                          Text('Health: ${community.health}', style: textTheme.bodySmall),
+                          Text(
+                            community.name,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(community.description),
                         ],
                       ),
                     ),
-                    FilledButton(
-                      onPressed: () {},
-                      child: const Text('Manage'),
+                    Column(
+                      children: [
+                        Switch.adaptive(
+                          value: community.joined,
+                          onChanged: onJoinToggle,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(community.joined ? 'Joined' : 'Join',
+                            style: Theme.of(context).textTheme.labelMedium),
+                      ],
                     ),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'edit':
+                            onEdit();
+                            break;
+                          case 'delete':
+                            onDelete();
+                            break;
+                        }
+                      },
+                      itemBuilder: (context) => const [
+                        PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit_outlined), title: Text('Edit'))),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: ListTile(leading: Icon(Icons.archive_outlined), title: Text('Archive')),
+                        ),
+                      ],
+                    )
                   ],
                 ),
                 const SizedBox(height: 12),
                 Wrap(
                   spacing: 8,
-                  children: community.tags.map((tag) => Chip(label: Text(tag))).toList(),
+                  runSpacing: 8,
+                  children: [
+                    for (final tag in community.tags) Chip(label: Text('#$tag')),
+                    for (final focus in community.focusAreas)
+                      Chip(
+                        avatar: const Icon(Icons.bolt, size: 18),
+                        label: Text(focus),
+                      ),
+                  ],
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Community health', style: Theme.of(context).textTheme.labelLarge),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.people_alt_outlined, size: 18),
+                              const SizedBox(width: 6),
+                              Text('${community.memberCount} members'),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(Icons.event_available_outlined, size: 18),
+                              const SizedBox(width: 6),
+                              Text('${community.events.length} rituals upcoming'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: onOpenProfile,
+                      icon: const Icon(Icons.dashboard_outlined),
+                      label: const Text('Open profile'),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: onScheduleEvent,
+                      icon: const Icon(Icons.event_note_outlined),
+                      label: const Text('Schedule ritual'),
+                    ),
+                    const SizedBox(width: 12),
+                    TextButton.icon(
+                      onPressed: onInviteMember,
+                      icon: const Icon(Icons.mail_outline),
+                      label: const Text('Invite member'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                if (community.events.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Upcoming rituals', style: Theme.of(context).textTheme.labelMedium),
+                      const SizedBox(height: 12),
+                      for (final event in community.events.take(3))
+                        Card(
+                          child: ListTile(
+                            leading: const Icon(Icons.calendar_month_outlined),
+                            title: Text(event.title),
+                            subtitle: Text('${DateFormat.MMMd().add_jm().format(event.start)} · ${event.location}'),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => onRemoveEvent(event.id),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                if (community.members.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
+                      Text('Core operators', style: Theme.of(context).textTheme.labelMedium),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        children: [
+                          for (final member in community.members.take(6))
+                            Chip(
+                              avatar: CircleAvatar(backgroundImage: NetworkImage(member.avatarUrl)),
+                              label: Text(member.name),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -657,109 +582,34 @@ class _CommunityCard extends StatelessWidget {
   }
 }
 
-class _Capability {
-  const _Capability({
-    required this.icon,
-    required this.label,
-    required this.description,
-    required this.enabled,
-  });
+class _FeedPreview extends StatelessWidget {
+  const _FeedPreview({required this.posts});
 
-  final IconData icon;
-  final String label;
-  final String description;
-  final bool enabled;
-}
-
-class _CapabilityCard extends StatelessWidget {
-  const _CapabilityCard({required this.capability, required this.colorScheme, required this.textTheme});
-
-  final _Capability capability;
-  final ColorScheme colorScheme;
-  final TextTheme textTheme;
+  final List<FeedPost> posts;
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = capability.enabled
-        ? colorScheme.primary.withOpacity(0.1)
-        : colorScheme.surfaceVariant.withOpacity(0.35);
-    final borderColor = capability.enabled
-        ? colorScheme.primary.withOpacity(0.3)
-        : colorScheme.outline.withOpacity(0.2);
-    final iconColor = capability.enabled ? colorScheme.primary : colorScheme.outline;
-    final statusColor = capability.enabled ? colorScheme.primary : colorScheme.error;
-    final statusLabel = capability.enabled ? 'Enabled' : 'Restricted';
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 220, maxWidth: 320),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: borderColor),
-          color: backgroundColor,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  height: 40,
-                  width: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: iconColor.withOpacity(0.15),
-                  ),
-                  child: Icon(capability.icon, color: iconColor),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    capability.label,
-                    style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              capability.description,
-              style: textTheme.bodySmall,
-            ),
-            const SizedBox(height: 12),
-            Chip(
-              label: Text(statusLabel),
-              backgroundColor: statusColor.withOpacity(0.12),
-              labelStyle: textTheme.labelSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: statusColor,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Live feed spotlight', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        for (final post in posts)
+          Card(
+            child: ListTile(
+              leading: CircleAvatar(backgroundImage: NetworkImage(post.authorAvatar)),
+              title: Text(post.authorName),
+              subtitle: Text(post.message, maxLines: 2, overflow: TextOverflow.ellipsis),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.favorite_outline, size: 20),
+                  Text('${post.reactionCount}')
+                ],
               ),
-              side: BorderSide.none,
             ),
-          ],
-        ),
-      ),
+          )
+      ],
     );
   }
-}
-
-class _FeedPost {
-  const _FeedPost({
-    required this.authorName,
-    required this.authorRole,
-    required this.communityName,
-    required this.body,
-    required this.tags,
-  });
-
-  final String authorName;
-  final String authorRole;
-  final String communityName;
-  final String body;
-  final List<String> tags;
-}
-
-extension<T> on Set<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

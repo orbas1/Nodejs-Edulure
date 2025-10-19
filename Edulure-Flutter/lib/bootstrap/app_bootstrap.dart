@@ -6,6 +6,7 @@ import '../core/state/provider_logger.dart';
 import '../core/telemetry/telemetry_service.dart';
 import '../core/runtime/capability_manifest_notifier.dart';
 import '../services/language_service.dart';
+import '../services/community_data_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/session_manager.dart';
 import '../services/notification_preference_service.dart';
@@ -30,6 +31,7 @@ class AppBootstrap {
   Future<void> _initialize() async {
     await SessionManager.init();
     await LanguageService.init();
+    await CommunityDataService.instance.init();
     await container.read(telemetryServiceProvider).prepare();
     await PushNotificationService.instance.initialize();
     await NotificationPreferenceService.instance
