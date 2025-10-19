@@ -1,8 +1,9 @@
 import PropTypes from 'prop-types';
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import CourseCreationHeader from './instructor/courseCreation/CourseCreationHeader.jsx';
 import CourseCreationSummaryCards from './instructor/courseCreation/CourseCreationSummaryCards.jsx';
 import CourseBlueprintCard from './instructor/courseCreation/CourseBlueprintCard.jsx';
@@ -23,7 +24,9 @@ export default function InstructorCourseCreate({
   onImportFromNotion,
   onSyncFromLms
 }) {
-  const { dashboard, refresh } = useOutletContext();
+  const { dashboard, refresh, instructorOrchestration } = useOutletContext();
+  const [pendingAction, setPendingAction] = useState(null);
+  const [feedback, setFeedback] = useState(null);
   const blueprints = useMemo(
     () => dashboard?.courses?.creationBlueprints ?? EMPTY_BLUEPRINTS,
     [dashboard]
@@ -99,6 +102,96 @@ export default function InstructorCourseCreate({
     [blueprints.length, lifecycle.length, lifecycleSummary, overview.averageReadiness, overview.modules, overview.outstanding]
   );
 
+  const defaultGenerateOutline = useCallback(async () => {
+    if (!instructorOrchestration?.generateCourseOutline) {
+      return;
+    }
+    setPendingAction('generate');
+    setFeedback(null);
+    try {
+      const payload = {
+        courseId: blueprints[0]?.id,
+        topic: blueprints[0]?.title,
+        moduleCount: blueprints.length > 0 ? blueprints[0]?.moduleCount ?? blueprints.length * 4 : 6,
+        outcomes: blueprints.flatMap((item) => item.outstanding ?? [])
+      };
+      const result = await instructorOrchestration.generateCourseOutline(payload);
+      setFeedback({
+        tone: 'success',
+        message: 'Course outline orchestration triggered.',
+        detail: result?.summary ?? 'We will notify you once drafting completes.'
+      });
+      await refresh?.();
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error.message ?? 'Unable to orchestrate an outline right now.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [instructorOrchestration, blueprints, refresh]);
+
+  const defaultImportFromNotion = useCallback(async () => {
+    if (!instructorOrchestration?.importFromNotion) {
+      return;
+    }
+    setPendingAction('notion');
+    setFeedback(null);
+    try {
+      const payload = {
+        workspaceId: dashboard?.courses?.workspaceId,
+        sections: blueprints.map((item) => item.title)
+      };
+      const result = await instructorOrchestration.importFromNotion(payload);
+      setFeedback({
+        tone: 'success',
+        message: 'Notion import queued.',
+        detail: result?.summary ?? 'We will align sections to your blueprint shortly.'
+      });
+      await refresh?.();
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error.message ?? 'Unable to import Notion content.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [dashboard, instructorOrchestration, blueprints, refresh]);
+
+  const defaultSyncFromLms = useCallback(async () => {
+    if (!instructorOrchestration?.syncFromLms) {
+      return;
+    }
+    setPendingAction('lms');
+    setFeedback(null);
+    try {
+      const payload = {
+        provider: dashboard?.courses?.lmsProvider ?? 'manual',
+        courseCode: blueprints[0]?.code
+      };
+      const result = await instructorOrchestration.syncFromLms(payload);
+      setFeedback({
+        tone: 'success',
+        message: 'LMS synchronisation started.',
+        detail: result?.summary ?? 'Your assets will refresh once the sync completes.'
+      });
+      await refresh?.();
+    } catch (error) {
+      setFeedback({
+        tone: 'error',
+        message: error.message ?? 'Unable to sync from the LMS.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [dashboard, instructorOrchestration, blueprints, refresh]);
+
+  const handleGenerateOutline = onGenerateOutline ?? defaultGenerateOutline;
+  const handleImportFromNotion = onImportFromNotion ?? defaultImportFromNotion;
+  const handleSyncFromLms = onSyncFromLms ?? defaultSyncFromLms;
+
   if (blueprints.length === 0) {
     return (
       <DashboardStateMessage
@@ -112,10 +205,14 @@ export default function InstructorCourseCreate({
 
   return (
     <div className="space-y-10">
+      <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
       <CourseCreationHeader
-        onGenerateOutline={onGenerateOutline}
-        onImportFromNotion={onImportFromNotion}
-        onSyncFromLms={onSyncFromLms}
+        onGenerateOutline={handleGenerateOutline}
+        onImportFromNotion={handleImportFromNotion}
+        onSyncFromLms={handleSyncFromLms}
+        isGenerating={pendingAction === 'generate'}
+        isImporting={pendingAction === 'notion'}
+        isSyncing={pendingAction === 'lms'}
       />
       <CourseCreationSummaryCards cards={summaryCards} />
       <section className="space-y-6">

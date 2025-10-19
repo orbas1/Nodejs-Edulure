@@ -29,6 +29,7 @@ import telemetryRoutes from './telemetry.routes.js';
 import governanceRoutes from './governance.routes.js';
 import releaseRoutes from './release.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
+import instructorRoutes from './instructor.routes.js';
 
 const routerMap = {
   auth: authRoutes,
@@ -60,6 +61,7 @@ const routerMap = {
   telemetry: telemetryRoutes,
   enablement: enablementRoutes,
   governance: governanceRoutes,
+  instructor: instructorRoutes,
   release: releaseRoutes
 };
 

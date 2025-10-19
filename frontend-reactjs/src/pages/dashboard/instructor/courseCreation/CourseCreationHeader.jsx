@@ -1,6 +1,13 @@
 import PropTypes from 'prop-types';
 
-export default function CourseCreationHeader({ onGenerateOutline, onImportFromNotion, onSyncFromLms }) {
+export default function CourseCreationHeader({
+  onGenerateOutline,
+  onImportFromNotion,
+  onSyncFromLms,
+  isGenerating,
+  isImporting,
+  isSyncing
+}) {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -10,14 +17,32 @@ export default function CourseCreationHeader({ onGenerateOutline, onImportFromNo
         </p>
       </div>
       <div className="flex flex-wrap gap-3">
-        <button type="button" className="dashboard-primary-pill" onClick={onGenerateOutline}>
-          Generate outline
+        <button
+          type="button"
+          className="dashboard-primary-pill disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onGenerateOutline}
+          disabled={isGenerating}
+          aria-busy={isGenerating}
+        >
+          {isGenerating ? 'Generating…' : 'Generate outline'}
         </button>
-        <button type="button" className="dashboard-pill" onClick={onImportFromNotion}>
-          Import from Notion
+        <button
+          type="button"
+          className="dashboard-pill disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onImportFromNotion}
+          disabled={isImporting}
+          aria-busy={isImporting}
+        >
+          {isImporting ? 'Importing…' : 'Import from Notion'}
         </button>
-        <button type="button" className="dashboard-pill" onClick={onSyncFromLms}>
-          Sync from LMS
+        <button
+          type="button"
+          className="dashboard-pill disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={onSyncFromLms}
+          disabled={isSyncing}
+          aria-busy={isSyncing}
+        >
+          {isSyncing ? 'Syncing…' : 'Sync from LMS'}
         </button>
       </div>
     </div>
@@ -27,11 +52,17 @@ export default function CourseCreationHeader({ onGenerateOutline, onImportFromNo
 CourseCreationHeader.propTypes = {
   onGenerateOutline: PropTypes.func,
   onImportFromNotion: PropTypes.func,
-  onSyncFromLms: PropTypes.func
+  onSyncFromLms: PropTypes.func,
+  isGenerating: PropTypes.bool,
+  isImporting: PropTypes.bool,
+  isSyncing: PropTypes.bool
 };
 
 CourseCreationHeader.defaultProps = {
   onGenerateOutline: undefined,
   onImportFromNotion: undefined,
-  onSyncFromLms: undefined
+  onSyncFromLms: undefined,
+  isGenerating: false,
+  isImporting: false,
+  isSyncing: false
 };
