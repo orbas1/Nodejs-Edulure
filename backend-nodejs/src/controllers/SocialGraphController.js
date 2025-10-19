@@ -171,6 +171,30 @@ export default class SocialGraphController {
     }
   }
 
+  static async listMutes(req, res, next) {
+    try {
+      const result = await SocialGraphService.listMutedUsers(req.user.id);
+      return success(res, {
+        data: result,
+        message: 'Muted users retrieved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async listBlocks(req, res, next) {
+    try {
+      const result = await SocialGraphService.listBlockedUsers(req.user.id);
+      return success(res, {
+        data: result,
+        message: 'Blocked users retrieved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async getPrivacy(req, res, next) {
     try {
       const result = await SocialGraphService.getPrivacySettings(req.params.userId ?? req.user.id, req.user.id);

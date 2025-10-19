@@ -26,6 +26,11 @@ import {
 import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
 import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
+import {
+  mapFollowerItem,
+  mapRecommendationItem,
+  formatPersonDisplayName
+} from '../utils/socialGraph.js';
 
 const defaultProfile = {
   name: 'Alex Morgan',
@@ -214,94 +219,6 @@ const fallbackVerificationRequirements = [
 
 const FOLLOW_PAGE_SIZE = 6;
 
-function formatPersonName(user) {
-  if (!user) {
-    return 'Unknown member';
-  }
-
-  const parts = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-  if (parts.length > 0) {
-    return parts;
-  }
-
-  if (typeof user.email === 'string' && user.email.length > 0) {
-    return user.email;
-  }
-
-  if (user.id) {
-    return `Member #${user.id}`;
-  }
-
-  return 'Community member';
-}
-
-function buildRoleLabel(user) {
-  if (!user?.role) {
-    return 'Member';
-  }
-  const role = user.role.toString();
-  return role.charAt(0).toUpperCase() + role.slice(1);
-}
-
-function normaliseMetadataTagline(metadata = {}) {
-  if (!metadata || typeof metadata !== 'object') {
-    return 'Edulure community member';
-  }
-
-  const preferredKey = ['context', 'note', 'message', 'reason', 'source'];
-  for (const key of preferredKey) {
-    if (typeof metadata[key] === 'string' && metadata[key].trim().length > 0) {
-      return metadata[key]
-        .trim()
-        .replace(/[_-]+/g, ' ')
-        .replace(/\s+/g, ' ')
-        .replace(/^\w/, (char) => char.toUpperCase());
-    }
-  }
-
-  const firstEntry = Object.entries(metadata).find(([, value]) => typeof value === 'string' && value.trim().length > 0);
-  if (firstEntry) {
-    const [key, value] = firstEntry;
-    return `${key.replace(/[_-]+/g, ' ')}: ${value}`;
-  }
-
-  return 'Edulure community member';
-}
-
-function computeTrustScore(seed) {
-  const base = 72;
-  const spread = 24;
-  return Math.min(99, base + ((Math.abs(Number(seed) || 0) * 7) % spread));
-}
-
-function mapFollowerItem(item) {
-  const user = item?.user ?? {};
-  const relationship = item?.relationship ?? {};
-  return {
-    id: user.id ?? relationship.id ?? Math.random().toString(36).slice(2),
-    name: formatPersonName(user),
-    role: buildRoleLabel(user),
-    tagline: normaliseMetadataTagline(relationship.metadata),
-    trust: computeTrustScore(user.id ?? relationship.id ?? Date.now()),
-    relationship
-  };
-}
-
-function mapRecommendationItem(item) {
-  const user = item?.user ?? {};
-  const recommendation = item?.recommendation ?? {};
-  const metadataTagline = normaliseMetadataTagline(recommendation.metadata ?? {});
-  return {
-    id: user.id ?? recommendation.recommendedUserId,
-    name: formatPersonName(user),
-    role: buildRoleLabel(user),
-    tagline: metadataTagline,
-    score: recommendation.score ?? null,
-    mutualFollowers: recommendation.mutualFollowersCount ?? 0,
-    recommendation
-  };
-}
-
 function buildLocationFromAddress(address, fallback = 'Not specified') {
   if (!address || typeof address !== 'object') {
     return fallback;
@@ -398,7 +315,7 @@ function buildProfileStateFromUser(user) {
     name:
       profileRecord.displayName && profileRecord.displayName.trim().length > 0
         ? profileRecord.displayName.trim()
-        : formatPersonName(user) || defaultProfile.name,
+        : formatPersonDisplayName(user) || defaultProfile.name,
     handle: user.email ? `@${user.email.split('@')[0]}` : defaultProfile.handle,
     tagline: profileRecord.tagline ?? defaultProfile.tagline,
     bio: profileRecord.bio ?? defaultProfile.bio,

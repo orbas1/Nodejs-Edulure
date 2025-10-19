@@ -92,4 +92,27 @@ export default class CommunityChannelMemberModel {
       .orderBy('created_at', 'asc');
     return rows.map((row) => mapRecord(row));
   }
+
+  static async updateMembership(channelId, userId, updates = {}, connection = db) {
+    const payload = { updated_at: connection.fn.now() };
+    if (updates.role !== undefined) {
+      payload.role = updates.role;
+    }
+    if (updates.notificationsEnabled !== undefined) {
+      payload.notifications_enabled = Boolean(updates.notificationsEnabled);
+    }
+    if (updates.muteUntil !== undefined) {
+      payload.mute_until = updates.muteUntil ?? null;
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = JSON.stringify(updates.metadata ?? {});
+    }
+
+    await connection('community_channel_members').where({ channel_id: channelId, user_id: userId }).update(payload);
+    return this.findMembership(channelId, userId, connection);
+  }
+
+  static async removeMembership(channelId, userId, connection = db) {
+    return connection('community_channel_members').where({ channel_id: channelId, user_id: userId }).del();
+  }
 }

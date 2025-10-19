@@ -10,6 +10,8 @@ router.get('/users/:userId/followers', auth(), SocialGraphController.listFollowe
 router.get('/following', auth(), SocialGraphController.listFollowing);
 router.get('/users/:userId/following', auth(), SocialGraphController.listFollowing);
 router.get('/recommendations', auth(), SocialGraphController.listRecommendations);
+router.get('/mutes', auth(), SocialGraphController.listMutes);
+router.get('/blocks', auth(), SocialGraphController.listBlocks);
 
 router.post('/follows/:userId', auth(), SocialGraphController.follow);
 router.delete('/follows/:userId', auth(), SocialGraphController.unfollow);

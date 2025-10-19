@@ -715,6 +715,36 @@ export default class SocialGraphService {
     return [...stored, ...fallbackItems].slice(0, limit);
   }
 
+  static async listMutedUsers(userId) {
+    const records = await UserMuteModel.listForUser(userId, db);
+    if (!records.length) {
+      return [];
+    }
+
+    const users = await UserModel.findByIds(records.map((record) => record.mutedUserId), db);
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    return records.map((record) => ({
+      mute: record,
+      user: userMap.get(record.mutedUserId) ?? null
+    }));
+  }
+
+  static async listBlockedUsers(userId) {
+    const records = await UserBlockModel.listForUser(userId, db);
+    if (!records.length) {
+      return [];
+    }
+
+    const users = await UserModel.findByIds(records.map((record) => record.blockedUserId), db);
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    return records.map((record) => ({
+      block: record,
+      user: userMap.get(record.blockedUserId) ?? null
+    }));
+  }
+
   static async getPrivacySettings(userId, actorId) {
     if (Number(userId) !== actorId) {
       const error = new Error('You can only view your own privacy settings');

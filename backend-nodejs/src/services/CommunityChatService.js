@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import slugify from 'slugify';
 
 import db from '../config/database.js';
 import CommunityChannelMemberModel from '../models/CommunityChannelMemberModel.js';
@@ -10,6 +11,7 @@ import CommunityMessageReactionModel from '../models/CommunityMessageReactionMod
 import CommunityModel from '../models/CommunityModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import UserPresenceSessionModel from '../models/UserPresenceSessionModel.js';
+import UserModel from '../models/UserModel.js';
 import { env } from '../config/env.js';
 import logger from '../config/logger.js';
 
@@ -92,6 +94,288 @@ export default class CommunityChatService {
     return { community, channel: serializeChannel(channel), membership, channelMembership };
   }
 
+  static assertChannelManagementRights(membership) {
+    if (!membership || !MODERATOR_ROLES.has(membership.role)) {
+      const error = new Error('You do not have permission to manage channels');
+      error.status = 403;
+      throw error;
+    }
+  }
+
+  static sanitizeChannelMetadata(metadata = {}) {
+    if (!metadata || typeof metadata !== 'object') {
+      return {};
+    }
+
+    const allowed = { ...metadata };
+    if (metadata.permissions && typeof metadata.permissions === 'object') {
+      allowed.permissions = {
+        broadcast: Boolean(metadata.permissions.broadcast),
+        media: Boolean(metadata.permissions.media),
+        voice: Boolean(metadata.permissions.voice),
+        events: Boolean(metadata.permissions.events)
+      };
+    }
+
+    if (metadata.topics && Array.isArray(metadata.topics)) {
+      allowed.topics = metadata.topics.slice(0, 15).map((topic) => String(topic).trim()).filter(Boolean);
+    }
+
+    if (metadata.live && typeof metadata.live === 'object') {
+      const live = metadata.live;
+      allowed.live = {
+        enabled: Boolean(live.enabled),
+        provider: live.provider ?? 'internal',
+        url: live.url ?? null,
+        startAt: live.startAt ?? null
+      };
+    }
+
+    return allowed;
+  }
+
+  static async resolveChannelSlug(communityId, requestedSlug, trx) {
+    const base = slugify(requestedSlug, { lower: true, strict: true }) || `channel-${Date.now()}`;
+    let candidate = base;
+    let attempt = 1;
+    const query = (slug) =>
+      (trx ?? db)('community_channels').where({ community_id: communityId, slug }).first();
+
+    // eslint-disable-next-line no-await-in-loop
+    while (await query(candidate)) {
+      candidate = `${base}-${attempt}`;
+      attempt += 1;
+    }
+
+    return candidate;
+  }
+
+  static async createChannel(communityId, userId, payload = {}) {
+    const { community, membership } = await this.ensureCommunityMember(communityId, userId);
+    this.assertChannelManagementRights(membership);
+
+    const metadata = this.sanitizeChannelMetadata(payload.metadata ?? {});
+    const requestedSlug = payload.slug ?? payload.name ?? `channel-${Date.now()}`;
+
+    return db.transaction(async (trx) => {
+      const slug = await this.resolveChannelSlug(community.id, requestedSlug, trx);
+      const created = await CommunityChannelModel.create(
+        {
+          communityId: community.id,
+          name: payload.name,
+          slug,
+          channelType: payload.channelType ?? 'general',
+          description: payload.description ?? null,
+          isDefault: Boolean(payload.isDefault),
+          metadata
+        },
+        trx
+      );
+
+      if (payload.isDefault) {
+        await trx('community_channels')
+          .where({ community_id: community.id })
+          .andWhereNot({ id: created.id })
+          .update({ is_default: false, updated_at: trx.fn.now() });
+      }
+
+      await CommunityChannelMemberModel.ensureMembership(
+        created.id,
+        userId,
+        { role: 'moderator', metadata: { addedBy: userId } },
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_channel',
+          entityId: created.id,
+          eventType: 'community.channel.created',
+          payload: { communityId: community.id, channelType: created.channelType },
+          performedBy: userId
+        },
+        trx
+      );
+
+      return serializeChannel(created);
+    });
+  }
+
+  static async updateChannel(communityId, channelId, userId, payload = {}) {
+    const { community, channel, membership } = await this.ensureChannelAccess(communityId, channelId, userId);
+    this.assertChannelManagementRights(membership);
+
+    const metadata = payload.metadata ? this.sanitizeChannelMetadata(payload.metadata) : undefined;
+
+    return db.transaction(async (trx) => {
+      let slugUpdate;
+      if (payload.slug) {
+        slugUpdate = await this.resolveChannelSlug(community.id, payload.slug, trx);
+      } else if (payload.name && !payload.slug && channel.slug?.startsWith('channel-')) {
+        slugUpdate = await this.resolveChannelSlug(community.id, payload.name, trx);
+      }
+
+      const next = await CommunityChannelModel.update(
+        channel.id,
+        {
+          name: payload.name,
+          slug: slugUpdate,
+          channelType: payload.channelType,
+          description: payload.description,
+          isDefault: payload.isDefault,
+          metadata
+        },
+        trx
+      );
+
+      if (payload.isDefault === true) {
+        await trx('community_channels')
+          .where({ community_id: community.id })
+          .andWhereNot({ id: channel.id })
+          .update({ is_default: false, updated_at: trx.fn.now() });
+      }
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_channel',
+          entityId: channel.id,
+          eventType: 'community.channel.updated',
+          payload: { communityId: community.id, updates: payload },
+          performedBy: userId
+        },
+        trx
+      );
+
+      return serializeChannel(next);
+    });
+  }
+
+  static async deleteChannel(communityId, channelId, userId) {
+    const { community, channel, membership } = await this.ensureChannelAccess(communityId, channelId, userId);
+    this.assertChannelManagementRights(membership);
+
+    if (channel.isDefault) {
+      const error = new Error('Default channels cannot be deleted');
+      error.status = 409;
+      throw error;
+    }
+
+    await db.transaction(async (trx) => {
+      await CommunityChannelModel.delete(channel.id, trx);
+      await DomainEventModel.record(
+        {
+          entityType: 'community_channel',
+          entityId: channel.id,
+          eventType: 'community.channel.deleted',
+          payload: { communityId: community.id },
+          performedBy: userId
+        },
+        trx
+      );
+    });
+
+    return { success: true };
+  }
+
+  static async listChannelMembers(communityId, channelId, userId) {
+    const { channel } = await this.ensureChannelAccess(communityId, channelId, userId);
+    const memberships = await CommunityChannelMemberModel.listForChannel(channel.id);
+    if (!memberships.length) {
+      return [];
+    }
+
+    const users = await UserModel.findByIds(memberships.map((member) => member.userId));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    return memberships.map((membership) => ({
+      membership,
+      user: userMap.get(membership.userId) ?? null
+    }));
+  }
+
+  static async upsertChannelMember(communityId, channelId, actorId, payload = {}) {
+    if (!payload.userId) {
+      const error = new Error('A user identifier is required');
+      error.status = 400;
+      throw error;
+    }
+
+    const { community, channel, membership } = await this.ensureChannelAccess(communityId, channelId, actorId);
+    this.assertChannelManagementRights(membership);
+
+    const targetMembership = await CommunityMemberModel.findMembership(community.id, payload.userId);
+    if (!targetMembership || targetMembership.status !== 'active') {
+      const error = new Error('Target user is not an active community member');
+      error.status = targetMembership ? 403 : 404;
+      throw error;
+    }
+
+    return db.transaction(async (trx) => {
+      await CommunityChannelMemberModel.ensureMembership(
+        channel.id,
+        payload.userId,
+        {
+          role: payload.role ?? (MODERATOR_ROLES.has(targetMembership.role) ? 'moderator' : 'member'),
+          notificationsEnabled: payload.notificationsEnabled ?? true,
+          metadata: { addedBy: actorId }
+        },
+        trx
+      );
+
+      const updated = await CommunityChannelMemberModel.updateMembership(
+        channel.id,
+        payload.userId,
+        {
+          role: payload.role,
+          notificationsEnabled: payload.notificationsEnabled,
+          muteUntil: payload.muteUntil,
+          metadata: payload.metadata
+        },
+        trx
+      );
+
+      await DomainEventModel.record(
+        {
+          entityType: 'community_channel',
+          entityId: channel.id,
+          eventType: 'community.channel.member.updated',
+          payload: { communityId: community.id, memberId: payload.userId, role: updated.role },
+          performedBy: actorId
+        },
+        trx
+      );
+
+      return updated;
+    });
+  }
+
+  static async removeChannelMember(communityId, channelId, actorId, targetUserId) {
+    const { community, channel, membership } = await this.ensureChannelAccess(communityId, channelId, actorId);
+    this.assertChannelManagementRights(membership);
+
+    if (actorId === targetUserId) {
+      const error = new Error('Use the leave action to exit the channel');
+      error.status = 400;
+      throw error;
+    }
+
+    await db.transaction(async (trx) => {
+      await CommunityChannelMemberModel.removeMembership(channel.id, targetUserId, trx);
+      await DomainEventModel.record(
+        {
+          entityType: 'community_channel',
+          entityId: channel.id,
+          eventType: 'community.channel.member.removed',
+          payload: { communityId: community.id, memberId: targetUserId },
+          performedBy: actorId
+        },
+        trx
+      );
+    });
+
+    return { success: true };
+  }
+
   static async listChannels(communityId, userId) {
     const { community, membership } = await this.ensureCommunityMember(communityId, userId);
     const channels = await CommunityChannelModel.listByCommunity(community.id);
@@ -113,21 +397,35 @@ export default class CommunityChatService {
       return acc;
     }, new Map());
 
+    const memberCountsRaw = await db('community_channel_members')
+      .whereIn('channel_id', channels.map((channel) => channel.id))
+      .select('channel_id as channelId')
+      .count({ count: '*' })
+      .groupBy('channel_id');
+
+    const memberCountMap = new Map(
+      memberCountsRaw.map((entry) => [entry.channelId, Number(entry.count ?? 0)])
+    );
+
+    const unreadCounts = await Promise.all(
+      channels.map((channel, index) =>
+        CommunityMessageModel.countSince(channel.id, memberships[index].lastReadAt)
+      )
+    );
+
     const response = [];
     for (let index = 0; index < channels.length; index += 1) {
       const channel = serializeChannel(channels[index]);
       const channelMembership = memberships[index];
       const latestMessage = latestMap.get(channel.id) ?? null;
-      const unreadCount = await CommunityMessageModel.countSince(
-        channel.id,
-        channelMembership.lastReadAt
-      );
+      const unreadCount = unreadCounts[index] ?? 0;
 
       response.push({
         channel,
         membership: channelMembership,
         latestMessage,
-        unreadCount
+        unreadCount,
+        memberCount: memberCountMap.get(channel.id) ?? 0
       });
     }
 

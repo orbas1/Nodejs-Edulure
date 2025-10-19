@@ -173,6 +173,218 @@ export async function publishCommunityRunbook({ communityId, token, payload }) {
   return mapResponse(response);
 }
 
+export async function fetchCommunityChatChannels({ communityId, token, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/chat/channels`, {
+    token,
+    signal,
+    cache: {
+      ttl: 5_000,
+      tags: [`community:${communityId}:chat:channels`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function createCommunityChatChannel({ communityId, token, payload, signal } = {}) {
+  const response = await httpClient.post(`/communities/${communityId}/chat/channels`, payload ?? {}, {
+    token,
+    signal,
+    cache: {
+      invalidateTags: [`community:${communityId}:chat:channels`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunityChatChannel({ communityId, channelId, token, payload, signal } = {}) {
+  const response = await httpClient.put(
+    `/communities/${communityId}/chat/channels/${channelId}`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:chat:channels`, `community:${communityId}:detail`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function deleteCommunityChatChannel({ communityId, channelId, token, signal } = {}) {
+  const response = await httpClient.delete(`/communities/${communityId}/chat/channels/${channelId}`, {
+    token,
+    signal,
+    cache: {
+      invalidateTags: [`community:${communityId}:chat:channels`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function fetchCommunityChatMembers({ communityId, channelId, token, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/chat/channels/${channelId}/members`, {
+    token,
+    signal,
+    cache: {
+      ttl: 5_000,
+      tags: [`community:${communityId}:chat:members:${channelId}`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function upsertCommunityChatMember({ communityId, channelId, token, payload, signal } = {}) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/chat/channels/${channelId}/members`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:chat:members:${channelId}`, `community:${communityId}:chat:channels`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function removeCommunityChatMember({ communityId, channelId, userId, token, signal } = {}) {
+  const response = await httpClient.delete(
+    `/communities/${communityId}/chat/channels/${channelId}/members/${userId}`,
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:chat:members:${channelId}`, `community:${communityId}:chat:channels`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function fetchCommunityChatMessages({
+  communityId,
+  channelId,
+  token,
+  params,
+  signal
+} = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/chat/channels/${channelId}/messages`, {
+    token,
+    params,
+    signal,
+    cache: {
+      ttl: 3_000,
+      tags: [`community:${communityId}:chat:messages:${channelId}`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function postCommunityChatMessage({
+  communityId,
+  channelId,
+  token,
+  payload,
+  signal
+} = {}) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/chat/channels/${channelId}/messages`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:chat:messages:${channelId}`, `community:${communityId}:chat:channels`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function acknowledgeCommunityChat({ communityId, channelId, token, payload, signal } = {}) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/chat/channels/${channelId}/read`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:chat:channels`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function addCommunityChatReaction({
+  communityId,
+  channelId,
+  messageId,
+  token,
+  payload,
+  signal
+} = {}) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/chat/channels/${channelId}/messages/${messageId}/reactions`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:chat:messages:${channelId}`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function removeCommunityChatReaction({
+  communityId,
+  channelId,
+  messageId,
+  token,
+  payload,
+  signal
+} = {}) {
+  const response = await httpClient.delete(
+    `/communities/${communityId}/chat/channels/${channelId}/messages/${messageId}/reactions`,
+    {
+      token,
+      data: payload ?? {},
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:chat:messages:${channelId}`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function fetchCommunityChatPresence({ communityId, token, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/chat/presence`, {
+    token,
+    signal,
+    cache: {
+      ttl: 3_000,
+      tags: [`community:${communityId}:chat:presence`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunityChatPresence({ communityId, token, payload, signal } = {}) {
+  const response = await httpClient.post(`/communities/${communityId}/chat/presence`, payload ?? {}, {
+    token,
+    signal,
+    cache: {
+      invalidateTags: [`community:${communityId}:chat:presence`]
+    }
+  });
+  return mapResponse(response);
+}
+
 export async function acknowledgeCommunityEscalation({ communityId, escalationId, token, payload }) {
   const response = await httpClient.post(
     `/communities/${communityId}/operations/escalations/${escalationId}/acknowledge`,

@@ -52,6 +52,27 @@ const presenceSchema = Joi.object({
   connectedAt: Joi.date().optional()
 });
 
+const channelCreateSchema = Joi.object({
+  name: Joi.string().trim().min(3).max(120).required(),
+  slug: Joi.string().trim().max(150).optional(),
+  channelType: Joi.string()
+    .valid('general', 'classroom', 'resources', 'announcements', 'events')
+    .default('general'),
+  description: Joi.string().max(500).allow('', null),
+  isDefault: Joi.boolean().default(false),
+  metadata: Joi.object().default({})
+});
+
+const channelUpdateSchema = channelCreateSchema.fork(['name', 'slug'], (schema) => schema.optional());
+
+const channelMemberSchema = Joi.object({
+  userId: Joi.number().integer().min(1).required(),
+  role: Joi.string().valid('member', 'moderator').optional(),
+  notificationsEnabled: Joi.boolean().optional(),
+  muteUntil: Joi.date().optional(),
+  metadata: Joi.object().default({})
+});
+
 export default class CommunityChatController {
   static async listChannels(req, res, next) {
     try {
@@ -59,6 +80,126 @@ export default class CommunityChatController {
       return success(res, {
         data: channels,
         message: 'Chat channels fetched'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createChannel(req, res, next) {
+    try {
+      const payload = await channelCreateSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const channel = await CommunityChatService.createChannel(req.params.communityId, req.user.id, payload);
+      return success(res, {
+        data: channel,
+        message: 'Channel created',
+        status: 201
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async updateChannel(req, res, next) {
+    try {
+      const payload = await channelUpdateSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const channel = await CommunityChatService.updateChannel(
+        req.params.communityId,
+        req.params.channelId,
+        req.user.id,
+        payload
+      );
+      return success(res, {
+        data: channel,
+        message: 'Channel updated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async deleteChannel(req, res, next) {
+    try {
+      const result = await CommunityChatService.deleteChannel(
+        req.params.communityId,
+        req.params.channelId,
+        req.user.id
+      );
+      return success(res, {
+        data: result,
+        message: 'Channel removed'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async listChannelMembers(req, res, next) {
+    try {
+      const members = await CommunityChatService.listChannelMembers(
+        req.params.communityId,
+        req.params.channelId,
+        req.user.id
+      );
+      return success(res, {
+        data: members,
+        message: 'Channel members fetched'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async upsertChannelMember(req, res, next) {
+    try {
+      const payload = await channelMemberSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const membership = await CommunityChatService.upsertChannelMember(
+        req.params.communityId,
+        req.params.channelId,
+        req.user.id,
+        payload
+      );
+      return success(res, {
+        data: membership,
+        message: 'Channel member updated'
+      });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async removeChannelMember(req, res, next) {
+    try {
+      const result = await CommunityChatService.removeChannelMember(
+        req.params.communityId,
+        req.params.channelId,
+        req.user.id,
+        req.params.userId
+      );
+      return success(res, {
+        data: result,
+        message: 'Channel member removed'
       });
     } catch (error) {
       return next(error);
