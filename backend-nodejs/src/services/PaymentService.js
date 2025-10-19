@@ -18,6 +18,18 @@ import EscrowService from './EscrowService.js';
 import webhookEventBusService from './WebhookEventBusService.js';
 import IntegrationProviderService from './IntegrationProviderService.js';
 import MonetizationFinanceService from './MonetizationFinanceService.js';
+
+const COMMISSION_CATEGORY_MAP = Object.freeze({
+  community_subscription: 'community_subscription',
+  community_live_donation: 'community_live_donation',
+  live_donation: 'community_live_donation',
+  course: 'course_sale',
+  course_sale: 'course_sale',
+  course_enrollment: 'course_sale',
+  ebook: 'ebook_sale',
+  ebook_sale: 'ebook_sale',
+  tutor_booking: 'tutor_booking'
+});
 const MAX_COUPON_PERCENTAGE_BASIS_POINTS = Math.round(env.payments.coupons.maxPercentageDiscount * 100);
 
 function centsToCurrencyString(amount) {
@@ -434,9 +446,13 @@ class PaymentService {
 
     const totals = this.calculateTotals({ items, coupon, taxRegion: tax, currency: normalizedCurrency });
     const monetizationSettings = await PlatformSettingsService.getMonetizationSettings();
-    const platformCommissionCents = PlatformSettingsService.calculateCommission(
+    const commissionCategory = entity?.type
+      ? COMMISSION_CATEGORY_MAP[entity.type] ?? entity.type
+      : null;
+    const commissionBreakdown = PlatformSettingsService.calculateCommission(
       totals.total,
-      monetizationSettings.commissions
+      monetizationSettings.commissions,
+      { category: commissionCategory }
     );
 
     const publicId = randomUUID();
@@ -459,9 +475,12 @@ class PaymentService {
       monetization: {
         commission: {
           enabled: monetizationSettings.commissions.enabled,
-          rateBps: monetizationSettings.commissions.rateBps,
-          minimumFeeCents: monetizationSettings.commissions.minimumFeeCents,
-          amountCents: platformCommissionCents
+          rateBps: commissionBreakdown.appliedRateBps,
+          minimumFeeCents: commissionBreakdown.appliedMinimumFeeCents,
+          affiliateShareRatio: commissionBreakdown.affiliateShareRatio,
+          amountCents: commissionBreakdown.platformAmountCents,
+          affiliateAmountCents: commissionBreakdown.affiliateAmountCents,
+          category: commissionBreakdown.category ?? commissionCategory ?? null
         },
         subscriptions: {
           enabled: monetizationSettings.subscriptions.enabled,

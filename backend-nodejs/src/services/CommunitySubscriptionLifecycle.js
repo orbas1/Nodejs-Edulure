@@ -4,6 +4,7 @@ import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
 import CommunityAffiliateModel from '../models/CommunityAffiliateModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
+import PlatformSettingsService from './PlatformSettingsService.js';
 
 function addInterval(startDate, interval) {
   if (!startDate) return null;
@@ -39,7 +40,13 @@ async function updateAffiliateEarnings(subscription, intent, connection) {
   if (!affiliate || affiliate.status !== 'approved') {
     return;
   }
-  const commission = Math.floor((intent.amountTotal ?? 0) * (affiliate.commissionRateBasisPoints / 10000));
+  const monetizationSettings = await PlatformSettingsService.getMonetizationSettings(connection);
+  const breakdown = PlatformSettingsService.calculateCommission(
+    intent.amountTotal ?? 0,
+    monetizationSettings.commissions,
+    { category: 'community_subscription' }
+  );
+  const commission = breakdown.affiliateAmountCents;
   if (commission <= 0) {
     return;
   }
@@ -56,7 +63,9 @@ async function updateAffiliateEarnings(subscription, intent, connection) {
       payload: {
         subscriptionId: subscription.id,
         paymentIntentId: intent.id,
-        amountCents: commission
+        amountCents: commission,
+        platformShareCents: breakdown.platformAmountCents,
+        commissionCategory: breakdown.category ?? 'community_subscription'
       }
     },
     connection
