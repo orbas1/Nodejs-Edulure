@@ -211,7 +211,6 @@ export class DomainEventDispatcherService {
     }
 
     for (const dispatch of claimed) {
-      // eslint-disable-next-line no-await-in-loop
       await this.processDispatch(dispatch);
     }
   }

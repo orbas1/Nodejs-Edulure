@@ -121,7 +121,6 @@ async function generateDiagram(domain) {
     const metadata = await fetchSchemaMetadata(knex, domainConfig);
     const diagram = buildPlantUml(domainConfig, metadata);
     await fs.promises.writeFile(domainConfig.output, diagram, 'utf8');
-    // eslint-disable-next-line no-console
     console.log(`ERD generated for domain "${domain}" at ${domainConfig.output}`);
   } finally {
     await knex.destroy();
@@ -136,7 +135,6 @@ function parseArgs(argv) {
 const { domain } = parseArgs(process.argv);
 
 generateDiagram(domain).catch((error) => {
-  // eslint-disable-next-line no-console
   console.error('Failed to generate ERD', error);
   process.exitCode = 1;
 });

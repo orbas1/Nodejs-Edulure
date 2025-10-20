@@ -119,7 +119,7 @@ export default class FeatureFlagModel {
 
   static async insert(definition, connection = db) {
     const payload = toRowPayload(definition);
-    const [id] = await connection('feature_flags').insert(payload);
+    await connection('feature_flags').insert(payload);
     return this.findByKey(definition.key, connection);
   }
 

@@ -18,7 +18,7 @@ function parseJson(value, fallback = []) {
       return Array.isArray(parsed) ? parsed : fallback;
     }
     return parsed ?? fallback;
-  } catch (error) {
+  } catch (_error) {
     return fallback;
   }
 }

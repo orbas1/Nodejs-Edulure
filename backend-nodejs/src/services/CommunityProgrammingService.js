@@ -62,7 +62,7 @@ function normaliseStatusList(value) {
 }
 
 export default class CommunityProgrammingService {
-  static async ensureContext(communityIdentifier, userId, actorRole) {
+  static async ensureContext(communityIdentifier, userId) {
     const community = await resolveCommunity(communityIdentifier);
     if (!community) {
       const error = new Error('Community not found');
@@ -76,11 +76,7 @@ export default class CommunityProgrammingService {
   }
 
   static async listWebinars(communityIdentifier, actor, filters = {}) {
-    const { community, membership } = await this.ensureContext(
-      communityIdentifier,
-      actor?.id,
-      actor?.role
-    );
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
 
     assertReadAccess(community, membership, actor?.role);
 
@@ -113,7 +109,7 @@ export default class CommunityProgrammingService {
   }
 
   static async createWebinar(communityIdentifier, actor, payload) {
-    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id, actor?.role);
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertManageAccess(membership, actor?.role);
 
     return db.transaction(async (trx) => {
@@ -154,7 +150,7 @@ export default class CommunityProgrammingService {
   }
 
   static async updateWebinar(communityIdentifier, webinarId, actor, updates = {}) {
-    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id, actor?.role);
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertManageAccess(membership, actor?.role);
 
     const webinar = await CommunityWebinarModel.findById(webinarId);
@@ -207,11 +203,7 @@ export default class CommunityProgrammingService {
   }
 
   static async listPodcastEpisodes(communityIdentifier, actor, filters = {}) {
-    const { community, membership } = await this.ensureContext(
-      communityIdentifier,
-      actor?.id,
-      actor?.role
-    );
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertReadAccess(community, membership, actor?.role);
 
     const episodes = await CommunityPodcastEpisodeModel.listForCommunity(community.id, {
@@ -243,7 +235,7 @@ export default class CommunityProgrammingService {
   }
 
   static async createPodcastEpisode(communityIdentifier, actor, payload) {
-    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id, actor?.role);
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertManageAccess(membership, actor?.role);
 
     return db.transaction(async (trx) => {
@@ -284,7 +276,7 @@ export default class CommunityProgrammingService {
   }
 
   static async updatePodcastEpisode(communityIdentifier, episodeId, actor, updates = {}) {
-    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id, actor?.role);
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertManageAccess(membership, actor?.role);
 
     const episode = await CommunityPodcastEpisodeModel.findById(episodeId);
@@ -312,7 +304,7 @@ export default class CommunityProgrammingService {
   }
 
   static async deletePodcastEpisode(communityIdentifier, episodeId, actor) {
-    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id, actor?.role);
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertManageAccess(membership, actor?.role);
 
     const episode = await CommunityPodcastEpisodeModel.findById(episodeId);
@@ -337,11 +329,7 @@ export default class CommunityProgrammingService {
   }
 
   static async listGrowthExperiments(communityIdentifier, actor, filters = {}) {
-    const { community, membership } = await this.ensureContext(
-      communityIdentifier,
-      actor?.id,
-      actor?.role
-    );
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertReadAccess(community, membership, actor?.role);
 
     const experiments = await CommunityGrowthExperimentModel.listForCommunity(community.id, {
@@ -373,7 +361,7 @@ export default class CommunityProgrammingService {
   }
 
   static async createGrowthExperiment(communityIdentifier, actor, payload) {
-    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id, actor?.role);
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertManageAccess(membership, actor?.role);
 
     return db.transaction(async (trx) => {
@@ -418,7 +406,7 @@ export default class CommunityProgrammingService {
   }
 
   static async updateGrowthExperiment(communityIdentifier, experimentId, actor, updates = {}) {
-    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id, actor?.role);
+    const { community, membership } = await this.ensureContext(communityIdentifier, actor?.id);
     assertManageAccess(membership, actor?.role);
 
     const experiment = await CommunityGrowthExperimentModel.findById(experimentId);

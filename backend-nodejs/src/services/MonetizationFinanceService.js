@@ -190,7 +190,7 @@ async function resolveUsageRecords({
   }
 
   for (const id of usageRecordIds) {
-    if (!id) continue; // eslint-disable-line no-continue
+    if (!id) continue;
     try {
       const updated = await MonetizationUsageRecordModel.markProcessed(
         id,
@@ -209,7 +209,6 @@ async function resolveUsageRecords({
     const rows = await queryConnection('monetization_usage_records')
       .where({ tenant_id: tenantId })
       .whereIn('external_reference', usageExternalRefs);
-    // eslint-disable-next-line no-restricted-syntax
     for (const row of rows) {
       const updated = await MonetizationUsageRecordModel.markProcessed(
         row.id,
@@ -353,7 +352,6 @@ class MonetizationFinanceService {
     }
 
     let catalogItem = null;
-    // eslint-disable-next-line no-restricted-syntax
     for (const code of candidateCodes) {
       catalogItem = await MonetizationCatalogItemModel.findByProductCode(tenantId, code, queryConnection);
       if (catalogItem) {
@@ -464,7 +462,6 @@ class MonetizationFinanceService {
     const schedules = [];
 
     await runWithTransaction(connection, async (trx) => {
-      // eslint-disable-next-line no-restricted-syntax
       for (const item of items) {
         const catalogItem = await this.ensureCatalogItem({ tenantId, item, connection: trx });
         const plan = this.buildRecognitionPlan({ catalogItem, item, capturedAt });
@@ -664,7 +661,7 @@ class MonetizationFinanceService {
 
       const reduction = Math.min(coercePositiveInteger(schedule.recognizedAmountCents), remaining);
       if (reduction <= 0) {
-        continue; // eslint-disable-line no-continue
+        continue;
       }
 
       await MonetizationRevenueScheduleModel.reduceRecognizedAmount(
@@ -729,7 +726,7 @@ class MonetizationFinanceService {
           coercePositiveInteger(schedule.amountCents) - coercePositiveInteger(schedule.recognizedAmountCents)
         );
         if (openAmount <= 0) {
-          continue; // eslint-disable-line no-continue
+          continue;
         }
 
         const reduction = Math.min(openAmount, remaining);
@@ -814,7 +811,6 @@ class MonetizationFinanceService {
     let recognizedTotal = 0;
 
     await db.transaction(async (trx) => {
-      // eslint-disable-next-line no-restricted-syntax
       for (const schedule of dueSchedules) {
         await MonetizationRevenueScheduleModel.markInProgress(schedule.id, trx);
         const recognized = await MonetizationRevenueScheduleModel.markRecognized(

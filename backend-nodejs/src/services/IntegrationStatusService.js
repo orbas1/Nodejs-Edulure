@@ -150,6 +150,7 @@ export class IntegrationStatusService {
       );
 
       const mergedMetadata = normaliseMetadata(existing?.metadata ?? {}, {
+        ...metadata,
         lastRun: {
           syncRunId,
           status: runStatus,

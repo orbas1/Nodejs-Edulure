@@ -257,7 +257,7 @@ export default class IntegrationApiKeyInviteService {
     return { invite: sanitizeInvite(invite), token: rawToken, claimUrl };
   }
 
-  async resendInvite(id, { requestedBy, requestedByName } = {}) {
+  async resendInvite(id, { requestedBy: _requestedBy, requestedByName } = {}) {
     const invite = await this.inviteModel.findById(id);
     if (!invite) {
       throw Object.assign(new Error('Invitation not found'), { status: 404 });
