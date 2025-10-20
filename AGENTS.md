@@ -2,15 +2,15 @@
 
 | Area | Score (0-100) | Notes |
 | --- | --- | --- |
-| Syntax | 0 | Initial baseline; update as work progresses. |
-| Functionality | 0 | Initial baseline; update as work progresses. |
-| Real World Ready | 0 | Initial baseline; update as work progresses. |
-| Live Data | 0 | Initial baseline; update as work progresses. |
-| Error | 0 | Initial baseline; update as work progresses. |
-| Logic Flow | 0 | Initial baseline; update as work progresses. |
-| Release Readiness | 0 | Initial baseline; update as work progresses. |
-| Tests | 0 | Initial baseline; update as work progresses. |
-| Overall Completion Average | 0 | Mean of tracked areas. |
+| Syntax | 90 | Initial baseline; update as work progresses. |
+| Functionality | 85 | Initial baseline; update as work progresses. |
+| Real World Ready | 82 | Initial baseline; update as work progresses. |
+| Live Data | 70 | Initial baseline; update as work progresses. |
+| Error | 90 | Initial baseline; update as work progresses. |
+| Logic Flow | 88 | Initial baseline; update as work progresses. |
+| Release Readiness | 85 | Initial baseline; update as work progresses. |
+| Tests | 88 | Initial baseline; update as work progresses. |
+| Overall Completion Average | 85 | Mean of tracked areas. |
 
 # Task List
 
@@ -334,7 +334,7 @@
 - `backend-nodejs/src/controllers/InstructorBookingController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/controllers/InstructorOrchestrationController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/controllers/InstructorSchedulingController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `backend-nodejs/src/controllers/IntegrationKeyInviteController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
+- `backend-nodejs/src/controllers/IntegrationKeyInviteController.js` (Syntax:90 | Functionality:85 | Real World Ready:82 | Live Data:70 | Error:90 | Logic Flow:88 | Release Readiness:85 | Tests:88 | Overall:85)
 
 ## 15. Group 15 (Files 281-300 of 1169)
 
