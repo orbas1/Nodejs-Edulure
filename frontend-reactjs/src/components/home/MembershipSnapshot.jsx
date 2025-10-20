@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 const PLAN_KEYS = [
   {
@@ -31,10 +32,10 @@ export default function MembershipSnapshot() {
   const { t } = useLanguage();
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 py-24 text-white">
+    <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 text-white">
       <div className="absolute left-1/4 top-0 h-64 w-64 -translate-x-1/2 rounded-full bg-primary/20 blur-3xl" aria-hidden="true" />
       <div className="absolute bottom-10 right-10 h-72 w-72 translate-x-1/2 rounded-full bg-fuchsia-500/20 blur-[140px]" aria-hidden="true" />
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-16 px-6">
+      <HomeSection className="relative flex flex-col gap-16">
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs uppercase tracking-[0.4em] text-white/60">
             {t('home.membership.pretitle', 'Membership snapshot')}
@@ -122,7 +123,7 @@ export default function MembershipSnapshot() {
             {t('home.membership.disclaimer', 'Every plan comes with a 14-day joyride guarantee.')}
           </span>
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }

@@ -60,10 +60,43 @@ const TRANSLATIONS = {
             title: 'Creator tea digest',
             meta: 'Fresh drops every Monday',
             cta: 'Read now'
-      }
-    },
-    instructorPill: "I'm an instructor",
-    illustrationAlt: 'Collage of instructors and learners collaborating'
+          }
+        },
+        instructorPill: "I'm an instructor",
+        illustrationAlt: 'Collage of instructors and learners collaborating'
+      },
+      featureGrid: {
+        eyebrow: 'Workflow shortcuts',
+        headline: 'Move from idea to launch without detours',
+        categories: {
+          programs: {
+            title: 'Programs',
+            helper: 'Build cohorts fast',
+            actions: {
+              cohort: 'New Cohort',
+              library: 'Module Library',
+              studio: 'Lesson Studio'
+            }
+          },
+          engagement: {
+            title: 'Engagement',
+            helper: 'Keep rooms active',
+            actions: {
+              rooms: 'Live Rooms',
+              calendar: 'Calendar',
+              inbox: 'Inbox'
+            }
+          },
+          revenue: {
+            title: 'Revenue',
+            helper: 'Track and grow',
+            actions: {
+              pricing: 'Pricing',
+              affiliate: 'Affiliate',
+              ads: 'Ads'
+            }
+          }
+        }
       },
       perks: {
         eyebrow: 'Playful perks',
@@ -188,6 +221,7 @@ const TRANSLATIONS = {
         subtitle:
           'Toggle between community rooms, curriculum, and live ops to feel the flow before you sign in.',
         helper: 'Spotlights from this week’s launches',
+        tablistLabel: 'Preview categories',
         cta: 'Browse all spaces',
         footnote: 'Fresh previews rotate every Monday at 09:00 UTC.',
         tabs: {

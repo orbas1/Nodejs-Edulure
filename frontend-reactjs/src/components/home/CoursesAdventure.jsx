@@ -2,6 +2,7 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 const STAGES = [
   {
@@ -155,7 +156,7 @@ export default function CoursesAdventure() {
         <div className="absolute bottom-0 right-0 h-80 w-80 translate-x-1/3 bg-fuchsia-500/20 blur-[160px]" />
         <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 opacity-95" />
       </div>
-      <div className="relative mx-auto max-w-6xl px-6 py-20">
+      <HomeSection className="relative" pad="py-20">
         <div className="max-w-3xl space-y-6">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.3em] text-white/70">
             <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
@@ -232,7 +233,7 @@ export default function CoursesAdventure() {
             {t('home.courses.ctaHelper', 'Head straight to the full catalogue and start plotting your next cohort.')}
           </span>
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }

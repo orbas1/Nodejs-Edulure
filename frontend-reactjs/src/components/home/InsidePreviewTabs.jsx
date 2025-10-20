@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircleIcon } from '@heroicons/react/24/solid';
 
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 import communitiesPreview from '../../assets/home/preview/communities.svg';
 import coursesPreview from '../../assets/home/preview/courses.svg';
@@ -77,6 +78,7 @@ const HIGHLIGHT_KEYS = ['highlightOne', 'highlightTwo', 'highlightThree'];
 export default function InsidePreviewTabs() {
   const { t } = useLanguage();
   const [activeKey, setActiveKey] = useState(TAB_CONFIG[0].key);
+  const tabRefs = useRef({});
 
   const tabs = useMemo(
     () =>
@@ -94,6 +96,38 @@ export default function InsidePreviewTabs() {
   );
 
   const activeTab = tabs.find((tab) => tab.key === activeKey) ?? tabs[0];
+  const tabOrder = useMemo(() => tabs.map((tab) => tab.key), [tabs]);
+
+  const activateTab = (key) => {
+    setActiveKey(key);
+    const node = tabRefs.current[key];
+    if (node) {
+      node.focus();
+    }
+  };
+
+  const handleKeyDown = (event, currentKey) => {
+    const currentIndex = tabOrder.indexOf(currentKey);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      const nextIndex = (currentIndex + 1) % tabOrder.length;
+      activateTab(tabOrder[nextIndex]);
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const prevIndex = (currentIndex - 1 + tabOrder.length) % tabOrder.length;
+      activateTab(tabOrder[prevIndex]);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      activateTab(tabOrder[0]);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      activateTab(tabOrder[tabOrder.length - 1]);
+    }
+  };
 
   const title = t(
     'home.preview.title',
@@ -109,11 +143,11 @@ export default function InsidePreviewTabs() {
     'home.preview.footnote',
     'Fresh previews rotate every Monday at 09:00 UTC.'
   );
+  const tablistLabel = t('home.preview.tablistLabel', 'Preview categories');
 
   return (
     <section className="bg-gradient-to-b from-slate-50 via-white to-slate-100">
-      <div className="mx-auto max-w-6xl px-6 py-24">
-        <div className="grid gap-12 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
+      <HomeSection className="grid gap-12 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)] lg:items-start">
           <aside className="space-y-8">
             <div className="space-y-4">
               <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
@@ -124,20 +158,34 @@ export default function InsidePreviewTabs() {
               </h2>
               <p className="text-base text-slate-600">{subtitle}</p>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3" role="tablist" aria-label={tablistLabel}>
               {tabs.map((tab) => {
                 const isActive = tab.key === activeKey;
+                const tabId = `home-preview-tab-${tab.key}`;
+                const panelId = `home-preview-tabpanel-${tab.key}`;
                 return (
                   <button
                     key={tab.key}
                     type="button"
                     onClick={() => setActiveKey(tab.key)}
+                    onKeyDown={(event) => handleKeyDown(event, tab.key)}
+                    ref={(element) => {
+                      if (element) {
+                        tabRefs.current[tab.key] = element;
+                      } else {
+                        delete tabRefs.current[tab.key];
+                      }
+                    }}
                     className={`relative overflow-hidden rounded-2xl border px-5 py-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
                       isActive
                         ? 'border-transparent bg-gradient-to-r from-primary/10 via-white to-white shadow-[0_12px_40px_-20px_rgba(79,70,229,0.6)]'
                         : 'border-slate-200 bg-white/70 hover:border-primary/40 hover:bg-white'
                     }`}
-                    aria-pressed={isActive}
+                    role="tab"
+                    id={tabId}
+                    aria-selected={isActive}
+                    aria-controls={panelId}
+                    tabIndex={isActive ? 0 : -1}
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div>
@@ -171,7 +219,13 @@ export default function InsidePreviewTabs() {
               </Link>
             </div>
           </aside>
-          <div className="relative">
+          <div
+            className="relative"
+            role="tabpanel"
+            id={`home-preview-tabpanel-${activeTab.key}`}
+            aria-labelledby={`home-preview-tab-${activeTab.key}`}
+            tabIndex={0}
+          >
             <div className="absolute -left-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
             <div className="absolute -right-6 top-12 h-56 w-56 rounded-full bg-fuchsia-300/20 blur-[140px]" aria-hidden="true" />
             <div className="relative overflow-hidden rounded-[2.75rem] border border-slate-200 bg-white shadow-[0_40px_120px_-45px_rgba(15,23,42,0.45)]">
@@ -202,8 +256,7 @@ export default function InsidePreviewTabs() {
               ))}
             </div>
           </div>
-        </div>
-      </div>
+        </HomeSection>
     </section>
   );
 }

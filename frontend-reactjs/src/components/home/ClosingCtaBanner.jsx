@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 export default function ClosingCtaBanner() {
   const { t } = useLanguage();
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-amber-400 via-rose-500 to-indigo-600 py-20 text-white">
+    <section className="relative overflow-hidden bg-gradient-to-br from-amber-400 via-rose-500 to-indigo-600 text-white">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.25),_transparent_60%)]" aria-hidden="true" />
       <div className="absolute inset-x-0 top-0 flex justify-center" aria-hidden="true">
         <div className="mt-4 flex gap-4">
@@ -28,7 +29,7 @@ export default function ClosingCtaBanner() {
         <span>✦</span>
         <span>✺</span>
       </div>
-      <div className="relative mx-auto max-w-4xl px-6 text-center">
+      <HomeSection className="relative text-center" size="max-w-4xl" pad="py-20">
         <p className="text-xs font-semibold uppercase tracking-[0.45em] text-white/70">
           {t('home.closingCta.pretitle', 'Ready when you are')}
         </p>
@@ -58,7 +59,7 @@ export default function ClosingCtaBanner() {
         <p className="mt-6 text-xs text-white/70">
           {t('home.closingCta.footer', 'Dual launchpads, one vibrant universe.')}
         </p>
-      </div>
+      </HomeSection>
     </section>
   );
 }

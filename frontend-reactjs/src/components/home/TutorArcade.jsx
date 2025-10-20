@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 const QUEUE_ITEMS = [
   {
@@ -117,7 +118,7 @@ export default function TutorArcade() {
         <div className="absolute -bottom-32 right-10 h-64 w-64 rounded-full bg-sky-500/30 blur-[120px]" />
         <div className="absolute top-1/2 left-0 h-72 w-72 -translate-y-1/2 -translate-x-1/2 rounded-full bg-emerald-500/20 blur-[140px]" />
       </div>
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-16 px-6 py-24 lg:flex-row lg:items-center lg:gap-20">
+      <HomeSection className="relative flex flex-col gap-16 lg:flex-row lg:items-center lg:gap-20">
         <div className="relative w-full lg:w-1/2">
           <div className="relative mx-auto max-w-xl">
             <span className="sr-only">{t('home.tutoring.calendar.title', 'Arcade queue')}</span>
@@ -236,7 +237,7 @@ export default function TutorArcade() {
             </Link>
           </div>
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }

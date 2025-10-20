@@ -2,6 +2,7 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import mascotIllustration from '../../assets/home/faq/mascot.svg';
+import HomeSection from './HomeSection.jsx';
 
 const FAQ_KEYS = [
   'orbit',
@@ -19,9 +20,9 @@ export default function HomeFaq() {
   };
 
   return (
-    <section className="relative overflow-hidden bg-slate-100 py-24">
+    <section className="relative overflow-hidden bg-slate-100">
       <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-slate-200/70 to-transparent" aria-hidden="true" />
-      <div className="relative mx-auto grid max-w-6xl gap-16 px-6 lg:grid-cols-[1fr_minmax(0,360px)] lg:items-center">
+      <HomeSection className="relative grid gap-16 lg:grid-cols-[1fr_minmax(0,360px)] lg:items-center">
         <div className="flex flex-col gap-6 text-slate-900">
           <p className="text-xs font-semibold uppercase tracking-[0.4em] text-slate-500">
             {t('home.faq.pretitle', 'FAQ')}
@@ -110,7 +111,7 @@ export default function HomeFaq() {
             </p>
           </div>
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }

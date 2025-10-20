@@ -1,47 +1,122 @@
 import { Link } from 'react-router-dom';
 
-const features = [
+import { useLanguage } from '../context/LanguageContext.jsx';
+import HomeSection from './home/HomeSection.jsx';
+
+const FEATURE_CONFIG = [
   {
-    title: 'Programs',
-    helper: 'Build cohorts fast',
+    key: 'programs',
+    fallback: {
+      title: 'Programs',
+      helper: 'Build cohorts fast'
+    },
     actions: [
-      { label: 'New Cohort', to: '/dashboard/instructor/courses/create' },
-      { label: 'Module Library', to: '/dashboard/instructor/courses/library' },
-      { label: 'Lesson Studio', to: '/dashboard/instructor/creation-studio' }
+      {
+        key: 'cohort',
+        fallback: 'New Cohort',
+        to: '/dashboard/instructor/courses/create'
+      },
+      {
+        key: 'library',
+        fallback: 'Module Library',
+        to: '/dashboard/instructor/courses/library'
+      },
+      {
+        key: 'studio',
+        fallback: 'Lesson Studio',
+        to: '/dashboard/instructor/creation-studio'
+      }
     ]
   },
   {
-    title: 'Engagement',
-    helper: 'Keep rooms active',
+    key: 'engagement',
+    fallback: {
+      title: 'Engagement',
+      helper: 'Keep rooms active'
+    },
     actions: [
-      { label: 'Live Rooms', to: '/dashboard/instructor/live-classes' },
-      { label: 'Calendar', to: '/dashboard/instructor/calendar' },
-      { label: 'Inbox', to: '/dashboard/instructor/inbox' }
+      {
+        key: 'rooms',
+        fallback: 'Live Rooms',
+        to: '/dashboard/instructor/live-classes'
+      },
+      {
+        key: 'calendar',
+        fallback: 'Calendar',
+        to: '/dashboard/instructor/calendar'
+      },
+      {
+        key: 'inbox',
+        fallback: 'Inbox',
+        to: '/dashboard/instructor/inbox'
+      }
     ]
   },
   {
-    title: 'Revenue',
-    helper: 'Track and grow',
+    key: 'revenue',
+    fallback: {
+      title: 'Revenue',
+      helper: 'Track and grow'
+    },
     actions: [
-      { label: 'Pricing', to: '/dashboard/instructor/pricing' },
-      { label: 'Affiliate', to: '/dashboard/instructor/affiliate' },
-      { label: 'Ads', to: '/dashboard/instructor/ads' }
+      {
+        key: 'pricing',
+        fallback: 'Pricing',
+        to: '/dashboard/instructor/pricing'
+      },
+      {
+        key: 'affiliate',
+        fallback: 'Affiliate',
+        to: '/dashboard/instructor/affiliate'
+      },
+      {
+        key: 'ads',
+        fallback: 'Ads',
+        to: '/dashboard/instructor/ads'
+      }
     ]
   }
 ];
 
 export default function FeatureGrid() {
+  const { t } = useLanguage();
+
+  const eyebrow = t('home.featureGrid.eyebrow', 'Workflow shortcuts');
+  const heading = t(
+    'home.featureGrid.headline',
+    'Move from idea to launch without detours'
+  );
+
+  const features = FEATURE_CONFIG.map((feature) => ({
+    key: feature.key,
+    title: t(
+      `home.featureGrid.categories.${feature.key}.title`,
+      feature.fallback.title
+    ),
+    helper: t(
+      `home.featureGrid.categories.${feature.key}.helper`,
+      feature.fallback.helper
+    ),
+    actions: feature.actions.map((action) => ({
+      ...action,
+      label: t(
+        `home.featureGrid.categories.${feature.key}.actions.${action.key}`,
+        action.fallback
+      )
+    }))
+  }));
+
   return (
     <section className="bg-slate-50/70">
-      <div className="mx-auto max-w-6xl px-6 py-20">
+      <HomeSection pad="py-20">
         <div className="md:text-center">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Workflow shortcuts</p>
-          <h2 className="mt-3 text-3xl font-semibold text-slate-900">Move from idea to launch without detours</h2>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">{eyebrow}</p>
+          <h2 className="mt-3 text-3xl font-semibold text-slate-900">{heading}</h2>
         </div>
         <div className="mt-12 grid grid-cols-1 gap-8 md:grid-cols-3">
           {features.map((feature) => (
             <div
-              key={feature.title}
+              key={feature.key}
               className="flex h-full flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-card"
             >
               <div>
@@ -51,7 +126,7 @@ export default function FeatureGrid() {
               <div className="grid gap-3">
                 {feature.actions.map((action) => (
                   <Link
-                    key={action.label}
+                    key={action.key}
                     to={action.to}
                     className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
                   >
@@ -62,7 +137,7 @@ export default function FeatureGrid() {
             </div>
           ))}
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import badgeSparkle from '../../assets/home/community/badge-sparkle.svg';
 import polaroidNote from '../../assets/home/community/polaroid-note.svg';
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 const LEARNER_BENEFITS = [
   {
@@ -43,7 +44,7 @@ export default function CommunitySpotlight() {
   );
 
   return (
-    <section className="relative overflow-hidden bg-white py-24 sm:py-28" aria-labelledby="community-spotlight-heading">
+    <section className="relative overflow-hidden bg-white" aria-labelledby="community-spotlight-heading">
       <div className="pointer-events-none absolute inset-0 select-none" aria-hidden="true">
         <div className="absolute left-[-4rem] top-16 hidden rotate-[-8deg] sm:block">
           <img src={polaroidNote} alt="" className="w-64 drop-shadow-xl" />
@@ -54,7 +55,7 @@ export default function CommunitySpotlight() {
         <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
-      <div className="relative mx-auto max-w-6xl px-6">
+      <HomeSection className="relative" pad="py-24 sm:py-28">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
             {eyebrow}
@@ -133,7 +134,7 @@ export default function CommunitySpotlight() {
             </ul>
           </article>
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }

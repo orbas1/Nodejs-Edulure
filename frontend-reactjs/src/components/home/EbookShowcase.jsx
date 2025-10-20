@@ -3,6 +3,7 @@ import builderNotebookCover from '../../assets/home/ebooks/builder-notebook.svg'
 import communityCookbookCover from '../../assets/home/ebooks/community-cookbook.svg';
 import remixAtlasCover from '../../assets/home/ebooks/remix-atlas.svg';
 import { useTranslate } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 const cards = [
   {
@@ -32,9 +33,9 @@ export default function EbookShowcase() {
   const t = useTranslate();
 
   return (
-    <section className="relative overflow-hidden bg-white py-24" aria-labelledby="ebooks-heading">
+    <section className="relative overflow-hidden bg-white" aria-labelledby="ebooks-heading">
       <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-pink-200/30 blur-3xl" aria-hidden="true" />
-      <div className="mx-auto max-w-6xl px-6">
+      <HomeSection>
         <div className="md:flex md:items-end md:justify-between">
           <div className="max-w-xl">
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
@@ -146,7 +147,7 @@ export default function EbookShowcase() {
             </div>
           </section>
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { useLanguage } from '../../context/LanguageContext.jsx';
+import HomeSection from './HomeSection.jsx';
 
 const PERK_ITEMS = [
   {
@@ -50,7 +51,7 @@ export default function PerksGrid() {
 
   return (
     <section className="bg-gradient-to-b from-slate-50 via-white to-slate-100/70">
-      <div className="mx-auto max-w-6xl px-6 py-20">
+      <HomeSection pad="py-20">
         <div className="max-w-3xl">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary">
             {eyebrow}
@@ -105,7 +106,7 @@ export default function PerksGrid() {
             );
           })}
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }
