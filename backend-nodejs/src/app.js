@@ -63,6 +63,12 @@ export function getCurrentReadinessReport() {
   };
 }
 
+// NOTE: keep the versioned base path in sync with mountVersionedApi defaults
+// so Stripe webhook requests retain their raw body for signature verification.
+const STRIPE_WEBHOOK_ROUTE_SUFFIX = '/payments/webhooks/stripe';
+const VERSIONED_API_BASE_PATH = '/api/v1';
+const STRIPE_WEBHOOK_VERSIONED_ROUTE = `${VERSIONED_API_BASE_PATH}${STRIPE_WEBHOOK_ROUTE_SUFFIX}`;
+
 const app = express();
 
 app.disable('x-powered-by');
@@ -139,7 +145,7 @@ app.use(
   express.json({
     limit: '1mb',
     verify: (req, _res, buf) => {
-      if (req.originalUrl.startsWith('/api/payments/webhooks/stripe')) {
+      if (req.originalUrl.startsWith(STRIPE_WEBHOOK_VERSIONED_ROUTE)) {
         req.rawBody = buf.toString();
       }
     }
