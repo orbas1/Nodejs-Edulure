@@ -55,7 +55,7 @@ export default function CommunitySpotlight() {
         <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
-      <HomeSection className="relative" pad="py-24 sm:py-28">
+      <HomeSection className="relative" pad="balanced">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
             {eyebrow}

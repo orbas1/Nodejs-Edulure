@@ -29,7 +29,7 @@ export default function ClosingCtaBanner() {
         <span>✦</span>
         <span>✺</span>
       </div>
-      <HomeSection className="relative text-center" size="max-w-4xl" pad="py-20">
+      <HomeSection className="relative text-center" size="narrow" pad="cozy">
         <p className="text-xs font-semibold uppercase tracking-[0.45em] text-white/70">
           {t('home.closingCta.pretitle', 'Ready when you are')}
         </p>
