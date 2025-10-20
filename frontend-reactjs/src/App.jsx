@@ -7,7 +7,6 @@ import InstructorRegister from './pages/InstructorRegister.jsx';
 import Feed from './pages/Feed.jsx';
 import Profile from './pages/Profile.jsx';
 import Explorer from './pages/Explorer.jsx';
-import SearchHub from './pages/SearchHub.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Admin from './pages/Admin.jsx';
 import ContentLibrary from './pages/ContentLibrary.jsx';
@@ -105,14 +104,6 @@ function App() {
           element={(
             <ProtectedRoute allowedRoles={['user', 'instructor', 'admin']}>
               <Explorer />
-            </ProtectedRoute>
-          )}
-        />
-        <Route
-          path="/search"
-          element={(
-            <ProtectedRoute allowedRoles={['user', 'instructor', 'admin']}>
-              <SearchHub />
             </ProtectedRoute>
           )}
         />
