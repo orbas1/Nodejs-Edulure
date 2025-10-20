@@ -5,6 +5,11 @@ import db from '../config/database.js';
 import { env } from '../config/env.js';
 
 const SETTINGS_KEYS = Object.freeze({
+  ADMIN_PROFILE: 'admin_profile',
+  PAYMENT: 'payment',
+  EMAIL: 'email',
+  SECURITY: 'security',
+  FINANCE: 'finance',
   MONETIZATION: 'monetization',
   APPEARANCE: 'appearance',
   PREFERENCES: 'preferences',
@@ -96,6 +101,211 @@ const DEFAULT_INTEGRATIONS = Object.freeze({
 
 const DEFAULT_THIRD_PARTY = Object.freeze({
   credentials: []
+});
+
+const DEFAULT_ADMIN_PROFILE = Object.freeze({
+  organisation: {
+    name: 'Edulure Operations',
+    mission: 'Deliver resilient learning operations with trust and transparency.',
+    tagline: 'Ops excellence hub',
+    headquarters: 'London, United Kingdom',
+    established: '2018',
+    statement:
+      'Edulure admin console centralises operational controls so administrators can support partners and learners with pace.',
+    heroVideoUrl: 'https://cdn.edulure.test/media/admin-console-tour.mp4',
+    heroPosterUrl: 'https://cdn.edulure.test/media/admin-console-tour.jpg'
+  },
+  leadership: [
+    {
+      id: 'ops-director',
+      name: 'Avery Chen',
+      role: 'Director of Platform Operations',
+      email: 'avery.chen@edulure.test',
+      phone: '+44 20 1234 5678',
+      avatarUrl: 'https://cdn.edulure.test/avatars/avery-chen.png',
+      bio: 'Leads global operations, incident response and partner enablement.'
+    }
+  ],
+  supportChannels: [
+    {
+      id: 'channel-email',
+      type: 'Email',
+      label: 'Operations desk',
+      destination: 'ops@edulure.test',
+      slaMinutes: 120,
+      activeHours: '24/7'
+    },
+    {
+      id: 'channel-slack',
+      type: 'Slack',
+      label: 'Escalations',
+      destination: '#admin-escalations',
+      slaMinutes: 15,
+      activeHours: 'Weekdays'
+    }
+  ],
+  runbooks: [
+    {
+      id: 'runbook-incident',
+      title: 'Critical incident response playbook',
+      url: 'https://support.edulure.test/runbooks/incident-response',
+      lastReviewed: '2024-01-04'
+    }
+  ],
+  media: [
+    {
+      id: 'media-tour',
+      type: 'video',
+      title: 'Admin console walkthrough',
+      url: 'https://cdn.edulure.test/media/admin-console-tour.mp4',
+      thumbnailUrl: 'https://cdn.edulure.test/media/admin-console-tour.jpg'
+    }
+  ],
+  onCall: {
+    rotation: 'Follow-the-sun (EMEA · AMER · APAC)',
+    timezone: 'UTC',
+    currentPrimary: 'Avery Chen',
+    backup: 'Noah Patel',
+    escalationChannel: '#admin-escalations'
+  }
+});
+
+const DEFAULT_PAYMENT_SETTINGS = Object.freeze({
+  processors: [
+    {
+      id: 'stripe',
+      provider: 'Stripe',
+      status: 'active',
+      merchantId: 'acct_12345',
+      capabilities: ['card_payments', 'payouts'],
+      settlementTimeframe: 'T+2',
+      currencies: ['USD', 'GBP', 'EUR'],
+      supportContact: 'finance@edulure.test'
+    }
+  ],
+  payoutRules: {
+    schedule: 'weekly',
+    dayOfWeek: 'friday',
+    minimumPayoutCents: 10000,
+    reservePercentage: 5,
+    autoApproveRefunds: false,
+    riskThreshold: 'medium'
+  },
+  bankAccounts: [
+    {
+      id: 'primary',
+      name: 'Primary Operating',
+      bankName: 'Barclays UK',
+      last4: '6789',
+      currency: 'GBP',
+      primary: true
+    }
+  ],
+  webhooks: [
+    {
+      id: 'payment-failures',
+      event: 'payment.failed',
+      url: 'https://ops.edulure.test/webhooks/payments',
+      active: true
+    }
+  ]
+});
+
+const DEFAULT_EMAIL_SETTINGS = Object.freeze({
+  branding: {
+    fromName: 'Edulure Operations',
+    fromEmail: 'ops@mailer.edulure.test',
+    replyTo: 'support@edulure.test'
+  },
+  notifications: {
+    onboarding: true,
+    weeklyDigest: true,
+    incidentAlerts: true,
+    marketingOptInDefault: false
+  },
+  escalationRecipients: ['incident@edulure.test', 'compliance@edulure.test'],
+  domains: [
+    {
+      id: 'mailer-edulure-test',
+      domain: 'mailer.edulure.test',
+      status: 'verified',
+      dkimStatus: 'valid',
+      spfStatus: 'valid'
+    }
+  ],
+  templates: [
+    {
+      id: 'template-incident',
+      name: 'Incident escalation',
+      category: 'operations',
+      subject: 'Immediate attention required: {incidentReference}',
+      lastUpdated: '2024-02-10'
+    },
+    {
+      id: 'template-onboarding',
+      name: 'New administrator onboarding',
+      category: 'onboarding',
+      subject: 'Welcome to Edulure operations',
+      lastUpdated: '2024-01-06'
+    }
+  ]
+});
+
+const DEFAULT_SECURITY_SETTINGS = Object.freeze({
+  enforcement: {
+    requiredForAdmins: true,
+    requiredForInstructors: true,
+    requiredForFinance: true,
+    rememberDeviceDays: 30,
+    sessionTimeoutMinutes: 30
+  },
+  methods: [
+    { id: 'totp', type: 'totp', enabled: true, description: 'Authenticator apps (TOTP)' },
+    { id: 'sms', type: 'sms', enabled: false, description: 'SMS fallback (restricted markets)' },
+    { id: 'webauthn', type: 'webauthn', enabled: true, description: 'Hardware security keys' }
+  ],
+  backup: {
+    backupCodesEnabled: true,
+    requireRegenerationOnUse: true
+  },
+  audits: [{ id: '2023-q4', label: 'Quarterly access review Q4', completedAt: '2023-12-11' }]
+});
+
+const DEFAULT_FINANCE_SETTINGS = Object.freeze({
+  policies: {
+    billingContact: 'finance@edulure.test',
+    invoiceGraceDays: 7,
+    reconciliationCadence: 'weekly',
+    payoutScheduleDays: 30,
+    defaultCommissionBps: 250,
+    minimumCommissionCents: 0,
+    currency: 'USD'
+  },
+  tiers: [
+    {
+      id: 'digital',
+      name: 'Digital catalogues',
+      appliesTo: ['course', 'ebook'],
+      thresholdCents: 0,
+      rateBps: 500
+    },
+    {
+      id: 'live',
+      name: 'Live sessions',
+      appliesTo: ['live_stream', 'tutoring'],
+      thresholdCents: 0,
+      rateBps: 250
+    }
+  ],
+  adjustments: [],
+  revenueStreams: [
+    { id: 'subscriptions', name: 'Community subscriptions', shareBps: 250, active: true },
+    { id: 'donations', name: 'Live donations', shareBps: 1000, active: true }
+  ],
+  approvals: {
+    requireDualApproval: true,
+    financeReviewer: 'finance-controller@edulure.test'
+  }
 });
 
 const DEFAULT_MONETIZATION = Object.freeze({
@@ -492,6 +702,439 @@ function normaliseThirdParty(rawSettings = {}) {
   return result;
 }
 
+function normaliseAdminProfile(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_ADMIN_PROFILE);
+
+  if (rawSettings.organisation && typeof rawSettings.organisation === 'object') {
+    result.organisation = {
+      ...result.organisation,
+      name: normaliseText(rawSettings.organisation.name, {
+        max: 160,
+        fallback: result.organisation.name,
+        allowEmpty: false
+      }),
+      mission: normaliseText(rawSettings.organisation.mission, { max: 360, fallback: result.organisation.mission }),
+      tagline: normaliseText(rawSettings.organisation.tagline, { max: 160, fallback: result.organisation.tagline }),
+      headquarters: normaliseText(rawSettings.organisation.headquarters, {
+        max: 160,
+        fallback: result.organisation.headquarters
+      }),
+      established: normaliseText(rawSettings.organisation.established, {
+        max: 40,
+        fallback: result.organisation.established
+      }),
+      statement: normaliseText(rawSettings.organisation.statement, {
+        max: 720,
+        fallback: result.organisation.statement
+      }),
+      heroVideoUrl: normaliseUrl(rawSettings.organisation.heroVideoUrl) || result.organisation.heroVideoUrl,
+      heroPosterUrl: normaliseUrl(rawSettings.organisation.heroPosterUrl) || result.organisation.heroPosterUrl
+    };
+  }
+
+  if (Array.isArray(rawSettings.leadership)) {
+    result.leadership = dedupeById(
+      rawSettings.leadership
+        .map((member) => ({
+          id: createStableId('leader', member?.id),
+          name: normaliseText(member?.name, { max: 160, fallback: '', allowEmpty: false }),
+          role: normaliseText(member?.role, { max: 160, fallback: '' }),
+          email: normaliseText(member?.email, { max: 180, fallback: '' }),
+          phone: normaliseText(member?.phone, { max: 60, fallback: '' }),
+          avatarUrl: normaliseUrl(member?.avatarUrl),
+          bio: normaliseText(member?.bio, { max: 360, fallback: '' })
+        }))
+        .filter((entry) => entry.name)
+    ).slice(0, 12);
+  }
+
+  if (Array.isArray(rawSettings.supportChannels)) {
+    result.supportChannels = dedupeById(
+      rawSettings.supportChannels
+        .map((channel) => ({
+          id: createStableId('channel', channel?.id),
+          type: normaliseText(channel?.type, { max: 60, fallback: 'Channel', allowEmpty: false }),
+          label: normaliseText(channel?.label, { max: 160, fallback: '' }),
+          destination: normaliseText(channel?.destination, { max: 180, fallback: '' }),
+          slaMinutes: clampInt(channel?.slaMinutes, { min: 5, max: 2880, fallback: 120 }),
+          activeHours: normaliseText(channel?.activeHours, { max: 120, fallback: '' })
+        }))
+        .filter((entry) => entry.destination || entry.label)
+    ).slice(0, 20);
+  }
+
+  if (Array.isArray(rawSettings.runbooks)) {
+    result.runbooks = dedupeById(
+      rawSettings.runbooks
+        .map((runbook) => ({
+          id: createStableId('runbook', runbook?.id),
+          title: normaliseText(runbook?.title, { max: 200, fallback: 'Operational runbook', allowEmpty: false }),
+          url: normaliseUrl(runbook?.url) || '',
+          lastReviewed: normaliseText(runbook?.lastReviewed, { max: 40, fallback: '' })
+        }))
+        .filter((entry) => entry.url)
+    ).slice(0, 30);
+  }
+
+  if (Array.isArray(rawSettings.media)) {
+    const allowedTypes = new Set(['image', 'video']);
+    result.media = dedupeById(
+      rawSettings.media
+        .map((asset) => {
+          const type = String(asset?.type ?? 'image').toLowerCase();
+          return {
+            id: createStableId('media', asset?.id),
+            type: allowedTypes.has(type) ? type : 'image',
+            title: normaliseText(asset?.title, { max: 160, fallback: 'Media asset' }),
+            url: normaliseUrl(asset?.url) || '',
+            thumbnailUrl: normaliseUrl(asset?.thumbnailUrl)
+          };
+        })
+        .filter((asset) => asset.url)
+    ).slice(0, 20);
+  }
+
+  if (rawSettings.onCall && typeof rawSettings.onCall === 'object') {
+    result.onCall = {
+      rotation: normaliseText(rawSettings.onCall.rotation, { max: 160, fallback: result.onCall.rotation }),
+      timezone: normaliseText(rawSettings.onCall.timezone, { max: 60, fallback: result.onCall.timezone }),
+      currentPrimary: normaliseText(rawSettings.onCall.currentPrimary, {
+        max: 160,
+        fallback: result.onCall.currentPrimary
+      }),
+      backup: normaliseText(rawSettings.onCall.backup, { max: 160, fallback: result.onCall.backup }),
+      escalationChannel: normaliseText(rawSettings.onCall.escalationChannel, {
+        max: 160,
+        fallback: result.onCall.escalationChannel
+      })
+    };
+  }
+
+  return result;
+}
+
+function normalisePaymentSettings(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_PAYMENT_SETTINGS);
+  const statusSet = new Set(['active', 'paused', 'error', 'testing']);
+  const scheduleSet = new Set(['daily', 'weekly', 'biweekly', 'monthly', 'adhoc']);
+  const daySet = new Set(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+
+  if (Array.isArray(rawSettings.processors)) {
+    result.processors = dedupeById(
+      rawSettings.processors
+        .map((processor) => ({
+          id: createStableId('processor', processor?.id),
+          provider: normaliseText(processor?.provider, { max: 160, fallback: 'processor', allowEmpty: false }),
+          status: statusSet.has(String(processor?.status ?? '').toLowerCase())
+            ? String(processor.status).toLowerCase()
+            : 'active',
+          merchantId: normaliseText(processor?.merchantId, { max: 160, fallback: '' }),
+          capabilities: normalizeStringArray(processor?.capabilities).slice(0, 10),
+          settlementTimeframe: normaliseText(processor?.settlementTimeframe, {
+            max: 40,
+            fallback: 'T+2'
+          }),
+          currencies: normalizeStringArray(processor?.currencies).slice(0, 10),
+          supportContact: normaliseText(processor?.supportContact, { max: 180, fallback: '' })
+        }))
+        .filter((entry) => entry.provider)
+    ).slice(0, 10);
+  }
+
+  if (rawSettings.payoutRules && typeof rawSettings.payoutRules === 'object') {
+    const schedule = String(rawSettings.payoutRules.schedule ?? '').toLowerCase();
+    const dayOfWeek = String(rawSettings.payoutRules.dayOfWeek ?? '').toLowerCase();
+    result.payoutRules = {
+      schedule: scheduleSet.has(schedule) ? schedule : result.payoutRules.schedule,
+      dayOfWeek: daySet.has(dayOfWeek) ? dayOfWeek : result.payoutRules.dayOfWeek,
+      minimumPayoutCents: clampInt(rawSettings.payoutRules.minimumPayoutCents, {
+        min: 0,
+        max: 1_000_000_000,
+        fallback: result.payoutRules.minimumPayoutCents
+      }),
+      reservePercentage: clampInt(rawSettings.payoutRules.reservePercentage, {
+        min: 0,
+        max: 100,
+        fallback: result.payoutRules.reservePercentage
+      }),
+      autoApproveRefunds: Boolean(
+        rawSettings.payoutRules.autoApproveRefunds ?? result.payoutRules.autoApproveRefunds
+      ),
+      riskThreshold: normaliseText(rawSettings.payoutRules.riskThreshold, {
+        max: 60,
+        fallback: result.payoutRules.riskThreshold
+      })
+    };
+  }
+
+  if (Array.isArray(rawSettings.bankAccounts)) {
+    result.bankAccounts = dedupeById(
+      rawSettings.bankAccounts
+        .map((account) => {
+          const last4Digits = normaliseText(account?.last4, { max: 4, fallback: '' }).replace(/[^0-9]/g, '');
+          return {
+            id: createStableId('bank', account?.id),
+            name: normaliseText(account?.name, { max: 160, fallback: 'Settlement account', allowEmpty: false }),
+            bankName: normaliseText(account?.bankName, { max: 160, fallback: '' }),
+            last4: last4Digits.slice(-4),
+            currency: normaliseText(account?.currency, { max: 12, fallback: 'USD' }).toUpperCase(),
+            primary: Boolean(account?.primary)
+          };
+        })
+        .filter((entry) => entry.name)
+    ).slice(0, 10);
+    if (!result.bankAccounts.some((account) => account.primary) && result.bankAccounts.length) {
+      result.bankAccounts[0].primary = true;
+    }
+  }
+
+  if (Array.isArray(rawSettings.webhooks)) {
+    result.webhooks = dedupeById(
+      rawSettings.webhooks
+        .map((webhook) => ({
+          id: createStableId('payments-webhook', webhook?.id),
+          event: normaliseText(webhook?.event, { max: 160, fallback: 'payment.succeeded', allowEmpty: false }),
+          url: normaliseUrl(webhook?.url) || '',
+          active: Boolean(webhook?.active ?? true)
+        }))
+        .filter((entry) => entry.url)
+    ).slice(0, 20);
+  }
+
+  return result;
+}
+
+function normaliseEmailSettings(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_EMAIL_SETTINGS);
+
+  if (rawSettings.branding && typeof rawSettings.branding === 'object') {
+    result.branding = {
+      fromName: normaliseText(rawSettings.branding.fromName, { max: 160, fallback: result.branding.fromName }),
+      fromEmail: normaliseText(rawSettings.branding.fromEmail, { max: 180, fallback: result.branding.fromEmail }),
+      replyTo: normaliseText(rawSettings.branding.replyTo, { max: 180, fallback: result.branding.replyTo })
+    };
+  }
+
+  if (rawSettings.notifications && typeof rawSettings.notifications === 'object') {
+    result.notifications = {
+      onboarding: Boolean(rawSettings.notifications.onboarding ?? result.notifications.onboarding),
+      weeklyDigest: Boolean(rawSettings.notifications.weeklyDigest ?? result.notifications.weeklyDigest),
+      incidentAlerts: Boolean(rawSettings.notifications.incidentAlerts ?? result.notifications.incidentAlerts),
+      marketingOptInDefault: Boolean(
+        rawSettings.notifications.marketingOptInDefault ?? result.notifications.marketingOptInDefault
+      )
+    };
+  }
+
+  if (rawSettings.escalationRecipients !== undefined) {
+    result.escalationRecipients = normalizeStringArray(rawSettings.escalationRecipients).slice(0, 20);
+  }
+
+  if (Array.isArray(rawSettings.domains)) {
+    const allowedStatus = new Set(['verified', 'pending', 'failed']);
+    const dnsStatus = new Set(['valid', 'pending', 'failed']);
+    result.domains = dedupeById(
+      rawSettings.domains
+        .map((domain) => ({
+          id: createStableId('email-domain', domain?.id),
+          domain: normaliseText(domain?.domain, { max: 180, fallback: '', allowEmpty: false }).toLowerCase(),
+          status: allowedStatus.has(String(domain?.status ?? '').toLowerCase())
+            ? String(domain.status).toLowerCase()
+            : 'pending',
+          dkimStatus: dnsStatus.has(String(domain?.dkimStatus ?? '').toLowerCase())
+            ? String(domain.dkimStatus).toLowerCase()
+            : 'pending',
+          spfStatus: dnsStatus.has(String(domain?.spfStatus ?? '').toLowerCase())
+            ? String(domain.spfStatus).toLowerCase()
+            : 'pending'
+        }))
+        .filter((entry) => entry.domain)
+    ).slice(0, 10);
+  }
+
+  if (Array.isArray(rawSettings.templates)) {
+    result.templates = dedupeById(
+      rawSettings.templates
+        .map((template) => ({
+          id: createStableId('email-template', template?.id),
+          name: normaliseText(template?.name, { max: 160, fallback: 'Template', allowEmpty: false }),
+          category: normaliseText(template?.category, { max: 120, fallback: 'general' }),
+          subject: normaliseText(template?.subject, { max: 200, fallback: '' }),
+          lastUpdated: normaliseText(template?.lastUpdated, { max: 40, fallback: '' })
+        }))
+        .filter((entry) => entry.name)
+    ).slice(0, 30);
+  }
+
+  return result;
+}
+
+function normaliseSecuritySettings(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_SECURITY_SETTINGS);
+  const methodTypes = new Set(['totp', 'sms', 'webauthn', 'email']);
+
+  if (rawSettings.enforcement && typeof rawSettings.enforcement === 'object') {
+    result.enforcement = {
+      requiredForAdmins: Boolean(
+        rawSettings.enforcement.requiredForAdmins ?? result.enforcement.requiredForAdmins
+      ),
+      requiredForInstructors: Boolean(
+        rawSettings.enforcement.requiredForInstructors ?? result.enforcement.requiredForInstructors
+      ),
+      requiredForFinance: Boolean(
+        rawSettings.enforcement.requiredForFinance ?? result.enforcement.requiredForFinance
+      ),
+      rememberDeviceDays: clampInt(rawSettings.enforcement.rememberDeviceDays, {
+        min: 0,
+        max: 90,
+        fallback: result.enforcement.rememberDeviceDays
+      }),
+      sessionTimeoutMinutes: clampInt(rawSettings.enforcement.sessionTimeoutMinutes, {
+        min: 5,
+        max: 600,
+        fallback: result.enforcement.sessionTimeoutMinutes
+      })
+    };
+  }
+
+  if (Array.isArray(rawSettings.methods)) {
+    result.methods = dedupeById(
+      rawSettings.methods
+        .map((method) => {
+          const type = String(method?.type ?? '').toLowerCase();
+          return {
+            id: createStableId('mfa-method', method?.id),
+            type: methodTypes.has(type) ? type : 'totp',
+            enabled: Boolean(method?.enabled ?? true),
+            description: normaliseText(method?.description, { max: 200, fallback: '' })
+          };
+        })
+        .filter((entry) => entry.id && entry.type)
+    ).slice(0, 10);
+  }
+
+  if (rawSettings.backup && typeof rawSettings.backup === 'object') {
+    result.backup = {
+      backupCodesEnabled: Boolean(
+        rawSettings.backup.backupCodesEnabled ?? result.backup.backupCodesEnabled
+      ),
+      requireRegenerationOnUse: Boolean(
+        rawSettings.backup.requireRegenerationOnUse ?? result.backup.requireRegenerationOnUse
+      )
+    };
+  }
+
+  if (Array.isArray(rawSettings.audits)) {
+    result.audits = dedupeById(
+      rawSettings.audits
+        .map((audit) => ({
+          id: createStableId('mfa-audit', audit?.id),
+          label: normaliseText(audit?.label, { max: 200, fallback: 'Access review' }),
+          completedAt: normaliseText(audit?.completedAt, { max: 40, fallback: '' })
+        }))
+        .filter((entry) => entry.label)
+    ).slice(0, 20);
+  }
+
+  return result;
+}
+
+function normaliseFinanceSettings(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_FINANCE_SETTINGS);
+  const adjustmentStatus = new Set(['draft', 'scheduled', 'processing', 'processed', 'cancelled']);
+
+  if (rawSettings.policies && typeof rawSettings.policies === 'object') {
+    result.policies = {
+      billingContact: normaliseText(rawSettings.policies.billingContact, {
+        max: 180,
+        fallback: result.policies.billingContact
+      }),
+      invoiceGraceDays: clampInt(rawSettings.policies.invoiceGraceDays, {
+        min: 0,
+        max: 60,
+        fallback: result.policies.invoiceGraceDays
+      }),
+      reconciliationCadence: normaliseText(rawSettings.policies.reconciliationCadence, {
+        max: 120,
+        fallback: result.policies.reconciliationCadence
+      }),
+      payoutScheduleDays: clampInt(rawSettings.policies.payoutScheduleDays, {
+        min: 7,
+        max: 120,
+        fallback: result.policies.payoutScheduleDays
+      }),
+      defaultCommissionBps: clampInt(rawSettings.policies.defaultCommissionBps, {
+        min: 0,
+        max: 5000,
+        fallback: result.policies.defaultCommissionBps
+      }),
+      minimumCommissionCents: clampInt(rawSettings.policies.minimumCommissionCents, {
+        min: 0,
+        max: 1_000_000_000,
+        fallback: result.policies.minimumCommissionCents
+      }),
+      currency: normaliseText(rawSettings.policies.currency, { max: 12, fallback: result.policies.currency }).toUpperCase()
+    };
+  }
+
+  if (Array.isArray(rawSettings.tiers)) {
+    result.tiers = dedupeById(
+      rawSettings.tiers
+        .map((tier) => ({
+          id: createStableId('finance-tier', tier?.id),
+          name: normaliseText(tier?.name, { max: 160, fallback: 'Commission tier', allowEmpty: false }),
+          appliesTo: normalizeStringArray(tier?.appliesTo).slice(0, 10),
+          thresholdCents: clampInt(tier?.thresholdCents, { min: 0, max: 1_000_000_000, fallback: 0 }),
+          rateBps: clampInt(tier?.rateBps, { min: 0, max: 5000, fallback: result.policies.defaultCommissionBps })
+        }))
+        .filter((entry) => entry.name)
+    ).slice(0, 20);
+  }
+
+  if (Array.isArray(rawSettings.adjustments)) {
+    result.adjustments = dedupeById(
+      rawSettings.adjustments
+        .map((adjustment) => ({
+          id: createStableId('finance-adjustment', adjustment?.id),
+          description: normaliseText(adjustment?.description, { max: 240, fallback: 'Adjustment' }),
+          amountCents: clampInt(adjustment?.amountCents, { min: -1_000_000_000, max: 1_000_000_000, fallback: 0 }),
+          status: adjustmentStatus.has(String(adjustment?.status ?? '').toLowerCase())
+            ? String(adjustment.status).toLowerCase()
+            : 'draft',
+          createdAt: normaliseText(adjustment?.createdAt, { max: 40, fallback: '' })
+        }))
+        .filter((entry) => entry.description)
+    ).slice(0, 20);
+  }
+
+  if (Array.isArray(rawSettings.revenueStreams)) {
+    result.revenueStreams = dedupeById(
+      rawSettings.revenueStreams
+        .map((stream) => ({
+          id: createStableId('finance-stream', stream?.id),
+          name: normaliseText(stream?.name, { max: 160, fallback: 'Revenue stream', allowEmpty: false }),
+          shareBps: clampInt(stream?.shareBps, { min: 0, max: 5000, fallback: 0 }),
+          active: Boolean(stream?.active ?? true)
+        }))
+        .filter((entry) => entry.name)
+    ).slice(0, 20);
+  }
+
+  if (rawSettings.approvals && typeof rawSettings.approvals === 'object') {
+    result.approvals = {
+      requireDualApproval: Boolean(
+        rawSettings.approvals.requireDualApproval ?? result.approvals.requireDualApproval
+      ),
+      financeReviewer: normaliseText(rawSettings.approvals.financeReviewer, {
+        max: 180,
+        fallback: result.approvals.financeReviewer
+      })
+    };
+  }
+
+  return result;
+}
+
 function sanitizeAppearancePayload(payload = {}) {
   const sanitized = {};
   if (payload.branding !== undefined) {
@@ -555,6 +1198,107 @@ function sanitizeThirdPartyPayload(payload = {}) {
   const sanitized = {};
   if (payload.credentials !== undefined) {
     sanitized.credentials = normaliseThirdParty({ credentials: payload.credentials }).credentials;
+  }
+  return sanitized;
+}
+
+function sanitizeAdminProfilePayload(payload = {}) {
+  const sanitized = {};
+  if (payload.organisation !== undefined) {
+    sanitized.organisation = normaliseAdminProfile({ organisation: payload.organisation }).organisation;
+  }
+  if (payload.leadership !== undefined) {
+    sanitized.leadership = normaliseAdminProfile({ leadership: payload.leadership }).leadership;
+  }
+  if (payload.supportChannels !== undefined) {
+    sanitized.supportChannels = normaliseAdminProfile({ supportChannels: payload.supportChannels }).supportChannels;
+  }
+  if (payload.runbooks !== undefined) {
+    sanitized.runbooks = normaliseAdminProfile({ runbooks: payload.runbooks }).runbooks;
+  }
+  if (payload.media !== undefined) {
+    sanitized.media = normaliseAdminProfile({ media: payload.media }).media;
+  }
+  if (payload.onCall !== undefined) {
+    sanitized.onCall = normaliseAdminProfile({ onCall: payload.onCall }).onCall;
+  }
+  return sanitized;
+}
+
+function sanitizePaymentSettingsPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.processors !== undefined) {
+    sanitized.processors = normalisePaymentSettings({ processors: payload.processors }).processors;
+  }
+  if (payload.payoutRules !== undefined) {
+    sanitized.payoutRules = normalisePaymentSettings({ payoutRules: payload.payoutRules }).payoutRules;
+  }
+  if (payload.bankAccounts !== undefined) {
+    sanitized.bankAccounts = normalisePaymentSettings({ bankAccounts: payload.bankAccounts }).bankAccounts;
+  }
+  if (payload.webhooks !== undefined) {
+    sanitized.webhooks = normalisePaymentSettings({ webhooks: payload.webhooks }).webhooks;
+  }
+  return sanitized;
+}
+
+function sanitizeEmailSettingsPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.branding !== undefined) {
+    sanitized.branding = normaliseEmailSettings({ branding: payload.branding }).branding;
+  }
+  if (payload.notifications !== undefined) {
+    sanitized.notifications = normaliseEmailSettings({ notifications: payload.notifications }).notifications;
+  }
+  if (payload.escalationRecipients !== undefined) {
+    sanitized.escalationRecipients = normaliseEmailSettings({
+      escalationRecipients: payload.escalationRecipients
+    }).escalationRecipients;
+  }
+  if (payload.domains !== undefined) {
+    sanitized.domains = normaliseEmailSettings({ domains: payload.domains }).domains;
+  }
+  if (payload.templates !== undefined) {
+    sanitized.templates = normaliseEmailSettings({ templates: payload.templates }).templates;
+  }
+  return sanitized;
+}
+
+function sanitizeSecuritySettingsPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.enforcement !== undefined) {
+    sanitized.enforcement = normaliseSecuritySettings({ enforcement: payload.enforcement }).enforcement;
+  }
+  if (payload.methods !== undefined) {
+    sanitized.methods = normaliseSecuritySettings({ methods: payload.methods }).methods;
+  }
+  if (payload.backup !== undefined) {
+    sanitized.backup = normaliseSecuritySettings({ backup: payload.backup }).backup;
+  }
+  if (payload.audits !== undefined) {
+    sanitized.audits = normaliseSecuritySettings({ audits: payload.audits }).audits;
+  }
+  return sanitized;
+}
+
+function sanitizeFinanceSettingsPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.policies !== undefined) {
+    sanitized.policies = normaliseFinanceSettings({ policies: payload.policies }).policies;
+  }
+  if (payload.tiers !== undefined) {
+    sanitized.tiers = normaliseFinanceSettings({ tiers: payload.tiers }).tiers;
+  }
+  if (payload.adjustments !== undefined) {
+    sanitized.adjustments = normaliseFinanceSettings({ adjustments: payload.adjustments }).adjustments;
+  }
+  if (payload.revenueStreams !== undefined) {
+    sanitized.revenueStreams = normaliseFinanceSettings({
+      revenueStreams: payload.revenueStreams
+    }).revenueStreams;
+  }
+  if (payload.approvals !== undefined) {
+    sanitized.approvals = normaliseFinanceSettings({ approvals: payload.approvals }).approvals;
   }
   return sanitized;
 }
@@ -1096,6 +1840,86 @@ function normaliseMonetization(rawSettings = {}) {
 }
 
 export default class PlatformSettingsService {
+  static async getAdminProfileSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.ADMIN_PROFILE, connection);
+    return normaliseAdminProfile(record?.value ?? {});
+  }
+
+  static async updateAdminProfileSettings(payload, connection = db) {
+    const sanitized = sanitizeAdminProfilePayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getAdminProfileSettings(connection);
+    }
+    const current = await this.getAdminProfileSettings(connection);
+    const merged = normaliseAdminProfile(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.ADMIN_PROFILE, merged, connection);
+    return merged;
+  }
+
+  static async getPaymentSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.PAYMENT, connection);
+    return normalisePaymentSettings(record?.value ?? {});
+  }
+
+  static async updatePaymentSettings(payload, connection = db) {
+    const sanitized = sanitizePaymentSettingsPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getPaymentSettings(connection);
+    }
+    const current = await this.getPaymentSettings(connection);
+    const merged = normalisePaymentSettings(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.PAYMENT, merged, connection);
+    return merged;
+  }
+
+  static async getEmailSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.EMAIL, connection);
+    return normaliseEmailSettings(record?.value ?? {});
+  }
+
+  static async updateEmailSettings(payload, connection = db) {
+    const sanitized = sanitizeEmailSettingsPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getEmailSettings(connection);
+    }
+    const current = await this.getEmailSettings(connection);
+    const merged = normaliseEmailSettings(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.EMAIL, merged, connection);
+    return merged;
+  }
+
+  static async getSecuritySettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.SECURITY, connection);
+    return normaliseSecuritySettings(record?.value ?? {});
+  }
+
+  static async updateSecuritySettings(payload, connection = db) {
+    const sanitized = sanitizeSecuritySettingsPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getSecuritySettings(connection);
+    }
+    const current = await this.getSecuritySettings(connection);
+    const merged = normaliseSecuritySettings(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.SECURITY, merged, connection);
+    return merged;
+  }
+
+  static async getFinanceSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.FINANCE, connection);
+    return normaliseFinanceSettings(record?.value ?? {});
+  }
+
+  static async updateFinanceSettings(payload, connection = db) {
+    const sanitized = sanitizeFinanceSettingsPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getFinanceSettings(connection);
+    }
+    const current = await this.getFinanceSettings(connection);
+    const merged = normaliseFinanceSettings(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.FINANCE, merged, connection);
+    return merged;
+  }
+
   static async getAppearanceSettings(connection = db) {
     const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.APPEARANCE, connection);
     return normaliseAppearance(record?.value ?? {});
@@ -1281,5 +2105,10 @@ export {
   normalisePreferences,
   normaliseSystem,
   normaliseIntegrations,
-  normaliseThirdParty
+  normaliseThirdParty,
+  normaliseAdminProfile,
+  normalisePaymentSettings,
+  normaliseEmailSettings,
+  normaliseSecuritySettings,
+  normaliseFinanceSettings
 };

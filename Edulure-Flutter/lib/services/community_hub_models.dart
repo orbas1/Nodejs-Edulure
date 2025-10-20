@@ -245,6 +245,9 @@ class CommunityCalendarEntry {
     this.reminders = const <Duration>[],
     this.tags = const <String>[],
     this.coverImageUrl,
+    this.meetingUrl,
+    this.notes,
+    this.attachments = const <String>[],
   });
 
   final String id;
@@ -258,6 +261,9 @@ class CommunityCalendarEntry {
   final List<Duration> reminders;
   final List<String> tags;
   final String? coverImageUrl;
+  final String? meetingUrl;
+  final String? notes;
+  final List<String> attachments;
 
   CommunityCalendarEntry copyWith({
     String? title,
@@ -270,6 +276,9 @@ class CommunityCalendarEntry {
     List<Duration>? reminders,
     List<String>? tags,
     String? coverImageUrl,
+    String? meetingUrl,
+    String? notes,
+    List<String>? attachments,
   }) {
     return CommunityCalendarEntry(
       id: id,
@@ -283,6 +292,9 @@ class CommunityCalendarEntry {
       reminders: reminders ?? this.reminders,
       tags: tags ?? this.tags,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      meetingUrl: meetingUrl ?? this.meetingUrl,
+      notes: notes ?? this.notes,
+      attachments: attachments ?? this.attachments,
     );
   }
 
@@ -299,6 +311,9 @@ class CommunityCalendarEntry {
       'reminders': reminders.map((duration) => duration.inMinutes).toList(),
       'tags': tags,
       'coverImageUrl': coverImageUrl,
+      'meetingUrl': meetingUrl,
+      'notes': notes,
+      'attachments': attachments,
     }..removeWhere((key, value) => value == null);
   }
 
@@ -326,6 +341,9 @@ class CommunityCalendarEntry {
       reminders: reminderList,
       tags: _castStringList(json['tags']),
       coverImageUrl: json['coverImageUrl']?.toString(),
+      meetingUrl: json['meetingUrl']?.toString(),
+      notes: json['notes']?.toString(),
+      attachments: _castStringList(json['attachments']),
     );
   }
 

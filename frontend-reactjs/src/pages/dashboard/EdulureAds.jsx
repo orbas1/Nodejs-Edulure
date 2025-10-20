@@ -14,18 +14,26 @@ import {
   updateAdsCampaign
 } from '../../api/adsApi.js';
 
-const ALLOWED_ROLES = new Set(['instructor', 'admin']);
+const ALLOWED_ROLES = new Set(['learner', 'instructor', 'admin']);
+
+const CAMPAIGN_STATUSES = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'active', label: 'Active' },
+  { value: 'paused', label: 'Paused' },
+  { value: 'completed', label: 'Completed' },
+  { value: 'archived', label: 'Archived' }
+];
 
 const compactNumberFormatter = new Intl.NumberFormat('en-US', {
   notation: 'compact',
   maximumFractionDigits: 1
 });
 
-const integerFormatter = new Intl.NumberFormat('en-US', {
-  maximumFractionDigits: 0
+const currencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 2
 });
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium' });
 
 function formatCompactNumber(value) {
   const numeric = Number(value ?? 0);
@@ -35,38 +43,407 @@ function formatCompactNumber(value) {
   return compactNumberFormatter.format(numeric);
 }
 
-function formatInteger(value) {
-  const numeric = Number(value ?? 0);
-  if (!Number.isFinite(numeric) || Number.isNaN(numeric)) {
-    return '0';
-  }
-  return integerFormatter.format(Math.round(numeric));
+function toDateInput(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function formatDateLabel(isoString) {
-  if (!isoString) return 'Not yet synced';
-  try {
-    const parsed = new Date(isoString);
-    if (Number.isNaN(parsed.getTime())) {
-      return typeof isoString === 'string' ? isoString : 'Not yet synced';
-    }
-    return dateFormatter.format(parsed);
-  } catch (error) {
-    console.warn('Failed to format date label', error);
-    return 'Not yet synced';
-  }
+function toDateTimeLocalInput(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}T${hours}:${minutes}`;
 }
 
-function Chip({ children }) {
+function parseCommaSeparated(value) {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function parseMultiline(value) {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+function formatPlacementLabel(placement) {
+  if (!placement) return '';
+  if (typeof placement === 'string') return placement;
+  const label = placement.label ?? placement.name;
+  if (label) return label;
+  const tokens = [placement.surface, placement.slot, placement.optimisation].filter(Boolean);
+  return tokens.length ? tokens.join(' · ') : '';
+}
+
+const emptyCampaignForm = {
+  id: null,
+  name: '',
+  status: 'draft',
+  objective: '',
+  dailyBudgetCents: '',
+  totalSpendCents: '',
+  startAt: '',
+  endAt: '',
+  lastSyncedAt: '',
+  metricsImpressions: '',
+  metricsClicks: '',
+  metricsConversions: '',
+  metricsSpendCents: '',
+  metricsRevenueCents: '',
+  metricsCtr: '',
+  metricsCpc: '',
+  metricsCpa: '',
+  metricsRoas: '',
+  targetingKeywords: '',
+  targetingAudiences: '',
+  targetingLocations: '',
+  targetingLanguages: '',
+  targetingSummary: '',
+  creativeHeadline: '',
+  creativeDescription: '',
+  creativeUrl: '',
+  placements: ''
+};
+
+function CampaignForm({ form, onChange, onSubmit, onCancel, submitting }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary-dark">
-      {children}
-    </span>
+    <form className="space-y-6" onSubmit={onSubmit}>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Campaign name
+          <input
+            required
+            name="name"
+            value={form.name}
+            onChange={onChange}
+            placeholder="Spring funnel accelerator"
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Status
+          <select
+            name="status"
+            value={form.status}
+            onChange={onChange}
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          >
+            {CAMPAIGN_STATUSES.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Objective
+        <input
+          name="objective"
+          value={form.objective}
+          onChange={onChange}
+          placeholder="Drive qualified cohort applications"
+          className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </label>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Daily budget (cents)
+          <input
+            name="dailyBudgetCents"
+            type="number"
+            min="0"
+            value={form.dailyBudgetCents}
+            onChange={onChange}
+            placeholder="25000"
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Lifetime spend (cents)
+          <input
+            name="totalSpendCents"
+            type="number"
+            min="0"
+            value={form.totalSpendCents}
+            onChange={onChange}
+            placeholder="125000"
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          ROAS
+          <input
+            name="metricsRoas"
+            value={form.metricsRoas}
+            onChange={onChange}
+            placeholder="3.4x"
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Start date
+          <input
+            name="startAt"
+            type="date"
+            value={form.startAt}
+            onChange={onChange}
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          End date
+          <input
+            name="endAt"
+            type="date"
+            value={form.endAt}
+            onChange={onChange}
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          Last synced
+          <input
+            name="lastSyncedAt"
+            type="datetime-local"
+            value={form.lastSyncedAt}
+            onChange={onChange}
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+      </div>
+
+      <fieldset className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
+        <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Performance metrics</legend>
+        <div className="mt-2 grid gap-4 md:grid-cols-3">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Impressions
+            <input
+              name="metricsImpressions"
+              type="number"
+              min="0"
+              value={form.metricsImpressions}
+              onChange={onChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Clicks
+            <input
+              name="metricsClicks"
+              type="number"
+              min="0"
+              value={form.metricsClicks}
+              onChange={onChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Conversions
+            <input
+              name="metricsConversions"
+              type="number"
+              min="0"
+              value={form.metricsConversions}
+              onChange={onChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Spend (cents)
+            <input
+              name="metricsSpendCents"
+              type="number"
+              min="0"
+              value={form.metricsSpendCents}
+              onChange={onChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Revenue (cents)
+            <input
+              name="metricsRevenueCents"
+              type="number"
+              min="0"
+              value={form.metricsRevenueCents}
+              onChange={onChange}
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            CTR (%)
+            <input
+              name="metricsCtr"
+              value={form.metricsCtr}
+              onChange={onChange}
+              placeholder="3.2"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            CPC (currency)
+            <input
+              name="metricsCpc"
+              value={form.metricsCpc}
+              onChange={onChange}
+              placeholder="$2.40"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            CPA (currency)
+            <input
+              name="metricsCpa"
+              value={form.metricsCpa}
+              onChange={onChange}
+              placeholder="$18.00"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
+        <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Targeting</legend>
+        <div className="mt-2 grid gap-4 md:grid-cols-2">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Keywords (comma separated)
+            <input
+              name="targetingKeywords"
+              value={form.targetingKeywords}
+              onChange={onChange}
+              placeholder="product strategy, design systems"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Audiences (comma separated)
+            <input
+              name="targetingAudiences"
+              value={form.targetingAudiences}
+              onChange={onChange}
+              placeholder="Product leads, Design managers"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Locations (comma separated)
+            <input
+              name="targetingLocations"
+              value={form.targetingLocations}
+              onChange={onChange}
+              placeholder="United States, Canada"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Languages (comma separated)
+            <input
+              name="targetingLanguages"
+              value={form.targetingLanguages}
+              onChange={onChange}
+              placeholder="English, Spanish"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 md:col-span-2">
+            Summary insight
+            <textarea
+              name="targetingSummary"
+              value={form.targetingSummary}
+              onChange={onChange}
+              rows={2}
+              placeholder="Design leaders in North America with active hiring roadmaps."
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset className="rounded-3xl border border-slate-200 bg-slate-50/60 p-4">
+        <legend className="px-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Creative</legend>
+        <div className="mt-2 space-y-3">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Headline
+            <input
+              name="creativeHeadline"
+              value={form.creativeHeadline}
+              onChange={onChange}
+              placeholder="Launch elite cohorts in 60 days"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Description
+            <textarea
+              name="creativeDescription"
+              value={form.creativeDescription}
+              onChange={onChange}
+              rows={2}
+              placeholder="Partner with Edulure producers to design premium cohort experiences."
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Destination URL
+            <input
+              name="creativeUrl"
+              value={form.creativeUrl}
+              onChange={onChange}
+              placeholder="https://edulure.test/campaigns/spring-growth"
+              className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+        </div>
+      </fieldset>
+
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+        Placements (one per line)
+        <textarea
+          name="placements"
+          value={form.placements}
+          onChange={onChange}
+          rows={3}
+          placeholder="Discovery Feed · Homepage Hero"
+          className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+      </label>
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          disabled={submitting}
+          className="dashboard-primary-pill px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {submitting ? 'Saving…' : 'Save campaign'}
+        </button>
+        <button type="button" onClick={onCancel} className="dashboard-pill px-5 py-2 text-sm">
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
-Chip.propTypes = {
-  children: PropTypes.node.isRequired
+CampaignForm.defaultProps = {
+  submitting: false
 };
 
 const OBJECTIVE_OPTIONS = [
@@ -141,70 +518,171 @@ export default function EdulureAds() {
 
   const ads = useMemo(() => {
     if (!adsRaw || typeof adsRaw !== 'object') return null;
-    const asArray = (value) => (Array.isArray(value) ? value : []);
-    const asObject = (value) => (value && typeof value === 'object' ? value : {});
 
-    const sanitizeCampaign = (campaign) => {
-      const safeCampaign = asObject(campaign);
-      const metrics = asObject(safeCampaign.metrics);
-      const placement = asObject(safeCampaign.placement);
-      const targeting = asObject(safeCampaign.targeting);
-      const creative = asObject(safeCampaign.creative);
+    const campaigns = Array.isArray(adsRaw.campaigns)
+      ? adsRaw.campaigns.map((campaign) => ({
+          ...campaign,
+          metrics: campaign.metrics && typeof campaign.metrics === 'object' ? campaign.metrics : {},
+          targeting: campaign.targeting && typeof campaign.targeting === 'object' ? campaign.targeting : {},
+          creative: campaign.creative && typeof campaign.creative === 'object' ? campaign.creative : {},
+          placements: Array.isArray(campaign.placements) ? campaign.placements : []
+        }))
+      : [];
 
-      return {
-        ...safeCampaign,
+    const summary = adsRaw.summary && typeof adsRaw.summary === 'object' ? adsRaw.summary : {};
+
+    return { campaigns, summary };
+  }, [adsRaw]);
+
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [campaignFormVisible, setCampaignFormVisible] = useState(false);
+  const [campaignForm, setCampaignForm] = useState(emptyCampaignForm);
+  const [campaignSubmitting, setCampaignSubmitting] = useState(false);
+
+  const campaigns = ads?.campaigns ?? [];
+  const summary = ads?.summary ?? {};
+
+  const handleCampaignFieldChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setCampaignForm((current) => ({ ...current, [name]: value }));
+  }, []);
+
+  const closeCampaignForm = useCallback(() => {
+    setCampaignForm(emptyCampaignForm);
+    setCampaignFormVisible(false);
+    setCampaignSubmitting(false);
+  }, []);
+
+  const openCampaignForm = useCallback((campaign) => {
+    if (campaign) {
+      setCampaignForm({
+        id: campaign.id,
+        name: campaign.name ?? '',
+        status: campaign.status ?? 'draft',
+        objective: campaign.objective ?? '',
+        dailyBudgetCents: campaign.dailyBudgetCents != null ? String(campaign.dailyBudgetCents) : '',
+        totalSpendCents: campaign.totalSpendCents != null ? String(campaign.totalSpendCents) : '',
+        startAt: toDateInput(campaign.startAt),
+        endAt: toDateInput(campaign.endAt),
+        lastSyncedAt: toDateTimeLocalInput(campaign.lastSyncedAt ?? campaign.metrics?.lastSyncedAt),
+        metricsImpressions: campaign.metrics?.impressions ?? '',
+        metricsClicks: campaign.metrics?.clicks ?? '',
+        metricsConversions: campaign.metrics?.conversions ?? '',
+        metricsSpendCents: campaign.metrics?.spendCents ?? '',
+        metricsRevenueCents: campaign.metrics?.revenueCents ?? '',
+        metricsCtr: campaign.metrics?.ctr ?? '',
+        metricsCpc: campaign.metrics?.cpc ?? '',
+        metricsCpa: campaign.metrics?.cpa ?? '',
+        metricsRoas: campaign.metrics?.roas ?? '',
+        targetingKeywords: (campaign.targeting?.keywords ?? []).join(', '),
+        targetingAudiences: (campaign.targeting?.audiences ?? []).join(', '),
+        targetingLocations: (campaign.targeting?.locations ?? []).join(', '),
+        targetingLanguages: (campaign.targeting?.languages ?? []).join(', '),
+        targetingSummary: campaign.targeting?.summary ?? '',
+        creativeHeadline: campaign.creative?.headline ?? '',
+        creativeDescription: campaign.creative?.description ?? '',
+        creativeUrl: campaign.creative?.url ?? '',
+        placements: campaign.placements.map((placement) => formatPlacementLabel(placement)).filter(Boolean).join('\n')
+      });
+    } else {
+      setCampaignForm(emptyCampaignForm);
+    }
+    setCampaignFormVisible(true);
+  }, []);
+
+  const handleCampaignSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage Edulure Ads.' });
+        return;
+      }
+
+      setCampaignSubmitting(true);
+
+      const payload = {
+        name: campaignForm.name.trim(),
+        status: campaignForm.status,
+        objective: campaignForm.objective?.trim() || null,
+        dailyBudgetCents: Number(campaignForm.dailyBudgetCents || 0),
+        totalSpendCents: Number(campaignForm.totalSpendCents || 0),
+        startAt: campaignForm.startAt || null,
+        endAt: campaignForm.endAt || null,
+        lastSyncedAt: campaignForm.lastSyncedAt ? new Date(campaignForm.lastSyncedAt).toISOString() : null,
         metrics: {
-          impressions: Number(metrics.impressions ?? 0),
-          clicks: Number(metrics.clicks ?? 0),
-          conversions: Number(metrics.conversions ?? 0),
-          revenueFormatted: metrics.revenueFormatted ?? '—',
-          roas: metrics.roas ?? null,
-          lastSyncedAt: metrics.lastSyncedAt ?? null
-        },
-        placement: {
-          ...placement,
-          tags: asArray(placement.tags)
+          impressions: Number(campaignForm.metricsImpressions || 0),
+          clicks: Number(campaignForm.metricsClicks || 0),
+          conversions: Number(campaignForm.metricsConversions || 0),
+          spendCents: Number(campaignForm.metricsSpendCents || 0),
+          revenueCents: Number(campaignForm.metricsRevenueCents || 0),
+          ctr: campaignForm.metricsCtr || null,
+          cpc: campaignForm.metricsCpc || null,
+          cpa: campaignForm.metricsCpa || null,
+          roas: campaignForm.metricsRoas || null,
+          lastSyncedAt: campaignForm.lastSyncedAt ? new Date(campaignForm.lastSyncedAt).toISOString() : null
         },
         targeting: {
-          keywords: asArray(targeting.keywords),
-          audiences: asArray(targeting.audiences),
-          locations: asArray(targeting.locations),
-          languages: asArray(targeting.languages)
+          summary: campaignForm.targetingSummary?.trim() || '',
+          keywords: parseCommaSeparated(campaignForm.targetingKeywords),
+          audiences: parseCommaSeparated(campaignForm.targetingAudiences),
+          locations: parseCommaSeparated(campaignForm.targetingLocations),
+          languages: parseCommaSeparated(campaignForm.targetingLanguages)
         },
         creative: {
-          headline: creative.headline ?? 'Untitled creative',
-          description: creative.description ?? 'Add a compelling description to improve engagement.',
-          url: creative.url ?? null
+          headline: campaignForm.creativeHeadline?.trim() || null,
+          description: campaignForm.creativeDescription?.trim() || null,
+          url: campaignForm.creativeUrl?.trim() || null
         },
-        spend: asObject(safeCampaign.spend),
-        dailyBudget: asObject(safeCampaign.dailyBudget)
+        placements: parseMultiline(campaignForm.placements)
       };
-    };
 
-    return {
-      summary: asObject(adsRaw.summary),
-      active: asArray(adsRaw.active).map(sanitizeCampaign),
-      experiments: asArray(adsRaw.experiments).map(asObject),
-      placements: asArray(adsRaw.placements).map((placement) => ({
-        ...asObject(placement),
-        tags: asArray(placement?.tags)
-      })),
-      targeting: {
-        summary: adsRaw.targeting?.summary ?? '',
-        keywords: asArray(adsRaw.targeting?.keywords),
-        audiences: asArray(adsRaw.targeting?.audiences),
-        locations: asArray(adsRaw.targeting?.locations),
-        languages: asArray(adsRaw.targeting?.languages)
-      },
-      tags: asArray(adsRaw.tags).map(asObject)
-    };
-  }, [adsRaw]);
+      try {
+        if (campaignForm.id) {
+          await updateAdCampaign({ token, campaignId: campaignForm.id, payload });
+          setStatusMessage({ type: 'success', message: 'Campaign updated successfully.' });
+        } else {
+          await createAdCampaign({ token, payload });
+          setStatusMessage({ type: 'success', message: 'New Edulure Ads campaign launched.' });
+        }
+        closeCampaignForm();
+        await refresh?.();
+      } catch (error) {
+        setStatusMessage({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unable to save campaign right now.'
+        });
+      } finally {
+        setCampaignSubmitting(false);
+      }
+    },
+    [campaignForm, closeCampaignForm, refresh, token]
+  );
+
+  const handleCampaignDelete = useCallback(
+    async (campaignId) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage Edulure Ads.' });
+        return;
+      }
+      try {
+        await deleteAdCampaign({ token, campaignId });
+        setStatusMessage({ type: 'success', message: 'Campaign archived.' });
+        await refresh?.();
+      } catch (error) {
+        setStatusMessage({
+          type: 'error',
+          message: error instanceof Error ? error.message : 'Unable to archive this campaign.'
+        });
+      }
+    },
+    [refresh, token]
+  );
 
   if (role && !ALLOWED_ROLES.has(role)) {
     return (
       <DashboardStateMessage
         title="Restricted access"
-        description="Switch to an instructor or admin Learnspace to manage Edulure Ads placements and experiments."
+        description="Switch to a learner or instructor Learnspace to orchestrate Edulure Ads placements."
         actionLabel="Return"
         onAction={() => window.history.back()}
       />
@@ -214,55 +692,57 @@ export default function EdulureAds() {
   if (!ads) {
     return (
       <DashboardStateMessage
-        title="Edulure Ads Learnspace offline"
-        description="Performance data hasn't synced from your ad accounts yet. Refresh after connecting channels."
+        title="Edulure Ads workspace offline"
+        description="We could not retrieve the latest campaign data. Refresh once accounts are connected."
         actionLabel="Refresh"
         onAction={() => refresh?.()}
       />
     );
   }
 
-  const hasSignals =
-    (ads.active?.length ?? 0) +
-      (ads.placements?.length ?? 0) +
-      (ads.experiments?.length ?? 0) +
-      (ads.tags?.length ?? 0) >
-    0;
+  const hasSignals = campaigns.length > 0;
 
   const showTelemetryNotice = !hasSignals;
-
-  const summary = ads.summary ?? {};
 
   const overviewMetrics = [
     {
       title: 'Active campaigns',
-      value: summary.activeCampaigns ?? 0,
-      hint: 'Connected Learnspaces'
+      value: summary.activeCampaigns ?? campaigns.filter((campaign) => campaign.status === 'active').length,
+      hint: 'Live flighting'
     },
     {
       title: 'Lifetime spend',
-      value: summary.totalSpend?.formatted ?? '—',
-      hint: summary.totalSpend?.currency ?? 'Multi-currency'
+      value: summary.totalSpend ?? currencyFormatter.format(
+        campaigns.reduce((total, campaign) => total + Number(campaign.totalSpendCents ?? 0), 0) / 100
+      ),
+      hint: 'All placements'
     },
     {
-      title: 'Avg CTR',
-      value: summary.averageCtr ?? '—',
-      hint: `${formatCompactNumber(summary.totalImpressions ?? 0)} impressions`
+      title: 'Average daily budget',
+      value: summary.averageDailyBudget ?? currencyFormatter.format(
+        campaigns.length
+          ? campaigns.reduce((total, campaign) => total + Number(campaign.dailyBudgetCents ?? 0), 0) /
+            (campaigns.length * 100)
+          : 0
+      ),
+      hint: 'Current period'
     },
     {
-      title: 'Avg CPC',
-      value: summary.averageCpc ?? '—',
-      hint: summary.averageCpc !== '—' ? 'Across active placements' : 'Awaiting click volume'
+      title: 'Total impressions',
+      value: formatCompactNumber(campaigns.reduce((total, campaign) => total + Number(campaign.metrics?.impressions ?? 0), 0)),
+      hint: 'Last sync'
     },
     {
-      title: 'Avg CPA',
-      value: summary.averageCpa ?? '—',
-      hint: summary.averageCpa !== '—' ? 'Per acquisition' : 'Awaiting conversions'
+      title: 'Total clicks',
+      value: formatCompactNumber(campaigns.reduce((total, campaign) => total + Number(campaign.metrics?.clicks ?? 0), 0)),
+      hint: 'Last sync'
     },
     {
-      title: 'ROAS',
-      value: summary.roas ?? '—',
-      hint: summary.roas !== '—' ? 'Return on ad spend' : 'Insufficient revenue data'
+      title: 'Conversions',
+      value: formatCompactNumber(
+        campaigns.reduce((total, campaign) => total + Number(campaign.metrics?.conversions ?? 0), 0)
+      ),
+      hint: 'Attributed'
     }
   ];
 
@@ -443,24 +923,36 @@ export default function EdulureAds() {
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Edulure Ads</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Orchestrate placements, fine-tune targeting, and monitor revenue quality in real time.
+          <p className="dashboard-kicker text-primary">Growth engine</p>
+          <h1 className="dashboard-title">Coordinate Edulure Ads campaigns</h1>
+          <p className="dashboard-subtitle">
+            Launch paid growth experiments, orchestrate targeting, and review revenue telemetry without leaving the dashboard.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" className="dashboard-pill px-5 py-2" onClick={() => refresh?.()}>
             Refresh metrics
           </button>
-          <button
-            type="button"
-            className="dashboard-primary-pill px-5 py-2"
-            onClick={() => window.open('/ads/campaigns', '_blank', 'noopener')}
-          >
-            Launch campaign
+          <button type="button" className="dashboard-primary-pill px-5 py-2" onClick={() => openCampaignForm(null)}>
+            New campaign
           </button>
         </div>
-      </div>
+      </header>
+
+      {statusMessage ? (
+        <div
+          role="status"
+          className={`rounded-3xl border px-4 py-3 text-sm ${
+            statusMessage.type === 'error'
+              ? 'border-rose-200 bg-rose-50 text-rose-700'
+              : statusMessage.type === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                : 'border-slate-200 bg-slate-50 text-slate-600'
+          }`}
+        >
+          {statusMessage.message}
+        </div>
+      ) : null}
 
       {showTelemetryNotice ? (
         <section className="dashboard-section border-dashed border-primary/40 bg-primary/5">
@@ -998,71 +1490,98 @@ export default function EdulureAds() {
         </div>
       </section>
 
-      <section className="dashboard-section">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Active placements</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Detailed telemetry across surfaces, budgets, and creative packages powering your funnel.
-            </p>
-          </div>
-        </div>
-        <div className="mt-6 space-y-6">
-          {activeCampaigns.map((campaign) => (
+      {campaignFormVisible ? (
+        <section className="dashboard-section">
+          <h2 className="text-lg font-semibold text-slate-900">
+            {campaignForm.id ? 'Edit Edulure Ads campaign' : 'Launch new campaign'}
+          </h2>
+          <CampaignForm
+            form={campaignForm}
+            onChange={handleCampaignFieldChange}
+            onSubmit={handleCampaignSubmit}
+            onCancel={closeCampaignForm}
+            submitting={campaignSubmitting}
+          />
+        </section>
+      ) : null}
+
+      <section className="space-y-6">
+        {campaigns.map((campaign) => {
+          const placements = campaign.placements.map((placement) => formatPlacementLabel(placement)).filter(Boolean);
+          return (
             <article
               key={campaign.id}
-              className="rounded-3xl border border-primary/15 bg-white/90 p-6 shadow-sm backdrop-blur transition hover:border-primary/40"
+              className="rounded-3xl border border-slate-200 bg-white/80 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">{campaign.objective ?? 'Campaign objective'}</p>
-                  <h3 className="mt-2 text-xl font-semibold text-slate-950">{campaign.name ?? 'Untitled campaign'}</h3>
-                  <p className="mt-1 text-xs text-slate-500">{campaign.placement.scheduleLabel ?? 'Schedule syncing'}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Chip>{campaign.status === 'active' ? 'Live' : campaign.status ?? 'Draft'}</Chip>
-                  {campaign.metrics.roas ? <Chip>{campaign.metrics.roas} ROAS</Chip> : null}
-                </div>
-              </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lifetime spend</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.spend.label ?? '—'}</p>
-                  <p className="mt-1 text-xs text-slate-500">{campaign.dailyBudget.label ?? 'Budget syncing'}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Click health</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.ctr ?? '—'}</p>
+                  <p className="dashboard-kicker text-primary">{campaign.objective ?? 'Campaign objective'}</p>
+                  <h3 className="text-xl font-semibold text-slate-950">{campaign.name}</h3>
                   <p className="mt-1 text-xs text-slate-500">
-                    {(campaign.cpc ?? '—')} · {(campaign.cpa ?? '—')}
+                    {campaign.startAt ? new Date(campaign.startAt).toLocaleDateString() : 'Schedule pending'} —{' '}
+                    {campaign.endAt ? new Date(campaign.endAt).toLocaleDateString() : 'No end date'}
                   </p>
                 </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 font-semibold text-primary">
+                    {campaign.status}
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+                    {currencyFormatter.format(Number(campaign.dailyBudgetCents ?? 0) / 100)} / day
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-600">
+                    Lifetime {currencyFormatter.format(Number(campaign.totalSpendCents ?? 0) / 100)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-4">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Volume</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">
-                    {formatInteger(campaign.metrics.impressions)} impressions
+                    {formatCompactNumber(campaign.metrics?.impressions)} impressions
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {formatInteger(campaign.metrics.clicks)} clicks · {formatInteger(campaign.metrics.conversions)} conversions
+                    {formatCompactNumber(campaign.metrics?.clicks)} clicks ·{' '}
+                    {formatCompactNumber(campaign.metrics?.conversions)} conversions
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Efficiency</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {campaign.metrics?.ctr ? `${campaign.metrics.ctr}% CTR` : 'CTR syncing'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {campaign.metrics?.cpc ?? 'CPC syncing'} · {campaign.metrics?.cpa ?? 'CPA syncing'}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Revenue</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-900">{campaign.metrics.revenueFormatted}</p>
-                  <p className="mt-1 text-xs text-slate-500">Synced {formatDateLabel(campaign.metrics.lastSyncedAt)}</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {currencyFormatter.format(Number(campaign.metrics?.revenueCents ?? 0) / 100)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">ROAS {campaign.metrics?.roas ?? 'Syncing'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Last synced</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {campaign.metrics?.lastSyncedAt
+                      ? new Date(campaign.metrics.lastSyncedAt).toLocaleString()
+                      : campaign.lastSyncedAt
+                        ? new Date(campaign.lastSyncedAt).toLocaleString()
+                        : 'Awaiting sync'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">{campaign.placements.length} placements tracked</p>
                 </div>
               </div>
-              <div className="mt-5 flex flex-wrap gap-2">
-                {campaign.placement.tags.map((tag) => (
-                  <Chip key={`${campaign.id}-${tag}`}>{tag}</Chip>
-                ))}
-              </div>
+
               <div className="mt-5 grid gap-4 lg:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-white/60 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Targeting</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {campaign.targeting.keywords.slice(0, 4).map((keyword) => (
-                      <span key={`${campaign.id}-kw-${keyword}`} className="rounded-full bg-primary/10 px-3 py-1 text-xs text-primary">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Targeting focus</p>
+                  <p className="mt-2 text-sm text-slate-700">{campaign.targeting?.summary || 'Add a targeting narrative.'}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                    {(campaign.targeting?.keywords ?? []).map((keyword) => (
+                      <span key={`${campaign.id}-kw-${keyword}`} className="rounded-full bg-primary/10 px-3 py-1 font-semibold text-primary">
                         {keyword}
                       </span>
                     ))}
@@ -1092,10 +1611,6 @@ export default function EdulureAds() {
                   </a>
                 </div>
               </div>
-            </article>
-          ))}
-        </div>
-      </section>
 
       <div className="grid gap-6 lg:grid-cols-5">
         <section className="dashboard-section lg:col-span-3">
@@ -1187,10 +1702,6 @@ export default function EdulureAds() {
                 ))}
                 {tags.length === 0 && <span className="text-slate-400">No tags available</span>}
               </div>
-            </div>
-          </div>
-        </section>
-      </div>
 
       <section className="dashboard-section">
         <h2 className="text-lg font-semibold text-slate-900">Placement board</h2>
@@ -1220,9 +1731,9 @@ export default function EdulureAds() {
                   <span className="text-[11px] text-slate-400">No placement tags</span>
                 )}
               </div>
-            </div>
-          ))}
-        </div>
+            </article>
+          );
+        })}
       </section>
     </div>
   );

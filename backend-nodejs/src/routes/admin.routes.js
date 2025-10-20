@@ -14,6 +14,17 @@ import auth from '../middleware/auth.js';
 
 const router = Router();
 
+router.get('/settings/profile', auth('admin'), AdminSettingsController.getAdminProfileSettings);
+router.put('/settings/profile', auth('admin'), AdminSettingsController.updateAdminProfileSettings);
+router.get('/settings/payments', auth('admin'), AdminSettingsController.getPaymentSettings);
+router.put('/settings/payments', auth('admin'), AdminSettingsController.updatePaymentSettings);
+router.get('/settings/emails', auth('admin'), AdminSettingsController.getEmailSettings);
+router.put('/settings/emails', auth('admin'), AdminSettingsController.updateEmailSettings);
+router.get('/settings/security', auth('admin'), AdminSettingsController.getSecuritySettings);
+router.put('/settings/security', auth('admin'), AdminSettingsController.updateSecuritySettings);
+router.get('/settings/finance', auth('admin'), AdminSettingsController.getFinanceSettings);
+router.put('/settings/finance', auth('admin'), AdminSettingsController.updateFinanceSettings);
+
 router.get('/settings/appearance', auth('admin'), AdminSettingsController.getAppearanceSettings);
 router.put('/settings/appearance', auth('admin'), AdminSettingsController.updateAppearanceSettings);
 router.get('/settings/preferences', auth('admin'), AdminSettingsController.getPreferenceSettings);

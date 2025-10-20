@@ -10,6 +10,11 @@ import { useRuntimeConfig } from '../context/RuntimeConfigContext.jsx';
 import AdminApprovalsSection from './admin/sections/AdminApprovalsSection.jsx';
 import AdminComplianceSection from './admin/sections/AdminComplianceSection.jsx';
 import AdminMonetizationSettingsSection from './admin/sections/AdminMonetizationSettingsSection.jsx';
+import AdminProfileSettingsSection from './admin/sections/AdminProfileSettingsSection.jsx';
+import AdminPaymentSettingsSection from './admin/sections/AdminPaymentSettingsSection.jsx';
+import AdminEmailSettingsSection from './admin/sections/AdminEmailSettingsSection.jsx';
+import AdminSecuritySettingsSection from './admin/sections/AdminSecuritySettingsSection.jsx';
+import AdminFinanceCommissionSection from './admin/sections/AdminFinanceCommissionSection.jsx';
 import AdminOperationsSection from './admin/sections/AdminOperationsSection.jsx';
 import AdminPolicyHubSection from './admin/sections/AdminPolicyHubSection.jsx';
 import AdminRevenueSection from './admin/sections/AdminRevenueSection.jsx';
@@ -42,6 +47,11 @@ const SECTION_NAVIGATION = Object.freeze([
   { id: 'revenue-management', label: 'Revenue Ops' },
   { id: 'ads-management', label: 'Ads' },
   { id: 'monetization', label: 'Monetization' },
+  { id: 'profile-settings', label: 'Admin profile' },
+  { id: 'payment-settings', label: 'Payments' },
+  { id: 'email-settings', label: 'Emails' },
+  { id: 'security-settings', label: '2FA' },
+  { id: 'finance-settings', label: 'Finance' },
   { id: 'communities', label: 'Communities' },
   { id: 'tools', label: 'Tools' },
   { id: 'operations', label: 'Operations' },
@@ -163,6 +173,11 @@ export default function Admin() {
   const topCommunities = adminData.revenue?.topCommunities ?? EMPTY_ARRAY;
 
   const monetizationSettings = adminData.settings?.monetization ?? null;
+  const adminProfileSettings = adminData.settings?.profile ?? null;
+  const paymentSettings = adminData.settings?.payments ?? null;
+  const emailSettings = adminData.settings?.emails ?? null;
+  const securitySettings = adminData.settings?.security ?? null;
+  const financeSettings = adminData.settings?.finance ?? null;
   const blog = adminData.blog ?? null;
 
   const operations = adminData.operations ?? EMPTY_OBJECT;
@@ -535,6 +550,41 @@ export default function Admin() {
               sectionId="monetization"
               settings={monetizationSettings}
               token={token}
+              onSettingsUpdated={refresh}
+            />
+
+            <AdminProfileSettingsSection
+              sectionId="profile-settings"
+              token={token}
+              settings={adminProfileSettings}
+              onSettingsUpdated={refresh}
+            />
+
+            <AdminPaymentSettingsSection
+              sectionId="payment-settings"
+              token={token}
+              settings={paymentSettings}
+              onSettingsUpdated={refresh}
+            />
+
+            <AdminEmailSettingsSection
+              sectionId="email-settings"
+              token={token}
+              settings={emailSettings}
+              onSettingsUpdated={refresh}
+            />
+
+            <AdminSecuritySettingsSection
+              sectionId="security-settings"
+              token={token}
+              settings={securitySettings}
+              onSettingsUpdated={refresh}
+            />
+
+            <AdminFinanceCommissionSection
+              sectionId="finance-settings"
+              token={token}
+              settings={financeSettings}
               onSettingsUpdated={refresh}
             />
 
