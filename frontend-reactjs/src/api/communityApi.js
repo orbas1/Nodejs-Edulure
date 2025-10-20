@@ -63,16 +63,6 @@ export async function fetchCommunityDetail(communityId, token) {
   return mapResponse(response);
 }
 
-export async function updateCommunity({ communityId, token, payload }) {
-  const response = await httpClient.put(`/communities/${communityId}`, payload, {
-    token,
-    cache: {
-      invalidateTags: [`community:${communityId}:detail`, 'communities:list']
-    }
-  });
-  return mapResponse(response);
-}
-
 export async function fetchCommunityFeed({
   communityId,
   token,
