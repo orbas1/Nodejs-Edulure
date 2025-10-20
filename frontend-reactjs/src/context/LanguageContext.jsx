@@ -231,6 +231,7 @@ const TRANSLATIONS = {
         ctaLearners: 'Start as a learner',
         ctaInstructors: 'Launch as an instructor',
         footer: 'Dual launchpads, one vibrant universe.'
+      },
       preview: {
         title: 'See what’s waiting inside the Edulure clubhouse',
         subtitle:
@@ -279,6 +280,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Smart recs rotate weekly',
             highlightThree: 'Brand-safe sharing links',
             imageAlt: 'Preview of Edulure resource library grid'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Tutor arcade',
         headline: 'Queue up your next breakthrough session',
@@ -320,6 +324,9 @@ const TRANSLATIONS = {
             0: 'Fill idle blocks with learners already primed for your craft.',
             1: 'Launch reusable session templates with one neon tap.',
             2: 'Earn spotlight boosts when five-star reviews roll in fast.'
+          }
+        }
+      },
       courses: {
         kicker: 'Courses adventure',
         title: 'Chart the shared courses adventure',
@@ -469,6 +476,9 @@ const TRANSLATIONS = {
             title: 'Opérations de croissance',
             learners: 'Débloquez badges, niveaux et surprises au fil de votre engagement.',
             instructors: 'Suivez tunnels, revenus et expérimentations avec des tableaux de bord dédiés aux learning ops.'
+          }
+        }
+      },
       preview: {
         title: 'Découvrez ce qui vous attend dans la maison Edulure',
         subtitle:
@@ -516,6 +526,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Recommandations dynamiques chaque semaine',
             highlightThree: 'Liens de partage sûrs pour la marque',
             imageAlt: 'Aperçu de la grille de la bibliothèque Edulure'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Arcade des tuteurs',
         headline: 'Alignez votre prochaine session décisive',
@@ -557,6 +570,9 @@ const TRANSLATIONS = {
             0: 'Remplissez vos créneaux libres avec des apprenant·e·s aligné·e·s sur votre expertise.',
             1: 'Déployez des modèles de session réutilisables en un tap néon.',
             2: 'Gagnez des boosts de visibilité quand les avis cinq étoiles s’enchaînent.'
+          }
+        }
+      },
       courses: {
         kicker: 'Parcours cours',
         title: "Cartographiez l'aventure des cours ensemble",
@@ -705,6 +721,9 @@ const TRANSLATIONS = {
             title: 'Operaciones de crecimiento',
             learners: 'Desbloquea insignias, niveles y sorpresas mientras sigues participando.',
             instructors: 'Controla embudos, ingresos y experimentos con tableros hechos para learning ops.'
+          }
+        }
+      },
       preview: {
         title: 'Descubre lo que te espera en la casa Edulure',
         subtitle:
@@ -752,6 +771,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Recomendaciones inteligentes que rotan',
             highlightThree: 'Enlaces seguros para la marca',
             imageAlt: 'Vista previa de la cuadrícula de biblioteca de Edulure'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Arcade de tutores',
         headline: 'Enfila tu próxima sesión decisiva',
@@ -793,6 +815,9 @@ const TRANSLATIONS = {
             0: 'Llena huecos libres con estudiantes alineados a tu expertise.',
             1: 'Lanza plantillas de sesión reutilizables con un toque neón.',
             2: 'Gana impulsos de visibilidad cuando llueven reseñas de cinco estrellas.'
+          }
+        }
+      },
       courses: {
         kicker: 'Travesía de cursos',
         title: 'Mapea la aventura de los cursos en conjunto',
@@ -941,6 +966,9 @@ const TRANSLATIONS = {
             title: 'Operações de crescimento',
             learners: 'Desbloqueie insígnias, níveis e surpresas conforme continua aparecendo.',
             instructors: 'Acompanhe funis, receita e experimentos com dashboards feitos para learning ops.'
+          }
+        }
+      },
       preview: {
         title: 'Veja o que espera por você na casa Edulure',
         subtitle:
@@ -988,6 +1016,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Recomendações inteligentes que giram',
             highlightThree: 'Links de compartilhamento seguros para a marca',
             imageAlt: 'Prévia da grade da biblioteca Edulure'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Arcade de tutores',
         headline: 'Fila sua próxima sessão decisiva',
@@ -1029,6 +1060,9 @@ const TRANSLATIONS = {
             0: 'Preencha janelas livres com aprendizes prontos para o seu ofício.',
             1: 'Dispare modelos reutilizáveis de sessão com um toque neon.',
             2: 'Ganhe boosts de destaque quando as avaliações cinco estrelas chegarem rápido.'
+          }
+        }
+      },
       courses: {
         kicker: 'Jornada de cursos',
         title: 'Mapeie a jornada dos cursos em conjunto',
@@ -1177,6 +1211,9 @@ const TRANSLATIONS = {
             title: 'Ops di crescita',
             learners: 'Sblocca badge, livelli e sorprese continuando a farti vedere.',
             instructors: 'Monitora funnel, entrate ed esperimenti con dashboard pensate per le learning ops.'
+          }
+        }
+      },
       preview: {
         title: 'Scopri cosa ti aspetta nella casa Edulure',
         subtitle:
@@ -1224,6 +1261,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Raccomandazioni smart che ruotano',
             highlightThree: 'Link di condivisione brand-safe',
             imageAlt: 'Anteprima della griglia biblioteca Edulure'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Arcade tutor',
         headline: 'Metti in coda la tua prossima sessione di svolta',
@@ -1265,6 +1305,9 @@ const TRANSLATIONS = {
             0: 'Riempi gli slot liberi con learner già allineati al tuo mestiere.',
             1: 'Lancia template riutilizzabili di sessione con un tap neon.',
             2: 'Ottieni boost di visibilità quando arrivano recensioni a cinque stelle a ritmo serrato.'
+          }
+        }
+      },
       courses: {
         kicker: 'Avventura dei corsi',
         title: "Mappa l'avventura dei corsi insieme",
@@ -1413,6 +1456,9 @@ const TRANSLATIONS = {
             title: 'Operacje wzrostu',
             learners: 'Odblokowuj odznaki, poziomy i niespodzianki, gdy konsekwentnie się pojawiasz.',
             instructors: 'Śledź lejki, przychody i eksperymenty na pulpitach zaprojektowanych dla learning ops.'
+          }
+        }
+      },
       preview: {
         title: 'Zobacz, co czeka w domu Edulure',
         subtitle:
@@ -1460,6 +1506,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Sprytne rekomendacje rotują co tydzień',
             highlightThree: 'Bezpieczne dla marki linki do udostępniania',
             imageAlt: 'Podgląd siatki biblioteki Edulure'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Arcade tutorów',
         headline: 'Ustaw w kolejce swoją następną przełomową sesję',
@@ -1501,6 +1550,9 @@ const TRANSLATIONS = {
             0: 'Wypełniaj wolne okna uczniami gotowymi na twoją specjalizację.',
             1: 'Odpalaj wielorazowe szablony sesji jednym neonowym kliknięciem.',
             2: 'Zgarniaj boosty widoczności, gdy spływają szybkie pięciogwiazdkowe oceny.'
+          }
+        }
+      },
       courses: {
         kicker: 'Podróż kursowa',
         title: 'Zmapuj wspólną podróż kursu',
@@ -1649,6 +1701,9 @@ const TRANSLATIONS = {
             title: 'ग्रोथ ऑप्स',
             learners: 'लगातार भाग लेते हुए बैज, लेवल और सरप्राइज़ अनलॉक करें।',
             instructors: 'लर्निंग ऑप्स के लिए बनाए डैशबोर्ड पर फ़नल, राजस्व और प्रयोगों को ट्रैक करें।'
+          }
+        }
+      },
       preview: {
         title: 'देखें एड्यूलर घर के अंदर क्या इंतज़ार कर रहा है',
         subtitle:
@@ -1696,6 +1751,9 @@ const TRANSLATIONS = {
             highlightTwo: 'हर हफ्ते घूमती स्मार्ट सिफारिशें',
             highlightThree: 'ब्रांड-सुरक्षित शेयर लिंक',
             imageAlt: 'एड्यूलर संसाधन लाइब्रेरी ग्रिड का पूर्वावलोकन'
+          }
+        }
+      },
       tutoring: {
         kicker: 'ट्यूटर आर्केड',
         headline: 'अपना अगला ब्रेकथ्रू सत्र कतार में लगाएँ',
@@ -1737,6 +1795,9 @@ const TRANSLATIONS = {
             0: 'अपने कौशल के अनुरूप तैयार शिक्षार्थियों से खाली स्लॉट भरें।',
             1: 'एक नीयॉन टैप से पुन: प्रयोज्य सत्र टेम्पलेट लॉन्च करें।',
             2: 'तेज़ पाँच-सितारा समीक्षाओं पर स्पॉटलाइट बूस्ट कमाएँ।'
+          }
+        }
+      },
       courses: {
         kicker: 'कोर्स यात्रा',
         title: 'कोर्स यात्रा को साथ मिलकर मानचित्रित करें',
@@ -1885,6 +1946,9 @@ const TRANSLATIONS = {
             title: 'عمليات النمو',
             learners: 'افتح الشارات والمستويات والمفاجآت كلما واصلت المشاركة.',
             instructors: 'تتبع القمع والإيرادات والتجارب عبر لوحات معلومات مصممة لعمليات التعلّم.'
+          }
+        }
+      },
       preview: {
         title: 'اكتشف ما ينتظرك داخل بيت إدولور',
         subtitle:
@@ -1932,6 +1996,9 @@ const TRANSLATIONS = {
             highlightTwo: 'توصيات ذكية تتغير أسبوعياً',
             highlightThree: 'روابط مشاركة آمنة للعلامة',
             imageAlt: 'معاينة لشبكة مكتبة إدولور'
+          }
+        }
+      },
       tutoring: {
         kicker: 'أركيد المدرّسين',
         headline: 'أدرج جلستك الحاسمة التالية في الطابور',
@@ -1973,6 +2040,9 @@ const TRANSLATIONS = {
             0: 'املأ الفترات الفارغة بمتعلمين جاهزين لمجالك.',
             1: 'أطلق قوالب جلسات قابلة لإعادة الاستخدام بلمسة نيون واحدة.',
             2: 'احصل على دفعات spotlight عند تدفق تقييمات الخمس نجوم بسرعة.'
+          }
+        }
+      },
       courses: {
         kicker: 'رحلة الدورات',
         title: 'ارسموا معًا رحلة الدورات المتكاملة',
@@ -2169,6 +2239,9 @@ const TRANSLATIONS = {
             title: 'Growth Ops',
             learners: 'Schalte Abzeichen, Levels und Überraschungen frei, wenn du dranbleibst.',
             instructors: 'Verfolge Funnels, Umsatz und Experimente mit Dashboards für Learning Ops.'
+          }
+        }
+      },
       preview: {
         title: 'Entdecke, was dich im Edulure Clubhouse erwartet',
         subtitle:
@@ -2216,6 +2289,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Clevere Empfehlungen rotieren wöchentlich',
             highlightThree: 'Markensichere Freigabelinks',
             imageAlt: 'Vorschau des Edulure-Bibliotheksrasters'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Tutor-Arcade',
         headline: 'Stell deine nächste Durchbruch-Session in die Queue',
@@ -2257,6 +2333,9 @@ const TRANSLATIONS = {
             0: 'Fülle freie Slots mit Lernenden, die zu deinem Skillset passen.',
             1: 'Starte wiederverwendbare Session-Templates mit einem Neon-Tap.',
             2: 'Sichere dir Spotlight-Boosts, wenn Fünf-Sterne-Reviews im Takt eintrudeln.'
+          }
+        }
+      },
       courses: {
         kicker: 'Kursreise',
         title: 'Gemeinsam die Kursreise kartieren',
@@ -2320,6 +2399,7 @@ const TRANSLATIONS = {
         }
       }
     },
+  },
   ru: {
     navigation: {
       login: 'Войти',
@@ -2404,6 +2484,9 @@ const TRANSLATIONS = {
             title: 'Операции роста',
             learners: 'Открывайте бейджи, уровни и сюрпризы, продолжая появляться.',
             instructors: 'Отслеживайте воронки, доходы и эксперименты на дашбордах, созданных для учебных операций.'
+          }
+        }
+      },
       preview: {
         title: 'Посмотрите, что ждёт внутри клуба Edulure',
         subtitle:
@@ -2451,6 +2534,9 @@ const TRANSLATIONS = {
             highlightTwo: 'Умные рекомендации обновляются еженедельно',
             highlightThree: 'Безопасные для бренда ссылки на шаринг',
             imageAlt: 'Предпросмотр сетки библиотеки Edulure'
+          }
+        }
+      },
       tutoring: {
         kicker: 'Аркада тьюторов',
         headline: 'Поставьте в очередь следующую прорывную сессию',
@@ -2492,6 +2578,9 @@ const TRANSLATIONS = {
             0: 'Заполняйте свободные окна учениками, готовыми к вашему мастерству.',
             1: 'Запускайте повторно используемые шаблоны сессий одним неоновым кликом.',
             2: 'Получайте бусты видимости, когда стремительно приходят пятёрки.'
+          }
+        }
+      },
       courses: {
         kicker: 'Путешествие по курсам',
         title: 'Спланируйте совместное путешествие по курсам',
@@ -2555,6 +2644,7 @@ const TRANSLATIONS = {
         }
       }
     }
+  }
 };
 
 const LanguageContext = createContext({
