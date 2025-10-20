@@ -224,33 +224,33 @@ export async function updateFinanceSettings({ token, payload, signal } = {}) {
   });
 }
 
-export async function createFinanceBudget({ token, payload, signal } = {}) {
+export async function createFinancePurchase({ token, payload, signal } = {}) {
   ensureToken(token);
-  return httpClient.post('/dashboard/learner/settings/finance/budgets', payload ?? {}, {
+  return httpClient.post('/dashboard/learner/settings/finance/purchases', payload ?? {}, {
     token,
     signal,
     invalidateTags: [`dashboard:me:${token}`]
   });
 }
 
-export async function updateFinanceBudget({ token, budgetId, payload, signal } = {}) {
+export async function updateFinancePurchase({ token, purchaseId, payload, signal } = {}) {
   ensureToken(token);
-  if (!budgetId) {
-    throw new Error('A finance budget identifier is required to update the record');
+  if (!purchaseId) {
+    throw new Error('A finance purchase identifier is required to update the record');
   }
-  return httpClient.patch(`/dashboard/learner/settings/finance/budgets/${budgetId}`, payload ?? {}, {
+  return httpClient.patch(`/dashboard/learner/settings/finance/purchases/${purchaseId}`, payload ?? {}, {
     token,
     signal,
     invalidateTags: [`dashboard:me:${token}`]
   });
 }
 
-export async function deleteFinanceBudget({ token, budgetId, signal } = {}) {
+export async function deleteFinancePurchase({ token, purchaseId, signal } = {}) {
   ensureToken(token);
-  if (!budgetId) {
-    throw new Error('A finance budget identifier is required to remove the record');
+  if (!purchaseId) {
+    throw new Error('A finance purchase identifier is required to remove the record');
   }
-  return httpClient.delete(`/dashboard/learner/settings/finance/budgets/${budgetId}`, {
+  return httpClient.delete(`/dashboard/learner/settings/finance/purchases/${purchaseId}`, {
     token,
     signal,
     invalidateTags: [`dashboard:me:${token}`]

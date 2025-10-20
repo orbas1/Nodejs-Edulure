@@ -8,9 +8,9 @@ import {
   fetchSystemPreferences,
   updateFinanceSettings,
   updateSystemPreferences,
-  createFinanceBudget,
-  updateFinanceBudget,
-  deleteFinanceBudget
+  createFinancePurchase,
+  updateFinancePurchase,
+  deleteFinancePurchase
 } from '../../api/learnerDashboardApi.js';
 
 const SUPPORTED_LANGUAGES = [
@@ -32,12 +32,29 @@ const SUPPORTED_TIMEZONES = [
   'Australia/Sydney'
 ];
 
-const BUDGET_PERIODS = [
-  { value: 'monthly', label: 'Monthly' },
-  { value: 'quarterly', label: 'Quarterly' },
-  { value: 'annual', label: 'Annual' },
-  { value: 'one-time', label: 'One-off' }
+const PURCHASE_STATUSES = [
+  { value: 'paid', label: 'Paid' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'refunded', label: 'Refunded' },
+  { value: 'cancelled', label: 'Cancelled' }
 ];
+
+const STATUS_BADGE_STYLES = {
+  paid: 'bg-emerald-100 text-emerald-700',
+  pending: 'bg-amber-100 text-amber-700',
+  refunded: 'bg-sky-100 text-sky-700',
+  cancelled: 'bg-rose-100 text-rose-700'
+};
+
+const SUBSCRIPTION_STATUS_STYLES = {
+  active: 'bg-emerald-100 text-emerald-700',
+  trialing: 'bg-sky-100 text-sky-700',
+  incomplete: 'bg-amber-100 text-amber-700',
+  incomplete_expired: 'bg-rose-100 text-rose-700',
+  past_due: 'bg-rose-100 text-rose-700',
+  cancelled: 'bg-slate-200 text-slate-600',
+  canceled: 'bg-slate-200 text-slate-600'
+};
 
 const INTERFACE_DENSITIES = [
   { value: 'comfortable', label: 'Comfortable' },
@@ -82,15 +99,15 @@ const DEFAULT_FINANCE_FORM = {
   }
 };
 
-const DEFAULT_BUDGET_FORM = {
+const DEFAULT_PURCHASE_FORM = {
   id: null,
-  name: '',
+  reference: '',
+  description: '',
   amount: '',
   currency: 'USD',
-  period: 'monthly',
-  alertsEnabled: true,
-  alertThresholdPercent: 80,
-  metadataCategory: ''
+  status: 'paid',
+  purchasedAt: '',
+  receiptUrl: ''
 };
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
@@ -100,7 +117,7 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 2
 });
 
-function formatBudgetAmount(amountCents, currency = 'USD') {
+function formatCurrencyAmount(amountCents, currency = 'USD') {
   try {
     const formatter = new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -114,6 +131,19 @@ function formatBudgetAmount(amountCents, currency = 'USD') {
   }
 }
 
+function toInputDateTime(value) {
+  if (!value) return '';
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return date.toISOString().slice(0, 16);
+  } catch (_error) {
+    return '';
+  }
+}
+
 export default function LearnerSettings() {
   const { isLearner, section: settings, loading, error, refresh } = useLearnerDashboardSection('settings');
   const { session } = useAuth();
@@ -121,9 +151,10 @@ export default function LearnerSettings() {
 
   const [systemForm, setSystemForm] = useState(DEFAULT_SYSTEM_FORM);
   const [financeForm, setFinanceForm] = useState(DEFAULT_FINANCE_FORM);
-  const [budgets, setBudgets] = useState([]);
-  const [budgetModalOpen, setBudgetModalOpen] = useState(false);
-  const [budgetForm, setBudgetForm] = useState(DEFAULT_BUDGET_FORM);
+  const [purchases, setPurchases] = useState([]);
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [purchaseModalOpen, setPurchaseModalOpen] = useState(false);
+  const [purchaseForm, setPurchaseForm] = useState(DEFAULT_PURCHASE_FORM);
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
 
@@ -154,7 +185,8 @@ export default function LearnerSettings() {
     normalisedFinance.taxId = settings.finance.profile?.taxId ?? '';
     normalisedFinance.reserveTarget = settings.finance.profile?.reserveTarget ?? 0;
     setFinanceForm(normalisedFinance);
-    setBudgets(Array.isArray(settings.finance.budgets) ? settings.finance.budgets : []);
+    setPurchases(Array.isArray(settings.finance.purchases) ? settings.finance.purchases : []);
+    setSubscriptions(Array.isArray(settings.finance.subscriptions) ? settings.finance.subscriptions : []);
   }, [settings?.system, settings?.finance]);
 
   useEffect(() => {
@@ -214,11 +246,11 @@ export default function LearnerSettings() {
     }));
   };
 
-  const handleBudgetFormChange = (event) => {
-    const { name, type, checked, value } = event.target;
-    setBudgetForm((previous) => ({
+  const handlePurchaseFormChange = (event) => {
+    const { name, value } = event.target;
+    setPurchaseForm((previous) => ({
       ...previous,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value
     }));
   };
 
@@ -243,7 +275,8 @@ export default function LearnerSettings() {
     const response = await fetchFinanceSettings({ token }).catch(() => null);
     if (response?.data) {
       const payload = response.data;
-      setBudgets(Array.isArray(payload.budgets) ? payload.budgets : []);
+      setPurchases(Array.isArray(payload.purchases) ? payload.purchases : []);
+      setSubscriptions(Array.isArray(payload.subscriptions) ? payload.subscriptions : []);
       setFinanceForm({
         ...DEFAULT_FINANCE_FORM,
         ...payload.profile,
@@ -342,88 +375,86 @@ export default function LearnerSettings() {
     }
   };
 
-  const openBudgetModal = (budget = null) => {
-    if (budget) {
-      setBudgetForm({
-        id: budget.id,
-        name: budget.name ?? '',
-        amount: budget.amountCents ? Math.round(Number(budget.amountCents) / 100) : '',
-        currency: budget.currency ?? 'USD',
-        period: budget.period ?? 'monthly',
-        alertsEnabled: Boolean(budget.alertsEnabled),
-        alertThresholdPercent: budget.alertThresholdPercent ?? 80,
-        metadataCategory: budget.metadata?.category ?? ''
+  const openPurchaseModal = (purchase = null) => {
+    if (purchase) {
+      setPurchaseForm({
+        id: purchase.id,
+        reference: purchase.reference ?? '',
+        description: purchase.description ?? '',
+        amount: purchase.amountCents ? Math.round(Number(purchase.amountCents) / 100) : '',
+        currency: purchase.currency ?? 'USD',
+        status: purchase.status ?? 'paid',
+        purchasedAt: toInputDateTime(purchase.purchasedAt),
+        receiptUrl: purchase.metadata?.receiptUrl ?? purchase.metadata?.invoiceUrl ?? ''
       });
     } else {
-      setBudgetForm(DEFAULT_BUDGET_FORM);
+      setPurchaseForm(DEFAULT_PURCHASE_FORM);
     }
-    setBudgetModalOpen(true);
+    setPurchaseModalOpen(true);
   };
 
-  const closeBudgetModal = () => {
-    setBudgetModalOpen(false);
-    setBudgetForm(DEFAULT_BUDGET_FORM);
+  const closePurchaseModal = () => {
+    setPurchaseModalOpen(false);
+    setPurchaseForm(DEFAULT_PURCHASE_FORM);
   };
 
-  const handleBudgetSubmit = async (event) => {
+  const handlePurchaseSubmit = async (event) => {
     event.preventDefault();
     if (!token) {
-      setStatusMessage({ type: 'error', message: 'Sign in again to manage budgets.' });
+      setStatusMessage({ type: 'error', message: 'Sign in again to manage purchases.' });
       return;
     }
     try {
       const payload = {
-        name: budgetForm.name,
-        amount: Number(budgetForm.amount ?? 0),
-        currency: budgetForm.currency,
-        period: budgetForm.period,
-        alertsEnabled: budgetForm.alertsEnabled,
-        alertThresholdPercent: Number(budgetForm.alertThresholdPercent ?? 80),
-        metadata: budgetForm.metadataCategory
-          ? { category: budgetForm.metadataCategory }
-          : undefined
+        reference: purchaseForm.reference,
+        description: purchaseForm.description,
+        amount: Number(purchaseForm.amount ?? 0),
+        currency: purchaseForm.currency,
+        status: purchaseForm.status,
+        purchasedAt: purchaseForm.purchasedAt ? new Date(purchaseForm.purchasedAt).toISOString() : undefined,
+        metadata: purchaseForm.receiptUrl ? { receiptUrl: purchaseForm.receiptUrl } : undefined
       };
-      setPendingAction('budget');
-      const response = budgetForm.id
-        ? await updateFinanceBudget({ token, budgetId: budgetForm.id, payload })
-        : await createFinanceBudget({ token, payload });
-      const updatedBudget = response?.data ?? response;
-      setBudgets((previous) => {
+      setPendingAction('purchase');
+      const response = purchaseForm.id
+        ? await updateFinancePurchase({ token, purchaseId: purchaseForm.id, payload })
+        : await createFinancePurchase({ token, payload });
+      const updatedPurchase = response?.data ?? response;
+      setPurchases((previous) => {
         const list = Array.isArray(previous) ? [...previous] : [];
-        if (budgetForm.id) {
-          return list.map((entry) => (entry.id === budgetForm.id ? updatedBudget : entry));
+        if (purchaseForm.id) {
+          return list.map((entry) => (entry.id === purchaseForm.id ? updatedPurchase : entry));
         }
-        return [updatedBudget, ...list];
+        return [updatedPurchase, ...list];
       });
-      closeBudgetModal();
+      closePurchaseModal();
       setStatusMessage({
         type: 'success',
-        message: budgetForm.id ? 'Budget updated.' : 'Budget created.'
+        message: purchaseForm.id ? 'Purchase updated.' : 'Purchase recorded.'
       });
       refresh?.();
-    } catch (budgetError) {
+    } catch (purchaseError) {
       setStatusMessage({
         type: 'error',
         message:
-          budgetError instanceof Error
-            ? budgetError.message
-            : 'We could not save your budget. Check the details and try again.'
+          purchaseError instanceof Error
+            ? purchaseError.message
+            : 'We could not save your purchase. Check the details and try again.'
       });
     } finally {
       setPendingAction(null);
     }
   };
 
-  const handleBudgetDelete = async (budgetId) => {
+  const handlePurchaseDelete = async (purchaseId) => {
     if (!token) {
-      setStatusMessage({ type: 'error', message: 'Sign in again to manage budgets.' });
+      setStatusMessage({ type: 'error', message: 'Sign in again to manage purchases.' });
       return;
     }
     try {
-      setPendingAction(`delete-budget-${budgetId}`);
-      await deleteFinanceBudget({ token, budgetId });
-      setBudgets((previous) => previous.filter((budget) => budget.id !== budgetId));
-      setStatusMessage({ type: 'success', message: 'Budget removed.' });
+      setPendingAction(`delete-purchase-${purchaseId}`);
+      await deleteFinancePurchase({ token, purchaseId });
+      setPurchases((previous) => previous.filter((purchase) => purchase.id !== purchaseId));
+      setStatusMessage({ type: 'success', message: 'Purchase removed.' });
       refresh?.();
     } catch (removeError) {
       setStatusMessage({
@@ -431,7 +462,7 @@ export default function LearnerSettings() {
         message:
           removeError instanceof Error
             ? removeError.message
-            : 'We were unable to remove that budget. Please retry.'
+            : 'We were unable to remove that purchase. Please retry.'
       });
     } finally {
       setPendingAction(null);
@@ -702,8 +733,8 @@ export default function LearnerSettings() {
               Control autopay, reserve strategy, and finance alerts. Keep your tuition and reimbursements on track.
             </p>
           </div>
-          <button type="button" className="dashboard-pill" onClick={() => openBudgetModal()}>
-            Add budget
+          <button type="button" className="dashboard-pill" onClick={() => openPurchaseModal()}>
+            Log purchase
           </button>
         </div>
 
@@ -798,7 +829,7 @@ export default function LearnerSettings() {
             <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
               <div>
                 <p className="font-semibold text-slate-900">Email alerts</p>
-                <p className="text-xs text-slate-500">Notify when budgets approach thresholds.</p>
+                <p className="text-xs text-slate-500">Notify when purchases clear or invoices are overdue.</p>
               </div>
               <input
                 type="checkbox"
@@ -862,67 +893,148 @@ export default function LearnerSettings() {
           </div>
 
           <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/70 p-6">
-            <h3 className="text-base font-semibold text-slate-900">Budget allocations</h3>
+            <h3 className="text-base font-semibold text-slate-900">Purchase history</h3>
             <p className="text-sm text-slate-600">
-              Track tuition, mentorship, and operations budgets. Alerts trigger when spend crosses thresholds.
+              Review learning purchases, reimbursements, and shared receipts to maintain audit-ready records.
             </p>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-4 py-3 text-left">Budget</th>
+                    <th className="px-4 py-3 text-left">Reference</th>
                     <th className="px-4 py-3 text-left">Amount</th>
-                    <th className="px-4 py-3 text-left">Period</th>
-                    <th className="px-4 py-3 text-left">Alerts</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Purchased on</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {budgets.length ? (
-                    budgets.map((budget) => (
-                      <tr key={budget.id} className="hover:bg-primary/5">
-                        <td className="px-4 py-3 font-medium text-slate-900">{budget.name}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {formatBudgetAmount(budget.amountCents, budget.currency)}
-                        </td>
-                        <td className="px-4 py-3 text-slate-600">{budget.period}</td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {budget.alertsEnabled
-                            ? `Alerts at ${budget.alertThresholdPercent}%`
-                            : 'Alerts off'}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              className="dashboard-pill px-3 py-1"
-                              onClick={() => openBudgetModal(budget)}
-                              disabled={disableActions}
+                  {purchases.length ? (
+                    purchases.map((purchase) => {
+                      const receiptUrl = purchase.metadata?.receiptUrl ?? purchase.metadata?.invoiceUrl ?? null;
+                      const statusStyle = STATUS_BADGE_STYLES[purchase.status] ?? 'bg-slate-200 text-slate-600';
+                      return (
+                        <tr key={purchase.id} className="hover:bg-primary/5">
+                          <td className="px-4 py-3 align-top">
+                            <div className="font-medium text-slate-900">{purchase.reference}</div>
+                            <div className="text-xs text-slate-500">{purchase.description}</div>
+                            {receiptUrl ? (
+                              <a
+                                href={receiptUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-1 inline-flex text-xs font-medium text-primary hover:underline"
+                              >
+                                View receipt
+                              </a>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{formatCurrencyAmount(purchase.amountCents, purchase.currency)}</td>
+                          <td className="px-4 py-3 text-slate-600">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle}`}
                             >
-                              Edit
-                            </button>
-                            <button
-                              type="button"
-                              className="dashboard-pill px-3 py-1 text-rose-600"
-                              onClick={() => handleBudgetDelete(budget.id)}
-                              disabled={disableActions}
-                            >
-                              {pendingAction === `delete-budget-${budget.id}` ? 'Removing…' : 'Delete'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {(purchase.status ?? 'pending').replace(/_/g, ' ')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{purchase.purchasedAtLabel ?? 'Pending confirmation'}</td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                className="dashboard-pill px-3 py-1"
+                                onClick={() => openPurchaseModal(purchase)}
+                                disabled={disableActions}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="dashboard-pill px-3 py-1 text-rose-600"
+                                onClick={() => handlePurchaseDelete(purchase.id)}
+                                disabled={disableActions}
+                              >
+                                {pendingAction === `delete-purchase-${purchase.id}` ? 'Removing…' : 'Delete'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan="5" className="px-4 py-6 text-center text-sm text-slate-500">
-                        No budgets configured yet. Create a budget to track learning investments.
+                        No purchases logged yet. Record a purchase to keep your finance workspace in sync.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white/70 p-6">
+            <h3 className="text-base font-semibold text-slate-900">Subscriptions</h3>
+            <p className="text-sm text-slate-600">
+              Monitor active community memberships, renewal cadences, and payment providers.
+            </p>
+            {subscriptions.length ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {subscriptions.map((subscription) => {
+                  const badgeStyle = SUBSCRIPTION_STATUS_STYLES[subscription.status] ?? 'bg-slate-200 text-slate-600';
+                  const communityHref = subscription.community?.slug
+                    ? `/communities/${subscription.community.slug}`
+                    : subscription.community?.id
+                      ? `/communities/${subscription.community.id}`
+                      : null;
+                  return (
+                    <article key={subscription.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {subscription.plan?.name ?? 'Subscription'}
+                          </p>
+                          {subscription.community ? (
+                            <p className="text-xs text-slate-500">{subscription.community.name}</p>
+                          ) : null}
+                        </div>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${badgeStyle}`}>
+                          {(subscription.status ?? 'active').replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                        <span>{subscription.plan?.priceFormatted ?? '—'}</span>
+                        <span className="hidden sm:inline">•</span>
+                        <span>{subscription.plan?.billingInterval ?? 'flexible cadence'}</span>
+                        {subscription.provider ? (
+                          <span className="hidden sm:inline">•</span>
+                        ) : null}
+                        {subscription.provider ? <span>{subscription.provider}</span> : null}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        Renewal {subscription.currentPeriodEndLabel ?? 'pending confirmation'}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs">
+                        {communityHref ? (
+                          <a href={communityHref} className="font-medium text-primary hover:underline">
+                            Visit community
+                          </a>
+                        ) : null}
+                        {subscription.cancelAtPeriodEnd ? (
+                          <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-700">
+                            Cancels at period end
+                          </span>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
+                No subscriptions yet. Join a community or bundle to see renewal details here.
+              </p>
+            )}
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
@@ -953,45 +1065,57 @@ export default function LearnerSettings() {
         </form>
       </section>
 
-      {budgetModalOpen ? (
+      {purchaseModalOpen ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-4">
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="dashboard-kicker text-primary-dark">Budget workspace</p>
+                <p className="dashboard-kicker text-primary-dark">Purchase workspace</p>
                 <h3 className="text-xl font-semibold text-slate-900">
-                  {budgetForm.id ? 'Edit budget allocation' : 'Create new budget'}
+                  {purchaseForm.id ? 'Edit purchase record' : 'Log new purchase'}
                 </h3>
                 <p className="mt-1 text-sm text-slate-600">
-                  Track per-program spend and trigger proactive alerts for overruns.
+                  Capture learner purchases, reimbursements, and attachments for finance reporting.
                 </p>
               </div>
-              <button type="button" className="dashboard-pill" onClick={closeBudgetModal}>
+              <button type="button" className="dashboard-pill" onClick={closePurchaseModal}>
                 Close
               </button>
             </div>
 
-            <form className="mt-6 space-y-4" onSubmit={handleBudgetSubmit}>
+            <form className="mt-6 space-y-4" onSubmit={handlePurchaseSubmit}>
               <label className="block text-sm font-medium text-slate-700">
-                Name
+                Reference
                 <input
-                  name="name"
-                  value={budgetForm.name}
-                  onChange={handleBudgetFormChange}
+                  name="reference"
+                  value={purchaseForm.reference}
+                  onChange={handlePurchaseFormChange}
                   required
                   className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  placeholder="Mentorship stipend"
+                  placeholder="Invoice #INV-2049"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Description
+                <textarea
+                  name="description"
+                  value={purchaseForm.description}
+                  onChange={handlePurchaseFormChange}
+                  required
+                  rows="3"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="January tutoring bundle"
                 />
               </label>
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="block text-sm font-medium text-slate-700">
-                  Amount (in currency)
+                  Amount
                   <input
                     type="number"
                     name="amount"
                     min="0"
-                    value={budgetForm.amount}
-                    onChange={handleBudgetFormChange}
+                    value={purchaseForm.amount}
+                    onChange={handlePurchaseFormChange}
                     required
                     className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
@@ -1000,68 +1124,56 @@ export default function LearnerSettings() {
                   Currency
                   <input
                     name="currency"
-                    value={budgetForm.currency}
-                    onChange={handleBudgetFormChange}
+                    value={purchaseForm.currency}
+                    onChange={handlePurchaseFormChange}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="block text-sm font-medium text-slate-700">
+                  Status
+                  <select
+                    name="status"
+                    value={purchaseForm.status}
+                    onChange={handlePurchaseFormChange}
+                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    {PURCHASE_STATUSES.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-sm font-medium text-slate-700">
+                  Purchased at
+                  <input
+                    type="datetime-local"
+                    name="purchasedAt"
+                    value={purchaseForm.purchasedAt}
+                    onChange={handlePurchaseFormChange}
                     className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
                 </label>
               </div>
               <label className="block text-sm font-medium text-slate-700">
-                Period
-                <select
-                  name="period"
-                  value={budgetForm.period}
-                  onChange={handleBudgetFormChange}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  {BUDGET_PERIODS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm">
-                <div>
-                  <p className="font-semibold text-slate-900">Enable alerts</p>
-                  <p className="text-xs text-slate-500">Notify when spending reaches the configured threshold.</p>
-                </div>
+                Receipt URL (optional)
                 <input
-                  type="checkbox"
-                  name="alertsEnabled"
-                  checked={budgetForm.alertsEnabled}
-                  onChange={handleBudgetFormChange}
-                  className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary"
-                />
-              </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Alert threshold (%)
-                <input
-                  type="number"
-                  name="alertThresholdPercent"
-                  min="1"
-                  max="100"
-                  value={budgetForm.alertThresholdPercent}
-                  onChange={handleBudgetFormChange}
+                  name="receiptUrl"
+                  value={purchaseForm.receiptUrl}
+                  onChange={handlePurchaseFormChange}
                   className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-              </label>
-              <label className="block text-sm font-medium text-slate-700">
-                Category (optional)
-                <input
-                  name="metadataCategory"
-                  value={budgetForm.metadataCategory}
-                  onChange={handleBudgetFormChange}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="https://receipts.example.com/inv-2049.pdf"
                 />
               </label>
 
               <div className="flex justify-end gap-3">
-                <button type="button" className="dashboard-pill" onClick={closeBudgetModal}>
+                <button type="button" className="dashboard-pill" onClick={closePurchaseModal}>
                   Cancel
                 </button>
                 <button type="submit" className="dashboard-primary-pill" disabled={disableActions}>
-                  {pendingAction === 'budget' ? 'Saving…' : budgetForm.id ? 'Save changes' : 'Create budget'}
+                  {pendingAction === 'purchase' ? 'Saving…' : purchaseForm.id ? 'Save changes' : 'Log purchase'}
                 </button>
               </div>
             </form>

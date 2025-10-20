@@ -39,16 +39,16 @@ router.get('/learner/settings/system', auth(), LearnerDashboardController.getSys
 router.put('/learner/settings/system', auth(), LearnerDashboardController.updateSystemPreferences);
 router.get('/learner/settings/finance', auth(), LearnerDashboardController.getFinanceSettings);
 router.put('/learner/settings/finance', auth(), LearnerDashboardController.updateFinanceSettings);
-router.post('/learner/settings/finance/budgets', auth(), LearnerDashboardController.createFinanceBudget);
+router.post('/learner/settings/finance/purchases', auth(), LearnerDashboardController.createFinancePurchase);
 router.patch(
-  '/learner/settings/finance/budgets/:budgetId',
+  '/learner/settings/finance/purchases/:purchaseId',
   auth(),
-  LearnerDashboardController.updateFinanceBudget
+  LearnerDashboardController.updateFinancePurchase
 );
 router.delete(
-  '/learner/settings/finance/budgets/:budgetId',
+  '/learner/settings/finance/purchases/:purchaseId',
   auth(),
-  LearnerDashboardController.deleteFinanceBudget
+  LearnerDashboardController.deleteFinancePurchase
 );
 router.post('/learner/growth/initiatives', auth(), LearnerDashboardController.createGrowthInitiative);
 router.patch(

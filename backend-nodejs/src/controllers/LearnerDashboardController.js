@@ -102,12 +102,12 @@ export default class LearnerDashboardController {
     }
   }
 
-  static async createFinanceBudget(req, res, next) {
+  static async createFinancePurchase(req, res, next) {
     try {
-      const budget = await LearnerDashboardService.createFinanceBudget(req.user.id, req.body ?? {});
+      const purchase = await LearnerDashboardService.createFinancePurchase(req.user.id, req.body ?? {});
       return success(res, {
-        data: budget,
-        message: 'Finance budget created',
+        data: purchase,
+        message: 'Purchase recorded',
         status: 201
       });
     } catch (error) {
@@ -115,26 +115,26 @@ export default class LearnerDashboardController {
     }
   }
 
-  static async updateFinanceBudget(req, res, next) {
+  static async updateFinancePurchase(req, res, next) {
     try {
-      const { budgetId } = req.params;
-      const budget = await LearnerDashboardService.updateFinanceBudget(req.user.id, budgetId, req.body ?? {});
+      const { purchaseId } = req.params;
+      const purchase = await LearnerDashboardService.updateFinancePurchase(req.user.id, purchaseId, req.body ?? {});
       return success(res, {
-        data: budget,
-        message: 'Finance budget updated'
+        data: purchase,
+        message: 'Purchase updated'
       });
     } catch (error) {
       return next(error);
     }
   }
 
-  static async deleteFinanceBudget(req, res, next) {
+  static async deleteFinancePurchase(req, res, next) {
     try {
-      const { budgetId } = req.params;
-      const acknowledgement = await LearnerDashboardService.deleteFinanceBudget(req.user.id, budgetId);
+      const { purchaseId } = req.params;
+      const acknowledgement = await LearnerDashboardService.deleteFinancePurchase(req.user.id, purchaseId);
       return success(res, {
         data: acknowledgement,
-        message: acknowledgement.message ?? 'Finance budget removed'
+        message: acknowledgement.message ?? 'Purchase removed'
       });
     } catch (error) {
       return next(error);

@@ -6,7 +6,10 @@ import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
 import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
-import LearnerFinanceBudgetModel from '../models/LearnerFinanceBudgetModel.js';
+import LearnerFinancePurchaseModel from '../models/LearnerFinancePurchaseModel.js';
+import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
+import CommunityModel from '../models/CommunityModel.js';
+import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -377,7 +380,8 @@ export function buildLearnerDashboard({
   libraryEntries = [],
   fieldServiceWorkspace = null,
   financialProfile = null,
-  financeBudgets = [],
+  financePurchases = [],
+  financeSubscriptions = [],
   systemPreferences = null
 } = {}) {
   const hasSignals =
@@ -811,37 +815,63 @@ export function buildLearnerDashboard({
             : { enabled: false, instructions: null }
       };
 
-      const financeBudgetsList = Array.isArray(financeBudgets)
-        ? financeBudgets.map((budget) => ({
-            id: budget.id ?? `budget-${crypto.randomUUID()}`,
-            name: budget.name ?? 'Learning budget',
-            amountCents: Number(budget.amountCents ?? 0),
-            amountFormatted: formatCurrency(budget.amountCents ?? 0, budget.currency ?? 'USD'),
-            currency: budget.currency ?? 'USD',
-            period: budget.period ?? 'monthly',
-            alertsEnabled: Boolean(budget.alertsEnabled ?? true),
-            alertThresholdPercent: Number(budget.alertThresholdPercent ?? 80),
-            metadata: budget.metadata ?? {},
-            createdAt: budget.createdAt ?? null,
-            updatedAt: budget.updatedAt ?? null
-          }))
-        : [];
+  const financePurchasesList = Array.isArray(financePurchases)
+    ? financePurchases.map((purchase) => ({
+        id: purchase.id ?? `purchase-${crypto.randomUUID()}`,
+        reference: purchase.reference ?? 'Purchase',
+        description: purchase.description ?? '',
+        amountCents: Number(purchase.amountCents ?? 0),
+        amountFormatted: formatCurrency(purchase.amountCents ?? 0, purchase.currency ?? 'USD'),
+        currency: purchase.currency ?? 'USD',
+        status: purchase.status ?? 'paid',
+        purchasedAt: purchase.purchasedAt ?? null,
+        purchasedAtLabel:
+          purchase.purchasedAtLabel ??
+          (purchase.purchasedAt
+            ? formatDateTime(purchase.purchasedAt, { dateStyle: 'medium', timeStyle: undefined })
+            : 'Pending confirmation'),
+        metadata: purchase.metadata ?? {},
+        createdAt: purchase.createdAt ?? null,
+        updatedAt: purchase.updatedAt ?? null
+      }))
+    : [];
 
-      const financeSettings = {
-        profile: {
-          currency: financialPreferences.currency,
-          taxId: financialPreferences.taxId,
-          invoiceDelivery: financialPreferences.invoiceDelivery,
-          payoutSchedule: financialPreferences.payoutSchedule,
-          autoPayEnabled: Boolean(financialPreferences.autoPay?.enabled),
-          reserveTarget: financialPreferences.reserveTarget,
-          reserveTargetCents: financialPreferences.reserveTargetCents
-        },
-        alerts: { ...DEFAULT_FINANCE_ALERTS, ...(financialPreferences.alerts ?? {}) },
-        budgets: financeBudgetsList,
-        documents: financialPreferences.documents ?? [],
-        reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
-      };
+  const financeSubscriptionsList = Array.isArray(financeSubscriptions)
+    ? financeSubscriptions.map((subscription) => ({
+        id: subscription.id ?? `subscription-${crypto.randomUUID()}`,
+        status: subscription.status ?? 'active',
+        provider: subscription.provider ?? null,
+        cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
+        currentPeriodEnd: subscription.currentPeriodEnd ?? null,
+        currentPeriodEndLabel:
+          subscription.currentPeriodEndLabel ??
+          (subscription.currentPeriodEnd
+            ? formatDateTime(subscription.currentPeriodEnd, { dateStyle: 'medium', timeStyle: undefined })
+            : null),
+        plan: subscription.plan ?? null,
+        community: subscription.community ?? null,
+        metadata: subscription.metadata ?? {},
+        createdAt: subscription.createdAt ?? null,
+        updatedAt: subscription.updatedAt ?? null
+      }))
+    : [];
+
+  const financeSettings = {
+    profile: {
+      currency: financialPreferences.currency,
+      taxId: financialPreferences.taxId,
+      invoiceDelivery: financialPreferences.invoiceDelivery,
+      payoutSchedule: financialPreferences.payoutSchedule,
+      autoPayEnabled: Boolean(financialPreferences.autoPay?.enabled),
+      reserveTarget: financialPreferences.reserveTarget,
+      reserveTargetCents: financialPreferences.reserveTargetCents
+    },
+    alerts: { ...DEFAULT_FINANCE_ALERTS, ...(financialPreferences.alerts ?? {}) },
+    purchases: financePurchasesList,
+    subscriptions: financeSubscriptionsList,
+    documents: financialPreferences.documents ?? [],
+    reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
+  };
 
       const systemSettings = {
         language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
@@ -3970,7 +4000,7 @@ export default class DashboardService {
         paymentMethodsRaw,
         billingContactsRaw,
         financialProfile,
-        financeBudgetsRaw,
+        financePurchasesRaw,
         systemPreferencesRaw,
         growthInitiativesRaw,
         affiliateChannelsRaw,
@@ -3980,7 +4010,7 @@ export default class DashboardService {
         LearnerPaymentMethodModel.listByUserId(user.id),
         LearnerBillingContactModel.listByUserId(user.id),
         LearnerFinancialProfileModel.findByUserId(user.id),
-        LearnerFinanceBudgetModel.listByUserId(user.id),
+        LearnerFinancePurchaseModel.listByUserId(user.id),
         LearnerSystemPreferenceModel.getForUser(user.id),
         LearnerGrowthInitiativeModel.listByUserId(user.id),
         LearnerAffiliateChannelModel.listByUserId(user.id),
@@ -4106,6 +4136,22 @@ export default class DashboardService {
         recommendations: followRecommendations
       };
 
+      const communitySummaryMap = new Map(communitySummaries.map((summary) => [summary.id, summary]));
+      const financeSubscriptionsDetailed = communitySubscriptions.map((subscription) => ({
+        ...subscription,
+        community: communitySummaryMap.get(subscription.communityId ?? null)
+          ? {
+              id: communitySummaryMap.get(subscription.communityId ?? null).id,
+              name: communitySummaryMap.get(subscription.communityId ?? null).name,
+              slug: communitySummaryMap.get(subscription.communityId ?? null).slug,
+              coverImageUrl: communitySummaryMap.get(subscription.communityId ?? null).coverImageUrl ?? null
+            }
+          : null,
+        currentPeriodEndLabel: subscription.currentPeriodEnd
+          ? formatDateTime(subscription.currentPeriodEnd, { dateStyle: 'medium', timeStyle: undefined })
+          : null
+      }));
+
       learnerSnapshot =
         buildLearnerDashboard({
           user,
@@ -4132,7 +4178,8 @@ export default class DashboardService {
           libraryEntries,
           fieldServiceWorkspace,
           financialProfile,
-          financeBudgets: financeBudgetsRaw,
+          financePurchases: financePurchasesRaw,
+          financeSubscriptions: financeSubscriptionsDetailed,
           systemPreferences: systemPreferencesRaw
         }) ?? undefined;
     } catch (error) {
@@ -4410,11 +4457,55 @@ export default class DashboardService {
         });
       }
 
-      const [financialProfile, financeBudgetsRaw, systemPreferencesRaw] = await Promise.all([
+      const [financialProfile, financePurchasesRaw, financeSubscriptionsRaw, systemPreferencesRaw] = await Promise.all([
         LearnerFinancialProfileModel.findByUserId(user.id),
-        LearnerFinanceBudgetModel.listByUserId(user.id),
+        LearnerFinancePurchaseModel.listByUserId(user.id),
+        CommunitySubscriptionModel.listByUser(user.id),
         LearnerSystemPreferenceModel.getForUser(user.id)
       ]);
+
+      const subscriptionCommunityIds = Array.from(
+        new Set(financeSubscriptionsRaw.map((subscription) => subscription.communityId).filter(Boolean))
+      );
+      const subscriptionTierIds = Array.from(
+        new Set(financeSubscriptionsRaw.map((subscription) => subscription.tierId).filter(Boolean))
+      );
+      const [subscriptionCommunities, subscriptionTiers] = await Promise.all([
+        Promise.all(subscriptionCommunityIds.map((communityId) => CommunityModel.findById(communityId))),
+        Promise.all(subscriptionTierIds.map((tierId) => CommunityPaywallTierModel.findById(tierId)))
+      ]);
+      const subscriptionCommunityMap = new Map(
+        subscriptionCommunities.filter(Boolean).map((community) => [community.id, community])
+      );
+      const subscriptionTierMap = new Map(
+        subscriptionTiers.filter(Boolean).map((tier) => [tier.id, tier])
+      );
+      const financeSubscriptionsDetailed = financeSubscriptionsRaw.map((subscription) => {
+        const community = subscriptionCommunityMap.get(subscription.communityId ?? null);
+        const tier = subscriptionTierMap.get(subscription.tierId ?? null);
+        return {
+          ...subscription,
+          community: community
+            ? {
+                id: community.id,
+                name: community.name,
+                slug: community.slug,
+                coverImageUrl: community.coverImageUrl ?? null
+              }
+            : null,
+          plan: tier
+            ? {
+                id: tier.id,
+                name: tier.name,
+                priceFormatted: formatCurrency(tier.priceCents, tier.currency),
+                billingInterval: tier.billingInterval
+              }
+            : subscription.plan ?? null,
+          currentPeriodEndLabel: subscription.currentPeriodEnd
+            ? formatDateTime(subscription.currentPeriodEnd, { dateStyle: 'medium', timeStyle: undefined })
+            : null
+        };
+      });
 
       learnerSnapshot =
         buildLearnerDashboard({
@@ -4436,7 +4527,8 @@ export default class DashboardService {
           libraryEntries,
           fieldServiceWorkspace: learnerFieldServiceWorkspace,
           financialProfile,
-          financeBudgets: financeBudgetsRaw,
+          financePurchases: financePurchasesRaw,
+          financeSubscriptions: financeSubscriptionsDetailed,
           systemPreferences: systemPreferencesRaw
         }) ?? undefined;
 

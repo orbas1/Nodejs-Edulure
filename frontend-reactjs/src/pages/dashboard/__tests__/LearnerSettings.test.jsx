@@ -8,9 +8,9 @@ const useLearnerDashboardSectionMock = vi.hoisted(() => vi.fn());
 const useAuthMock = vi.hoisted(() => vi.fn());
 const updateSystemPreferencesMock = vi.hoisted(() => vi.fn());
 const updateFinanceSettingsMock = vi.hoisted(() => vi.fn());
-const createFinanceBudgetMock = vi.hoisted(() => vi.fn());
-const updateFinanceBudgetMock = vi.hoisted(() => vi.fn());
-const deleteFinanceBudgetMock = vi.hoisted(() => vi.fn());
+const createFinancePurchaseMock = vi.hoisted(() => vi.fn());
+const updateFinancePurchaseMock = vi.hoisted(() => vi.fn());
+const deleteFinancePurchaseMock = vi.hoisted(() => vi.fn());
 const fetchSystemPreferencesMock = vi.hoisted(() => vi.fn());
 const fetchFinanceSettingsMock = vi.hoisted(() => vi.fn());
 
@@ -25,9 +25,9 @@ vi.mock('../../../context/AuthContext.jsx', () => ({
 vi.mock('../../../api/learnerDashboardApi.js', () => ({
   updateSystemPreferences: updateSystemPreferencesMock,
   updateFinanceSettings: updateFinanceSettingsMock,
-  createFinanceBudget: createFinanceBudgetMock,
-  updateFinanceBudget: updateFinanceBudgetMock,
-  deleteFinanceBudget: deleteFinanceBudgetMock,
+  createFinancePurchase: createFinancePurchaseMock,
+  updateFinancePurchase: updateFinancePurchaseMock,
+  deleteFinancePurchase: deleteFinancePurchaseMock,
   fetchSystemPreferences: fetchSystemPreferencesMock,
   fetchFinanceSettings: fetchFinanceSettingsMock
 }));
@@ -77,16 +77,27 @@ describe('<LearnerSettings />', () => {
             enabled: false,
             instructions: ''
           },
-          budgets: [
+          purchases: [
             {
-              id: 'budget-1',
-              name: 'Mentorship',
+              id: 'purchase-1',
+              reference: 'INV-100',
+              description: 'Mentorship bundle',
               amountCents: 120000,
               currency: 'USD',
-              period: 'monthly',
-              alertsEnabled: true,
-              alertThresholdPercent: 80,
-              metadata: {}
+              status: 'paid',
+              purchasedAtLabel: '1 Feb 2024',
+              metadata: { receiptUrl: 'https://example.com/receipt.pdf' }
+            }
+          ],
+          subscriptions: [
+            {
+              id: 'sub-1',
+              status: 'active',
+              cancelAtPeriodEnd: false,
+              currentPeriodEndLabel: '1 Mar 2024',
+              provider: 'stripe',
+              plan: { name: 'Founders Club', billingInterval: 'monthly', priceFormatted: '$99.00' },
+              community: { id: 1, name: 'Growth Guild', slug: 'growth-guild' }
             }
           ]
         }
@@ -95,16 +106,16 @@ describe('<LearnerSettings />', () => {
     useAuthMock.mockReturnValue({ session: { tokens: { accessToken: 'token-123' } } });
     updateSystemPreferencesMock.mockResolvedValue({ message: 'System preferences updated' });
     updateFinanceSettingsMock.mockResolvedValue({ message: 'Finance settings updated' });
-    createFinanceBudgetMock.mockResolvedValue({
+    createFinancePurchaseMock.mockResolvedValue({
       data: {
-        id: 'budget-2',
-        name: 'Scholarships',
+        id: 'purchase-2',
+        reference: 'INV-200',
+        description: 'Scholarships',
         amountCents: 250000,
         currency: 'USD',
-        period: 'monthly',
-        alertsEnabled: true,
-        alertThresholdPercent: 90,
-        metadata: {}
+        status: 'paid',
+        purchasedAtLabel: '2 Feb 2024',
+        metadata: { receiptUrl: 'https://example.com/receipt-200.pdf' }
       }
     });
     fetchSystemPreferencesMock.mockResolvedValue({
@@ -142,7 +153,8 @@ describe('<LearnerSettings />', () => {
           notifyThresholdPercent: 80
         },
         reimbursements: { enabled: false, instructions: '' },
-        budgets: []
+        purchases: [],
+        subscriptions: []
       }
     });
   });
@@ -171,20 +183,24 @@ describe('<LearnerSettings />', () => {
     });
   });
 
-  it('creates a new finance budget from the modal form', async () => {
+  it('creates a new finance purchase from the modal form', async () => {
     const user = userEvent.setup();
     render(<LearnerSettings />);
 
-    await user.click(screen.getByRole('button', { name: /add budget/i }));
-    await user.type(screen.getByLabelText(/^name$/i), 'Scholarships');
-    await user.clear(screen.getByLabelText(/amount/i));
-    await user.type(screen.getByLabelText(/amount/i), '2500');
-    await user.click(screen.getByRole('button', { name: /create budget/i }));
+    const [openPurchaseModalButton] = screen.getAllByRole('button', { name: /log purchase/i });
+    await user.click(openPurchaseModalButton);
+    await user.clear(screen.getByLabelText(/^reference$/i));
+    await user.type(screen.getByLabelText(/^reference$/i), 'INV-200');
+    await user.type(screen.getByLabelText(/^description$/i), 'Scholarships');
+    await user.clear(screen.getByLabelText(/^amount$/i));
+    await user.type(screen.getByLabelText(/^amount$/i), '2500');
+    const [, submitPurchaseButton] = screen.getAllByRole('button', { name: /log purchase/i });
+    await user.click(submitPurchaseButton);
 
     await waitFor(() => {
-      expect(createFinanceBudgetMock).toHaveBeenCalledWith({
+      expect(createFinancePurchaseMock).toHaveBeenCalledWith({
         token: 'token-123',
-        payload: expect.objectContaining({ name: 'Scholarships', amount: 2500 })
+        payload: expect.objectContaining({ reference: 'INV-200', amount: 2500 })
       });
     });
 
@@ -192,7 +208,7 @@ describe('<LearnerSettings />', () => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    expect(await screen.findByText(/budget created/i)).toBeInTheDocument();
+    expect(await screen.findByText(/purchase recorded/i)).toBeInTheDocument();
   });
 
   it('submits finance preferences form', async () => {

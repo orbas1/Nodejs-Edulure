@@ -19,12 +19,21 @@ const mocks = vi.hoisted(() => ({
     findByUserId: vi.fn(),
     upsertForUser: vi.fn()
   },
-  financeBudgetModel: {
+  financePurchaseModel: {
     listByUserId: vi.fn(),
     create: vi.fn(),
     findByIdForUser: vi.fn(),
     updateByIdForUser: vi.fn(),
     deleteByIdForUser: vi.fn()
+  },
+  communitySubscriptionModel: {
+    listByUser: vi.fn()
+  },
+  communityModel: {
+    findById: vi.fn()
+  },
+  paywallTierModel: {
+    findById: vi.fn()
   },
   systemPreferenceModel: {
     getForUser: vi.fn(),
@@ -94,8 +103,20 @@ vi.mock('../src/models/LearnerFinancialProfileModel.js', () => ({
   default: mocks.financialProfileModel
 }));
 
-vi.mock('../src/models/LearnerFinanceBudgetModel.js', () => ({
-  default: mocks.financeBudgetModel
+vi.mock('../src/models/LearnerFinancePurchaseModel.js', () => ({
+  default: mocks.financePurchaseModel
+}));
+
+vi.mock('../src/models/CommunitySubscriptionModel.js', () => ({
+  default: mocks.communitySubscriptionModel
+}));
+
+vi.mock('../src/models/CommunityModel.js', () => ({
+  default: mocks.communityModel
+}));
+
+vi.mock('../src/models/CommunityPaywallTierModel.js', () => ({
+  default: mocks.paywallTierModel
 }));
 
 vi.mock('../src/models/LearnerSystemPreferenceModel.js', () => ({
@@ -154,7 +175,10 @@ const {
   growthInitiativeModel,
   growthExperimentModel,
   financialProfileModel,
-  financeBudgetModel,
+  financePurchaseModel,
+  communitySubscriptionModel,
+  communityModel,
+  paywallTierModel,
   systemPreferenceModel,
   affiliateChannelModel,
   affiliatePayoutModel,
@@ -179,46 +203,49 @@ describe('LearnerDashboardService', () => {
       reserveTargetCents: 0,
       preferences: {}
     });
-    financeBudgetModel.listByUserId.mockResolvedValue([]);
-    financeBudgetModel.create.mockResolvedValue({
+    financePurchaseModel.listByUserId.mockResolvedValue([]);
+    financePurchaseModel.create.mockResolvedValue({
       id: 1,
       userId: 42,
-      name: 'Default budget',
+      reference: 'INV-1',
+      description: 'Default purchase',
       amountCents: 0,
       currency: 'USD',
-      period: 'monthly',
-      alertsEnabled: true,
-      alertThresholdPercent: 80,
+      status: 'paid',
+      purchasedAt: '2024-01-01T00:00:00.000Z',
       metadata: {},
       createdAt: null,
       updatedAt: null
     });
-    financeBudgetModel.findByIdForUser.mockResolvedValue({
+    financePurchaseModel.findByIdForUser.mockResolvedValue({
       id: 1,
       userId: 42,
-      name: 'Default budget',
+      reference: 'INV-1',
+      description: 'Default purchase',
       amountCents: 0,
       currency: 'USD',
-      period: 'monthly',
-      alertsEnabled: true,
-      alertThresholdPercent: 80,
+      status: 'paid',
+      purchasedAt: '2024-01-01T00:00:00.000Z',
       metadata: {},
       createdAt: null,
       updatedAt: null
     });
-    financeBudgetModel.updateByIdForUser.mockResolvedValue({
+    financePurchaseModel.updateByIdForUser.mockResolvedValue({
       id: 1,
       userId: 42,
-      name: 'Updated budget',
+      reference: 'INV-1',
+      description: 'Updated purchase',
       amountCents: 10000,
       currency: 'USD',
-      period: 'monthly',
-      alertsEnabled: true,
-      alertThresholdPercent: 75,
+      status: 'paid',
+      purchasedAt: '2024-01-02T00:00:00.000Z',
       metadata: {},
       createdAt: null,
       updatedAt: null
     });
+    communitySubscriptionModel.listByUser.mockResolvedValue([]);
+    communityModel.findById.mockResolvedValue(null);
+    paywallTierModel.findById.mockResolvedValue(null);
     systemPreferenceModel.getForUser.mockResolvedValue(null);
     systemPreferenceModel.upsertForUser.mockResolvedValue({
       id: 2,
@@ -557,21 +584,41 @@ describe('LearnerDashboardService', () => {
       ...existingProfile,
       preferences: { currency: 'USD', alerts: { sendEmail: true, sendSms: true } }
     });
-    financeBudgetModel.listByUserId.mockResolvedValue([
+    financePurchaseModel.listByUserId.mockResolvedValue([
       {
         id: 5,
         userId: 42,
-        name: 'Mentorship',
+        reference: 'INV-200',
+        description: 'Mentorship programme',
         amountCents: 120000,
         currency: 'USD',
-        period: 'monthly',
-        alertsEnabled: true,
-        alertThresholdPercent: 80,
-        metadata: {},
-        createdAt: null,
-        updatedAt: null
+        status: 'paid',
+        purchasedAt: '2024-02-01T00:00:00.000Z',
+        metadata: {}
       }
     ]);
+    communitySubscriptionModel.listByUser.mockResolvedValue([
+      {
+        id: 9,
+        publicId: 'sub_123',
+        communityId: 77,
+        userId: 42,
+        tierId: 501,
+        status: 'active',
+        cancelAtPeriodEnd: false,
+        provider: 'stripe',
+        currentPeriodEnd: '2024-03-01T00:00:00.000Z',
+        metadata: {}
+      }
+    ]);
+    communityModel.findById.mockResolvedValue({ id: 77, name: 'Growth Guild', slug: 'growth-guild' });
+    paywallTierModel.findById.mockResolvedValue({
+      id: 501,
+      name: 'Founders Club',
+      priceCents: 9900,
+      currency: 'USD',
+      billingInterval: 'monthly'
+    });
 
     const acknowledgement = await LearnerDashboardService.updateFinanceSettings(42, {
       alerts: { sendSms: true }
@@ -589,40 +636,42 @@ describe('LearnerDashboardService', () => {
     );
     expect(acknowledgement.meta.financeSettings.profile.autoPayEnabled).toBe(true);
     expect(acknowledgement.meta.financeSettings.alerts.sendSms).toBe(true);
-    expect(acknowledgement.meta.financeSettings.budgets).toHaveLength(1);
+    expect(acknowledgement.meta.financeSettings.purchases).toHaveLength(1);
+    expect(acknowledgement.meta.financeSettings.subscriptions).toHaveLength(1);
   });
 
-  it('creates a finance budget and normalises values', async () => {
-    financeBudgetModel.create.mockResolvedValue({
+  it('creates a finance purchase and normalises values', async () => {
+    financePurchaseModel.create.mockResolvedValue({
       id: 7,
       userId: 42,
-      name: 'Scholarships',
+      reference: 'INV-900',
+      description: 'Scholarship bundle',
       amountCents: 250000,
       currency: 'USD',
-      period: 'monthly',
-      alertsEnabled: true,
-      alertThresholdPercent: 85,
-      metadata: { category: 'scholarship' },
+      status: 'pending',
+      purchasedAt: '2024-01-05T00:00:00.000Z',
+      metadata: { receiptUrl: 'https://example.com/receipt.pdf' },
       createdAt: null,
       updatedAt: null
     });
 
-    const budget = await LearnerDashboardService.createFinanceBudget(42, {
-      name: 'Scholarships',
+    const purchase = await LearnerDashboardService.createFinancePurchase(42, {
+      reference: 'INV-900',
+      description: 'Scholarship bundle',
       amount: 2500,
       currency: 'usd',
-      period: 'monthly',
-      alertThresholdPercent: 85,
-      metadata: { category: 'scholarship' }
+      status: 'pending',
+      purchasedAt: '2024-01-05T12:00',
+      metadata: { receiptUrl: 'https://example.com/receipt.pdf' }
     });
 
-    expect(financeBudgetModel.create).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 42, amountCents: 250000, currency: 'USD' }),
+    expect(financePurchaseModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 42, amountCents: 250000, currency: 'USD', status: 'pending' }),
       expect.anything()
     );
-    expect(budget.amountCents).toBe(250000);
-    expect(budget.amountFormatted).toBeDefined();
-    expect(budget.currency).toBe('USD');
+    expect(purchase.amountCents).toBe(250000);
+    expect(purchase.amountFormatted).toBeDefined();
+    expect(purchase.status).toBe('pending');
   });
 
   it('returns default system preferences when none stored', async () => {

@@ -7,7 +7,7 @@ import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
 import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
-import LearnerFinanceBudgetModel from '../models/LearnerFinanceBudgetModel.js';
+import LearnerFinancePurchaseModel from '../models/LearnerFinancePurchaseModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -19,6 +19,9 @@ import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
 import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
+import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
+import CommunityModel from '../models/CommunityModel.js';
+import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -90,20 +93,77 @@ function formatCurrencyValue(amountCents, currency = 'USD') {
   }
 }
 
-function formatBudget(budget) {
-  if (!budget) return null;
+function formatDateLabel(value, fallback = 'Not recorded') {
+  if (!value) return fallback;
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return fallback;
+    }
+    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(date);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function formatPurchase(purchase) {
+  if (!purchase) return null;
   return {
-    id: budget.id,
-    name: budget.name,
-    amountCents: Number(budget.amountCents ?? 0),
-    amountFormatted: formatCurrencyValue(budget.amountCents, budget.currency),
-    currency: budget.currency ?? 'USD',
-    period: budget.period ?? 'monthly',
-    alertsEnabled: Boolean(budget.alertsEnabled),
-    alertThresholdPercent: Number(budget.alertThresholdPercent ?? 80),
-    metadata: budget.metadata ?? {},
-    createdAt: budget.createdAt ?? null,
-    updatedAt: budget.updatedAt ?? null
+    id: purchase.id,
+    reference: purchase.reference,
+    description: purchase.description,
+    amountCents: Number(purchase.amountCents ?? 0),
+    amountFormatted: formatCurrencyValue(purchase.amountCents, purchase.currency),
+    currency: purchase.currency ?? 'USD',
+    status: purchase.status ?? 'paid',
+    purchasedAt: purchase.purchasedAt ?? null,
+    purchasedAtLabel: formatDateLabel(purchase.purchasedAt, 'Awaiting confirmation'),
+    metadata: purchase.metadata ?? {},
+    createdAt: purchase.createdAt ?? null,
+    updatedAt: purchase.updatedAt ?? null
+  };
+}
+
+function formatSubscription(subscription, communityMap, tierMap) {
+  if (!subscription) return null;
+  const community = communityMap.get(subscription.communityId ?? null);
+  const tier = tierMap.get(subscription.tierId ?? null);
+  const priceCents = tier?.priceCents ?? subscription.metadata?.priceCents;
+  const currency = tier?.currency ?? subscription.metadata?.currency ?? 'USD';
+  const billingInterval = tier?.billingInterval ?? subscription.metadata?.billingInterval ?? 'monthly';
+
+  return {
+    id: subscription.publicId ?? subscription.id,
+    status: subscription.status ?? 'active',
+    provider: subscription.provider ?? 'platform',
+    cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
+    currentPeriodStart: subscription.currentPeriodStart ?? null,
+    currentPeriodEnd: subscription.currentPeriodEnd ?? null,
+    currentPeriodEndLabel: formatDateLabel(subscription.currentPeriodEnd, 'No renewal date'),
+    community: community
+      ? {
+          id: community.id,
+          name: community.name,
+          slug: community.slug,
+          coverImageUrl: community.coverImageUrl ?? null
+        }
+      : null,
+    plan: tier
+      ? {
+          id: tier.id,
+          name: tier.name,
+          billingInterval,
+          priceFormatted: formatCurrencyValue(priceCents, currency)
+        }
+      : {
+          id: null,
+          name: subscription.metadata?.planName ?? 'Subscription',
+          billingInterval,
+          priceFormatted: formatCurrencyValue(priceCents ?? 0, currency)
+        },
+    metadata: subscription.metadata ?? {},
+    createdAt: subscription.createdAt ?? null,
+    updatedAt: subscription.updatedAt ?? null
   };
 }
 
@@ -371,58 +431,64 @@ export default class LearnerDashboardService {
     });
   }
 
-  static async listFinanceBudgets(userId) {
-    const budgets = await LearnerFinanceBudgetModel.listByUserId(userId);
-    return budgets.map((budget) => formatBudget(budget));
+  static async listFinancePurchases(userId) {
+    const purchases = await LearnerFinancePurchaseModel.listByUserId(userId);
+    return purchases.map((purchase) => formatPurchase(purchase));
   }
 
-  static async createFinanceBudget(userId, payload = {}) {
-    if (!payload.name || payload.name.trim().length < 3) {
-      throw new Error('A descriptive name is required for the finance budget');
+  static async createFinancePurchase(userId, payload = {}) {
+    if (!payload.reference || payload.reference.trim().length < 3) {
+      throw new Error('A reference label is required for the purchase');
     }
+    if (!payload.description || payload.description.trim().length < 3) {
+      throw new Error('A description is required for the purchase');
+    }
+
     const amountCentsRaw =
       payload.amountCents !== undefined
         ? Number(payload.amountCents)
         : Number.parseFloat(payload.amount ?? payload.amountDollars ?? 0) * 100;
     const amountCents = Math.max(0, Math.round(Number.isFinite(amountCentsRaw) ? amountCentsRaw : 0));
-    const period =
-      typeof payload.period === 'string' &&
-      ['monthly', 'quarterly', 'annual', 'one-time'].includes(payload.period)
-        ? payload.period
-        : 'monthly';
-    const alertsEnabled = payload.alertsEnabled !== undefined ? Boolean(payload.alertsEnabled) : true;
-    const threshold = payload.alertThresholdPercent ?? payload.alertThreshold ?? 80;
-    const alertThresholdPercent = Math.min(100, Math.max(1, Number.parseInt(threshold, 10) || 80));
+    const allowedStatuses = new Set(['paid', 'pending', 'refunded', 'cancelled']);
+    const status = allowedStatuses.has(payload.status) ? payload.status : 'paid';
+    const purchasedAt = (() => {
+      if (!payload.purchasedAt) return new Date();
+      const parsed = new Date(payload.purchasedAt);
+      return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    })();
 
-    const budget = await LearnerFinanceBudgetModel.create(
+    const purchase = await LearnerFinancePurchaseModel.create(
       {
         userId,
-        name: payload.name.trim(),
+        reference: payload.reference.trim().slice(0, 64),
+        description: payload.description.trim().slice(0, 255),
         amountCents,
         currency: typeof payload.currency === 'string' ? payload.currency.slice(0, 3).toUpperCase() : 'USD',
-        period,
-        alertsEnabled,
-        alertThresholdPercent,
+        status,
+        purchasedAt,
         metadata: payload.metadata ?? {}
       },
       db
     );
 
-    log.info({ userId, budgetId: budget.id }, 'Learner created finance budget');
-    return formatBudget(budget);
+    log.info({ userId, purchaseId: purchase.id }, 'Learner recorded finance purchase');
+    return formatPurchase(purchase);
   }
 
-  static async updateFinanceBudget(userId, budgetId, payload = {}) {
-    const existing = await LearnerFinanceBudgetModel.findByIdForUser(userId, budgetId);
+  static async updateFinancePurchase(userId, purchaseId, payload = {}) {
+    const existing = await LearnerFinancePurchaseModel.findByIdForUser(userId, purchaseId);
     if (!existing) {
-      const error = new Error('Finance budget not found');
+      const error = new Error('Finance purchase not found');
       error.status = 404;
       throw error;
     }
 
     const updates = { ...payload };
-    if (updates.name !== undefined && typeof updates.name === 'string') {
-      updates.name = updates.name.trim();
+    if (updates.reference !== undefined && typeof updates.reference === 'string') {
+      updates.reference = updates.reference.trim().slice(0, 64);
+    }
+    if (updates.description !== undefined && typeof updates.description === 'string') {
+      updates.description = updates.description.trim().slice(0, 255);
     }
     if (updates.amountCents === undefined && updates.amount !== undefined) {
       const cents = Number.parseFloat(updates.amount) * 100;
@@ -434,38 +500,36 @@ export default class LearnerDashboardService {
     if (updates.currency !== undefined && typeof updates.currency === 'string') {
       updates.currency = updates.currency.slice(0, 3).toUpperCase();
     }
-    if (updates.period !== undefined) {
-      updates.period = ['monthly', 'quarterly', 'annual', 'one-time'].includes(updates.period)
-        ? updates.period
-        : existing.period;
+    if (updates.status !== undefined) {
+      const allowedStatuses = new Set(['paid', 'pending', 'refunded', 'cancelled']);
+      updates.status = allowedStatuses.has(updates.status) ? updates.status : existing.status;
     }
-    if (updates.alertThresholdPercent !== undefined) {
-      updates.alertThresholdPercent = Math.min(
-        100,
-        Math.max(1, Number.parseInt(updates.alertThresholdPercent, 10) || existing.alertThresholdPercent)
-      );
+    if (updates.purchasedAt !== undefined) {
+      const parsed = new Date(updates.purchasedAt);
+      updates.purchasedAt = Number.isNaN(parsed.getTime()) ? existing.purchasedAt : parsed;
     }
 
-    const updated = await LearnerFinanceBudgetModel.updateByIdForUser(userId, budgetId, updates);
-    log.info({ userId, budgetId }, 'Learner updated finance budget');
-    return formatBudget(updated);
+    const updated = await LearnerFinancePurchaseModel.updateByIdForUser(userId, purchaseId, updates);
+    log.info({ userId, purchaseId }, 'Learner updated finance purchase');
+    return formatPurchase(updated);
   }
 
-  static async deleteFinanceBudget(userId, budgetId) {
-    const deleted = await LearnerFinanceBudgetModel.deleteByIdForUser(userId, budgetId);
+  static async deleteFinancePurchase(userId, purchaseId) {
+    const deleted = await LearnerFinancePurchaseModel.deleteByIdForUser(userId, purchaseId);
     if (!deleted) {
-      const error = new Error('Finance budget not found');
+      const error = new Error('Finance purchase not found');
       error.status = 404;
       throw error;
     }
-    log.info({ userId, budgetId }, 'Learner removed finance budget');
-    return buildAcknowledgement({ reference: budgetId, message: 'Finance budget removed' });
+    log.info({ userId, purchaseId }, 'Learner removed finance purchase');
+    return buildAcknowledgement({ reference: purchaseId, message: 'Finance purchase removed' });
   }
 
   static async getFinanceSettings(userId) {
-    const [profile, budgets] = await Promise.all([
+    const [profile, purchases, subscriptions] = await Promise.all([
       LearnerFinancialProfileModel.findByUserId(userId),
-      LearnerFinanceBudgetModel.listByUserId(userId)
+      LearnerFinancePurchaseModel.listByUserId(userId),
+      CommunitySubscriptionModel.listByUser(userId)
     ]);
     const preferences = profile?.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
     const alerts = {
@@ -493,10 +557,32 @@ export default class LearnerDashboardService {
           }
         : { enabled: false, instructions: null };
 
+    const communityIds = Array.from(
+      new Set(subscriptions.map((subscription) => subscription.communityId).filter(Boolean))
+    );
+    const tierIds = Array.from(new Set(subscriptions.map((subscription) => subscription.tierId).filter(Boolean)));
+
+    const [communityRecords, tierRecords] = await Promise.all([
+      Promise.all(communityIds.map((communityId) => CommunityModel.findById(communityId))),
+      Promise.all(tierIds.map((tierId) => CommunityPaywallTierModel.findById(tierId)))
+    ]);
+
+    const communityMap = new Map(
+      communityRecords
+        .filter((community) => community)
+        .map((community) => [community.id, community])
+    );
+    const tierMap = new Map(
+      tierRecords
+        .filter((tier) => tier)
+        .map((tier) => [tier.id, tier])
+    );
+
     return {
       profile: financeProfile,
       alerts,
-      budgets: budgets.map((budget) => formatBudget(budget)),
+      purchases: purchases.map((purchase) => formatPurchase(purchase)),
+      subscriptions: subscriptions.map((subscription) => formatSubscription(subscription, communityMap, tierMap)),
       documents,
       reimbursements
     };
