@@ -20,7 +20,8 @@ const POST_COLUMNS = [
   'cp.reaction_summary as reactionSummary',
   'cp.metadata',
   'cp.created_at as createdAt',
-  'cp.updated_at as updatedAt'
+  'cp.updated_at as updatedAt',
+  'cp.deleted_at as deletedAt'
 ];
 
 const AUTHOR_COLUMNS = [
@@ -36,7 +37,105 @@ const CHANNEL_COLUMNS = [
   'cc.channel_type as channelType'
 ];
 
+function parseJson(value, fallback) {
+  if (!value) return structuredClone(fallback);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(fallback) && !Array.isArray(parsed)) {
+        return structuredClone(fallback);
+      }
+      if (typeof parsed === 'object' && parsed !== null) {
+        return Array.isArray(parsed)
+          ? parsed
+          : { ...fallback, ...parsed };
+      }
+      return structuredClone(fallback);
+    } catch (_error) {
+      return structuredClone(fallback);
+    }
+  }
+  if (typeof value === 'object' && value !== null) {
+    if (Array.isArray(fallback)) {
+      return Array.isArray(value) ? value : structuredClone(fallback);
+    }
+    return { ...fallback, ...value };
+  }
+  return structuredClone(fallback);
+}
+
+function normaliseTags(tags) {
+  if (!tags) {
+    return [];
+  }
+  if (Array.isArray(tags)) {
+    return tags.map((tag) => String(tag)).filter(Boolean);
+  }
+  if (typeof tags === 'string') {
+    try {
+      const parsed = JSON.parse(tags);
+      return Array.isArray(parsed) ? parsed.map((tag) => String(tag)).filter(Boolean) : [];
+    } catch (_error) {
+      return [];
+    }
+  }
+  return [];
+}
+
+function toDomain(record) {
+  if (!record) return null;
+  return {
+    id: record.id,
+    communityId: record.communityId,
+    channelId: record.channelId ?? null,
+    authorId: record.authorId,
+    postType: record.postType,
+    title: record.title ?? null,
+    body: record.body,
+    tags: normaliseTags(record.tags),
+    visibility: record.visibility,
+    status: record.status,
+    moderationState: record.moderationState,
+    moderationMetadata: parseJson(record.moderationMetadata, {}),
+    lastModeratedAt: record.lastModeratedAt ?? null,
+    scheduledAt: record.scheduledAt ?? null,
+    publishedAt: record.publishedAt ?? null,
+    commentCount: Number(record.commentCount ?? 0),
+    reactionSummary: parseJson(record.reactionSummary, {}),
+    metadata: parseJson(record.metadata, {}),
+    createdAt: record.createdAt,
+    updatedAt: record.updatedAt,
+    deletedAt: record.deletedAt ?? null,
+    authorName: record.authorName ?? null,
+    authorRole: record.authorRole ?? null,
+    channelName: record.channelName ?? null,
+    channelSlug: record.channelSlug ?? null,
+    channelType: record.channelType ?? null,
+    communityName: record.communityName ?? null,
+    communitySlug: record.communitySlug ?? null
+  };
+}
+
+function clamp(value, { min = 1, max = 100, defaultValue = 10 } = {}) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return defaultValue;
+  }
+  return Math.min(Math.max(Math.trunc(numeric), min), max);
+}
+
 export default class CommunityPostModel {
+  static toDomain(record) {
+    return toDomain(record);
+  }
+
+  static sanitisePagination({ page = 1, perPage = 10 } = {}) {
+    return {
+      page: clamp(page, { min: 1, max: 1000, defaultValue: 1 }),
+      perPage: clamp(perPage, { min: 1, max: 100, defaultValue: 10 })
+    };
+  }
+
   static async create(post, connection = db) {
     const payload = {
       community_id: post.communityId,
@@ -45,16 +144,16 @@ export default class CommunityPostModel {
       post_type: post.postType ?? 'update',
       title: post.title ?? null,
       body: post.body,
-      tags: JSON.stringify(post.tags ?? []),
+      tags: JSON.stringify(normaliseTags(post.tags)),
       visibility: post.visibility ?? 'members',
       status: post.status ?? 'draft',
       moderation_state: post.moderationState ?? 'clean',
-      moderation_metadata: JSON.stringify(post.moderationMetadata ?? {}),
+      moderation_metadata: JSON.stringify(parseJson(post.moderationMetadata, {})),
       scheduled_at: post.scheduledAt ?? null,
       published_at: post.publishedAt ?? null,
       comment_count: post.commentCount ?? 0,
-      reaction_summary: JSON.stringify(post.reactionSummary ?? {}),
-      metadata: JSON.stringify(post.metadata ?? {})
+      reaction_summary: JSON.stringify(parseJson(post.reactionSummary, {})),
+      metadata: JSON.stringify(parseJson(post.metadata, {}))
     };
 
     const [id] = await connection('community_posts').insert(payload);
@@ -62,7 +161,7 @@ export default class CommunityPostModel {
   }
 
   static async findById(id, connection = db) {
-    return connection('community_posts as cp')
+    const row = await connection('community_posts as cp')
       .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
       .leftJoin('communities as c', 'cp.community_id', 'c.id')
       .leftJoin('users as u', 'cp.author_id', 'u.id')
@@ -75,6 +174,7 @@ export default class CommunityPostModel {
       ])
       .where('cp.id', id)
       .first();
+    return toDomain(row);
   }
 
   static async updateModerationState(id, changes, connection = db) {
@@ -155,7 +255,8 @@ export default class CommunityPostModel {
   }
 
   static async paginateForCommunity(communityId, filters = {}, connection = db) {
-    const { page = 1, perPage = 10, channelId, postType, visibility, query } = filters;
+    const { channelId, postType, visibility, query } = filters;
+    const { page, perPage } = this.sanitisePagination(filters);
 
     const baseQuery = connection('community_posts as cp')
       .leftJoin('community_channels as cc', 'cp.channel_id', 'cc.id')
@@ -202,7 +303,7 @@ export default class CommunityPostModel {
     const total = Number(totalRow?.count ?? 0);
 
     return {
-      items,
+      items: items.map((item) => toDomain(item)),
       pagination: {
         page,
         perPage,
@@ -213,7 +314,8 @@ export default class CommunityPostModel {
   }
 
   static async paginateForUser(userId, filters = {}, connection = db) {
-    const { page = 1, perPage = 10, postType, query } = filters;
+    const { postType, query } = filters;
+    const { page, perPage } = this.sanitisePagination(filters);
 
     const baseQuery = connection('community_posts as cp')
       .innerJoin('community_members as cm', function joinMembers() {
@@ -264,7 +366,7 @@ export default class CommunityPostModel {
     const total = Number(totalRow?.count ?? 0);
 
     return {
-      items,
+      items: items.map((item) => toDomain(item)),
       pagination: {
         page,
         perPage,
