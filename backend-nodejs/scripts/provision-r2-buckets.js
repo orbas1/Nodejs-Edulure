@@ -11,6 +11,7 @@ import {
 import { env } from '../src/config/env.js';
 import logger from '../src/config/logger.js';
 import { r2Client } from '../src/config/storage.js';
+import { createCorsOriginValidator } from '../src/config/corsPolicy.js';
 
 function buildTagSet(tags) {
   return Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
@@ -99,7 +100,12 @@ async function ensureBucketConfiguration(bucket) {
 }
 
 async function main() {
-  const corsOrigins = Array.from(new Set(env.app.corsOrigins ?? [])).map((origin) => origin.replace(/\/$/, ''));
+  const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? [], {
+    allowDevelopmentOrigins: !env.isProduction
+  });
+  const corsOrigins = corsPolicy.allowAll
+    ? ['*']
+    : Array.from(new Set([...corsPolicy.getExactOrigins(), ...corsPolicy.getWildcardOrigins()]));
 
   const buckets = [
     {
