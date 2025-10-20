@@ -147,4 +147,46 @@ describe('IntegrationCircuitBreaker', () => {
       lastAttemptAt: '2024-01-01T00:00:30.000Z'
     });
   });
+
+  it('exposes a state snapshot with computed resume hints', async () => {
+    const breaker = new IntegrationCircuitBreaker({
+      redisClient: redis,
+      key: 'test:snapshot',
+      cooldownMs: 5000,
+      logger
+    });
+
+    const openedAt = Date.now();
+    await breaker.persistState({
+      mode: 'open',
+      openedAt,
+      lastAttemptAt: new Date('2024-01-01T00:00:10Z')
+    });
+
+    const snapshot = await breaker.getState();
+    expect(snapshot.mode).toBe('open');
+    expect(snapshot.resumeAt).toBe(new Date(openedAt + 5000).toISOString());
+    expect(snapshot.lastAttemptAt).toBe('2024-01-01T00:00:10.000Z');
+    expect(snapshot.pausedUntil).toBeNull();
+  });
+
+  it('prioritises manual pauses when reporting resume hints', async () => {
+    const breaker = new IntegrationCircuitBreaker({
+      redisClient: redis,
+      key: 'test:snapshot-pause',
+      cooldownMs: 5000,
+      logger
+    });
+
+    await breaker.persistState({
+      mode: 'open',
+      openedAt: Date.now(),
+      pausedUntil: new Date('2024-01-01T00:05:00Z')
+    });
+
+    const snapshot = await breaker.getState();
+    expect(snapshot.mode).toBe('open');
+    expect(snapshot.resumeAt).toBe('2024-01-01T00:05:00.000Z');
+    expect(snapshot.pausedUntil).toBe('2024-01-01T00:05:00.000Z');
+  });
 });

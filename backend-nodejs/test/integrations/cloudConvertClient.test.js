@@ -77,4 +77,69 @@ describe('CloudConvertClient', () => {
     expect(requestSpy).toHaveBeenCalledTimes(2);
     vi.useRealTimers();
   });
+
+  it('extracts exported files from completed jobs', () => {
+    const client = new CloudConvertClient({ apiKey: 'files' });
+    const files = client.extractExportedFiles({
+      data: {
+        tasks: [
+          {
+            name: 'export-1',
+            operation: 'export/url',
+            result: { files: [{ url: 'https://file-1', filename: 'file-1.pdf' }] }
+          },
+          {
+            name: 'convert',
+            operation: 'convert',
+            result: {}
+          },
+          {
+            name: 'export-2',
+            attributes: {
+              operation: 'export/url',
+              result: { files: [{ url: 'https://file-2', filename: 'file-2.pdf' }] }
+            }
+          }
+        ]
+      }
+    });
+
+    expect(files).toEqual([
+      { url: 'https://file-1', filename: 'file-1.pdf' },
+      { url: 'https://file-2', filename: 'file-2.pdf' }
+    ]);
+  });
+
+  it('creates jobs and waits for completion, returning exported files', async () => {
+    const client = new CloudConvertClient({ apiKey: 'combo' });
+    const createSpy = vi.spyOn(client, 'createJob').mockResolvedValue({ id: 'job-123' });
+    const waitSpy = vi.spyOn(client, 'waitForJob').mockResolvedValue({
+      data: {
+        id: 'job-123',
+        tasks: [
+          {
+            operation: 'export/url',
+            result: { files: [{ url: 'https://download', filename: 'archive.zip' }] }
+          }
+        ]
+      }
+    });
+
+    const result = await client.createJobAndWait({ tasks: [] });
+
+    expect(createSpy).toHaveBeenCalledWith({ tasks: [] });
+    expect(waitSpy).toHaveBeenCalledWith('job-123', {});
+    expect(result.files).toEqual([{ url: 'https://download', filename: 'archive.zip' }]);
+    expect(result.job).toEqual({
+      data: {
+        id: 'job-123',
+        tasks: [
+          {
+            operation: 'export/url',
+            result: { files: [{ url: 'https://download', filename: 'archive.zip' }] }
+          }
+        ]
+      }
+    });
+  });
 });

@@ -116,6 +116,52 @@ describe('SalesforceClient', () => {
     );
   });
 
+  it('coalesces concurrent authentication requests', async () => {
+    const now = Date.now();
+    let resolveAuth;
+    const authResponse = new Promise((resolve) => {
+      resolveAuth = () =>
+        resolve(
+          createResponse({
+            jsonBody: {
+              access_token: 'token-shared',
+              instance_url: 'https://example.salesforce.com',
+              issued_at: `${now}`,
+              expires_in: 3600
+            }
+          })
+        );
+    });
+
+    const fetchImpl = vi
+      .fn()
+      .mockReturnValueOnce(authResponse)
+      .mockResolvedValue(createResponse({ jsonBody: { records: [] } }));
+
+    const client = createClient({ fetchImpl });
+
+    const pending = Promise.all([client.authenticate(), client.authenticate()]);
+    resolveAuth();
+    const [first, second] = await pending;
+
+    expect(first).toEqual(second);
+    expect(first.accessToken).toBe('token-shared');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears cached credentials when authentication fails', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      createResponse({ status: 500, body: JSON.stringify({ error: 'invalid_client' }) })
+    );
+
+    const client = createClient({ fetchImpl });
+
+    await expect(client.authenticate()).rejects.toThrow('Salesforce authentication failed');
+    expect(client.accessToken).toBeNull();
+    expect(client.instanceUrl).toBeNull();
+    expect(client.tokenExpiresAt).toBeNull();
+  });
+
   it('aggregates results when upserting batches of leads', async () => {
     const client = createClient();
     const error = Object.assign(new Error('invalid lead'), { code: 'INVALID_FIELD' });

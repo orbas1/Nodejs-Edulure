@@ -120,6 +120,30 @@ export default class IntegrationCircuitBreaker {
     return { allowed: true, mode: state.mode ?? 'closed' };
   }
 
+  computeResumeAt(state) {
+    if (state.pausedUntil instanceof Date) {
+      return state.pausedUntil;
+    }
+
+    if (state.mode === 'open' && typeof state.openedAt === 'number') {
+      return new Date(state.openedAt + this.cooldownMs);
+    }
+
+    return null;
+  }
+
+  async getState() {
+    const state = await this.loadState();
+    const resumeDate = this.computeResumeAt(state);
+
+    return {
+      ...state,
+      pausedUntil: state.pausedUntil instanceof Date ? state.pausedUntil.toISOString() : null,
+      lastAttemptAt: state.lastAttemptAt instanceof Date ? state.lastAttemptAt.toISOString() : null,
+      resumeAt: resumeDate ? resumeDate.toISOString() : null
+    };
+  }
+
   async recordSuccess() {
     const state = await this.loadState();
     state.lastSuccessAt = Date.now();

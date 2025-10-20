@@ -23,7 +23,8 @@ export default class SalesforceClient {
     externalIdField = 'Edulure_Project_Id__c',
     logger,
     fetchImpl,
-    auditLogger
+    auditLogger,
+    refreshSkewMs = 60000
   } = {}) {
     if (!clientId || !clientSecret || !username || !password) {
       throw new Error('SalesforceClient requires clientId, clientSecret, username, and password.');
@@ -41,10 +42,12 @@ export default class SalesforceClient {
     this.logger = logger ?? console;
     this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.auditLogger = typeof auditLogger === 'function' ? auditLogger : null;
+    this.refreshSkewMs = Number.isFinite(refreshSkewMs) && refreshSkewMs >= 0 ? refreshSkewMs : 60000;
 
     this.accessToken = null;
     this.instanceUrl = null;
     this.tokenExpiresAt = null;
+    this.authPromise = null;
   }
 
   async recordAudit({ requestMethod, requestPath, statusCode, outcome, durationMs, metadata, error }) {
@@ -72,39 +75,73 @@ export default class SalesforceClient {
   }
 
   async authenticate(force = false) {
-    if (!force && this.accessToken && this.tokenExpiresAt && Date.now() < this.tokenExpiresAt - 60000) {
+    const now = Date.now();
+    const hasValidToken =
+      this.accessToken && this.tokenExpiresAt && now < this.tokenExpiresAt - this.refreshSkewMs;
+
+    if (!force && hasValidToken) {
       return { accessToken: this.accessToken, instanceUrl: this.instanceUrl };
     }
 
-    const body = new URLSearchParams({
-      grant_type: 'password',
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      username: this.username,
-      password: `${this.password}${this.securityToken}`
-    });
-
-    const response = await this.fetchImpl(`${this.loginUrl}/services/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      const error = new Error(`Salesforce authentication failed with status ${response.status}`);
-      error.details = errorBody;
-      throw error;
+    if (!force && this.authPromise) {
+      return this.authPromise;
     }
 
-    const payload = await response.json();
-    this.accessToken = payload.access_token;
-    this.instanceUrl = payload.instance_url;
-    const issuedAt = Number(payload.issued_at ?? Date.now());
-    this.tokenExpiresAt = issuedAt + Number(payload.expires_in ?? 3600) * 1000;
-    return { accessToken: this.accessToken, instanceUrl: this.instanceUrl };
+    if (force && this.authPromise) {
+      try {
+        await this.authPromise.catch(() => {});
+      } finally {
+        this.authPromise = null;
+      }
+    }
+
+    const performAuthentication = async () => {
+      const body = new URLSearchParams({
+        grant_type: 'password',
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        username: this.username,
+        password: `${this.password}${this.securityToken}`
+      });
+
+      const response = await this.fetchImpl(`${this.loginUrl}/services/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const error = new Error(`Salesforce authentication failed with status ${response.status}`);
+        error.details = errorBody;
+        throw error;
+      }
+
+      const payload = await response.json();
+      this.accessToken = payload.access_token;
+      this.instanceUrl = payload.instance_url;
+      const issuedAt = Number(payload.issued_at ?? Date.now());
+      this.tokenExpiresAt = issuedAt + Number(payload.expires_in ?? 3600) * 1000;
+      return { accessToken: this.accessToken, instanceUrl: this.instanceUrl };
+    };
+
+    this.authPromise = performAuthentication()
+      .then((result) => {
+        return result;
+      })
+      .catch((error) => {
+        this.accessToken = null;
+        this.instanceUrl = null;
+        this.tokenExpiresAt = null;
+        throw error;
+      })
+      .finally(() => {
+        this.authPromise = null;
+      });
+
+    return this.authPromise;
   }
 
   async request(path, { method = 'GET', body, query, headers = {}, retryOnUnauthorized = true } = {}) {
