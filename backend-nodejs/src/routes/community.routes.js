@@ -4,6 +4,7 @@ import CommunityController from '../controllers/CommunityController.js';
 import CommunityEngagementController from '../controllers/CommunityEngagementController.js';
 import CommunityChatController from '../controllers/CommunityChatController.js';
 import CommunityMonetizationController from '../controllers/CommunityMonetizationController.js';
+import CommunityMemberAdminController from '../controllers/CommunityMemberAdminController.js';
 import CommunityOperationsController from '../controllers/CommunityOperationsController.js';
 import auth from '../middleware/auth.js';
 
@@ -12,9 +13,11 @@ const router = Router();
 router.get('/', auth(), CommunityController.listForUser);
 router.get('/feed', auth(), CommunityController.listUserFeed);
 router.post('/', auth('instructor'), CommunityController.create);
+router.put('/:communityId', auth('instructor'), CommunityController.update);
 router.get('/:communityId', auth(), CommunityController.getDetail);
 router.get('/:communityId/posts', auth(), CommunityController.listFeed);
 router.post('/:communityId/posts', auth(), CommunityController.createPost);
+router.put('/:communityId/posts/:postId', auth('instructor'), CommunityController.updatePost);
 router.post('/:communityId/join', auth(), CommunityController.join);
 router.post('/:communityId/leave', auth(), CommunityController.leave);
 router.post('/:communityId/posts/:postId/moderate', auth(), CommunityController.moderatePost);
@@ -25,6 +28,11 @@ router.get('/:communityId/resources', auth(), CommunityController.listResources)
 router.post('/:communityId/resources', auth(), CommunityController.createResource);
 router.put('/:communityId/resources/:resourceId', auth(), CommunityController.updateResource);
 router.delete('/:communityId/resources/:resourceId', auth(), CommunityController.deleteResource);
+
+router.get('/:communityId/members', auth('instructor'), CommunityMemberAdminController.list);
+router.post('/:communityId/members', auth('instructor'), CommunityMemberAdminController.create);
+router.patch('/:communityId/members/:userId', auth('instructor'), CommunityMemberAdminController.update);
+router.delete('/:communityId/members/:userId', auth('instructor'), CommunityMemberAdminController.remove);
 
 router.get('/:communityId/chat/channels', auth(), CommunityChatController.listChannels);
 router.post('/:communityId/chat/channels', auth(), CommunityChatController.createChannel);
@@ -119,6 +127,11 @@ router.patch(
   auth('instructor'),
   CommunityMonetizationController.updateTier
 );
+router.get(
+  '/:communityId/monetization/summary',
+  auth('instructor'),
+  CommunityMonetizationController.revenueSummary
+);
 router.post('/:communityId/paywall/checkout', auth(), CommunityMonetizationController.startCheckout);
 router.get(
   '/:communityId/subscriptions/me',
@@ -129,6 +142,16 @@ router.post(
   '/:communityId/subscriptions/:subscriptionId/cancel',
   auth(),
   CommunityMonetizationController.cancelSubscription
+);
+router.get(
+  '/:communityId/subscriptions',
+  auth('instructor'),
+  CommunityMonetizationController.listSubscriptions
+);
+router.patch(
+  '/:communityId/subscriptions/:subscriptionId',
+  auth('instructor'),
+  CommunityMonetizationController.updateSubscription
 );
 router.post(
   '/:communityId/live/donations',
@@ -155,6 +178,11 @@ router.patch(
   '/:communityId/operations/paywall/tiers/:tierId',
   auth('instructor'),
   CommunityOperationsController.manageTier
+);
+router.get(
+  '/:communityId/operations/safety',
+  auth('instructor'),
+  CommunityOperationsController.listIncidents
 );
 router.post(
   '/:communityId/operations/safety/:caseId/resolve',

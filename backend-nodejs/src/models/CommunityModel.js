@@ -173,6 +173,37 @@ export default class CommunityModel {
     return this.findById(id, connection);
   }
 
+  static async updateById(id, updates = {}, connection = db) {
+    const payload = { updated_at: connection.fn.now() };
+
+    if (updates.name !== undefined) {
+      payload.name = updates.name;
+    }
+    if (updates.slug !== undefined) {
+      payload.slug = updates.slug ?? null;
+    }
+    if (updates.description !== undefined) {
+      payload.description = updates.description ?? null;
+    }
+    if (updates.coverImageUrl !== undefined) {
+      payload.cover_image_url = updates.coverImageUrl ?? null;
+    }
+    if (updates.visibility !== undefined) {
+      payload.visibility = updates.visibility;
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = JSON.stringify(updates.metadata ?? {});
+    }
+
+    if (Object.keys(payload).length === 1) {
+      // No meaningful updates, return existing record
+      return this.findById(id, connection);
+    }
+
+    await connection('communities').where({ id }).update(payload);
+    return this.findById(id, connection);
+  }
+
   static async listAll({ search, visibility, limit = 50, offset = 0 } = {}, connection = db) {
     const query = connection('communities as c')
       .select([

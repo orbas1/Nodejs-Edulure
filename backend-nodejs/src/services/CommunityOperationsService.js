@@ -102,6 +102,26 @@ function mergeResolutionMetadata(existingMetadata, resolution) {
 }
 
 export default class CommunityOperationsService {
+  static async listIncidents(communityIdentifier, actorId, filters = {}) {
+    const { community } = await ensureModerator(communityIdentifier, actorId);
+
+    const queryFilters = {
+      communityId: community.id,
+      status: filters.status,
+      severity: filters.severity,
+      search: filters.search,
+      from: filters.from,
+      to: filters.to
+    };
+
+    const pagination = {
+      page: Number(filters.page ?? 1),
+      perPage: Math.min(Number(filters.perPage ?? 20), 100)
+    };
+
+    return CommunityPostModerationCaseModel.list(queryFilters, pagination);
+  }
+
   static async publishRunbook(communityIdentifier, actorId, payload) {
     const { community } = await ensureModerator(communityIdentifier, actorId);
 

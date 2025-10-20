@@ -163,6 +163,7 @@ const navigationByRole = {
       children: [
         { id: 'instructor-launch', name: 'Launch', to: `${basePath}/communities/create`, icon: UserGroupIcon },
         { id: 'instructor-manage-communities', name: 'Manage', to: `${basePath}/communities/manage`, icon: Cog6ToothIcon },
+        { id: 'instructor-community-operations', name: 'Operations', to: `${basePath}/communities/operations`, icon: ShieldCheckIcon },
         { id: 'instructor-community-chats', name: 'Chats', to: `${basePath}/communities/chats`, icon: ChatBubbleBottomCenterTextIcon },
         { id: 'instructor-webinars', name: 'Webinars', to: `${basePath}/communities/webinars`, icon: VideoCameraIcon },
         { id: 'instructor-podcasts', name: 'Podcasts', to: `${basePath}/communities/podcasts`, icon: MicrophoneIcon }

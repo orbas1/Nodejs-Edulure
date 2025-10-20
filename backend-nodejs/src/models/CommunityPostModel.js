@@ -100,6 +100,45 @@ export default class CommunityPostModel {
     return this.findById(id, connection);
   }
 
+  static async updateById(id, updates = {}, connection = db) {
+    const payload = { updated_at: connection.fn.now() };
+
+    if (updates.title !== undefined) {
+      payload.title = updates.title ?? null;
+    }
+    if (updates.body !== undefined) {
+      payload.body = updates.body;
+    }
+    if (updates.tags !== undefined) {
+      payload.tags = JSON.stringify(Array.isArray(updates.tags) ? updates.tags : []);
+    }
+    if (updates.visibility !== undefined) {
+      payload.visibility = updates.visibility;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.scheduledAt !== undefined) {
+      payload.scheduled_at = updates.scheduledAt ?? null;
+    }
+    if (updates.publishedAt !== undefined) {
+      payload.published_at = updates.publishedAt ?? null;
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = JSON.stringify(updates.metadata ?? {});
+    }
+    if (updates.channelId !== undefined) {
+      payload.channel_id = updates.channelId ?? null;
+    }
+
+    if (Object.keys(payload).length === 1) {
+      return this.findById(id, connection);
+    }
+
+    await connection('community_posts').where({ id }).update(payload);
+    return this.findById(id, connection);
+  }
+
   static async archive(id, { metadata } = {}, connection = db) {
     const payload = {
       status: 'archived',
