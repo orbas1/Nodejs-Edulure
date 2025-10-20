@@ -430,6 +430,10 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
       if (video.isNotEmpty) 'videoUrl': video,
     };
     if (media.isEmpty) {
+      final existingMedia = widget.initialPost?.metadata['media'];
+      if (existingMedia is Map && existingMedia.isNotEmpty) {
+        return <String, dynamic>{};
+      }
       return null;
     }
     return media;
