@@ -21,6 +21,9 @@ const createSchema = Joi.object({
     .try(Joi.array().items(Joi.string().trim().max(5)), Joi.string().trim().max(120))
     .optional(),
   isbn: Joi.string().trim().max(32).allow(null, '').optional(),
+  coverImageUrl: Joi.string().uri().allow(null, '').optional(),
+  sampleDownloadUrl: Joi.string().uri().allow(null, '').optional(),
+  audiobookUrl: Joi.string().uri().allow(null, '').optional(),
   readingTimeMinutes: Joi.number().integer().min(0).max(100000).optional(),
   price: Joi.object({
     currency: Joi.string().length(3).uppercase().required(),
@@ -49,6 +52,9 @@ const updateSchema = Joi.object({
     .try(Joi.array().items(Joi.string().trim().max(5)), Joi.string().trim().max(120))
     .optional(),
   isbn: Joi.string().trim().max(32).allow(null, '').optional(),
+  coverImageUrl: Joi.string().uri().allow(null, '').optional(),
+  sampleDownloadUrl: Joi.string().uri().allow(null, '').optional(),
+  audiobookUrl: Joi.string().uri().allow(null, '').optional(),
   readingTimeMinutes: Joi.number().integer().min(0).max(100000).optional(),
   price: Joi.object({
     currency: Joi.string().length(3).uppercase().required(),
@@ -133,6 +139,9 @@ export default class EbookController {
         ...payload,
         priceCurrency: payload.price.currency,
         priceAmount,
+        coverImageUrl: payload.coverImageUrl || undefined,
+        sampleDownloadUrl: payload.sampleDownloadUrl || undefined,
+        audiobookUrl: payload.audiobookUrl || undefined,
         authors: normaliseArray(payload.authors),
         tags: normaliseArray(payload.tags),
         categories: normaliseArray(payload.categories),
@@ -158,6 +167,9 @@ export default class EbookController {
         ...payload,
         priceCurrency: payload.price?.currency,
         priceAmount,
+        coverImageUrl: payload.coverImageUrl || undefined,
+        sampleDownloadUrl: payload.sampleDownloadUrl || undefined,
+        audiobookUrl: payload.audiobookUrl || undefined,
         authors: normaliseArray(payload.authors),
         tags: normaliseArray(payload.tags),
         categories: normaliseArray(payload.categories),
