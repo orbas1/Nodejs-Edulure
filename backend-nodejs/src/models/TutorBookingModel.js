@@ -24,9 +24,12 @@ const BASE_COLUMNS = [
   'tp.display_name as tutorDisplayName',
   'tp.headline as tutorHeadline',
   'tp.metadata as tutorMetadata',
-  'learner.first_name as learnerFirstName',
-  'learner.last_name as learnerLastName',
-  'learner.email as learnerEmail'
+  'tu.first_name as tutorFirstName',
+  'tu.last_name as tutorLastName',
+  'tu.email as tutorEmail',
+  'lu.first_name as learnerFirstName',
+  'lu.last_name as learnerLastName',
+  'lu.email as learnerEmail'
 ];
 
 function parseJson(value, fallback) {
@@ -68,160 +71,138 @@ function deserialize(row) {
       id: row.tutorId,
       displayName: row.tutorDisplayName ?? null,
       headline: row.tutorHeadline ?? null,
-      metadata: parseJson(row.tutorMetadata, {})
+      metadata: parseJson(row.tutorMetadata, {}),
+      user: row.tutorEmail
+        ? {
+            email: row.tutorEmail,
+            firstName: row.tutorFirstName ?? null,
+            lastName: row.tutorLastName ?? null
+          }
+        : null
     },
-    learner: {
-      id: row.learnerId,
-      firstName: row.learnerFirstName ?? null,
-      lastName: row.learnerLastName ?? null,
-      email: row.learnerEmail ?? null
-    }
+    learner: row.learnerEmail
+      ? {
+          id: row.learnerId,
+          email: row.learnerEmail,
+          firstName: row.learnerFirstName ?? null,
+          lastName: row.learnerLastName ?? null
+        }
+      : null
   };
+}
+
+function serializeMetadata(value) {
+  if (value === null || value === undefined) return JSON.stringify({});
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+}
+
+function buildBaseQuery(connection = db) {
+  return connection(`${TABLE} as tb`)
+    .leftJoin('tutor_profiles as tp', 'tb.tutor_id', 'tp.id')
+    .leftJoin('users as tu', 'tp.user_id', 'tu.id')
+    .leftJoin('users as lu', 'tb.learner_id', 'lu.id')
+    .select(BASE_COLUMNS);
+}
+
+function applyStatusFilter(query, status) {
+  if (status && status !== 'all') {
+    query.andWhere('tb.status', status);
+  }
+  return query;
+}
+
+function applySearchFilter(query, search) {
+  if (!search) return query;
+  const term = `%${search.toLowerCase()}%`;
+  query.andWhere((builder) => {
+    builder
+      .whereRaw('LOWER(lu.email) LIKE ?', [term])
+      .orWhereRaw('LOWER(lu.first_name) LIKE ?', [term])
+      .orWhereRaw('LOWER(lu.last_name) LIKE ?', [term])
+      .orWhereRaw("LOWER(COALESCE(tb.meeting_url, '')) LIKE ?", [term]);
+  });
+  return query;
 }
 
 export default class TutorBookingModel {
   static async listByLearnerId(learnerId, { limit = 50 } = {}, connection = db) {
     if (!learnerId) return [];
-    const rows = await connection(`${TABLE} as tb`)
-      .leftJoin('tutor_profiles as tp', 'tb.tutor_id', 'tp.id')
-      .leftJoin('users as learner', 'tb.learner_id', 'learner.id')
-      .select(BASE_COLUMNS)
+    const rows = await buildBaseQuery(connection)
       .where('tb.learner_id', learnerId)
       .orderBy('tb.scheduled_start', 'desc')
       .limit(limit);
     return rows.map((row) => deserialize(row));
   }
 
-  static async list(
-    { search, status, tutorId, learnerId, from, to, limit = 25, offset = 0 } = {},
+  static async listForInstructor(
+    instructorUserId,
+    { status = 'all', search, limit = 25, offset = 0 } = {},
     connection = db
   ) {
-    const query = connection(`${TABLE} as tb`)
-      .leftJoin('tutor_profiles as tp', 'tb.tutor_id', 'tp.id')
-      .leftJoin('users as learner', 'tb.learner_id', 'learner.id')
-      .select(BASE_COLUMNS)
+    if (!instructorUserId) return [];
+    const query = buildBaseQuery(connection)
+      .where('tp.user_id', instructorUserId)
       .orderBy('tb.scheduled_start', 'desc');
-
-    if (tutorId) {
-      query.where('tb.tutor_id', tutorId);
+    applyStatusFilter(query, status);
+    applySearchFilter(query, search);
+    if (Number.isFinite(limit)) {
+      query.limit(limit);
     }
-
-    if (learnerId) {
-      query.where('tb.learner_id', learnerId);
+    if (Number.isFinite(offset) && offset > 0) {
+      query.offset(offset);
     }
-
-    if (status) {
-      const statuses = Array.isArray(status) ? status : [status];
-      query.whereIn('tb.status', statuses);
-    }
-
-    if (from) {
-      query.where('tb.scheduled_start', '>=', from);
-    }
-
-    if (to) {
-      query.where('tb.scheduled_start', '<=', to);
-    }
-
-    if (search) {
-      query.andWhere((builder) => {
-        builder
-          .whereILike('tp.display_name', `%${search}%`)
-          .orWhereILike('learner.email', `%${search}%`)
-          .orWhereILike('tb.meeting_url', `%${search}%`);
-      });
-    }
-
-    const rows = await query.limit(limit).offset(offset);
+    const rows = await query;
     return rows.map((row) => deserialize(row));
   }
 
-  static async count(
-    { search, status, tutorId, learnerId, from, to } = {},
-    connection = db
-  ) {
+  static async countForInstructor(instructorUserId, { status = 'all', search } = {}, connection = db) {
+    if (!instructorUserId) return 0;
     const query = connection(`${TABLE} as tb`)
       .leftJoin('tutor_profiles as tp', 'tb.tutor_id', 'tp.id')
-      .leftJoin('users as learner', 'tb.learner_id', 'learner.id');
-
-    if (tutorId) {
-      query.where('tb.tutor_id', tutorId);
-    }
-
-    if (learnerId) {
-      query.where('tb.learner_id', learnerId);
-    }
-
-    if (status) {
-      const statuses = Array.isArray(status) ? status : [status];
-      query.whereIn('tb.status', statuses);
-    }
-
-    if (from) {
-      query.where('tb.scheduled_start', '>=', from);
-    }
-
-    if (to) {
-      query.where('tb.scheduled_start', '<=', to);
-    }
-
-    if (search) {
-      query.andWhere((builder) => {
-        builder
-          .whereILike('tp.display_name', `%${search}%`)
-          .orWhereILike('learner.email', `%${search}%`)
-          .orWhereILike('tb.meeting_url', `%${search}%`);
-      });
-    }
-
+      .leftJoin('users as lu', 'tb.learner_id', 'lu.id');
+    query.where('tp.user_id', instructorUserId);
+    applyStatusFilter(query, status);
+    applySearchFilter(query, search);
     const result = await query.count({ total: '*' }).first();
     return Number(result?.total ?? 0);
   }
 
-  static async findById(id, connection = db) {
-    const row = await connection(`${TABLE} as tb`)
-      .leftJoin('tutor_profiles as tp', 'tb.tutor_id', 'tp.id')
-      .leftJoin('users as learner', 'tb.learner_id', 'learner.id')
-      .select(BASE_COLUMNS)
-      .where('tb.id', id)
-      .first();
-    return deserialize(row);
-  }
-
   static async findByPublicId(publicId, connection = db) {
-    const row = await connection(`${TABLE} as tb`)
-      .leftJoin('tutor_profiles as tp', 'tb.tutor_id', 'tp.id')
-      .leftJoin('users as learner', 'tb.learner_id', 'learner.id')
-      .select(BASE_COLUMNS)
-      .where('tb.public_id', publicId)
-      .first();
+    if (!publicId) return null;
+    const row = await buildBaseQuery(connection).where('tb.public_id', publicId).first();
     return deserialize(row);
   }
 
   static async create(booking, connection = db) {
     const payload = {
-      public_id: booking.publicId ?? randomUUID(),
+      public_id: booking.publicId,
       tutor_id: booking.tutorId,
       learner_id: booking.learnerId,
-      requested_at: booking.requestedAt ?? connection.fn.now(),
+      requested_at: booking.requestedAt ?? new Date(),
       confirmed_at: booking.confirmedAt ?? null,
       cancelled_at: booking.cancelledAt ?? null,
       completed_at: booking.completedAt ?? null,
       scheduled_start: booking.scheduledStart,
       scheduled_end: booking.scheduledEnd,
-      duration_minutes: booking.durationMinutes ?? 60,
-      hourly_rate_amount: booking.hourlyRateAmount ?? 0,
+      duration_minutes: booking.durationMinutes ?? null,
+      hourly_rate_amount: booking.hourlyRateAmount ?? null,
       hourly_rate_currency: booking.hourlyRateCurrency ?? 'USD',
       meeting_url: booking.meetingUrl ?? null,
       status: booking.status ?? 'requested',
-      metadata: JSON.stringify(booking.metadata ?? {})
+      metadata: serializeMetadata(booking.metadata ?? {})
     };
 
     const [id] = await connection(TABLE).insert(payload);
-    return this.findById(id, connection);
+    const created = await connection(TABLE)
+      .select('public_id as publicId')
+      .where({ id })
+      .first();
+    return this.findByPublicId(created?.publicId ?? booking.publicId, connection);
   }
 
-  static async updateById(id, updates, connection = db) {
+  static async updateByPublicId(publicId, updates, connection = db) {
+    if (!publicId) return null;
     const payload = {};
     if (updates.tutorId !== undefined) payload.tutor_id = updates.tutorId;
     if (updates.learnerId !== undefined) payload.learner_id = updates.learnerId;
@@ -236,20 +217,17 @@ export default class TutorBookingModel {
     if (updates.hourlyRateCurrency !== undefined) payload.hourly_rate_currency = updates.hourlyRateCurrency;
     if (updates.meetingUrl !== undefined) payload.meeting_url = updates.meetingUrl;
     if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
+    if (updates.metadata !== undefined) payload.metadata = serializeMetadata(updates.metadata ?? {});
 
-    if (Object.keys(payload).length === 0) {
-      return this.findById(id, connection);
+    if (Object.keys(payload).length > 0) {
+      await connection(TABLE).where({ public_id: publicId }).update(payload);
     }
 
-    await connection(TABLE)
-      .where({ id })
-      .update(payload);
-
-    return this.findById(id, connection);
+    return this.findByPublicId(publicId, connection);
   }
 
-  static async deleteById(id, connection = db) {
-    await connection(TABLE).where({ id }).del();
+  static async deleteByPublicId(publicId, connection = db) {
+    if (!publicId) return;
+    await connection(TABLE).where({ public_id: publicId }).del();
   }
 }

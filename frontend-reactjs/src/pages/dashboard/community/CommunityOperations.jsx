@@ -1,12 +1,23 @@
-import PropTypes from 'prop-types';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import PropTypes from "prop-types";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
+import DashboardActionFeedback from "../../../components/dashboard/DashboardActionFeedback.jsx";
+import DashboardStateMessage from "../../../components/dashboard/DashboardStateMessage.jsx";
 import {
   acknowledgeCommunityEscalation,
   publishCommunityRunbook
-} from '../../../api/communityApi.js';
-import { useAuth } from '../../../context/AuthContext.jsx';
+} from "../../../api/communityApi.js";
+import { useAuth } from "../../../context/AuthContext.jsx";
+
+const emptyRunbookForm = {
+  communityId: "",
+  title: "",
+  summary: "",
+  owner: "",
+  tagsInput: "",
+  linkUrl: "",
+  automationReady: false
+};
 
 export default function CommunityOperations({ dashboard, onRefresh }) {
   const { session } = useAuth();
@@ -25,8 +36,14 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
   );
   const [runbooks, setRunbooks] = useState(initialRunbooks);
   const [escalations, setEscalations] = useState(initialEscalations);
-  const [error, setError] = useState(null);
+  const [runbookForm, setRunbookForm] = useState({
+    ...emptyRunbookForm,
+    owner: session?.profile?.name ?? "Operations team"
+  });
+  const [ackNotes, setAckNotes] = useState({});
+  const [feedback, setFeedback] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ackPendingId, setAckPendingId] = useState(null);
 
   useEffect(() => {
     setRunbooks(initialRunbooks);
@@ -36,106 +53,162 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
     setEscalations(initialEscalations);
   }, [initialEscalations]);
 
-  const handlePublishRunbook = useCallback(async () => {
-    if (!token) {
-      setError('You must be signed in to publish runbooks.');
-      return;
-    }
-    setError(null);
-    const title = window.prompt('Runbook title');
-    if (!title) {
-      return;
-    }
-    const summary = window.prompt('Runbook summary') ?? '';
-    const owner = window.prompt('Runbook owner', 'Operations team') ?? 'Operations team';
-    const automationReady = window.confirm('Mark runbook as automation ready?');
-    const linkUrl = window.prompt('Runbook link (optional)') ?? undefined;
-
-    const resolvedCommunityId =
-      dashboard?.operations?.targetCommunityId ??
-      runbooks[0]?.communityId ??
-      escalations[0]?.communityId ??
-      window.prompt('Target community ID');
-
-    if (!resolvedCommunityId) {
-      setError('Community identifier is required to publish a runbook.');
-      return;
-    }
-
-    const optimisticRunbook = {
-      id: `temp-${Date.now()}`,
-      title,
-      summary,
-      owner,
-      automationReady,
-      tags: [],
-      linkUrl: linkUrl || null,
-      updatedAt: new Date().toISOString(),
-      communityId: resolvedCommunityId
-    };
-
-    setRunbooks((prev) => [optimisticRunbook, ...prev]);
-    setIsSubmitting(true);
-    try {
-      const response = await publishCommunityRunbook({
-        communityId: resolvedCommunityId,
-        token,
-        payload: {
-          title,
-          summary,
-          owner,
-          automationReady,
-          linkUrl: linkUrl || undefined,
-          tags: []
+  const communityOptions = useMemo(() => {
+    const options = new Map();
+    if (Array.isArray(dashboard?.operations?.communities)) {
+      dashboard.operations.communities.forEach((community) => {
+        if (community?.id) {
+          options.set(String(community.id), {
+            value: String(community.id),
+            label: community.name ?? community.title ?? `Community ${community.id}`
+          });
         }
       });
-      if (response.data) {
-        setRunbooks((prev) =>
-          prev.map((runbook) => (runbook.id === optimisticRunbook.id ? response.data : runbook))
-        );
-      }
-    } catch (err) {
-      setRunbooks((prev) => prev.filter((runbook) => runbook.id !== optimisticRunbook.id));
-      setError(err?.message || 'Failed to publish runbook.');
-    } finally {
-      setIsSubmitting(false);
     }
-  }, [dashboard?.id, token]);
+    [...runbooks, ...escalations].forEach((item) => {
+      if (!item?.communityId) return;
+      const key = String(item.communityId);
+      if (!options.has(key)) {
+        options.set(key, {
+          value: key,
+          label: item.communityName ?? item.community ?? `Community ${key}`
+        });
+      }
+    });
+    return Array.from(options.values());
+  }, [dashboard?.operations?.communities, escalations, runbooks]);
+
+  const defaultCommunityId = useMemo(() => {
+    if (dashboard?.operations?.targetCommunityId) {
+      return String(dashboard.operations.targetCommunityId);
+    }
+    if (communityOptions.length > 0) {
+      return communityOptions[0].value;
+    }
+    if (runbooks[0]?.communityId) {
+      return String(runbooks[0].communityId);
+    }
+    if (escalations[0]?.communityId) {
+      return String(escalations[0].communityId);
+    }
+    return "";
+  }, [communityOptions, dashboard?.operations?.targetCommunityId, escalations, runbooks]);
+
+  useEffect(() => {
+    setRunbookForm((previous) => ({
+      ...previous,
+      communityId: previous.communityId || defaultCommunityId
+    }));
+  }, [defaultCommunityId]);
+
+  const handleRunbookFieldChange = useCallback((event) => {
+    const { name, value, type, checked } = event.target;
+    setRunbookForm((previous) => ({
+      ...previous,
+      [name]: type === "checkbox" ? checked : value
+    }));
+  }, []);
+
+  const handleRunbookSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!token) {
+        setFeedback({ tone: "error", message: "You must be signed in to publish runbooks." });
+        return;
+      }
+      if (!runbookForm.communityId) {
+        setFeedback({ tone: "error", message: "Select a community to attach the runbook to." });
+        return;
+      }
+      if (!runbookForm.title) {
+        setFeedback({ tone: "error", message: "Runbook title is required." });
+        return;
+      }
+      setIsSubmitting(true);
+      setFeedback(null);
+      const tags = runbookForm.tagsInput
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      const optimistic = {
+        id: `temp-${Date.now()}`,
+        title: runbookForm.title,
+        summary: runbookForm.summary,
+        owner: runbookForm.owner || "Operations team",
+        automationReady: runbookForm.automationReady,
+        tags,
+        linkUrl: runbookForm.linkUrl || null,
+        updatedAt: new Date().toISOString(),
+        communityId: runbookForm.communityId
+      };
+      setRunbooks((previous) => [optimistic, ...previous]);
+      try {
+        const response = await publishCommunityRunbook({
+          communityId: runbookForm.communityId,
+          token,
+          payload: {
+            title: runbookForm.title,
+            summary: runbookForm.summary,
+            owner: runbookForm.owner || "Operations team",
+            automationReady: runbookForm.automationReady,
+            linkUrl: runbookForm.linkUrl || undefined,
+            tags
+          }
+        });
+        if (response.data) {
+          setRunbooks((previous) =>
+            previous.map((runbook) => (runbook.id === optimistic.id ? response.data : runbook))
+          );
+          setFeedback({ tone: "success", message: "Runbook published successfully." });
+        }
+        setRunbookForm({
+          ...emptyRunbookForm,
+          owner: runbookForm.owner,
+          communityId: runbookForm.communityId
+        });
+      } catch (error) {
+        setRunbooks((previous) => previous.filter((runbook) => runbook.id !== optimistic.id));
+        setFeedback({ tone: "error", message: error?.message ?? "Failed to publish runbook." });
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [runbookForm, token]
+  );
 
   const handleAcknowledge = useCallback(
     async (task) => {
       if (!token) {
-        setError('You must be signed in to acknowledge escalations.');
+        setFeedback({ tone: "error", message: "You must be signed in to acknowledge escalations." });
         return;
       }
-      setError(null);
-      const resolvedCommunityId =
-        dashboard?.operations?.targetCommunityId ??
-        task.communityId ??
-        runbooks[0]?.communityId ??
-        window.prompt('Target community ID');
-
-      if (!resolvedCommunityId) {
-        setError('Community identifier is required to acknowledge escalations.');
+      const targetCommunityId =
+        runbookForm.communityId || defaultCommunityId || String(task.communityId ?? "");
+      if (!targetCommunityId) {
+        setFeedback({ tone: "error", message: "Community identifier required to acknowledge." });
         return;
       }
-
-      const note = window.prompt('Add acknowledgement note (optional)') ?? '';
-      const optimistic = { ...task, status: 'Acknowledged' };
-      setEscalations((prev) => prev.map((item) => (item.id === task.id ? optimistic : item)));
+      setAckPendingId(task.id);
+      setFeedback(null);
+      const note = ackNotes[task.id] ?? "";
+      const optimistic = { ...task, status: "Acknowledged" };
+      setEscalations((previous) => previous.map((item) => (item.id === task.id ? optimistic : item)));
       try {
         await acknowledgeCommunityEscalation({
-          communityId: resolvedCommunityId,
+          communityId: targetCommunityId,
           escalationId: task.id,
           token,
           payload: note ? { note } : {}
         });
-      } catch (err) {
-        setEscalations((prev) => prev.map((item) => (item.id === task.id ? task : item)));
-        setError('Failed to acknowledge escalation.');
+        setFeedback({ tone: "success", message: "Escalation acknowledged." });
+      } catch (error) {
+        setEscalations((previous) => previous.map((item) => (item.id === task.id ? task : item)));
+        setFeedback({ tone: "error", message: error?.message ?? "Failed to acknowledge escalation." });
+      } finally {
+        setAckPendingId(null);
       }
     },
-    [dashboard?.id, token]
+    [ackNotes, defaultCommunityId, runbookForm.communityId, token]
   );
 
   if (!dashboard) {
@@ -151,6 +224,7 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
 
   return (
     <div className="space-y-8">
+      <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
       <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="dashboard-title">Operations command center</h1>
@@ -165,36 +239,116 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <article className="dashboard-section space-y-5">
-        <div>
-          <p className="dashboard-kicker">Runbooks</p>
-          <h2 className="text-lg font-semibold text-slate-900">Automation-ready playbooks</h2>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="dashboard-pill px-4 py-2"
-            onClick={handlePublishRunbook}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Publishing…' : 'Publish runbook'}
-          </button>
-        </div>
-        <ul className="space-y-4">
-          {runbooks.map((runbook) => (
-            <li key={runbook.id} className="rounded-2xl border border-slate-200 p-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
+          <div>
+            <p className="dashboard-kicker">Runbooks</p>
+            <h2 className="text-lg font-semibold text-slate-900">Automation-ready playbooks</h2>
+          </div>
+          <form className="grid gap-4 rounded-2xl border border-slate-200 bg-white/70 p-4" onSubmit={handleRunbookSubmit}>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Target community
+                <select
+                  name="communityId"
+                  value={runbookForm.communityId}
+                  onChange={handleRunbookFieldChange}
+                  className="dashboard-input"
+                >
+                  <option value="">Select community</option>
+                  {communityOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Owner
+                <input
+                  name="owner"
+                  value={runbookForm.owner}
+                  onChange={handleRunbookFieldChange}
+                  className="dashboard-input"
+                  placeholder="Operations team"
+                />
+              </label>
+            </div>
+            <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Title
+              <input
+                required
+                name="title"
+                value={runbookForm.title}
+                onChange={handleRunbookFieldChange}
+                className="dashboard-input"
+                placeholder="Incident response ritual"
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Summary
+              <textarea
+                name="summary"
+                value={runbookForm.summary}
+                onChange={handleRunbookFieldChange}
+                className="dashboard-input min-h-[100px]"
+                placeholder="Outline the cadence, tooling, and roles involved in this ritual."
+              />
+            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tags
+                <input
+                  name="tagsInput"
+                  value={runbookForm.tagsInput}
+                  onChange={handleRunbookFieldChange}
+                  className="dashboard-input"
+                  placeholder="escalation, moderation, onboarding"
+                />
+              </label>
+              <label className="grid gap-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Link URL
+                <input
+                  name="linkUrl"
+                  value={runbookForm.linkUrl}
+                  onChange={handleRunbookFieldChange}
+                  className="dashboard-input"
+                  placeholder="https://docs.example.com/runbook"
+                />
+              </label>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <input
+                type="checkbox"
+                name="automationReady"
+                checked={runbookForm.automationReady}
+                onChange={handleRunbookFieldChange}
+              />
+              Automation ready
+            </label>
+            <div className="flex justify-end">
+              <button type="submit" className="dashboard-primary-pill px-5 py-2" disabled={isSubmitting}>
+                {isSubmitting ? "Publishing…" : "Publish runbook"}
+              </button>
+            </div>
+          </form>
+          <ul className="space-y-4">
+            {runbooks.map((runbook) => (
+              <li key={runbook.id} className="rounded-2xl border border-slate-200 p-5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
                     <p className="text-base font-semibold text-slate-900">{runbook.title}</p>
                     <p className="mt-1 text-xs text-slate-500">Maintained by {runbook.owner}</p>
                   </div>
                   <span
                     className={`dashboard-pill px-3 py-1 text-xs font-semibold ${
-                      runbook.automationReady ? 'border-primary/30 text-primary' : 'border-slate-200 text-slate-500'
+                      runbook.automationReady ? "border-primary/30 text-primary" : "border-slate-200 text-slate-500"
                     }`}
                   >
-                    {runbook.automationReady ? 'Automation ready' : 'Manual workflow'}
+                    {runbook.automationReady ? "Automation ready" : "Manual workflow"}
                   </span>
                 </div>
+                {runbook.summary ? (
+                  <p className="mt-3 text-sm text-slate-600">{runbook.summary}</p>
+                ) : null}
                 <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
                   {runbook.tags?.map((tag) => (
                     <span key={`${runbook.id}-${tag}`} className="dashboard-pill px-3 py-1">
@@ -202,6 +356,16 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
                     </span>
                   ))}
                   <span className="dashboard-pill px-3 py-1">Updated {runbook.updatedAt}</span>
+                  {runbook.linkUrl ? (
+                    <a
+                      href={runbook.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="dashboard-pill px-3 py-1 text-primary hover:underline"
+                    >
+                      View documentation
+                    </a>
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -219,37 +383,45 @@ export default function CommunityOperations({ dashboard, onRefresh }) {
             <p className="dashboard-kicker">Escalations</p>
             <h2 className="text-lg font-semibold text-slate-900">Operational backlog</h2>
           </div>
-          {error ? (
-            <div
-              role="alert"
-              className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4 text-sm text-rose-700"
-            >
-              {error}
-            </div>
-          ) : null}
           <ul className="space-y-4">
             {escalations.map((task) => (
               <li key={task.id} className="rounded-2xl border border-amber-200 bg-amber-50/60 p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-base font-semibold text-amber-900">{task.title}</p>
-                    <p className="mt-1 text-xs uppercase tracking-wide text-amber-600">Due {task.due}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-amber-600">
+                      Due {task.due ?? task.sla ?? "soon"}
+                    </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="dashboard-pill border-amber-200 px-3 py-1 text-xs font-semibold text-amber-700">
-                      {task.status}
-                    </span>
-                    <button
-                      type="button"
-                      className="dashboard-pill border-amber-300 px-3 py-1 text-xs font-semibold text-amber-800"
-                      onClick={() => handleAcknowledge(task)}
-                    >
-                      Acknowledge
-                    </button>
-                  </div>
+                  <span className="dashboard-pill border-amber-200 px-3 py-1 text-xs font-semibold text-amber-800">
+                    {task.status}
+                  </span>
                 </div>
-                <p className="mt-3 text-sm text-amber-800">{task.community}</p>
-                <p className="mt-1 text-xs text-amber-700">Owner: {task.owner}</p>
+                {task.community ? (
+                  <p className="mt-3 text-sm text-amber-800">{task.community}</p>
+                ) : null}
+                <p className="mt-1 text-xs text-amber-700">Owner: {task.owner ?? "Operations"}</p>
+                <label className="mt-3 block text-xs text-amber-700">
+                  Acknowledgement note
+                  <textarea
+                    value={ackNotes[task.id] ?? ""}
+                    onChange={(event) =>
+                      setAckNotes((previous) => ({ ...previous, [task.id]: event.target.value }))
+                    }
+                    className="dashboard-input mt-1"
+                    placeholder="Document actions, next steps, or hand-offs."
+                  />
+                </label>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
+                  <button
+                    type="button"
+                    className="dashboard-pill border-amber-300 bg-white px-3 py-1 text-amber-700"
+                    onClick={() => handleAcknowledge(task)}
+                    disabled={ackPendingId === task.id}
+                  >
+                    {ackPendingId === task.id ? "Submitting…" : "Acknowledge"}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
