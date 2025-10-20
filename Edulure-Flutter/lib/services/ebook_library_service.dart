@@ -8,25 +8,53 @@ import '../provider/learning/learning_models.dart';
 import 'content_service.dart';
 import 'ebook_reader_backend.dart';
 
+class EbookDownloadException implements Exception {
+  const EbookDownloadException(this.message, [this.cause]);
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() => cause == null ? message : '$message (${cause.toString()})';
+}
+
 class EbookLibraryService implements EbookReaderBackend {
-  EbookLibraryService({Dio? httpClient})
-      : _client = httpClient ?? Dio(BaseOptions(receiveTimeout: const Duration(seconds: 30)));
+  EbookLibraryService({
+    Dio? httpClient,
+    Future<Directory> Function()? libraryDirectoryBuilder,
+  })  : _client = httpClient ?? Dio(BaseOptions(receiveTimeout: const Duration(seconds: 30))),
+        _libraryDirectoryBuilder =
+            libraryDirectoryBuilder ?? _defaultLibraryDirectoryBuilder;
 
   static const _filesBoxName = 'ebook_library.files';
   static const _progressBoxName = 'ebook_library.progress';
   static const _preferencesBoxName = 'ebook_library.preferences';
 
   final Dio _client;
+  final Future<Directory> Function() _libraryDirectoryBuilder;
   Box<dynamic>? _filesBox;
   Box<dynamic>? _progressBox;
   Box<dynamic>? _preferencesBox;
   Directory? _libraryDirectory;
+  Future<void>? _ensureReadyFuture;
+  bool _ready = false;
 
   Future<void> ensureReady() async {
-    _filesBox ??= await Hive.openBox<dynamic>(_filesBoxName);
-    _progressBox ??= await Hive.openBox<dynamic>(_progressBoxName);
-    _preferencesBox ??= await Hive.openBox<dynamic>(_preferencesBoxName);
-    _libraryDirectory ??= await _prepareLibraryDirectory();
+    if (_ready) {
+      _hydrateSynchronousCaches();
+      return;
+    }
+    if (_ensureReadyFuture != null) {
+      return _ensureReadyFuture!;
+    }
+    final future = _initialize();
+    _ensureReadyFuture = future;
+    try {
+      await future;
+      _ready = true;
+    } finally {
+      _ensureReadyFuture = null;
+    }
   }
 
   Future<String> ensureDownloaded(Ebook ebook) async {
@@ -38,9 +66,24 @@ class EbookLibraryService implements EbookReaderBackend {
     final fileName = _buildFileName(ebook);
     final directory = _libraryDirectory!;
     final filePath = '${directory.path}/$fileName';
-    await _client.download(ebook.fileUrl, filePath);
-    await _filesBox?.put(ebook.id, filePath);
-    return filePath;
+    final file = File(filePath);
+    try {
+      await _client.download(ebook.fileUrl, filePath);
+      await _filesBox?.put(ebook.id, filePath);
+      return filePath;
+    } on DioException catch (error) {
+      await _cleanupFailedDownload(file, ebook.id);
+      throw EbookDownloadException(
+        'Failed to download "${ebook.title}". Check your connection and try again.',
+        error,
+      );
+    } catch (error) {
+      await _cleanupFailedDownload(file, ebook.id);
+      throw EbookDownloadException(
+        'Failed to save "${ebook.title}" to your offline library.',
+        error,
+      );
+    }
   }
 
   Future<void> removeDownload(String ebookId) async {
@@ -56,6 +99,7 @@ class EbookLibraryService implements EbookReaderBackend {
   }
 
   bool isDownloaded(String ebookId) {
+    _filesBox ??= _maybeOpenBox(_filesBoxName);
     final cached = _filesBox?.get(ebookId);
     if (cached is String) {
       final file = File(cached);
@@ -91,6 +135,7 @@ class EbookLibraryService implements EbookReaderBackend {
 
   @override
   ReaderPreferences loadReaderPreferences() {
+    _preferencesBox ??= _maybeOpenBox(_preferencesBoxName);
     final raw = _preferencesBox?.get('preferences');
     if (raw is Map) {
       return ReaderPreferences.fromJson(Map<String, dynamic>.from(raw as Map));
@@ -121,12 +166,7 @@ class EbookLibraryService implements EbookReaderBackend {
   }
 
   Future<Directory> _prepareLibraryDirectory() async {
-    final root = await getApplicationDocumentsDirectory();
-    final directory = Directory('${root.path}/edulure/library');
-    if (!await directory.exists()) {
-      await directory.create(recursive: true);
-    }
-    return directory;
+    return _libraryDirectoryBuilder();
   }
 
   String _buildFileName(Ebook ebook) {
@@ -136,5 +176,42 @@ class EbookLibraryService implements EbookReaderBackend {
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-');
     return '${ebook.id}-$sanitized.$extension';
+  }
+
+  Future<void> _initialize() async {
+    _filesBox ??= await Hive.openBox<dynamic>(_filesBoxName);
+    _progressBox ??= await Hive.openBox<dynamic>(_progressBoxName);
+    _preferencesBox ??= await Hive.openBox<dynamic>(_preferencesBoxName);
+    _libraryDirectory ??= await _prepareLibraryDirectory();
+    _hydrateSynchronousCaches();
+  }
+
+  Future<void> _cleanupFailedDownload(File file, String ebookId) async {
+    if (await file.exists()) {
+      await file.delete();
+    }
+    await _filesBox?.delete(ebookId);
+  }
+
+  void _hydrateSynchronousCaches() {
+    _filesBox ??= _maybeOpenBox(_filesBoxName);
+    _progressBox ??= _maybeOpenBox(_progressBoxName);
+    _preferencesBox ??= _maybeOpenBox(_preferencesBoxName);
+  }
+
+  Box<dynamic>? _maybeOpenBox(String name) {
+    if (Hive.isBoxOpen(name)) {
+      return Hive.box<dynamic>(name);
+    }
+    return null;
+  }
+
+  static Future<Directory> _defaultLibraryDirectoryBuilder() async {
+    final root = await getApplicationDocumentsDirectory();
+    final directory = Directory('${root.path}/edulure/library');
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
+    }
+    return directory;
   }
 }
