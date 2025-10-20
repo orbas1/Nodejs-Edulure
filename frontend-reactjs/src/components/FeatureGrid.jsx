@@ -108,7 +108,7 @@ export default function FeatureGrid() {
 
   return (
     <section className="bg-slate-50/70">
-      <HomeSection pad="py-20">
+      <HomeSection pad="cozy">
         <div className="md:text-center">
           <p className="text-xs font-semibold uppercase tracking-wide text-primary">{eyebrow}</p>
           <h2 className="mt-3 text-3xl font-semibold text-slate-900">{heading}</h2>

@@ -51,7 +51,7 @@ export default function PerksGrid() {
 
   return (
     <section className="bg-gradient-to-b from-slate-50 via-white to-slate-100/70">
-      <HomeSection pad="py-20">
+      <HomeSection pad="cozy">
         <div className="max-w-3xl">
           <p className="text-xs font-semibold uppercase tracking-[0.35em] text-primary">
             {eyebrow}
