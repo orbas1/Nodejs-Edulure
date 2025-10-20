@@ -14,6 +14,11 @@ const platformSettingsServiceMock = vi.hoisted(() => ({
   calculateCommission: vi.fn(() => 0)
 }));
 
+const escrowServiceMock = vi.hoisted(() => ({
+  isConfigured: vi.fn(() => true),
+  createTransaction: vi.fn()
+}));
+
 vi.mock('../src/config/logger.js', () => ({
   default: {
     child: () => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }),
@@ -36,6 +41,10 @@ vi.mock('../src/config/database.js', () => ({
 
 vi.mock('../src/services/PlatformSettingsService.js', () => ({
   default: platformSettingsServiceMock
+}));
+
+vi.mock('../src/services/EscrowService.js', () => ({
+  default: escrowServiceMock
 }));
 
 const mockedModules = vi.hoisted(() => {
@@ -132,6 +141,9 @@ describe('PaymentService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     transactionSpy.mockClear();
+    escrowServiceMock.isConfigured.mockReset();
+    escrowServiceMock.createTransaction.mockReset();
+    escrowServiceMock.isConfigured.mockReturnValue(true);
     platformSettingsServiceMock.getMonetizationSettings.mockResolvedValue({
       commissions: {
         enabled: true,
@@ -319,6 +331,96 @@ describe('PaymentService', () => {
         discount: 240,
         tax: 48,
         total: 1308
+      }
+    });
+  });
+
+  it('creates Escrow payment intents with buyer and seller context', async () => {
+    env.payments.tax.inclusive = false;
+    env.payments.tax.minimumRate = 0;
+    env.payments.tax.table = {};
+
+    const escrowTransaction = {
+      id: 'escrow-transaction-1',
+      status: 'pending',
+      checkoutUrl: 'https://escrow.test/checkout/escrow-transaction-1'
+    };
+
+    escrowServiceMock.createTransaction.mockResolvedValue(escrowTransaction);
+
+    paymentIntentModel.create.mockImplementation(async (payload) => ({
+      ...payload,
+      id: 44,
+      publicId: payload.publicId,
+      status: payload.status,
+      amountSubtotal: payload.amountSubtotal,
+      amountDiscount: payload.amountDiscount,
+      amountTax: payload.amountTax,
+      amountTotal: payload.amountTotal,
+      amountRefunded: payload.amountRefunded,
+      taxBreakdown: payload.taxBreakdown,
+      metadata: payload.metadata,
+      couponId: payload.couponId,
+      entityType: payload.entityType,
+      entityId: payload.entityId,
+      receiptEmail: payload.receiptEmail,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+
+    const result = await PaymentService.createPaymentIntent({
+      userId: 'user-escrow',
+      provider: 'escrow',
+      currency: 'USD',
+      entity: { id: 'order-1', type: 'commerce-item', name: 'Marketplace Order' },
+      items: [
+        { id: 'item-1', name: 'Service package', unitAmount: 2000, quantity: 1 }
+      ],
+      escrow: {
+        buyer: { email: 'buyer@example.com', firstName: 'Buyer', lastName: 'Example' },
+        seller: { email: 'seller@example.com', firstName: 'Seller', lastName: 'Example' },
+        description: 'Custom service escrow'
+      }
+    });
+
+    expect(escrowServiceMock.isConfigured).toHaveBeenCalled();
+    expect(escrowServiceMock.createTransaction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        publicId: expect.any(String),
+        amountCents: 2000,
+        currency: 'USD',
+        description: 'Custom service escrow',
+        buyer: { email: 'buyer@example.com', firstName: 'Buyer', lastName: 'Example' },
+        seller: { email: 'seller@example.com', firstName: 'Seller', lastName: 'Example' }
+      })
+    );
+    expect(paymentIntentModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: 'escrow',
+        status: 'requires_action',
+        amountSubtotal: 2000,
+        amountDiscount: 0,
+        amountTax: 0,
+        amountTotal: 2000,
+        metadata: expect.objectContaining({
+          escrow: escrowTransaction
+        })
+      })
+    );
+    expect(result).toEqual({
+      provider: 'escrow',
+      paymentId: expect.any(String),
+      status: 'requires_action',
+      totals: {
+        subtotal: 2000,
+        discount: 0,
+        tax: 0,
+        total: 2000
+      },
+      escrow: {
+        transactionId: 'escrow-transaction-1',
+        status: 'pending',
+        redirectUrl: 'https://escrow.test/checkout/escrow-transaction-1'
       }
     });
   });
