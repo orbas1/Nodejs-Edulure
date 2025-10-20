@@ -23,13 +23,14 @@
         "last_login_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
         "password_changed_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
         "last_verification_sent_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
-        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP", "extra": "on update CURRENT_TIMESTAMP" },
         "deleted_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null }
       },
       "indexes": [
         { "name": "PRIMARY", "columns": ["id"], "unique": true },
-        { "name": "users_email_unique", "columns": ["email"], "unique": true }
+        { "name": "users_email_unique", "columns": ["email"], "unique": true },
+        { "name": "idx_users_role", "columns": ["role"], "unique": false }
       ]
     },
     "communities": {
@@ -42,8 +43,8 @@
         "cover_image_url": { "dataType": "varchar", "columnType": "varchar(500)", "isNullable": true, "columnDefault": null },
         "visibility": { "dataType": "enum", "columnType": "enum('public','private')", "isNullable": false, "columnDefault": "public" },
         "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
-        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
+        "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP", "extra": "on update CURRENT_TIMESTAMP" },
         "deleted_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null }
       },
       "indexes": [
@@ -206,7 +207,7 @@
         "variants": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
         "environments": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "[\"development\",\"staging\",\"production\"]" },
         "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
@@ -234,7 +235,7 @@
         "updated_by": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": false, "columnDefault": null },
         "activated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
         "deactivated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
@@ -269,7 +270,7 @@
         "dry_run": { "dataType": "tinyint", "columnType": "tinyint(1)", "isNullable": false, "columnDefault": "0" },
         "trace_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": true, "columnDefault": null },
         "correlation_id": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": true, "columnDefault": null },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
@@ -294,7 +295,7 @@
         "active": { "dataType": "tinyint", "columnType": "tinyint(1)", "isNullable": false, "columnDefault": "1" },
         "criteria": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
         "description": { "dataType": "varchar", "columnType": "varchar(255)", "isNullable": false, "columnDefault": null },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
@@ -312,7 +313,7 @@
         "strategy": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": false, "columnDefault": null },
         "retention_days": { "dataType": "int", "columnType": "int unsigned", "isNullable": false, "columnDefault": "365" },
         "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
@@ -352,7 +353,7 @@
         "expires_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": null },
         "failure_code": { "dataType": "varchar", "columnType": "varchar(60)", "isNullable": true, "columnDefault": null },
         "failure_message": { "dataType": "varchar", "columnType": "varchar(500)", "isNullable": true, "columnDefault": null },
-        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" },
+        "created_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "timestamp", "columnType": "timestamp", "isNullable": true, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [

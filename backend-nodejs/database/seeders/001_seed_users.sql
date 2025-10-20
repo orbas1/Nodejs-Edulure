@@ -8,8 +8,11 @@ INSERT INTO users (
   address,
   two_factor_enabled,
   two_factor_enrolled_at,
+  two_factor_last_verified_at,
   email_verified_at,
-  last_login_at
+  last_login_at,
+  password_changed_at,
+  last_verification_sent_at
 )
 VALUES
   (
@@ -21,6 +24,9 @@ VALUES
     34,
     'London, UK',
     1,
+    NOW(),
+    NOW(),
+    NOW(),
     NOW(),
     NOW(),
     NOW()
@@ -35,7 +41,10 @@ VALUES
     'Austin, US',
     0,
     NULL,
+    NULL,
     NOW(),
+    NOW(),
+    NULL,
     NOW()
   ),
   (
@@ -48,7 +57,10 @@ VALUES
     'Toronto, CA',
     0,
     NULL,
+    NULL,
     NOW(),
+    NOW(),
+    NULL,
     NOW()
   )
 ON DUPLICATE KEY UPDATE
@@ -60,5 +72,8 @@ ON DUPLICATE KEY UPDATE
   address = VALUES(address),
   two_factor_enabled = VALUES(two_factor_enabled),
   two_factor_enrolled_at = VALUES(two_factor_enrolled_at),
+  two_factor_last_verified_at = VALUES(two_factor_last_verified_at),
   email_verified_at = VALUES(email_verified_at),
-  last_login_at = VALUES(last_login_at);
+  last_login_at = VALUES(last_login_at),
+  password_changed_at = VALUES(password_changed_at),
+  last_verification_sent_at = VALUES(last_verification_sent_at);
