@@ -86,6 +86,20 @@ const listAffiliatesQuery = Joi.object({
   status: Joi.string().valid('pending', 'approved', 'suspended', 'revoked').optional()
 });
 
+const listSubscriptionsQuery = Joi.object({
+  status: Joi.string()
+    .valid('active', 'paused', 'canceled', 'pending', 'incomplete', 'trialing')
+    .optional(),
+  search: Joi.string().max(120).allow('', null)
+});
+
+const updateSubscriptionSchema = Joi.object({
+  status: Joi.string().valid('active', 'paused', 'canceled'),
+  cancelAtPeriodEnd: Joi.boolean()
+})
+  .min(1)
+  .messages({ 'object.min': 'At least one field must be provided to update a subscription' });
+
 export default class CommunityMonetizationController {
   static async listRoles(req, res, next) {
     try {
@@ -139,6 +153,58 @@ export default class CommunityMonetizationController {
       );
       return success(res, { data: tiers, message: 'Paywall tiers fetched' });
     } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async revenueSummary(req, res, next) {
+    try {
+      const summary = await CommunityMonetizationService.getRevenueSummary(req.params.communityId, req.user.id);
+      return success(res, { data: summary, message: 'Community revenue summary fetched' });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async listSubscriptions(req, res, next) {
+    try {
+      const filters = await listSubscriptionsQuery.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const subscriptions = await CommunityMonetizationService.listSubscriptionsForCommunity(
+        req.params.communityId,
+        req.user.id,
+        filters
+      );
+      return success(res, { data: subscriptions, message: 'Community subscriptions fetched' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async updateSubscription(req, res, next) {
+    try {
+      const payload = await updateSubscriptionSchema.validateAsync(req.body ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const subscription = await CommunityMonetizationService.updateSubscription(
+        req.params.communityId,
+        req.user.id,
+        req.params.subscriptionId,
+        payload
+      );
+      return success(res, { data: subscription, message: 'Subscription updated' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
       return next(error);
     }
   }

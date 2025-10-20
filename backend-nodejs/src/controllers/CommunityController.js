@@ -11,6 +11,17 @@ const createSchema = Joi.object({
   metadata: Joi.object().default({})
 });
 
+const updateSchema = Joi.object({
+  name: Joi.string().trim().min(3).max(150),
+  slug: Joi.string().trim().max(150).allow('', null),
+  description: Joi.string().max(2000).allow('', null),
+  coverImageUrl: Joi.string().uri().allow('', null),
+  visibility: Joi.string().valid('public', 'private'),
+  metadata: Joi.object()
+})
+  .min(1)
+  .messages({ 'object.min': 'At least one field must be provided for update' });
+
 const feedQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).default(1),
   perPage: Joi.number().integer().min(1).max(100).default(10),
@@ -32,6 +43,20 @@ const createPostSchema = Joi.object({
   publishedAt: Joi.date().optional(),
   metadata: Joi.object().default({})
 });
+
+const updatePostSchema = Joi.object({
+  channelId: Joi.number().integer().min(1),
+  title: Joi.string().max(200).allow(null, ''),
+  body: Joi.string().min(10).max(8000),
+  tags: Joi.array().items(Joi.string().trim().max(40)).max(12),
+  visibility: Joi.string().valid('public', 'members', 'admins'),
+  status: Joi.string().valid('draft', 'scheduled', 'published', 'archived'),
+  scheduledAt: Joi.date().optional().allow(null),
+  publishedAt: Joi.date().optional().allow(null),
+  metadata: Joi.object()
+})
+  .min(1)
+  .messages({ 'object.min': 'At least one field must be provided for update' });
 
 const listResourcesQuerySchema = Joi.object({
   limit: Joi.number().integer().min(1).max(50).default(10),
@@ -123,6 +148,22 @@ export default class CommunityController {
     }
   }
 
+  static async update(req, res, next) {
+    try {
+      const payload = await updateSchema.validateAsync(req.body ?? {}, { abortEarly: false, stripUnknown: true });
+      const community = await CommunityService.updateCommunity(req.params.communityId, req.user.id, payload, {
+        actorRole: req.user.role
+      });
+      return success(res, { data: community, message: 'Community updated' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
   static async getDetail(req, res, next) {
     try {
       const community = await CommunityService.getCommunityDetail(req.params.communityId, req.user.id);
@@ -190,6 +231,26 @@ export default class CommunityController {
       if (error.isJoi) {
         error.status = 422;
         error.details = error.details.map((d) => d.message);
+      }
+      return next(error);
+    }
+  }
+
+  static async updatePost(req, res, next) {
+    try {
+      const payload = await updatePostSchema.validateAsync(req.body ?? {}, { abortEarly: false, stripUnknown: true });
+      const post = await CommunityService.updatePost(
+        req.params.communityId,
+        Number(req.params.postId),
+        req.user.id,
+        payload,
+        { actorRole: req.user.role }
+      );
+      return success(res, { data: post, message: 'Post updated' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
       }
       return next(error);
     }
