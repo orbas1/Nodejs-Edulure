@@ -2,15 +2,15 @@
 
 | Area | Score (0-100) | Notes |
 | --- | --- | --- |
-| Syntax | 80 | Initial baseline; update as work progresses. |
-| Functionality | 70 | Initial baseline; update as work progresses. |
-| Real World Ready | 65 | Initial baseline; update as work progresses. |
-| Live Data | 60 | Initial baseline; update as work progresses. |
-| Error | 75 | Initial baseline; update as work progresses. |
-| Logic Flow | 70 | Initial baseline; update as work progresses. |
-| Release Readiness | 65 | Initial baseline; update as work progresses. |
-| Tests | 50 | Initial baseline; update as work progresses. |
-| Overall Completion Average | 67 | Mean of tracked areas. |
+| Syntax | 0 | Initial baseline; update as work progresses. |
+| Functionality | 0 | Initial baseline; update as work progresses. |
+| Real World Ready | 0 | Initial baseline; update as work progresses. |
+| Live Data | 0 | Initial baseline; update as work progresses. |
+| Error | 0 | Initial baseline; update as work progresses. |
+| Logic Flow | 0 | Initial baseline; update as work progresses. |
+| Release Readiness | 0 | Initial baseline; update as work progresses. |
+| Tests | 0 | Initial baseline; update as work progresses. |
+| Overall Completion Average | 0 | Mean of tracked areas. |
 
 # Task List
 
@@ -379,7 +379,7 @@
 - `backend-nodejs/src/enablement/content/analytics-revenue-enablement.md` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/enablement/content/operator-onboarding-playbook.md` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/enablement/content/stakeholder-communications-kit.md` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `backend-nodejs/src/graphql/router.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
+- `backend-nodejs/src/graphql/router.js` (Syntax:98 | Functionality:96 | Real World Ready:95 | Live Data:90 | Error:97 | Logic Flow:95 | Release Readiness:95 | Tests:92 | Overall:95)
 - `backend-nodejs/src/graphql/schema.js` (Syntax:95 | Functionality:85 | Real World Ready:85 | Live Data:80 | Error:95 | Logic Flow:90 | Release Readiness:85 | Tests:70 | Overall:86)
 
 ## 17. Group 17 (Files 321-340 of 1169)
@@ -767,7 +767,7 @@
 - `backend-nodejs/test/feedHttpRoutes.test.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/test/governanceHttpRoutes.test.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/test/governanceStakeholderService.test.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `backend-nodejs/test/graphqlFeedRoutes.test.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
+- `backend-nodejs/test/graphqlFeedRoutes.test.js` (Syntax:97 | Functionality:95 | Real World Ready:93 | Live Data:90 | Error:95 | Logic Flow:95 | Release Readiness:94 | Tests:96 | Overall:95)
 - `backend-nodejs/test/identityVerificationService.test.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/test/instructorBookingService.test.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/test/instructorHttpRoutes.test.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
