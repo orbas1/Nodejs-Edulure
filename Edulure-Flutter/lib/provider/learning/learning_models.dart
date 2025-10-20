@@ -56,6 +56,9 @@ class Course {
     this.isPublished = false,
     this.favorite = false,
     this.rating,
+    this.promoVideoUrl,
+    this.syllabusUrl,
+    this.learningOutcomes = const <String>[],
   });
 
   final String id;
@@ -71,6 +74,9 @@ class Course {
   final bool isPublished;
   final bool favorite;
   final double? rating;
+  final String? promoVideoUrl;
+  final String? syllabusUrl;
+  final List<String> learningOutcomes;
 
   double get overallProgress {
     if (modules.isEmpty) return 0;
@@ -94,6 +100,9 @@ class Course {
     bool? isPublished,
     bool? favorite,
     double? rating,
+    String? promoVideoUrl,
+    String? syllabusUrl,
+    List<String>? learningOutcomes,
   }) {
     return Course(
       id: id ?? this.id,
@@ -109,6 +118,9 @@ class Course {
       isPublished: isPublished ?? this.isPublished,
       favorite: favorite ?? this.favorite,
       rating: rating ?? this.rating,
+      promoVideoUrl: promoVideoUrl ?? this.promoVideoUrl,
+      syllabusUrl: syllabusUrl ?? this.syllabusUrl,
+      learningOutcomes: learningOutcomes ?? this.learningOutcomes,
     );
   }
 
@@ -145,6 +157,8 @@ class Ebook {
     this.progress = 0,
     this.rating,
     this.downloaded = false,
+    this.previewVideoUrl,
+    this.audioSampleUrl,
   });
 
   final String id;
@@ -159,6 +173,8 @@ class Ebook {
   final double progress;
   final double? rating;
   final bool downloaded;
+  final String? previewVideoUrl;
+  final String? audioSampleUrl;
 
   Ebook copyWith({
     String? id,
@@ -173,6 +189,8 @@ class Ebook {
     double? progress,
     double? rating,
     bool? downloaded,
+    String? previewVideoUrl,
+    String? audioSampleUrl,
   }) {
     return Ebook(
       id: id ?? this.id,
@@ -187,6 +205,8 @@ class Ebook {
       progress: progress ?? this.progress,
       rating: rating ?? this.rating,
       downloaded: downloaded ?? this.downloaded,
+      previewVideoUrl: previewVideoUrl ?? this.previewVideoUrl,
+      audioSampleUrl: audioSampleUrl ?? this.audioSampleUrl,
     );
   }
 }
@@ -209,6 +229,7 @@ class Tutor {
   const Tutor({
     required this.id,
     required this.name,
+    required this.headline,
     required this.expertise,
     required this.bio,
     required this.languages,
@@ -217,10 +238,13 @@ class Tutor {
     this.rating,
     this.sessionCount = 0,
     this.reviewCount = 0,
+    this.introVideoUrl,
+    this.certifications = const <String>[],
   });
 
   final String id;
   final String name;
+  final String headline;
   final List<String> expertise;
   final String bio;
   final List<String> languages;
@@ -229,10 +253,13 @@ class Tutor {
   final double? rating;
   final int sessionCount;
   final int reviewCount;
+  final String? introVideoUrl;
+  final List<String> certifications;
 
   Tutor copyWith({
     String? id,
     String? name,
+    String? headline,
     List<String>? expertise,
     String? bio,
     List<String>? languages,
@@ -241,10 +268,13 @@ class Tutor {
     double? rating,
     int? sessionCount,
     int? reviewCount,
+    String? introVideoUrl,
+    List<String>? certifications,
   }) {
     return Tutor(
       id: id ?? this.id,
       name: name ?? this.name,
+      headline: headline ?? this.headline,
       expertise: expertise ?? this.expertise,
       bio: bio ?? this.bio,
       languages: languages ?? this.languages,
@@ -253,6 +283,8 @@ class Tutor {
       rating: rating ?? this.rating,
       sessionCount: sessionCount ?? this.sessionCount,
       reviewCount: reviewCount ?? this.reviewCount,
+      introVideoUrl: introVideoUrl ?? this.introVideoUrl,
+      certifications: certifications ?? this.certifications,
     );
   }
 }
@@ -283,6 +315,8 @@ class LiveSession {
     required this.capacity,
     required this.enrolled,
     this.isRecordingAvailable = false,
+    this.recordingUrl,
+    this.agenda = const <String>[],
   });
 
   final String id;
@@ -297,6 +331,8 @@ class LiveSession {
   final int capacity;
   final int enrolled;
   final bool isRecordingAvailable;
+  final String? recordingUrl;
+  final List<String> agenda;
 
   LiveSession copyWith({
     String? id,
@@ -311,6 +347,8 @@ class LiveSession {
     int? capacity,
     int? enrolled,
     bool? isRecordingAvailable,
+    String? recordingUrl,
+    List<String>? agenda,
   }) {
     return LiveSession(
       id: id ?? this.id,
@@ -325,6 +363,8 @@ class LiveSession {
       capacity: capacity ?? this.capacity,
       enrolled: enrolled ?? this.enrolled,
       isRecordingAvailable: isRecordingAvailable ?? this.isRecordingAvailable,
+      recordingUrl: recordingUrl ?? this.recordingUrl,
+      agenda: agenda ?? this.agenda,
     );
   }
 }

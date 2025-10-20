@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
@@ -41,6 +42,11 @@ class _CourseViewerScreenState extends ConsumerState<CourseViewerScreen> {
       appBar: AppBar(
         title: const Text('Course catalog'),
         actions: [
+          IconButton(
+            tooltip: 'Guided course wizard',
+            icon: const Icon(Icons.auto_fix_high_outlined),
+            onPressed: _openCourseWizard,
+          ),
           IconButton(
             tooltip: 'Create course',
             icon: const Icon(Icons.add_circle_outline),
@@ -172,6 +178,24 @@ class _CourseViewerScreenState extends ConsumerState<CourseViewerScreen> {
                 const SnackBar(content: Text('Course updated')),
               );
             }
+          },
+        );
+      },
+    );
+  }
+
+  void _openCourseWizard() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return _CourseWizardSheet(
+          onSubmit: (course) {
+            ref.read(courseStoreProvider.notifier).createCourse(course);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('"${course.title}" drafted via guided wizard')),
+            );
           },
         );
       },
@@ -389,6 +413,23 @@ class _CourseDetailState extends State<_CourseDetail> {
     }
   }
 
+  Future<void> _launchExternal(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link is invalid')),
+      );
+      return;
+    }
+
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open link')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final progressText = (_course.overallProgress * 100).toStringAsFixed(0);
@@ -492,6 +533,95 @@ class _CourseDetailState extends State<_CourseDetail> {
                   spacing: 8,
                   children: [for (final tag in _course.tags) Chip(label: Text(tag))],
                 ),
+                if ((_course.promoVideoUrl ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  GestureDetector(
+                    onTap: () => _launchExternal(_course.promoVideoUrl!),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.network(
+                              '${_course.thumbnailUrl}?auto=format&fit=crop&w=900&q=80',
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withOpacity(0.05),
+                                  Colors.black.withOpacity(0.45),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Center(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.65),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(18),
+                                child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 36),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+                if ((_course.syllabusUrl ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => _launchExternal(_course.syllabusUrl!),
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('Download syllabus'),
+                    ),
+                  ),
+                ],
+                if (_course.learningOutcomes.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Card(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Learner outcomes',
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 12),
+                          ..._course.learningOutcomes.map(
+                            (outcome) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(Icons.check_circle_outline, color: Theme.of(context).colorScheme.primary),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text(outcome)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -589,6 +719,492 @@ class _CourseDetailState extends State<_CourseDetail> {
   }
 }
 
+class _CourseWizardSheet extends ConsumerStatefulWidget {
+  const _CourseWizardSheet({
+    required this.onSubmit,
+    this.template,
+  });
+
+  final Course? template;
+  final void Function(Course course) onSubmit;
+
+  @override
+  ConsumerState<_CourseWizardSheet> createState() => _CourseWizardSheetState();
+}
+
+class _CourseWizardSheetState extends ConsumerState<_CourseWizardSheet> {
+  final _formKey = GlobalKey<FormState>();
+  int _currentStep = 0;
+  late final TextEditingController _titleController;
+  late final TextEditingController _summaryController;
+  late final TextEditingController _categoryController;
+  late final TextEditingController _levelController;
+  late final TextEditingController _languageController;
+  late final TextEditingController _thumbnailController;
+  late final TextEditingController _promoVideoController;
+  late final TextEditingController _syllabusController;
+  late final TextEditingController _priceController;
+  late final TextEditingController _tagsController;
+  late final TextEditingController _outcomesController;
+  bool _isPublished = true;
+  bool _favorite = false;
+  double? _rating;
+  final List<_ModuleFormData> _modules = [];
+
+  @override
+  void initState() {
+    super.initState();
+    final template = widget.template;
+    _titleController = TextEditingController(text: template?.title ?? '');
+    _summaryController = TextEditingController(text: template?.summary ?? '');
+    _categoryController = TextEditingController(text: template?.category ?? '');
+    _levelController = TextEditingController(text: template?.level ?? '');
+    _languageController = TextEditingController(text: template?.language ?? '');
+    _thumbnailController = TextEditingController(text: template?.thumbnailUrl ?? '');
+    _promoVideoController = TextEditingController(text: template?.promoVideoUrl ?? '');
+    _syllabusController = TextEditingController(text: template?.syllabusUrl ?? '');
+    _priceController = TextEditingController(text: template?.price.toString() ?? '');
+    _tagsController = TextEditingController(text: template?.tags.join(', ') ?? '');
+    _outcomesController = TextEditingController(
+      text: template == null || template.learningOutcomes.isEmpty
+          ? ''
+          : template.learningOutcomes.join('\n'),
+    );
+    _isPublished = template?.isPublished ?? true;
+    _favorite = template?.favorite ?? false;
+    _rating = template?.rating;
+    if (template != null) {
+      for (final module in template.modules) {
+        _modules.add(
+          _ModuleFormData(
+            id: module.id,
+            titleController: TextEditingController(text: module.title),
+            lessonsController: TextEditingController(text: module.lessonCount.toString()),
+            durationController: TextEditingController(text: module.durationMinutes.toString()),
+            descriptionController: TextEditingController(text: module.description),
+          ),
+        );
+      }
+    }
+    if (_modules.isEmpty) {
+      _addModule();
+    }
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _summaryController.dispose();
+    _categoryController.dispose();
+    _levelController.dispose();
+    _languageController.dispose();
+    _thumbnailController.dispose();
+    _promoVideoController.dispose();
+    _syllabusController.dispose();
+    _priceController.dispose();
+    _tagsController.dispose();
+    _outcomesController.dispose();
+    for (final module in _modules) {
+      module.dispose();
+    }
+    super.dispose();
+  }
+
+  void _addModule() {
+    setState(() {
+      _modules.add(_ModuleFormData.newEmpty());
+    });
+  }
+
+  void _removeModule(_ModuleFormData data) {
+    if (_modules.length <= 1) return;
+    setState(() {
+      _modules.remove(data);
+      data.dispose();
+    });
+  }
+
+  Course _buildCourseDraft() {
+    final notifier = ref.read(courseStoreProvider.notifier);
+    final modules = _modules
+        .map(
+          (module) => CourseModule(
+            id: module.id,
+            title: module.titleController.text.trim(),
+            lessonCount: int.tryParse(module.lessonsController.text) ?? 0,
+            durationMinutes: int.tryParse(module.durationController.text) ?? 0,
+            description: module.descriptionController.text.trim(),
+          ),
+        )
+        .toList();
+
+    final tags = _tagsController.text
+        .split(',')
+        .map((tag) => tag.trim())
+        .where((tag) => tag.isNotEmpty)
+        .toList();
+    final outcomes = _outcomesController.text
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+
+    return notifier.buildCourseFromForm(
+      id: widget.template?.id,
+      title: _titleController.text.trim(),
+      category: _categoryController.text.trim(),
+      level: _levelController.text.trim().isEmpty ? 'Beginner' : _levelController.text.trim(),
+      summary: _summaryController.text.trim(),
+      thumbnailUrl: _thumbnailController.text.trim(),
+      price: double.tryParse(_priceController.text) ?? 0,
+      language: _languageController.text.trim().isEmpty ? 'English' : _languageController.text.trim(),
+      tags: tags,
+      modules: modules,
+      isPublished: _isPublished,
+      favorite: _favorite,
+      rating: _rating,
+      promoVideoUrl: _promoVideoController.text.trim().isEmpty ? null : _promoVideoController.text.trim(),
+      syllabusUrl: _syllabusController.text.trim().isEmpty ? null : _syllabusController.text.trim(),
+      learningOutcomes: outcomes,
+    );
+  }
+
+  void _handleContinue() {
+    if (_currentStep == 3) {
+      _submit();
+      return;
+    }
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() => _currentStep += 1);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please complete the highlighted fields.')),
+      );
+    }
+  }
+
+  void _handleBack() {
+    if (_currentStep == 0) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _currentStep -= 1);
+    }
+  }
+
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please complete the highlighted fields.')),
+      );
+      return;
+    }
+    final course = _buildCourseDraft();
+    widget.onSubmit(course);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = [
+      Step(
+        title: const Text('Overview'),
+        isActive: _currentStep >= 0,
+        state: _currentStep > 0 ? StepState.complete : StepState.indexed,
+        content: Column(
+          children: [
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Course title'),
+              validator: (value) => value == null || value.trim().isEmpty ? 'Title required' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _summaryController,
+              decoration: const InputDecoration(labelText: 'Course narrative'),
+              minLines: 3,
+              maxLines: 5,
+              validator: (value) => value == null || value.trim().isEmpty ? 'Storytelling summary required' : null,
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _categoryController,
+                    decoration: const InputDecoration(labelText: 'Category'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _levelController,
+                    decoration: const InputDecoration(labelText: 'Learner level'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _languageController,
+              decoration: const InputDecoration(labelText: 'Delivery language'),
+            ),
+          ],
+        ),
+      ),
+      Step(
+        title: const Text('Media & pricing'),
+        isActive: _currentStep >= 1,
+        state: _currentStep > 1 ? StepState.complete : StepState.indexed,
+        content: Column(
+          children: [
+            TextFormField(
+              controller: _thumbnailController,
+              decoration: const InputDecoration(labelText: 'Cover image URL'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _promoVideoController,
+              decoration: const InputDecoration(labelText: 'Promo video URL (optional)'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _syllabusController,
+              decoration: const InputDecoration(labelText: 'Syllabus or brochure URL (optional)'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _priceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Tuition'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _tagsController,
+                    decoration: const InputDecoration(labelText: 'Tags (comma separated)'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: SwitchListTile.adaptive(
+                    value: _isPublished,
+                    onChanged: (value) => setState(() => _isPublished = value),
+                    title: const Text('Publish immediately'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                Expanded(
+                  child: SwitchListTile.adaptive(
+                    value: _favorite,
+                    onChanged: (value) => setState(() => _favorite = value),
+                    title: const Text('Mark as featured'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              initialValue: _rating?.toString() ?? '',
+              decoration: const InputDecoration(labelText: 'Quality benchmark rating (optional)'),
+              keyboardType: TextInputType.number,
+              onChanged: (value) => _rating = double.tryParse(value),
+            ),
+          ],
+        ),
+      ),
+      Step(
+        title: const Text('Curriculum'),
+        isActive: _currentStep >= 2,
+        state: _currentStep > 2 ? StepState.complete : StepState.indexed,
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _outcomesController,
+              decoration: const InputDecoration(labelText: 'Learning outcomes (one per line)'),
+              minLines: 3,
+              maxLines: 5,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Text('Modules', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                const Spacer(),
+                TextButton.icon(onPressed: _addModule, icon: const Icon(Icons.add), label: const Text('Add module')),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ..._modules.map(
+              (module) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    color: Colors.grey.shade50,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: module.titleController,
+                                decoration: const InputDecoration(labelText: 'Module title'),
+                                validator: (value) {
+                                  if (_currentStep < 2) return null;
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Module title required';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Remove module',
+                              onPressed: () => _removeModule(module),
+                              icon: const Icon(Icons.remove_circle_outline),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: module.descriptionController,
+                          decoration: const InputDecoration(labelText: 'Module description'),
+                          minLines: 2,
+                          maxLines: 4,
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: module.lessonsController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(labelText: 'Lessons'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                controller: module.durationController,
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(labelText: 'Duration (minutes)'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      Step(
+        title: const Text('Review & launch'),
+        isActive: _currentStep >= 3,
+        state: _currentStep == 3 ? StepState.editing : StepState.indexed,
+        content: Builder(
+          builder: (context) {
+            final draft = _buildCourseDraft();
+            final price = NumberFormat.simpleCurrency().format(draft.price);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(backgroundImage: NetworkImage('${draft.thumbnailUrl}?w=120&fit=crop')),
+                  title: Text(draft.title, style: Theme.of(context).textTheme.titleMedium),
+                  subtitle: Text('${draft.category} • ${draft.level}'),
+                  trailing: Text(price, style: const TextStyle(fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(height: 12),
+                Text(draft.summary),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [for (final tag in draft.tags) Chip(label: Text(tag))],
+                ),
+                const SizedBox(height: 12),
+                if (draft.learningOutcomes.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Learner outcomes', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      ...draft.learningOutcomes.map(
+                        (outcome) => Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.check_circle_outline, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(outcome)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 12),
+                Text('${draft.modules.length} modules ready to publish'),
+              ],
+            );
+          },
+        ),
+      ),
+    ];
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Stepper(
+                currentStep: _currentStep,
+                controlsBuilder: (context, details) {
+                  final isLast = _currentStep == steps.length - 1;
+                  return Row(
+                    children: [
+                      FilledButton(
+                        onPressed: _handleContinue,
+                        child: Text(isLast ? 'Launch course' : 'Next'),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: _handleBack,
+                        child: Text(_currentStep == 0 ? 'Cancel' : 'Back'),
+                      ),
+                    ],
+                  );
+                },
+                onStepCancel: _handleBack,
+                onStepContinue: _handleContinue,
+                onStepTapped: (index) => setState(() => _currentStep = index),
+                steps: steps,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CourseFormSheet extends ConsumerStatefulWidget {
   const _CourseFormSheet({
     required this.onSubmit,
@@ -612,6 +1228,9 @@ class _CourseFormSheetState extends ConsumerState<_CourseFormSheet> {
   late final TextEditingController _priceController;
   late final TextEditingController _languageController;
   late final TextEditingController _tagsController;
+  late final TextEditingController _promoVideoController;
+  late final TextEditingController _syllabusController;
+  late final TextEditingController _outcomesController;
   bool _isPublished = false;
   bool _favorite = false;
   double? _rating;
@@ -629,6 +1248,13 @@ class _CourseFormSheetState extends ConsumerState<_CourseFormSheet> {
     _priceController = TextEditingController(text: course?.price.toString() ?? '');
     _languageController = TextEditingController(text: course?.language ?? '');
     _tagsController = TextEditingController(text: course?.tags.join(', ') ?? '');
+    _promoVideoController = TextEditingController(text: course?.promoVideoUrl ?? '');
+    _syllabusController = TextEditingController(text: course?.syllabusUrl ?? '');
+    _outcomesController = TextEditingController(
+      text: course == null || course.learningOutcomes.isEmpty
+          ? ''
+          : course.learningOutcomes.join('\n'),
+    );
     _isPublished = course?.isPublished ?? true;
     _favorite = course?.favorite ?? false;
     _rating = course?.rating;
@@ -660,6 +1286,9 @@ class _CourseFormSheetState extends ConsumerState<_CourseFormSheet> {
     _priceController.dispose();
     _languageController.dispose();
     _tagsController.dispose();
+    _promoVideoController.dispose();
+    _syllabusController.dispose();
+    _outcomesController.dispose();
     for (final module in _modules) {
       module.dispose();
     }
@@ -696,6 +1325,13 @@ class _CourseFormSheetState extends ConsumerState<_CourseFormSheet> {
         .toList();
 
     final tags = _tagsController.text.split(',').map((tag) => tag.trim()).where((tag) => tag.isNotEmpty).toList();
+    final promoVideo = _promoVideoController.text.trim();
+    final syllabusUrl = _syllabusController.text.trim();
+    final outcomes = _outcomesController.text
+        .split('\n')
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
     final course = notifier.buildCourseFromForm(
       id: widget.course?.id,
       title: _titleController.text.trim(),
@@ -710,6 +1346,9 @@ class _CourseFormSheetState extends ConsumerState<_CourseFormSheet> {
       isPublished: _isPublished,
       favorite: _favorite,
       rating: _rating,
+      promoVideoUrl: promoVideo.isEmpty ? null : promoVideo,
+      syllabusUrl: syllabusUrl.isEmpty ? null : syllabusUrl,
+      learningOutcomes: outcomes,
     );
     widget.onSubmit(course);
     Navigator.pop(context);
@@ -769,6 +1408,16 @@ class _CourseFormSheetState extends ConsumerState<_CourseFormSheet> {
                     decoration: const InputDecoration(labelText: 'Thumbnail URL'),
                   ),
                   const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _promoVideoController,
+                    decoration: const InputDecoration(labelText: 'Promo video URL (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _syllabusController,
+                    decoration: const InputDecoration(labelText: 'Syllabus or brochure URL (optional)'),
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -819,6 +1468,15 @@ class _CourseFormSheetState extends ConsumerState<_CourseFormSheet> {
                     decoration: const InputDecoration(labelText: 'Rating (optional)'),
                     keyboardType: TextInputType.number,
                     onChanged: (value) => _rating = double.tryParse(value),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _outcomesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Learning outcomes (one per line)',
+                    ),
+                    minLines: 3,
+                    maxLines: 5,
                   ),
                   const SizedBox(height: 24),
                   Row(

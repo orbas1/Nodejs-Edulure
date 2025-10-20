@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
@@ -191,6 +192,21 @@ class _SessionCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
+  Future<void> _launchExternal(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link is invalid')),
+      );
+      return;
+    }
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open link')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateRange = '${dateFormat.format(session.startTime)} — ${dateFormat.format(session.endTime)}';
@@ -258,21 +274,13 @@ class _SessionCard extends StatelessWidget {
               spacing: 8,
               children: [
                 FilledButton.tonalIcon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Room link copied: ${session.roomLink}')),
-                    );
-                  },
+                  onPressed: () => _launchExternal(context, session.roomLink),
                   icon: const Icon(Icons.link_outlined),
-                  label: const Text('Copy room link'),
+                  label: const Text('Open classroom'),
                 ),
                 FilledButton.tonalIcon(
-                  onPressed: session.isRecordingAvailable
-                      ? () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Recording shared with learners')),
-                          );
-                        }
+                  onPressed: session.isRecordingAvailable && (session.recordingUrl ?? '').isNotEmpty
+                      ? () => _launchExternal(context, session.recordingUrl!)
                       : null,
                   icon: const Icon(Icons.play_circle_outline),
                   label: const Text('Share recording'),
@@ -284,6 +292,24 @@ class _SessionCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (session.agenda.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Agenda', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ...session.agenda.map(
+                (item) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.check_circle_outline, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(item)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -310,6 +336,7 @@ class _SessionCard extends StatelessWidget {
                     leading: const Icon(Icons.insert_drive_file_outlined),
                     title: Text(resource.label),
                     subtitle: Text(resource.url),
+                    onTap: () => _launchExternal(context, resource.url),
                     trailing: IconButton(
                       icon: const Icon(Icons.copy_outlined),
                       onPressed: () {
@@ -347,6 +374,8 @@ class _LiveSessionFormSheetState extends ConsumerState<_LiveSessionFormSheet> {
   late final TextEditingController _roomController;
   late final TextEditingController _capacityController;
   late final TextEditingController _enrolledController;
+  late final TextEditingController _recordingUrlController;
+  late final TextEditingController _agendaController;
   final List<_ResourceFormData> _resources = [];
   String? _selectedCourse;
   String? _selectedTutor;
@@ -363,6 +392,10 @@ class _LiveSessionFormSheetState extends ConsumerState<_LiveSessionFormSheet> {
     _roomController = TextEditingController(text: session?.roomLink ?? '');
     _capacityController = TextEditingController(text: session?.capacity.toString() ?? '');
     _enrolledController = TextEditingController(text: session?.enrolled.toString() ?? '0');
+    _recordingUrlController = TextEditingController(text: session?.recordingUrl ?? '');
+    _agendaController = TextEditingController(
+      text: session == null || session.agenda.isEmpty ? '' : session.agenda.join('\n'),
+    );
     _selectedCourse = session?.courseId;
     _selectedTutor = session?.tutorId;
     _recordingAvailable = session?.isRecordingAvailable ?? false;
@@ -389,6 +422,8 @@ class _LiveSessionFormSheetState extends ConsumerState<_LiveSessionFormSheet> {
     _roomController.dispose();
     _capacityController.dispose();
     _enrolledController.dispose();
+    _recordingUrlController.dispose();
+    _agendaController.dispose();
     for (final resource in _resources) {
       resource.dispose();
     }
@@ -439,6 +474,11 @@ class _LiveSessionFormSheetState extends ConsumerState<_LiveSessionFormSheet> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final notifier = ref.read(liveSessionStoreProvider.notifier);
+    final agenda = _agendaController.text
+        .split('\n')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
     final session = notifier.buildSessionFromForm(
       id: widget.session?.id,
       title: _titleController.text.trim(),
@@ -459,6 +499,8 @@ class _LiveSessionFormSheetState extends ConsumerState<_LiveSessionFormSheet> {
       capacity: int.tryParse(_capacityController.text) ?? 0,
       enrolled: int.tryParse(_enrolledController.text) ?? 0,
       isRecordingAvailable: _recordingAvailable,
+      recordingUrl: _recordingUrlController.text.trim().isEmpty ? null : _recordingUrlController.text.trim(),
+      agenda: agenda,
     );
 
     if (widget.session == null) {
@@ -580,6 +622,19 @@ class _LiveSessionFormSheetState extends ConsumerState<_LiveSessionFormSheet> {
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Recording available'),
                     onChanged: (value) => setState(() => _recordingAvailable = value),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _recordingUrlController,
+                    decoration: const InputDecoration(labelText: 'Recording URL (optional)'),
+                    enabled: _recordingAvailable,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _agendaController,
+                    decoration: const InputDecoration(labelText: 'Agenda (one item per line)'),
+                    minLines: 3,
+                    maxLines: 6,
                   ),
                   const SizedBox(height: 16),
                   Row(

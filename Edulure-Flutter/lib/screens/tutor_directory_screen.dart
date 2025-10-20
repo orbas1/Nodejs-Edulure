@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
@@ -248,6 +249,14 @@ class _TutorCard extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                         ),
                         const SizedBox(height: 4),
+                        Text(
+                          tutor.headline,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Colors.blueGrey.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
                         Wrap(
                           spacing: 8,
                           runSpacing: 4,
@@ -261,6 +270,20 @@ class _TutorCard extends StatelessWidget {
                           maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        if (tutor.certifications.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              for (final credential in tutor.certifications.take(3))
+                                Chip(
+                                  avatar: const Icon(Icons.verified_outlined, size: 18),
+                                  label: Text(credential),
+                                ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -294,6 +317,21 @@ class _TutorProfileSheet extends StatelessWidget {
 
   final Tutor tutor;
 
+  Future<void> _launchExternal(BuildContext context, String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link is invalid')),
+      );
+      return;
+    }
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open link')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -301,6 +339,12 @@ class _TutorProfileSheet extends StatelessWidget {
         automaticallyImplyLeading: false,
         title: Text(tutor.name),
         actions: [
+          if ((tutor.introVideoUrl ?? '').isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.play_circle_outline),
+              tooltip: 'Play intro video',
+              onPressed: () => _launchExternal(context, tutor.introVideoUrl!),
+            ),
           IconButton(
             icon: const Icon(Icons.event_available_outlined),
             tooltip: 'Book session',
@@ -331,6 +375,14 @@ class _TutorProfileSheet extends StatelessWidget {
                       tutor.name,
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      tutor.headline,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.blueGrey.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -351,6 +403,20 @@ class _TutorProfileSheet extends StatelessWidget {
                           ),
                       ],
                     ),
+                    if (tutor.certifications.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          for (final credential in tutor.certifications)
+                            Chip(
+                              avatar: const Icon(Icons.workspace_premium_outlined, size: 18),
+                              label: Text(credential),
+                            ),
+                        ],
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -367,6 +433,14 @@ class _TutorProfileSheet extends StatelessWidget {
                         Text('${tutor.reviewCount} reviews'),
                       ],
                     ),
+                    if ((tutor.introVideoUrl ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _launchExternal(context, tutor.introVideoUrl!),
+                        icon: const Icon(Icons.play_circle_fill_outlined),
+                        label: const Text('Watch intro video'),
+                      ),
+                    ],
                   ],
                 ),
               )
@@ -413,10 +487,13 @@ class _TutorFormSheet extends ConsumerStatefulWidget {
 class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameController;
+  late final TextEditingController _headlineController;
   late final TextEditingController _bioController;
   late final TextEditingController _avatarController;
   late final TextEditingController _languagesController;
   late final TextEditingController _expertiseController;
+  late final TextEditingController _introVideoController;
+  late final TextEditingController _certificationsController;
   double? _rating;
   int _sessionCount = 0;
   int _reviewCount = 0;
@@ -427,10 +504,13 @@ class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
     super.initState();
     final tutor = widget.tutor;
     _nameController = TextEditingController(text: tutor?.name ?? '');
+    _headlineController = TextEditingController(text: tutor?.headline ?? '');
     _bioController = TextEditingController(text: tutor?.bio ?? '');
     _avatarController = TextEditingController(text: tutor?.avatarUrl ?? '');
     _languagesController = TextEditingController(text: tutor?.languages.join(', ') ?? '');
     _expertiseController = TextEditingController(text: tutor?.expertise.join(', ') ?? '');
+    _introVideoController = TextEditingController(text: tutor?.introVideoUrl ?? '');
+    _certificationsController = TextEditingController(text: tutor?.certifications.join(', ') ?? '');
     _rating = tutor?.rating;
     _sessionCount = tutor?.sessionCount ?? 0;
     _reviewCount = tutor?.reviewCount ?? 0;
@@ -454,10 +534,13 @@ class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
   @override
   void dispose() {
     _nameController.dispose();
+    _headlineController.dispose();
     _bioController.dispose();
     _avatarController.dispose();
     _languagesController.dispose();
     _expertiseController.dispose();
+    _introVideoController.dispose();
+    _certificationsController.dispose();
     for (final slot in _availability) {
       slot.dispose();
     }
@@ -481,9 +564,15 @@ class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     final notifier = ref.read(tutorStoreProvider.notifier);
+    final certifications = _certificationsController.text
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
     final tutor = notifier.buildTutorFromForm(
       id: widget.tutor?.id,
       name: _nameController.text.trim(),
+      headline: _headlineController.text.trim().isEmpty ? 'Learning specialist' : _headlineController.text.trim(),
       expertise: _expertiseController.text.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList(),
       bio: _bioController.text.trim(),
       languages: _languagesController.text.split(',').map((item) => item.trim()).where((item) => item.isNotEmpty).toList(),
@@ -500,6 +589,8 @@ class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
       rating: _rating,
       sessionCount: _sessionCount,
       reviewCount: _reviewCount,
+      introVideoUrl: _introVideoController.text.trim().isEmpty ? null : _introVideoController.text.trim(),
+      certifications: certifications,
     );
 
     if (widget.tutor == null) {
@@ -541,6 +632,12 @@ class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    controller: _headlineController,
+                    decoration: const InputDecoration(labelText: 'Headline'),
+                    validator: (value) => value == null || value.isEmpty ? 'Headline required' : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
                     controller: _bioController,
                     decoration: const InputDecoration(labelText: 'Bio'),
                     minLines: 3,
@@ -553,6 +650,11 @@ class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    controller: _introVideoController,
+                    decoration: const InputDecoration(labelText: 'Intro video URL (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
                     controller: _languagesController,
                     decoration: const InputDecoration(labelText: 'Languages (comma separated)'),
                   ),
@@ -560,6 +662,11 @@ class _TutorFormSheetState extends ConsumerState<_TutorFormSheet> {
                   TextFormField(
                     controller: _expertiseController,
                     decoration: const InputDecoration(labelText: 'Expertise (comma separated)'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _certificationsController,
+                    decoration: const InputDecoration(labelText: 'Certifications (comma separated)'),
                   ),
                   const SizedBox(height: 12),
                   Row(

@@ -27,6 +27,13 @@ class CourseStore extends StateNotifier<List<Course>> {
         language: 'English',
         tags: const ['Product', 'Strategy', 'SaaS'],
         rating: 4.8,
+        promoVideoUrl: 'https://videos.example.com/courses/product-strategy/teaser.mp4',
+        syllabusUrl: 'https://cdn.example.com/courses/product-strategy/syllabus.pdf',
+        learningOutcomes: const [
+          'Launch a validated product playbook with quantified demand signals',
+          'Operationalize persona research into reusable messaging assets',
+          'Build async collaboration cadences for cross-functional launches',
+        ],
         modules: const [
           CourseModule(
             id: 'module-1',
@@ -59,6 +66,12 @@ class CourseStore extends StateNotifier<List<Course>> {
         language: 'English',
         tags: const ['Remote Work', 'Leadership', 'Operations'],
         rating: 4.6,
+        promoVideoUrl: 'https://videos.example.com/courses/async-leadership/intro.mp4',
+        syllabusUrl: 'https://cdn.example.com/courses/async-leadership/syllabus.pdf',
+        learningOutcomes: const [
+          'Design asynchronous rituals for distributed leadership teams',
+          'Ship knowledge bases with lifecycle governance and analytics',
+        ],
         modules: const [
           CourseModule(
             id: 'module-3',
@@ -142,6 +155,9 @@ class CourseStore extends StateNotifier<List<Course>> {
     bool isPublished = false,
     bool favorite = false,
     double? rating,
+    String? promoVideoUrl,
+    String? syllabusUrl,
+    List<String> learningOutcomes = const <String>[],
   }) {
     return Course(
       id: id ?? _generateId('course'),
@@ -157,6 +173,9 @@ class CourseStore extends StateNotifier<List<Course>> {
       isPublished: isPublished,
       favorite: favorite,
       rating: rating,
+      promoVideoUrl: promoVideoUrl,
+      syllabusUrl: syllabusUrl,
+      learningOutcomes: learningOutcomes,
     );
   }
 }
@@ -181,6 +200,8 @@ class EbookStore extends StateNotifier<List<Ebook>> {
             progress: 0.32,
             rating: 4.7,
             downloaded: true,
+            previewVideoUrl: 'https://videos.example.com/ebooks/accountability/overview.mp4',
+            audioSampleUrl: 'https://cdn.example.com/ebooks/accountability/sample.mp3',
           ),
           Ebook(
             id: 'ebook-2',
@@ -197,6 +218,8 @@ class EbookStore extends StateNotifier<List<Ebook>> {
             ],
             progress: 0.12,
             rating: 4.5,
+            previewVideoUrl: 'https://videos.example.com/ebooks/community/preview.mp4',
+            audioSampleUrl: 'https://cdn.example.com/ebooks/community/sample.mp3',
           ),
         ]);
 
@@ -228,6 +251,8 @@ class EbookStore extends StateNotifier<List<Ebook>> {
     double progress = 0,
     double? rating,
     bool downloaded = false,
+    String? previewVideoUrl,
+    String? audioSampleUrl,
   }) {
     return Ebook(
       id: id ?? _generateId('ebook'),
@@ -242,6 +267,8 @@ class EbookStore extends StateNotifier<List<Ebook>> {
       progress: progress,
       rating: rating,
       downloaded: downloaded,
+      previewVideoUrl: previewVideoUrl,
+      audioSampleUrl: audioSampleUrl,
     );
   }
 }
@@ -252,6 +279,7 @@ class TutorStore extends StateNotifier<List<Tutor>> {
           Tutor(
             id: 'tutor-1',
             name: 'Akira Sato',
+            headline: 'Fractional product discovery coach',
             expertise: const ['Product Research', 'Interviewing'],
             bio: 'Led discovery sprints for 30+ venture-backed products. Coaches teams on decision narratives.',
             languages: const ['English', 'Japanese'],
@@ -263,10 +291,13 @@ class TutorStore extends StateNotifier<List<Tutor>> {
             rating: 4.9,
             sessionCount: 128,
             reviewCount: 42,
+            introVideoUrl: 'https://videos.example.com/tutors/akira/intro.mp4',
+            certifications: const ['IDEO Design Thinking', 'Product Strategy Guild'],
           ),
           Tutor(
             id: 'tutor-2',
             name: 'Leila Haddad',
+            headline: 'Community experience architect',
             expertise: const ['Community Ops', 'Facilitation'],
             bio: 'Community architect for global accelerators. Hosts immersive cohort rituals.',
             languages: const ['English', 'Arabic', 'French'],
@@ -278,6 +309,8 @@ class TutorStore extends StateNotifier<List<Tutor>> {
             rating: 4.8,
             sessionCount: 96,
             reviewCount: 36,
+            introVideoUrl: 'https://videos.example.com/tutors/leila/intro.mp4',
+            certifications: const ['IAF Certified Facilitator', 'CMX Masterclass Graduate'],
           ),
         ]);
 
@@ -299,6 +332,7 @@ class TutorStore extends StateNotifier<List<Tutor>> {
   Tutor buildTutorFromForm({
     String? id,
     required String name,
+    required String headline,
     required List<String> expertise,
     required String bio,
     required List<String> languages,
@@ -307,10 +341,13 @@ class TutorStore extends StateNotifier<List<Tutor>> {
     double? rating,
     int sessionCount = 0,
     int reviewCount = 0,
+    String? introVideoUrl,
+    List<String> certifications = const <String>[],
   }) {
     return Tutor(
       id: id ?? _generateId('tutor'),
       name: name,
+      headline: headline,
       expertise: expertise,
       bio: bio,
       languages: languages,
@@ -319,6 +356,8 @@ class TutorStore extends StateNotifier<List<Tutor>> {
       rating: rating,
       sessionCount: sessionCount,
       reviewCount: reviewCount,
+      introVideoUrl: introVideoUrl,
+      certifications: certifications,
     );
   }
 }
@@ -342,6 +381,13 @@ class LiveSessionStore extends StateNotifier<List<LiveSession>> {
             capacity: 50,
             enrolled: 32,
             isRecordingAvailable: true,
+            recordingUrl: 'https://videos.example.com/sessions/opportunity-recording.mp4',
+            agenda: const [
+              '00:00 – Check-in and context framing',
+              '00:20 – Persona signal review',
+              '01:10 – Breakout board working session',
+              '01:50 – Retro and next steps',
+            ],
           ),
           LiveSession(
             id: 'session-2',
@@ -357,6 +403,11 @@ class LiveSessionStore extends StateNotifier<List<LiveSession>> {
             ],
             capacity: 35,
             enrolled: 20,
+            agenda: const [
+              '00:00 – Ritual design warm-up',
+              '00:35 – Community journey mapping',
+              '01:20 – Live facilitation labs',
+            ],
           ),
         ]);
 
@@ -388,6 +439,8 @@ class LiveSessionStore extends StateNotifier<List<LiveSession>> {
     required int capacity,
     required int enrolled,
     bool isRecordingAvailable = false,
+    String? recordingUrl,
+    List<String> agenda = const <String>[],
   }) {
     return LiveSession(
       id: id ?? _generateId('session'),
@@ -402,6 +455,8 @@ class LiveSessionStore extends StateNotifier<List<LiveSession>> {
       capacity: capacity,
       enrolled: enrolled,
       isRecordingAvailable: isRecordingAvailable,
+      recordingUrl: recordingUrl,
+      agenda: agenda,
     );
   }
 }

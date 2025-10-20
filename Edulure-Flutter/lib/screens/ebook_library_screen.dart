@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
@@ -323,6 +324,22 @@ class _EbookDetailSheetState extends State<_EbookDetailSheet> {
     _progress = widget.ebook.progress;
   }
 
+  Future<void> _launchExternal(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Link is invalid')),
+      );
+      return;
+    }
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open link')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -330,6 +347,18 @@ class _EbookDetailSheetState extends State<_EbookDetailSheet> {
         automaticallyImplyLeading: false,
         title: Text(widget.ebook.title),
         actions: [
+          if ((widget.ebook.previewVideoUrl ?? '').isNotEmpty)
+            IconButton(
+              tooltip: 'Play trailer',
+              onPressed: () => _launchExternal(widget.ebook.previewVideoUrl!),
+              icon: const Icon(Icons.play_circle_outline),
+            ),
+          if ((widget.ebook.audioSampleUrl ?? '').isNotEmpty)
+            IconButton(
+              tooltip: 'Listen to audio sample',
+              onPressed: () => _launchExternal(widget.ebook.audioSampleUrl!),
+              icon: const Icon(Icons.graphic_eq_outlined),
+            ),
           IconButton(
             tooltip: 'Open reader',
             onPressed: () {
@@ -396,6 +425,30 @@ class _EbookDetailSheetState extends State<_EbookDetailSheet> {
                         );
                       },
                     ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 8,
+                      children: [
+                        if ((widget.ebook.previewVideoUrl ?? '').isNotEmpty)
+                          FilledButton.tonalIcon(
+                            onPressed: () => _launchExternal(widget.ebook.previewVideoUrl!),
+                            icon: const Icon(Icons.play_circle_fill_outlined),
+                            label: const Text('Watch trailer'),
+                          ),
+                        if ((widget.ebook.audioSampleUrl ?? '').isNotEmpty)
+                          FilledButton.tonalIcon(
+                            onPressed: () => _launchExternal(widget.ebook.audioSampleUrl!),
+                            icon: const Icon(Icons.graphic_eq),
+                            label: const Text('Audio sample'),
+                          ),
+                        FilledButton.tonalIcon(
+                          onPressed: () => _launchExternal(widget.ebook.fileUrl),
+                          icon: const Icon(Icons.picture_as_pdf_outlined),
+                          label: const Text('Download e-book'),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               )
@@ -450,6 +503,8 @@ class _EbookFormSheetState extends ConsumerState<_EbookFormSheet> {
   late final TextEditingController _descriptionController;
   late final TextEditingController _languageController;
   late final TextEditingController _tagsController;
+  late final TextEditingController _previewVideoController;
+  late final TextEditingController _audioSampleController;
   double _progress = 0;
   double? _rating;
   bool _downloaded = false;
@@ -466,6 +521,8 @@ class _EbookFormSheetState extends ConsumerState<_EbookFormSheet> {
     _descriptionController = TextEditingController(text: ebook?.description ?? '');
     _languageController = TextEditingController(text: ebook?.language ?? '');
     _tagsController = TextEditingController(text: ebook?.tags.join(', ') ?? '');
+    _previewVideoController = TextEditingController(text: ebook?.previewVideoUrl ?? '');
+    _audioSampleController = TextEditingController(text: ebook?.audioSampleUrl ?? '');
     _progress = ebook?.progress ?? 0;
     _rating = ebook?.rating;
     _downloaded = ebook?.downloaded ?? false;
@@ -495,6 +552,8 @@ class _EbookFormSheetState extends ConsumerState<_EbookFormSheet> {
     _descriptionController.dispose();
     _languageController.dispose();
     _tagsController.dispose();
+    _previewVideoController.dispose();
+    _audioSampleController.dispose();
     for (final chapter in _chapters) {
       chapter.dispose();
     }
@@ -542,6 +601,8 @@ class _EbookFormSheetState extends ConsumerState<_EbookFormSheet> {
       progress: _progress,
       rating: _rating,
       downloaded: _downloaded,
+      previewVideoUrl: _previewVideoController.text.trim().isEmpty ? null : _previewVideoController.text.trim(),
+      audioSampleUrl: _audioSampleController.text.trim().isEmpty ? null : _audioSampleController.text.trim(),
     );
 
     if (widget.ebook == null) {
@@ -602,6 +663,16 @@ class _EbookFormSheetState extends ConsumerState<_EbookFormSheet> {
                   TextFormField(
                     controller: _fileController,
                     decoration: const InputDecoration(labelText: 'File URL'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _previewVideoController,
+                    decoration: const InputDecoration(labelText: 'Preview trailer URL (optional)'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _audioSampleController,
+                    decoration: const InputDecoration(labelText: 'Audio sample URL (optional)'),
                   ),
                   const SizedBox(height: 12),
                   Row(
