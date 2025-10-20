@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import CreationStudioController from '../controllers/CreationStudioController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/projects', auth('user'), CreationStudioController.listProjects);
 router.get('/analytics/summary', auth('user'), CreationStudioController.analyticsSummary);

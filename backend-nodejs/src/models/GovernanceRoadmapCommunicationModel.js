@@ -53,7 +53,6 @@ function extractCount(row) {
   }
   const value =
     row.count ??
-    row['count'] ??
     row['count(*)'] ??
     row['COUNT(*)'] ??
     row['count(`*`)'] ??
@@ -124,18 +123,42 @@ export default class GovernanceRoadmapCommunicationModel {
 
   static async updateByPublicId(publicId, updates, connection = db) {
     const payload = {};
-    if (updates.slug !== undefined) payload.slug = updates.slug;
-    if (updates.audience !== undefined) payload.audience = updates.audience;
-    if (updates.channel !== undefined) payload.channel = updates.channel;
-    if (updates.subject !== undefined) payload.subject = updates.subject;
-    if (updates.body !== undefined) payload.body = updates.body;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.scheduleAt !== undefined) payload.schedule_at = updates.scheduleAt || null;
-    if (updates.sentAt !== undefined) payload.sent_at = updates.sentAt || null;
-    if (updates.ownerEmail !== undefined) payload.owner_email = updates.ownerEmail;
-    if (updates.metrics !== undefined) payload.metrics = serialiseJson(updates.metrics, {});
-    if (updates.attachments !== undefined) payload.attachments = serialiseJson(updates.attachments, []);
-    if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata, {});
+    if (updates.slug !== undefined) {
+      payload.slug = updates.slug;
+    }
+    if (updates.audience !== undefined) {
+      payload.audience = updates.audience;
+    }
+    if (updates.channel !== undefined) {
+      payload.channel = updates.channel;
+    }
+    if (updates.subject !== undefined) {
+      payload.subject = updates.subject;
+    }
+    if (updates.body !== undefined) {
+      payload.body = updates.body;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.scheduleAt !== undefined) {
+      payload.schedule_at = updates.scheduleAt || null;
+    }
+    if (updates.sentAt !== undefined) {
+      payload.sent_at = updates.sentAt || null;
+    }
+    if (updates.ownerEmail !== undefined) {
+      payload.owner_email = updates.ownerEmail;
+    }
+    if (updates.metrics !== undefined) {
+      payload.metrics = serialiseJson(updates.metrics, {});
+    }
+    if (updates.attachments !== undefined) {
+      payload.attachments = serialiseJson(updates.attachments, []);
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = serialiseJson(updates.metadata, {});
+    }
 
     if (!Object.keys(payload).length) {
       return this.findByPublicId(publicId, connection);

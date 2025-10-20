@@ -208,4 +208,33 @@ export default class CloudConvertClient {
       throw timeoutError;
     });
   }
+
+  extractExportedFiles(jobResponse) {
+    if (!jobResponse) {
+      return [];
+    }
+
+    const tasks = jobResponse?.data?.tasks ?? jobResponse?.tasks ?? [];
+    return tasks
+      .filter((task) => {
+        const operation = task?.operation ?? task?.attributes?.operation ?? '';
+        return typeof operation === 'string' && operation.startsWith('export/');
+      })
+      .flatMap((task) => {
+        const result = task?.result ?? task?.attributes?.result;
+        return Array.isArray(result?.files) ? result.files : [];
+      })
+      .filter(Boolean);
+  }
+
+  async createJobAndWait(payload, options = {}) {
+    const job = await this.createJob(payload);
+    const jobId = job?.id ?? job?.data?.id;
+    if (!jobId) {
+      throw new Error('CloudConvert createJob did not return a job identifier.');
+    }
+
+    const finalJob = await this.waitForJob(jobId, options);
+    return { job: finalJob, files: this.extractExportedFiles(finalJob) };
+  }
 }

@@ -35,7 +35,7 @@ export default class ContentAssetEventModel {
       .count({ total: '*' })
       .where({ asset_id: assetId })
       .groupBy('event_type');
-    return rows;
+    return rows.map((row) => ({ eventType: row.eventType, total: Number(row.total ?? 0) }));
   }
 
   static async latestForAsset(assetId, limit = 50, connection = db) {
@@ -46,7 +46,18 @@ export default class ContentAssetEventModel {
       .limit(limit);
     return rows.map((row) => ({
       ...row,
-      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : row.metadata
+      metadata:
+        typeof row.metadata === 'string'
+          ? (() => {
+              try {
+                return JSON.parse(row.metadata || '{}');
+              } catch (_error) {
+                return {};
+              }
+            })()
+          : row.metadata && typeof row.metadata === 'object'
+          ? row.metadata
+          : {}
     }));
   }
 }

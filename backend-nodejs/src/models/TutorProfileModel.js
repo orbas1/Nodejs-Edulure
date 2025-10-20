@@ -195,24 +195,57 @@ export default class TutorProfileModel {
 
   static async updateById(id, updates, connection = db) {
     const payload = {};
-    if (updates.displayName !== undefined) payload.display_name = updates.displayName;
-    if (updates.headline !== undefined) payload.headline = updates.headline ?? null;
-    if (updates.bio !== undefined) payload.bio = updates.bio ?? null;
-    if (updates.skills !== undefined) payload.skills = serialiseJson(updates.skills ?? [], []);
-    if (updates.languages !== undefined) payload.languages = serialiseJson(updates.languages ?? ['en'], ['en']);
-    if (updates.country !== undefined) payload.country = updates.country ?? null;
-    if (updates.timezones !== undefined) payload.timezones = serialiseJson(updates.timezones ?? ['Etc/UTC'], ['Etc/UTC']);
-    if (updates.availabilityPreferences !== undefined)
+    if (updates.displayName !== undefined) {
+      payload.display_name = updates.displayName;
+    }
+    if (updates.headline !== undefined) {
+      payload.headline = updates.headline ?? null;
+    }
+    if (updates.bio !== undefined) {
+      payload.bio = updates.bio ?? null;
+    }
+    if (updates.skills !== undefined) {
+      payload.skills = serialiseJson(updates.skills ?? [], []);
+    }
+    if (updates.languages !== undefined) {
+      payload.languages = serialiseJson(updates.languages ?? ['en'], ['en']);
+    }
+    if (updates.country !== undefined) {
+      payload.country = updates.country ?? null;
+    }
+    if (updates.timezones !== undefined) {
+      payload.timezones = serialiseJson(updates.timezones ?? ['Etc/UTC'], ['Etc/UTC']);
+    }
+    if (updates.availabilityPreferences !== undefined) {
       payload.availability_preferences = serialiseJson(updates.availabilityPreferences ?? {}, {});
-    if (updates.hourlyRateAmount !== undefined) payload.hourly_rate_amount = updates.hourlyRateAmount ?? 0;
-    if (updates.hourlyRateCurrency !== undefined) payload.hourly_rate_currency = updates.hourlyRateCurrency ?? 'USD';
-    if (updates.ratingAverage !== undefined) payload.rating_average = updates.ratingAverage ?? 0;
-    if (updates.ratingCount !== undefined) payload.rating_count = updates.ratingCount ?? 0;
-    if (updates.completedSessions !== undefined) payload.completed_sessions = updates.completedSessions ?? 0;
-    if (updates.responseTimeMinutes !== undefined) payload.response_time_minutes = updates.responseTimeMinutes ?? 0;
-    if (updates.isVerified !== undefined) payload.is_verified = updates.isVerified;
-    if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata ?? {}, {});
-    if (updates.userId !== undefined) payload.user_id = updates.userId;
+    }
+    if (updates.hourlyRateAmount !== undefined) {
+      payload.hourly_rate_amount = updates.hourlyRateAmount ?? 0;
+    }
+    if (updates.hourlyRateCurrency !== undefined) {
+      payload.hourly_rate_currency = updates.hourlyRateCurrency ?? 'USD';
+    }
+    if (updates.ratingAverage !== undefined) {
+      payload.rating_average = updates.ratingAverage ?? 0;
+    }
+    if (updates.ratingCount !== undefined) {
+      payload.rating_count = updates.ratingCount ?? 0;
+    }
+    if (updates.completedSessions !== undefined) {
+      payload.completed_sessions = updates.completedSessions ?? 0;
+    }
+    if (updates.responseTimeMinutes !== undefined) {
+      payload.response_time_minutes = updates.responseTimeMinutes ?? 0;
+    }
+    if (updates.isVerified !== undefined) {
+      payload.is_verified = updates.isVerified;
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = serialiseJson(updates.metadata ?? {}, {});
+    }
+    if (updates.userId !== undefined) {
+      payload.user_id = updates.userId;
+    }
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);

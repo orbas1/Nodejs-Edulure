@@ -247,7 +247,11 @@ class SloRegistry {
   }
 
   recordHttpObservation({ route, method, statusCode, durationMs, timestamp = Date.now() }) {
-    if (!route || !method || typeof statusCode !== 'number') {
+    const normalisedRoute = typeof route === 'string' ? route : '';
+    const normalisedMethod = typeof method === 'string' ? method.trim().toUpperCase() : '';
+    const normalisedStatus = Number(statusCode);
+
+    if (!normalisedRoute || !normalisedMethod || !Number.isInteger(normalisedStatus)) {
       return;
     }
 
@@ -255,38 +259,49 @@ class SloRegistry {
       if (definition.indicator.type !== 'http') {
         continue;
       }
-      if (!this.matchesHttpIndicator(definition, { route, method, statusCode })) {
+      if (!this.matchesHttpIndicator(definition, { route: normalisedRoute, method: normalisedMethod, statusCode: normalisedStatus })) {
         continue;
       }
-      this.applyObservation(definition.id, { statusCode, durationMs, timestamp });
+      this.applyObservation(definition.id, {
+        statusCode: normalisedStatus,
+        durationMs: Number.isFinite(durationMs) && durationMs >= 0 ? Number(durationMs) : null,
+        timestamp
+      });
     }
   }
 
   matchesHttpIndicator(definition, { route, method, statusCode }) {
     const indicator = definition.indicator;
+    if (indicator.matcher.global) {
+      indicator.matcher.lastIndex = 0;
+    }
     if (!indicator.matcher.test(route)) {
       return false;
     }
 
     if (
       Array.isArray(indicator.excludeMatchers) &&
-      indicator.excludeMatchers.some((entry) => entry.regex.test(route))
+      indicator.excludeMatchers.some((entry) => {
+        if (entry.regex.global) {
+          entry.regex.lastIndex = 0;
+        }
+        return entry.regex.test(route);
+      })
     ) {
       return false;
     }
 
     if (indicator.methodWhitelist.length > 0) {
-      const normalisedMethod = method.toUpperCase();
-      if (!indicator.methodWhitelist.includes(normalisedMethod)) {
+      if (!indicator.methodWhitelist.includes(method)) {
         return false;
       }
     }
 
-    if (indicator.successStatusCodes.includes(statusCode)) {
+    if (indicator.successStatusCodes.length > 0 && indicator.successStatusCodes.includes(statusCode)) {
       return true;
     }
 
-    if (indicator.failureStatusCodes.includes(statusCode)) {
+    if (indicator.failureStatusCodes.length > 0 && indicator.failureStatusCodes.includes(statusCode)) {
       return true;
     }
 

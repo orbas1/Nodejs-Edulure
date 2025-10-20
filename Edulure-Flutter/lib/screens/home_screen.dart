@@ -34,8 +34,30 @@ class _PublicHomeView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: LanguageService.listenable(),
-      builder: (context, code, _) {
+      builder: (context, _, __) {
         final t = LanguageService.translate;
+        String resolveCopy(String key, String fallback) {
+          final value = t(key);
+          return value == key ? fallback : value;
+        }
+        final heroTitle = resolveCopy(
+          'home.hero.title',
+          'Learning communities built for scale',
+        );
+        final heroDescription = resolveCopy(
+          'home.hero.description',
+          'Run courses, community, and live sessions from one secure app.',
+        );
+        final heroPrimaryCta = resolveCopy(
+          'home.hero.ctaPrimary',
+          'Join the community',
+        );
+        final heroSecondaryCta = resolveCopy(
+          'home.hero.ctaSecondary',
+          'Peek inside live circles',
+        );
+        final navLogin = resolveCopy('navigation.login', 'Log in');
+        final navRegister = resolveCopy('navigation.register', 'Create account');
         return Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
@@ -62,12 +84,12 @@ class _PublicHomeView extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.pushNamed(context, '/login'),
-                child: Text(t('navigation.login')),
+                child: Text(navLogin),
               ),
               const SizedBox(width: 8),
               FilledButton(
                 onPressed: () => Navigator.pushNamed(context, '/register'),
-                child: Text(t('navigation.register')),
+                child: Text(navRegister),
               ),
               const SizedBox(width: 16),
             ],
@@ -75,52 +97,70 @@ class _PublicHomeView extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.all(24),
             children: [
-          Container(
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFEEF2FF), Color(0xFFEFF6FF)],
-              ),
-              borderRadius: BorderRadius.circular(32),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  t('home.hero.title'),
-                  'Learning communities built for scale',
-                  style: Theme.of(context)
-                      .textTheme
-                      .headlineSmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
+              Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFEEF2FF), Color(0xFFEFF6FF)],
+                  ),
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: const Color(0xFFD6E4FF)),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  t('home.hero.description'),
-                  'Run courses, community, and live sessions from one secure app.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 24),
-                Wrap(
-                  spacing: 12,
-                  children: const [
-                    Chip(label: Text('Communities')),
-                    Chip(label: Text('Classrooms')),
-                    Chip(label: Text('Analytics')),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      heroTitle,
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      heroDescription,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: const Color(0xFF1F2A44)),
+                    ),
+                    const SizedBox(height: 24),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        FilledButton(
+                          onPressed: () => Navigator.pushNamed(context, '/register'),
+                          child: Text(heroPrimaryCta),
+                        ),
+                        OutlinedButton(
+                          onPressed: () => Navigator.pushNamed(context, '/explorer'),
+                          child: Text(heroSecondaryCta),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: const [
+                        Chip(label: Text('Communities')),
+                        Chip(label: Text('Classrooms')),
+                        Chip(label: Text('Analytics')),
+                      ],
+                    ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          ValueListenableBuilder(
-            valueListenable: SessionManager.assetsCache.listenable(),
-            builder: (context, box, _) {
-              final role = SessionManager.getActiveRole();
-              final classroomTarget = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
+              ),
+              const SizedBox(height: 24),
+              ValueListenableBuilder(
+                valueListenable: SessionManager.assetsCache.listenable(),
+                builder: (context, __, ___) {
+                  final role = SessionManager.getActiveRole();
+                  final classroomTarget = role == 'instructor' ? '/instructor-dashboard' : '/dashboard/learner';
 
-              return Column(
-                children: [
+                  return Column(
+                    children: [
                   ListTile(
                     leading: const Icon(Icons.groups_3_outlined),
                     title: const Text('Communities'),

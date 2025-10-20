@@ -3,6 +3,7 @@ import { Router } from 'express';
 import logger from '../config/logger.js';
 import { createFeatureFlagGate } from '../middleware/featureFlagGate.js';
 import { createRouteErrorBoundary } from '../middleware/routeErrorBoundary.js';
+import { describeRouteRegistry } from './registryValidator.js';
 
 const DEFAULT_API_VERSION = 'v1';
 const DEFAULT_API_PREFIX = '/api';
@@ -62,12 +63,27 @@ export function mountVersionedApi(app, {
 
     mountedRoutes.push({
       name: entry.name,
+      basePath: entry.basePath,
       path: `${versionBasePath}${entry.basePath}`,
       capability: entry.capability,
       flagKey: entry.flagKey,
-      defaultState: entry.defaultState ?? 'disabled'
+      defaultState: entry.defaultState ?? 'disabled',
+      audience: entry.audience ?? 'public'
     });
   }
+
+  if (mountedRoutes.length === 0) {
+    throw new Error('No routes were mounted. Ensure the registry contains valid route descriptors.');
+  }
+
+  loggerInstance.info(
+    {
+      component: 'api-router',
+      version,
+      routes: describeRouteRegistry(mountedRoutes)
+    },
+    'Mounted versioned API routes'
+  );
 
   versionRouter.use(
     createRouteErrorBoundary({

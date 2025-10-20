@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import ExplorerController from '../controllers/ExplorerController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.post('/search', auth('user'), ExplorerController.search);
 router.get('/saved-searches', auth(), ExplorerController.listSavedSearches);

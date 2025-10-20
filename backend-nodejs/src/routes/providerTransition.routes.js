@@ -1,8 +1,7 @@
-import { Router } from 'express';
-
 import ProviderTransitionController from '../controllers/ProviderTransitionController.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/announcements', ProviderTransitionController.list);
 router.get('/announcements/:slug', ProviderTransitionController.show);

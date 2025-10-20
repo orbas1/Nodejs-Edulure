@@ -44,11 +44,18 @@ class CommunityEngagementState {
 }
 
 class CommunityEngagementController extends StateNotifier<CommunityEngagementState> {
-  CommunityEngagementController() : super(const CommunityEngagementState());
+  CommunityEngagementController({
+    Random? random,
+    CommunityChatService? chatService,
+    CommunityEngagementStorage? storage,
+  })  : _random = random ?? Random(),
+        _chatService = chatService ?? CommunityChatService(),
+        _storage = storage ?? CommunityEngagementStorage(),
+        super(const CommunityEngagementState());
 
-  final Random _random = Random();
-  final CommunityChatService _chatService = CommunityChatService();
-  final CommunityEngagementStorage _storage = CommunityEngagementStorage();
+  final Random _random;
+  final CommunityChatService _chatService;
+  final CommunityEngagementStorage _storage;
 
   Future<void> bootstrap(CommunityDetail detail, {bool forceRefresh = false}) async {
     if (!forceRefresh && state.snapshots.containsKey(detail.id)) {

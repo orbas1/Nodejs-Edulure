@@ -3019,8 +3019,13 @@ export async function seed(knex) {
 
     await trx('security_incidents').insert(securityIncidents);
 
-    const [phishingIncident, takeoverIncident, marketplaceIncident, resolvedSmishingIncident, resolvedAbuseIncident] =
-      securityIncidents;
+    const [
+      phishingIncident,
+      takeoverIncident,
+      _marketplaceIncident,
+      resolvedSmishingIncident,
+      _resolvedAbuseIncident
+    ] = securityIncidents;
 
     await trx('audit_events').insert([
       {

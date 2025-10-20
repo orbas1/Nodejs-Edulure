@@ -57,7 +57,6 @@ import MonetizationUsageRecordModel from '../src/models/MonetizationUsageRecordM
 import MonetizationRevenueScheduleModel from '../src/models/MonetizationRevenueScheduleModel.js';
 import MonetizationReconciliationRunModel from '../src/models/MonetizationReconciliationRunModel.js';
 import PaymentLedgerEntryModel from '../src/models/PaymentLedgerEntryModel.js';
-import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
 import {
   updateMonetizationCatalogMetrics,
   recordMonetizationUsage,

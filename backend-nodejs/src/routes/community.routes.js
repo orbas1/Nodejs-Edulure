@@ -1,5 +1,3 @@
-import { Router } from 'express';
-
 import CommunityController from '../controllers/CommunityController.js';
 import CommunityEngagementController from '../controllers/CommunityEngagementController.js';
 import CommunityChatController from '../controllers/CommunityChatController.js';
@@ -8,8 +6,9 @@ import CommunityMemberAdminController from '../controllers/CommunityMemberAdminC
 import CommunityOperationsController from '../controllers/CommunityOperationsController.js';
 import CommunityProgrammingController from '../controllers/CommunityProgrammingController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/', auth(), CommunityController.listForUser);
 router.get('/feed', auth(), CommunityController.listUserFeed);

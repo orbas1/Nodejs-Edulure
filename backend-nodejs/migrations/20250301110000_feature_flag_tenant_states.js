@@ -1,6 +1,7 @@
 const TABLE_NAME = 'feature_flag_tenant_states';
 
 const STATE_ENUM = ['enabled', 'disabled', 'conditional'];
+const JSON_EMPTY_OBJECT = JSON.stringify({});
 
 export async function up(knex) {
   const exists = await knex.schema.hasTable(TABLE_NAME);
@@ -28,7 +29,7 @@ export async function up(knex) {
       .defaultTo('disabled');
     table.string('variant_key', 120);
     table.decimal('rollout_percentage', 5, 2).unsigned().notNullable().defaultTo(0);
-    table.json('criteria').notNullable().defaultTo('{}');
+    table.json('criteria').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.string('notes', 512);
     table.string('updated_by', 120).notNullable();
     table.timestamp('activated_at');

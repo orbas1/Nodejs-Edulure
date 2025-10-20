@@ -58,17 +58,17 @@ export default class ContentAssetModel {
 
   static async patchById(id, updates, connection = db) {
     const payload = {};
-    if (updates.status) payload.status = updates.status;
-    if (updates.storageKey) payload.storage_key = updates.storageKey;
-    if (updates.storageBucket) payload.storage_bucket = updates.storageBucket;
-    if (updates.convertedKey) payload.converted_key = updates.convertedKey;
-    if (updates.convertedBucket) payload.converted_bucket = updates.convertedBucket;
-    if (updates.visibility) payload.visibility = updates.visibility;
-    if (updates.checksum) payload.checksum = updates.checksum;
-    if (typeof updates.sizeBytes === 'number') payload.size_bytes = updates.sizeBytes;
-    if (updates.mimeType) payload.mime_type = updates.mimeType;
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.storageKey !== undefined) payload.storage_key = updates.storageKey ?? null;
+    if (updates.storageBucket !== undefined) payload.storage_bucket = updates.storageBucket ?? null;
+    if (updates.convertedKey !== undefined) payload.converted_key = updates.convertedKey ?? null;
+    if (updates.convertedBucket !== undefined) payload.converted_bucket = updates.convertedBucket ?? null;
+    if (updates.visibility !== undefined) payload.visibility = updates.visibility;
+    if (updates.checksum !== undefined) payload.checksum = updates.checksum ?? null;
+    if (updates.sizeBytes !== undefined) payload.size_bytes = updates.sizeBytes ?? null;
+    if (updates.mimeType !== undefined) payload.mime_type = updates.mimeType ?? null;
     if (updates.publishedAt !== undefined) payload.published_at = updates.publishedAt;
-    if (updates.metadata) payload.metadata = JSON.stringify(updates.metadata);
+    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
     await connection(TABLE).where({ id }).update({ ...payload, updated_at: connection.fn.now() });
     return this.findById(id, connection);
   }
@@ -103,9 +103,22 @@ export default class ContentAssetModel {
   }
 
   static deserialize(row) {
+    let metadata = row.metadata;
+    if (typeof metadata === 'string') {
+      try {
+        metadata = JSON.parse(metadata || '{}');
+      } catch (_error) {
+        metadata = {};
+      }
+    }
+
+    if (!metadata || typeof metadata !== 'object') {
+      metadata = {};
+    }
+
     return {
       ...row,
-      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : row.metadata
+      metadata
     };
   }
 }

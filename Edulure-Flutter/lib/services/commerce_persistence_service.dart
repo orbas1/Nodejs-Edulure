@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'commerce_models.dart';
@@ -24,9 +25,13 @@ abstract class CommercePersistence {
 }
 
 class CommercePersistenceService implements CommercePersistence {
-  CommercePersistenceService({String boxName = _defaultBoxName})
-      : _boxName = boxName,
-        _encoder = const CommerceJsonEncoder();
+  CommercePersistenceService({
+    String boxName = _defaultBoxName,
+    HiveInterface? hive,
+    CommerceJsonEncoder? encoder,
+  })  : _boxName = boxName,
+        _hive = hive ?? Hive,
+        _encoder = encoder ?? const CommerceJsonEncoder();
 
   static const _defaultBoxName = 'commerce.state';
   static const _paymentsKey = 'payments';
@@ -35,6 +40,7 @@ class CommercePersistenceService implements CommercePersistence {
   static const _communityKey = 'community.subscriptions';
 
   final String _boxName;
+  final HiveInterface _hive;
   final CommerceJsonEncoder _encoder;
   Box<String>? _cachedBox;
 
@@ -43,7 +49,7 @@ class CommercePersistenceService implements CommercePersistence {
     if (cached != null && cached.isOpen) {
       return cached;
     }
-    final box = await Hive.openBox<String>(_boxName);
+    final box = await _hive.openBox<String>(_boxName);
     _cachedBox = box;
     return box;
   }

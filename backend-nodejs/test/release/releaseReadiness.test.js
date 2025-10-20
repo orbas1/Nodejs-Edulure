@@ -78,7 +78,9 @@ describe('Release readiness guardrails', () => {
 
   afterAll(async () => {
     if (server) {
-      await new Promise((resolve) => server.close(resolve));
+    await new Promise((resolve) => {
+      server.close(resolve);
+    });
     }
   });
 

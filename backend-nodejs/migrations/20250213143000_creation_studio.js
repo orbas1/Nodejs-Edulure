@@ -1,9 +1,12 @@
+const JSON_EMPTY_OBJECT = JSON.stringify({});
+const JSON_EMPTY_ARRAY = JSON.stringify([]);
+
 export async function up(knex) {
   const hasProjects = await knex.schema.hasTable('creation_projects');
   if (!hasProjects) {
     await knex.schema.createTable('creation_projects', (table) => {
       table.increments('id').primary();
-      table.uuid('public_id').notNullable().unique();
+      table.uuid('public_id').notNullable().unique().defaultTo(knex.raw('(UUID())'));
       table
         .integer('owner_id')
         .unsigned()
@@ -20,11 +23,11 @@ export async function up(knex) {
         .defaultTo('draft');
       table.string('title', 240).notNullable();
       table.text('summary');
-      table.json('metadata').notNullable().defaultTo('{}');
-      table.json('content_outline').notNullable().defaultTo(JSON.stringify([]));
-      table.json('compliance_notes').notNullable().defaultTo(JSON.stringify([]));
-      table.json('analytics_targets').notNullable().defaultTo(JSON.stringify({}));
-      table.json('publishing_channels').notNullable().defaultTo(JSON.stringify([]));
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('content_outline').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+      table.json('compliance_notes').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+      table.json('analytics_targets').notNullable().defaultTo(JSON_EMPTY_OBJECT);
+      table.json('publishing_channels').notNullable().defaultTo(JSON_EMPTY_ARRAY);
       table.timestamp('review_requested_at');
       table.timestamp('approved_at');
       table.timestamp('published_at');
@@ -74,7 +77,7 @@ export async function up(knex) {
   if (!hasTemplates) {
     await knex.schema.createTable('creation_templates', (table) => {
       table.increments('id').primary();
-      table.uuid('public_id').notNullable().unique();
+      table.uuid('public_id').notNullable().unique().defaultTo(knex.raw('(UUID())'));
       table
         .enum('type', ['course', 'ebook', 'community', 'ads_asset'])
         .notNullable();
@@ -90,7 +93,7 @@ export async function up(knex) {
         .references('id')
         .inTable('users')
         .onDelete('CASCADE');
-      table.json('governance_tags').notNullable().defaultTo(JSON.stringify([]));
+      table.json('governance_tags').notNullable().defaultTo(JSON_EMPTY_ARRAY);
       table.timestamp('published_at');
       table.timestamp('retired_at');
       table.timestamp('created_at').defaultTo(knex.fn.now());
@@ -107,7 +110,7 @@ export async function up(knex) {
   if (!hasSessions) {
     await knex.schema.createTable('creation_collaboration_sessions', (table) => {
       table.increments('id').primary();
-      table.uuid('public_id').notNullable().unique();
+      table.uuid('public_id').notNullable().unique().defaultTo(knex.raw('(UUID())'));
       table
         .integer('project_id')
         .unsigned()
@@ -126,8 +129,8 @@ export async function up(knex) {
         .enum('role', ['owner', 'editor', 'commenter', 'viewer'])
         .notNullable()
         .defaultTo('editor');
-      table.json('capabilities').notNullable().defaultTo(JSON.stringify([]));
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('capabilities').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('joined_at').defaultTo(knex.fn.now());
       table.timestamp('last_heartbeat_at').defaultTo(knex.fn.now());
       table.timestamp('left_at');
@@ -158,7 +161,7 @@ export async function up(knex) {
         .inTable('users')
         .onDelete('CASCADE');
       table.json('snapshot').notNullable();
-      table.json('change_summary').notNullable().defaultTo(JSON.stringify({}));
+      table.json('change_summary').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.unique(['project_id', 'version_number']);
     });

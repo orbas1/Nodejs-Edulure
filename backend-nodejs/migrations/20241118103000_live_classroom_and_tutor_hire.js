@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasTutorProfiles = await knex.schema.hasTable('tutor_profiles');
   if (!hasTutorProfiles) {
@@ -13,11 +15,11 @@ export async function up(knex) {
       table.string('display_name', 200).notNullable();
       table.string('headline', 250);
       table.text('bio');
-      table.json('skills').notNullable().defaultTo(JSON.stringify([]));
-      table.json('languages').notNullable().defaultTo(JSON.stringify(['en']));
+      table.json('skills').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('languages').notNullable().defaultTo(jsonDefault(knex, ["en"]));
       table.string('country', 2);
-      table.json('timezones').notNullable().defaultTo(JSON.stringify(['Etc/UTC']));
-      table.json('availability_preferences').notNullable().defaultTo('{}');
+      table.json('timezones').notNullable().defaultTo(jsonDefault(knex, ["Etc/UTC"]));
+      table.json('availability_preferences').notNullable().defaultTo(jsonDefault(knex, {}));
       table.integer('hourly_rate_amount').unsigned().notNullable().defaultTo(0);
       table.string('hourly_rate_currency', 3).notNullable().defaultTo('USD');
       table.decimal('rating_average', 4, 2).notNullable().defaultTo(0);
@@ -25,7 +27,7 @@ export async function up(knex) {
       table.integer('completed_sessions').unsigned().notNullable().defaultTo(0);
       table.integer('response_time_minutes').unsigned().notNullable().defaultTo(0);
       table.boolean('is_verified').notNullable().defaultTo(false);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -55,7 +57,7 @@ export async function up(knex) {
         .defaultTo('open');
       table.boolean('is_recurring').notNullable().defaultTo(false);
       table.string('recurrence_rule', 240);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.index(['tutor_id', 'start_at']);
       table.index(['tutor_id', 'status']);
@@ -95,7 +97,7 @@ export async function up(knex) {
         .enum('status', ['requested', 'confirmed', 'cancelled', 'completed'])
         .notNullable()
         .defaultTo('requested');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.index(['tutor_id', 'status']);
       table.index(['learner_id', 'status']);
     });
@@ -138,8 +140,8 @@ export async function up(knex) {
       table.string('timezone', 60).notNullable().defaultTo('Etc/UTC');
       table.timestamp('start_at').notNullable();
       table.timestamp('end_at').notNullable();
-      table.json('topics').notNullable().defaultTo(JSON.stringify([]));
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('topics').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -178,7 +180,7 @@ export async function up(knex) {
       table.timestamp('registered_at').defaultTo(knex.fn.now());
       table.timestamp('attended_at');
       table.timestamp('cancelled_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['classroom_id', 'user_id']);
       table.index(['classroom_id', 'status']);
     });
