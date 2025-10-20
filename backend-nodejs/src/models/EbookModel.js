@@ -90,10 +90,60 @@ function serialiseMetadata(value) {
 }
 
 function sanitiseSlug(value) {
-  if (!value) {
+  if (value === null || value === undefined) {
     return null;
   }
-  return slugify(value, { lower: true, strict: true });
+  const source = typeof value === 'string' ? value : String(value);
+  if (!source.trim()) {
+    return null;
+  }
+  const slug = slugify(source, { lower: true, strict: true });
+  return slug.length ? slug : null;
+}
+
+function ensureNonEmptyString(value, fieldName) {
+  if (typeof value !== 'string') {
+    throw new TypeError(`${fieldName} must be provided as a non-empty string`);
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new TypeError(`${fieldName} must be provided as a non-empty string`);
+  }
+  return trimmed;
+}
+
+function resolveSlug(explicitSlug, title) {
+  const direct = sanitiseSlug(explicitSlug);
+  if (direct) {
+    return direct;
+  }
+  const fromTitle = sanitiseSlug(title);
+  if (fromTitle) {
+    return fromTitle;
+  }
+  throw new TypeError('Ebook slug could not be derived from the provided slug or title');
+}
+
+function normaliseFilterValues(values) {
+  if (!values?.length) {
+    return [];
+  }
+
+  const normalised = values
+    .map((value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed.length ? trimmed : null;
+      }
+      return value;
+    })
+    .filter((value) => value !== null)
+    .map((value) => JSON.stringify(value));
+
+  return Array.from(new Set(normalised));
 }
 
 export default class EbookModel {
@@ -140,11 +190,12 @@ export default class EbookModel {
   }
 
   static async create(ebook, connection = db) {
+    const title = ensureNonEmptyString(ebook.title, 'title');
     const payload = {
       public_id: ebook.publicId,
       asset_id: ebook.assetId,
-      title: ebook.title,
-      slug: ebook.slug ?? sanitiseSlug(ebook.title),
+      title,
+      slug: resolveSlug(ebook.slug, title),
       subtitle: ebook.subtitle ?? null,
       description: ebook.description ?? null,
       cover_image_url: ebook.coverImageUrl ?? null,
@@ -173,8 +224,14 @@ export default class EbookModel {
 
   static async updateById(id, updates, connection = db) {
     const payload = {};
-    if (updates.title !== undefined) payload.title = updates.title;
-    if (updates.slug !== undefined) payload.slug = sanitiseSlug(updates.slug);
+    if (updates.title !== undefined) payload.title = ensureNonEmptyString(updates.title, 'title');
+    if (updates.slug !== undefined) {
+      const normalisedSlug = sanitiseSlug(updates.slug);
+      if (!normalisedSlug) {
+        throw new TypeError('slug must resolve to a valid URL-friendly value');
+      }
+      payload.slug = normalisedSlug;
+    }
     if (updates.subtitle !== undefined) payload.subtitle = updates.subtitle ?? null;
     if (updates.description !== undefined) payload.description = updates.description ?? null;
     if (updates.coverImageUrl !== undefined) payload.cover_image_url = updates.coverImageUrl ?? null;
@@ -307,7 +364,8 @@ export default class EbookModel {
       });
     }
 
-    if (categories?.length) {
+    const categoryFilters = normaliseFilterValues(categories);
+    if (categoryFilters.length) {
       query.where((builder) => {
         for (const category of categories) {
           builder.orWhereRaw('JSON_CONTAINS(ebooks.categories, ?)', [JSON.stringify(category)]);
@@ -315,7 +373,8 @@ export default class EbookModel {
       });
     }
 
-    if (tags?.length) {
+    const tagFilters = normaliseFilterValues(tags);
+    if (tagFilters.length) {
       query.where((builder) => {
         for (const tag of tags) {
           builder.orWhereRaw('JSON_CONTAINS(ebooks.tags, ?)', [JSON.stringify(tag)]);
@@ -323,7 +382,8 @@ export default class EbookModel {
       });
     }
 
-    if (languages?.length) {
+    const languageFilters = normaliseFilterValues(languages);
+    if (languageFilters.length) {
       query.where((builder) => {
         for (const language of languages) {
           builder.orWhereRaw('JSON_CONTAINS(ebooks.languages, ?)', [JSON.stringify(language)]);

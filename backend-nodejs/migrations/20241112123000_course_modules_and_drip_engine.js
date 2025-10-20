@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasCourses = await knex.schema.hasTable('courses');
   if (!hasCourses) {
@@ -20,9 +22,9 @@ export async function up(knex) {
         .notNullable()
         .defaultTo('beginner');
       table.string('category', 120).notNullable().defaultTo('general');
-      table.json('skills').notNullable().defaultTo(JSON.stringify([]));
-      table.json('tags').notNullable().defaultTo(JSON.stringify([]));
-      table.json('languages').notNullable().defaultTo(JSON.stringify(['en']));
+      table.json('skills').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('tags').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('languages').notNullable().defaultTo(jsonDefault(knex, ["en"]));
       table
         .enum('delivery_format', ['self_paced', 'cohort', 'live', 'blended'])
         .notNullable()
@@ -39,7 +41,7 @@ export async function up(knex) {
         .enum('status', ['draft', 'review', 'published', 'archived'])
         .notNullable()
         .defaultTo('draft');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -65,7 +67,7 @@ export async function up(knex) {
       table.string('slug', 220).notNullable();
       table.integer('position').unsigned().notNullable().defaultTo(0);
       table.integer('release_offset_days').notNullable().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -104,7 +106,7 @@ export async function up(knex) {
       table.integer('position').unsigned().notNullable().defaultTo(0);
       table.integer('duration_minutes').unsigned().notNullable().defaultTo(0);
       table.timestamp('release_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -135,8 +137,8 @@ export async function up(knex) {
       table.text('instructions');
       table.integer('max_score').unsigned().notNullable().defaultTo(100);
       table.integer('due_offset_days').notNullable().defaultTo(0);
-      table.json('rubric').notNullable().defaultTo('{}');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('rubric').notNullable().defaultTo(jsonDefault(knex, {}));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -173,7 +175,7 @@ export async function up(knex) {
       table.timestamp('started_at').defaultTo(knex.fn.now());
       table.timestamp('completed_at');
       table.timestamp('last_accessed_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['course_id', 'user_id']);
       table.index(['status']);
       table.index(['user_id', 'status']);
@@ -201,7 +203,7 @@ export async function up(knex) {
       table.boolean('completed').notNullable().defaultTo(false);
       table.timestamp('completed_at');
       table.decimal('progress_percent', 5, 2).notNullable().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['enrollment_id', 'lesson_id']);
       table.index(['lesson_id']);
     });

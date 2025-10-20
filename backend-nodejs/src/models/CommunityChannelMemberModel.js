@@ -1,13 +1,18 @@
 import db from '../config/database.js';
+import { ensureIntegerInRange, normaliseBoolean, readJsonColumn, writeJsonColumn } from '../utils/modelUtils.js';
 
-function parseJson(value, fallback) {
-  if (!value) return fallback;
-  if (typeof value === 'object') return value;
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return fallback;
+const TABLE = 'community_channel_members';
+const MEMBER_ROLES = new Set(['member', 'moderator']);
+
+function parseRole(role, { defaultRole = 'member' } = {}) {
+  if (role === undefined || role === null) {
+    return defaultRole;
   }
+  const candidate = String(role).trim().toLowerCase();
+  if (!MEMBER_ROLES.has(candidate)) {
+    throw new Error(`Unsupported channel member role '${role}'`);
+  }
+  return candidate;
 }
 
 function mapRecord(record) {
@@ -18,12 +23,12 @@ function mapRecord(record) {
     userId: record.user_id,
     role: record.role,
     notificationsEnabled: Boolean(record.notifications_enabled),
-    muteUntil: record.mute_until,
-    lastReadAt: record.last_read_at,
+    muteUntil: record.mute_until ?? null,
+    lastReadAt: record.last_read_at ?? null,
     lastReadMessageId: record.last_read_message_id ?? null,
-    metadata: parseJson(record.metadata, {}),
-    createdAt: record.created_at,
-    updatedAt: record.updated_at
+    metadata: readJsonColumn(record.metadata, {}),
+    createdAt: record.created_at ?? null,
+    updatedAt: record.updated_at ?? null
   };
 }
 
@@ -33,28 +38,30 @@ export default class CommunityChannelMemberModel {
     if (existing) {
       return existing;
     }
+
     const payload = {
-      channel_id: channelId,
-      user_id: userId,
-      role: defaults.role ?? 'member',
-      notifications_enabled: defaults.notificationsEnabled ?? true,
+      channel_id: ensureIntegerInRange(channelId, { fieldName: 'channelId', min: 1 }),
+      user_id: ensureIntegerInRange(userId, { fieldName: 'userId', min: 1 }),
+      role: parseRole(defaults.role),
+      notifications_enabled: normaliseBoolean(defaults.notificationsEnabled ?? true),
       mute_until: defaults.muteUntil ?? null,
-      metadata: JSON.stringify(defaults.metadata ?? {})
+      metadata: writeJsonColumn(defaults.metadata, {})
     };
-    const [id] = await connection('community_channel_members').insert(payload);
-    const row = await connection('community_channel_members').where({ id }).first();
+
+    const [id] = await connection(TABLE).insert(payload);
+    const row = await connection(TABLE).where({ id }).first();
     return mapRecord(row);
   }
 
   static async findMembership(channelId, userId, connection = db) {
-    const row = await connection('community_channel_members')
-      .where({ channel_id: channelId, user_id: userId })
+    const row = await connection(TABLE)
+      .where({ channel_id: ensureIntegerInRange(channelId, { fieldName: 'channelId', min: 1 }), user_id: ensureIntegerInRange(userId, { fieldName: 'userId', min: 1 }) })
       .first();
     return mapRecord(row);
   }
 
   static async updateLastRead(channelId, userId, { timestamp, messageId }, connection = db) {
-    await connection('community_channel_members')
+    await connection(TABLE)
       .where({ channel_id: channelId, user_id: userId })
       .update({
         last_read_at: timestamp ?? connection.fn.now(),
@@ -65,7 +72,7 @@ export default class CommunityChannelMemberModel {
   }
 
   static async listForUser(userId, connection = db) {
-    const rows = await connection('community_channel_members as ccm')
+    const rows = await connection(`${TABLE} as ccm`)
       .leftJoin('community_channels as cc', 'ccm.channel_id', 'cc.id')
       .select([
         'ccm.id',
@@ -81,38 +88,49 @@ export default class CommunityChannelMemberModel {
         'ccm.updated_at',
         'cc.community_id'
       ])
-      .where('ccm.user_id', userId);
+      .where('ccm.user_id', ensureIntegerInRange(userId, { fieldName: 'userId', min: 1 }));
 
-    return rows.map((row) => ({ ...mapRecord(row), communityId: row.community_id }));
+    return rows.map((row) => ({ ...mapRecord(row), communityId: row.community_id ?? null }));
   }
 
   static async listForChannel(channelId, connection = db) {
-    const rows = await connection('community_channel_members')
-      .where({ channel_id: channelId })
+    const rows = await connection(TABLE)
+      .where({ channel_id: ensureIntegerInRange(channelId, { fieldName: 'channelId', min: 1 }) })
       .orderBy('created_at', 'asc');
     return rows.map((row) => mapRecord(row));
   }
 
   static async updateMembership(channelId, userId, updates = {}, connection = db) {
     const payload = { updated_at: connection.fn.now() };
+
     if (updates.role !== undefined) {
-      payload.role = updates.role;
+      payload.role = parseRole(updates.role);
     }
     if (updates.notificationsEnabled !== undefined) {
-      payload.notifications_enabled = Boolean(updates.notificationsEnabled);
+      payload.notifications_enabled = normaliseBoolean(updates.notificationsEnabled);
     }
     if (updates.muteUntil !== undefined) {
       payload.mute_until = updates.muteUntil ?? null;
     }
     if (updates.metadata !== undefined) {
-      payload.metadata = JSON.stringify(updates.metadata ?? {});
+      payload.metadata = writeJsonColumn(updates.metadata, {});
     }
 
-    await connection('community_channel_members').where({ channel_id: channelId, user_id: userId }).update(payload);
+    await connection(TABLE)
+      .where({
+        channel_id: ensureIntegerInRange(channelId, { fieldName: 'channelId', min: 1 }),
+        user_id: ensureIntegerInRange(userId, { fieldName: 'userId', min: 1 })
+      })
+      .update(payload);
     return this.findMembership(channelId, userId, connection);
   }
 
   static async removeMembership(channelId, userId, connection = db) {
-    return connection('community_channel_members').where({ channel_id: channelId, user_id: userId }).del();
+    return connection(TABLE)
+      .where({
+        channel_id: ensureIntegerInRange(channelId, { fieldName: 'channelId', min: 1 }),
+        user_id: ensureIntegerInRange(userId, { fieldName: 'userId', min: 1 })
+      })
+      .del();
   }
 }

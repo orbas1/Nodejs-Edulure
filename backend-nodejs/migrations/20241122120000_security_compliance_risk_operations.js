@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 const RISK_TABLE = 'security_risk_register';
 const REVIEW_TABLE = 'security_risk_reviews';
 const EVIDENCE_TABLE = 'security_audit_evidence';
@@ -45,10 +47,10 @@ export async function up(knex) {
     table.string('owner_display_name', 160).nullable();
     table.string('owner_email', 160).nullable();
     table.integer('risk_owner_user_id').nullable();
-    table.json('tags').defaultTo('[]');
-    table.json('detection_controls').defaultTo('[]');
-    table.json('mitigation_controls').defaultTo('[]');
-    table.json('metadata').defaultTo('{}');
+    table.json('tags').defaultTo(jsonDefault(knex, []));
+    table.json('detection_controls').defaultTo(jsonDefault(knex, []));
+    table.json('mitigation_controls').defaultTo(jsonDefault(knex, []));
+    table.json('metadata').defaultTo(jsonDefault(knex, {}));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);
     table.index(['tenant_id', 'status'], `${RISK_TABLE}_tenant_status_idx`);
@@ -78,10 +80,10 @@ export async function up(knex) {
     table.string('residual_likelihood', 40).notNullable().defaultTo('possible');
     table.decimal('residual_risk_score', 6, 2).notNullable().defaultTo(0);
     table.text('notes').nullable();
-    table.json('evidence_references').defaultTo('[]');
+    table.json('evidence_references').defaultTo(jsonDefault(knex, []));
     table.timestamp('reviewed_at').notNullable().defaultTo(knex.fn.now());
     table.timestamp('next_review_at').nullable();
-    table.json('metadata').defaultTo('{}');
+    table.json('metadata').defaultTo(jsonDefault(knex, {}));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);
     table.index(['risk_id', 'reviewed_at'], `${REVIEW_TABLE}_risk_reviewed_idx`);
@@ -107,14 +109,14 @@ export async function up(knex) {
     table.string('evidence_type', 80).notNullable().defaultTo('document');
     table.string('storage_path', 500).notNullable();
     table.string('checksum', 128).nullable();
-    table.json('sources').defaultTo('[]');
+    table.json('sources').defaultTo(jsonDefault(knex, []));
     table.timestamp('captured_at').notNullable().defaultTo(knex.fn.now());
     table.timestamp('expires_at').nullable();
     table.string('status', 60).notNullable().defaultTo('submitted');
     table.integer('submitted_by').nullable();
     table.string('submitted_by_email', 160).nullable();
     table.text('description').nullable();
-    table.json('metadata').defaultTo('{}');
+    table.json('metadata').defaultTo(jsonDefault(knex, {}));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);
     table.index(['tenant_id', 'framework'], `${EVIDENCE_TABLE}_tenant_framework_idx`);
@@ -141,11 +143,11 @@ export async function up(knex) {
     table.integer('actual_rpo_minutes').nullable();
     table.string('outcome', 60).notNullable().defaultTo('pending_report');
     table.text('lessons_learned').nullable();
-    table.json('follow_up_actions').defaultTo('[]');
+    table.json('follow_up_actions').defaultTo(jsonDefault(knex, []));
     table.integer('owner_id').nullable();
     table.string('owner_display_name', 160).nullable();
     table.string('owner_email', 160).nullable();
-    table.json('metadata').defaultTo('{}');
+    table.json('metadata').defaultTo(jsonDefault(knex, {}));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);
     table.index(['tenant_id', 'scenario_key'], `${CONTINUITY_TABLE}_tenant_scenario_idx`);
@@ -171,7 +173,7 @@ export async function up(knex) {
     table.text('methodology').nullable();
     table.text('findings').nullable();
     table.text('next_steps').nullable();
-    table.json('metadata').defaultTo('{}');
+    table.json('metadata').defaultTo(jsonDefault(knex, {}));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);
     table.index(['tenant_id', 'assessment_type'], `${ASSESSMENT_TABLE}_tenant_type_idx`);

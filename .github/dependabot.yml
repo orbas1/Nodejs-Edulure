@@ -4,7 +4,9 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    target-branch: "main"
     open-pull-requests-limit: 10
+    rebase-strategy: "disabled"
     allow:
       - dependency-type: "all"
     ignore:
@@ -22,33 +24,101 @@ updates:
           - "@headlessui/*"
           - "@heroicons/*"
           - "socket.io*"
+    labels:
+      - "dependencies"
+      - "release-automation"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
   - package-ecosystem: "npm"
     directory: "/backend-nodejs"
     schedule:
       interval: "daily"
+    target-branch: "main"
     open-pull-requests-limit: 10
+    rebase-strategy: "disabled"
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
   - package-ecosystem: "npm"
     directory: "/frontend-reactjs"
     schedule:
       interval: "daily"
+    target-branch: "main"
     open-pull-requests-limit: 10
+    rebase-strategy: "disabled"
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
   - package-ecosystem: "npm"
     directory: "/sdk-typescript"
     schedule:
       interval: "weekly"
+    target-branch: "main"
     open-pull-requests-limit: 5
+    rebase-strategy: "disabled"
+    labels:
+      - "dependencies"
+      - "sdk"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
   - package-ecosystem: "pub"
     directory: "/Edulure-Flutter"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    target-branch: "main"
+    rebase-strategy: "disabled"
+    groups:
+      flutter-core:
+        patterns:
+          - "flutter"
+          - "flutter_*"
+          - "google_fonts"
+      firebase-suite:
+        patterns:
+          - "firebase_*"
+          - "cloud_firestore"
+      instrumentation:
+        patterns:
+          - "sentry_*"
+          - "package_info_plus"
+    labels:
+      - "dependencies"
+      - "mobile"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
   - package-ecosystem: "terraform"
     directory: "/infrastructure/terraform"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    target-branch: "main"
+    rebase-strategy: "disabled"
+    labels:
+      - "dependencies"
+      - "infrastructure"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "daily"
     open-pull-requests-limit: 10
+    target-branch: "main"
+    rebase-strategy: "disabled"
+    labels:
+      - "dependencies"
+      - "automation"
+    commit-message:
+      prefix: "chore"
+      include: "scope"

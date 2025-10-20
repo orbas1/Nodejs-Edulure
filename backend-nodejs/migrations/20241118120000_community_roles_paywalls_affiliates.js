@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 const BILLING_INTERVALS = ['monthly', 'quarterly', 'annual', 'lifetime'];
 const SUBSCRIPTION_STATUSES = ['incomplete', 'trialing', 'active', 'past_due', 'canceled', 'expired'];
 const AFFILIATE_STATUSES = ['pending', 'approved', 'suspended', 'revoked'];
@@ -27,7 +29,7 @@ export async function up(knex) {
       table.integer('commission_rate_bps').unsigned().notNullable().defaultTo(250);
       table.integer('total_earned_cents').unsigned().notNullable().defaultTo(0);
       table.integer('total_paid_cents').unsigned().notNullable().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('approved_at');
       table.timestamp('suspended_at');
       table.timestamp('revoked_at');
@@ -55,7 +57,7 @@ export async function up(knex) {
       table.string('role_key', 60).notNullable();
       table.string('name', 120).notNullable();
       table.string('description', 500);
-      table.json('permissions').notNullable().defaultTo('{}');
+      table.json('permissions').notNullable().defaultTo(jsonDefault(knex, {}));
       table.boolean('is_default_assignable').notNullable().defaultTo(true);
       table
         .integer('created_by')
@@ -91,8 +93,8 @@ export async function up(knex) {
       table.enum('billing_interval', BILLING_INTERVALS).notNullable().defaultTo('monthly');
       table.integer('trial_period_days').unsigned().notNullable().defaultTo(0);
       table.boolean('is_active').notNullable().defaultTo(true);
-      table.json('benefits').notNullable().defaultTo('[]');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('benefits').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.string('stripe_price_id', 120);
       table.string('paypal_plan_id', 120);
       table.timestamp('created_at').defaultTo(knex.fn.now());
@@ -153,7 +155,7 @@ export async function up(knex) {
         .references('id')
         .inTable('community_affiliates')
         .onDelete('SET NULL');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -181,7 +183,7 @@ export async function up(knex) {
       table.timestamp('scheduled_at');
       table.timestamp('processed_at');
       table.string('failure_reason', 500);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -193,7 +195,7 @@ export async function up(knex) {
   const hasMemberMetadata = await knex.schema.hasColumn('community_members', 'metadata');
   if (!hasMemberMetadata) {
     await knex.schema.table('community_members', (table) => {
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
     });
   }
 
