@@ -16,6 +16,9 @@ npm run dev
 Key environment variables are validated on boot. Ensure the following are set before starting the server:
 
 - `APP_URL` or `CORS_ALLOWED_ORIGINS` – comma-separated list of allowed web origins.
+- `CORS_ALLOWED_METHODS`, `CORS_ALLOWED_HEADERS`, `CORS_ALLOW_CREDENTIALS`, `CORS_MAX_AGE_SECONDS` – tighten cross-origin requests
+  for production deployments. Defaults permit common REST verbs, authenticated requests, and cache pre-flight responses for ten
+  minutes.
 - `JWT_KEYSET` / `JWT_ACTIVE_KEY_ID` – base64 encoded JSON describing signing keys. Generate via `npm run security:rotate-jwt`. A legacy `JWT_SECRET` is still honoured for local environments.
 - `JWT_REFRESH_SECRET` – 32+ character secret for refresh token HMAC hashing.
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` – database credentials. Set `DB_PROVISION_USER=true` only for local installs.

@@ -1,52 +1,73 @@
 export async function up(knex) {
-  const hasEmailVerifiedAt = await knex.schema.hasColumn('users', 'email_verified_at');
-  if (!hasEmailVerifiedAt) {
-    await knex.schema.alterTable('users', (table) => {
-      table.timestamp('email_verified_at').nullable().after('email');
-    });
+  const hasUsersTable = await knex.schema.hasTable('users');
+  if (!hasUsersTable) {
+    return;
   }
 
-  const hasFailedLoginAttempts = await knex.schema.hasColumn('users', 'failed_login_attempts');
-  if (!hasFailedLoginAttempts) {
-    await knex.schema.alterTable('users', (table) => {
-      table.integer('failed_login_attempts').unsigned().notNullable().defaultTo(0).after('password_hash');
-    });
-  }
+  const ensureColumn = async (columnName, definition) => {
+    const exists = await knex.schema.hasColumn('users', columnName);
+    if (!exists) {
+      await knex.schema.alterTable('users', (table) => {
+        definition(table);
+      });
+    }
+  };
 
-  const hasLastFailedLoginAt = await knex.schema.hasColumn('users', 'last_failed_login_at');
-  if (!hasLastFailedLoginAt) {
-    await knex.schema.alterTable('users', (table) => {
-      table.timestamp('last_failed_login_at').nullable().after('failed_login_attempts');
-    });
-  }
+  await ensureColumn('email_verified_at', (table) => {
+    table.timestamp('email_verified_at').nullable().after('email');
+  });
 
-  const hasLockedUntil = await knex.schema.hasColumn('users', 'locked_until');
-  if (!hasLockedUntil) {
-    await knex.schema.alterTable('users', (table) => {
-      table.timestamp('locked_until').nullable().after('last_failed_login_at');
-    });
-  }
+  await ensureColumn('failed_login_attempts', (table) => {
+    table
+      .integer('failed_login_attempts')
+      .unsigned()
+      .notNullable()
+      .defaultTo(0)
+      .after('password_hash');
+  });
 
-  const hasLastLoginAt = await knex.schema.hasColumn('users', 'last_login_at');
-  if (!hasLastLoginAt) {
-    await knex.schema.alterTable('users', (table) => {
-      table.timestamp('last_login_at').nullable().after('locked_until');
-    });
-  }
+  await ensureColumn('last_failed_login_at', (table) => {
+    table.timestamp('last_failed_login_at').nullable().after('failed_login_attempts');
+  });
 
-  const hasPasswordChangedAt = await knex.schema.hasColumn('users', 'password_changed_at');
-  if (!hasPasswordChangedAt) {
-    await knex.schema.alterTable('users', (table) => {
-      table.timestamp('password_changed_at').nullable().after('last_login_at');
-    });
-  }
+  await ensureColumn('locked_until', (table) => {
+    table.timestamp('locked_until').nullable().after('last_failed_login_at');
+  });
 
-  const hasLastVerificationSentAt = await knex.schema.hasColumn('users', 'last_verification_sent_at');
-  if (!hasLastVerificationSentAt) {
-    await knex.schema.alterTable('users', (table) => {
-      table.timestamp('last_verification_sent_at').nullable().after('password_changed_at');
-    });
-  }
+  await ensureColumn('last_login_at', (table) => {
+    table.timestamp('last_login_at').nullable().after('locked_until');
+  });
+
+  await ensureColumn('password_changed_at', (table) => {
+    table.timestamp('password_changed_at').nullable().after('last_login_at');
+  });
+
+  await ensureColumn('last_verification_sent_at', (table) => {
+    table.timestamp('last_verification_sent_at').nullable().after('password_changed_at');
+  });
+
+  await ensureColumn('two_factor_enabled', (table) => {
+    table
+      .boolean('two_factor_enabled')
+      .notNullable()
+      .defaultTo(false)
+      .after('address');
+  });
+
+  await ensureColumn('two_factor_secret', (table) => {
+    table
+      .specificType('two_factor_secret', 'varbinary(255)')
+      .nullable()
+      .after('two_factor_enabled');
+  });
+
+  await ensureColumn('two_factor_enrolled_at', (table) => {
+    table.timestamp('two_factor_enrolled_at').nullable().after('two_factor_secret');
+  });
+
+  await ensureColumn('two_factor_last_verified_at', (table) => {
+    table.timestamp('two_factor_last_verified_at').nullable().after('two_factor_enrolled_at');
+  });
 
   const hasVerificationTable = await knex.schema.hasTable('user_email_verification_tokens');
   if (!hasVerificationTable) {
@@ -77,6 +98,10 @@ export async function down(knex) {
   }
 
   const columnNames = [
+    'two_factor_last_verified_at',
+    'two_factor_enrolled_at',
+    'two_factor_secret',
+    'two_factor_enabled',
     'last_verification_sent_at',
     'password_changed_at',
     'last_login_at',
@@ -85,6 +110,11 @@ export async function down(knex) {
     'failed_login_attempts',
     'email_verified_at'
   ];
+
+  const hasUsersTable = await knex.schema.hasTable('users');
+  if (!hasUsersTable) {
+    return;
+  }
 
   for (const column of columnNames) {
     const exists = await knex.schema.hasColumn('users', column);
