@@ -1,5 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
 
+jest.mock('../../api/learnerDashboardApi.js', () => ({
+  fetchSupportTickets: jest.fn().mockResolvedValue({ data: { tickets: [] } })
+}));
+
 import useLearnerSupportCases from '../useLearnerSupportCases.js';
 
 function createSession(id = 'tester-support') {

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 import logger from '../config/logger.js';
+import LearnerSupportRepository from '../repositories/LearnerSupportRepository.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
 
 function safeJsonParse(value, fallback) {
@@ -16,6 +17,57 @@ function safeJsonParse(value, fallback) {
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 let operatorDashboardService;
 const log = logger.child({ service: 'DashboardService' });
+
+const DEFAULT_SUPPORT_KB = [
+  {
+    id: 'kb-billing',
+    title: 'Resolve billing discrepancies fast',
+    excerpt: 'Step-by-step workflow to reconcile invoices, credits, and refunds without disrupting learner access.',
+    url: 'https://support.edulure.test/articles/billing-reconciliation',
+    category: 'Billing',
+    minutes: 4
+  },
+  {
+    id: 'kb-classroom',
+    title: 'Stabilise live classroom sessions',
+    excerpt: 'Mitigate live classroom drops by refreshing keys, re-inviting facilitators, and notifying impacted cohorts.',
+    url: 'https://support.edulure.test/articles/live-classroom',
+    category: 'Live learning',
+    minutes: 5
+  },
+  {
+    id: 'kb-community',
+    title: 'Moderate community escalations with confidence',
+    excerpt: 'Use templated macros and audit trails to resolve moderation flags in under ten minutes.',
+    url: 'https://support.edulure.test/articles/community-escalations',
+    category: 'Community',
+    minutes: 6
+  }
+];
+
+const DEFAULT_SUPPORT_CONTACTS = [
+  {
+    id: 'email',
+    label: 'Email learner success',
+    description: 'Raise a ticket for complex issues. Average first response under two hours.',
+    action: 'Send email',
+    href: 'mailto:support@edulure.test'
+  },
+  {
+    id: 'live-chat',
+    label: 'Live concierge chat',
+    description: 'Weekday concierge with escalation to instructors and operations in real time.',
+    action: 'Start chat',
+    href: 'https://support.edulure.test/chat'
+  },
+  {
+    id: 'call',
+    label: 'Book a callback',
+    description: 'Schedule a 20 minute call for billing or classroom incident review.',
+    action: 'Schedule call',
+    href: 'https://support.edulure.test/call'
+  }
+];
 
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
@@ -707,6 +759,22 @@ export function buildLearnerDashboard({
         workloadWeight: completionEntries.length
       },
       resources: []
+    },
+    support: {
+      cases: supportCases,
+      knowledgeBase: DEFAULT_SUPPORT_KB,
+      contacts: DEFAULT_SUPPORT_CONTACTS,
+      serviceWindow: '24/7 global support',
+      metrics: {
+        open: supportMetrics.open,
+        waiting: supportMetrics.waiting,
+        resolved: supportMetrics.resolved,
+        closed: supportMetrics.closed,
+        awaitingLearner: supportMetrics.awaitingLearner,
+        averageResponseMinutes: supportMetrics.averageResponseMinutes,
+        latestUpdatedAt: supportMetrics.latestUpdatedAt,
+        firstResponseMinutes: supportMetrics.averageResponseMinutes || 42
+      }
     },
     followers: followerSection,
     settings: {
@@ -2340,6 +2408,74 @@ export default class DashboardService {
       const error = new Error('User not found');
       error.status = 404;
       throw error;
+    }
+
+    let supportCases = [];
+    const supportMetrics = {
+      open: 0,
+      waiting: 0,
+      resolved: 0,
+      closed: 0,
+      awaitingLearner: 0,
+      averageResponseMinutes: 0,
+      latestUpdatedAt: null
+    };
+    try {
+      supportCases = await LearnerSupportRepository.listCases(user.id);
+      const responseDurations = [];
+      supportCases.forEach((supportCase) => {
+        const status = (supportCase.status ?? 'open').toLowerCase();
+        if (supportMetrics[status] !== undefined) {
+          supportMetrics[status] += 1;
+        } else {
+          supportMetrics.open += 1;
+        }
+        const messages = Array.isArray(supportCase.messages) ? supportCase.messages : [];
+        if (messages.length) {
+          const latestMessage = messages[messages.length - 1];
+          if (latestMessage.author !== 'learner' && status !== 'resolved' && status !== 'closed') {
+            supportMetrics.awaitingLearner += 1;
+          }
+          messages.forEach((message, index) => {
+            if (message.author !== 'learner') {
+              for (let previous = index - 1; previous >= 0; previous -= 1) {
+                const candidate = messages[previous];
+                if (candidate.author === 'learner') {
+                  const agentDate = new Date(message.createdAt ?? 0);
+                  const learnerDate = new Date(candidate.createdAt ?? 0);
+                  if (!Number.isNaN(agentDate.getTime()) && !Number.isNaN(learnerDate.getTime())) {
+                    const diffMinutes = Math.max(
+                      0,
+                      Math.round((agentDate.getTime() - learnerDate.getTime()) / (60 * 1000))
+                    );
+                    responseDurations.push(diffMinutes);
+                  }
+                  break;
+                }
+              }
+            }
+          });
+          const latestTimestamp = latestMessage.createdAt ?? supportCase.updatedAt;
+          if (latestTimestamp) {
+            const latestDate = new Date(latestTimestamp);
+            if (!Number.isNaN(latestDate.getTime())) {
+              if (!supportMetrics.latestUpdatedAt) {
+                supportMetrics.latestUpdatedAt = latestDate.toISOString();
+              } else if (new Date(supportMetrics.latestUpdatedAt) < latestDate) {
+                supportMetrics.latestUpdatedAt = latestDate.toISOString();
+              }
+            }
+          }
+        }
+      });
+      if (responseDurations.length) {
+        supportMetrics.averageResponseMinutes = Math.round(
+          responseDurations.reduce((sum, value) => sum + value, 0) / responseDurations.length
+        );
+      }
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load learner support workspace data');
+      supportCases = [];
     }
 
     let courseWorkspaceInput = {

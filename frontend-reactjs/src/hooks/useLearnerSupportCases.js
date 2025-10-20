@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo } from 'react';
 
+import { fetchSupportTickets } from '../api/learnerDashboardApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import usePersistentCollection from './usePersistentCollection.js';
 
@@ -205,6 +206,7 @@ export default function useLearnerSupportCases(initialCases = [], options = {}) 
   const { session: sessionOverride, userId: userIdOverride } = options;
   const auth = sessionOverride ? null : useAuth();
   const session = sessionOverride ?? auth?.session ?? null;
+  const token = session?.tokens?.accessToken ?? null;
   const userId = userIdOverride ?? session?.user?.id ?? 'anonymous';
   const storageKey = `${STORAGE_NAMESPACE}:${userId}`;
 
@@ -219,6 +221,26 @@ export default function useLearnerSupportCases(initialCases = [], options = {}) 
     storageKey,
     normalisedInitial
   );
+
+  useEffect(() => {
+    if (!token) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    fetchSupportTickets({ token, signal: controller.signal })
+      .then((response) => {
+        const remoteTickets = Array.isArray(response?.data?.tickets)
+          ? response.data.tickets
+          : Array.isArray(response?.tickets)
+            ? response.tickets
+            : [];
+        if (remoteTickets.length) {
+          replaceItems(remoteTickets.map((item) => normaliseSupportCase(item)).filter(Boolean));
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [replaceItems, token]);
 
   useEffect(() => {
     if (!Array.isArray(initialCases) || initialCases.length === 0) {

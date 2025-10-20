@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 import logger from '../config/logger.js';
+import LearnerSupportRepository from '../repositories/LearnerSupportRepository.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -136,5 +137,74 @@ export default class LearnerDashboardService {
         action: payload.action ?? 'general'
       }
     });
+  }
+
+  static async listSupportTickets(userId) {
+    const cases = await LearnerSupportRepository.listCases(userId);
+    return cases;
+  }
+
+  static async createSupportTicket(userId, payload = {}) {
+    if (!payload.subject) {
+      throw new Error('Subject is required to create a support ticket');
+    }
+    const initialMessages = [];
+    if (payload.description) {
+      initialMessages.push({
+        author: 'learner',
+        body: payload.description,
+        attachments: payload.attachments ?? [],
+        createdAt: new Date().toISOString()
+      });
+    }
+    const ticket = await LearnerSupportRepository.createCase(userId, {
+      subject: payload.subject,
+      category: payload.category ?? 'General',
+      priority: payload.priority ?? 'normal',
+      status: 'open',
+      channel: 'Portal',
+      initialMessages,
+      metadata: payload.metadata ?? {}
+    });
+    log.info({ userId, ticketId: ticket?.id }, 'Learner created support ticket');
+    return ticket;
+  }
+
+  static async updateSupportTicket(userId, ticketId, payload = {}) {
+    const ticket = await LearnerSupportRepository.updateCase(userId, ticketId, payload);
+    if (!ticket) {
+      throw new Error('Support ticket not found');
+    }
+    log.info({ userId, ticketId }, 'Learner updated support ticket');
+    return ticket;
+  }
+
+  static async addSupportTicketMessage(userId, ticketId, payload = {}) {
+    if (!payload.body && !Array.isArray(payload.attachments)) {
+      throw new Error('Message content is required');
+    }
+    const message = await LearnerSupportRepository.addMessage(userId, ticketId, {
+      author: payload.author ?? 'learner',
+      body: payload.body ?? '',
+      attachments: payload.attachments ?? [],
+      createdAt: payload.createdAt ?? new Date().toISOString()
+    });
+    if (!message) {
+      throw new Error('Support ticket not found');
+    }
+    log.info({ userId, ticketId }, 'Learner added support ticket message');
+    return message;
+  }
+
+  static async closeSupportTicket(userId, ticketId, payload = {}) {
+    const ticket = await LearnerSupportRepository.closeCase(userId, ticketId, {
+      resolutionNote: payload.resolutionNote ?? payload.note ?? null,
+      satisfaction: payload.satisfaction ?? null
+    });
+    if (!ticket) {
+      throw new Error('Support ticket not found');
+    }
+    log.info({ userId, ticketId }, 'Learner closed support ticket');
+    return ticket;
   }
 }

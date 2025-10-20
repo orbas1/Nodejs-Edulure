@@ -17,5 +17,10 @@ router.put('/learner/financial/preferences', auth(), LearnerDashboardController.
 router.post('/learner/live-sessions/:sessionId/join', auth(), LearnerDashboardController.joinLiveSession);
 router.post('/learner/live-sessions/:sessionId/check-in', auth(), LearnerDashboardController.checkInToLiveSession);
 router.post('/learner/communities/:communityId/actions', auth(), LearnerDashboardController.triggerCommunityAction);
+router.get('/learner/support/tickets', auth(), LearnerDashboardController.listSupportTickets);
+router.post('/learner/support/tickets', auth(), LearnerDashboardController.createSupportTicket);
+router.put('/learner/support/tickets/:ticketId', auth(), LearnerDashboardController.updateSupportTicket);
+router.post('/learner/support/tickets/:ticketId/messages', auth(), LearnerDashboardController.replyToSupportTicket);
+router.post('/learner/support/tickets/:ticketId/close', auth(), LearnerDashboardController.closeSupportTicket);
 
 export default router;

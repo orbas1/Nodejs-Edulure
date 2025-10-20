@@ -149,6 +149,15 @@ export async function createSupportTicket({ token, payload, signal } = {}) {
   });
 }
 
+export async function fetchSupportTickets({ token, signal } = {}) {
+  ensureToken(token);
+  return httpClient.get('/dashboard/learner/support/tickets', {
+    token,
+    signal,
+    cache: { enabled: false }
+  });
+}
+
 export async function updateSupportTicket({ token, ticketId, payload, signal } = {}) {
   ensureToken(token);
   if (!ticketId) {
@@ -197,6 +206,7 @@ export const learnerDashboardApi = {
   checkInToLiveSession,
   triggerCommunityAction,
   createSupportTicket,
+  fetchSupportTickets,
   updateSupportTicket,
   replyToSupportTicket,
   closeSupportTicket
