@@ -633,15 +633,24 @@ describe('Payments models', () => {
 
     const expectedFingerprint = DataEncryptionService.hash('pi_provider');
     expect(intent.currency).toBe('eur');
-    expect(intent.providerIntentId).toBe(expectedFingerprint);
-    expect(intent.receiptEmail).toBe('encrypted');
+    expect(intent.providerIntentId).toBe('pi_provider');
+    expect(intent.receiptEmail).toBe('payer@example.com');
+    expect(intent.failureMessage).toBe('initial failure');
     expect(intent.sensitiveDetailsHash).toBeTruthy();
 
     const storedCiphertext = await connection('payment_intents')
-      .select('sensitive_details_ciphertext')
+      .select(
+        'sensitive_details_ciphertext',
+        'provider_intent_id',
+        'receipt_email',
+        'failure_message'
+      )
       .where({ id: intent.id })
       .first();
     expect(Buffer.isBuffer(storedCiphertext.sensitive_details_ciphertext)).toBe(true);
+    expect(storedCiphertext.provider_intent_id).toBe(expectedFingerprint);
+    expect(storedCiphertext.receipt_email).toBe('encrypted');
+    expect(storedCiphertext.failure_message).toBe('encrypted');
 
     const lookupByProvider = await PaymentIntentModel.findByProviderIntentId('pi_provider', connection);
     expect(lookupByProvider?.publicId).toBe(intent.publicId);
@@ -658,8 +667,15 @@ describe('Payments models', () => {
 
     const updated = await PaymentIntentModel.findByPublicId(intent.publicId, connection);
     expect(updated?.status).toBe('requires_capture');
-    expect(updated?.receiptEmail).toBe('encrypted');
-    expect(updated?.failureMessage).toBe('encrypted');
+    expect(updated?.receiptEmail).toBe('payer+updated@example.com');
+    expect(updated?.failureMessage).toBe('declined');
+
+    const refreshedRow = await connection('payment_intents')
+      .select('receipt_email', 'failure_message')
+      .where({ id: intent.id })
+      .first();
+    expect(refreshedRow.receipt_email).toBe('encrypted');
+    expect(refreshedRow.failure_message).toBe('encrypted');
 
   });
 
@@ -679,8 +695,18 @@ describe('Payments models', () => {
     );
 
     const expectedHash = DataEncryptionService.hash('pr_123');
-    expect(refund.providerRefundId).toBe(expectedHash);
+    expect(refund.providerRefundId).toBe('pr_123');
+    expect(refund.failureMessage).toBe('initial failure');
+    expect(refund.failureCode).toBe('init');
     expect(refund.sensitiveDetailsHash).toBeTruthy();
+
+    const storedRefundRow = await connection('payment_refunds')
+      .select('provider_refund_id', 'failure_code', 'failure_message')
+      .where({ id: refund.id })
+      .first();
+    expect(storedRefundRow.provider_refund_id).toBe(expectedHash);
+    expect(storedRefundRow.failure_code).toBe('encrypted');
+    expect(storedRefundRow.failure_message).toBe('encrypted');
 
     const updated = await PaymentRefundModel.updateById(
       refund.id,
