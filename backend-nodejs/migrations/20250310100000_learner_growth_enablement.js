@@ -20,9 +20,10 @@ export async function up(knex) {
       table.boolean('auto_pay_enabled').notNullable().defaultTo(false);
       table.integer('reserve_target_cents').unsigned().notNullable().defaultTo(0);
       table.json('preferences').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['user_id']);
     });
@@ -45,9 +46,10 @@ export async function up(knex) {
       table.string('expiry', 10).notNullable();
       table.boolean('is_primary').notNullable().defaultTo(false);
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['user_id', 'label']);
       table.index(['user_id', 'is_primary'], 'learner_payment_methods_user_primary_idx');
@@ -70,9 +72,10 @@ export async function up(knex) {
       table.string('phone', 60);
       table.string('company', 150);
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['user_id', 'email']);
       table.index(['user_id'], 'learner_billing_contacts_user_idx');
@@ -102,9 +105,10 @@ export async function up(knex) {
       table.timestamp('end_at');
       table.json('tags').notNullable().defaultTo('[]');
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['user_id', 'slug']);
       table.index(['user_id', 'status'], 'learner_growth_initiatives_status_idx');
@@ -133,9 +137,10 @@ export async function up(knex) {
       table.timestamp('end_at');
       table.json('segments').notNullable().defaultTo('[]');
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['initiative_id', 'status'], 'learner_growth_experiments_status_idx');
     });
@@ -163,9 +168,10 @@ export async function up(knex) {
       table.json('notes').notNullable().defaultTo('[]');
       table.json('performance').notNullable().defaultTo('{}');
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['user_id', 'referral_code']);
       table.index(['user_id', 'status'], 'learner_affiliate_channels_status_idx');
@@ -191,9 +197,10 @@ export async function up(knex) {
       table.string('reference', 120);
       table.string('note', 500);
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['channel_id', 'status'], 'learner_affiliate_payouts_status_idx');
     });
@@ -223,9 +230,10 @@ export async function up(knex) {
       table.json('creative').notNullable().defaultTo('{}');
       table.json('placements').notNullable().defaultTo('[]');
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['user_id', 'status'], 'learner_ad_campaigns_status_idx');
     });
@@ -254,9 +262,10 @@ export async function up(knex) {
       table.timestamp('reviewed_at');
       table.text('decision_note');
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['user_id']);
       table.index(['status'], 'instructor_applications_status_idx');

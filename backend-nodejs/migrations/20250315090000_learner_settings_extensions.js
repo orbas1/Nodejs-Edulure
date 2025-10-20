@@ -19,9 +19,10 @@ export async function up(knex) {
       table.boolean('high_contrast').notNullable().defaultTo(false);
       table.boolean('reduced_motion').notNullable().defaultTo(false);
       table.json('preferences').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.unique(['user_id']);
     });
@@ -45,9 +46,10 @@ export async function up(knex) {
       table.string('status', 32).notNullable().defaultTo('paid');
       table.timestamp('purchased_at').notNullable().defaultTo(knex.fn.now());
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['user_id', 'purchased_at'], 'learner_finance_purchases_user_date_idx');
       table.index(['user_id', 'status'], 'learner_finance_purchases_user_status_idx');

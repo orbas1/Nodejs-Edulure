@@ -31,9 +31,10 @@ export async function up(knex) {
       table.string('audio_url', 500);
       table.string('preview_url', 500);
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['user_id'], 'learner_library_entries_user_idx');
       table.index(['user_id', 'format'], 'learner_library_entries_format_idx');

@@ -27,9 +27,10 @@ export async function up(knex) {
       table.string('watch_url', 500);
       table.text('description');
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['community_id', 'start_at']);
       table.index(['status']);
@@ -65,9 +66,10 @@ export async function up(knex) {
       table.string('audio_url', 500);
       table.string('cover_art_url', 500);
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['community_id']);
       table.index(['stage']);
@@ -108,9 +110,10 @@ export async function up(knex) {
       table.text('notes');
       table.string('experiment_url', 500);
       table.json('metadata').notNullable().defaultTo('{}');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.index(['community_id']);
       table.index(['status']);
