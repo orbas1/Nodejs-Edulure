@@ -141,7 +141,6 @@ export default class CommunityChatService {
     const query = (slug) =>
       (trx ?? db)('community_channels').where({ community_id: communityId, slug }).first();
 
-    // eslint-disable-next-line no-await-in-loop
     while (await query(candidate)) {
       candidate = `${base}-${attempt}`;
       attempt += 1;

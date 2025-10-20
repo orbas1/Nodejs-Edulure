@@ -111,7 +111,6 @@ export class MonetizationReconciliationJob {
       const tenantSummaries = [];
       const failures = [];
 
-      // eslint-disable-next-line no-restricted-syntax
       for (const tenantId of tenants) {
         try {
           const recognition = await this.service.recognizeDeferredRevenue({ tenantId });

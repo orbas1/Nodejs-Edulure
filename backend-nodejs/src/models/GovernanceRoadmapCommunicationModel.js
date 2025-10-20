@@ -145,7 +145,7 @@ export default class GovernanceRoadmapCommunicationModel {
     return this.findByPublicId(publicId, connection);
   }
 
-  static applyFilters(query, filters = {}, connection = db) {
+  static applyFilters(query, filters = {}) {
     const builder = query.clone();
     if (filters.status) {
       const statuses = Array.isArray(filters.status) ? filters.status : [filters.status];
@@ -175,11 +175,10 @@ export default class GovernanceRoadmapCommunicationModel {
 
     const baseQuery = this.applyFilters(
       connection(TABLE).select(BASE_COLUMNS).orderBy('schedule_at', 'asc'),
-      filters,
-      connection
+      filters
     );
     const rows = await baseQuery.clone().limit(limit).offset(offset);
-    const countRow = await this.applyFilters(connection(TABLE).count({ count: '*' }), filters, connection).first();
+    const countRow = await this.applyFilters(connection(TABLE).count({ count: '*' }), filters).first();
 
     return {
       total: extractCount(countRow),

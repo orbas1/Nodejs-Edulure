@@ -64,7 +64,7 @@ function fallbackMarkdownRenderer(markdown) {
     if (!trimmed) {
       flushParagraph();
       closeList();
-      continue; // eslint-disable-line no-continue
+      continue;
     }
 
     const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
@@ -73,7 +73,7 @@ function fallbackMarkdownRenderer(markdown) {
       closeList();
       const level = Math.min(6, headingMatch[1].length);
       html.push(`<h${level}>${formatInline(headingMatch[2])}</h${level}>`);
-      continue; // eslint-disable-line no-continue
+      continue;
     }
 
     if (trimmed.startsWith('- ')) {
@@ -83,7 +83,7 @@ function fallbackMarkdownRenderer(markdown) {
         inList = true;
       }
       html.push(`<li>${formatInline(trimmed.slice(2))}</li>`);
-      continue; // eslint-disable-line no-continue
+      continue;
     }
 
     paragraphBuffer.push(trimmed);
@@ -98,7 +98,7 @@ function fallbackMarkdownRenderer(markdown) {
 function renderMarkdown(markdown) {
   for (const candidate of markdownCandidates) {
     if (!candidate) {
-      continue; // eslint-disable-line no-continue
+      continue;
     }
     if (typeof candidate.parse === 'function') {
       return candidate.parse(markdown, { mangle: false, headerIds: false });
@@ -196,7 +196,6 @@ function createExcerpt(markdown, length = 60) {
 async function walkMarkdownFiles(directory) {
   const entries = await fs.readdir(directory, { withFileTypes: true });
   const files = [];
-  // eslint-disable-next-line no-restricted-syntax
   for (const entry of entries) {
     const fullPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
@@ -276,7 +275,6 @@ class EnablementContentService {
     const articles = [];
     const articleLookup = new Map();
 
-    // eslint-disable-next-line no-restricted-syntax
     for (const filePath of files) {
       try {
         const rawContent = await fs.readFile(filePath, 'utf8');
@@ -285,7 +283,7 @@ class EnablementContentService {
         const slug = normaliseSlug(rawMetadata.slug, normaliseSlug(path.basename(filePath, '.md')));
         if (!slug) {
           serviceLogger.warn({ filePath }, 'Enablement article missing slug; skipping');
-          continue; // eslint-disable-line no-continue
+          continue;
         }
 
         const metadata = {

@@ -26,7 +26,7 @@ function parseJson(value, fallback = []) {
   if (typeof value === 'object') return value;
   try {
     return JSON.parse(value) ?? fallback;
-  } catch (error) {
+  } catch (_error) {
     return fallback;
   }
 }

@@ -258,7 +258,7 @@ export function summariseIncidentQueue(incidents, { now = new Date() } = {}) {
   };
 }
 
-export function buildScamSummary(incidents, { now = new Date() } = {}) {
+export function buildScamSummary(incidents, { now: _now = new Date() } = {}) {
   const scamIncidents = incidents.filter((incident) => incident.category === 'scam' || incident.metadata?.tags?.includes('scam'));
   if (!scamIncidents.length) {
     return {

@@ -106,7 +106,7 @@ export default class ProviderTransitionAnnouncementModel {
           try {
             JSON.parse(payload.metadata);
             return payload.metadata;
-          } catch (error) {
+  } catch (_error) {
             return JSON.stringify({});
           }
         }
@@ -123,7 +123,7 @@ export default class ProviderTransitionAnnouncementModel {
     if (typeof metadata === 'string') {
       try {
         metadata = JSON.parse(metadata);
-      } catch (error) {
+    } catch (_error) {
         metadata = {};
       }
     } else if (!metadata || typeof metadata !== 'object') {

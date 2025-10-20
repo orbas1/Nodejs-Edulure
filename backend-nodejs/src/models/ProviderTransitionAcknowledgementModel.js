@@ -76,7 +76,7 @@ export default class ProviderTransitionAcknowledgementModel {
     if (typeof metadata === 'string') {
       try {
         metadata = JSON.parse(metadata);
-      } catch (error) {
+  } catch (_error) {
         metadata = {};
       }
     }
@@ -102,7 +102,7 @@ export default class ProviderTransitionAcknowledgementModel {
     if (typeof metadata === 'string') {
       try {
         metadata = JSON.parse(metadata);
-      } catch (error) {
+    } catch (_error) {
         metadata = {};
       }
     }
