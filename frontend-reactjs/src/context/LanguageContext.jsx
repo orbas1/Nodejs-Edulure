@@ -65,6 +65,53 @@ const TRANSLATIONS = {
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
       },
+      preview: {
+        title: 'See what’s waiting inside the Edulure clubhouse',
+        subtitle:
+          'Toggle between community rooms, curriculum, and live ops to feel the flow before you sign in.',
+        helper: 'Spotlights from this week’s launches',
+        cta: 'Browse all spaces',
+        footnote: 'Fresh previews rotate every Monday at 09:00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Communities',
+            caption: 'Threaded clubhouses with rituals built in.',
+            description:
+              'Spin up themed rooms, layer rituals, and keep every cohort pulsing with guided prompts that surface fresh wins.',
+            highlightOne: 'Guided weekly prompts',
+            highlightTwo: 'Moderation cues baked in',
+            highlightThree: 'Members see wins instantly',
+            imageAlt: 'Preview of Edulure community spaces'
+          },
+          courses: {
+            label: 'Courses',
+            caption: 'Story-based curricula without the spreadsheets.',
+            description:
+              'Design multi-week arcs, stack media-rich lessons, and publish refreshes without exporting a single syllabus spreadsheet.',
+            highlightOne: 'Drag-and-drop modules',
+            highlightTwo: 'Completion signals live',
+            highlightThree: 'Scope updates in real time',
+            imageAlt: 'Preview of Edulure course builder interface'
+          },
+          liveEvents: {
+            label: 'Live events',
+            caption: 'Studio energy minus the chaos.',
+            description:
+              'Host jam sessions, AMAs, and office hours with a control room that keeps chat, back-channel notes, and recordings in sync.',
+            highlightOne: 'Green-room checklists',
+            highlightTwo: 'Auto recordings ready',
+            highlightThree: 'Backstage chat for hosts',
+            imageAlt: 'Preview of Edulure live event control center'
+          },
+          library: {
+            label: 'Resource library',
+            caption: 'A candy shop of downloads and replays.',
+            description:
+              'Curate templates, replays, and swipe files with smart filters so learners always find the exact asset they need.',
+            highlightOne: 'Filter by format fast',
+            highlightTwo: 'Smart recs rotate weekly',
+            highlightThree: 'Brand-safe sharing links',
+            imageAlt: 'Preview of Edulure resource library grid'
       tutoring: {
         kicker: 'Tutor arcade',
         headline: 'Queue up your next breakthrough session',
@@ -218,6 +265,53 @@ const TRANSLATIONS = {
         instructorPill: 'Je suis instructeur·rice',
         illustrationAlt: "Collage d'instructeurs et d'apprenants en collaboration"
       },
+      preview: {
+        title: 'Découvrez ce qui vous attend dans la maison Edulure',
+        subtitle:
+          'Parcourez les salons communautaires, les cursus et les opérations live pour sentir l’énergie avant même de vous connecter.',
+        helper: 'Mises en avant des lancements de la semaine',
+        cta: 'Explorer tous les espaces',
+        footnote: 'Nouveaux aperçus chaque lundi à 09h00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Communautés',
+            caption: 'Clubs en fil de discussion, rituels inclus.',
+            description:
+              'Lancez des salons thématiques, cadencez les rituels et maintenez chaque cohorte en mouvement grâce à des invites guidées.',
+            highlightOne: 'Invites hebdomadaires guidées',
+            highlightTwo: 'Repères de modération intégrés',
+            highlightThree: 'Les victoires des membres émergent instantanément',
+            imageAlt: 'Aperçu des espaces communautaires Edulure'
+          },
+          courses: {
+            label: 'Cours',
+            caption: 'Des parcours narratifs sans tableurs.',
+            description:
+              'Concevez des arcs sur plusieurs semaines, empilez des leçons riches en médias et publiez des rafraîchissements sans exporter un seul tableur.',
+            highlightOne: 'Modules à glisser-déposer',
+            highlightTwo: 'Signaux de complétion en direct',
+            highlightThree: 'Mises à jour en temps réel',
+            imageAlt: "Aperçu de l’éditeur de cours Edulure"
+          },
+          liveEvents: {
+            label: 'Événements live',
+            caption: 'Énergie studio, zéro chaos.',
+            description:
+              'Organisez jams, AMA et permanences avec une régie qui synchronise chat, notes backstage et enregistrements.',
+            highlightOne: 'Checklist de loge technique',
+            highlightTwo: 'Enregistrements automatiques prêts',
+            highlightThree: 'Backstage de discussion pour les hôtes',
+            imageAlt: 'Aperçu de la régie des événements live Edulure'
+          },
+          library: {
+            label: 'Bibliothèque de ressources',
+            caption: 'Un candy shop de téléchargements et replays.',
+            description:
+              'Curatez modèles, replays et playbooks avec des filtres malins pour que chacun trouve l’actif parfait.',
+            highlightOne: 'Filtrage rapide par format',
+            highlightTwo: 'Recommandations dynamiques chaque semaine',
+            highlightThree: 'Liens de partage sûrs pour la marque',
+            imageAlt: 'Aperçu de la grille de la bibliothèque Edulure'
       tutoring: {
         kicker: 'Arcade des tuteurs',
         headline: 'Alignez votre prochaine session décisive',
@@ -371,6 +465,53 @@ const TRANSLATIONS = {
         instructorPill: 'Soy instructor/a',
         illustrationAlt: 'Collage de instructores y estudiantes colaborando'
       },
+      preview: {
+        title: 'Descubre lo que te espera en la casa Edulure',
+        subtitle:
+          'Alterna entre salas comunitarias, currículum y operaciones en vivo para sentir el flujo antes de iniciar sesión.',
+        helper: 'Destacados de los lanzamientos de esta semana',
+        cta: 'Explorar todos los espacios',
+        footnote: 'Nuevas vistas previas cada lunes a las 09:00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Comunidades',
+            caption: 'Clubes con hilos y rituales incluidos.',
+            description:
+              'Activa salas temáticas, marca rituales y mantiene cada cohorte vibrando con indicaciones guiadas.',
+            highlightOne: 'Indicaciones semanales guiadas',
+            highlightTwo: 'Señales de moderación integradas',
+            highlightThree: 'Las victorias de la comunidad aparecen al instante',
+            imageAlt: 'Vista previa de los espacios comunitarios de Edulure'
+          },
+          courses: {
+            label: 'Cursos',
+            caption: 'Currículos narrativos sin hojas de cálculo.',
+            description:
+              'Diseña arcos de varias semanas, apila lecciones ricas en medios y publica actualizaciones sin exportar hojas de cálculo.',
+            highlightOne: 'Módulos arrastrar y soltar',
+            highlightTwo: 'Señales de finalización en vivo',
+            highlightThree: 'Actualizaciones en tiempo real',
+            imageAlt: 'Vista previa del editor de cursos de Edulure'
+          },
+          liveEvents: {
+            label: 'Eventos en vivo',
+            caption: 'Energía de estudio, cero caos.',
+            description:
+              'Organiza jams, AMAs y mentorías con una cabina que sincroniza chat, notas backstage y grabaciones.',
+            highlightOne: 'Listas de control de camerino',
+            highlightTwo: 'Grabaciones automáticas listas',
+            highlightThree: 'Chat tras bambalinas para anfitriones',
+            imageAlt: 'Vista previa del centro de eventos en vivo de Edulure'
+          },
+          library: {
+            label: 'Biblioteca de recursos',
+            caption: 'Un candy shop de descargas y replays.',
+            description:
+              'Curaduría de plantillas, replays y playbooks con filtros inteligentes para encontrar el recurso exacto.',
+            highlightOne: 'Filtra por formato en segundos',
+            highlightTwo: 'Recomendaciones inteligentes que rotan',
+            highlightThree: 'Enlaces seguros para la marca',
+            imageAlt: 'Vista previa de la cuadrícula de biblioteca de Edulure'
       tutoring: {
         kicker: 'Arcade de tutores',
         headline: 'Enfila tu próxima sesión decisiva',
@@ -524,6 +665,53 @@ const TRANSLATIONS = {
         instructorPill: 'Sou instrutor(a)',
         illustrationAlt: 'Colagem de instrutores e aprendizes colaborando'
       },
+      preview: {
+        title: 'Veja o que espera por você na casa Edulure',
+        subtitle:
+          'Alterne entre salas da comunidade, currículo e operações ao vivo para sentir o ritmo antes de entrar.',
+        helper: 'Destaques dos lançamentos da semana',
+        cta: 'Explorar todos os espaços',
+        footnote: 'Novas prévias toda segunda-feira às 09h00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Comunidades',
+            caption: 'Clubes em formato de thread com rituais incluídos.',
+            description:
+              'Lance salas temáticas, cadencie rituais e mantenha cada coorte vibrante com prompts guiados.',
+            highlightOne: 'Prompts semanais guiados',
+            highlightTwo: 'Sinais de moderação embutidos',
+            highlightThree: 'Vitórias dos membros aparecem na hora',
+            imageAlt: 'Prévia dos espaços comunitários Edulure'
+          },
+          courses: {
+            label: 'Cursos',
+            caption: 'Currículos narrativos sem planilhas.',
+            description:
+              'Desenhe arcos de várias semanas, empilhe aulas ricas em mídia e publique atualizações sem exportar planilhas.',
+            highlightOne: 'Módulos arrastar e soltar',
+            highlightTwo: 'Sinais de conclusão ao vivo',
+            highlightThree: 'Atualizações em tempo real',
+            imageAlt: 'Prévia do construtor de cursos Edulure'
+          },
+          liveEvents: {
+            label: 'Eventos ao vivo',
+            caption: 'Energia de estúdio, zero caos.',
+            description:
+              'Hospede jams, AMAs e plantões com uma central que sincroniza chat, notas de bastidor e gravações.',
+            highlightOne: 'Checklists de camarim',
+            highlightTwo: 'Gravações automáticas prontas',
+            highlightThree: 'Chat de bastidor para anfitriões',
+            imageAlt: 'Prévia da central de eventos ao vivo da Edulure'
+          },
+          library: {
+            label: 'Biblioteca de recursos',
+            caption: 'Uma doceria de downloads e replays.',
+            description:
+              'Curate templates, replays e playbooks com filtros inteligentes para que todos encontrem o ativo certo.',
+            highlightOne: 'Filtre por formato num piscar',
+            highlightTwo: 'Recomendações inteligentes que giram',
+            highlightThree: 'Links de compartilhamento seguros para a marca',
+            imageAlt: 'Prévia da grade da biblioteca Edulure'
       tutoring: {
         kicker: 'Arcade de tutores',
         headline: 'Fila sua próxima sessão decisiva',
@@ -677,6 +865,53 @@ const TRANSLATIONS = {
         instructorPill: 'Sono un* istruttore/trice',
         illustrationAlt: 'Collage di istruttori e studenti che collaborano'
       },
+      preview: {
+        title: 'Scopri cosa ti aspetta nella casa Edulure',
+        subtitle:
+          'Passa tra sale community, curriculum e live ops per percepire il ritmo prima di accedere.',
+        helper: 'Highlights dei lanci di questa settimana',
+        cta: 'Esplora tutti gli spazi',
+        footnote: 'Nuove anteprime ogni lunedì alle 09:00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Comunità',
+            caption: 'Club a thread con rituali inclusi.',
+            description:
+              'Avvia sale tematiche, scandisci rituali e mantieni ogni coorte in movimento con prompt guidati.',
+            highlightOne: 'Prompt settimanali guidati',
+            highlightTwo: 'Segnali di moderazione integrati',
+            highlightThree: 'I successi della community emergono subito',
+            imageAlt: 'Anteprima degli spazi community di Edulure'
+          },
+          courses: {
+            label: 'Corsi',
+            caption: 'Curricula narrativi senza fogli di calcolo.',
+            description:
+              'Progetta archi di più settimane, impila lezioni ricche di media e pubblica refresh senza esportare un solo foglio.',
+            highlightOne: 'Moduli drag & drop',
+            highlightTwo: 'Segnali di completamento live',
+            highlightThree: 'Aggiornamenti in tempo reale',
+            imageAlt: 'Anteprima del course builder Edulure'
+          },
+          liveEvents: {
+            label: 'Eventi live',
+            caption: 'Energia da studio, zero caos.',
+            description:
+              'Conduci jam, AMA e office hour con una regia che sincronizza chat, note backstage e registrazioni.',
+            highlightOne: 'Checklist di backstage',
+            highlightTwo: 'Registrazioni automatiche pronte',
+            highlightThree: 'Chat dietro le quinte per gli host',
+            imageAlt: 'Anteprima della regia eventi live Edulure'
+          },
+          library: {
+            label: 'Libreria risorse',
+            caption: 'Una candy shop di download e replay.',
+            description:
+              'Cura template, replay e playbook con filtri intelligenti così tutti trovano l’asset giusto.',
+            highlightOne: 'Filtra per formato in un attimo',
+            highlightTwo: 'Raccomandazioni smart che ruotano',
+            highlightThree: 'Link di condivisione brand-safe',
+            imageAlt: 'Anteprima della griglia biblioteca Edulure'
       tutoring: {
         kicker: 'Arcade tutor',
         headline: 'Metti in coda la tua prossima sessione di svolta',
@@ -830,6 +1065,53 @@ const TRANSLATIONS = {
         instructorPill: 'Jestem instruktorem',
         illustrationAlt: 'Kolaż instruktorów i uczniów współpracujących ze sobą'
       },
+      preview: {
+        title: 'Zobacz, co czeka w domu Edulure',
+        subtitle:
+          'Przełączaj się między salami społeczności, programem i operacjami na żywo, aby poczuć klimat przed logowaniem.',
+        helper: 'Wyróżnione premiery tygodnia',
+        cta: 'Poznaj wszystkie przestrzenie',
+        footnote: 'Nowe podglądy w każdy poniedziałek o 09:00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Społeczności',
+            caption: 'Kluby w wątkach z gotowymi rytuałami.',
+            description:
+              'Uruchamiaj tematyczne pokoje, ustaw rytuały i utrzymuj każdą kohortę w ruchu dzięki prowadzącym podpowiedziom.',
+            highlightOne: 'Prowadzone cotygodniowe podpowiedzi',
+            highlightTwo: 'Wbudowane wskazówki moderacji',
+            highlightThree: 'Sukcesy członków widoczne od razu',
+            imageAlt: 'Podgląd przestrzeni społeczności Edulure'
+          },
+          courses: {
+            label: 'Kursy',
+            caption: 'Narracyjne programy bez arkuszy kalkulacyjnych.',
+            description:
+              'Projektuj wielotygodniowe ścieżki, układaj lekcje pełne mediów i publikuj odświeżenia bez eksportu arkuszy.',
+            highlightOne: 'Moduły drag & drop',
+            highlightTwo: 'Sygnały ukończenia na żywo',
+            highlightThree: 'Aktualizacje w czasie rzeczywistym',
+            imageAlt: 'Podgląd edytora kursów Edulure'
+          },
+          liveEvents: {
+            label: 'Wydarzenia na żywo',
+            caption: 'Energia studia, zero chaosu.',
+            description:
+              'Prowadź jamy, AMA i dyżury z reżyserką, która synchronizuje czat, notatki backstage i nagrania.',
+            highlightOne: 'Listy kontrolne backstagu',
+            highlightTwo: 'Automatyczne nagrania gotowe',
+            highlightThree: 'Backstage chat dla prowadzących',
+            imageAlt: 'Podgląd reżyserki wydarzeń na żywo Edulure'
+          },
+          library: {
+            label: 'Biblioteka zasobów',
+            caption: 'Słodki sklep z plikami i replayami.',
+            description:
+              'Kuruj szablony, replaye i playbooki z inteligentnymi filtrami, by każdy znalazł potrzebny zasób.',
+            highlightOne: 'Szybkie filtrowanie po formacie',
+            highlightTwo: 'Sprytne rekomendacje rotują co tydzień',
+            highlightThree: 'Bezpieczne dla marki linki do udostępniania',
+            imageAlt: 'Podgląd siatki biblioteki Edulure'
       tutoring: {
         kicker: 'Arcade tutorów',
         headline: 'Ustaw w kolejce swoją następną przełomową sesję',
@@ -983,6 +1265,53 @@ const TRANSLATIONS = {
         instructorPill: 'मैं प्रशिक्षक हूँ',
         illustrationAlt: 'प्रशिक्षकों और शिक्षार्थियों के सहयोग का कोलाज'
       },
+      preview: {
+        title: 'देखें एड्यूलर घर के अंदर क्या इंतज़ार कर रहा है',
+        subtitle:
+          'समुदाय कक्षों, पाठ्यक्रम और लाइव ऑप्स के बीच स्विच करें और लॉग इन करने से पहले ही माहौल महसूस करें.',
+        helper: 'इस सप्ताह के लॉन्च हाइलाइट्स',
+        cta: 'सभी स्पेस देखें',
+        footnote: 'हर सोमवार 09:00 UTC पर नई झलकियाँ।',
+        tabs: {
+          communities: {
+            label: 'समुदाय',
+            caption: 'थ्रेड वाले क्लब, रिवाज पहले से तैयार.',
+            description:
+              'थीम वाले रूम चालू करें, रिवाज सेट करें और गाइडेड प्रॉम्प्ट्स से हर कोहोर्ट को चालू रखें.',
+            highlightOne: 'साप्ताहिक गाइडेड प्रॉम्प्ट्स',
+            highlightTwo: 'अंदरूनी मॉडरेशन संकेत',
+            highlightThree: 'सदस्यों की जीत तुरंत दिखे',
+            imageAlt: 'एड्यूलर समुदाय स्पेस का पूर्वावलोकन'
+          },
+          courses: {
+            label: 'पाठ्यक्रम',
+            caption: 'कहानी आधारित करिकुलम बिना स्प्रेडशीट के.',
+            description:
+              'बहु-सप्ताह के आर्क डिज़ाइन करें, मीडिया-समृद्ध पाठ जोड़ें और बिना स्प्रेडशीट एक्सपोर्ट किए अपडेट प्रकाशित करें.',
+            highlightOne: 'ड्रैग-एंड-ड्रॉप मॉड्यूल',
+            highlightTwo: 'रियल-टाइम पूरा होने के संकेत',
+            highlightThree: 'तुरंत स्कोप अपडेट्स',
+            imageAlt: 'एड्यूलर पाठ्यक्रम बिल्डर का पूर्वावलोकन'
+          },
+          liveEvents: {
+            label: 'लाइव इवेंट्स',
+            caption: 'स्टूडियो की ऊर्जा, बिना अव्यवस्था.',
+            description:
+              'जैम, AMA और ऑफिस आवर्स को ऐसे कंट्रोल रूम से होस्ट करें जो चैट, बैकस्टेज नोट्स और रिकॉर्डिंग को सिंक रखता है.',
+            highlightOne: 'ग्रीन-रूम चेकलिस्ट',
+            highlightTwo: 'ऑटो रिकॉर्डिंग तैयार',
+            highlightThree: 'होस्ट के लिए बैकस्टेज चैट',
+            imageAlt: 'एड्यूलर लाइव इवेंट कंट्रोल का पूर्वावलोकन'
+          },
+          library: {
+            label: 'संसाधन लाइब्रेरी',
+            caption: 'डाउनलोड और रिप्ले का मीठा स्टोर.',
+            description:
+              'टेम्पलेट, रिप्ले और प्लेबुक को स्मार्ट फिल्टर के साथ क्यूरेट करें ताकि सीखने वाले तुरंत सही संसाधन पाएँ.',
+            highlightOne: 'फॉर्मेट अनुसार तुरंत फ़िल्टर',
+            highlightTwo: 'हर हफ्ते घूमती स्मार्ट सिफारिशें',
+            highlightThree: 'ब्रांड-सुरक्षित शेयर लिंक',
+            imageAlt: 'एड्यूलर संसाधन लाइब्रेरी ग्रिड का पूर्वावलोकन'
       tutoring: {
         kicker: 'ट्यूटर आर्केड',
         headline: 'अपना अगला ब्रेकथ्रू सत्र कतार में लगाएँ',
@@ -1136,6 +1465,53 @@ const TRANSLATIONS = {
         instructorPill: 'أنا مدرّس/ة',
         illustrationAlt: 'مجموعة صور لمدربين ومتعلّمين يتعاونون'
       },
+      preview: {
+        title: 'اكتشف ما ينتظرك داخل بيت إدولور',
+        subtitle:
+          'تنقّل بين غرف المجتمع، المناهج، والعمليات المباشرة لتشعر بالإيقاع قبل تسجيل الدخول.',
+        helper: 'أبرز إصدارات هذا الأسبوع',
+        cta: 'استكشاف جميع المساحات',
+        footnote: 'معاينات جديدة كل يوم اثنين الساعة 09:00 بتوقيت UTC.',
+        tabs: {
+          communities: {
+            label: 'المجتمعات',
+            caption: 'أندية بخيوط محادثة وطقوس جاهزة.',
+            description:
+              'أطلق غرفاً موضوعية، اضبط الطقوس، وأبق كل دفعة نابضة بفضل المطالبات الموجهة.',
+            highlightOne: 'مطالبات أسبوعية موجهة',
+            highlightTwo: 'إشارات ضبط مضمنة',
+            highlightThree: 'نجاحات الأعضاء تظهر فوراً',
+            imageAlt: 'معاينة لمساحات المجتمع في إدولور'
+          },
+          courses: {
+            label: 'الدورات',
+            caption: 'مناهج قصصية بدون جداول بيانات.',
+            description:
+              'صمّم مسارات لعدة أسابيع، أضف دروساً غنية بالوسائط، وانشر التحديثات من دون أي تصدير لجداول.',
+            highlightOne: 'وحدات سحب وإفلات',
+            highlightTwo: 'إشارات إكمال مباشرة',
+            highlightThree: 'تحديثات نطاق لحظية',
+            imageAlt: 'معاينة لمحرر الدورات في إدولور'
+          },
+          liveEvents: {
+            label: 'الفعاليات المباشرة',
+            caption: 'طاقة الاستوديو بلا فوضى.',
+            description:
+              'استضف جلسات، AMA وساعات مكتبية من غرفة تحكم تزامن الدردشة، ملاحظات الكواليس والتسجيلات.',
+            highlightOne: 'قوائم تدقيق لغرفة الانتظار',
+            highlightTwo: 'تسجيلات تلقائية جاهزة',
+            highlightThree: 'دردشة خلف الكواليس للمضيفين',
+            imageAlt: 'معاينة لغرفة التحكم بالفعاليات المباشرة في إدولور'
+          },
+          library: {
+            label: 'مكتبة الموارد',
+            caption: 'متجر حلويات للتحميلات والإعادات.',
+            description:
+              'نسّق القوالب، الإعادات ودفاتر اللعب مع فلاتر ذكية ليجد المتعلمون المورد المناسب فوراً.',
+            highlightOne: 'تصفية سريعة حسب التنسيق',
+            highlightTwo: 'توصيات ذكية تتغير أسبوعياً',
+            highlightThree: 'روابط مشاركة آمنة للعلامة',
+            imageAlt: 'معاينة لشبكة مكتبة إدولور'
       tutoring: {
         kicker: 'أركيد المدرّسين',
         headline: 'أدرج جلستك الحاسمة التالية في الطابور',
@@ -1289,6 +1665,53 @@ const TRANSLATIONS = {
         instructorPill: 'Ich bin Trainer:in',
         illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
       },
+      preview: {
+        title: 'Entdecke, was dich im Edulure Clubhouse erwartet',
+        subtitle:
+          'Wechsle zwischen Community-Räumen, Curriculum und Live-Operations, um den Flow vor dem Login zu fühlen.',
+        helper: 'Highlights der Launches dieser Woche',
+        cta: 'Alle Spaces erkunden',
+        footnote: 'Neue Previews jeden Montag um 09:00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Communities',
+            caption: 'Thread-basierte Clubs mit eingebauten Ritualen.',
+            description:
+              'Starte thematische Räume, takte Rituale und halte jede Kohorte mit geführten Prompts in Bewegung.',
+            highlightOne: 'Geführte Wochenprompts',
+            highlightTwo: 'Integrierte Moderationshinweise',
+            highlightThree: 'Mitglieder-Erfolge sofort sichtbar',
+            imageAlt: 'Vorschau der Edulure-Community-Bereiche'
+          },
+          courses: {
+            label: 'Kurse',
+            caption: 'Story-basierte Curricula ohne Tabellen.',
+            description:
+              'Gestalte mehrwöchige Bögen, staple medienreiche Lektionen und veröffentliche Updates ohne Tabellenexport.',
+            highlightOne: 'Drag-and-drop-Module',
+            highlightTwo: 'Live-Abschluss-Signale',
+            highlightThree: 'Aktualisierungen in Echtzeit',
+            imageAlt: 'Vorschau des Edulure-Kursbuilders'
+          },
+          liveEvents: {
+            label: 'Live-Events',
+            caption: 'Studio-Energie ohne Chaos.',
+            description:
+              'Hoste Jams, AMAs und Office Hours mit einer Regie, die Chat, Backstage-Notizen und Aufnahmen synchron hält.',
+            highlightOne: 'Backstage-Checklisten',
+            highlightTwo: 'Automatische Aufzeichnungen bereit',
+            highlightThree: 'Backstage-Chat für Hosts',
+            imageAlt: 'Vorschau des Edulure-Live-Event-Control-Centers'
+          },
+          library: {
+            label: 'Ressourcenbibliothek',
+            caption: 'Ein Candy-Shop für Downloads und Replays.',
+            description:
+              'Kuratiere Templates, Replays und Playbooks mit smarten Filtern, damit Lernende schnell das richtige Asset finden.',
+            highlightOne: 'Schnell nach Format filtern',
+            highlightTwo: 'Clevere Empfehlungen rotieren wöchentlich',
+            highlightThree: 'Markensichere Freigabelinks',
+            imageAlt: 'Vorschau des Edulure-Bibliotheksrasters'
       tutoring: {
         kicker: 'Tutor-Arcade',
         headline: 'Stell deine nächste Durchbruch-Session in die Queue',
@@ -1441,6 +1864,53 @@ const TRANSLATIONS = {
         instructorPill: 'Я преподаватель',
         illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'
       },
+      preview: {
+        title: 'Посмотрите, что ждёт внутри клуба Edulure',
+        subtitle:
+          'Переключайтесь между комнатами сообщества, учебными треками и лайв-операциями, чтобы почувствовать атмосферу до входа.',
+        helper: 'Главные релизы недели',
+        cta: 'Исследовать все пространства',
+        footnote: 'Новые превью каждый понедельник в 09:00 UTC.',
+        tabs: {
+          communities: {
+            label: 'Сообщества',
+            caption: 'Клубы в форматах тредов с готовыми ритуалами.',
+            description:
+              'Запускайте тематические комнаты, задавайте ритуалы и держите каждую когорту в тонусе с помощью направляющих подсказок.',
+            highlightOne: 'Еженедельные подсказки с сопровождением',
+            highlightTwo: 'Встроенные сигналы модерации',
+            highlightThree: 'Победы участников видны мгновенно',
+            imageAlt: 'Предпросмотр пространств сообщества Edulure'
+          },
+          courses: {
+            label: 'Курсы',
+            caption: 'Нарративные курсы без таблиц.',
+            description:
+              'Проектируйте многонедельные дуги, добавляйте насыщенные медиа уроки и публикуйте обновления без экспорта таблиц.',
+            highlightOne: 'Модули drag-and-drop',
+            highlightTwo: 'Онлайн-сигналы завершения',
+            highlightThree: 'Обновления в реальном времени',
+            imageAlt: 'Предпросмотр конструктора курсов Edulure'
+          },
+          liveEvents: {
+            label: 'Живые события',
+            caption: 'Энергия студии без хаоса.',
+            description:
+              'Проводите джемы, AMA и офис-часы в пульте, который синхронизирует чат, бэк-ноты и записи.',
+            highlightOne: 'Чек-листы гримерки',
+            highlightTwo: 'Автозаписи готовы',
+            highlightThree: 'Бэкстейдж-чат для ведущих',
+            imageAlt: 'Предпросмотр контрольной комнаты лайв-событий Edulure'
+          },
+          library: {
+            label: 'Библиотека ресурсов',
+            caption: 'Кондитерская из материалов и записей.',
+            description:
+              'Курируйте шаблоны, записи и плейбуки с умными фильтрами, чтобы участники мгновенно находили нужный актив.',
+            highlightOne: 'Быстрая фильтрация по формату',
+            highlightTwo: 'Умные рекомендации обновляются еженедельно',
+            highlightThree: 'Безопасные для бренда ссылки на шаринг',
+            imageAlt: 'Предпросмотр сетки библиотеки Edulure'
       tutoring: {
         kicker: 'Аркада тьюторов',
         headline: 'Поставьте в очередь следующую прорывную сессию',
