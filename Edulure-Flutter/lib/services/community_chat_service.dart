@@ -1,43 +1,48 @@
 import 'package:dio/dio.dart';
 
 import 'api_config.dart';
+import 'community_service.dart' show CommunityServiceException;
 import 'session_manager.dart';
 
 typedef JsonMap = Map<String, dynamic>;
 
 class CommunityChatService {
-  CommunityChatService()
-      : _dio = Dio(
-          BaseOptions(
-            baseUrl: apiBaseUrl,
-            connectTimeout: const Duration(seconds: 12),
-            receiveTimeout: const Duration(seconds: 20),
-          ),
-        );
+  CommunityChatService({Dio? client})
+      : _dio = client ?? ApiConfig.createHttpClient(requiresAuth: true);
 
   final Dio _dio;
 
-  Options _authOptions() {
+  Options _authorizedOptions() {
     final token = SessionManager.getAccessToken();
     if (token == null || token.isEmpty) {
-      throw Exception('Authentication required');
+      throw CommunityServiceException('Authentication required to access community chat.');
     }
-    return Options(headers: {'Authorization': 'Bearer $token'});
+    return Options(
+      headers: {
+        ..._dio.options.headers,
+        'Authorization': 'Bearer $token',
+      },
+      extra: {
+        ...?_dio.options.extra,
+        'requiresAuth': true,
+      },
+    );
   }
 
-  Future<List<CommunityChatChannelSummary>> listChannels(String communityId) async {
-    final response = await _dio.get(
-      '/communities/$communityId/chat/channels',
-      options: _authOptions(),
+  Future<List<CommunityChatChannelSummary>> listChannels(String communityId) {
+    return _withAuth(
+      (options) => _dio.get(
+        '/communities/$communityId/chat/channels',
+        options: options,
+      ),
+      'Unable to load chat channels.',
+      (response) {
+        final entries = _asMapList(_unwrapData(response));
+        return entries
+            .map(CommunityChatChannelSummary.fromJson)
+            .toList(growable: false);
+      },
     );
-    final data = response.data;
-    if (data is JsonMap && data['data'] is List) {
-      return (data['data'] as List)
-          .whereType<Map>()
-          .map((entry) => CommunityChatChannelSummary.fromJson(Map<String, dynamic>.from(entry as Map)))
-          .toList();
-    }
-    return const <CommunityChatChannelSummary>[];
   }
 
   Future<List<CommunityChatMessageDto>> listMessages(
@@ -48,7 +53,7 @@ class CommunityChatService {
     DateTime? after,
     int? threadRootId,
     bool includeHidden = false,
-  }) async {
+  }) {
     final query = <String, dynamic>{
       if (limit != null) 'limit': limit,
       if (before != null) 'before': before.toIso8601String(),
@@ -57,46 +62,52 @@ class CommunityChatService {
       if (includeHidden) 'includeHidden': true,
     };
 
-    final response = await _dio.get(
-      '/communities/$communityId/chat/channels/$channelId/messages',
-      queryParameters: query.isEmpty ? null : query,
-      options: _authOptions(),
+    return _withAuth(
+      (options) => _dio.get(
+        '/communities/$communityId/chat/channels/$channelId/messages',
+        queryParameters: query.isEmpty ? null : query,
+        options: options,
+      ),
+      'Unable to load channel messages.',
+      (response) {
+        final entries = _asMapList(_unwrapData(response));
+        return entries
+            .map(CommunityChatMessageDto.fromJson)
+            .toList(growable: false);
+      },
     );
-    final data = response.data;
-    if (data is JsonMap && data['data'] is List) {
-      return (data['data'] as List)
-          .whereType<Map>()
-          .map((entry) => CommunityChatMessageDto.fromJson(Map<String, dynamic>.from(entry as Map)))
-          .toList();
-    }
-    return const <CommunityChatMessageDto>[];
   }
 
   Future<CommunityChatMessageDto> postMessage(
     String communityId,
     String channelId,
     CommunityChatMessageDraft draft,
-  ) async {
-    final response = await _dio.post(
-      '/communities/$communityId/chat/channels/$channelId/messages',
-      data: draft.toJson(),
-      options: _authOptions(),
+  ) {
+    return _withAuth(
+      (options) => _dio.post(
+        '/communities/$communityId/chat/channels/$channelId/messages',
+        data: draft.toJson(),
+        options: options,
+      ),
+      'Unable to send message.',
+      (response) => CommunityChatMessageDto.fromJson(
+        _asMap(_unwrapData(response), 'Unable to send message.'),
+      ),
     );
-    final data = response.data;
-    if (data is JsonMap && data['data'] is Map) {
-      return CommunityChatMessageDto.fromJson(Map<String, dynamic>.from(data['data'] as Map));
-    }
-    throw Exception('Unexpected message payload');
   }
 
   Future<void> acknowledgeRead(String communityId, String channelId, {int? messageId, DateTime? timestamp}) async {
-    await _dio.post(
-      '/communities/$communityId/chat/channels/$channelId/read',
-      data: <String, dynamic>{
-        if (messageId != null) 'messageId': messageId,
-        if (timestamp != null) 'timestamp': timestamp.toIso8601String(),
-      },
-      options: _authOptions(),
+    await _withAuth<void>(
+      (options) => _dio.post(
+        '/communities/$communityId/chat/channels/$channelId/read',
+        data: <String, dynamic>{
+          if (messageId != null) 'messageId': messageId,
+          if (timestamp != null) 'timestamp': timestamp.toIso8601String(),
+        },
+        options: options,
+      ),
+      'Unable to acknowledge messages.',
+      (_) => null,
     );
   }
 
@@ -105,17 +116,18 @@ class CommunityChatService {
     String channelId,
     String messageId,
     String emoji,
-  ) async {
-    final response = await _dio.post(
-      '/communities/$communityId/chat/channels/$channelId/messages/$messageId/reactions',
-      data: <String, dynamic>{'emoji': emoji},
-      options: _authOptions(),
+  ) {
+    return _withAuth(
+      (options) => _dio.post(
+        '/communities/$communityId/chat/channels/$channelId/messages/$messageId/reactions',
+        data: <String, dynamic>{'emoji': emoji},
+        options: options,
+      ),
+      'Unable to add reaction.',
+      (response) => CommunityChatReactionSummary.fromJson(
+        _asMap(_unwrapData(response), 'Unable to add reaction.'),
+      ),
     );
-    final data = response.data;
-    if (data is JsonMap && data['data'] is Map) {
-      return CommunityChatReactionSummary.fromJson(Map<String, dynamic>.from(data['data'] as Map));
-    }
-    throw Exception('Unexpected reaction payload');
   }
 
   Future<CommunityChatReactionSummary> removeReaction(
@@ -123,17 +135,18 @@ class CommunityChatService {
     String channelId,
     String messageId,
     String emoji,
-  ) async {
-    final response = await _dio.delete(
-      '/communities/$communityId/chat/channels/$channelId/messages/$messageId/reactions',
-      data: <String, dynamic>{'emoji': emoji},
-      options: _authOptions(),
+  ) {
+    return _withAuth(
+      (options) => _dio.delete(
+        '/communities/$communityId/chat/channels/$channelId/messages/$messageId/reactions',
+        data: <String, dynamic>{'emoji': emoji},
+        options: options,
+      ),
+      'Unable to remove reaction.',
+      (response) => CommunityChatReactionSummary.fromJson(
+        _asMap(_unwrapData(response), 'Unable to remove reaction.'),
+      ),
     );
-    final data = response.data;
-    if (data is JsonMap && data['data'] is Map) {
-      return CommunityChatReactionSummary.fromJson(Map<String, dynamic>.from(data['data'] as Map));
-    }
-    throw Exception('Unexpected reaction payload');
   }
 
   Future<CommunityChatMessageModeration> moderateMessage(
@@ -141,45 +154,119 @@ class CommunityChatService {
     String channelId,
     String messageId,
     CommunityChatModeration moderation,
+  ) {
+    return _withAuth(
+      (options) => _dio.post(
+        '/communities/$communityId/chat/channels/$channelId/messages/$messageId/moderate',
+        data: moderation.toJson(),
+        options: options,
+      ),
+      'Unable to moderate message.',
+      (response) => CommunityChatMessageModeration.fromJson(
+        _asMap(_unwrapData(response), 'Unable to moderate message.'),
+      ),
+    );
+  }
+
+  Future<List<CommunityPresenceSession>> listPresence(String communityId) {
+    return _withAuth(
+      (options) => _dio.get(
+        '/communities/$communityId/chat/presence',
+        options: options,
+      ),
+      'Unable to load presence.',
+      (response) {
+        final entries = _asMapList(_unwrapData(response));
+        return entries
+            .map(CommunityPresenceSession.fromJson)
+            .toList(growable: false);
+      },
+    );
+  }
+
+  Future<CommunityPresenceSession> updatePresence(CommunityPresenceDraft draft) {
+    return _withAuth(
+      (options) => _dio.post(
+        '/communities/${draft.communityId}/chat/presence',
+        data: draft.toJson(),
+        options: options,
+      ),
+      'Unable to update presence.',
+      (response) => CommunityPresenceSession.fromJson(
+        _asMap(_unwrapData(response), 'Unable to update presence.'),
+      ),
+    );
+  }
+
+  Future<T> _withAuth<T>(
+    Future<Response<dynamic>> Function(Options options) action,
+    String fallbackMessage,
+    T Function(Response response) parser,
   ) async {
-    final response = await _dio.post(
-      '/communities/$communityId/chat/channels/$channelId/messages/$messageId/moderate',
-      data: moderation.toJson(),
-      options: _authOptions(),
-    );
-    final data = response.data;
-    if (data is JsonMap && data['data'] is Map) {
-      return CommunityChatMessageModeration.fromJson(Map<String, dynamic>.from(data['data'] as Map));
+    final options = _authorizedOptions();
+    try {
+      final response = await action(options);
+      return parser(response);
+    } on DioException catch (error) {
+      final message = _extractErrorMessage(error) ?? fallbackMessage;
+      throw CommunityServiceException(
+        message,
+        cause: error,
+        stackTrace: error.stackTrace,
+      );
+    } catch (error, stackTrace) {
+      throw CommunityServiceException(
+        fallbackMessage,
+        cause: error,
+        stackTrace: stackTrace,
+      );
     }
-    throw Exception('Unexpected moderation payload');
   }
 
-  Future<List<CommunityPresenceSession>> listPresence(String communityId) async {
-    final response = await _dio.get(
-      '/communities/$communityId/chat/presence',
-      options: _authOptions(),
-    );
+  dynamic _unwrapData(Response response) {
     final data = response.data;
-    if (data is JsonMap && data['data'] is List) {
-      return (data['data'] as List)
+    if (data is Map && data.containsKey('data')) {
+      return data['data'];
+    }
+    return data;
+  }
+
+  Map<String, dynamic> _asMap(
+    dynamic value,
+    String message, {
+    bool allowEmpty = false,
+  }) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value as Map);
+    }
+    if (allowEmpty) {
+      return <String, dynamic>{};
+    }
+    throw CommunityServiceException(message);
+  }
+
+  List<Map<String, dynamic>> _asMapList(dynamic value) {
+    if (value is List) {
+      return value
           .whereType<Map>()
-          .map((entry) => CommunityPresenceSession.fromJson(Map<String, dynamic>.from(entry as Map)))
-          .toList();
+          .map((entry) => Map<String, dynamic>.from(entry as Map))
+          .toList(growable: false);
     }
-    return const <CommunityPresenceSession>[];
+    return const <Map<String, dynamic>>[];
   }
 
-  Future<CommunityPresenceSession> updatePresence(CommunityPresenceDraft draft) async {
-    final response = await _dio.post(
-      '/communities/${draft.communityId}/chat/presence',
-      data: draft.toJson(),
-      options: _authOptions(),
-    );
-    final data = response.data;
-    if (data is JsonMap && data['data'] is Map) {
-      return CommunityPresenceSession.fromJson(Map<String, dynamic>.from(data['data'] as Map));
+  String? _extractErrorMessage(DioException error) {
+    final data = error.response?.data;
+    if (data is Map && data['message'] is String) {
+      return data['message'] as String;
     }
-    throw Exception('Unexpected presence payload');
+    if (data is Map && data['errors'] is List && data['errors'].isNotEmpty) {
+      return data['errors'].first.toString();
+    }
+    return error.message;
   }
 }
 
