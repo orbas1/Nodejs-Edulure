@@ -108,6 +108,71 @@ function formatPurchase(purchase) {
   };
 }
 
+function toIso(value) {
+  if (!value) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  const asDate = new Date(value);
+  return Number.isNaN(asDate.getTime()) ? null : asDate.toISOString();
+}
+
+function formatBookingAcknowledgement(booking, message = 'Tutor booking updated') {
+  if (!booking) {
+    return buildAcknowledgement({ reference: null, message, meta: {} });
+  }
+
+  const reference = booking.publicId ?? booking.id ?? booking.reference ?? null;
+  const metadata = booking.metadata && typeof booking.metadata === 'object' ? booking.metadata : {};
+
+  return buildAcknowledgement({
+    reference,
+    message,
+    meta: {
+      status: booking.status ?? null,
+      scheduledStart: toIso(booking.scheduledStart ?? booking.metadata?.scheduledStart),
+      scheduledEnd: toIso(booking.scheduledEnd ?? booking.metadata?.scheduledEnd),
+      durationMinutes: booking.durationMinutes ?? null,
+      hourlyRateAmount: booking.hourlyRateAmount ?? null,
+      hourlyRateCurrency: booking.hourlyRateCurrency ?? null,
+      tutorId: booking.tutorId ?? null,
+      metadata
+    }
+  });
+}
+
+function formatLibraryEntry(entry) {
+  if (!entry) {
+    return null;
+  }
+
+  const tags = Array.isArray(entry.tags)
+    ? entry.tags
+    : typeof entry.tags === 'string'
+      ? entry.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
+      : [];
+
+  return {
+    id: entry.id,
+    userId: entry.userId ?? null,
+    title: entry.title ?? '',
+    format: entry.format ?? 'E-book',
+    progress: Number.isFinite(Number(entry.progress)) ? Number(entry.progress) : 0,
+    lastOpened: entry.lastOpened ?? null,
+    lastOpenedLabel: formatDateLabel(entry.lastOpened, 'Not opened yet'),
+    url: entry.url ?? null,
+    summary: entry.summary ?? null,
+    author: entry.author ?? null,
+    coverUrl: entry.coverUrl ?? null,
+    tags,
+    metadata: entry.metadata ?? {},
+    createdAt: entry.createdAt ?? null,
+    updatedAt: entry.updatedAt ?? null
+  };
+}
+
 function formatSubscription(subscription, communityMap, tierMap) {
   if (!subscription) return null;
   const community = communityMap.get(subscription.communityId ?? null);

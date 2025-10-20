@@ -280,7 +280,7 @@ export default class CreationStudioService {
     const offset = (page - 1) * limit;
 
     let projectIds;
-    let includeArchived = Boolean(filters.includeArchived);
+    const includeArchived = Boolean(filters.includeArchived);
     const statusFilter = filters.status ? toArray(filters.status) : undefined;
     const typeFilter = filters.type ? toArray(filters.type) : undefined;
     const search = filters.search ?? undefined;

@@ -115,7 +115,7 @@ export default class ProviderTransitionAcknowledgementModel {
       contactName: row.contactName,
       contactEmail: row.contactEmail,
       ackMethod: row.ackMethod,
-      followUpRequired: !!row.followUpRequired,
+      followUpRequired: Boolean(row.followUpRequired),
       followUpNotes: row.followUpNotes ?? null,
       metadata,
       acknowledgedAt: row.acknowledgedAt ? new Date(row.acknowledgedAt) : null,
