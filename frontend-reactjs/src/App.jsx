@@ -10,12 +10,16 @@ import Explorer from './pages/Explorer.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Admin from './pages/Admin.jsx';
 import ContentLibrary from './pages/ContentLibrary.jsx';
+import LiveClassrooms from './pages/LiveClassrooms.jsx';
+import Ebooks from './pages/Ebooks.jsx';
+import Courses from './pages/Courses.jsx';
 import About from './pages/About.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
 import Blog from './pages/Blog.jsx';
 import BlogPost from './pages/BlogPost.jsx';
 import Communities from './pages/Communities.jsx';
+import TutorProfile from './pages/TutorProfile.jsx';
 import IntegrationCredentialInvite from './pages/IntegrationCredentialInvite.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
@@ -132,6 +136,10 @@ function App() {
             </ProtectedRoute>
           )}
         />
+        <Route path="/live-classrooms" element={<LiveClassrooms />} />
+        <Route path="/courses" element={<Courses />} />
+        <Route path="/ebooks" element={<Ebooks />} />
+        <Route path="/tutors" element={<TutorProfile />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/about" element={<About />} />

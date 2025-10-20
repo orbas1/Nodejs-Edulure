@@ -15,6 +15,7 @@ import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
 import FeedCard from '../components/FeedCard.jsx';
 import CommunityInteractiveSuite from '../components/community/CommunityInteractiveSuite.jsx';
+import CommunityCrudManager from '../components/community/CommunityCrudManager.jsx';
 import CommunityChatModule from '../components/community/CommunityChatModule.jsx';
 import CommunityMembersManager from '../components/community/CommunityMembersManager.jsx';
 import CommunityMap from '../components/community/CommunityMap.jsx';
@@ -914,6 +915,8 @@ export default function Communities() {
               <p className="mt-6 rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">{resourcesError}</p>
             )}
           </section>
+
+          <CommunityCrudManager />
 
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr),380px]">
             <div className="space-y-6">
