@@ -52,6 +52,7 @@ import InstructorTutorManagement from './pages/dashboard/InstructorTutorManageme
 import InstructorServiceSuite from './pages/dashboard/InstructorServiceSuite.jsx';
 import InstructorProjects from './pages/dashboard/InstructorProjects.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
+import InstructorGrowth from './pages/dashboard/InstructorGrowth.jsx';
 import EdulureAds from './pages/dashboard/EdulureAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
@@ -240,6 +241,7 @@ function App() {
         <Route path="courses/library" element={<InstructorCourseLibrary />} />
         <Route path="courses/manage" element={<InstructorCourseManage />} />
         <Route path="inbox" element={<DashboardInbox />} />
+        <Route path="growth" element={<InstructorGrowth />} />
         <Route path="pricing" element={<InstructorPricing />} />
         <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />

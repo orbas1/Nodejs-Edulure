@@ -20,6 +20,7 @@ import {
   DocumentTextIcon,
   IdentificationIcon,
   InboxStackIcon,
+  BeakerIcon,
   MapIcon,
   MegaphoneIcon,
   PuzzlePieceIcon,
@@ -177,6 +178,7 @@ const navigationByRole = {
       name: 'Growth',
       icon: ChartBarIcon,
       children: [
+        { id: 'instructor-growth-hub', name: 'Growth hub', to: `${basePath}/growth`, icon: BeakerIcon },
         { id: 'instructor-pricing', name: 'Pricing', to: `${basePath}/pricing`, icon: BanknotesIcon },
         { id: 'instructor-affiliate', name: 'Affiliate', to: `${basePath}/affiliate`, icon: UserPlusIcon },
         { id: 'instructor-ads', name: 'Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
