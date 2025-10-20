@@ -196,16 +196,30 @@ export default class CourseModel {
     return rows.map((row) => this.deserialize(row));
   }
 
-  static async listPublished({ limit = 10, excludeIds = [] } = {}, connection = db) {
+  static async listPublished(
+    { limit = 10, offset = 0, excludeIds = [], search } = {},
+    connection = db
+  ) {
     const query = connection(TABLE)
       .select(BASE_COLUMNS)
       .where('status', 'published')
       .orderBy('rating_average', 'desc')
       .orderBy('updated_at', 'desc')
-      .limit(limit);
+      .limit(limit)
+      .offset(offset);
 
     if (excludeIds?.length) {
       query.whereNotIn('id', excludeIds);
+    }
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('title', `%${search}%`)
+          .orWhereILike('slug', `%${search}%`)
+          .orWhereILike('description', `%${search}%`)
+          .orWhereILike('summary', `%${search}%`);
+      });
     }
 
     const rows = await query;

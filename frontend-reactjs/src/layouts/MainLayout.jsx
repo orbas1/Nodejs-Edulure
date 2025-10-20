@@ -33,6 +33,10 @@ export default function MainLayout() {
     if (!isAuthenticated) {
       return [
         { name: 'Home', to: '/' },
+        { name: 'Live classrooms', to: '/live-classrooms' },
+        { name: 'Courses', to: '/courses' },
+        { name: 'E-books', to: '/ebooks' },
+        { name: 'Tutors', to: '/tutors' },
         { name: 'About', to: '/about' },
         { name: 'Blog', to: '/blog' }
       ];
@@ -47,6 +51,10 @@ export default function MainLayout() {
 
     const items = [
       { name: 'Home', to: '/' },
+      { name: 'Live classrooms', to: '/live-classrooms' },
+      { name: 'Courses', to: '/courses' },
+      { name: 'E-books', to: '/ebooks' },
+      { name: 'Tutors', to: '/tutors' },
       { name: 'Feed', to: '/feed' },
       { name: 'Explore', to: '/explorer' },
       { name: 'Communities', to: '/communities' },
@@ -57,16 +65,22 @@ export default function MainLayout() {
       { name: 'About', to: '/about' }
     ];
 
+    const insertBeforeProfile = (link) => {
+      const profileIndex = items.findIndex((item) => item.name === 'Profile');
+      const index = profileIndex === -1 ? items.length : profileIndex;
+      items.splice(index, 0, link);
+    };
+
     if (contentLibraryEnabled && (resolvedRole === 'instructor' || resolvedRole === 'admin')) {
-      items.splice(5, 0, { name: 'Library', to: '/content' });
+      insertBeforeProfile({ name: 'Library', to: '/content' });
     }
 
     if (analyticsDashboardEnabled && (resolvedRole === 'instructor' || resolvedRole === 'admin')) {
-      items.splice(5, 0, { name: 'Insights', to: '/analytics' });
+      insertBeforeProfile({ name: 'Insights', to: '/analytics' });
     }
 
     if (adminConsoleEnabled && resolvedRole === 'admin') {
-      items.splice(5, 0, { name: 'Admin', to: '/admin' });
+      insertBeforeProfile({ name: 'Admin', to: '/admin' });
     }
 
     return items;

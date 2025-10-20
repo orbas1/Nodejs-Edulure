@@ -35,6 +35,24 @@ const BASE_COLUMNS = [
   'reg.registered_at as registeredAt'
 ];
 
+const PUBLIC_STATUSES = ['scheduled', 'live'];
+
+function normaliseStatuses(statuses) {
+  if (!statuses) {
+    return [...PUBLIC_STATUSES];
+  }
+
+  if (typeof statuses === 'string') {
+    return [statuses];
+  }
+
+  if (Array.isArray(statuses) && statuses.length > 0) {
+    return statuses;
+  }
+
+  return [...PUBLIC_STATUSES];
+}
+
 function parseJson(value, fallback) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;
@@ -121,6 +139,37 @@ export default class LiveClassroomModel {
     return rows.map((row) => deserialize(row));
   }
 
+  static async listPublic(
+    { search, statuses, limit = 12, offset = 0, upcomingOnly = true } = {},
+    connection = db
+  ) {
+    const resolvedStatuses = normaliseStatuses(statuses);
+    const query = connection(`${TABLE} as lc`)
+      .leftJoin('communities as comm', 'lc.community_id', 'comm.id')
+      .select(BASE_COLUMNS)
+      .whereIn('lc.status', resolvedStatuses)
+      .orderBy(upcomingOnly ? 'lc.start_at' : 'lc.updated_at', upcomingOnly ? 'asc' : 'desc')
+      .limit(limit)
+      .offset(offset);
+
+    if (upcomingOnly) {
+      query.andWhere('lc.start_at', '>=', connection.fn.now());
+    }
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('lc.title', `%${search}%`)
+          .orWhereILike('lc.slug', `%${search}%`)
+          .orWhereILike('lc.summary', `%${search}%`)
+          .orWhereILike('lc.description', `%${search}%`);
+      });
+    }
+
+    const rows = await query;
+    return rows.map((row) => deserialize(row));
+  }
+
   static async countAll({ search, status } = {}, connection = db) {
     const query = connection(TABLE);
 
@@ -134,6 +183,28 @@ export default class LiveClassroomModel {
           .whereILike('title', `%${search}%`)
           .orWhereILike('slug', `%${search}%`)
           .orWhereILike('summary', `%${search}%`);
+      });
+    }
+
+    const result = await query.count({ total: '*' }).first();
+    return Number(result?.total ?? 0);
+  }
+
+  static async countPublic({ search, statuses, upcomingOnly = true } = {}, connection = db) {
+    const resolvedStatuses = normaliseStatuses(statuses);
+    const query = connection(TABLE).whereIn('status', resolvedStatuses);
+
+    if (upcomingOnly) {
+      query.andWhere('start_at', '>=', connection.fn.now());
+    }
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('title', `%${search}%`)
+          .orWhereILike('slug', `%${search}%`)
+          .orWhereILike('summary', `%${search}%`)
+          .orWhereILike('description', `%${search}%`);
       });
     }
 
