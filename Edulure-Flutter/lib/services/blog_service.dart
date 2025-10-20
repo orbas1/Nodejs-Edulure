@@ -90,9 +90,14 @@ class BlogService {
       return _postCache[slug]!;
     }
     try {
-      final response = await _dio.get('/blog/posts/$slug', options: ApiConfig.unauthenticatedOptions());
-      final data = _coerceMap(response.data['data'] ?? response.data);
-      final article = BlogArticle.fromJson(data);
+      final response = await _dio.get(
+        '/blog/posts/$slug',
+        options: ApiConfig.unauthenticatedOptions(),
+      );
+      final envelope = _coerceMap(response.data);
+      final rawArticle = envelope['data'];
+      final articleJson = rawArticle is Map ? _coerceMap(rawArticle) : envelope;
+      final article = BlogArticle.fromJson(articleJson);
       _postCache[slug] = article;
       return article;
     } on DioException catch (error) {

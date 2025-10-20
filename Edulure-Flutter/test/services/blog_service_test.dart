@@ -98,6 +98,30 @@ void main() {
       expect(cached.title, 'Creator playbook');
     });
 
+    test('fetchPost tolerates non-enveloped payloads', () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.com/api'));
+      dio.httpClientAdapter = _FakeHttpClientAdapter((options, _) async {
+        return ResponseBody.fromString(
+          jsonEncode({
+            'slug': 'direct-response',
+            'title': 'Direct response',
+            'excerpt': 'Payload without data envelope.',
+          }),
+          200,
+          headers: {
+            Headers.contentTypeHeader: [Headers.jsonContentType],
+          },
+        );
+      });
+
+      final service = BlogService(client: dio);
+
+      final article = await service.fetchPost('direct-response', forceRefresh: true);
+
+      expect(article.slug, 'direct-response');
+      expect(article.title, 'Direct response');
+    });
+
     test('surface API error message when fetch fails', () async {
       final dio = Dio(BaseOptions(baseUrl: 'https://example.com/api'));
       dio.httpClientAdapter = _FakeHttpClientAdapter((options, _) async {
