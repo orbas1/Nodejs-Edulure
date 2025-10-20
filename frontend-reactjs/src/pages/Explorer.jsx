@@ -1,18 +1,15 @@
-import { useMemo, useState } from 'react';
 import {
   AcademicCapIcon,
   ArrowTrendingUpIcon,
-  BoltIcon,
   ChartBarIcon,
   CheckCircleIcon,
   GlobeAltIcon,
   LifebuoyIcon,
-  ShieldCheckIcon,
   SparklesIcon,
   UserCircleIcon
 } from '@heroicons/react/24/outline';
+import { Link } from 'react-router-dom';
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
-import SubscriptionPlanner from '../components/search/SubscriptionPlanner.jsx';
 import BlogSearchSection from '../components/search/BlogSearchSection.jsx';
 
 const SECTION_CONFIG = [
@@ -266,55 +263,6 @@ const HIGHLIGHTS = [
   }
 ];
 
-const PLAN_VARIANTS = [
-  {
-    id: 'free',
-    name: 'Free tier',
-    price: '$0',
-    cadence: 'per seat',
-    description: 'Bootstrap your discovery workflows with curated previews and automated weekly digests.',
-    features: [
-      '3 saved searches with analytics snapshots',
-      'Email digests for community + course trends',
-      'Lightweight explorer filters and map previews',
-      'Access to public communities and blog content'
-    ],
-    icon: ShieldCheckIcon
-  },
-  {
-    id: 'pro',
-    name: 'Pro subscription',
-    price: '$39',
-    cadence: 'per seat / month',
-    description: 'Unlock full-fidelity search, unlimited CRUD and production SLAs across the Edulure graph.',
-    features: [
-      'Unlimited saved searches with pinning',
-      'Advanced filters, response-time analytics and velocity charts',
-      'Role-based access control and workspace collaboration',
-      'Priority live classroom and tutor availability windows'
-    ],
-    icon: SparklesIcon
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 'Let’s talk',
-    cadence: 'annual partnerships',
-    description: 'Hardening for scale with compliance, private inventory feeds and integration accelerators.',
-    features: [
-      'Private inventory ingestion + SSO (SAML/OIDC)',
-      'Premium onboarding with dedicated solutions architect',
-      'Custom SLAs with 24/7 pager coverage',
-      'Sandbox + production environments for integrations'
-    ],
-    icon: BoltIcon
-  }
-];
-
-function classNames(...classes) {
-  return classes.filter(Boolean).join(' ');
-}
-
 function HighlightCard({ title, body, icon: Icon }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
@@ -325,78 +273,80 @@ function HighlightCard({ title, body, icon: Icon }) {
   );
 }
 
-function PlanSwitcher({ activePlanId, onSelect }) {
+function CommunityAccessPanel() {
   return (
-    <div className="grid gap-3 rounded-3xl border border-slate-200 bg-white/80 p-3 shadow-inner sm:grid-cols-3">
-      {PLAN_VARIANTS.map((plan) => {
-        const isActive = plan.id === activePlanId;
-        const Icon = plan.icon;
-        return (
-          <button
-            type="button"
-            key={plan.id}
-            onClick={() => onSelect(plan.id)}
-            className={classNames(
-              'flex flex-col items-start gap-3 rounded-2xl border px-5 py-4 text-left transition',
-              isActive
-                ? 'border-primary bg-primary/5 shadow-card'
-                : 'border-transparent hover:border-primary/40 hover:bg-primary/5'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <Icon className={classNames('h-6 w-6', isActive ? 'text-primary' : 'text-slate-400')} />
+    <section className="rounded-4xl border border-slate-200 bg-white/80 p-10 shadow-xl">
+      <div className="grid gap-8 lg:grid-cols-[1.4fr,1fr] lg:items-center">
+        <div className="space-y-5">
+          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+            Community-gated access
+          </span>
+          <h2 className="text-3xl font-semibold text-slate-900">Subscriptions live inside community workspaces</h2>
+          <p className="text-sm text-slate-600">
+            Join a community from the directory to unlock the right explorer capabilities for your role. Upgrades, seat assignments and add-ons are handled by community leads so the explorer stays aligned with membership policies.
+          </p>
+          <ul className="space-y-4">
+            <li className="flex gap-3">
+              <CheckCircleIcon className="h-5 w-5 flex-none text-primary" />
               <div>
-                <p className="text-sm font-semibold text-slate-500">{plan.name}</p>
-                <p className="text-base font-semibold text-slate-900">
-                  {plan.price}{' '}
-                  <span className="text-xs font-medium text-slate-400">{plan.cadence}</span>
+                <p className="text-sm font-semibold text-slate-800">Choose a community workspace</p>
+                <p className="text-sm text-slate-600">
+                  Browse the community directory, review governance details and request access directly from the Explorer.
                 </p>
               </div>
-            </div>
-            <p className="text-sm text-slate-600">{plan.description}</p>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function PlanDetail({ plan }) {
-  return (
-    <div className="rounded-4xl border border-slate-100 bg-gradient-to-br from-white via-white to-slate-50 p-10 shadow-xl">
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            {plan.name}
-          </span>
-          <h3 className="mt-4 text-3xl font-semibold text-slate-900">{plan.description}</h3>
+            </li>
+            <li className="flex gap-3">
+              <CheckCircleIcon className="h-5 w-5 flex-none text-primary" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Coordinate subscription upgrades</p>
+                <p className="text-sm text-slate-600">
+                  Owners and moderators manage billing, add-ons and seat assignments from the Community Monetisation console.
+                </p>
+              </div>
+            </li>
+            <li className="flex gap-3">
+              <CheckCircleIcon className="h-5 w-5 flex-none text-primary" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Launch with membership guardrails</p>
+                <p className="text-sm text-slate-600">
+                  Every saved search inherits the community’s safety settings, audit logging and moderation workflows.
+                </p>
+              </div>
+            </li>
+          </ul>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Link
+              to="/communities"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary/90"
+            >
+              Explore communities
+            </Link>
+            <Link
+              to="/dashboard/community/monetisation"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-primary/40 bg-white px-6 py-3 text-sm font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
+            >
+              Open monetisation console
+            </Link>
+          </div>
         </div>
-        <div className="flex items-baseline gap-2 text-3xl font-bold text-primary">
-          {plan.price}
-          <span className="text-xs font-semibold uppercase tracking-wide text-primary/60">{plan.cadence}</span>
+        <div className="space-y-4 rounded-3xl border border-slate-200 bg-slate-50/70 p-6">
+          <div className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-white">
+            <SparklesIcon className="h-4 w-4" />
+            Live handoff
+          </div>
+          <p className="text-sm text-slate-600">
+            Need help mapping memberships to explorer permissions? Our community success pod will join your workspace to set up the billing ladder, review compliance requirements and prepare reporting for finance teams.
+          </p>
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+            Community leads · Finance partners · Explorer admins
+          </div>
         </div>
       </div>
-      <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-        {plan.features.map((feature) => (
-          <li key={feature} className="flex items-start gap-3 rounded-2xl border border-primary/10 bg-white/70 p-4 text-sm text-slate-700">
-            <CheckCircleIcon className="mt-0.5 h-5 w-5 flex-none text-primary" />
-            <span>{feature}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-8 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.25em] text-primary/70">
-        <ShieldCheckIcon className="h-5 w-5" />
-        SOC2-ready infrastructure · Continuous compliance · Production-grade monitoring
-      </div>
-    </div>
+    </section>
   );
 }
 
 export default function Explorer() {
-  const [activePlanId, setActivePlanId] = useState('pro');
-
-  const activePlan = useMemo(() => PLAN_VARIANTS.find((plan) => plan.id === activePlanId) ?? PLAN_VARIANTS[0], [activePlanId]);
-
   return (
     <div className="bg-slate-100 pb-24">
       <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6 py-16">
@@ -406,7 +356,7 @@ export default function Explorer() {
           </span>
           <h1 className="text-4xl font-semibold text-slate-900">Operational discovery, production ready</h1>
           <p className="mx-auto max-w-3xl text-sm text-slate-600">
-            Orchestrate community scouting, course procurement, live classroom scheduling and content sourcing from one interactive surface. Every search ships with full CRUD, analytics, and subscription-aware guardrails.
+            Orchestrate community scouting, course procurement, live classroom scheduling and content sourcing from one interactive surface. Every search ships with full CRUD, analytics, and community-aware guardrails.
           </p>
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
             {HIGHLIGHTS.map((item) => (
@@ -415,24 +365,7 @@ export default function Explorer() {
           </div>
         </header>
 
-        <section className="space-y-6">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-2xl font-semibold text-slate-900">Subscription and free tier</h2>
-              <p className="mt-2 max-w-2xl text-sm text-slate-600">
-                Model how each plan unlocks the explorer for your team. Toggle through tiers to align procurement, then design the exact subscription ladder with the planner.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.3em] text-primary/80">
-              <SparklesIcon className="h-5 w-5" />
-              Billing ready · Seats aware · CRUD safe
-            </div>
-          </div>
-          <PlanSwitcher activePlanId={activePlanId} onSelect={setActivePlanId} />
-          <PlanDetail plan={activePlan} />
-        </section>
-
-        <SubscriptionPlanner />
+        <CommunityAccessPanel />
 
         <div className="space-y-12">
           {SECTION_CONFIG.map((section) => (
