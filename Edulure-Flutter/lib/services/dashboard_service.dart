@@ -230,44 +230,6 @@ class AssessmentOverviewMetric {
       value: json['value']?.toString() ?? '0',
       context: json['context']?.toString(),
       tone: json['tone']?.toString(),
-class BlogArticle {
-  BlogArticle({
-    required this.slug,
-    required this.title,
-    required this.excerpt,
-    required this.category,
-    required this.readingTimeMinutes,
-    required this.publishedAt,
-    required this.heroImageUrl,
-    required this.isFeatured,
-  });
-
-  final String slug;
-  final String title;
-  final String excerpt;
-  final String category;
-  final int readingTimeMinutes;
-  final String? publishedAt;
-  final String? heroImageUrl;
-  final bool isFeatured;
-
-  factory BlogArticle.fromJson(Map<String, dynamic> json) {
-    return BlogArticle(
-      slug: json['slug']?.toString() ?? '',
-      title: json['title']?.toString() ?? 'Article',
-      excerpt: json['excerpt']?.toString() ?? '',
-      category: json['category'] is Map
-          ? (json['category']['name']?.toString() ?? 'Insight')
-          : json['category']?.toString() ?? 'Insight',
-      readingTimeMinutes: (json['readingTimeMinutes'] is num)
-          ? (json['readingTimeMinutes'] as num).round()
-          : int.tryParse('${json['readingTimeMinutes'] ?? 0}') ?? 0,
-      publishedAt: json['publishedAt']?.toString(),
-      heroImageUrl: json['heroImage']?.toString() ??
-          (json['media'] is List && (json['media'] as List).isNotEmpty && (json['media'] as List).first is Map
-              ? Map<String, dynamic>.from((json['media'] as List).first as Map)['mediaUrl']?.toString()
-              : null),
-      isFeatured: json['featured'] == true || json['isFeatured'] == true,
     );
   }
 
@@ -327,14 +289,30 @@ class AssessmentTimelineItem {
       recommended: json['recommended']?.toString(),
       submissionUrl: json['submissionUrl']?.toString(),
       instructions: json['instructions']?.toString(),
-      'slug': slug,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
       'title': title,
-      'excerpt': excerpt,
-      'category': category,
-      'readingTimeMinutes': readingTimeMinutes,
-      'publishedAt': publishedAt,
-      'heroImageUrl': heroImageUrl,
-      'isFeatured': isFeatured,
+      'course': course,
+      if (type != null) 'type': type,
+      if (due != null) 'due': due,
+      if (dueIn != null) 'dueIn': dueIn,
+      if (status != null) 'status': status,
+      if (weight != null) 'weight': weight,
+      if (mode != null) 'mode': mode,
+      if (score != null) 'score': score,
+      if (recommended != null) 'recommended': recommended,
+      if (submissionUrl != null) 'submissionUrl': submissionUrl,
+      if (instructions != null) 'instructions': instructions,
+    };
+  }
+
+  bool get hasSubmission => (submissionUrl ?? '').isNotEmpty;
+}
+
 class LiveClassOccupancy {
   LiveClassOccupancy({
     required this.reserved,
@@ -365,6 +343,13 @@ class LiveClassOccupancy {
       if (rate != null) 'rate': rate,
     };
   }
+
+  double? get occupancyRate {
+    if (capacity == null || capacity == 0) {
+      return null;
+    }
+    return reserved / capacity!;
+  }
 }
 
 class LiveClassSecurity {
@@ -388,19 +373,9 @@ class LiveClassSecurity {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'title': title,
-      'course': course,
-      if (type != null) 'type': type,
-      if (due != null) 'due': due,
-      if (dueIn != null) 'dueIn': dueIn,
-      if (status != null) 'status': status,
-      if (weight != null) 'weight': weight,
-      if (mode != null) 'mode': mode,
-      if (score != null) 'score': score,
-      if (recommended != null) 'recommended': recommended,
-      if (submissionUrl != null) 'submissionUrl': submissionUrl,
-      if (instructions != null) 'instructions': instructions,
+      'waitingRoom': waitingRoom,
+      'passcodeRequired': passcodeRequired,
+      'recordingConsent': recordingConsent,
     };
   }
 }
@@ -432,15 +407,25 @@ class AssessmentCourseReport {
       name: json['name']?.toString() ?? 'Course',
       progress: json['progress']?.toString() ?? '0% complete',
       status: json['status']?.toString() ?? 'On track',
-      upcoming: (json['upcoming'] is num) ? (json['upcoming'] as num).round() : int.tryParse('${json['upcoming'] ?? 0}') ?? 0,
-      awaitingFeedback: (json['awaitingFeedback'] is num)
+      upcoming: json['upcoming'] is num ? (json['upcoming'] as num).round() : int.tryParse('${json['upcoming'] ?? 0}') ?? 0,
+      awaitingFeedback: json['awaitingFeedback'] is num
           ? (json['awaitingFeedback'] as num).round()
           : int.tryParse('${json['awaitingFeedback'] ?? 0}') ?? 0,
-      overdue: (json['overdue'] is num) ? (json['overdue'] as num).round() : int.tryParse('${json['overdue'] ?? 0}') ?? 0,
+      overdue: json['overdue'] is num ? (json['overdue'] as num).round() : int.tryParse('${json['overdue'] ?? 0}') ?? 0,
       averageScore: json['averageScore']?.toString(),
-      'waitingRoom': waitingRoom,
-      'passcodeRequired': passcodeRequired,
-      'recordingConsent': recordingConsent,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'progress': progress,
+      'status': status,
+      'upcoming': upcoming,
+      'awaitingFeedback': awaitingFeedback,
+      'overdue': overdue,
+      if (averageScore != null) 'averageScore': averageScore,
     };
   }
 }
@@ -465,21 +450,17 @@ class LiveClassWhiteboard {
       ready: json['ready'] == true,
       lastUpdatedLabel: json['lastUpdatedLabel']?.toString(),
       facilitators: facilitatorsRaw is List
-          ? facilitatorsRaw.map((item) => item.toString()).where((item) => item.isNotEmpty).toList()
+          ? facilitatorsRaw.map((value) => value.toString()).where((value) => value.isNotEmpty).toList()
           : <String>[],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'name': name,
-      'progress': progress,
-      'status': status,
-      'upcoming': upcoming,
-      'awaitingFeedback': awaitingFeedback,
-      'overdue': overdue,
-      if (averageScore != null) 'averageScore': averageScore,
+      if (template != null) 'template': template,
+      'ready': ready,
+      if (lastUpdatedLabel != null) 'lastUpdatedLabel': lastUpdatedLabel,
+      'facilitators': facilitators,
     };
   }
 }
@@ -512,10 +493,18 @@ class AssessmentPlanBlock {
       duration: json['duration']?.toString() ?? '45 mins',
       mode: json['mode']?.toString(),
       submissionUrl: json['submissionUrl']?.toString(),
-      if (template != null) 'template': template,
-      'ready': ready,
-      if (lastUpdatedLabel != null) 'lastUpdatedLabel': lastUpdatedLabel,
-      'facilitators': facilitators,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'focus': focus,
+      'course': course,
+      'window': window,
+      'duration': duration,
+      if (mode != null) 'mode': mode,
+      if (submissionUrl != null) 'submissionUrl': submissionUrl,
     };
   }
 }
@@ -541,13 +530,9 @@ class LiveClassCallToAction {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'focus': focus,
-      'course': course,
-      'window': window,
-      'duration': duration,
-      if (mode != null) 'mode': mode,
-      if (submissionUrl != null) 'submissionUrl': submissionUrl,
+      'label': label,
+      'action': action,
+      'enabled': enabled,
     };
   }
 }
@@ -557,9 +542,25 @@ class AssessmentScheduleEvent {
     required this.id,
     required this.title,
     required this.date,
-      'label': label,
-      'action': action,
-      'enabled': enabled,
+  });
+
+  final String id;
+  final String title;
+  final String date;
+
+  factory AssessmentScheduleEvent.fromJson(Map<String, dynamic> json) {
+    return AssessmentScheduleEvent(
+      id: json['id']?.toString() ?? json['title']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: json['title']?.toString() ?? 'Event',
+      date: json['date']?.toString() ?? 'Upcoming',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'date': date,
     };
   }
 }
@@ -584,13 +585,6 @@ class LiveClassSessionSummary {
 
   final String id;
   final String title;
-  final String date;
-
-  factory AssessmentScheduleEvent.fromJson(Map<String, dynamic> json) {
-    return AssessmentScheduleEvent(
-      id: json['id']?.toString() ?? json['title']?.toString() ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      title: json['title']?.toString() ?? 'Event',
-      date: json['date']?.toString() ?? 'Upcoming',
   final String stage;
   final String status;
   final String startLabel;
@@ -610,6 +604,7 @@ class LiveClassSessionSummary {
     final whiteboardJson = json['whiteboard'];
     final callToActionJson = json['callToAction'];
     final breakoutRoomsRaw = json['breakoutRooms'];
+
     return LiveClassSessionSummary(
       id: json['id']?.toString() ?? json['slug']?.toString() ?? 'live-${DateTime.now().millisecondsSinceEpoch}',
       title: json['title']?.toString() ?? 'Live classroom',
@@ -620,10 +615,10 @@ class LiveClassSessionSummary {
       community: json['community']?.toString(),
       summary: json['summary']?.toString(),
       occupancy: LiveClassOccupancy.fromJson(
-        occupancyJson is Map ? Map<String, dynamic>.from(occupancyJson as Map) : const {},
+        occupancyJson is Map ? Map<String, dynamic>.from(occupancyJson as Map) : const <String, dynamic>{},
       ),
       security: LiveClassSecurity.fromJson(
-        securityJson is Map ? Map<String, dynamic>.from(securityJson as Map) : const {},
+        securityJson is Map ? Map<String, dynamic>.from(securityJson as Map) : const <String, dynamic>{},
       ),
       whiteboard: whiteboardJson is Map
           ? LiveClassWhiteboard.fromJson(Map<String, dynamic>.from(whiteboardJson as Map))
@@ -647,9 +642,22 @@ class LiveClassSessionSummary {
     return {
       'id': id,
       'title': title,
-      'date': date,
+      'stage': stage,
+      'status': status,
+      'startLabel': startLabel,
+      if (timezone != null) 'timezone': timezone,
+      if (community != null) 'community': community,
+      if (summary != null) 'summary': summary,
+      'occupancy': occupancy.toJson(),
+      'security': security.toJson(),
+      if (whiteboard != null) 'whiteboard': whiteboard!.toJson(),
+      if (callToAction != null) 'callToAction': callToAction!.toJson(),
+      'isGroupSession': isGroup,
+      'breakoutRooms': breakoutRooms,
     };
   }
+
+  bool get hasCapacity => occupancy.capacity != null && occupancy.capacity! > 0;
 }
 
 class AssessmentTypeInsight {
@@ -666,27 +674,26 @@ class AssessmentTypeInsight {
   final int? averageScore;
 
   factory AssessmentTypeInsight.fromJson(Map<String, dynamic> json) {
+    final weightRaw = json['weightShare'] ?? json['weight_share'];
+    final averageRaw = json['averageScore'] ?? json['average_score'];
     return AssessmentTypeInsight(
       type: json['type']?.toString() ?? 'Assessment',
-      count: (json['count'] is num) ? (json['count'] as num).round() : int.tryParse('${json['count'] ?? 0}') ?? 0,
-      weightShare: (json['weightShare'] is num)
-          ? (json['weightShare'] as num).round()
-          : int.tryParse('${json['weightShare'] ?? json['weight_share'] ?? 0}') ?? 0,
-      averageScore: (json['averageScore'] is num)
-          ? (json['averageScore'] as num).round()
-          : int.tryParse('${json['averageScore'] ?? json['average_score'] ?? 0}') ?? 0,
-      'stage': stage,
-      'status': status,
-      'startLabel': startLabel,
-      if (timezone != null) 'timezone': timezone,
-      if (community != null) 'community': community,
-      if (summary != null) 'summary': summary,
-      'occupancy': occupancy.toJson(),
-      'security': security.toJson(),
-      if (whiteboard != null) 'whiteboard': whiteboard!.toJson(),
-      if (callToAction != null) 'callToAction': callToAction!.toJson(),
-      'isGroupSession': isGroup,
-      'breakoutRooms': breakoutRooms,
+      count: json['count'] is num ? (json['count'] as num).round() : int.tryParse('${json['count'] ?? 0}') ?? 0,
+      weightShare: weightRaw is num
+          ? (weightRaw as num).round()
+          : (weightRaw != null ? int.tryParse(weightRaw.toString()) : null),
+      averageScore: averageRaw is num
+          ? (averageRaw as num).round()
+          : (averageRaw != null ? int.tryParse(averageRaw.toString()) : null),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'type': type,
+      'count': count,
+      if (weightShare != null) 'weightShare': weightShare,
+      if (averageScore != null) 'averageScore': averageScore,
     };
   }
 }
@@ -715,10 +722,10 @@ class LiveClassReadinessItem {
 
   Map<String, dynamic> toJson() {
     return {
-      'type': type,
-      'count': count,
-      if (weightShare != null) 'weightShare': weightShare,
-      if (averageScore != null) 'averageScore': averageScore,
+      'id': id,
+      'label': label,
+      'status': status,
+      'detail': detail,
     };
   }
 }
@@ -741,32 +748,41 @@ class AssessmentAnalytics {
   final int? completionRate;
 
   factory AssessmentAnalytics.fromJson(Map<String, dynamic> json) {
+    int? _asInt(dynamic value) {
+      if (value is num) {
+        return value.round();
+      }
+      if (value == null) {
+        return null;
+      }
+      return int.tryParse(value.toString());
+    }
+
     final byTypeJson = json['byType'];
+    final weightRaw = json['workloadWeight'];
+
     return AssessmentAnalytics(
       byType: byTypeJson is List
           ? byTypeJson
               .map((item) => AssessmentTypeInsight.fromJson(Map<String, dynamic>.from(item as Map)))
               .toList()
           : <AssessmentTypeInsight>[],
-      pendingReviews: (json['pendingReviews'] is num)
-          ? (json['pendingReviews'] as num).round()
-          : int.tryParse('${json['pendingReviews'] ?? 0}') ?? 0,
-      overdue: (json['overdue'] is num)
-          ? (json['overdue'] as num).round()
-          : int.tryParse('${json['overdue'] ?? 0}') ?? 0,
-      averageLeadTimeDays: (json['averageLeadTimeDays'] is num)
-          ? (json['averageLeadTimeDays'] as num).round()
-          : int.tryParse('${json['averageLeadTimeDays'] ?? 0}') ?? 0,
-      workloadWeight: json['workloadWeight'] is num
-          ? (json['workloadWeight'] as num)
-          : num.tryParse(json['workloadWeight']?.toString() ?? ''),
-      completionRate: (json['completionRate'] is num)
-          ? (json['completionRate'] as num).round()
-          : int.tryParse('${json['completionRate'] ?? 0}') ?? 0,
-      'id': id,
-      'label': label,
-      'status': status,
-      'detail': detail,
+      pendingReviews: _asInt(json['pendingReviews']),
+      overdue: _asInt(json['overdue']),
+      averageLeadTimeDays: _asInt(json['averageLeadTimeDays']),
+      workloadWeight: weightRaw is num ? weightRaw : num.tryParse(weightRaw?.toString() ?? ''),
+      completionRate: _asInt(json['completionRate']),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'byType': byType.map((entry) => entry.toJson()).toList(),
+      if (pendingReviews != null) 'pendingReviews': pendingReviews,
+      if (overdue != null) 'overdue': overdue,
+      if (averageLeadTimeDays != null) 'averageLeadTimeDays': averageLeadTimeDays,
+      if (workloadWeight != null) 'workloadWeight': workloadWeight,
+      if (completionRate != null) 'completionRate': completionRate,
     };
   }
 }
@@ -797,19 +813,19 @@ class LiveClassWhiteboardSnapshot {
       ready: json['ready'] == true,
       lastUpdatedLabel: json['lastUpdatedLabel']?.toString(),
       facilitators: facilitatorsRaw is List
-          ? facilitatorsRaw.map((item) => item.toString()).where((item) => item.isNotEmpty).toList()
+          ? facilitatorsRaw.map((value) => value.toString()).where((value) => value.isNotEmpty).toList()
           : <String>[],
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'byType': byType.map((entry) => entry.toJson()).toList(),
-      if (pendingReviews != null) 'pendingReviews': pendingReviews,
-      if (overdue != null) 'overdue': overdue,
-      if (averageLeadTimeDays != null) 'averageLeadTimeDays': averageLeadTimeDays,
-      if (workloadWeight != null) 'workloadWeight': workloadWeight,
-      if (completionRate != null) 'completionRate': completionRate,
+      'id': id,
+      'title': title,
+      'template': template,
+      'ready': ready,
+      if (lastUpdatedLabel != null) 'lastUpdatedLabel': lastUpdatedLabel,
+      'facilitators': facilitators,
     };
   }
 }
@@ -839,10 +855,10 @@ class LearnerAssessmentsData {
 
   factory LearnerAssessmentsData.fromJson(Map<String, dynamic> json) {
     final overviewJson = json['overview'];
-    final timelineJson = json['timeline'] is Map ? Map<String, dynamic>.from(json['timeline'] as Map) : const {};
+    final timelineJson = json['timeline'] is Map ? Map<String, dynamic>.from(json['timeline'] as Map) : const <String, dynamic>{};
     final coursesJson = json['courses'];
-    final scheduleJson = json['schedule'] is Map ? Map<String, dynamic>.from(json['schedule'] as Map) : const {};
-    final analyticsJson = json['analytics'] is Map ? Map<String, dynamic>.from(json['analytics'] as Map) : const {};
+    final scheduleJson = json['schedule'] is Map ? Map<String, dynamic>.from(json['schedule'] as Map) : const <String, dynamic>{};
+    final analyticsJson = json['analytics'] is Map ? Map<String, dynamic>.from(json['analytics'] as Map) : const <String, dynamic>{};
     final resourcesJson = json['resources'];
 
     return LearnerAssessmentsData(
@@ -882,15 +898,25 @@ class LearnerAssessmentsData {
               .toList()
           : <AssessmentScheduleEvent>[],
       analytics: AssessmentAnalytics.fromJson(analyticsJson),
-      resources: resourcesJson is List
-          ? resourcesJson.map((item) => item.toString()).toList()
-          : <String>[],
-      'id': id,
-      'title': title,
-      'template': template,
-      'ready': ready,
-      if (lastUpdatedLabel != null) 'lastUpdatedLabel': lastUpdatedLabel,
-      'facilitators': facilitators,
+      resources: resourcesJson is List ? resourcesJson.map((item) => item.toString()).toList() : <String>[],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'overview': overview.map((metric) => metric.toJson()).toList(),
+      'timeline': {
+        'upcoming': upcoming.map((item) => item.toJson()).toList(),
+        'overdue': overdue.map((item) => item.toJson()).toList(),
+        'completed': completed.map((item) => item.toJson()).toList(),
+      },
+      'courses': courses.map((course) => course.toJson()).toList(),
+      'schedule': {
+        'studyPlan': studyPlan.map((item) => item.toJson()).toList(),
+        'events': events.map((event) => event.toJson()).toList(),
+      },
+      'analytics': analytics.toJson(),
+      'resources': resources,
     };
   }
 }
@@ -918,7 +944,8 @@ class LiveClassroomsSnapshot {
     final whiteboardJson = json['whiteboard'] is Map
         ? Map<String, dynamic>.from(json['whiteboard'] as Map)
         : const <String, dynamic>{};
-    final parseSessions = (String key) {
+
+    List<LiveClassSessionSummary> parseSessions(String key) {
       final value = json[key];
       if (value is List) {
         return value
@@ -926,7 +953,7 @@ class LiveClassroomsSnapshot {
             .toList();
       }
       return <LiveClassSessionSummary>[];
-    };
+    }
 
     return LiveClassroomsSnapshot(
       metrics: json['metrics'] is List
@@ -953,19 +980,6 @@ class LiveClassroomsSnapshot {
 
   Map<String, dynamic> toJson() {
     return {
-      'overview': overview.map((metric) => metric.toJson()).toList(),
-      'timeline': {
-        'upcoming': upcoming.map((item) => item.toJson()).toList(),
-        'overdue': overdue.map((item) => item.toJson()).toList(),
-        'completed': completed.map((item) => item.toJson()).toList(),
-      },
-      'courses': courses.map((course) => course.toJson()).toList(),
-      'schedule': {
-        'studyPlan': studyPlan.map((item) => item.toJson()).toList(),
-        'events': events.map((event) => event.toJson()).toList(),
-      },
-      'analytics': analytics.toJson(),
-      'resources': resources,
       'metrics': metrics.map((metric) => metric.toJson()).toList(),
       'active': active.map((session) => session.toJson()).toList(),
       'upcoming': upcoming.map((session) => session.toJson()).toList(),
