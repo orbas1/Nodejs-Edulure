@@ -29,6 +29,25 @@ const createExperimentDraft = () => ({
   experimentUrl: ''
 });
 
+const createLoadState = () => ({
+  items: [],
+  pagination: { total: 0, count: 0, limit: 0, offset: 0 },
+  loading: false,
+  error: null
+});
+
+const normalisePagination = (pagination, fallbackCount = 0) => ({
+  total: typeof pagination?.total === 'number' ? pagination.total : fallbackCount,
+  count: typeof pagination?.count === 'number' ? pagination.count : fallbackCount,
+  limit:
+    typeof pagination?.limit === 'number'
+      ? pagination.limit
+      : fallbackCount > 0
+        ? fallbackCount
+        : 0,
+  offset: typeof pagination?.offset === 'number' ? pagination.offset : 0
+});
+
 function normaliseExperiment(experiment) {
   const statusValue = String(experiment.status ?? 'ideation').toLowerCase();
   const statusLabel = statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
@@ -64,7 +83,7 @@ export default function InstructorGrowth() {
   const [communitiesState, setCommunitiesState] = useState({ items: [], loading: false, error: null });
   const [selectedCommunityId, setSelectedCommunityId] = useState(null);
 
-  const [experimentsState, setExperimentsState] = useState({ items: [], loading: false, error: null });
+  const [experimentsState, setExperimentsState] = useState(createLoadState);
   const [draft, setDraft] = useState(createExperimentDraft);
   const [editingId, setEditingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('All');
@@ -102,7 +121,7 @@ export default function InstructorGrowth() {
   const loadExperiments = useCallback(
     async (communityId, { showFeedback = false } = {}) => {
       if (!token || !communityId) {
-        setExperimentsState({ items: [], loading: false, error: null });
+        setExperimentsState(createLoadState());
         return;
       }
       setExperimentsState((prev) => ({ ...prev, loading: true, error: null }));
@@ -113,12 +132,22 @@ export default function InstructorGrowth() {
           params: { order: 'desc', limit: 200 }
         });
         const items = response.data.map(normaliseExperiment);
-        setExperimentsState({ items, loading: false, error: null });
+        setExperimentsState({
+          items,
+          pagination: normalisePagination(response.pagination, items.length),
+          loading: false,
+          error: null
+        });
         if (showFeedback) {
           setFeedback({ tone: 'success', message: 'Growth experiments refreshed from workspace telemetry.' });
         }
       } catch (error) {
-        setExperimentsState({ items: [], loading: false, error });
+        setExperimentsState({
+          items: [],
+          pagination: normalisePagination(null, 0),
+          loading: false,
+          error
+        });
       }
     },
     [token]
@@ -128,7 +157,7 @@ export default function InstructorGrowth() {
     if (selectedCommunityId) {
       loadExperiments(selectedCommunityId);
     } else {
-      setExperimentsState({ items: [], loading: false, error: null });
+      setExperimentsState(createLoadState());
     }
   }, [loadExperiments, selectedCommunityId]);
 
@@ -147,8 +176,9 @@ export default function InstructorGrowth() {
       },
       { byStatus: {}, liveCount: 0, completedCount: 0 }
     );
-    return totals;
-  }, [experimentsState.items]);
+    const totalExperiments = experimentsState.pagination.total ?? experimentsState.items.length;
+    return { ...totals, totalExperiments };
+  }, [experimentsState.items, experimentsState.pagination.total]);
 
   const filteredExperiments = useMemo(() => {
     return experimentsState.items.filter((experiment) => {
@@ -302,7 +332,7 @@ export default function InstructorGrowth() {
       <section className="grid gap-4 md:grid-cols-3">
         <div className="dashboard-card-muted p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Active experiments</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{experimentsState.items.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{experimentSummary.totalExperiments}</p>
           <p className="mt-1 text-xs text-slate-500">Total experiments tracked across the selected community.</p>
         </div>
         <div className="dashboard-card-muted p-5">
@@ -571,14 +601,18 @@ export default function InstructorGrowth() {
 
         {filteredExperiments.length === 0 ? (
           <DashboardStateMessage
-            title={experimentsState.items.length === 0 ? 'No growth experiments yet' : 'No experiments match your filters'}
+            title={
+              experimentSummary.totalExperiments === 0
+                ? 'No growth experiments yet'
+                : 'No experiments match your filters'
+            }
             description={
-              experimentsState.items.length === 0
+              experimentSummary.totalExperiments === 0
                 ? 'Use the planner above to log your first experiment and start tracking impact.'
                 : 'Try a different status filter or clear your search to continue managing experiments.'
             }
-            actionLabel={experimentsState.items.length === 0 ? 'Create experiment' : undefined}
-            onAction={experimentsState.items.length === 0 ? () => setEditingId(null) : undefined}
+            actionLabel={experimentSummary.totalExperiments === 0 ? 'Create experiment' : undefined}
+            onAction={experimentSummary.totalExperiments === 0 ? () => setEditingId(null) : undefined}
           />
         ) : null}
 

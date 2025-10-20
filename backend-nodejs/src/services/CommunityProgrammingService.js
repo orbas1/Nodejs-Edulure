@@ -92,12 +92,24 @@ export default class CommunityProgrammingService {
       offset: filters.offset
     });
 
-    return webinars.map((webinar) => ({
+    const canEdit = actor?.role === 'admin' || (isActiveMembership(membership) && MANAGER_ROLES.has(membership.role));
+
+    const data = webinars.items.map((webinar) => ({
       ...webinar,
       permissions: {
-        canEdit: actor?.role === 'admin' || (isActiveMembership(membership) && MANAGER_ROLES.has(membership.role))
+        canEdit
       }
     }));
+
+    return {
+      data,
+      pagination: {
+        total: webinars.total,
+        count: data.length,
+        limit: webinars.limit,
+        offset: webinars.offset
+      }
+    };
   }
 
   static async createWebinar(communityIdentifier, actor, payload) {
@@ -210,12 +222,24 @@ export default class CommunityProgrammingService {
       offset: filters.offset
     });
 
-    return episodes.map((episode) => ({
+    const canEdit = actor?.role === 'admin' || (isActiveMembership(membership) && MANAGER_ROLES.has(membership.role));
+
+    const data = episodes.items.map((episode) => ({
       ...episode,
       permissions: {
-        canEdit: actor?.role === 'admin' || (isActiveMembership(membership) && MANAGER_ROLES.has(membership.role))
+        canEdit
       }
     }));
+
+    return {
+      data,
+      pagination: {
+        total: episodes.total,
+        count: data.length,
+        limit: episodes.limit,
+        offset: episodes.offset
+      }
+    };
   }
 
   static async createPodcastEpisode(communityIdentifier, actor, payload) {
@@ -328,12 +352,24 @@ export default class CommunityProgrammingService {
       offset: filters.offset
     });
 
-    return experiments.map((experiment) => ({
+    const canEdit = actor?.role === 'admin' || (isActiveMembership(membership) && MANAGER_ROLES.has(membership.role));
+
+    const data = experiments.items.map((experiment) => ({
       ...experiment,
       permissions: {
-        canEdit: actor?.role === 'admin' || (isActiveMembership(membership) && MANAGER_ROLES.has(membership.role))
+        canEdit
       }
     }));
+
+    return {
+      data,
+      pagination: {
+        total: experiments.total,
+        count: data.length,
+        limit: experiments.limit,
+        offset: experiments.offset
+      }
+    };
   }
 
   static async createGrowthExperiment(communityIdentifier, actor, payload) {

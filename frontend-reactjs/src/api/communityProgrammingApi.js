@@ -1,9 +1,18 @@
 import { httpClient } from './httpClient.js';
 
-const mapListResponse = (response) => ({
-  data: Array.isArray(response?.data) ? response.data : [],
-  pagination: response?.meta?.pagination ?? { count: 0, limit: 0, offset: 0 }
-});
+const mapListResponse = (response) => {
+  const data = Array.isArray(response?.data) ? response.data : [];
+  const pagination = response?.meta?.pagination ?? {};
+  return {
+    data,
+    pagination: {
+      total: typeof pagination.total === 'number' ? pagination.total : data.length,
+      count: typeof pagination.count === 'number' ? pagination.count : data.length,
+      limit: typeof pagination.limit === 'number' ? pagination.limit : data.length,
+      offset: typeof pagination.offset === 'number' ? pagination.offset : 0
+    }
+  };
+};
 
 export function listCommunityWebinars({ communityId, token, params = {}, signal } = {}) {
   return httpClient

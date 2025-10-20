@@ -25,6 +25,25 @@ const createWebinarDraft = () => ({
   host: ''
 });
 
+const createLoadState = () => ({
+  items: [],
+  pagination: { total: 0, count: 0, limit: 0, offset: 0 },
+  loading: false,
+  error: null
+});
+
+const normalisePagination = (pagination, fallbackCount = 0) => ({
+  total: typeof pagination?.total === 'number' ? pagination.total : fallbackCount,
+  count: typeof pagination?.count === 'number' ? pagination.count : fallbackCount,
+  limit:
+    typeof pagination?.limit === 'number'
+      ? pagination.limit
+      : fallbackCount > 0
+        ? fallbackCount
+        : 0,
+  offset: typeof pagination?.offset === 'number' ? pagination.offset : 0
+});
+
 function normaliseWebinar(webinar) {
   const iso = typeof webinar.startAt === 'string' ? webinar.startAt : new Date().toISOString();
   const date = iso.slice(0, 10);
@@ -61,7 +80,7 @@ export default function InstructorCommunityWebinars() {
   const [communitiesState, setCommunitiesState] = useState({ items: [], loading: false, error: null });
   const [selectedCommunityId, setSelectedCommunityId] = useState(null);
 
-  const [webinarsState, setWebinarsState] = useState({ items: [], loading: false, error: null });
+  const [webinarsState, setWebinarsState] = useState(createLoadState);
   const [draft, setDraft] = useState(createWebinarDraft);
   const [editingId, setEditingId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('All');
@@ -99,7 +118,7 @@ export default function InstructorCommunityWebinars() {
   const loadWebinars = useCallback(
     async (communityId, { showFeedback = false } = {}) => {
       if (!token || !communityId) {
-        setWebinarsState({ items: [], loading: false, error: null });
+        setWebinarsState(createLoadState());
         return;
       }
       setWebinarsState((prev) => ({ ...prev, loading: true, error: null }));
@@ -110,12 +129,22 @@ export default function InstructorCommunityWebinars() {
           params: { order: 'desc', limit: 200 }
         });
         const items = response.data.map(normaliseWebinar);
-        setWebinarsState({ items, loading: false, error: null });
+        setWebinarsState({
+          items,
+          pagination: normalisePagination(response.pagination, items.length),
+          loading: false,
+          error: null
+        });
         if (showFeedback) {
           setFeedback({ tone: 'success', message: 'Webinars synced from community workspace.' });
         }
       } catch (error) {
-        setWebinarsState({ items: [], loading: false, error });
+        setWebinarsState({
+          items: [],
+          pagination: normalisePagination(null, 0),
+          loading: false,
+          error
+        });
       }
     },
     [token]
@@ -125,22 +154,28 @@ export default function InstructorCommunityWebinars() {
     if (selectedCommunityId) {
       loadWebinars(selectedCommunityId);
     } else {
-      setWebinarsState({ items: [], loading: false, error: null });
+      setWebinarsState(createLoadState());
     }
   }, [loadWebinars, selectedCommunityId]);
 
   useEffect(() => {
     if (Array.isArray(dashboard?.communities?.webinars) && webinarsState.items.length === 0 && selectedCommunityId) {
       const seeded = dashboard.communities.webinars.map(normaliseWebinar);
-      setWebinarsState({ items: seeded, loading: false, error: null });
+      setWebinarsState({
+        items: seeded,
+        pagination: normalisePagination(null, seeded.length),
+        loading: false,
+        error: null
+      });
     }
   }, [dashboard?.communities?.webinars, selectedCommunityId, webinarsState.items.length]);
 
   const analytics = useMemo(() => {
     const totalRegistrants = webinarsState.items.reduce((total, webinar) => total + Number(webinar.registrants ?? 0), 0);
     const upcoming = webinarsState.items.filter((webinar) => new Date(webinar.startAt) >= new Date()).length;
-    return { totalRegistrants, upcoming, pipeline: webinarsState.items.length };
-  }, [webinarsState.items]);
+    const pipeline = webinarsState.pagination.total ?? webinarsState.items.length;
+    return { totalRegistrants, upcoming, pipeline };
+  }, [webinarsState.items, webinarsState.pagination.total]);
 
   const filteredWebinars = useMemo(() => {
     return webinarsState.items.filter((webinar) => {
@@ -529,14 +564,18 @@ export default function InstructorCommunityWebinars() {
 
         {filteredWebinars.length === 0 ? (
           <DashboardStateMessage
-            title={webinarsState.items.length === 0 ? 'No community webinars scheduled' : 'No webinars match your filters'}
+            title={
+              webinarsState.pagination.total === 0
+                ? 'No community webinars scheduled'
+                : 'No webinars match your filters'
+            }
             description={
-              webinarsState.items.length === 0
+              webinarsState.pagination.total === 0
                 ? 'Use the planner above to launch your first webinar or sync with your external events tool.'
                 : 'Adjust the search or status filters to continue managing your webinar pipeline.'
             }
-            actionLabel={webinarsState.items.length === 0 ? 'Create webinar' : undefined}
-            onAction={webinarsState.items.length === 0 ? () => setEditingId(null) : undefined}
+            actionLabel={webinarsState.pagination.total === 0 ? 'Create webinar' : undefined}
+            onAction={webinarsState.pagination.total === 0 ? () => setEditingId(null) : undefined}
           />
         ) : null}
 

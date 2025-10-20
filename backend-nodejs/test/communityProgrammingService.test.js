@@ -102,9 +102,12 @@ describe('CommunityProgrammingService', () => {
 
   describe('listWebinars', () => {
     it('returns webinars with permission flags when viewer is manager', async () => {
-      communityWebinarModelMock.listForCommunity.mockResolvedValue([
-        { id: 1, topic: 'Automation dry run', status: 'announced' }
-      ]);
+      communityWebinarModelMock.listForCommunity.mockResolvedValue({
+        items: [{ id: 1, topic: 'Automation dry run', status: 'announced' }],
+        total: 1,
+        limit: 100,
+        offset: 0
+      });
 
       const result = await CommunityProgrammingService.listWebinars('42', { id: 7, role: 'instructor' }, {});
 
@@ -115,13 +118,21 @@ describe('CommunityProgrammingService', () => {
         limit: undefined,
         offset: undefined
       });
-      expect(result).toEqual([
-        expect.objectContaining({
-          id: 1,
-          topic: 'Automation dry run',
-          permissions: { canEdit: true }
-        })
-      ]);
+      expect(result).toEqual({
+        data: [
+          expect.objectContaining({
+            id: 1,
+            topic: 'Automation dry run',
+            permissions: { canEdit: true }
+          })
+        ],
+        pagination: {
+          total: 1,
+          count: 1,
+          limit: 100,
+          offset: 0
+        }
+      });
     });
 
     it('throws when community is private and user lacks membership', async () => {
@@ -225,6 +236,46 @@ describe('CommunityProgrammingService', () => {
     });
   });
 
+  describe('listPodcastEpisodes', () => {
+    it('returns podcast episodes with pagination metadata', async () => {
+      communityPodcastEpisodeModelMock.listForCommunity.mockResolvedValue({
+        items: [{ id: 9, title: 'Creator funnel debrief', stage: 'editing' }],
+        total: 6,
+        limit: 50,
+        offset: 0
+      });
+
+      const result = await CommunityProgrammingService.listPodcastEpisodes(
+        '42',
+        { id: 7, role: 'instructor' },
+        { stage: 'editing' }
+      );
+
+      expect(communityPodcastEpisodeModelMock.listForCommunity).toHaveBeenCalledWith(42, {
+        stage: ['editing'],
+        search: undefined,
+        order: undefined,
+        limit: undefined,
+        offset: undefined
+      });
+      expect(result).toEqual({
+        data: [
+          expect.objectContaining({
+            id: 9,
+            title: 'Creator funnel debrief',
+            permissions: { canEdit: true }
+          })
+        ],
+        pagination: {
+          total: 6,
+          count: 1,
+          limit: 50,
+          offset: 0
+        }
+      });
+    });
+  });
+
   describe('createPodcastEpisode', () => {
     it('enforces permissions and records creation event', async () => {
       const createdEpisode = { id: 3, communityId: 42, title: 'Growth AMA', stage: 'recording' };
@@ -250,6 +301,46 @@ describe('CommunityProgrammingService', () => {
         expect.any(Object)
       );
       expect(result).toEqual(createdEpisode);
+    });
+  });
+
+  describe('listGrowthExperiments', () => {
+    it('includes pagination metadata when listing experiments', async () => {
+      communityGrowthExperimentModelMock.listForCommunity.mockResolvedValue({
+        items: [{ id: 11, title: 'Activation uplift', status: 'design' }],
+        total: 4,
+        limit: 25,
+        offset: 5
+      });
+
+      const result = await CommunityProgrammingService.listGrowthExperiments(
+        '42',
+        { id: 7, role: 'instructor' },
+        { status: 'design', limit: 25, offset: 5 }
+      );
+
+      expect(communityGrowthExperimentModelMock.listForCommunity).toHaveBeenCalledWith(42, {
+        status: ['design'],
+        search: undefined,
+        order: undefined,
+        limit: 25,
+        offset: 5
+      });
+      expect(result).toEqual({
+        data: [
+          expect.objectContaining({
+            id: 11,
+            title: 'Activation uplift',
+            permissions: { canEdit: true }
+          })
+        ],
+        pagination: {
+          total: 4,
+          count: 1,
+          limit: 25,
+          offset: 5
+        }
+      });
     });
   });
 

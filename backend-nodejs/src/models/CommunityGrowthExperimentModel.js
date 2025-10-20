@@ -42,7 +42,12 @@ export default class CommunityGrowthExperimentModel {
 
   static async listForCommunity(communityId, filters = {}, connection = db) {
     const { status, search, order = 'desc', limit = 100, offset = 0 } = filters;
-    const query = this.table(connection)
+    const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
+    const safeOffset = Math.max(Number(offset) || 0, 0);
+    const direction = order === 'asc' ? 'asc' : 'desc';
+    const orderColumn = order === 'asc' ? 'start_date' : 'updated_at';
+
+    const scopedQuery = this.table(connection)
       .where({ community_id: communityId })
       .modify((qb) => {
         if (Array.isArray(status) && status.length) {
@@ -59,13 +64,30 @@ export default class CommunityGrowthExperimentModel {
               .orWhereRaw('LOWER(target_metric) LIKE ?', [like]);
           });
         }
-      })
-      .orderBy(order === 'asc' ? 'start_date' : 'updated_at', order === 'asc' ? 'asc' : 'desc')
-      .limit(Math.min(Math.max(Number(limit) || 100, 1), 500))
-      .offset(Math.max(Number(offset) || 0, 0));
+      });
 
-    const rows = await query;
-    return rows.map(mapRow);
+    const [rows, totalResult] = await Promise.all([
+      scopedQuery
+        .clone()
+        .orderBy(orderColumn, direction)
+        .limit(safeLimit)
+        .offset(safeOffset),
+      scopedQuery
+        .clone()
+        .clearSelect()
+        .clearOrder()
+        .count({ total: '*' })
+        .first()
+    ]);
+
+    const total = Number(totalResult?.total ?? rows.length ?? 0);
+
+    return {
+      items: rows.map(mapRow),
+      total,
+      limit: safeLimit,
+      offset: safeOffset
+    };
   }
 
   static async findById(id, connection = db) {

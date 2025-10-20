@@ -38,7 +38,11 @@ export default class CommunityPodcastEpisodeModel {
 
   static async listForCommunity(communityId, filters = {}, connection = db) {
     const { stage, search, limit = 100, offset = 0, order = 'desc' } = filters;
-    const query = this.table(connection)
+    const safeLimit = Math.min(Math.max(Number(limit) || 100, 1), 500);
+    const safeOffset = Math.max(Number(offset) || 0, 0);
+    const direction = order === 'asc' ? 'asc' : 'desc';
+
+    const scopedQuery = this.table(connection)
       .where({ community_id: communityId })
       .modify((qb) => {
         if (Array.isArray(stage) && stage.length) {
@@ -55,13 +59,30 @@ export default class CommunityPodcastEpisodeModel {
               .orWhereRaw('LOWER(summary) LIKE ?', [like]);
           });
         }
-      })
-      .orderBy('release_on', order === 'asc' ? 'asc' : 'desc')
-      .limit(Math.min(Math.max(Number(limit) || 100, 1), 500))
-      .offset(Math.max(Number(offset) || 0, 0));
+      });
 
-    const rows = await query;
-    return rows.map(mapRow);
+    const [rows, totalResult] = await Promise.all([
+      scopedQuery
+        .clone()
+        .orderBy('release_on', direction)
+        .limit(safeLimit)
+        .offset(safeOffset),
+      scopedQuery
+        .clone()
+        .clearSelect()
+        .clearOrder()
+        .count({ total: '*' })
+        .first()
+    ]);
+
+    const total = Number(totalResult?.total ?? rows.length ?? 0);
+
+    return {
+      items: rows.map(mapRow),
+      total,
+      limit: safeLimit,
+      offset: safeOffset
+    };
   }
 
   static async findById(id, connection = db) {

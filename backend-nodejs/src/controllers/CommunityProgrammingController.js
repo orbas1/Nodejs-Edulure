@@ -89,13 +89,21 @@ export default class CommunityProgrammingController {
     try {
       const query = await listQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
       const actor = actorFromRequest(req);
-      const webinars = await CommunityProgrammingService.listWebinars(req.params.communityId, actor, query);
+      const result = await CommunityProgrammingService.listWebinars(req.params.communityId, actor, query);
+      const pagination = {
+        total: result.pagination?.total ?? result.data.length,
+        count: result.pagination?.count ?? result.data.length,
+        limit: result.pagination?.limit ?? query.limit ?? result.data.length,
+        offset: result.pagination?.offset ?? query.offset ?? 0
+      };
       return paginated(res, {
-        data: webinars,
-        pagination: {
-          count: webinars.length,
-          limit: query.limit ?? webinars.length,
-          offset: query.offset ?? 0
+        data: result.data,
+        pagination,
+        meta: {
+          filters: {
+            status: query.status ?? null,
+            search: query.search ?? null
+          }
         },
         message: 'Webinars retrieved'
       });
@@ -162,13 +170,21 @@ export default class CommunityProgrammingController {
     try {
       const query = await listQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
       const actor = actorFromRequest(req);
-      const episodes = await CommunityProgrammingService.listPodcastEpisodes(req.params.communityId, actor, query);
+      const result = await CommunityProgrammingService.listPodcastEpisodes(req.params.communityId, actor, query);
+      const pagination = {
+        total: result.pagination?.total ?? result.data.length,
+        count: result.pagination?.count ?? result.data.length,
+        limit: result.pagination?.limit ?? query.limit ?? result.data.length,
+        offset: result.pagination?.offset ?? query.offset ?? 0
+      };
       return paginated(res, {
-        data: episodes,
-        pagination: {
-          count: episodes.length,
-          limit: query.limit ?? episodes.length,
-          offset: query.offset ?? 0
+        data: result.data,
+        pagination,
+        meta: {
+          filters: {
+            stage: query.stage ?? null,
+            search: query.search ?? null
+          }
         },
         message: 'Podcast episodes retrieved'
       });
@@ -239,17 +255,25 @@ export default class CommunityProgrammingController {
     try {
       const query = await listQuerySchema.validateAsync(req.query, { abortEarly: false, stripUnknown: true });
       const actor = actorFromRequest(req);
-      const experiments = await CommunityProgrammingService.listGrowthExperiments(
+      const result = await CommunityProgrammingService.listGrowthExperiments(
         req.params.communityId,
         actor,
         query
       );
+      const pagination = {
+        total: result.pagination?.total ?? result.data.length,
+        count: result.pagination?.count ?? result.data.length,
+        limit: result.pagination?.limit ?? query.limit ?? result.data.length,
+        offset: result.pagination?.offset ?? query.offset ?? 0
+      };
       return paginated(res, {
-        data: experiments,
-        pagination: {
-          count: experiments.length,
-          limit: query.limit ?? experiments.length,
-          offset: query.offset ?? 0
+        data: result.data,
+        pagination,
+        meta: {
+          filters: {
+            status: query.status ?? null,
+            search: query.search ?? null
+          }
         },
         message: 'Growth experiments retrieved'
       });
