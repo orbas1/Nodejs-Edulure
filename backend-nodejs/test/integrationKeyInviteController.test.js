@@ -88,6 +88,9 @@ describe('IntegrationKeyInviteController', () => {
 
     expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');
     expect(res.headers['Cache-Control']).toBe('no-store, max-age=0, must-revalidate');
+    expect(res.headers['Referrer-Policy']).toBe('no-referrer');
+    expect(res.headers['Permissions-Policy']).toBe('interest-cohort=()');
+    expect(res.headers['Cross-Origin-Opener-Policy']).toBe('same-origin');
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
@@ -116,8 +119,30 @@ describe('IntegrationKeyInviteController', () => {
       success: false,
       message: 'Validation failed'
     });
+    expect(res.headers['Referrer-Policy']).toBe('no-referrer');
     expect(Array.isArray(res.body.errors)).toBe(true);
     expect(res.body.errors.length).toBeGreaterThan(0);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects invitation submissions when key expiration is in the past', async () => {
+    const req = {
+      params: { token: 'token-value-1234567890' },
+      body: {
+        key: 'sk_test_12345678901234567890',
+        keyExpiresAt: '2020-01-01T00:00:00.000Z'
+      }
+    };
+    const res = createMockRes();
+    const next = vi.fn();
+
+    await submitInvitation(req, res, next);
+
+    expect(mockService.submitInvitation).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(422);
+    expect(res.body).toMatchObject({ success: false, message: 'Validation failed' });
+    expect(res.body.errors.some((message) => message.includes('Key expiration must be in the future'))).toBe(true);
+    expect(res.headers['Referrer-Policy']).toBe('no-referrer');
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -132,6 +157,7 @@ describe('IntegrationKeyInviteController', () => {
     expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.body).toMatchObject({ success: false, message: 'Invalid invitation token' });
+    expect(res.headers['Referrer-Policy']).toBe('no-referrer');
     expect(next).not.toHaveBeenCalled();
   });
 
@@ -147,6 +173,8 @@ describe('IntegrationKeyInviteController', () => {
     expect(mockService.getInvitationDetails).toHaveBeenCalledWith('valid-token-1234567890');
     expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');
     expect(res.headers.Pragma).toBe('no-cache');
+    expect(res.headers['Referrer-Policy']).toBe('no-referrer');
+    expect(res.headers['Cross-Origin-Opener-Policy']).toBe('same-origin');
     expect(res.status).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'invite-123' } });
     expect(next).not.toHaveBeenCalled();
@@ -198,6 +226,7 @@ describe('IntegrationKeyInviteController', () => {
     await getInvitation(req, res, next);
 
     expect(next).toHaveBeenCalledWith(fatalError);
+    expect(res.headers['Cache-Control']).toBe('no-store, max-age=0, must-revalidate');
     expect(res.status).not.toHaveBeenCalled();
     expect(res.json).not.toHaveBeenCalled();
   });
@@ -241,5 +270,50 @@ describe('IntegrationKeyInviteController', () => {
     expect(res.headers['Cache-Control']).toBe('no-store, max-age=0, must-revalidate');
     expect(res.headers['X-Content-Type-Options']).toBe('nosniff');
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it('derives client ip from forwarded-for header when direct ips are unavailable', async () => {
+    const req = {
+      params: { token: 'token-value-1234567890' },
+      body: { key: 'sk_test_12345678901234567890' },
+      headers: {
+        'x-forwarded-for': '198.51.100.1, 192.0.2.5',
+        'user-agent': 'Vitest Agent'
+      },
+      ip: '192.0.2.5'
+    };
+    const res = createMockRes();
+    const next = vi.fn();
+
+    const resultPayload = { invite: { id: 'invite-ctx' }, apiKey: { token: 'masked' } };
+    mockService.submitInvitation.mockResolvedValue(resultPayload);
+
+    await submitInvitation(req, res, next);
+
+    const [, , contextArg] = mockService.submitInvitation.mock.calls[0];
+    expect(contextArg.ipAddress).toBe('198.51.100.1');
+    expect(contextArg.userAgent).toBe('Vitest Agent');
+    expect(res.headers['Referrer-Policy']).toBe('no-referrer');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('logs invite fulfilment with a fingerprinted token', async () => {
+    const req = {
+      params: { token: 'token-value-1234567890' },
+      body: { key: 'sk_test_12345678901234567890' },
+      log: { info: vi.fn() }
+    };
+    const res = createMockRes();
+    const next = vi.fn();
+
+    const resultPayload = { invite: { id: 'invite-3' }, apiKey: { token: 'masked' } };
+    mockService.submitInvitation.mockResolvedValue(resultPayload);
+
+    await submitInvitation(req, res, next);
+
+    const [meta, message] = req.log.info.mock.calls[0];
+    expect(meta.inviteTokenFingerprint).toBeDefined();
+    expect(meta.inviteTokenFingerprint).not.toBe('token-value-1234567890');
+    expect(message).toBe('Integration invite fulfilled');
   });
 });

@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import Joi from 'joi';
 
 import IntegrationApiKeyInviteService from '../services/IntegrationApiKeyInviteService.js';
@@ -15,7 +16,16 @@ const tokenParamSchema = Joi.object({
 const submitInvitationSchema = Joi.object({
   key: Joi.string().trim().min(MIN_KEY_LENGTH).max(512).required(),
   rotationIntervalDays: Joi.number().integer().min(MIN_ROTATION_DAYS).max(MAX_ROTATION_DAYS).optional(),
-  keyExpiresAt: Joi.date().iso().allow(null).optional(),
+  keyExpiresAt: Joi.date()
+    .iso()
+    .min('now')
+    .allow(null)
+    .empty('')
+    .default(null)
+    .messages({
+      'date.format': 'Key expiration must be an ISO-8601 date',
+      'date.min': 'Key expiration must be in the future'
+    }),
   actorEmail: Joi.string().trim().lowercase().email({ tlds: { allow: false } }).optional(),
   actorName: Joi.string().trim().max(120).allow(null).empty('').default(null),
   reason: Joi.string().trim().max(500).allow(null).empty('').default(null)
@@ -93,6 +103,10 @@ function ensureSensitiveResponseHeaders(res) {
   res.set('Expires', '0');
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Cross-Origin-Resource-Policy', 'same-origin');
+  res.set('Referrer-Policy', 'no-referrer');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Permissions-Policy', 'interest-cohort=()');
+  res.set('Cross-Origin-Opener-Policy', 'same-origin');
 }
 
 function extractSubmissionContext(req) {
@@ -100,9 +114,17 @@ function extractSubmissionContext(req) {
     ?? (typeof req?.id === 'string' ? req.id : null)
     ?? (typeof req?.requestId === 'string' ? req.requestId : null);
 
+  const forwardedForHeader = normaliseHeaderValue(req?.headers?.['x-forwarded-for']);
+  const forwardedChain = forwardedForHeader
+    ? forwardedForHeader
+        .split(',')
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+    : [];
+
   const ipAddress = Array.isArray(req?.ips) && req.ips.length > 0
     ? normaliseHeaderValue(req.ips[0])
-    : (typeof req?.ip === 'string' ? req.ip : null);
+    : forwardedChain[0] ?? (typeof req?.ip === 'string' ? req.ip : null);
 
   const userAgent = normaliseHeaderValue(req?.headers?.['user-agent']);
   const origin = normaliseHeaderValue(req?.headers?.origin);
@@ -125,6 +147,41 @@ function extractSubmissionContext(req) {
   };
 }
 
+function sanitiseDisplayName(name) {
+  if (typeof name !== 'string') {
+    return null;
+  }
+
+  const collapsed = name.replace(/[\s\u00A0]+/g, ' ').trim();
+  if (!collapsed) {
+    return null;
+  }
+
+  return collapsed.slice(0, 120);
+}
+
+function createTokenFingerprint(token) {
+  if (typeof token !== 'string') {
+    return null;
+  }
+
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return createHash('sha256').update(trimmed).digest('hex').slice(0, 16);
+}
+
+function logInviteEvent(req, level, message, metadata = {}) {
+  const logger = req?.log;
+  if (!logger || typeof logger[level] !== 'function') {
+    return;
+  }
+
+  logger[level]({ component: 'integration-invite-controller', ...metadata }, message);
+}
+
 export async function getInvitation(req, res, next) {
   try {
     const { token } = await tokenParamSchema.validateAsync(req.params ?? {}, {
@@ -136,8 +193,13 @@ export async function getInvitation(req, res, next) {
     ensureSensitiveResponseHeaders(res);
     res.json({ success: true, data: details });
   } catch (error) {
+    ensureSensitiveResponseHeaders(res);
+    const tokenFingerprint = createTokenFingerprint(req?.params?.token);
     if (error.isJoi) {
-      ensureSensitiveResponseHeaders(res);
+      logInviteEvent(req, 'warn', 'Invalid integration invite token received', {
+        tokenFingerprint,
+        validationErrors: error.details?.map((detail) => detail.message) ?? []
+      });
       res.status(400).json({
         success: false,
         message: 'Invalid invitation token',
@@ -147,10 +209,18 @@ export async function getInvitation(req, res, next) {
     }
     const { status, message } = normaliseError(error, 404, 'Invitation not found or expired');
     if (status >= 500) {
+      logInviteEvent(req, 'error', 'Unexpected failure while loading integration invite', {
+        tokenFingerprint,
+        err: error
+      });
       next(error);
       return;
     }
-    ensureSensitiveResponseHeaders(res);
+    logInviteEvent(req, 'warn', 'Integration invite lookup rejected', {
+      tokenFingerprint,
+      status,
+      message
+    });
     res.status(status).json({ success: false, message });
   }
 }
@@ -170,26 +240,22 @@ export async function submitInvitation(req, res, next) {
     const actorEmailFromContext = typeof req.user?.email === 'string' && isValidEmail(req.user.email)
       ? req.user.email.trim().toLowerCase()
       : null;
-    const actorNameFromContext = typeof req.user?.name === 'string'
-      ? req.user.name.trim().slice(0, 120)
-      : null;
-
-    const normalisedActorName = actorNameFromContext && actorNameFromContext.trim().length > 0
-      ? actorNameFromContext
-      : null;
+    const actorNameFromContext = sanitiseDisplayName(req.user?.name);
+    const actorNameFromPayload = sanitiseDisplayName(payload.actorName);
 
     const submission = {
       ...payload,
       actorEmail: payload.actorEmail ?? actorEmailFromContext ?? null,
-      actorName: payload.actorName ?? normalisedActorName
+      actorName: actorNameFromPayload ?? actorNameFromContext
     };
 
     const submissionContext = extractSubmissionContext(req);
     const result = await inviteService.submitInvitation(token, submission, submissionContext);
 
+    const tokenFingerprint = createTokenFingerprint(token);
     req.log?.info(
       {
-        inviteToken: token,
+        inviteTokenFingerprint: tokenFingerprint,
         inviteId: result.invite?.id ?? null,
         actor: submission.actorEmail ?? actorEmailFromContext ?? null,
         requestId: submissionContext.requestId ?? null
@@ -206,8 +272,13 @@ export async function submitInvitation(req, res, next) {
       }
     });
   } catch (error) {
+    ensureSensitiveResponseHeaders(res);
+    const tokenFingerprint = createTokenFingerprint(req?.params?.token);
     if (error.isJoi) {
-      ensureSensitiveResponseHeaders(res);
+      logInviteEvent(req, 'warn', 'Integration invite submission validation failed', {
+        tokenFingerprint,
+        validationErrors: error.details?.map((detail) => detail.message) ?? []
+      });
       res.status(422).json({
         success: false,
         message: 'Validation failed',
@@ -217,10 +288,18 @@ export async function submitInvitation(req, res, next) {
     }
     const { status, message } = normaliseError(error, 400, 'Unable to submit invitation');
     if (status >= 500) {
+      logInviteEvent(req, 'error', 'Unexpected failure while submitting integration invite', {
+        tokenFingerprint,
+        err: error
+      });
       next(error);
       return;
     }
-    ensureSensitiveResponseHeaders(res);
+    logInviteEvent(req, 'warn', 'Integration invite submission rejected', {
+      tokenFingerprint,
+      status,
+      message
+    });
     res.status(status).json({ success: false, message });
   }
 }

@@ -427,6 +427,9 @@ export default class IntegrationApiKeyInviteService {
       metadata.fulfilmentContext = fulfilmentContext;
     }
 
+    const completedAt = this.nowProvider();
+    metadata.fulfilledAt = completedAt.toISOString();
+
     let result;
     await this.database.transaction(async (trx) => {
       if (invite.apiKeyId) {
@@ -463,7 +466,7 @@ export default class IntegrationApiKeyInviteService {
         invite.id,
         {
           status: INVITE_STATUS.COMPLETED,
-          completedAt: this.nowProvider(),
+          completedAt,
           completedBy: actor,
           metadata,
           apiKeyId: result.id

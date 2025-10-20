@@ -282,7 +282,8 @@ describe('IntegrationApiKeyInviteService', () => {
         metadata: expect.objectContaining({
           fulfilledBy: 'ops@example.com',
           fulfilledByName: 'Ops Team',
-          fulfilledReason: 'Initial provision'
+          fulfilledReason: 'Initial provision',
+          fulfilledAt: now.toISOString()
         })
       }),
       trxMock
@@ -338,7 +339,8 @@ describe('IntegrationApiKeyInviteService', () => {
     expect(updatePayload.metadata).toMatchObject({
       fulfilledBy: 'rotator@example.com',
       fulfilledByName: 'Rotator',
-      fulfilledReason: 'delegated-rotation'
+      fulfilledReason: 'delegated-rotation',
+      fulfilledAt: now.toISOString()
     });
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 9, sanitized: true }));
   });
@@ -395,6 +397,7 @@ describe('IntegrationApiKeyInviteService', () => {
       userAgent: 'Vitest Agent',
       origin: 'https://portal.edulure.com'
     });
+    expect(updatePayload.metadata.fulfilledAt).toBe(now.toISOString());
   });
 
   afterEach(() => {
