@@ -37,12 +37,15 @@ function deriveRoleSet(user) {
   return derived;
 }
 
-export default function ProtectedRoute({ children, allowedRoles }) {
+export default function ProtectedRoute({ children, allowedRoles, allowGuests }) {
   const location = useLocation();
   const { isAuthenticated, session } = useAuth();
   const { roles: dashboardRoles } = useDashboard();
 
   if (!isAuthenticated) {
+    if (allowGuests) {
+      return children;
+    }
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -70,9 +73,11 @@ export default function ProtectedRoute({ children, allowedRoles }) {
 
 ProtectedRoute.propTypes = {
   children: PropTypes.node.isRequired,
-  allowedRoles: PropTypes.arrayOf(PropTypes.string)
+  allowedRoles: PropTypes.arrayOf(PropTypes.string),
+  allowGuests: PropTypes.bool
 };
 
 ProtectedRoute.defaultProps = {
-  allowedRoles: undefined
+  allowedRoles: undefined,
+  allowGuests: false
 };
