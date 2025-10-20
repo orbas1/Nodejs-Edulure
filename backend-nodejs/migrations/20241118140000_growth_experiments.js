@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('growth_experiments');
   if (!hasTable) {
@@ -19,8 +21,14 @@ export async function up(knex) {
       table.decimal('target_value', 12, 4);
       table.timestamp('start_at');
       table.timestamp('end_at');
-      table.jsonb('segments').notNullable().defaultTo(knex.raw("'[]'::jsonb"));
-      table.jsonb('metadata').notNullable().defaultTo(knex.raw("'{}'::jsonb"));
+      table
+        .json('segments')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, []));
+      table
+        .json('metadata')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, {}));
       table
         .integer('created_by')
         .unsigned()

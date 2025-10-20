@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasEbooks = await knex.schema.hasTable('ebooks');
   if (!hasEbooks) {
@@ -15,10 +17,10 @@ export async function up(knex) {
       table.string('slug', 220).notNullable().unique();
       table.string('subtitle', 500);
       table.text('description');
-      table.json('authors').notNullable().defaultTo(JSON.stringify([]));
-      table.json('tags').notNullable().defaultTo(JSON.stringify([]));
-      table.json('categories').notNullable().defaultTo(JSON.stringify([]));
-      table.json('languages').notNullable().defaultTo(JSON.stringify(['en']));
+      table.json('authors').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('tags').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('categories').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('languages').notNullable().defaultTo(jsonDefault(knex, ["en"]));
       table.string('isbn', 32);
       table.integer('reading_time_minutes').unsigned().defaultTo(0);
       table.string('price_currency', 3).notNullable().defaultTo('USD');
@@ -32,7 +34,7 @@ export async function up(knex) {
         .defaultTo('draft');
       table.boolean('is_public').notNullable().defaultTo(false);
       table.timestamp('release_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -58,7 +60,7 @@ export async function up(knex) {
       table.integer('position').unsigned().notNullable().defaultTo(0);
       table.integer('word_count').unsigned().defaultTo(0);
       table.text('summary');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -97,7 +99,7 @@ export async function up(knex) {
       table.text('text').notNullable();
       table.text('note');
       table.timestamp('created_at').defaultTo(knex.fn.now());
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.index(['ebook_id', 'user_id']);
     });
   }
@@ -129,7 +131,7 @@ export async function up(knex) {
       table.string('label', 200);
       table.string('location', 120).notNullable();
       table.timestamp('created_at').defaultTo(knex.fn.now());
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['ebook_id', 'user_id', 'location']);
     });
   }
@@ -149,7 +151,7 @@ export async function up(knex) {
       table.integer('font_size').unsigned().notNullable().defaultTo(16);
       table.decimal('line_height', 4, 2).notNullable().defaultTo(1.5);
       table.string('font_family', 80).notNullable().defaultTo('Inter');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('updated_at').defaultTo(knex.fn.now());
       table.unique(['user_id']);
     });
@@ -175,7 +177,7 @@ export async function up(knex) {
       table.string('download_reference', 120).notNullable();
       table.string('watermark_hash', 128).notNullable();
       table.timestamp('issued_at').defaultTo(knex.fn.now());
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['ebook_id', 'download_reference']);
       table.index(['ebook_id']);
     });
