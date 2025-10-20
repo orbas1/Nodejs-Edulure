@@ -311,6 +311,24 @@ export default class SecurityOperationsRepository {
     return mapRiskRow(row);
   }
 
+  async deleteRisk(riskId) {
+    if (!riskId) {
+      throw new Error('riskId is required to delete risk');
+    }
+
+    return this.connection.transaction(async (trx) => {
+      await trx(SECURITY_TABLES.RISK_REVIEWS).where({ risk_id: riskId }).del();
+      await trx(SECURITY_TABLES.AUDIT_EVIDENCE).where({ risk_id: riskId }).del();
+
+      const deleted = await trx(SECURITY_TABLES.RISK_REGISTER).where({ id: riskId }).del();
+      if (!deleted) {
+        throw new Error(`Risk ${riskId} was not found`);
+      }
+
+      return true;
+    });
+  }
+
   async listRisks({
     tenantId = 'global',
     status,
