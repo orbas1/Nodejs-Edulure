@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext.jsx';
 import LanguageSelector from '../navigation/LanguageSelector.jsx';
+import HomeSection from './HomeSection.jsx';
 
 const CHIP_KEYS = [
   { key: 'home.hero.chips.communities', fallback: 'Communities' },
@@ -31,7 +32,7 @@ export default function HomeHero() {
         <div className="absolute -bottom-40 right-12 h-[28rem] w-[28rem] rounded-full bg-fuchsia-500/30 blur-[160px]" />
         <div className="absolute bottom-10 left-1/3 h-60 w-60 -translate-x-1/2 rounded-full bg-sky-400/20 blur-3xl" />
       </div>
-      <div className="relative mx-auto flex max-w-6xl flex-col gap-16 px-6 py-24 lg:flex-row lg:items-center">
+      <HomeSection className="relative flex flex-col gap-16 lg:flex-row lg:items-center">
         <div className="flex w-full flex-col gap-10 lg:w-1/2">
           <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-[0.2em] text-white/70">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-[0.7rem] font-semibold">
@@ -148,7 +149,7 @@ export default function HomeHero() {
             </div>
           </div>
         </div>
-      </div>
+      </HomeSection>
     </section>
   );
 }
