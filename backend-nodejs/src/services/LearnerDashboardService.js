@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 
-import logger from '../config/logger.js';
 import db from '../config/database.js';
+import logger from '../config/logger.js';
+import TutorBookingModel from '../models/TutorBookingModel.js';
+import TutorProfileModel from '../models/TutorProfileModel.js';
 import LearnerSupportRepository from '../repositories/LearnerSupportRepository.js';
 import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
@@ -36,61 +38,42 @@ function buildAcknowledgement({
   };
 }
 
-function formatLastOpenedLabel(value) {
+function parseDate(value, fallback) {
   if (!value) {
-    return 'Not opened yet';
+    return fallback instanceof Date ? fallback : new Date(fallback ?? Date.now());
   }
-  try {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      return 'Not opened yet';
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return fallback instanceof Date ? fallback : new Date(fallback ?? Date.now());
+  }
+
+  return date;
+}
+
+function normaliseDurationMinutes(value, fallback = 60) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && numeric >= 15 && numeric <= 600) {
+    return Math.round(numeric);
+  }
+  return fallback;
+}
+
+function formatBookingAcknowledgement(booking, message, overrides = {}) {
+  return buildAcknowledgement({
+    reference: booking.publicId,
+    message,
+    meta: {
+      status: booking.status,
+      scheduledStart: booking.scheduledStart?.toISOString?.() ?? null,
+      scheduledEnd: booking.scheduledEnd?.toISOString?.() ?? null,
+      durationMinutes: booking.durationMinutes ?? null,
+      tutorId: booking.tutorId,
+      topic: booking.metadata?.topic ?? null,
+      timezone: booking.metadata?.timezone ?? null,
+      ...overrides
     }
-    return new Intl.DateTimeFormat('en-GB', {
-      dateStyle: 'medium',
-      timeStyle: 'short'
-    }).format(date);
-  } catch (_error) {
-    return 'Not opened yet';
-  }
-}
-
-function formatLibraryEntry(entry) {
-  if (!entry) return null;
-  return {
-    id: entry.id,
-    title: entry.title,
-    format: entry.format,
-    progress: Number(entry.progress ?? 0),
-    lastOpened: entry.lastOpened ?? null,
-    lastOpenedLabel: formatLastOpenedLabel(entry.lastOpened),
-    url: entry.url ?? null,
-    summary: entry.summary ?? null,
-    author: entry.author ?? null,
-    coverUrl: entry.coverUrl ?? null,
-    tags: Array.isArray(entry.tags) ? entry.tags : [],
-    highlights: Array.isArray(entry.highlights) ? entry.highlights : [],
-    audioUrl: entry.audioUrl ?? null,
-    previewUrl: entry.previewUrl ?? null,
-    metadata: entry.metadata ?? {}
-  };
-}
-
-async function buildFieldServiceAssignment({ userId, order, connection = db }) {
-  if (!order) return null;
-  const [events, providers] = await Promise.all([
-    FieldServiceEventModel.listByOrderIds([order.id], connection),
-    order.providerId ? FieldServiceProviderModel.listByIds([order.providerId], connection) : []
-  ]);
-
-  const workspace = buildFieldServiceWorkspace({
-    now: new Date(),
-    user: { id: userId },
-    orders: [order],
-    events,
-    providers
   });
-
-  return workspace.customer?.assignments?.find((assignment) => assignment.id === order.id) ?? null;
 }
 
 export default class LearnerDashboardService {
@@ -517,17 +500,70 @@ export default class LearnerDashboardService {
   }
 
   static async createTutorBookingRequest(userId, payload = {}) {
-    const bookingId = generateReference('booking');
-    log.info({ userId, bookingId, payload }, 'Learner requested new tutor booking');
-    return buildAcknowledgement({
-      reference: bookingId,
-      message: 'Tutor booking request submitted',
-      meta: {
+    if (!userId) {
+      const error = new Error('Authentication required to create a tutor booking');
+      error.status = 401;
+      throw error;
+    }
+
+    const tutorId = Number(payload.tutorId ?? payload.profileId ?? payload.tutorProfileId);
+    if (!Number.isInteger(tutorId) || tutorId <= 0) {
+      const error = new Error('A valid tutor identifier is required');
+      error.status = 422;
+      throw error;
+    }
+
+    const tutorProfile = await TutorProfileModel.findById(tutorId, db);
+    if (!tutorProfile) {
+      const error = new Error('Tutor profile not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const now = new Date();
+    const defaultDuration = normaliseDurationMinutes(
+      payload.durationMinutes,
+      tutorProfile.metadata?.defaultSessionMinutes ?? 60
+    );
+    const scheduledStart = parseDate(
+      payload.scheduledStart ?? payload.preferredStart,
+      now.getTime() + 60 * 60 * 1000
+    );
+    const scheduledEnd = parseDate(
+      payload.scheduledEnd,
+      scheduledStart.getTime() + defaultDuration * 60 * 1000
+    );
+
+    const hourlyRateAmount = Number.isFinite(Number(payload.hourlyRateAmount))
+      ? Number(payload.hourlyRateAmount)
+      : tutorProfile.hourlyRateAmount ?? 0;
+
+    const metadata = {
+      ...(tutorProfile.metadata ?? {}),
+      topic: payload.topic ?? tutorProfile.metadata?.primaryFocus ?? 'Mentorship session',
+      message: payload.message ?? null,
+      source: 'learner-dashboard',
+      timezone: payload.timezone ?? payload.timeZone ?? tutorProfile.metadata?.timezone ?? null
+    };
+
+    const booking = await TutorBookingModel.create(
+      {
+        publicId: crypto.randomUUID(),
+        tutorId,
+        learnerId: userId,
+        scheduledStart,
+        scheduledEnd,
+        durationMinutes: defaultDuration,
+        hourlyRateAmount,
+        hourlyRateCurrency: payload.hourlyRateCurrency ?? tutorProfile.hourlyRateCurrency ?? 'USD',
         status: 'requested',
-        topic: payload.topic ?? 'Mentorship session',
-        preferredDate: payload.preferredDate ?? null
-      }
-    });
+        metadata
+      },
+      db
+    );
+
+    log.info({ userId, tutorId, bookingId: booking.publicId }, 'Learner requested new tutor booking');
+    return formatBookingAcknowledgement(booking, 'Tutor booking request submitted');
   }
 
   static async exportTutorSchedule(userId) {
@@ -758,202 +794,131 @@ export default class LearnerDashboardService {
     });
   }
 
-  static async createFieldServiceAssignment(userId, payload = {}) {
-    if (!payload.serviceType) {
-      throw new Error('Service type is required to dispatch a field service assignment');
+  static async listTutorBookings(userId) {
+    if (!userId) {
+      return [];
     }
-
-    const owner = payload.owner?.trim();
-    if (!owner) {
-      throw new Error('An assignment owner is required');
-    }
-
-    return db.transaction(async (trx) => {
-      const reference = generateReference('fs');
-      const metadata = {
-        owner,
-        supportChannel: payload.supportChannel ?? null,
-        briefUrl: payload.briefUrl ?? null,
-        fieldNotes: payload.fieldNotes ?? null,
-        equipment: payload.equipment ?? null,
-        attachments: Array.isArray(payload.attachments)
-          ? payload.attachments.map((item) => String(item).trim()).filter(Boolean)
-          : [],
-        debriefHost: payload.debriefHost ?? null,
-        debriefAt: payload.debriefAt ?? null
-      };
-
-      const order = await FieldServiceOrderModel.createAssignment(
-        {
-          reference,
-          customerUserId: userId,
-          status: payload.status ? String(payload.status).toLowerCase() : 'dispatched',
-          priority: payload.priority ? String(payload.priority).toLowerCase() : 'standard',
-          serviceType: payload.serviceType.trim(),
-          summary: payload.fieldNotes ?? null,
-          requestedAt: new Date().toISOString(),
-          scheduledFor: payload.scheduledFor ?? null,
-          locationLabel: payload.location ?? null,
-          metadata
-        },
-        trx
-      );
-
-      await FieldServiceEventModel.create(
-        {
-          orderId: order.id,
-          eventType: 'dispatch_created',
-          status: order.status,
-          notes: payload.fieldNotes ?? null,
-          author: owner,
-          metadata: {
-            supportChannel: payload.supportChannel ?? null
-          }
-        },
-        trx
-      );
-
-      const assignment = await buildFieldServiceAssignment({ userId, order, connection: trx });
-      return assignment ?? {
-        id: order.id,
-        reference: order.reference,
-        status: order.status,
-        serviceType: order.serviceType,
-        priority: order.priority
-      };
-    });
+    const bookings = await TutorBookingModel.listByLearnerId(userId, { limit: 100 }, db);
+    return bookings;
   }
 
-  static async updateFieldServiceAssignment(userId, assignmentId, payload = {}) {
-    const order = await FieldServiceOrderModel.findByIdForCustomer(userId, assignmentId);
-    if (!order) {
-      const error = new Error('Field service assignment not found');
+  static async updateTutorBooking(userId, bookingPublicId, payload = {}) {
+    if (!userId) {
+      const error = new Error('Authentication required to update a tutor booking');
+      error.status = 401;
+      throw error;
+    }
+    if (!bookingPublicId) {
+      const error = new Error('A booking reference is required');
+      error.status = 422;
+      throw error;
+    }
+
+    const booking = await TutorBookingModel.findByPublicId(bookingPublicId, db);
+    if (!booking || booking.learnerId !== userId) {
+      const error = new Error('Tutor booking not found');
       error.status = 404;
       throw error;
     }
 
-    const metadata = { ...order.metadata };
-    if (payload.owner !== undefined) {
-      metadata.owner = payload.owner?.trim() || null;
-    }
-    if (payload.supportChannel !== undefined) {
-      metadata.supportChannel = payload.supportChannel || null;
-    }
-    if (payload.briefUrl !== undefined) {
-      metadata.briefUrl = payload.briefUrl || null;
-    }
-    if (payload.fieldNotes !== undefined) {
-      metadata.fieldNotes = payload.fieldNotes || null;
-    }
-    if (payload.equipment !== undefined) {
-      metadata.equipment = payload.equipment || null;
-    }
-    if (payload.attachments !== undefined) {
-      metadata.attachments = Array.isArray(payload.attachments)
-        ? payload.attachments.map((item) => String(item).trim()).filter(Boolean)
-        : [];
-    }
-    if (payload.debriefHost !== undefined) {
-      metadata.debriefHost = payload.debriefHost || null;
-    }
-    if (payload.debriefAt !== undefined) {
-      metadata.debriefAt = payload.debriefAt || null;
-    }
-    if (payload.escalation) {
-      metadata.escalatedAt = new Date().toISOString();
+    if (booking.status === 'completed' || booking.status === 'cancelled') {
+      const error = new Error('Completed or cancelled bookings cannot be modified');
+      error.status = 409;
+      throw error;
     }
 
-    return db.transaction(async (trx) => {
-      const updated = await FieldServiceOrderModel.updateById(
-        order.id,
-        {
-          status: payload.status ? String(payload.status).toLowerCase() : undefined,
-          priority: payload.priority ? String(payload.priority).toLowerCase() : undefined,
-          serviceType: payload.serviceType ? payload.serviceType.trim() : undefined,
-          summary: payload.fieldNotes !== undefined ? payload.fieldNotes : undefined,
-          scheduledFor: payload.scheduledFor !== undefined ? payload.scheduledFor : undefined,
-          locationLabel: payload.location !== undefined ? payload.location : undefined,
-          metadata
-        },
-        trx
+    const updates = {};
+    let metadata = { ...(booking.metadata ?? {}) };
+
+    if (payload.topic !== undefined) {
+      metadata = { ...metadata, topic: payload.topic || null };
+    }
+    if (payload.message !== undefined) {
+      metadata = { ...metadata, message: payload.message || null };
+    }
+    if (payload.timezone !== undefined || payload.timeZone !== undefined) {
+      metadata = { ...metadata, timezone: payload.timezone ?? payload.timeZone ?? null };
+    }
+
+    if (payload.scheduledStart || payload.scheduledEnd || payload.durationMinutes) {
+      const duration = normaliseDurationMinutes(payload.durationMinutes ?? booking.durationMinutes);
+      const scheduledStart = parseDate(payload.scheduledStart, booking.scheduledStart ?? new Date());
+      const scheduledEnd = parseDate(
+        payload.scheduledEnd,
+        scheduledStart.getTime() + duration * 60 * 1000
       );
+      updates.scheduledStart = scheduledStart;
+      updates.scheduledEnd = scheduledEnd;
+      updates.durationMinutes = duration;
+    }
 
-      const eventType = payload.status
-        ? `status_${String(payload.status).toLowerCase()}`
-        : 'details_updated';
+    if (payload.hourlyRateAmount !== undefined) {
+      updates.hourlyRateAmount = Number(payload.hourlyRateAmount);
+    }
 
-      await FieldServiceEventModel.create(
-        {
-          orderId: order.id,
-          eventType,
-          status: payload.status ? String(payload.status).toLowerCase() : updated.status,
-          notes: payload.fieldNotes ?? payload.notes ?? null,
-          author: metadata.owner ?? 'Learner operations',
-          metadata: {
-            supportChannel: metadata.supportChannel ?? null,
-            escalation: Boolean(payload.escalation ?? false)
-          }
-        },
-        trx
-      );
+    if (payload.hourlyRateCurrency !== undefined) {
+      updates.hourlyRateCurrency = payload.hourlyRateCurrency;
+    }
 
-      const assignment = await buildFieldServiceAssignment({ userId, order: updated, connection: trx });
-      return assignment ?? {
-        id: updated.id,
-        status: updated.status,
-        serviceType: updated.serviceType,
-        priority: updated.priority
-      };
-    });
+    if (payload.status && ['requested', 'confirmed', 'completed'].includes(payload.status)) {
+      updates.status = payload.status;
+      if (payload.status === 'confirmed' && !booking.confirmedAt) {
+        updates.confirmedAt = new Date();
+      }
+      if (payload.status === 'completed' && !booking.completedAt) {
+        updates.completedAt = new Date();
+      }
+    }
+
+    updates.metadata = metadata;
+
+    const updated = await TutorBookingModel.updateByPublicId(bookingPublicId, updates, db);
+    log.info({ userId, bookingId: bookingPublicId }, 'Learner updated tutor booking');
+    return formatBookingAcknowledgement(updated, 'Tutor booking updated');
   }
 
-  static async closeFieldServiceAssignment(userId, assignmentId, payload = {}) {
-    const order = await FieldServiceOrderModel.findByIdForCustomer(userId, assignmentId);
-    if (!order) {
-      const error = new Error('Field service assignment not found');
+  static async cancelTutorBooking(userId, bookingPublicId, payload = {}) {
+    if (!userId) {
+      const error = new Error('Authentication required to cancel a tutor booking');
+      error.status = 401;
+      throw error;
+    }
+    if (!bookingPublicId) {
+      const error = new Error('A booking reference is required');
+      error.status = 422;
+      throw error;
+    }
+
+    const booking = await TutorBookingModel.findByPublicId(bookingPublicId, db);
+    if (!booking || booking.learnerId !== userId) {
+      const error = new Error('Tutor booking not found');
       error.status = 404;
       throw error;
     }
 
-    return db.transaction(async (trx) => {
-      const metadata = {
-        ...order.metadata,
-        resolution: payload.resolution ?? null,
-        closedAt: new Date().toISOString(),
-        closedBy: userId
-      };
+    if (booking.status === 'cancelled') {
+      return formatBookingAcknowledgement(booking, 'Tutor booking already cancelled');
+    }
 
-      const updated = await FieldServiceOrderModel.updateById(
-        order.id,
-        {
-          status: 'closed',
-          metadata
-        },
-        trx
-      );
+    const metadata = {
+      ...(booking.metadata ?? {}),
+      cancellationReason: payload.reason ?? payload.cancellationReason ?? null,
+      cancellationNotes: payload.notes ?? payload.note ?? null,
+      cancelledByLearner: true
+    };
 
-      await FieldServiceEventModel.create(
-        {
-          orderId: order.id,
-          eventType: 'job_completed',
-          status: 'closed',
-          notes: payload.resolution ?? null,
-          author: metadata.owner ?? 'Learner operations',
-          metadata: {
-            resolution: payload.resolution ?? null
-          }
-        },
-        trx
-      );
+    const cancelled = await TutorBookingModel.updateByPublicId(
+      bookingPublicId,
+      {
+        status: 'cancelled',
+        cancelledAt: new Date(),
+        metadata
+      },
+      db
+    );
 
-      return buildAcknowledgement({
-        reference: updated.reference ?? `fs-${updated.id}`,
-        message: 'Field service assignment closed',
-        meta: {
-          assignmentId: updated.id
-        }
-      });
-    });
+    log.info({ userId, bookingId: bookingPublicId }, 'Learner cancelled tutor booking');
+    return formatBookingAcknowledgement(cancelled, 'Tutor booking cancelled');
   }
 
   static async listSupportTickets(userId) {

@@ -232,6 +232,14 @@ export const apiRouteMetadata = [
     disabledMessage: 'Release orchestration APIs are restricted to platform operators.'
   },
   {
+    name: 'media',
+    capability: 'media-asset-uploads',
+    description: 'Direct upload workflows for course trailers, cover art, syllabi, and promotional media.',
+    basePath: '/media',
+    flagKey: 'platform.api.v1.media',
+    defaultState: 'enabled'
+  },
+  {
     name: 'dashboard',
     capability: 'operator-dashboard',
     description: 'Operational dashboards, incident insights, and governance endpoints.',

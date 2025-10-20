@@ -15,6 +15,19 @@ export async function createTutorBookingRequest({ token, payload, signal } = {})
   });
 }
 
+export async function listTutorBookings({ token, signal } = {}) {
+  ensureToken(token);
+  const response = await httpClient.get('/dashboard/learner/tutor-bookings', {
+    token,
+    signal,
+    cache: {
+      ttl: 5_000,
+      tags: [`dashboard:me:${token}:tutor-bookings`]
+    }
+  });
+  return response?.data?.bookings ?? response?.data ?? [];
+}
+
 export async function exportTutorSchedule({ token, signal } = {}) {
   ensureToken(token);
   return httpClient.post(
