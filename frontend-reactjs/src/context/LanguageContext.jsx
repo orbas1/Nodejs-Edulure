@@ -65,55 +65,64 @@ const TRANSLATIONS = {
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
       },
-      ebooks: {
-        tagline: 'Community library',
-        title: 'Turn knowledge into collectible storybooks',
+      courses: {
+        kicker: 'Courses adventure',
+        title: 'Chart the shared courses adventure',
         subtitle:
-          'Browse playful previews from makers building in public—each zine is remixable and ready to share.',
-        meta: 'Peer-made drops',
-        carouselLabel: 'Swipe through featured community e-books',
-        stickers: {
-          new: 'New!',
-          trending: 'Trending',
-          remixable: 'Remix-ready'
+          'Follow the journey from discovery through celebration with aligned perks for learners and instructors.',
+        cta: 'Explore courses',
+        ctaHelper: 'Head straight to the full catalogue and start plotting your next cohort.',
+        roles: {
+          learners: 'Learners',
+          instructors: 'Instructors'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'Product sprints',
-            title: 'Builder’s Notebook',
-            description: 'Rapid rituals and templates for shipping experiments faster.',
-            alt: 'Illustrated cover for Builder’s Notebook showing gradient pages'
-          },
-          communityCookbook: {
-            tag: 'Community rituals',
-            title: 'Community Cookbook',
-            description: 'Icebreakers, retros, and prompts sourced from active cohorts.',
-            alt: 'Cover of Community Cookbook with playful green highlights'
-          },
-          remixAtlas: {
-            tag: 'Remix lab',
-            title: 'Remix Atlas',
-            description: 'Swipe starter frameworks and remix them into your own journeys.',
-            alt: 'Remix Atlas cover featuring arrows bending around a compass'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'Readers',
-            title: 'Pocket-sized insights for every mood',
-            bullets: {
-              discovery: 'Discover bite-sized field guides for every creative phase.',
-              sync: 'Sync progress across devices and pick up where you left off.',
-              community: 'Unlock community annotations and highlight reels.'
+        stages: {
+          discover: {
+            title: 'Discover',
+            headline: 'Match every learner with the right cohort',
+            learners: {
+              perk1: 'Browse curated cohorts by skill focus',
+              perk2: 'Preview syllabi, schedules and outcomes'
+            },
+            instructors: {
+              perk1: 'Spotlight differentiators with rich metadata',
+              perk2: 'Publish waitlists and discovery-ready previews'
             }
           },
-          creators: {
-            label: 'Creators',
-            title: 'Delight fans and ship faster',
-            bullets: {
-              publish: 'Drop beautiful digital zines without design tools.',
-              analytics: 'Track reads, saves, and remix requests in real time.',
-              revenue: 'Bundle e-books with live sessions to boost revenue.'
+          enroll: {
+            title: 'Enroll',
+            headline: 'Make enrollment effortless and transparent',
+            learners: {
+              perk1: 'Secure seats with flexible payment plans',
+              perk2: 'Track onboarding tasks and deadlines'
+            },
+            instructors: {
+              perk1: 'Automate acceptance and welcome flows',
+              perk2: 'Gate resources until kickoff'
+            }
+          },
+          coLearn: {
+            title: 'Co-learn',
+            headline: 'Keep momentum pulsing during the experience',
+            learners: {
+              perk1: 'Join live studios, async threads and office hours',
+              perk2: 'Earn badges for momentum and peer support'
+            },
+            instructors: {
+              perk1: 'Orchestrate sprints with templates and nudges',
+              perk2: 'Spot at-risk learners with pulse dashboards'
+            }
+          },
+          celebrate: {
+            title: 'Celebrate',
+            headline: 'Capture the finish-line energy together',
+            learners: {
+              perk1: 'Showcase capstone artefacts and reflections',
+              perk2: 'Share wins with the cohort and alumni'
+            },
+            instructors: {
+              perk1: 'Issue verifiable certificates in one click',
+              perk2: 'Collect testimonials and publish highlights'
             }
           }
         }
@@ -168,55 +177,64 @@ const TRANSLATIONS = {
         instructorPill: 'Je suis instructeur·rice',
         illustrationAlt: "Collage d'instructeurs et d'apprenants en collaboration"
       },
-      ebooks: {
-        tagline: 'Bibliothèque communautaire',
-        title: 'Transformez le savoir en livres à collectionner',
+      courses: {
+        kicker: 'Parcours cours',
+        title: "Cartographiez l'aventure des cours ensemble",
         subtitle:
-          'Parcourez des aperçus ludiques de créateurs qui construisent en public — chaque zine est remixable et prêt à partager.',
-        meta: 'Parutions entre pairs',
-        carouselLabel: 'Faites défiler les e-books phares de la communauté',
-        stickers: {
-          new: 'Nouveau !',
-          trending: 'Tendance',
-          remixable: 'Prêt pour remix'
+          'Suivez le parcours de la découverte à la célébration avec des avantages alignés pour apprenant·es et instructeur·rices.',
+        cta: 'Explorer les cours',
+        ctaHelper: 'Rejoignez directement le catalogue complet et planifiez votre prochaine cohorte.',
+        roles: {
+          learners: 'Apprenant·es',
+          instructors: 'Instructeur·rices'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'Sprints produit',
-            title: 'Carnet du builder',
-            description: 'Rituels et modèles pour expédier des expériences plus vite.',
-            alt: 'Couverture illustrée du Carnet du builder avec des pages en dégradé'
-          },
-          communityCookbook: {
-            tag: 'Rituels de communauté',
-            title: 'Livre de recettes communautaire',
-            description: 'Icebreakers, rétros et invitations issues de cohortes actives.',
-            alt: 'Couverture du Livre de recettes communautaire avec des accents verts ludiques'
-          },
-          remixAtlas: {
-            tag: 'Laboratoire remix',
-            title: 'Atlas du remix',
-            description: 'Capturez des canevas de départ et remixez-les pour vos propres parcours.',
-            alt: 'Couverture de l’Atlas du remix avec des flèches autour d’une boussole'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'Lecteurs',
-            title: 'Des pépites à glisser dans chaque humeur',
-            bullets: {
-              discovery: 'Découvrez des guides de terrain en format capsule pour chaque phase créative.',
-              sync: 'Synchronisez votre progression sur tous vos appareils et reprenez où vous en étiez.',
-              community: 'Débloquez les annotations communautaires et les moments forts.'
+        stages: {
+          discover: {
+            title: 'Découvrir',
+            headline: 'Faire matcher chaque profil avec la bonne cohorte',
+            learners: {
+              perk1: 'Parcourez des cohortes sélectionnées par compétence',
+              perk2: 'Prévisualisez programmes, plannings et résultats'
+            },
+            instructors: {
+              perk1: 'Mettez en avant vos différenciateurs avec des métadonnées riches',
+              perk2: 'Publiez listes d’attente et aperçus prêts pour la découverte'
             }
           },
-          creators: {
-            label: 'Créateurs',
-            title: 'Ravissez votre audience et livrez plus vite',
-            bullets: {
-              publish: 'Publiez de beaux zines numériques sans outils de design.',
-              analytics: 'Suivez lectures, sauvegardes et demandes de remix en temps réel.',
-              revenue: 'Associez e-books et sessions live pour booster vos revenus.'
+          enroll: {
+            title: 'S’inscrire',
+            headline: "Rendre l'inscription fluide et transparente",
+            learners: {
+              perk1: 'Réservez des places avec des paiements flexibles',
+              perk2: 'Suivez les tâches d’onboarding et les échéances'
+            },
+            instructors: {
+              perk1: 'Automatisez les flux d’acceptation et d’accueil',
+              perk2: 'Verrouillez les ressources jusqu’au lancement'
+            }
+          },
+          coLearn: {
+            title: 'Co-apprendre',
+            headline: "Maintenir l'élan tout au long de l'expérience",
+            learners: {
+              perk1: 'Rejoignez studios live, fils asynchrones et permanences',
+              perk2: 'Gagnez des badges pour le momentum et l’entraide'
+            },
+            instructors: {
+              perk1: 'Orchestrez les sprints avec modèles et relances',
+              perk2: 'Identifiez les apprenant·es à risque via des tableaux de bord'
+            }
+          },
+          celebrate: {
+            title: 'Célébrer',
+            headline: 'Capitaliser sur l’énergie de fin de parcours',
+            learners: {
+              perk1: 'Mettez en vitrine artefacts et réflexions finales',
+              perk2: 'Partagez vos réussites avec la cohorte et les alumnis'
+            },
+            instructors: {
+              perk1: 'Délivrez des certificats vérifiables en un clic',
+              perk2: 'Recueillez témoignages et publiez les moments forts'
             }
           }
         }
@@ -271,55 +289,64 @@ const TRANSLATIONS = {
         instructorPill: 'Soy instructor/a',
         illustrationAlt: 'Collage de instructores y estudiantes colaborando'
       },
-      ebooks: {
-        tagline: 'Biblioteca comunitaria',
-        title: 'Convierte el conocimiento en libros coleccionables',
+      courses: {
+        kicker: 'Travesía de cursos',
+        title: 'Mapea la aventura de los cursos en conjunto',
         subtitle:
-          'Explora avances juguetones de creadores que construyen en público; cada zine es remixable y listo para compartir.',
-        meta: 'Lanzamientos entre pares',
-        carouselLabel: 'Desliza por los e-books destacados de la comunidad',
-        stickers: {
-          new: '¡Nuevo!',
-          trending: 'Tendencia',
-          remixable: 'Listo para remix'
+          'Sigue el recorrido desde el descubrimiento hasta la celebración con beneficios alineados para estudiantes e instructores.',
+        cta: 'Explorar cursos',
+        ctaHelper: 'Entra directo al catálogo completo y planifica tu próxima cohorte.',
+        roles: {
+          learners: 'Estudiantes',
+          instructors: 'Instructores'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'Sprints de producto',
-            title: 'Cuaderno del builder',
-            description: 'Rituales y plantillas para lanzar experimentos más rápido.',
-            alt: 'Portada ilustrada del Cuaderno del builder con páginas degradadas'
-          },
-          communityCookbook: {
-            tag: 'Rituales comunitarios',
-            title: 'Recetario comunitario',
-            description: 'Icebreakers, retros y prompts recopilados de cohortes activas.',
-            alt: 'Portada del Recetario comunitario con destellos verdes divertidos'
-          },
-          remixAtlas: {
-            tag: 'Laboratorio remix',
-            title: 'Atlas remix',
-            description: 'Toma marcos iniciales y remíxalos para tus propias travesías.',
-            alt: 'Portada del Atlas remix con flechas rodeando una brújula'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'Lectores',
-            title: 'Ideas de bolsillo para cada estado de ánimo',
-            bullets: {
-              discovery: 'Descubre guías de campo en formato cápsula para cada fase creativa.',
-              sync: 'Sincroniza tu progreso en todos tus dispositivos y retoma donde lo dejaste.',
-              community: 'Desbloquea anotaciones de la comunidad y resúmenes destacados.'
+        stages: {
+          discover: {
+            title: 'Descubrir',
+            headline: 'Conecta a cada persona con la cohorte correcta',
+            learners: {
+              perk1: 'Explora cohortes seleccionadas por enfoque de habilidades',
+              perk2: 'Previsualiza programas, cronogramas y resultados'
+            },
+            instructors: {
+              perk1: 'Destaca tus diferenciales con metadatos ricos',
+              perk2: 'Publica listas de espera y vistas previas listas para descubrimiento'
             }
           },
-          creators: {
-            label: 'Creadores',
-            title: 'Sorprende a tu comunidad y entrega más rápido',
-            bullets: {
-              publish: 'Publica zines digitales hermosos sin herramientas de diseño.',
-              analytics: 'Sigue lecturas, guardados y solicitudes de remix en tiempo real.',
-              revenue: 'Combina e-books con sesiones en vivo para impulsar los ingresos.'
+          enroll: {
+            title: 'Inscribirse',
+            headline: 'Haz que la inscripción sea ágil y transparente',
+            learners: {
+              perk1: 'Asegura cupos con planes de pago flexibles',
+              perk2: 'Sigue tareas y plazos de onboarding'
+            },
+            instructors: {
+              perk1: 'Automatiza los flujos de aceptación y bienvenida',
+              perk2: 'Restringe recursos hasta el inicio'
+            }
+          },
+          coLearn: {
+            title: 'Co-aprender',
+            headline: 'Mantén el impulso durante toda la experiencia',
+            learners: {
+              perk1: 'Únete a estudios en vivo, hilos asíncronos y mentorías',
+              perk2: 'Gana insignias por el impulso y el apoyo entre pares'
+            },
+            instructors: {
+              perk1: 'Orquesta sprints con plantillas y recordatorios',
+              perk2: 'Detecta estudiantes en riesgo con tableros de pulso'
+            }
+          },
+          celebrate: {
+            title: 'Celebrar',
+            headline: 'Celebra el cierre con toda la comunidad',
+            learners: {
+              perk1: 'Muestra artefactos finales y reflexiones',
+              perk2: 'Comparte logros con la cohorte y exalumnos'
+            },
+            instructors: {
+              perk1: 'Emite certificados verificables con un clic',
+              perk2: 'Recopila testimonios y publica momentos destacados'
             }
           }
         }
@@ -374,55 +401,64 @@ const TRANSLATIONS = {
         instructorPill: 'Sou instrutor(a)',
         illustrationAlt: 'Colagem de instrutores e aprendizes colaborando'
       },
-      ebooks: {
-        tagline: 'Biblioteca da comunidade',
-        title: 'Transforme conhecimento em livros colecionáveis',
+      courses: {
+        kicker: 'Jornada de cursos',
+        title: 'Mapeie a jornada dos cursos em conjunto',
         subtitle:
-          'Explore prévias divertidas de quem constrói em público — cada zine é remixável e pronto para compartilhar.',
-        meta: 'Lançamentos entre pares',
-        carouselLabel: 'Deslize pelos e-books favoritos da comunidade',
-        stickers: {
-          new: 'Novo!',
-          trending: 'Em alta',
-          remixable: 'Pronto para remix'
+          'Acompanhe o caminho da descoberta à celebração com benefícios alinhados para aprendizes e instrutores.',
+        cta: 'Explorar cursos',
+        ctaHelper: 'Vá direto ao catálogo completo e planeje sua próxima turma.',
+        roles: {
+          learners: 'Aprendizes',
+          instructors: 'Instrutores'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'Sprints de produto',
-            title: 'Caderno do builder',
-            description: 'Rituais e modelos para lançar experimentos com mais velocidade.',
-            alt: 'Capa ilustrada do Caderno do builder com páginas em degradê'
-          },
-          communityCookbook: {
-            tag: 'Rituais da comunidade',
-            title: 'Livro de receitas da comunidade',
-            description: 'Icebreakers, retros e prompts coletados de cohortes ativas.',
-            alt: 'Capa do Livro de receitas da comunidade com destaques verdes divertidos'
-          },
-          remixAtlas: {
-            tag: 'Laboratório de remix',
-            title: 'Atlas remix',
-            description: 'Pegue frameworks iniciais e remixe para suas próprias jornadas.',
-            alt: 'Capa do Atlas remix com setas em torno de uma bússola'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'Leitores',
-            title: 'Insumos de bolso para cada momento',
-            bullets: {
-              discovery: 'Descubra guias de campo em cápsulas para cada fase criativa.',
-              sync: 'Sincronize o progresso entre dispositivos e retome de onde parou.',
-              community: 'Desbloqueie anotações da comunidade e destaques.'
+        stages: {
+          discover: {
+            title: 'Descobrir',
+            headline: 'Conecte cada pessoa à turma certa',
+            learners: {
+              perk1: 'Explore cohortes curadas por foco de habilidade',
+              perk2: 'Visualize ementas, cronogramas e resultados'
+            },
+            instructors: {
+              perk1: 'Destaque diferenciais com metadados ricos',
+              perk2: 'Publique listas de espera e prévias prontas para descoberta'
             }
           },
-          creators: {
-            label: 'Criadores',
-            title: 'Encante sua base e entregue mais rápido',
-            bullets: {
-              publish: 'Publique zines digitais lindos sem ferramentas de design.',
-              analytics: 'Acompanhe leituras, salvamentos e pedidos de remix em tempo real.',
-              revenue: 'Combine e-books com sessões ao vivo para impulsionar a receita.'
+          enroll: {
+            title: 'Inscrever-se',
+            headline: 'Torne a matrícula simples e transparente',
+            learners: {
+              perk1: 'Garanta vagas com planos de pagamento flexíveis',
+              perk2: 'Acompanhe tarefas e prazos de onboarding'
+            },
+            instructors: {
+              perk1: 'Automatize fluxos de aceitação e boas-vindas',
+              perk2: 'Proteja recursos até o início'
+            }
+          },
+          coLearn: {
+            title: 'Co-aprender',
+            headline: 'Mantenha o ritmo durante toda a experiência',
+            learners: {
+              perk1: 'Participe de estúdios ao vivo, threads assíncronas e plantões',
+              perk2: 'Ganhe badges por ritmo e apoio entre pares'
+            },
+            instructors: {
+              perk1: 'Orquestre sprints com templates e lembretes',
+              perk2: 'Detecte aprendizes em risco com dashboards de pulso'
+            }
+          },
+          celebrate: {
+            title: 'Celebrar',
+            headline: 'Comemore a linha de chegada em conjunto',
+            learners: {
+              perk1: 'Mostre artefatos finais e reflexões',
+              perk2: 'Compartilhe conquistas com a turma e ex-alunos'
+            },
+            instructors: {
+              perk1: 'Emita certificados verificáveis com um clique',
+              perk2: 'Colete depoimentos e publique destaques'
             }
           }
         }
@@ -477,55 +513,64 @@ const TRANSLATIONS = {
         instructorPill: 'Sono un* istruttore/trice',
         illustrationAlt: 'Collage di istruttori e studenti che collaborano'
       },
-      ebooks: {
-        tagline: 'Biblioteca della community',
-        title: 'Trasforma il sapere in libri da collezione',
+      courses: {
+        kicker: 'Avventura dei corsi',
+        title: "Mappa l'avventura dei corsi insieme",
         subtitle:
-          'Sfoglia anteprime giocose di chi costruisce in pubblico: ogni zine è remixabile e pronta da condividere.',
-        meta: 'Uscite tra pari',
-        carouselLabel: 'Scorri gli e-book di punta della community',
-        stickers: {
-          new: 'Nuovo!',
-          trending: 'Di tendenza',
-          remixable: 'Pronto al remix'
+          'Segui il percorso dalla scoperta alla celebrazione con vantaggi allineati per partecipanti e docenti.',
+        cta: 'Esplora i corsi',
+        ctaHelper: 'Vai subito al catalogo completo e pianifica la tua prossima coorte.',
+        roles: {
+          learners: 'Partecipanti',
+          instructors: 'Docenti'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'Sprints di prodotto',
-            title: 'Taccuino del builder',
-            description: 'Rituali e template per spedire esperimenti più in fretta.',
-            alt: 'Copertina illustrata del Taccuino del builder con pagine sfumate'
-          },
-          communityCookbook: {
-            tag: 'Rituali di community',
-            title: 'Ricettario della community',
-            description: 'Icebreaker, retro e prompt raccolti da coorti attive.',
-            alt: 'Copertina del Ricettario della community con accenti verdi giocosi'
-          },
-          remixAtlas: {
-            tag: 'Laboratorio remix',
-            title: 'Atlas remix',
-            description: 'Prendi framework di partenza e remixali per i tuoi percorsi.',
-            alt: 'Copertina dell’Atlas remix con frecce che circondano una bussola'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'Lettori',
-            title: 'Spunti tascabili per ogni stato d’animo',
-            bullets: {
-              discovery: 'Scopri guide da campo in formato mini per ogni fase creativa.',
-              sync: 'Sincronizza i progressi tra dispositivi e riprendi da dove eri rimasto.',
-              community: 'Sblocca annotazioni della community e momenti salienti.'
+        stages: {
+          discover: {
+            title: 'Scoprire',
+            headline: 'Abbina ogni persona alla coorte giusta',
+            learners: {
+              perk1: 'Esplora coorti curate per focus di competenze',
+              perk2: 'Anteprima di programmi, calendari e risultati'
+            },
+            instructors: {
+              perk1: 'Metti in evidenza i tuoi differenziatori con metadati ricchi',
+              perk2: 'Pubblica liste d’attesa e anteprime pronte alla scoperta'
             }
           },
-          creators: {
-            label: 'Creator',
-            title: 'Sorprendi il tuo pubblico e consegna più veloce',
-            bullets: {
-              publish: 'Pubblica zine digitali bellissime senza strumenti di design.',
-              analytics: 'Monitora letture, salvataggi e richieste di remix in tempo reale.',
-              revenue: 'Abbina e-book e sessioni live per incrementare le entrate.'
+          enroll: {
+            title: 'Iscriversi',
+            headline: "Rendi l'iscrizione semplice e trasparente",
+            learners: {
+              perk1: 'Blocca un posto con piani di pagamento flessibili',
+              perk2: 'Monitora attività e scadenze di onboarding'
+            },
+            instructors: {
+              perk1: 'Automatizza i flussi di accettazione e benvenuto',
+              perk2: 'Proteggi le risorse fino al kick-off'
+            }
+          },
+          coLearn: {
+            title: 'Co-apprendere',
+            headline: "Mantieni slancio lungo tutta l'esperienza",
+            learners: {
+              perk1: 'Partecipa a studi live, thread asincroni e office hour',
+              perk2: 'Guadagna badge per slancio e supporto tra pari'
+            },
+            instructors: {
+              perk1: 'Orchestra sprint con modelli e promemoria',
+              perk2: 'Individua learner a rischio con dashboard di andamento'
+            }
+          },
+          celebrate: {
+            title: 'Celebrare',
+            headline: 'Festeggia insieme il traguardo finale',
+            learners: {
+              perk1: 'Metti in mostra artefatti finali e riflessioni',
+              perk2: 'Condividi i successi con la coorte e gli alumni'
+            },
+            instructors: {
+              perk1: 'Emetti certificati verificabili con un clic',
+              perk2: 'Raccogli testimonianze e pubblica i momenti migliori'
             }
           }
         }
@@ -580,55 +625,64 @@ const TRANSLATIONS = {
         instructorPill: 'Jestem instruktorem',
         illustrationAlt: 'Kolaż instruktorów i uczniów współpracujących ze sobą'
       },
-      ebooks: {
-        tagline: 'Biblioteka społeczności',
-        title: 'Zamień wiedzę w kolekcjonerskie książki',
+      courses: {
+        kicker: 'Podróż kursowa',
+        title: 'Zmapuj wspólną podróż kursu',
         subtitle:
-          'Przeglądaj kolorowe zajawki twórców budujących publicznie — każdy zin można remiksować i udostępniać.',
-        meta: 'Premiery od społeczności',
-        carouselLabel: 'Przewijaj wyróżnione e-booki społeczności',
-        stickers: {
-          new: 'Nowość!',
-          trending: 'Na topie',
-          remixable: 'Gotowe do remiksu'
+          'Śledź drogę od odkrycia do celebracji z korzyściami dla uczących się i instruktorów.',
+        cta: 'Odkryj kursy',
+        ctaHelper: 'Przejdź prosto do pełnego katalogu i zaplanuj kolejną kohortę.',
+        roles: {
+          learners: 'Uczący się',
+          instructors: 'Instruktorzy'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'Sprinty produktowe',
-            title: 'Notatnik buildera',
-            description: 'Rytuały i szablony, dzięki którym szybciej wypuścisz eksperymenty.',
-            alt: 'Ilustrowana okładka Notatnika buildera z gradientowymi stronami'
-          },
-          communityCookbook: {
-            tag: 'Rytuały społeczności',
-            title: 'Książka kucharska społeczności',
-            description: 'Icebreakery, retro i podpowiedzi zebrane od aktywnych kohort.',
-            alt: 'Okładka Książki kucharskiej społeczności z zielonymi akcentami'
-          },
-          remixAtlas: {
-            tag: 'Laboratorium remixu',
-            title: 'Atlas remixu',
-            description: 'Chwytaj ramy startowe i remiksuj je pod własne ścieżki.',
-            alt: 'Okładka Atlasu remixu z strzałkami wokół kompasu'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'Czytelnicy',
-            title: 'Kieszonkowe inspiracje na każdy nastrój',
-            bullets: {
-              discovery: 'Odkrywaj kapsułowe przewodniki terenowe na każdy etap kreatywny.',
-              sync: 'Synchronizuj postępy między urządzeniami i wracaj dokładnie tam, gdzie skończyłeś.',
-              community: 'Odblokuj społecznościowe adnotacje i highlighty.'
+        stages: {
+          discover: {
+            title: 'Odkrywaj',
+            headline: 'Dopasuj każdego do właściwej kohorty',
+            learners: {
+              perk1: 'Przeglądaj wyselekcjonowane kohorty według kompetencji',
+              perk2: 'Podglądaj sylabusy, harmonogramy i rezultaty'
+            },
+            instructors: {
+              perk1: 'Wyróżnij przewagi dzięki bogatym metadanym',
+              perk2: 'Publikuj listy oczekujących i gotowe podglądy'
             }
           },
-          creators: {
-            label: 'Twórcy',
-            title: 'Zachwycaj społeczność i działaj szybciej',
-            bullets: {
-              publish: 'Publikuj piękne cyfrowe ziny bez narzędzi projektowych.',
-              analytics: 'Śledź odczyty, zapisy i prośby o remix w czasie rzeczywistym.',
-              revenue: 'Łącz e-booki z sesjami live, aby zwiększyć przychody.'
+          enroll: {
+            title: 'Zapisz się',
+            headline: 'Uczyń zapisy proste i przejrzyste',
+            learners: {
+              perk1: 'Zabezpiecz miejsce elastycznymi planami płatności',
+              perk2: 'Śledź zadania i terminy onboardingowe'
+            },
+            instructors: {
+              perk1: 'Automatyzuj proces akceptacji i powitania',
+              perk2: 'Chroń zasoby do momentu startu'
+            }
+          },
+          coLearn: {
+            title: 'Wspólna nauka',
+            headline: 'Utrzymuj tempo przez cały cykl',
+            learners: {
+              perk1: 'Dołączaj do live’ów, wątków asynchronicznych i dyżurów',
+              perk2: 'Zdobywaj odznaki za tempo i wsparcie dla innych'
+            },
+            instructors: {
+              perk1: 'Orkiestruj sprinty z szablonami i przypomnieniami',
+              perk2: 'Wykrywaj osoby zagrożone w pulpitach pulsów'
+            }
+          },
+          celebrate: {
+            title: 'Świętuj',
+            headline: 'Świętuj finisz razem',
+            learners: {
+              perk1: 'Prezentuj projekty końcowe i refleksje',
+              perk2: 'Dziel się sukcesami z kohortą i alumnami'
+            },
+            instructors: {
+              perk1: 'Wystawiaj weryfikowalne certyfikaty jednym kliknięciem',
+              perk2: 'Zbieraj rekomendacje i publikuj highlighty'
             }
           }
         }
@@ -683,55 +737,64 @@ const TRANSLATIONS = {
         instructorPill: 'मैं प्रशिक्षक हूँ',
         illustrationAlt: 'प्रशिक्षकों और शिक्षार्थियों के सहयोग का कोलाज'
       },
-      ebooks: {
-        tagline: 'समुदाय पुस्तकालय',
-        title: 'ज्ञान को संग्रहणीय पुस्तकों में बदलें',
+      courses: {
+        kicker: 'कोर्स यात्रा',
+        title: 'कोर्स यात्रा को साथ मिलकर मानचित्रित करें',
         subtitle:
-          'सार्वजनिक रूप से निर्माण करने वाले निर्माताओं की चंचल झलकियाँ देखें — हर ज़ीन रीमिक्स करने और साझा करने के लिए तैयार है।',
-        meta: 'साथियों द्वारा जारी',
-        carouselLabel: 'समुदाय के पसंदीदा ई-बुक्स को स्वाइप करें',
-        stickers: {
-          new: 'नई!',
-          trending: 'ट्रेंडिंग',
-          remixable: 'रीमिक्स के लिए तैयार'
+          'खोज से लेकर उत्सव तक की यात्रा को सीखने वालों और प्रशिक्षकों के लिए संरेखित लाभों के साथ ट्रैक करें।',
+        cta: 'कोर्स देखें',
+        ctaHelper: 'पूरे कैटलॉग पर सीधे जाएँ और अगली कोहोर्ट की योजना बनाएं।',
+        roles: {
+          learners: 'शिक्षार्थी',
+          instructors: 'प्रशिक्षक'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'उत्पाद स्प्रिंट्स',
-            title: 'बिल्डर की नोटबुक',
-            description: 'तेज़ी से प्रयोग शिप करने के लिए रीतियाँ और टेम्पलेट्स।',
-            alt: 'ग्रेडिएंट पन्नों वाली बिल्डर की नोटबुक का चित्रित कवर'
-          },
-          communityCookbook: {
-            tag: 'समुदाय रिवाज़',
-            title: 'कम्युनिटी कुकबुक',
-            description: 'सक्रिय कोहोर्ट्स से जुटाए गए आइसब्रेकर, रेट्रो और प्रॉम्प्ट्स।',
-            alt: 'हरे playful हाईलाइट्स वाली कम्युनिटी कुकबुक का कवर'
-          },
-          remixAtlas: {
-            tag: 'रीमिक्स प्रयोगशाला',
-            title: 'रीमिक्स एटलस',
-            description: 'स्टार्टर फ्रेमवर्क्स उठाएँ और उन्हें अपने सफ़र के लिए रीमिक्स करें।',
-            alt: 'कम्पास के चारों ओर घूमते तीरों वाला रीमिक्स एटलस कवर'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'रीडर्स',
-            title: 'हर मूड के लिए पॉकेट इनसाइट्स',
-            bullets: {
-              discovery: 'हर रचनात्मक चरण के लिए सूक्ष्म फील्ड गाइड खोजें।',
-              sync: 'डिवाइसों के बीच प्रगति को सिंक करें और वहीं से शुरू करें जहाँ छोड़ा था।',
-              community: 'समुदाय की टिप्पणियाँ और हाइलाइट झलकियाँ अनलॉक करें।'
+        stages: {
+          discover: {
+            title: 'खोजें',
+            headline: 'हर शिक्षार्थी को सही कोहोर्ट से जोड़ें',
+            learners: {
+              perk1: 'कौशल फोकस के अनुसार चुनी गई कोहोर्ट ब्राउज़ करें',
+              perk2: 'सिलेबस, शेड्यूल और परिणाम पहले ही देखें'
+            },
+            instructors: {
+              perk1: 'समृद्ध मेटाडेटा के साथ अपने अंतर को प्रदर्शित करें',
+              perk2: 'वेटलिस्ट और खोज-तैयार पूर्वावलोकन प्रकाशित करें'
             }
           },
-          creators: {
-            label: 'क्रिएटर्स',
-            title: 'प्रशंसकों को खुश करें और तेजी से लॉन्च करें',
-            bullets: {
-              publish: 'डिज़ाइन टूल्स के बिना सुंदर डिजिटल ज़ीन प्रकाशित करें।',
-              analytics: 'रीयल-टाइम में पढ़ाई, सेव और रीमिक्स अनुरोध ट्रैक करें।',
-              revenue: 'ई-बुक्स को लाइव सत्रों के साथ बाँधकर राजस्व बढ़ाएँ।'
+          enroll: {
+            title: 'नामांकन',
+            headline: 'नामांकन को सहज और पारदर्शी बनाएं',
+            learners: {
+              perk1: 'लचीली भुगतान योजनाओं से सीट सुनिश्चित करें',
+              perk2: 'ऑनबोर्डिंग कार्यों और समय सीमा का ट्रैक रखें'
+            },
+            instructors: {
+              perk1: 'स्वीकृति और स्वागत फ्लो को स्वचालित करें',
+              perk2: 'किकऑफ तक संसाधनों को सुरक्षित रखें'
+            }
+          },
+          coLearn: {
+            title: 'सह-सीखना',
+            headline: 'पूरे अनुभव के दौरान गति बनाए रखें',
+            learners: {
+              perk1: 'लाइव स्टूडियो, असिंक्रोनस थ्रेड्स और ऑफिस आवर्स में शामिल हों',
+              perk2: 'गति और साथी समर्थन के लिए बैज अर्जित करें'
+            },
+            instructors: {
+              perk1: 'टेम्पलेट और नज से स्प्रिंट आयोजित करें',
+              perk2: 'पल्स डैशबोर्ड से जोखिमग्रस्त शिक्षार्थियों को पहचानें'
+            }
+          },
+          celebrate: {
+            title: 'उत्सव मनाएं',
+            headline: 'फिनिश लाइन की ऊर्जा को साथ मनाएं',
+            learners: {
+              perk1: 'कैपस्टोन आर्टिफैक्ट और प्रतिबिंब प्रदर्शित करें',
+              perk2: 'कोहोर्ट और पूर्व छात्रों के साथ जीत साझा करें'
+            },
+            instructors: {
+              perk1: 'एक क्लिक में सत्यापित प्रमाणपत्र जारी करें',
+              perk2: 'प्रशंसापत्र एकत्र करें और मुख्य झलकियाँ प्रकाशित करें'
             }
           }
         }
@@ -786,55 +849,64 @@ const TRANSLATIONS = {
         instructorPill: 'أنا مدرّس/ة',
         illustrationAlt: 'مجموعة صور لمدربين ومتعلّمين يتعاونون'
       },
-      ebooks: {
-        tagline: 'مكتبة المجتمع',
-        title: 'حوّل المعرفة إلى كتب قابلة للجمع',
+      courses: {
+        kicker: 'رحلة الدورات',
+        title: 'ارسموا معًا رحلة الدورات المتكاملة',
         subtitle:
-          'تصفّح لمحات مرحة من صانعين يبنون على العلن — كل زين جاهز لإعادة المزج والمشاركة.',
-        meta: 'إصدارات الأقران',
-        carouselLabel: 'اسحب لاستعراض الكتب الإلكترونية المميزة في المجتمع',
-        stickers: {
-          new: 'جديد!',
-          trending: 'رائج',
-          remixable: 'جاهز لإعادة المزج'
+          'تابعوا المسار من الاكتشاف إلى الاحتفال مع مزايا متوازنة للمتعلمين والمدرّسين.',
+        cta: 'استكشف الدورات',
+        ctaHelper: 'انتقل مباشرة إلى الكتالوج الكامل وخطط للدُفعة التالية.',
+        roles: {
+          learners: 'المتعلمون',
+          instructors: 'المدرّسون'
         },
-        cards: {
-          builderNotebook: {
-            tag: 'سباقات المنتج',
-            title: 'دفتر الباني',
-            description: 'طقوس ونماذج لتسريع شحن التجارب.',
-            alt: 'غلاف مصوّر لدفتر الباني مع صفحات متدرجة الألوان'
-          },
-          communityCookbook: {
-            tag: 'طقوس المجتمع',
-            title: 'كتاب وصفات المجتمع',
-            description: 'كاسرات جليد، مراجعات ومحفزات مأخوذة من دفعات نشطة.',
-            alt: 'غلاف كتاب وصفات المجتمع مع لمسات خضراء مرحة'
-          },
-          remixAtlas: {
-            tag: 'مختبر الريمكس',
-            title: 'أطلس الريمكس',
-            description: 'اقتنص أطر البداية وأعد مزجها لمساراتك الخاصة.',
-            alt: 'غلاف أطلس الريمكس مع سهام تدور حول بوصلة'
-          }
-        },
-        panels: {
-          readers: {
-            label: 'للقرّاء',
-            title: 'رؤى صغيرة لكل مزاج',
-            bullets: {
-              discovery: 'اكتشف أدلة ميدانية مختصرة لكل مرحلة إبداعية.',
-              sync: 'زامن تقدمك عبر الأجهزة وواصل من حيث توقفت.',
-              community: 'افتح تعليقات المجتمع واللقطات المميزة.'
+        stages: {
+          discover: {
+            title: 'اكتشف',
+            headline: 'طابق كل شخص مع الدفعة المناسبة',
+            learners: {
+              perk1: 'استعرض دفعات منتقاة حسب التركيز المهاري',
+              perk2: 'اطلع مسبقًا على المناهج والجداول والنتائج'
+            },
+            instructors: {
+              perk1: 'ابرز نقاط التميّز ببيانات وصفية غنيّة',
+              perk2: 'انشر قوائم الانتظار وواجهات الاستعراض الجاهزة'
             }
           },
-          creators: {
-            label: 'للمبدعين',
-            title: 'أبهِر جمهورك وانطلق بسرعة',
-            bullets: {
-              publish: 'أنشر زينات رقمية جميلة من دون أدوات تصميم.',
-              analytics: 'تابع القراءات والحفظ وطلبات الريمكس مباشرة.',
-              revenue: 'ادمج الكتب الإلكترونية مع الجلسات المباشرة لزيادة الإيرادات.'
+          enroll: {
+            title: 'سجّل',
+            headline: 'اجعل التسجيل سلسًا وشفافًا',
+            learners: {
+              perk1: 'ضمن مقعدًا بخطط دفع مرنة',
+              perk2: 'تابع مهام وإرشادات الانضمام'
+            },
+            instructors: {
+              perk1: 'أتمت تدفقات القبول والترحيب',
+              perk2: 'احمِ الموارد حتى موعد الانطلاق'
+            }
+          },
+          coLearn: {
+            title: 'تعلّم جماعيًا',
+            headline: 'حافظ على الزخم طوال التجربة',
+            learners: {
+              perk1: 'انضم إلى الاستوديوهات المباشرة والخيوط غير المتزامنة وساعات المكتب',
+              perk2: 'اكسب شارات للزخم ولدعم الأقران'
+            },
+            instructors: {
+              perk1: 'نسّق السبرنتات بالقوالب والتنبيهات',
+              perk2: 'التقط المتعلمين المعرضين للخطر عبر لوحات النبض'
+            }
+          },
+          celebrate: {
+            title: 'احتفل',
+            headline: 'احتفلوا بالطاقة عند خط النهاية معًا',
+            learners: {
+              perk1: 'اعرض نتاج المشاريع النهائية والتأملات',
+              perk2: 'شارك الإنجازات مع الدفعة والخريجين'
+            },
+            instructors: {
+              perk1: 'أصدر شهادات موثوقة بضغطة واحدة',
+              perk2: 'اجمع الشهادات وانشر أبرز اللحظات'
             }
           }
         }
@@ -887,58 +959,66 @@ const TRANSLATIONS = {
           }
         },
         instructorPill: 'Ich bin Trainer:in',
-          illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
+        illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
+      },
+      courses: {
+        kicker: 'Kursreise',
+        title: 'Gemeinsam die Kursreise kartieren',
+        subtitle:
+          'Verfolge den Weg von der Entdeckung bis zur Feier mit abgestimmten Vorteilen für Lernende und Lehrende.',
+        cta: 'Kurse entdecken',
+        ctaHelper: 'Spring direkt in den vollständigen Katalog und plane deine nächste Kohorte.',
+        roles: {
+          learners: 'Lernende',
+          instructors: 'Lehrende'
         },
-        ebooks: {
-          tagline: 'Community-Bibliothek',
-          title: 'Verwandle Wissen in sammelbare Storybooks',
-          subtitle:
-            'Stöbere durch verspielte Previews von Maker*innen, die öffentlich bauen – jedes Zine lässt sich remixen und teilen.',
-          meta: 'Drops aus der Community',
-          carouselLabel: 'Streife durch die beliebtesten Community-E-Books',
-          stickers: {
-            new: 'Neu!',
-            trending: 'Im Trend',
-            remixable: 'Remix-ready'
-          },
-          cards: {
-            builderNotebook: {
-              tag: 'Product Sprints',
-              title: 'Builder’s Notebook',
-              description: 'Rituale und Templates, um Experimente schneller zu shippen.',
-              alt: 'Illustrierter Umschlag des Builder’s Notebook mit Farbverlauf'
+        stages: {
+          discover: {
+            title: 'Entdecken',
+            headline: 'Finde für jede Person die passende Kohorte',
+            learners: {
+              perk1: 'Durchstöbere kuratierte Kohorten nach Skill-Schwerpunkten',
+              perk2: 'Blicke vorab in Lehrpläne, Zeitpläne und Ergebnisse'
             },
-            communityCookbook: {
-              tag: 'Community-Rituale',
-              title: 'Community Cookbook',
-              description: 'Icebreaker, Retros und Prompts aus aktiven Kohorten.',
-              alt: 'Umschlag des Community Cookbook mit verspielten grünen Akzenten'
-            },
-            remixAtlas: {
-              tag: 'Remix-Labor',
-              title: 'Remix Atlas',
-              description: 'Schnapp dir Start-Frameworks und remixe sie für deine eigenen Journeys.',
-              alt: 'Remix-Atlas-Umschlag mit Pfeilen um einen Kompass'
+            instructors: {
+              perk1: 'Rücke Alleinstellungsmerkmale mit reichhaltigen Metadaten ins Rampenlicht',
+              perk2: 'Veröffentliche Wartelisten und entdeckungsbereite Previews'
             }
           },
-          panels: {
-            readers: {
-              label: 'Für Leser*innen',
-              title: 'Pocket-Insights für jede Stimmung',
-              bullets: {
-                discovery: 'Entdecke kompakte Field Guides für jede kreative Phase.',
-                sync: 'Synchronisiere Fortschritt geräteübergreifend und mach genau dort weiter, wo du aufgehört hast.',
-                community: 'Schalte Community-Notizen und Highlight-Reels frei.'
-              }
+          enroll: {
+            title: 'Einschreiben',
+            headline: 'Mache die Einschreibung einfach und transparent',
+            learners: {
+              perk1: 'Sichere dir Plätze mit flexiblen Zahlungsplänen',
+              perk2: 'Behalte Onboarding-Aufgaben und Deadlines im Blick'
             },
-            creators: {
-              label: 'Für Creator*innen',
-              title: 'Begeistere Fans und liefere schneller',
-              bullets: {
-                publish: 'Veröffentliche schöne digitale Zines ohne Design-Tools.',
-                analytics: 'Verfolge Reads, Saves und Remix-Anfragen in Echtzeit.',
-                revenue: 'Bündle E-Books mit Live-Sessions und steigere den Umsatz.'
-              }
+            instructors: {
+              perk1: 'Automatisiere Aufnahme- und Willkommensflows',
+              perk2: 'Schütze Ressourcen bis zum Kick-off'
+            }
+          },
+          coLearn: {
+            title: 'Gemeinsam lernen',
+            headline: 'Halte den Schwung während der gesamten Erfahrung',
+            learners: {
+              perk1: 'Nimm an Live-Studios, asynchronen Threads und Sprechstunden teil',
+              perk2: 'Verdiene Abzeichen für Momentum und Peer-Support'
+            },
+            instructors: {
+              perk1: 'Orchestriere Sprints mit Vorlagen und Nudges',
+              perk2: 'Erkenne gefährdete Lernende mit Puls-Dashboards'
+            }
+          },
+          celebrate: {
+            title: 'Feiern',
+            headline: 'Feiert gemeinsam den Zieleinlauf',
+            learners: {
+              perk1: 'Präsentiere Abschlussartefakte und Reflexionen',
+              perk2: 'Teile Erfolge mit der Kohorte und Alumni'
+            },
+            instructors: {
+              perk1: 'Stelle verifizierbare Zertifikate mit einem Klick aus',
+              perk2: 'Sammle Testimonials und veröffentliche Highlights'
             }
           }
         }
@@ -989,59 +1069,67 @@ const TRANSLATIONS = {
             cta: 'Читать сейчас'
           }
         },
-          instructorPill: 'Я преподаватель',
-          illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'
+        instructorPill: 'Я преподаватель',
+        illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'
+      },
+      courses: {
+        kicker: 'Путешествие по курсам',
+        title: 'Спланируйте совместное путешествие по курсам',
+        subtitle:
+          'Проследите путь от знакомства до празднования с выверенными выгодами для учащихся и преподавателей.',
+        cta: 'Исследовать курсы',
+        ctaHelper: 'Перейдите прямо к полному каталогу и запланируйте следующую когорту.',
+        roles: {
+          learners: 'Учащиеся',
+          instructors: 'Преподаватели'
         },
-        ebooks: {
-          tagline: 'Библиотека сообщества',
-          title: 'Превратите знания в коллекционные цифровые книги',
-          subtitle:
-            'Просматривайте яркие превью от создателей, которые строят на публике — каждый зин можно ремикснуть и поделиться.',
-          meta: 'Релизы от участников',
-          carouselLabel: 'Листайте избранные электронные книги сообщества',
-          stickers: {
-            new: 'Новинка!',
-            trending: 'В тренде',
-            remixable: 'Готово к ремиксу'
-          },
-          cards: {
-            builderNotebook: {
-              tag: 'Продуктовые спринты',
-              title: 'Дневник билдера',
-              description: 'Ритуалы и шаблоны, чтобы быстрее запускать эксперименты.',
-              alt: 'Обложка Дневника билдера с градиентными страницами'
+        stages: {
+          discover: {
+            title: 'Открыть',
+            headline: 'Подберите каждому подходящую когорту',
+            learners: {
+              perk1: 'Изучайте подобранные когорты по навыкам',
+              perk2: 'Смотрите программы, расписания и результаты заранее'
             },
-            communityCookbook: {
-              tag: 'Ритуалы сообщества',
-              title: 'Комьюнити-книга рецептов',
-              description: 'Айсбрекеры, ретро и подсказки от активных когорт.',
-              alt: 'Обложка Комьюнити-книги рецептов с игривыми зелёными акцентами'
-            },
-            remixAtlas: {
-              tag: 'Лаборатория ремиксов',
-              title: 'Атлас ремиксов',
-              description: 'Берите стартовые фреймворки и адаптируйте их под свои маршруты.',
-              alt: 'Обложка Атласа ремиксов со стрелками вокруг компаса'
+            instructors: {
+              perk1: 'Выделяйте преимущества с помощью богатых метаданных',
+              perk2: 'Публикуйте листы ожидания и готовые превью'
             }
           },
-          panels: {
-            readers: {
-              label: 'Для читателей',
-              title: 'Карманные инсайты на любой настрой',
-              bullets: {
-                discovery: 'Находите короткие полевые гиды для каждого этапа творчества.',
-                sync: 'Синхронизируйте прогресс между устройствами и продолжайте с нужного места.',
-                community: 'Открывайте доступ к заметкам и хайлайтам сообщества.'
-              }
+          enroll: {
+            title: 'Записаться',
+            headline: 'Сделайте запись простой и прозрачной',
+            learners: {
+              perk1: 'Закрепляйте места с гибкими планами оплаты',
+              perk2: 'Отслеживайте задачи и сроки онбординга'
             },
-            creators: {
-              label: 'Для создателей',
-              title: 'Удивляйте аудиторию и запускайте быстрее',
-              bullets: {
-                publish: 'Публикуйте красивые цифровые зины без дизайнерских инструментов.',
-                analytics: 'Отслеживайте чтения, сохранения и запросы на ремикс в реальном времени.',
-                revenue: 'Комбинируйте e-book’и с живыми сессиями, чтобы увеличить доход.'
-              }
+            instructors: {
+              perk1: 'Автоматизируйте процессы принятия и приветствия',
+              perk2: 'Ограничивайте доступ к ресурсам до старта'
+            }
+          },
+          coLearn: {
+            title: 'Совместно учиться',
+            headline: 'Поддерживайте темп на протяжении всей программы',
+            learners: {
+              perk1: 'Присоединяйтесь к живым студиям, асинхронным веткам и офисным часам',
+              perk2: 'Зарабатывайте бейджи за прогресс и поддержку коллег'
+            },
+            instructors: {
+              perk1: 'Организуйте спринты с шаблонами и напоминаниями',
+              perk2: 'Отслеживайте риски через дашборды пульса'
+            }
+          },
+          celebrate: {
+            title: 'Отпраздновать',
+            headline: 'Празднуйте финиш вместе',
+            learners: {
+              perk1: 'Показывайте итоговые артефакты и рефлексии',
+              perk2: 'Делитесь победами с когортой и выпускниками'
+            },
+            instructors: {
+              perk1: 'Выдавайте проверяемые сертификаты одним кликом',
+              perk2: 'Собирайте отзывы и публикуйте лучшие моменты'
             }
           }
         }
