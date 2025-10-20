@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import ReportingCourseEnrollmentDailyView from '../src/models/ReportingCourseEnrollmentDailyView.js';
 import ReportingPaymentsRevenueDailyView from '../src/models/ReportingPaymentsRevenueDailyView.js';
@@ -21,19 +21,79 @@ import UserModel from '../src/models/UserModel.js';
 import UserMuteModel from '../src/models/UserMuteModel.js';
 import UserPresenceSessionModel from '../src/models/UserPresenceSessionModel.js';
 
+const { databaseMock } = vi.hoisted(() => {
+  const queue = [];
+  const mock = vi.fn((table) => {
+    if (queue.length === 0) {
+      throw new Error(`Unexpected database access: ${table}`);
+    }
+    const expectation = queue.shift();
+    if (expectation.table && expectation.table !== table) {
+      throw new Error(`Expected access to table ${expectation.table} but received ${table}`);
+    }
+    return createQueryBuilder(expectation);
+  });
+
+  mock.raw = vi.fn((sql, bindings) => ({ sql, bindings }));
+  mock.fn = { now: vi.fn(() => new Date('2024-01-01T00:00:00.000Z')) };
+  mock.transaction = vi.fn(async (handler) => {
+    const transactionExpectations = queue.shift()?.transaction ?? [];
+    const trx = createConnectionStub(transactionExpectations);
+    trx.raw = mock.raw;
+    trx.fn = mock.fn;
+    return handler(trx);
+  });
+  mock.__setExpectations = (expectations = []) => {
+    queue.length = 0;
+    queue.push(...(expectations ?? []));
+  };
+
+  return { databaseMock: mock };
+});
+
+vi.mock('../src/config/database.js', () => ({
+  __esModule: true,
+  default: databaseMock,
+  healthcheck: vi.fn()
+}));
+
+afterEach(() => {
+  databaseMock.__setExpectations();
+});
+
+function handleNested(expectation, type, handler) {
+  const nested = createNestedBuilder();
+  handler(nested);
+  expectation.onNestedWhere?.(type, nested);
+}
+
 function createQueryBuilder(expectation = {}) {
   const rows = expectation.rows ?? [];
   const result = typeof expectation.result === 'function' ? expectation.result() : expectation.result ?? rows;
+  const createJoin = (type) =>
+    vi.fn((...args) => {
+      const maybeHandler = args[args.length - 1];
+      if (typeof maybeHandler === 'function') {
+        const joinBuilder = createJoinBuilder();
+        maybeHandler.call(joinBuilder, joinBuilder);
+        expectation.onJoin?.({ type, args, builder: joinBuilder });
+      } else {
+        expectation.onJoin?.({ type, args });
+      }
+      return builder;
+    });
   const builder = {
-    select: vi.fn(() => builder),
+    select: vi.fn((...args) => {
+      expectation.onSelect?.(args);
+      return builder;
+    }),
     from: vi.fn(() => builder),
-    leftJoin: vi.fn(() => builder),
-    innerJoin: vi.fn(() => builder),
-    join: vi.fn(() => builder),
+    leftJoin: createJoin('leftJoin'),
+    innerJoin: createJoin('innerJoin'),
+    join: createJoin('join'),
     where: vi.fn((...args) => {
       if (typeof args[0] === 'function') {
-        const nested = createNestedBuilder();
-        args[0](nested);
+        handleNested(expectation, 'where', args[0]);
       } else {
         expectation.onWhere?.(args);
       }
@@ -47,14 +107,25 @@ function createQueryBuilder(expectation = {}) {
       expectation.onWhereIn?.(args);
       return builder;
     }),
+    whereNot: vi.fn((...args) => {
+      if (typeof args[0] === 'function') {
+        handleNested(expectation, 'whereNot', args[0]);
+      } else {
+        expectation.onWhereNot?.(args);
+      }
+      return builder;
+    }),
+    whereNotIn: vi.fn((...args) => {
+      expectation.onWhereNotIn?.(args);
+      return builder;
+    }),
     whereNull: vi.fn((...args) => {
       expectation.onWhereNull?.(args);
       return builder;
     }),
     andWhere: vi.fn((arg1, arg2, arg3) => {
       if (typeof arg1 === 'function') {
-        const nested = createNestedBuilder();
-        arg1(nested);
+        handleNested(expectation, 'andWhere', arg1);
       } else {
         expectation.onWhere?.([arg1, arg2, arg3]);
       }
@@ -62,8 +133,7 @@ function createQueryBuilder(expectation = {}) {
     }),
     orWhere: vi.fn((arg1, arg2, arg3) => {
       if (typeof arg1 === 'function') {
-        const nested = createNestedBuilder();
-        arg1(nested);
+        handleNested(expectation, 'orWhere', arg1);
       } else {
         expectation.onWhere?.([arg1, arg2, arg3]);
       }
@@ -74,6 +144,7 @@ function createQueryBuilder(expectation = {}) {
         andWhere: vi.fn(() => nested)
       };
       fn(nested);
+      expectation.onModify?.(nested);
       return builder;
     }),
     groupBy: vi.fn(() => builder),
@@ -94,9 +165,14 @@ function createQueryBuilder(expectation = {}) {
     }),
     clearSelect: vi.fn(() => builder),
     count: vi.fn(() => {
+      expectation.onCount?.();
       if (expectation.countRow !== undefined) {
         builder.first = vi.fn(async () => expectation.countRow);
       }
+      return builder;
+    }),
+    countDistinct: vi.fn((...args) => {
+      expectation.onCountDistinct?.(args);
       return builder;
     }),
     whereRaw: vi.fn(() => builder),
@@ -105,7 +181,10 @@ function createQueryBuilder(expectation = {}) {
       merge: vi.fn(async () => expectation.mergeResult ?? 1)
     })),
     returning: vi.fn(() => builder),
-    forUpdate: vi.fn(() => builder),
+    forUpdate: vi.fn(() => {
+      expectation.onForUpdate?.();
+      return builder;
+    }),
     first: vi.fn(async () => {
       if (expectation.first !== undefined) {
         return typeof expectation.first === 'function' ? expectation.first() : expectation.first;
@@ -137,6 +216,8 @@ function createQueryBuilder(expectation = {}) {
     })
   };
 
+  builder.delete = vi.fn(async () => builder.del());
+
   builder.then = (resolve) => resolve(result ?? []);
   return builder;
 }
@@ -153,6 +234,15 @@ function createNestedBuilder() {
     orWhere: vi.fn(() => nested)
   };
   return nested;
+}
+
+function createJoinBuilder() {
+  const join = {
+    on: vi.fn(() => join),
+    andOn: vi.fn(() => join),
+    orOn: vi.fn(() => join)
+  };
+  return join;
 }
 
 function createConnectionStub(expectations = []) {
@@ -1599,6 +1689,203 @@ describe('UserBlockModel', () => {
 });
 
 describe('UserFollowModel', () => {
+  it('finds relationships with parsed metadata fields', async () => {
+    const connection = createConnectionStub([
+      {
+        table: 'user_follows',
+        first: {
+          id: 21,
+          follower_id: 4,
+          following_id: 9,
+          status: 'pending',
+          source: 'import',
+          reason: 'sync',
+          accepted_at: null,
+          metadata: JSON.stringify({ note: 'hello' }),
+          created_at: '2024-05-01T00:00:00.000Z',
+          updated_at: '2024-05-01T00:00:00.000Z'
+        }
+      }
+    ]);
+
+    const record = await UserFollowModel.findRelationship(4, 9, connection);
+    expect(record).toEqual({
+      id: 21,
+      followerId: 4,
+      followingId: 9,
+      status: 'pending',
+      source: 'import',
+      reason: 'sync',
+      acceptedAt: null,
+      metadata: { note: 'hello' },
+      createdAt: '2024-05-01T00:00:00.000Z',
+      updatedAt: '2024-05-01T00:00:00.000Z'
+    });
+  });
+
+  it('updates relationship status and returns latest projection', async () => {
+    const updates = [];
+    const connection = createConnectionStub([
+      {
+        table: 'user_follows',
+        onUpdate: (payload) => {
+          updates.push(payload);
+          return 1;
+        }
+      },
+      {
+        table: 'user_follows',
+        first: {
+          id: 21,
+          follower_id: 4,
+          following_id: 9,
+          status: 'accepted',
+          source: 'invite',
+          reason: 'approved',
+          accepted_at: '2024-05-02T00:00:00.000Z',
+          metadata: JSON.stringify({ context: 'class' }),
+          created_at: '2024-05-01T00:00:00.000Z',
+          updated_at: '2024-05-02T00:00:00.000Z'
+        }
+      }
+    ]);
+
+    const relationship = await UserFollowModel.updateStatus(
+      4,
+      9,
+      'accepted',
+      { acceptedAt: '2024-05-02T00:00:00.000Z', reason: 'approved' },
+      connection
+    );
+
+    expect(updates[0]).toMatchObject({
+      status: 'accepted',
+      accepted_at: '2024-05-02T00:00:00.000Z',
+      reason: 'approved'
+    });
+    expect(updates[0].updated_at).toBeInstanceOf(Date);
+    expect(relationship.status).toBe('accepted');
+    expect(relationship.metadata).toEqual({ context: 'class' });
+  });
+
+  it('determines following status and removes relationships when requested', async () => {
+    const followConnection = createConnectionStub([
+      {
+        table: 'user_follows',
+        first: { id: 1 }
+      }
+    ]);
+    await expect(UserFollowModel.isFollowing(4, 9, followConnection)).resolves.toBe(true);
+
+    const deleteConnection = createConnectionStub([
+      {
+        table: 'user_follows',
+        deleteResult: 1
+      }
+    ]);
+    await expect(UserFollowModel.deleteRelationship(4, 9, deleteConnection)).resolves.toBe(1);
+
+    const whereInCalls = [];
+    const removeConnection = createConnectionStub([
+      {
+        table: 'user_follows',
+        onWhereIn: (args) => whereInCalls.push(args),
+        deleteResult: 2
+      }
+    ]);
+    const removed = await UserFollowModel.removeBetween(4, 9, removeConnection);
+    expect(removed).toBe(2);
+    expect(whereInCalls).toEqual([
+      ['follower_id', [4, 9]],
+      ['following_id', [4, 9]]
+    ]);
+  });
+
+  it('counts following relationships independently of followers', async () => {
+    const connection = createConnectionStub([
+      {
+        table: 'user_follows',
+        rows: [{ count: '7' }]
+      }
+    ]);
+
+    const total = await UserFollowModel.countFollowing(4, connection);
+    expect(total).toBe(7);
+  });
+
+  it('lists mutual followers with aggregated counts', async () => {
+    const rows = [
+      {
+        user_id: 7,
+        first_name: 'Casey',
+        last_name: 'Stone',
+        role: 'learner',
+        email: 'casey@example.com',
+        mutual_followers: '3'
+      }
+    ];
+
+    const connection = createConnectionStub([
+      {
+        table: 'user_follows as uf',
+        rows
+      }
+    ]);
+
+    const mutuals = await UserFollowModel.listMutualFollowers(4, 9, connection);
+    expect(mutuals).toEqual([
+      {
+        id: 7,
+        firstName: 'Casey',
+        lastName: 'Stone',
+        role: 'learner',
+        email: 'casey@example.com',
+        mutualFollowers: 3
+      }
+    ]);
+  });
+
+  it('finds mutual follow candidates while respecting exclusions', async () => {
+    const onWhereNotIn = vi.fn();
+    const onCountDistinct = vi.fn();
+    const connection = createConnectionStub([
+      {
+        table: 'user_follows as uf',
+        rows: [
+          {
+            user_id: 11,
+            first_name: 'Taylor',
+            last_name: 'Ray',
+            role: 'creator',
+            email: 'taylor@example.com',
+            mutual_followers: '4'
+          }
+        ],
+        onWhereNotIn,
+        onCountDistinct
+      }
+    ]);
+
+    const suggestions = await UserFollowModel.findMutualCandidates(
+      4,
+      { limit: 5, excludeIds: [9, 10] },
+      connection
+    );
+
+    expect(suggestions).toEqual([
+      {
+        id: 11,
+        firstName: 'Taylor',
+        lastName: 'Ray',
+        role: 'creator',
+        email: 'taylor@example.com',
+        mutualFollowers: 4
+      }
+    ]);
+    expect(onWhereNotIn).toHaveBeenCalledWith(['uf.follower_id', [9, 10]]);
+    expect(onCountDistinct).toHaveBeenCalled();
+  });
+
   it('upserts relationships with metadata', async () => {
     const inserts = [];
     const connection = createConnectionStub([
@@ -1780,6 +2067,240 @@ describe('UserFollowModel', () => {
 });
 
 describe('UserModel', () => {
+  it('finds users by email using provided connection', async () => {
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        first: { id: 9, email: 'learner@example.com' }
+      }
+    ]);
+
+    const user = await UserModel.findByEmail('learner@example.com', connection);
+    expect(user).toEqual({ id: 9, email: 'learner@example.com' });
+  });
+
+  it('locks rows when fetching for update by email', async () => {
+    const onForUpdate = vi.fn();
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        onForUpdate,
+        first: { id: 12, email: 'locked@example.com' }
+      }
+    ]);
+
+    await UserModel.forUpdateByEmail('locked@example.com', connection);
+    expect(onForUpdate).toHaveBeenCalled();
+  });
+
+  it('selects base projection when finding by id', async () => {
+    const onSelect = vi.fn();
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        onSelect,
+        first: {
+          id: 5,
+          firstName: 'Sam',
+          lastName: 'Lee',
+          email: 'sam@example.com',
+          role: 'admin',
+          age: 29,
+          address: JSON.stringify({ city: 'LA' }),
+          twoFactorEnabled: 0,
+          twoFactorEnrolledAt: null,
+          twoFactorLastVerifiedAt: null,
+          emailVerifiedAt: null,
+          lastLoginAt: null,
+          createdAt: '2024-05-01T00:00:00.000Z',
+          updatedAt: '2024-05-01T00:00:00.000Z'
+        }
+      }
+    ]);
+
+    const user = await UserModel.findById(5, connection);
+    const callArgs = onSelect.mock.calls[0][0];
+    const columns = Array.isArray(callArgs[0]) ? callArgs[0] : callArgs;
+    expect(columns).toEqual(
+      expect.arrayContaining(['id', 'first_name as firstName', 'last_name as lastName'])
+    );
+    expect(user.firstName).toBe('Sam');
+  });
+
+  it('hydrates multiple ids and short circuits empty requests', async () => {
+    const noopConnection = vi.fn();
+    await expect(UserModel.findByIds([], noopConnection)).resolves.toEqual([]);
+    expect(noopConnection).not.toHaveBeenCalled();
+
+    const onWhereIn = vi.fn();
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        rows: [
+          { id: 1, firstName: 'Alex' },
+          { id: 2, firstName: 'Taylor' }
+        ],
+        onWhereIn
+      }
+    ]);
+
+    const users = await UserModel.findByIds([1, 2], connection);
+    expect(onWhereIn).toHaveBeenCalledWith(['id', [1, 2]]);
+    expect(users).toHaveLength(2);
+  });
+
+  it('lists users with consistent ordering and pagination', async () => {
+    const onSelect = vi.fn();
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        rows: [
+          { id: 1, firstName: 'Alex' },
+          { id: 2, firstName: 'Taylor' }
+        ],
+        onSelect
+      }
+    ]);
+
+    const result = await UserModel.list({ limit: 2, offset: 1 }, connection);
+    expect(onSelect).toHaveBeenCalled();
+    expect(result).toHaveLength(2);
+  });
+
+  it('updates provided fields and returns the latest row', async () => {
+    const updates = [];
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        onUpdate: (payload) => {
+          updates.push(payload);
+          return 1;
+        }
+      },
+      {
+        table: 'users',
+        first: {
+          id: 5,
+          firstName: 'Sam',
+          lastName: 'Lee',
+          email: 'sam@example.com',
+          role: 'admin',
+          age: 29,
+          address: JSON.stringify({ city: 'LA' }),
+          twoFactorEnabled: 0,
+          twoFactorEnrolledAt: null,
+          twoFactorLastVerifiedAt: null,
+          emailVerifiedAt: null,
+          lastLoginAt: null,
+          createdAt: '2024-05-01T00:00:00.000Z',
+          updatedAt: '2024-05-02T00:00:00.000Z'
+        }
+      }
+    ]);
+
+    const updated = await UserModel.updateById(
+      5,
+      { firstName: 'Sam', address: { city: 'LA' } },
+      connection
+    );
+
+    expect(updates[0]).toMatchObject({
+      first_name: 'Sam',
+      address: JSON.stringify({ city: 'LA' })
+    });
+    expect(updated.updatedAt).toBe('2024-05-02T00:00:00.000Z');
+  });
+
+  it('resets login failure counters and timestamps', async () => {
+    const updates = [];
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        onUpdate: (payload) => {
+          updates.push(payload);
+          return 1;
+        }
+      }
+    ]);
+
+    await UserModel.clearLoginFailures(5, connection);
+    expect(updates[0]).toMatchObject({
+      failed_login_attempts: 0,
+      last_failed_login_at: null,
+      locked_until: null
+    });
+    expect(updates[0].last_login_at).toBeInstanceOf(Date);
+  });
+
+  it('marks verification states with consistent timestamps', async () => {
+    const twoFactorUpdates = [];
+    const connection = createConnectionStub([
+      {
+        table: 'users',
+        onUpdate: (payload) => {
+          twoFactorUpdates.push(payload);
+          return 1;
+        }
+      }
+    ]);
+
+    await UserModel.markTwoFactorVerified(5, connection);
+    expect(twoFactorUpdates[0].two_factor_last_verified_at).toBeInstanceOf(Date);
+
+    const emailUpdates = [];
+    const emailConnection = createConnectionStub([
+      {
+        table: 'users',
+        onUpdate: (payload) => {
+          emailUpdates.push(payload);
+          return 1;
+        }
+      },
+      {
+        table: 'users',
+        first: {
+          id: 5,
+          firstName: 'Sam',
+          lastName: 'Lee',
+          email: 'sam@example.com',
+          role: 'admin',
+          age: 29,
+          address: JSON.stringify({ city: 'LA' }),
+          twoFactorEnabled: 0,
+          twoFactorEnrolledAt: null,
+          twoFactorLastVerifiedAt: null,
+          emailVerifiedAt: '2024-05-02T00:00:00.000Z',
+          lastLoginAt: null,
+          createdAt: '2024-05-01T00:00:00.000Z',
+          updatedAt: '2024-05-02T00:00:00.000Z'
+        }
+      }
+    ]);
+
+    const verified = await UserModel.markEmailVerified(5, emailConnection);
+    expect(emailUpdates[0]).toMatchObject({
+      email_verified_at: expect.any(Date),
+      failed_login_attempts: 0,
+      last_failed_login_at: null,
+      locked_until: null
+    });
+    expect(verified.emailVerifiedAt).toBe('2024-05-02T00:00:00.000Z');
+
+    const verificationUpdates = [];
+    const verifyConnection = createConnectionStub([
+      {
+        table: 'users',
+        onUpdate: (payload) => {
+          verificationUpdates.push(payload);
+          return 1;
+        }
+      }
+    ]);
+
+    await UserModel.touchVerificationSentAt(5, verifyConnection);
+    expect(verificationUpdates[0].last_verification_sent_at).toBeInstanceOf(Date);
+  });
+
   it('creates users and serialises structured address', async () => {
     const inserts = [];
     const connection = createConnectionStub([
@@ -1895,6 +2416,57 @@ describe('UserMuteModel', () => {
 });
 
 describe('UserPresenceSessionModel', () => {
+  it('clears sessions by identifier', async () => {
+    const onDel = vi.fn(() => 1);
+    const connection = createConnectionStub([
+      {
+        table: 'user_presence_sessions',
+        onDel
+      }
+    ]);
+
+    await UserPresenceSessionModel.clear('sess-1', connection);
+    expect(onDel).toHaveBeenCalled();
+  });
+
+  it('short circuits when no user ids are provided', async () => {
+    const connection = vi.fn();
+    await expect(UserPresenceSessionModel.listActiveByUserIds([], connection)).resolves.toEqual([]);
+    expect(connection).not.toHaveBeenCalled();
+  });
+
+  it('filters active sessions by expiration window', async () => {
+    const onNestedWhere = vi.fn();
+    const onWhereIn = vi.fn();
+    const connection = createConnectionStub([
+      {
+        table: 'user_presence_sessions',
+        rows: [
+          {
+            id: 1,
+            user_id: 5,
+            session_id: 'sess-1',
+            client: 'web',
+            status: 'online',
+            connected_at: '2024-05-01T00:00:00.000Z',
+            last_seen_at: '2024-05-01T00:05:00.000Z',
+            expires_at: null,
+            metadata: JSON.stringify({})
+          }
+        ],
+        onNestedWhere,
+        onWhereIn
+      }
+    ]);
+
+    const sessions = await UserPresenceSessionModel.listActiveByUserIds([5], connection);
+    expect(onWhereIn).toHaveBeenCalledWith(['user_id', [5]]);
+    const nested = onNestedWhere.mock.calls[0][1];
+    expect(nested.whereNull).toHaveBeenCalledWith('expires_at');
+    expect(nested.orWhere).toHaveBeenCalledWith('expires_at', '>', expect.any(Date));
+    expect(sessions).toHaveLength(1);
+  });
+
   it('upserts sessions and returns mapped record', async () => {
     const inserts = [];
     const connection = createConnectionStub([
@@ -1970,10 +2542,12 @@ describe('UserPresenceSessionModel', () => {
       }
     ];
 
+    const onNestedWhere = vi.fn();
     const connection = createConnectionStub([
       {
         table: 'user_presence_sessions as ups',
-        rows
+        rows,
+        onNestedWhere
       }
     ]);
 
@@ -1991,5 +2565,8 @@ describe('UserPresenceSessionModel', () => {
         metadata: { device: 'ios' }
       }
     ]);
+    const nested = onNestedWhere.mock.calls[0][1];
+    expect(nested.whereNull).toHaveBeenCalledWith('ups.expires_at');
+    expect(nested.orWhere).toHaveBeenCalledWith('ups.expires_at', '>', expect.any(Date));
   });
 });
