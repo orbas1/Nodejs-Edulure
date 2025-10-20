@@ -42,10 +42,12 @@ export async function up(knex) {
   }
 
   // Ensure legacy formats are normalised
-  await knex('learner_library_entries')
-    .whereNotIn('format', LIBRARY_FORMATS)
-    .update({ format: 'E-book' })
-    .catch(() => undefined);
+  const tableStillExists = hasLibraryEntries || (await knex.schema.hasTable('learner_library_entries'));
+  if (tableStillExists) {
+    await knex('learner_library_entries')
+      .whereNotIn('format', LIBRARY_FORMATS)
+      .update({ format: 'E-book' });
+  }
 }
 
 export async function down(knex) {
