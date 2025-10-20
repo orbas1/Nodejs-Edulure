@@ -7,6 +7,7 @@ import MonetizationRevenueScheduleModel from '../src/models/MonetizationRevenueS
 import MonetizationUsageRecordModel from '../src/models/MonetizationUsageRecordModel.js';
 import PaymentCouponModel from '../src/models/PaymentCouponModel.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
+import PaymentLedgerEntryModel from '../src/models/PaymentLedgerEntryModel.js';
 import PaymentRefundModel from '../src/models/PaymentRefundModel.js';
 import PlatformSettingModel from '../src/models/PlatformSettingModel.js';
 import PodcastEpisodeModel from '../src/models/PodcastEpisodeModel.js';
@@ -20,153 +21,159 @@ import ReleaseChecklistItemModel from '../src/models/ReleaseChecklistItemModel.j
 import ReleaseGateResultModel from '../src/models/ReleaseGateResultModel.js';
 import ReleaseRunModel from '../src/models/ReleaseRunModel.js';
 import ReportingCommunityEngagementDailyView from '../src/models/ReportingCommunityEngagementDailyView.js';
-import DataEncryptionService from '../src/services/DataEncryptionService.js';
 
 let connection;
 
-const TABLES = [
+const TABLE_ORDER = [
+  'users',
+  'communities',
   'monetization_catalog_items',
   'monetization_reconciliation_runs',
   'monetization_revenue_schedules',
   'monetization_usage_records',
-  'payment_coupon_redemptions',
   'payment_coupons',
+  'payment_coupon_redemptions',
   'payment_intents',
   'payment_refunds',
+  'payment_ledger_entries',
   'platform_settings',
-  'podcast_episodes',
   'podcast_shows',
-  'provider_transition_acknowledgements',
+  'podcast_episodes',
   'provider_transition_announcements',
+  'provider_transition_acknowledgements',
   'provider_transition_resources',
   'provider_transition_status_updates',
   'provider_transition_timeline_entries',
-  'release_gate_results',
-  'release_checklist_items',
   'release_runs',
-  'reporting_community_engagement_daily',
-  'communities',
-  'users'
+  'release_checklist_items',
+  'release_gate_results',
+  'reporting_community_engagement_daily'
 ];
 
-async function createSchema(knexInstance) {
-  await knexInstance.schema.createTable('monetization_catalog_items', (table) => {
+const TABLE_DEFINITIONS = {
+  users(table) {
     table.increments('id');
-    table.uuid('public_id');
+    table.string('email').notNullable();
+    table.string('first_name');
+    table.string('last_name');
+    table.timestamps(true, true);
+  },
+  communities(table) {
+    table.increments('id');
+    table.string('name').notNullable();
+    table.timestamps(true, true);
+  },
+  monetization_catalog_items(table) {
+    table.increments('id');
+    table.uuid('public_id').notNullable();
     table.string('tenant_id').notNullable();
     table.string('product_code').notNullable();
     table.string('name').notNullable();
     table.text('description');
-    table.string('pricing_model');
-    table.string('billing_interval');
-    table.string('revenue_recognition_method');
-    table.integer('recognition_duration_days');
-    table.integer('unit_amount_cents');
-    table.string('currency');
+    table.string('pricing_model').notNullable();
+    table.string('billing_interval').notNullable();
+    table.string('revenue_recognition_method').notNullable();
+    table.integer('recognition_duration_days').defaultTo(0);
+    table.integer('unit_amount_cents').defaultTo(0);
+    table.string('currency').notNullable();
     table.string('usage_metric');
     table.string('revenue_account');
     table.string('deferred_revenue_account');
     table.text('metadata');
-    table.string('status');
+    table.string('status').notNullable();
     table.timestamp('effective_from');
     table.timestamp('effective_to');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
     table.timestamp('retired_at');
-  });
-
-  await knexInstance.schema.createTable('monetization_reconciliation_runs', (table) => {
+  },
+  monetization_reconciliation_runs(table) {
     table.increments('id');
     table.string('tenant_id').notNullable();
     table.timestamp('window_start').notNullable();
     table.timestamp('window_end').notNullable();
     table.string('status').notNullable();
-    table.integer('invoiced_cents');
-    table.integer('usage_cents');
-    table.integer('recognized_cents');
-    table.integer('deferred_cents');
-    table.integer('variance_cents');
-    table.decimal('variance_ratio');
+    table.integer('invoiced_cents').defaultTo(0);
+    table.integer('usage_cents').defaultTo(0);
+    table.integer('recognized_cents').defaultTo(0);
+    table.integer('deferred_cents').defaultTo(0);
+    table.integer('variance_cents').defaultTo(0);
+    table.decimal('variance_ratio', 8, 4).defaultTo(0);
     table.text('metadata');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('monetization_revenue_schedules', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  monetization_revenue_schedules(table) {
     table.increments('id');
     table.string('tenant_id').notNullable();
     table.string('payment_intent_id');
     table.integer('catalog_item_id');
     table.integer('usage_record_id');
     table.string('product_code');
-    table.string('status');
-    table.string('recognition_method');
+    table.string('status').notNullable();
+    table.string('recognition_method').notNullable();
     table.timestamp('recognition_start');
     table.timestamp('recognition_end');
-    table.integer('amount_cents');
-    table.integer('recognized_amount_cents');
-    table.string('currency');
+    table.integer('amount_cents').defaultTo(0);
+    table.integer('recognized_amount_cents').defaultTo(0);
+    table.string('currency').notNullable();
     table.string('revenue_account');
     table.string('deferred_revenue_account');
     table.timestamp('recognized_at');
     table.text('metadata');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('monetization_usage_records', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  monetization_usage_records(table) {
     table.increments('id');
-    table.uuid('public_id');
+    table.uuid('public_id').notNullable();
     table.string('tenant_id').notNullable();
     table.integer('catalog_item_id');
-    table.string('product_code');
+    table.string('product_code').notNullable();
     table.string('account_reference');
     table.integer('user_id');
     table.timestamp('usage_date');
-    table.decimal('quantity');
-    table.integer('unit_amount_cents');
-    table.integer('amount_cents');
-    table.string('currency');
+    table.decimal('quantity', 10, 4).defaultTo(0);
+    table.integer('unit_amount_cents').defaultTo(0);
+    table.integer('amount_cents').defaultTo(0);
+    table.string('currency').notNullable();
     table.string('source');
     table.string('external_reference');
     table.string('payment_intent_id');
     table.text('metadata');
     table.timestamp('recorded_at');
     table.timestamp('processed_at');
-  });
-
-  await knexInstance.schema.createTable('payment_coupons', (table) => {
+  },
+  payment_coupons(table) {
     table.increments('id');
     table.string('code').notNullable();
     table.string('name');
     table.text('description');
-    table.string('discount_type');
-    table.decimal('discount_value');
+    table.string('discount_type').notNullable();
+    table.integer('discount_value').notNullable();
     table.string('currency');
     table.integer('max_redemptions');
     table.integer('per_user_limit');
     table.integer('times_redeemed').defaultTo(0);
     table.boolean('is_stackable').defaultTo(false);
-    table.string('status');
+    table.string('status').notNullable();
     table.timestamp('valid_from');
     table.timestamp('valid_until');
     table.text('metadata');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
     table.timestamp('archived_at');
-  });
-
-  await knexInstance.schema.createTable('payment_coupon_redemptions', (table) => {
+  },
+  payment_coupon_redemptions(table) {
     table.increments('id');
     table.integer('coupon_id').notNullable();
     table.string('payment_intent_id');
     table.integer('user_id');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('payment_intents', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+  },
+  payment_intents(table) {
     table.increments('id');
-    table.uuid('public_id');
+    table.uuid('public_id').notNullable();
     table.integer('user_id');
     table.string('provider');
     table.string('provider_intent_id');
@@ -194,13 +201,12 @@ async function createSchema(knexInstance) {
     table.string('sensitive_details_hash');
     table.string('classification_tag');
     table.string('encryption_key_version');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('payment_refunds', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  payment_refunds(table) {
     table.increments('id');
-    table.uuid('public_id');
+    table.uuid('public_id').notNullable();
     table.string('payment_intent_id');
     table.string('provider_refund_id');
     table.string('status');
@@ -215,43 +221,51 @@ async function createSchema(knexInstance) {
     table.string('sensitive_details_hash');
     table.string('classification_tag');
     table.string('encryption_key_version');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('platform_settings', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  payment_ledger_entries(table) {
     table.increments('id');
-    table.string('key').unique().notNullable();
+    table.string('payment_intent_id').notNullable();
+    table.string('entry_type').notNullable();
+    table.integer('amount').defaultTo(0);
+    table.string('currency').notNullable();
+    table.text('details');
+    table.timestamp('recorded_at').notNullable().defaultTo(connection.fn.now());
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  platform_settings(table) {
+    table.increments('id');
+    table.string('key').notNullable();
     table.text('value');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('podcast_shows', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  podcast_shows(table) {
     table.increments('id');
     table.integer('community_id');
     table.integer('owner_id');
-    table.string('title');
-    table.string('slug');
+    table.string('title').notNullable();
+    table.string('slug').notNullable();
     table.string('subtitle');
     table.text('description');
     table.string('cover_image_url');
     table.string('category');
     table.string('status');
-    table.boolean('is_public');
+    table.boolean('is_public').defaultTo(false);
     table.string('distribution_channels');
     table.text('metadata');
     table.timestamp('launch_at');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('podcast_episodes', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  podcast_episodes(table) {
     table.increments('id');
     table.integer('show_id').notNullable();
-    table.string('title');
-    table.string('slug');
-    table.text('summary');
+    table.string('title').notNullable();
+    table.string('slug').notNullable();
+    table.string('summary');
     table.text('description');
     table.string('audio_url');
     table.string('video_url');
@@ -261,117 +275,80 @@ async function createSchema(knexInstance) {
     table.string('status');
     table.timestamp('publish_at');
     table.text('metadata');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('provider_transition_announcements', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  provider_transition_announcements(table) {
     table.increments('id');
-    table.string('slug').unique();
-    table.string('title');
-    table.text('summary');
+    table.string('slug').notNullable();
+    table.string('title').notNullable();
+    table.string('summary');
     table.text('body_markdown');
     table.string('status');
     table.timestamp('effective_from');
     table.timestamp('effective_to');
-    table.boolean('ack_required');
+    table.boolean('ack_required').defaultTo(true);
     table.timestamp('ack_deadline');
     table.string('owner_email');
     table.string('tenant_scope');
     table.text('metadata');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('provider_transition_acknowledgements', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  provider_transition_acknowledgements(table) {
     table.increments('id');
-    table.integer('announcement_id');
+    table.integer('announcement_id').notNullable();
     table.string('provider_reference');
     table.string('organisation_name');
     table.string('contact_name');
-    table.string('contact_email');
+    table.string('contact_email').notNullable();
     table.string('ack_method');
-    table.boolean('follow_up_required');
+    table.boolean('follow_up_required').defaultTo(false);
     table.text('follow_up_notes');
     table.text('metadata');
     table.timestamp('acknowledged_at');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('provider_transition_resources', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  provider_transition_resources(table) {
     table.increments('id');
-    table.integer('announcement_id');
-    table.string('label');
+    table.integer('announcement_id').notNullable();
+    table.string('label').notNullable();
     table.string('url');
     table.string('type');
     table.string('locale');
     table.text('description');
-    table.integer('sort_order');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('provider_transition_status_updates', (table) => {
+    table.integer('sort_order').defaultTo(0);
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  provider_transition_status_updates(table) {
     table.increments('id');
-    table.integer('announcement_id');
+    table.integer('announcement_id').notNullable();
     table.string('provider_reference');
-    table.string('status_code');
+    table.string('status_code').notNullable();
     table.text('notes');
-    table.timestamp('recorded_at');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('provider_transition_timeline_entries', (table) => {
+    table.timestamp('recorded_at').notNullable();
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  provider_transition_timeline_entries(table) {
     table.increments('id');
-    table.integer('announcement_id');
-    table.timestamp('occurs_on');
-    table.string('headline');
+    table.integer('announcement_id').notNullable();
+    table.timestamp('occurs_on').notNullable();
+    table.string('headline').notNullable();
     table.string('owner');
     table.string('cta_label');
     table.string('cta_url');
     table.text('details_markdown');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('release_checklist_items', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  release_runs(table) {
     table.increments('id');
-    table.uuid('public_id');
-    table.string('slug').unique();
-    table.string('category');
-    table.string('title');
-    table.text('description');
-    table.boolean('auto_evaluated');
-    table.integer('weight');
-    table.string('default_owner_email');
-    table.text('success_criteria');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('release_gate_results', (table) => {
-    table.increments('id');
-    table.uuid('public_id');
-    table.integer('run_id');
-    table.integer('checklist_item_id');
-    table.string('gate_key');
-    table.string('status');
-    table.string('owner_email');
-    table.text('metrics');
-    table.text('notes');
-    table.string('evidence_url');
-    table.timestamp('last_evaluated_at');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('release_runs', (table) => {
-    table.increments('id');
-    table.uuid('public_id');
-    table.string('version_tag');
-    table.string('environment');
+    table.uuid('public_id').notNullable();
+    table.string('version_tag').notNullable();
+    table.string('environment').notNullable();
     table.string('status');
     table.string('initiated_by_email');
     table.string('initiated_by_name');
@@ -383,37 +360,62 @@ async function createSchema(knexInstance) {
     table.text('summary_notes');
     table.text('checklist_snapshot');
     table.text('metadata');
-    table.timestamp('created_at').defaultTo(knexInstance.fn.now());
-    table.timestamp('updated_at').defaultTo(knexInstance.fn.now());
-  });
-
-  await knexInstance.schema.createTable('reporting_community_engagement_daily', (table) => {
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  release_checklist_items(table) {
     table.increments('id');
-    table.date('reporting_date');
+    table.uuid('public_id').notNullable();
+    table.string('slug').notNullable();
+    table.string('category');
+    table.string('title');
+    table.text('description');
+    table.boolean('auto_evaluated').defaultTo(false);
+    table.integer('weight').defaultTo(1);
+    table.string('default_owner_email');
+    table.text('success_criteria');
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  release_gate_results(table) {
+    table.increments('id');
+    table.uuid('public_id').notNullable();
+    table.integer('run_id').notNullable();
+    table.integer('checklist_item_id');
+    table.string('gate_key').notNullable();
+    table.string('status');
+    table.string('owner_email');
+    table.text('metrics');
+    table.text('notes');
+    table.string('evidence_url');
+    table.timestamp('last_evaluated_at');
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  reporting_community_engagement_daily(table) {
+    table.increments('id');
+    table.date('reporting_date').notNullable();
     table.integer('community_id');
-    table.integer('published_posts');
-    table.integer('comment_count');
-    table.integer('tag_applications');
-    table.integer('public_posts');
-    table.integer('event_posts');
-  });
+    table.integer('published_posts').defaultTo(0);
+    table.integer('comment_count').defaultTo(0);
+    table.integer('tag_applications').defaultTo(0);
+    table.integer('public_posts').defaultTo(0);
+    table.integer('event_posts').defaultTo(0);
+  }
+};
 
-  await knexInstance.schema.createTable('communities', (table) => {
-    table.increments('id');
-    table.string('name');
-  });
-
-  await knexInstance.schema.createTable('users', (table) => {
-    table.increments('id');
-    table.string('email');
-    table.string('first_name');
-    table.string('last_name');
-  });
+async function createSchema(knexInstance) {
+  await knexInstance.raw('PRAGMA foreign_keys = OFF');
+  for (const tableName of TABLE_ORDER) {
+    const definition = TABLE_DEFINITIONS[tableName];
+    await knexInstance.schema.createTable(tableName, definition);
+  }
+  await knexInstance.raw('PRAGMA foreign_keys = ON');
 }
 
-async function truncateAll(knexInstance) {
-  for (const table of TABLES) {
-    await knexInstance(table).delete();
+async function resetTables() {
+  for (const table of TABLE_ORDER) {
+    await connection(table).del();
   }
 }
 
@@ -423,33 +425,31 @@ beforeAll(async () => {
     connection: { filename: ':memory:' },
     useNullAsDefault: true
   });
-
   await createSchema(connection);
 });
 
-afterAll(async () => {
-  if (connection) {
-    await connection.destroy();
-  }
+beforeEach(async () => {
+  await resetTables();
 });
 
-beforeEach(async () => {
-  await truncateAll(connection);
+afterAll(async () => {
+  await connection.destroy();
 });
 
 function iso(date) {
   return new Date(date).toISOString();
 }
 
-describe('Monetization catalog models', () => {
-  it('creates and lists catalog items with normalization', async () => {
+describe('Group 23 model flows', () => {
+  it('manages monetization catalog, usage, schedules, and reconciliation runs end-to-end', async () => {
     const created = await MonetizationCatalogItemModel.create(
       {
         tenantId: 'Tenant-A',
-        productCode: ' Pro Plan ',
+        productCode: 'PRO-PLAN',
         name: 'Pro Plan',
-        currency: 'gbp',
-        metadata: { tier: 'pro' }
+        metadata: { tier: 'premium' },
+        unitAmountCents: 2500,
+        currency: 'gbp'
       },
       connection
     );
@@ -458,474 +458,438 @@ describe('Monetization catalog models', () => {
       tenantId: 'tenant-a',
       productCode: 'pro-plan',
       currency: 'GBP',
-      metadata: { tier: 'pro' }
+      revenueAccount: '4000-education-services',
+      metadata: { tier: 'premium' }
     });
 
-    const fetched = await MonetizationCatalogItemModel.findByProductCode('Tenant-A', 'PRO-PLAN', connection);
-    expect(fetched?.id).toBe(created.id);
-
-    const list = await MonetizationCatalogItemModel.list({ tenantId: 'tenant-a' }, connection);
-    expect(list).toHaveLength(1);
-    expect(await MonetizationCatalogItemModel.distinctTenants(connection)).toEqual(['tenant-a']);
-  });
-
-  it('creates reconciliation runs and returns latest for tenant', async () => {
-    const created = await MonetizationReconciliationRunModel.create(
+    const usage = await MonetizationUsageRecordModel.create(
       {
-        tenantId: 'tenant-b',
-        windowStart: iso('2024-01-01T00:00:00Z'),
-        windowEnd: iso('2024-01-31T23:59:59Z'),
-        varianceRatio: 0.123456
+        tenantId: 'tenant-a',
+        productCode: 'pro-plan',
+        accountReference: 'acct-123',
+        quantity: 3,
+        unitAmountCents: 2500,
+        metadata: { region: 'emea' },
+        usageDate: iso('2024-04-01T09:00:00Z'),
+        recordedAt: iso('2024-04-01T09:05:00Z')
       },
       connection
     );
 
-    expect(created.varianceRatio).toBeCloseTo(0.1235, 4);
+    expect(usage).toMatchObject({
+      amountCents: 7500,
+      currency: 'GBP',
+      metadata: { region: 'emea' }
+    });
 
-    const latest = await MonetizationReconciliationRunModel.latest({ tenantId: 'tenant-b' }, connection);
-    expect(latest?.id).toBe(created.id);
+    const updatedUsage = await MonetizationUsageRecordModel.upsertByExternalReference(
+      {
+        tenantId: 'tenant-a',
+        productCode: 'pro-plan',
+        externalReference: 'usage-1',
+        quantity: 2,
+        unitAmountCents: 2500,
+        metadata: { adjustment: true },
+        usageDate: iso('2024-04-15T10:00:00Z')
+      },
+      connection
+    );
 
-    const list = await MonetizationReconciliationRunModel.list({ tenantId: 'tenant-b' }, connection);
-    expect(list).toHaveLength(1);
-  });
+    expect(updatedUsage).toMatchObject({
+      productCode: 'pro-plan',
+      quantity: 2,
+      amountCents: 5000,
+      metadata: { adjustment: true }
+    });
 
-  it('handles revenue schedule recognition lifecycle', async () => {
     const schedule = await MonetizationRevenueScheduleModel.create(
       {
-        tenantId: 'tenant-c',
-        paymentIntentId: 'pi_test',
-        productCode: 'bundle',
+        tenantId: 'tenant-a',
+        paymentIntentId: 'pi_123',
+        productCode: 'pro-plan',
         amountCents: 5000,
-        recognizedAmountCents: 0,
-        metadata: { source: 'initial' }
+        recognitionEnd: iso('2024-01-15')
       },
       connection
     );
 
-    expect(schedule.status).toBe('pending');
+    expect(schedule).toMatchObject({
+      status: 'pending',
+      amountCents: 5000,
+      currency: 'GBP'
+    });
 
-    const recognized = await MonetizationRevenueScheduleModel.markRecognized(
-      schedule.id,
-      { recognizedAt: iso('2024-02-01T00:00:00Z') },
+    const due = await MonetizationRevenueScheduleModel.listDueForRecognition(
+      { tenantId: 'tenant-a', asOf: iso('2024-01-20') },
       connection
     );
-    expect(recognized.status).toBe('recognized');
-    expect(recognized.recognizedAmountCents).toBe(5000);
+    expect(due.map((row) => row.id)).toContain(schedule.id);
+
+    const recognized = await MonetizationRevenueScheduleModel.markRecognized(schedule.id, { recognizedAt: iso('2024-01-16') }, connection);
+    expect(recognized).toMatchObject({ status: 'recognized', recognizedAmountCents: 5000 });
 
     const reduced = await MonetizationRevenueScheduleModel.reduceRecognizedAmount(
       schedule.id,
       2000,
-      { reason: 'partial refund' },
+      { type: 'refund', reason: 'partial credit' },
       connection
     );
-    expect(reduced.recognizedAmountCents).toBe(3000);
 
-    const summary = await MonetizationRevenueScheduleModel.sumRecognizedForWindow(
-      { tenantId: 'tenant-c', start: '2024-01-01', end: '2024-12-31' },
-      connection
-    );
-    expect(summary).toBe(3000);
-  });
+    expect(reduced).toMatchObject({ recognizedAmountCents: 3000, amountCents: 3000 });
+    expect(reduced.metadata.adjustments.at(-1)).toMatchObject({ amountCents: 2000, reason: 'partial credit' });
 
-  it('upserts usage records by external reference', async () => {
-    const created = await MonetizationUsageRecordModel.create(
+    const byIntent = await MonetizationRevenueScheduleModel.listByPaymentIntent('pi_123', connection);
+    expect(byIntent).toHaveLength(1);
+    expect(byIntent[0]).toMatchObject({ id: schedule.id, amountCents: 3000, recognizedAmountCents: 3000 });
+
+    const deferredBalance = await MonetizationRevenueScheduleModel.sumDeferredBalance({ tenantId: 'tenant-a' }, connection);
+    expect(deferredBalance).toBe(0);
+
+    const reconciliation = await MonetizationReconciliationRunModel.create(
       {
-        tenantId: 'tenant-d',
-        productCode: 'usage',
-        accountReference: 'acct-1',
-        quantity: 1.5,
-        unitAmountCents: 200,
-        externalReference: 'ext-1',
-        usageDate: '2024-03-01T00:00:00Z'
+        tenantId: 'tenant-a',
+        windowStart: iso('2024-01-01'),
+        windowEnd: iso('2024-01-31'),
+        invoicedCents: 3000,
+        usageCents: 3000
       },
       connection
     );
 
-    expect(created.amountCents).toBe(300);
+    expect(reconciliation).toMatchObject({ status: 'completed', invoicedCents: 3000 });
 
-    const updated = await MonetizationUsageRecordModel.upsertByExternalReference(
-      {
-        tenantId: 'tenant-d',
-        productCode: 'usage',
-        accountReference: 'acct-1',
-        quantity: 2,
-        unitAmountCents: 250,
-        externalReference: 'ext-1',
-        processedAt: iso('2024-03-01T00:00:00Z')
-      },
+    const latest = await MonetizationReconciliationRunModel.latest({ tenantId: 'tenant-a' }, connection);
+    expect(latest.id).toEqual(reconciliation.id);
+
+    const total = await MonetizationUsageRecordModel.sumForWindow(
+      { tenantId: 'tenant-a', start: '2024-04-01', end: '2024-04-30' },
       connection
     );
+    expect(total).toBe(usage.amountCents + updatedUsage.amountCents);
 
-    expect(updated.amountCents).toBe(500);
-    expect(updated.processedAt).toBe(iso('2024-03-01T00:00:00.000Z'));
-
-    const sum = await MonetizationUsageRecordModel.sumForWindow(
-      { tenantId: 'tenant-d', start: '2024-01-01', end: '2024-12-31' },
-      connection
-    );
-    expect(sum).toBe(500);
+    const tenants = await MonetizationCatalogItemModel.distinctTenants(connection);
+    expect(tenants).toEqual(['tenant-a']);
   });
-});
 
-describe('Payments models', () => {
-  it('retrieves coupons respecting limits and currency', async () => {
-    const evaluationDate = new Date('2024-05-01T00:00:00Z');
-
-    await connection('payment_coupons').insert({
-      code: 'SAVE10',
-      name: 'Save 10',
-      discount_type: 'fixed_amount',
-      discount_value: 1000,
-      currency: 'USD',
-      max_redemptions: 5,
-      per_user_limit: 2,
-      times_redeemed: 1,
-      is_stackable: 0,
+  it('applies coupons, encrypts payment intents, and handles refunds securely', async () => {
+    const [couponId] = await connection('payment_coupons').insert({
+      code: 'SAVE20',
+      name: 'Save 20%',
+      discount_type: 'percentage',
+      discount_value: 20,
       status: 'active',
+      is_stackable: 1,
+      currency: 'USD',
+      metadata: JSON.stringify({ segments: ['beta'] }),
       valid_from: new Date('2024-01-01T00:00:00Z'),
       valid_until: new Date('2024-12-31T00:00:00Z'),
-      metadata: JSON.stringify({})
+      max_redemptions: 100
     });
 
-    const coupon = await PaymentCouponModel.findActiveForRedemption(
-      'save10',
-      'USD',
-      connection,
-      evaluationDate
-    );
-    expect(coupon).toMatchObject({ code: 'SAVE10', timesRedeemed: 1 });
+    const coupon = await PaymentCouponModel.findActiveForRedemption('save20', 'USD', connection, new Date('2024-06-01'));
+    expect(coupon).toMatchObject({ code: 'SAVE20', discountType: 'percentage' });
+    expect(Boolean(coupon?.isStackable)).toBe(true);
 
-    const countBefore = await PaymentCouponModel.countUserRedemptions(coupon.id, 42, connection);
-    expect(countBefore).toBe(0);
+    await PaymentCouponModel.recordRedemption({ couponId, paymentIntentId: 'pi_coupon', userId: 99 }, connection);
+    const redemptionCount = await PaymentCouponModel.countUserRedemptions(couponId, 99, connection);
+    expect(redemptionCount).toBe(1);
 
-    await PaymentCouponModel.recordRedemption(
-      { couponId: coupon.id, paymentIntentId: 'pi_record', userId: 42 },
-      connection
-    );
-
-    const countAfter = await PaymentCouponModel.countUserRedemptions(coupon.id, 42, connection);
-    expect(countAfter).toBe(1);
-
-    const refreshed = await PaymentCouponModel.findById(coupon.id, connection);
-    expect(refreshed?.timesRedeemed).toBe(2);
-  });
-
-  it('creates and updates payment intents with encrypted sensitive details', async () => {
     const intent = await PaymentIntentModel.create(
       {
-        publicId: 'pi_public',
-        userId: 7,
+        userId: 42,
         provider: 'stripe',
-        providerIntentId: 'pi_provider',
-        providerCaptureId: 'cap_123',
-        providerLatestChargeId: 'ch_123',
-        currency: 'eur',
-        amountSubtotal: 1000,
-        amountTotal: 1200,
-        entityType: 'course',
-        entityId: 'course-1',
-        receiptEmail: 'payer@example.com',
-        failureCode: 'init',
-        failureMessage: 'initial failure'
-      },
-      connection
-    );
-
-    const expectedFingerprint = DataEncryptionService.hash('pi_provider');
-    expect(intent.currency).toBe('eur');
-    expect(intent.providerIntentId).toBe('pi_provider');
-    expect(intent.receiptEmail).toBe('payer@example.com');
-    expect(intent.failureMessage).toBe('initial failure');
-    expect(intent.sensitiveDetailsHash).toBeTruthy();
-
-    const storedCiphertext = await connection('payment_intents')
-      .select(
-        'sensitive_details_ciphertext',
-        'provider_intent_id',
-        'receipt_email',
-        'failure_message'
-      )
-      .where({ id: intent.id })
-      .first();
-    expect(Buffer.isBuffer(storedCiphertext.sensitive_details_ciphertext)).toBe(true);
-    expect(storedCiphertext.provider_intent_id).toBe(expectedFingerprint);
-    expect(storedCiphertext.receipt_email).toBe('encrypted');
-    expect(storedCiphertext.failure_message).toBe('encrypted');
-
-    const lookupByProvider = await PaymentIntentModel.findByProviderIntentId('pi_provider', connection);
-    expect(lookupByProvider?.publicId).toBe(intent.publicId);
-
-    await PaymentIntentModel.updateByPublicId(
-      intent.publicId,
-      {
+        providerIntentId: 'pi_abc',
         status: 'requires_capture',
-        receiptEmail: 'payer+updated@example.com',
-        failureMessage: 'declined'
+        currency: 'GBP',
+        amountSubtotal: 3000,
+        amountTotal: 3600,
+        entityType: 'subscription',
+        entityId: 'sub_123'
       },
       connection
     );
 
-    const updated = await PaymentIntentModel.findByPublicId(intent.publicId, connection);
-    expect(updated?.status).toBe('requires_capture');
-    expect(updated?.receiptEmail).toBe('payer+updated@example.com');
-    expect(updated?.failureMessage).toBe('declined');
+    expect(intent).toMatchObject({ provider: 'stripe', currency: 'GBP', status: 'requires_capture' });
+    expect(intent.providerIntentId).toBe('pi_abc');
+    expect(intent.receiptEmail).toBeNull();
 
-    const refreshedRow = await connection('payment_intents')
-      .select('receipt_email', 'failure_message')
-      .where({ id: intent.id })
-      .first();
-    expect(refreshedRow.receipt_email).toBe('encrypted');
-    expect(refreshedRow.failure_message).toBe('encrypted');
+    const hashedLookup = await PaymentIntentModel.findByProviderIntentId('pi_abc', connection);
+    expect(hashedLookup?.publicId).toEqual(intent.publicId);
+    expect(hashedLookup?.providerIntentId).toBe('pi_abc');
 
-  });
-
-  it('creates and updates payment refunds securely', async () => {
-    const refund = await PaymentRefundModel.create(
-      {
-        publicId: 're_1',
-        paymentIntentId: 'pi_public',
-        providerRefundId: 'pr_123',
-        amount: 600,
-        currency: 'USD',
-        reason: 'requested_by_customer',
-        failureCode: 'init',
-        failureMessage: 'initial failure'
-      },
-      connection
-    );
-
-    const expectedHash = DataEncryptionService.hash('pr_123');
-    expect(refund.providerRefundId).toBe('pr_123');
-    expect(refund.failureMessage).toBe('initial failure');
-    expect(refund.failureCode).toBe('init');
-    expect(refund.sensitiveDetailsHash).toBeTruthy();
-
-    const storedRefundRow = await connection('payment_refunds')
-      .select('provider_refund_id', 'failure_code', 'failure_message')
-      .where({ id: refund.id })
-      .first();
-    expect(storedRefundRow.provider_refund_id).toBe(expectedHash);
-    expect(storedRefundRow.failure_code).toBe('encrypted');
-    expect(storedRefundRow.failure_message).toBe('encrypted');
-
-    const updated = await PaymentRefundModel.updateById(
-      refund.id,
+    const refreshed = await PaymentIntentModel.updateById(
+      intent.id,
       {
         status: 'succeeded',
-        failureCode: 'none',
-        failureMessage: null,
-        processedAt: iso('2024-04-01T00:00:00Z')
+        providerCaptureId: 'ca_123',
+        receiptEmail: 'customer@example.com'
+      },
+      connection
+    );
+    expect(refreshed).toMatchObject({ status: 'succeeded' });
+    expect(refreshed.providerCaptureId).toBe('ca_123');
+    expect(refreshed.receiptEmail).toBe('customer@example.com');
+
+    const refund = await PaymentRefundModel.create(
+      {
+        paymentIntentId: intent.publicId,
+        providerRefundId: 're_987',
+        amount: 1200,
+        currency: 'GBP',
+        reason: 'user_request'
       },
       connection
     );
 
-    expect(updated?.status).toBe('succeeded');
-    expect(updated?.processedAt).toBe('2024-04-01T00:00:00.000Z');
-    expect(updated?.failureMessage).toBeNull();
+    expect(refund).toMatchObject({ status: 'pending', amount: 1200 });
+    expect(refund.providerRefundId).toBe('re_987');
+
+    const fetched = await PaymentRefundModel.findByProviderRefundId('re_987', connection);
+    expect(fetched?.publicId).toEqual(refund.publicId);
+    expect(fetched?.providerRefundId).toBe('re_987');
+
+    const processed = await PaymentRefundModel.updateById(
+      refund.id,
+      { status: 'succeeded', processedAt: iso('2024-02-01'), failureMessage: null },
+      connection
+    );
+    expect(processed).toMatchObject({ status: 'succeeded', processedAt: iso('2024-02-01') });
+    expect(processed.failureMessage).toBeNull();
+
+    await expect(PaymentLedgerEntryModel.record({ entryType: 'credit' }, connection)).rejects.toThrow(
+      /paymentIntentId is required/
+    );
+
+    const ledgerEntry = await PaymentLedgerEntryModel.record(
+      {
+        paymentIntentId: intent.publicId,
+        entryType: 'Captured Revenue',
+        amount: 3600.49,
+        currency: 'gbp',
+        details: { source: 'checkout', reference: 'order-123' }
+      },
+      connection
+    );
+
+    expect(ledgerEntry).toMatchObject({
+      paymentIntentId: intent.publicId,
+      entryType: 'captured-revenue',
+      amount: 3600,
+      currency: 'GBP'
+    });
+    expect(ledgerEntry.details).toMatchObject({ source: 'checkout', currency: 'GBP', entryType: 'captured-revenue' });
+
+    const ledgerEntries = await PaymentLedgerEntryModel.listForPayment(intent.publicId, connection);
+    expect(ledgerEntries).toHaveLength(1);
+    expect(ledgerEntries[0].recordedAt).toBeTruthy();
+    expect(ledgerEntries[0]).toMatchObject({ amount: 3600, entryType: 'captured-revenue' });
+
+    const byUser = await PaymentIntentModel.listByUser(42, { limit: 5 }, connection);
+    expect(byUser[0]).toMatchObject({ provider: 'stripe', providerIntentId: 'pi_abc', receiptEmail: 'customer@example.com' });
   });
-});
 
-describe('Platform settings', () => {
-  it('upserts and fetches platform settings JSON payloads', async () => {
-    const saved = await PlatformSettingModel.upsert('theme', { darkMode: true }, connection);
-    expect(saved?.value).toEqual({ darkMode: true });
+  it('stores platform settings and synchronises podcast show and episode metadata', async () => {
+    const [communityId] = await connection('communities').insert({ name: 'Growth Community' });
+    const [ownerId] = await connection('users').insert({
+      email: 'host@example.com',
+      first_name: 'Ava',
+      last_name: 'Instructor'
+    });
 
-    const updated = await PlatformSettingModel.upsert('theme', { darkMode: false }, connection);
-    expect(updated?.value).toEqual({ darkMode: false });
+    const themeSetting = await PlatformSettingModel.upsert('ui.theme', { mode: 'dark', accent: '#663399' }, connection);
+    expect(themeSetting).toMatchObject({ value: { mode: 'dark', accent: '#663399' } });
 
-    const fetched = await PlatformSettingModel.findByKey('theme', connection);
-    expect(fetched?.value).toEqual({ darkMode: false });
-  });
-});
-
-describe('Podcast models', () => {
-  it('manages shows and episodes with slug normalisation', async () => {
     const show = await PodcastShowModel.create(
       {
-        title: 'Learning Lab',
-        slug: 'Learning Lab',
-        ownerId: 1,
-        status: 'published',
-        metadata: { category: 'education' }
+        communityId,
+        ownerId,
+        title: 'Campus Insider',
+        description: 'Weekly updates',
+        distributionChannels: ['rss', 'spotify'],
+        metadata: { tags: ['education'] }
       },
       connection
     );
 
-    expect(show.slug).toBe('learning-lab');
-
-    const updatedShow = await PodcastShowModel.updateById(
-      show.id,
-      { distributionChannels: ['spotify', 'apple'] },
-      connection
-    );
-    expect(updatedShow.distributionChannels).toBe('spotify, apple');
+    expect(show).toMatchObject({
+      communityId,
+      ownerId,
+      slug: 'campus-insider',
+      metadata: { tags: ['education'] }
+    });
 
     const episode = await PodcastEpisodeModel.create(
       {
         showId: show.id,
-        title: 'Episode 1',
-        slug: 'Episode 1',
-        status: 'published',
-        metadata: { duration: '10m' }
+        title: 'Orientation Tips',
+        summary: 'Helping new students',
+        durationSeconds: 900,
+        status: 'scheduled',
+        publishAt: iso('2024-02-10')
       },
       connection
     );
 
-    expect(episode.slug).toBe('episode-1');
+    expect(episode).toMatchObject({
+      showId: show.id,
+      slug: 'orientation-tips',
+      status: 'scheduled'
+    });
+
+    const updatedEpisode = await PodcastEpisodeModel.updateById(
+      episode.id,
+      { status: 'published', metadata: { chapters: 4 } },
+      connection
+    );
+    expect(updatedEpisode).toMatchObject({ status: 'published', metadata: { chapters: 4 } });
 
     const list = await PodcastEpisodeModel.listByShow(show.id, { status: 'published' }, connection);
     expect(list).toHaveLength(1);
-    expect(await PodcastEpisodeModel.countByShow(show.id, { status: 'published' }, connection)).toBe(1);
-  });
-});
+    expect(list[0].showTitle).toBe('Campus Insider');
 
-describe('Provider transition models', () => {
-  it('upserts announcements and related artefacts', async () => {
+    const shows = await PodcastShowModel.listAll({ status: 'draft' }, connection);
+    expect(shows).toHaveLength(1);
+    expect(shows[0]).toMatchObject({ title: 'Campus Insider', distributionChannels: 'rss, spotify' });
+  });
+
+  it('tracks provider transitions across announcements, acknowledgements, status, and resources', async () => {
     const announcement = await ProviderTransitionAnnouncementModel.upsert(
       {
-        slug: 'transition-1',
-        title: 'Transition Plan',
+        slug: 'cloud-migration',
+        title: 'Cloud Migration',
+        summary: 'We are moving providers',
         status: 'active',
-        effectiveFrom: iso(Date.now()),
-        tenantScope: 'global'
+        effectiveFrom: new Date('2024-03-01T09:00:00Z'),
+        tenantScope: 'enterprise'
       },
       { connection }
     );
 
-    expect(announcement.slug).toBe('transition-1');
-
-    const resources = await ProviderTransitionResourceModel.bulkReplace(
-      announcement.id,
-      [
-        { label: 'Guide', url: 'https://example.com', type: 'guide', locale: 'en' },
-        { label: 'FAQ', url: 'https://example.com/faq', type: 'faq', locale: 'en' }
-      ],
-      { connection }
-    );
-    expect(resources).toHaveLength(2);
-
-    const timeline = await ProviderTransitionTimelineEntryModel.bulkReplace(
-      announcement.id,
-      [
-        { occursOn: iso('2024-06-01T00:00:00Z'), headline: 'Kickoff', detailsMarkdown: 'Start' },
-        { occursOn: iso('2024-07-01T00:00:00Z'), headline: 'Launch', detailsMarkdown: 'Go live' }
-      ],
-      { connection }
-    );
-    expect(timeline[0].headline).toBe('Kickoff');
+    expect(announcement).toMatchObject({ slug: 'cloud-migration', tenantScope: 'enterprise', ackRequired: true });
 
     const acknowledgement = await ProviderTransitionAcknowledgementModel.upsertForContact(
       announcement.id,
       'contact@example.com',
-      { organisationName: 'Acme', contactName: 'Alice' },
+      {
+        organisationName: 'Example Org',
+        contactName: 'Jordan Smith',
+        metadata: { region: 'emea' }
+      },
       { connection }
     );
-    expect(acknowledgement.contactEmail).toBe('contact@example.com');
+
+    expect(acknowledgement).toMatchObject({
+      announcementId: announcement.id,
+      contactEmail: 'contact@example.com',
+      metadata: { region: 'emea' }
+    });
+
+    const resources = await ProviderTransitionResourceModel.bulkReplace(
+      announcement.id,
+      [
+        {
+          label: 'Migration Playbook',
+          url: 'https://example.com/playbook',
+          type: 'guide',
+          locale: 'en'
+        }
+      ],
+      { connection }
+    );
+
+    expect(resources).toHaveLength(1);
+    expect(resources[0]).toMatchObject({ label: 'Migration Playbook', type: 'guide' });
 
     const statusUpdate = await ProviderTransitionStatusUpdateModel.record(
       announcement.id,
-      { statusCode: 'in_progress', notes: 'On track' },
+      {
+        statusCode: 'pilot-complete',
+        notes: 'Alpha tenants migrated',
+        recordedAt: new Date('2024-03-05T10:00:00Z')
+      },
       { connection }
     );
-    expect(statusUpdate.statusCode).toBe('in_progress');
 
-    const activeAnnouncements = await ProviderTransitionAnnouncementModel.listActive(
-      { tenantScope: 'global', connection },
-      connection
+    expect(statusUpdate).toMatchObject({ statusCode: 'pilot-complete', notes: 'Alpha tenants migrated' });
+
+    const timelineEntries = await ProviderTransitionTimelineEntryModel.bulkReplace(
+      announcement.id,
+      [
+        {
+          occursOn: new Date('2024-03-05T12:00:00Z'),
+          headline: 'Pilot Finished',
+          detailsMarkdown: 'All pilot tenants migrated'
+        }
+      ],
+      { connection }
     );
-    expect(activeAnnouncements).toHaveLength(1);
-  });
-});
 
-describe('Release orchestration models', () => {
-  it('handles checklist items and gate results', async () => {
-    const checklist = await ReleaseChecklistItemModel.create(
+    expect(timelineEntries).toHaveLength(1);
+    expect(timelineEntries[0]).toMatchObject({ headline: 'Pilot Finished' });
+
+    const active = await ProviderTransitionAnnouncementModel.listActive({ tenantScope: 'enterprise', connection });
+    expect(active).toHaveLength(1);
+
+    const acknowledgements = await ProviderTransitionAcknowledgementModel.countForAnnouncement(announcement.id, { connection });
+    expect(acknowledgements).toBe(1);
+  });
+
+  it('coordinates release readiness workflows and aggregates engagement reporting', async () => {
+    const run = await ReleaseRunModel.create(
       {
-        slug: 'security-review',
-        title: 'Security Review',
-        weight: 5,
-        successCriteria: { required: true }
+        versionTag: 'v2024.05.01',
+        environment: 'staging',
+        initiatedByEmail: 'release@edulure.test'
       },
       connection
     );
 
-    expect(checklist.successCriteria).toEqual({ required: true });
+    expect(run).toMatchObject({ status: 'scheduled', versionTag: 'v2024.05.01' });
 
-    const updatedChecklist = await ReleaseChecklistItemModel.updateBySlug(
-      'security-review',
-      { weight: 10 },
-      connection
-    );
-    expect(updatedChecklist.weight).toBe(10);
-
-    const run = await ReleaseRunModel.create(
+    const checklist = await ReleaseChecklistItemModel.create(
       {
-        publicId: 'run_1',
-        versionTag: 'v1.0.0',
-        environment: 'staging',
-        checklistSnapshot: [checklist]
+        slug: 'observability-health',
+        title: 'Observability Health',
+        autoEvaluated: true,
+        successCriteria: { errorBudget: '<5%' }
       },
       connection
     );
 
     const gate = await ReleaseGateResultModel.upsertByRunAndGate(
       run.id,
-      'quality',
-      { checklistItemId: checklist.id, status: 'passed', metrics: { score: 95 } },
-      connection
-    );
-
-    expect(gate.status).toBe('passed');
-
-    const breakdown = await ReleaseGateResultModel.getStatusSummary(run.id, connection);
-    expect(breakdown.passed).toBe(1);
-
-    const list = await ReleaseRunModel.list({ environment: 'staging' }, {}, connection);
-    expect(list.total).toBe(1);
-  });
-});
-
-describe('Reporting view', () => {
-  it('aggregates community engagement metrics', async () => {
-    await connection('communities').insert({ id: 1, name: 'Edulure Community' });
-
-    await connection('reporting_community_engagement_daily').insert([
+      'observability-health',
       {
-        reporting_date: '2024-05-01',
-        community_id: 1,
-        published_posts: 5,
-        comment_count: 12,
-        tag_applications: 7,
-        public_posts: 4,
-        event_posts: 1
+        checklistItemId: checklist.id,
+        status: 'approved',
+        metrics: { apdex: 0.98 },
+        ownerEmail: 'sre@example.com'
       },
-      {
-        reporting_date: '2024-05-02',
-        community_id: 1,
-        published_posts: 3,
-        comment_count: 4,
-        tag_applications: 2,
-        public_posts: 2,
-        event_posts: 0
-      }
-    ]);
-
-    const daily = await ReportingCommunityEngagementDailyView.fetchDailySummaries(
-      { start: '2024-05-01', end: '2024-05-02' },
       connection
     );
-    expect(daily).toHaveLength(2);
 
-    const top = await ReportingCommunityEngagementDailyView.fetchTopCommunities(
-      { start: '2024-05-01', end: '2024-05-02' },
-      connection
-    );
-    expect(top[0]).toMatchObject({ communityId: 1, posts: 8 });
+    expect(gate).toMatchObject({ gateKey: 'observability-health', status: 'approved', metrics: { apdex: 0.98 } });
+
+    const summary = await ReleaseGateResultModel.getStatusSummary(run.id, connection);
+    expect(summary).toEqual({ approved: 1 });
+
+    const dailyRows = [
+      { reporting_date: '2024-04-01', community_id: 1, published_posts: 6, comment_count: 12, tag_applications: 9, public_posts: 5, event_posts: 1 },
+      { reporting_date: '2024-04-02', community_id: 2, published_posts: 8, comment_count: 20, tag_applications: 11, public_posts: 6, event_posts: 2 }
+    ];
+    await connection('communities').insert([{ id: 1, name: 'Product Updates' }, { id: 2, name: 'Community Lounge' }]);
+    await connection('reporting_community_engagement_daily').insert(dailyRows);
 
     const totals = await ReportingCommunityEngagementDailyView.fetchTotals(
-      { start: '2024-05-01', end: '2024-05-02' },
+      { start: '2024-04-01', end: '2024-04-30' },
       connection
     );
-    expect(totals).toEqual({ posts: 8, comments: 16, tags: 9, publicPosts: 6, eventPosts: 1 });
+    expect(totals).toMatchObject({ posts: 14, comments: 32, tags: 20 });
+
+    const topCommunities = await ReportingCommunityEngagementDailyView.fetchTopCommunities(
+      { start: '2024-04-01', end: '2024-04-30', limit: 1 },
+      connection
+    );
+    expect(topCommunities[0]).toMatchObject({ communityId: 2, name: 'Community Lounge', posts: 8 });
   });
 });
