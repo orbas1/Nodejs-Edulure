@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasShows = await knex.schema.hasTable('podcast_shows');
   if (!hasShows) {
@@ -27,7 +29,7 @@ export async function up(knex) {
         .defaultTo('draft');
       table.boolean('is_public').notNullable().defaultTo(false);
       table.string('distribution_channels', 255);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('launch_at');
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
@@ -64,7 +66,7 @@ export async function up(knex) {
         .notNullable()
         .defaultTo('draft');
       table.timestamp('publish_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')

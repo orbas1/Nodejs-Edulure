@@ -3801,8 +3801,8 @@ export default class DashboardService {
       log.warn({ err: error }, 'Failed to load collaborator directory for course workspace');
     }
 
-    let learnerSnapshot;
-    let communitySnapshot;
+    let multiRoleLearnerSnapshot;
+    let multiRoleCommunitySnapshot;
     let communitySummaries = [];
     const communityEventsByCommunity = new Map();
     const communityRunbooksByCommunity = new Map();
@@ -4152,7 +4152,7 @@ export default class DashboardService {
           : null
       }));
 
-      learnerSnapshot =
+      multiRoleLearnerSnapshot =
         buildLearnerDashboard({
           user,
           now: referenceDate,
@@ -4273,7 +4273,7 @@ export default class DashboardService {
         });
         engagementTotals = { current: currentTotals, previous: previousTotals };
 
-        communitySnapshot =
+      multiRoleCommunitySnapshot =
           buildCommunityDashboard({
             user,
             now: referenceDate,
@@ -4563,7 +4563,14 @@ export default class DashboardService {
 
     const applySnapshot = (key, snapshot) => {
       if (!snapshot) return;
-      dashboards[key] = snapshot.dashboard;
+      if (snapshot.dashboard && typeof snapshot.dashboard === 'object') {
+        dashboards[key] = {
+          ...(dashboards[key] ?? {}),
+          ...snapshot.dashboard
+        };
+      } else if (dashboards[key] === undefined) {
+        dashboards[key] = snapshot.dashboard ?? null;
+      }
       if (Array.isArray(snapshot.searchIndex)) {
         searchIndex.push(...snapshot.searchIndex);
       }
@@ -4582,7 +4589,9 @@ export default class DashboardService {
       pushRole(snapshot.role);
     };
 
+    applySnapshot('learner', multiRoleLearnerSnapshot);
     applySnapshot('learner', learnerSnapshot);
+    applySnapshot('community', multiRoleCommunitySnapshot);
     applySnapshot('community', communitySnapshot);
     applySnapshot('instructor', instructorSnapshot);
 
