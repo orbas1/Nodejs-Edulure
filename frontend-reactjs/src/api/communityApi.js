@@ -16,6 +16,42 @@ export async function fetchCommunities(token) {
   return mapResponse(response);
 }
 
+export async function createCommunity({ token, payload }) {
+  const response = await httpClient.post('/communities', payload, {
+    token,
+    cache: {
+      invalidateTags: ['communities:list']
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunity({ communityId, token, payload }) {
+  const response = await httpClient.put(`/communities/${communityId}`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:detail`, 'communities:list']
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function deleteCommunity({ communityId, token, reason }) {
+  const response = await httpClient.delete(`/communities/${communityId}`, {
+    token,
+    body: reason ? { reason } : undefined,
+    cache: {
+      invalidateTags: [
+        'communities:list',
+        `community:${communityId}:detail`,
+        `community:${communityId}:feed`,
+        'communities:aggregatedFeed'
+      ]
+    }
+  });
+  return mapResponse(response);
+}
+
 export async function fetchCommunityDetail(communityId, token) {
   const response = await httpClient.get(`/communities/${communityId}`, {
     token,
@@ -126,6 +162,39 @@ export async function createCommunityPost({ communityId, token, payload }) {
       invalidateTags: [
         `community:${communityId}:feed`,
         `community:${communityId}:resources`,
+        'communities:aggregatedFeed'
+      ]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function moderateCommunityPost({ communityId, postId, token, action, reason }) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/posts/${postId}/moderate`,
+    { action, reason },
+    {
+      token,
+      cache: {
+        invalidateTags: [
+          `community:${communityId}:feed`,
+          `community:${communityId}:detail`,
+          'communities:aggregatedFeed'
+        ]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
+export async function removeCommunityPost({ communityId, postId, token, reason }) {
+  const response = await httpClient.delete(`/communities/${communityId}/posts/${postId}`, {
+    token,
+    body: reason ? { reason } : undefined,
+    cache: {
+      invalidateTags: [
+        `community:${communityId}:feed`,
+        `community:${communityId}:detail`,
         'communities:aggregatedFeed'
       ]
     }
