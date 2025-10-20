@@ -42,6 +42,12 @@ const tabs = [
   { id: 'manage', label: 'Manage', icon: AdjustmentsHorizontalIcon }
 ];
 
+const broadcastChannels = [
+  { id: 'in_app', label: 'In-app feed' },
+  { id: 'email', label: 'Email digest' },
+  { id: 'push', label: 'Mobile push' }
+];
+
 function SectionHeader({ title, description, actions }) {
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -125,6 +131,89 @@ StatCard.defaultProps = {
   description: null
 };
 
+function TierPreview({ tier, currencyFormatter, headline }) {
+  if (!tier) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+        Select a tier to see a live preview.
+      </div>
+    );
+  }
+
+  const benefits = Array.isArray(tier.benefits)
+    ? tier.benefits
+    : typeof tier.benefits === 'string'
+      ? tier.benefits
+          .split('\n')
+          .map((benefit) => benefit.trim())
+          .filter(Boolean)
+      : [];
+
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-6 shadow-inner">
+      {headline && <p className="text-xs font-semibold uppercase tracking-wide text-primary">{headline}</p>}
+      <div className="space-y-2">
+        <h4 className="text-xl font-semibold text-slate-900">{tier.name || 'Unnamed tier'}</h4>
+        <p className="text-sm text-slate-600">{tier.description || 'Add a compelling description to convert more learners.'}</p>
+      </div>
+      <div>
+        <span className="text-3xl font-semibold text-slate-900">
+          {currencyFormatter ? currencyFormatter.format(Number(tier.priceCents || tier.price || 0) / 100 || 0) : tier.priceCents}
+        </span>
+        <span className="ml-1 text-sm text-slate-500">/ {tier.billingInterval === 'yearly' ? 'year' : 'month'}</span>
+      </div>
+      <ul className="space-y-2">
+        {benefits.length ? (
+          benefits.map((benefit, index) => (
+            <li key={`${benefit}-${index}`} className="flex items-start gap-2 text-sm text-slate-600">
+              <span className="mt-1 inline-flex h-1.5 w-1.5 rounded-full bg-primary"></span>
+              <span>{benefit}</span>
+            </li>
+          ))
+        ) : (
+          <li className="text-sm text-slate-500">List a few highlights to help members understand the value.</li>
+        )}
+      </ul>
+      <button
+        type="button"
+        className="mt-2 inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary/90"
+      >
+        Subscribe now
+      </button>
+      {tier.metadata?.previewVideoUrl && (
+        <div className="overflow-hidden rounded-lg border border-slate-200">
+          <iframe
+            src={tier.metadata.previewVideoUrl}
+            title={`${tier.name ?? 'Tier'} teaser`}
+            className="aspect-video w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+TierPreview.propTypes = {
+  tier: PropTypes.shape({
+    name: PropTypes.string,
+    description: PropTypes.string,
+    priceCents: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    billingInterval: PropTypes.string,
+    benefits: PropTypes.oneOfType([PropTypes.arrayOf(PropTypes.string), PropTypes.string]),
+    metadata: PropTypes.shape({ previewVideoUrl: PropTypes.string })
+  }),
+  currencyFormatter: PropTypes.instanceOf(Intl.NumberFormat),
+  headline: PropTypes.string
+};
+
+TierPreview.defaultProps = {
+  tier: null,
+  currencyFormatter: null,
+  headline: null
+};
+
 function RevenuePanel({ communityId, token }) {
   const [summary, setSummary] = useState(null);
   const [tiers, setTiers] = useState([]);
@@ -134,14 +223,106 @@ function RevenuePanel({ communityId, token }) {
     priceCents: 0,
     billingInterval: 'monthly',
     description: '',
-    benefits: ''
+    benefits: '',
+    previewVideoUrl: ''
   });
-  const [tierDraft, setTierDraft] = useState({ name: '', priceCents: 4900, billingInterval: 'monthly' });
+  const [tierDraft, setTierDraft] = useState({
+    name: '',
+    priceCents: 4900,
+    billingInterval: 'monthly',
+    description: '',
+    benefits: '',
+    previewVideoUrl: ''
+  });
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [tierSearch, setTierSearch] = useState('');
 
   const currency = summary?.currency ?? 'USD';
   const currencyFormatter = useMemo(() => new Intl.NumberFormat(undefined, { style: 'currency', currency }), [currency]);
+
+  const revenueMetrics = useMemo(() => {
+    const mrrCents = Number(summary?.mrrCents ?? summary?.mrr ?? 0);
+    const arrCents = Number(summary?.arrCents ?? summary?.arr ?? mrrCents * 12);
+    const activeSubscribers = Number(summary?.activeSubscribers ?? summary?.activeMembers ?? 0);
+    const trialingSubscribers = Number(summary?.trialingSubscribers ?? summary?.trialing ?? 0);
+    const averagePriceCents = tiers.length
+      ? tiers.reduce((accumulator, tier) => accumulator + Number(tier.priceCents ?? 0), 0) / tiers.length
+      : 0;
+    return {
+      mrr: currencyFormatter.format(mrrCents / 100 || 0),
+      arr: currencyFormatter.format(arrCents / 100 || 0),
+      activeSubscribers,
+      trialingSubscribers,
+      averagePrice: currencyFormatter.format(averagePriceCents / 100 || 0)
+    };
+  }, [summary, tiers, currencyFormatter]);
+
+  const tierPriceError = Number(tierEditor.priceCents || 0) <= 0;
+  const tierDraftPriceError = Number(tierDraft.priceCents || 0) <= 0;
+
+  const parseBenefits = useCallback((value) => {
+    if (!value) return [];
+    return value
+      .split('\n')
+      .map((benefit) => benefit.trim())
+      .filter(Boolean);
+  }, []);
+
+  const filteredTiers = useMemo(() => {
+    if (!tierSearch.trim()) return tiers;
+    return tiers.filter((tier) => {
+      const haystack = `${tier.name ?? ''} ${tier.description ?? ''}`.toLowerCase();
+      return haystack.includes(tierSearch.trim().toLowerCase());
+    });
+  }, [tiers, tierSearch]);
+
+  useEffect(() => {
+    if (!filteredTiers.length) {
+      setSelectedTier(null);
+      return;
+    }
+    const stillVisible = filteredTiers.find((tier) => tier.id === selectedTier?.id);
+    if (!stillVisible) {
+      setSelectedTier(filteredTiers[0]);
+      setTierEditor({
+        name: filteredTiers[0].name ?? '',
+        priceCents: Number(filteredTiers[0].priceCents ?? 0),
+        billingInterval: filteredTiers[0].billingInterval ?? 'monthly',
+        description: filteredTiers[0].description ?? '',
+        benefits: Array.isArray(filteredTiers[0].benefits) ? filteredTiers[0].benefits.join('\n') : '',
+        previewVideoUrl: filteredTiers[0].metadata?.previewVideoUrl ?? ''
+      });
+    }
+  }, [filteredTiers, selectedTier?.id]);
+
+  const editingPreview = useMemo(() => {
+    if (!selectedTier) return null;
+    return {
+      ...selectedTier,
+      name: tierEditor.name,
+      description: tierEditor.description,
+      priceCents: Number(tierEditor.priceCents || 0),
+      billingInterval: tierEditor.billingInterval,
+      benefits: parseBenefits(tierEditor.benefits),
+      metadata: {
+        ...(selectedTier.metadata ?? {}),
+        previewVideoUrl: tierEditor.previewVideoUrl || null
+      }
+    };
+  }, [selectedTier, tierEditor, parseBenefits]);
+
+  const newTierPreview = useMemo(
+    () => ({
+      name: tierDraft.name,
+      description: tierDraft.description,
+      priceCents: Number(tierDraft.priceCents || 0),
+      billingInterval: tierDraft.billingInterval,
+      benefits: parseBenefits(tierDraft.benefits),
+      metadata: { previewVideoUrl: tierDraft.previewVideoUrl || null }
+    }),
+    [tierDraft, parseBenefits]
+  );
 
   const loadRevenue = useCallback(
     async (signal) => {
@@ -166,11 +347,19 @@ function RevenuePanel({ communityId, token }) {
             priceCents: Number(tier.priceCents ?? 0),
             billingInterval: tier.billingInterval ?? 'monthly',
             description: tier.description ?? '',
-            benefits: Array.isArray(tier.benefits) ? tier.benefits.join('\n') : ''
+            benefits: Array.isArray(tier.benefits) ? tier.benefits.join('\n') : '',
+            previewVideoUrl: tier.metadata?.previewVideoUrl ?? ''
           });
         } else {
           setSelectedTier(null);
-          setTierEditor({ name: '', priceCents: 0, billingInterval: 'monthly', description: '', benefits: '' });
+          setTierEditor({
+            name: '',
+            priceCents: 0,
+            billingInterval: 'monthly',
+            description: '',
+            benefits: '',
+            previewVideoUrl: ''
+          });
         }
       } catch (error) {
         if (signal?.aborted) return;
@@ -204,18 +393,28 @@ function RevenuePanel({ communityId, token }) {
             priceCents: Number(tierDraft.priceCents || 0),
             currency,
             billingInterval: tierDraft.billingInterval,
-            description: '',
-            benefits: []
+            description: tierDraft.description,
+            benefits: parseBenefits(tierDraft.benefits),
+            metadata: {
+              previewVideoUrl: tierDraft.previewVideoUrl || null
+            }
           }
         });
-        setTierDraft({ name: '', priceCents: 4900, billingInterval: 'monthly' });
+        setTierDraft({
+          name: '',
+          priceCents: 4900,
+          billingInterval: 'monthly',
+          description: '',
+          benefits: '',
+          previewVideoUrl: ''
+        });
         setFeedback({ tone: 'success', message: 'Tier created successfully.' });
         loadRevenue();
       } catch (error) {
         setFeedback({ tone: 'error', message: error?.message ?? 'Unable to create tier.' });
       }
     },
-    [communityId, token, tierDraft, currency, loadRevenue]
+    [communityId, token, tierDraft, currency, loadRevenue, parseBenefits]
   );
 
   const handleUpdateTier = useCallback(
@@ -233,10 +432,11 @@ function RevenuePanel({ communityId, token }) {
             description: tierEditor.description,
             priceCents: Number(tierEditor.priceCents || 0),
             billingInterval: tierEditor.billingInterval,
-            benefits: tierEditor.benefits
-              .split('\n')
-              .map((benefit) => benefit.trim())
-              .filter(Boolean)
+            benefits: parseBenefits(tierEditor.benefits),
+            metadata: {
+              ...(selectedTier?.metadata ?? {}),
+              previewVideoUrl: tierEditor.previewVideoUrl || null
+            }
           }
         });
         setFeedback({ tone: 'success', message: 'Tier updated successfully.' });
@@ -245,7 +445,7 @@ function RevenuePanel({ communityId, token }) {
         setFeedback({ tone: 'error', message: error?.message ?? 'Unable to update tier.' });
       }
     },
-    [communityId, token, selectedTier, tierEditor, loadRevenue]
+    [communityId, token, selectedTier, tierEditor, loadRevenue, parseBenefits]
   );
 
   const handleToggleTier = useCallback(
@@ -360,18 +560,31 @@ function RevenuePanel({ communityId, token }) {
       ) : (
         <>
           {summary ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard title="Monthly recurring revenue" value={currencyFormatter.format((summary.mrrCents ?? 0) / 100)} />
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <StatCard
+                title="Monthly recurring revenue"
+                value={revenueMetrics.mrr}
+                description="Net of refunds and failed payments."
+              />
+              <StatCard
+                title="Annual run rate"
+                value={revenueMetrics.arr}
+                description="12× trailing thirty day MRR."
+              />
               <StatCard
                 title="Active subscribers"
-                value={summary.activeSubscribers ?? 0}
-                description="Includes paused accounts scheduled to resume."
+                value={revenueMetrics.activeSubscribers.toLocaleString()}
+                description="Members with an active seat right now."
               />
-              <StatCard title="Churn this month" value={`${(((summary.monthlyChurnRate ?? 0) * 100).toFixed(1))}%`} />
               <StatCard
-                title="Projected run rate"
-                value={currencyFormatter.format((summary.projectedRunRateCents ?? 0) / 100)}
-                description="Based on current MRR and trial conversions."
+                title="Trialing members"
+                value={revenueMetrics.trialingSubscribers.toLocaleString()}
+                description="Trials that convert soon will roll into MRR."
+              />
+              <StatCard
+                title="Average tier price"
+                value={revenueMetrics.averagePrice}
+                description="Mean price across all published tiers."
               />
             </div>
           ) : (
@@ -381,7 +594,7 @@ function RevenuePanel({ communityId, token }) {
             />
           )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6 xl:grid-cols-3">
             <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
               <header>
                 <h3 className="text-lg font-semibold text-slate-900">Create a new tier</h3>
@@ -403,7 +616,7 @@ function RevenuePanel({ communityId, token }) {
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    Price ({currency})
+                    Price in cents ({currency})
                     <input
                       type="number"
                       min={1}
@@ -414,6 +627,9 @@ function RevenuePanel({ communityId, token }) {
                       }
                       className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
+                    {tierDraftPriceError && (
+                      <span className="mt-1 block text-xs text-red-600">Enter a price above zero.</span>
+                    )}
                   </label>
                   <label className="block text-sm font-medium text-slate-700">
                     Billing interval
@@ -425,147 +641,271 @@ function RevenuePanel({ communityId, token }) {
                       className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                     >
                       <option value="monthly">Monthly</option>
-                      <option value="quarterly">Quarterly</option>
-                      <option value="annual">Annual</option>
-                      <option value="lifetime">Lifetime</option>
+                      <option value="yearly">Yearly</option>
                     </select>
                   </label>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
-                >
-                  Launch tier
-                </button>
+                <label className="block text-sm font-medium text-slate-700">
+                  Short description
+                  <textarea
+                    rows={3}
+                    value={tierDraft.description}
+                    onChange={(event) => setTierDraft((draft) => ({ ...draft, description: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    placeholder="Give members a quick snapshot of the value."
+                  />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">
+                  Key benefits (one per line)
+                  <textarea
+                    rows={4}
+                    value={tierDraft.benefits}
+                    onChange={(event) => setTierDraft((draft) => ({ ...draft, benefits: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    placeholder={'Weekly live calls\nDownloadable resources\nPrivate forum access'}
+                  />
+                </label>
+                <label className="block text-sm font-medium text-slate-700">
+                  Preview video URL
+                  <input
+                    type="url"
+                    value={tierDraft.previewVideoUrl}
+                    onChange={(event) => setTierDraft((draft) => ({ ...draft, previewVideoUrl: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    placeholder="https://player.vimeo.com/video/..."
+                  />
+                </label>
+                <p className="text-xs text-slate-500">
+                  Members will see {currencyFormatter.format((tierDraft.priceCents || 0) / 100)} at checkout. Update benefits to
+                  highlight tangible outcomes.
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={tierDraftPriceError}
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
+                      tierDraftPriceError
+                        ? 'cursor-not-allowed bg-slate-300 text-slate-500'
+                        : 'bg-primary hover:bg-primary/90'
+                    }`}
+                  >
+                    Publish tier
+                  </button>
+                  <span className="text-xs text-slate-500">
+                    Drafts are published immediately and can be toggled off at any time.
+                  </span>
+                </div>
               </form>
+              <TierPreview tier={newTierPreview} currencyFormatter={currencyFormatter} headline="New tier preview" />
             </section>
 
             <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-              <header className="flex items-start justify-between gap-3">
+              <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-900">Existing tiers</h3>
-                  <p className="text-sm text-slate-500">Fine-tune pricing, copy, and benefits for your active offers.</p>
+                  <p className="text-sm text-slate-500">Search, update, and toggle production tiers in one place.</p>
                 </div>
-              </header>
-              {tiers.length ? (
-                <div className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    {tiers.map((tier) => (
-                      <button
-                        key={tier.id}
-                        type="button"
-                        onClick={() => {
+                <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+                  <input
+                    type="search"
+                    value={tierSearch}
+                    onChange={(event) => setTierSearch(event.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 sm:w-56"
+                    placeholder="Search tiers..."
+                  />
+                  {tiers.length > 1 && (
+                    <select
+                      value={selectedTier?.id ?? ''}
+                      onChange={(event) => {
+                        const tier = tiers.find((item) => item.id === Number(event.target.value));
+                        if (tier) {
                           setSelectedTier(tier);
                           setTierEditor({
                             name: tier.name ?? '',
                             priceCents: Number(tier.priceCents ?? 0),
                             billingInterval: tier.billingInterval ?? 'monthly',
                             description: tier.description ?? '',
-                            benefits: Array.isArray(tier.benefits) ? tier.benefits.join('\n') : ''
+                            benefits: Array.isArray(tier.benefits) ? tier.benefits.join('\n') : '',
+                            previewVideoUrl: tier.metadata?.previewVideoUrl ?? ''
                           });
-                        }}
-                        className={`rounded-full border px-4 py-1 text-sm font-medium transition ${
-                          selectedTier?.id === tier.id
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-slate-200 text-slate-600 hover:border-primary hover:text-primary'
-                        }`}
-                      >
-                        {tier.name}
-                      </button>
-                    ))}
+                        }
+                      }}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    >
+                      {tiers.map((tier) => (
+                        <option key={tier.id} value={tier.id}>
+                          {tier.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              </header>
+
+              {filteredTiers.length ? (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-2">
+                      {filteredTiers.map((tier) => (
+                        <button
+                          key={tier.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTier(tier);
+                            setTierEditor({
+                              name: tier.name ?? '',
+                              priceCents: Number(tier.priceCents ?? 0),
+                              billingInterval: tier.billingInterval ?? 'monthly',
+                              description: tier.description ?? '',
+                              benefits: Array.isArray(tier.benefits) ? tier.benefits.join('\n') : '',
+                              previewVideoUrl: tier.metadata?.previewVideoUrl ?? ''
+                            });
+                          }}
+                          className={`rounded-full px-4 py-1 text-xs font-semibold transition ${
+                            selectedTier?.id === tier.id
+                              ? 'bg-primary text-white shadow'
+                              : 'border border-slate-200 text-slate-600 hover:border-primary hover:text-primary'
+                          }`}
+                        >
+                          {tier.name}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => loadRevenue()}
+                      className="text-xs font-semibold text-primary hover:text-primary/80"
+                    >
+                      Refresh
+                    </button>
                   </div>
 
-                  {selectedTier ? (
-                    <form className="space-y-4" onSubmit={handleUpdateTier}>
+                  <form className="space-y-4" onSubmit={handleUpdateTier}>
+                    <label className="block text-sm font-medium text-slate-700">
+                      Tier title
+                      <input
+                        type="text"
+                        required
+                        value={tierEditor.name}
+                        onChange={(event) => setTierEditor((prev) => ({ ...prev, name: event.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      />
+                    </label>
+                    <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block text-sm font-medium text-slate-700">
-                        Display name
+                        Price in cents ({currency})
                         <input
-                          type="text"
-                          value={tierEditor.name}
-                          onChange={(event) => setTierEditor((prev) => ({ ...prev, name: event.target.value }))}
+                          type="number"
+                          min={1}
+                          required
+                          value={tierEditor.priceCents}
+                          onChange={(event) =>
+                            setTierEditor((prev) => ({ ...prev, priceCents: Number(event.target.value ?? 0) }))
+                          }
                           className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
                         />
-                      </label>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <label className="block text-sm font-medium text-slate-700">
-                          Price ({currency})
-                          <input
-                            type="number"
-                            min={1}
-                            value={tierEditor.priceCents}
-                            onChange={(event) =>
-                              setTierEditor((prev) => ({ ...prev, priceCents: Number(event.target.value ?? 0) }))
-                            }
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                          />
-                        </label>
-                        <label className="block text-sm font-medium text-slate-700">
-                          Interval
-                          <select
-                            value={tierEditor.billingInterval}
-                            onChange={(event) =>
-                              setTierEditor((prev) => ({ ...prev, billingInterval: event.target.value }))
-                            }
-                            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                          >
-                            <option value="monthly">Monthly</option>
-                            <option value="quarterly">Quarterly</option>
-                            <option value="annual">Annual</option>
-                            <option value="lifetime">Lifetime</option>
-                          </select>
-                        </label>
-                      </div>
-                      <label className="block text-sm font-medium text-slate-700">
-                        Marketing blurb
-                        <textarea
-                          rows={3}
-                          value={tierEditor.description}
-                          onChange={(event) => setTierEditor((prev) => ({ ...prev, description: event.target.value }))}
-                          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        />
+                        {tierPriceError && (
+                          <span className="mt-1 block text-xs text-red-600">Enter a price above zero.</span>
+                        )}
                       </label>
                       <label className="block text-sm font-medium text-slate-700">
-                        Benefits (one per line)
-                        <textarea
-                          rows={4}
-                          value={tierEditor.benefits}
-                          onChange={(event) => setTierEditor((prev) => ({ ...prev, benefits: event.target.value }))}
+                        Billing interval
+                        <select
+                          value={tierEditor.billingInterval}
+                          onChange={(event) =>
+                            setTierEditor((prev) => ({ ...prev, billingInterval: event.target.value }))
+                          }
                           className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-                        />
-                      </label>
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="submit"
-                          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
                         >
-                          Save changes
-                        </button>
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label className="block text-sm font-medium text-slate-700">
+                      Description
+                      <textarea
+                        rows={3}
+                        value={tierEditor.description}
+                        onChange={(event) => setTierEditor((prev) => ({ ...prev, description: event.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        placeholder="What makes this tier special?"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-700">
+                      Benefits (one per line)
+                      <textarea
+                        rows={4}
+                        value={tierEditor.benefits}
+                        onChange={(event) => setTierEditor((prev) => ({ ...prev, benefits: event.target.value }))}
+                        className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        placeholder={'Live cohort calls\nPrivate mastermind\n1:1 onboarding'}
+                      />
+                    </label>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block text-sm font-medium text-slate-700">
+                        Preview video URL
+                        <input
+                          type="url"
+                          value={tierEditor.previewVideoUrl}
+                          onChange={(event) =>
+                            setTierEditor((prev) => ({ ...prev, previewVideoUrl: event.target.value }))
+                          }
+                          className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </label>
+                      <div className="space-y-2 rounded-lg border border-dashed border-slate-300 p-4 text-xs text-slate-500">
+                        <p className="font-semibold text-slate-600">Status</p>
+                        <p>
+                          {selectedTier?.isActive
+                            ? 'Tier is live and purchasable. Disable it to remove from checkout.'
+                            : 'Tier is inactive. Enable it to sell again.'}
+                        </p>
                         <button
                           type="button"
                           onClick={() => handleToggleTier(selectedTier)}
-                          className={`rounded-lg border px-4 py-2 text-sm font-semibold transition ${
-                            selectedTier.isActive
-                              ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                              : 'border-emerald-200 bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
-                          }`}
+                          className="mt-2 inline-flex items-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-700"
                         >
-                          {selectedTier.isActive ? 'Pause tier' : 'Activate tier'}
+                          {selectedTier?.isActive ? 'Disable tier' : 'Activate tier'}
                         </button>
                       </div>
-                    </form>
-                  ) : (
-                    <DashboardStateMessage
-                      title="No tiers"
-                      description="Select a tier to begin editing or create a new one."
-                    />
-                  )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="submit"
+                        disabled={tierPriceError}
+                        className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
+                          tierPriceError
+                            ? 'cursor-not-allowed bg-slate-300 text-slate-500'
+                            : 'bg-primary hover:bg-primary/90'
+                        }`}
+                      >
+                        Save changes
+                      </button>
+                      <span className="text-xs text-slate-500">Updates sync instantly to your hosted paywall.</span>
+                    </div>
+                  </form>
                 </div>
               ) : (
                 <DashboardStateMessage
-                  title="No tiers configured"
-                  description="Launch your first tier to start charging for premium access."
+                  title={tierSearch ? 'No tiers match your search' : 'No tiers configured'}
+                  description={
+                    tierSearch
+                      ? 'Try adjusting your search keywords or clear the filter to see everything.'
+                      : 'Launch your first tier to start charging for premium access.'
+                  }
                 />
               )}
+            </section>
+
+            <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+              <header>
+                <h3 className="text-lg font-semibold text-slate-900">Live preview</h3>
+                <p className="text-sm text-slate-500">
+                  See exactly what learners experience on the hosted checkout before you publish.
+                </p>
+              </header>
+              <TierPreview tier={editingPreview} currencyFormatter={currencyFormatter} headline="Current tier preview" />
             </section>
           </div>
         </>
@@ -594,8 +934,21 @@ function BroadcastPanel({ communityId, token, communityName }) {
     visibility: 'members',
     mediaUrl: '',
     ctaText: '',
-    ctaUrl: ''
+    ctaUrl: '',
+    scheduledAt: '',
+    channels: ['in_app']
   });
+  const [filters, setFilters] = useState({ query: '', visibility: '', channelId: '' });
+
+  const toDateTimeInputValue = useCallback((value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (input) => input.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(
+      date.getMinutes()
+    )}`;
+  }, []);
 
   const loadPosts = useCallback(
     async (signal) => {
@@ -607,7 +960,10 @@ function BroadcastPanel({ communityId, token, communityName }) {
           token,
           signal,
           perPage: 8,
-          postType: 'broadcast'
+          postType: 'broadcast',
+          visibility: filters.visibility || undefined,
+          query: filters.query || undefined,
+          channelId: filters.channelId || undefined
         });
         if (signal?.aborted) return;
         setPosts(response?.data ?? []);
@@ -620,7 +976,7 @@ function BroadcastPanel({ communityId, token, communityName }) {
         }
       }
     },
-    [communityId, token]
+    [communityId, token, filters]
   );
 
   useEffect(() => {
@@ -630,7 +986,17 @@ function BroadcastPanel({ communityId, token, communityName }) {
   }, [loadPosts]);
 
   const resetEditor = useCallback(() => {
-    setEditor({ id: null, title: '', body: '', visibility: 'members', mediaUrl: '', ctaText: '', ctaUrl: '' });
+    setEditor({
+      id: null,
+      title: '',
+      body: '',
+      visibility: 'members',
+      mediaUrl: '',
+      ctaText: '',
+      ctaUrl: '',
+      scheduledAt: '',
+      channels: ['in_app']
+    });
   }, []);
 
   const handleSubmit = useCallback(
@@ -638,15 +1004,19 @@ function BroadcastPanel({ communityId, token, communityName }) {
       event.preventDefault();
       if (!communityId || !token) return;
       setFeedback(null);
+      const scheduledIso = editor.scheduledAt ? new Date(editor.scheduledAt).toISOString() : null;
+      const deliveryChannels = Array.isArray(editor.channels) && editor.channels.length ? editor.channels : ['in_app'];
       const payload = {
         title: editor.title,
         body: editor.body,
         postType: 'broadcast',
         visibility: editor.visibility,
-        status: 'published',
+        status: scheduledIso ? 'scheduled' : 'published',
         metadata: {
           mediaUrl: editor.mediaUrl || null,
-          cta: editor.ctaUrl ? { text: editor.ctaText || 'Learn more', url: editor.ctaUrl } : null
+          cta: editor.ctaUrl ? { text: editor.ctaText || 'Learn more', url: editor.ctaUrl } : null,
+          channels: deliveryChannels,
+          scheduledAt: scheduledIso
         }
       };
       try {
@@ -676,9 +1046,31 @@ function BroadcastPanel({ communityId, token, communityName }) {
       visibility: post.visibility ?? 'members',
       mediaUrl: metadata.mediaUrl ?? '',
       ctaText: cta?.text ?? '',
-      ctaUrl: cta?.url ?? ''
+      ctaUrl: cta?.url ?? '',
+      scheduledAt: toDateTimeInputValue(metadata.scheduledAt ?? post.publishAt ?? null),
+      channels: Array.isArray(metadata.channels) && metadata.channels.length ? metadata.channels : ['in_app']
+    });
+  }, [toDateTimeInputValue]);
+
+  const handleChannelToggle = useCallback((channel) => {
+    setEditor((prev) => {
+      const channels = new Set(prev.channels ?? []);
+      if (channels.has(channel)) {
+        channels.delete(channel);
+      } else {
+        channels.add(channel);
+      }
+      return { ...prev, channels: Array.from(channels) };
     });
   }, []);
+
+  const broadcastPreview = useMemo(
+    () => ({
+      ...editor,
+      channels: editor.channels ?? ['in_app']
+    }),
+    [editor]
+  );
 
   const handleDelete = useCallback(
     async (postId) => {
@@ -709,20 +1101,20 @@ function BroadcastPanel({ communityId, token, communityName }) {
 
       {feedback && <DashboardActionFeedback {...feedback} onDismiss={() => setFeedback(null)} />}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <header className="flex items-start justify-between gap-3">
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h3 className="text-lg font-semibold text-slate-900">{editor.id ? 'Update broadcast' : 'Compose broadcast'}</h3>
               <p className="text-sm text-slate-500">
-                Broadcasts go out instantly to all eligible members of {communityName ?? 'your community'}.
+                Broadcasts go out instantly or on schedule to all eligible members of {communityName ?? 'your community'}.
               </p>
             </div>
             {editor.id && (
               <button
                 type="button"
                 onClick={resetEditor}
-                className="text-sm font-semibold text-primary hover:text-primary/80"
+                className="self-end rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/20"
               >
                 New broadcast
               </button>
@@ -761,6 +1153,11 @@ function BroadcastPanel({ communityId, token, communityName }) {
                 placeholder="https://cdn.example.com/hero.jpg"
               />
             </label>
+            {editor.mediaUrl && (
+              <div className="overflow-hidden rounded-lg border border-dashed border-slate-300">
+                <img src={editor.mediaUrl} alt="Broadcast media preview" className="h-40 w-full object-cover" />
+              </div>
+            )}
             <div className="grid gap-4 md:grid-cols-2">
               <label className="block text-sm font-medium text-slate-700">
                 CTA label
@@ -783,88 +1180,200 @@ function BroadcastPanel({ communityId, token, communityName }) {
                 />
               </label>
             </div>
-            <label className="block text-sm font-medium text-slate-700">
-              Visibility
-              <select
-                value={editor.visibility}
-                onChange={(event) => setEditor((prev) => ({ ...prev, visibility: event.target.value }))}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                <option value="members">Members only</option>
-                <option value="public">Public</option>
-              </select>
-            </label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Visibility
+                <select
+                  value={editor.visibility}
+                  onChange={(event) => setEditor((prev) => ({ ...prev, visibility: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="members">Members only</option>
+                  <option value="public">Public</option>
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-slate-700">
+                Schedule (optional)
+                <input
+                  type="datetime-local"
+                  value={editor.scheduledAt}
+                  onChange={(event) => setEditor((prev) => ({ ...prev, scheduledAt: event.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </label>
+            </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-slate-700">Delivery channels</span>
+              <div className="flex flex-wrap gap-2">
+                {broadcastChannels.map((channel) => {
+                  const isActive = (editor.channels ?? []).includes(channel.id);
+                  return (
+                    <button
+                      key={channel.id}
+                      type="button"
+                      onClick={() => handleChannelToggle(channel.id)}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                        isActive
+                          ? 'bg-primary text-white shadow'
+                          : 'border border-slate-200 text-slate-600 hover:border-primary hover:text-primary'
+                      }`}
+                    >
+                      {channel.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-slate-500">
+                Choose one or more delivery channels. Members without the selected channel preference are skipped automatically.
+              </p>
+            </div>
             <button
               type="submit"
               className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
             >
-              {editor.id ? 'Save broadcast' : 'Publish broadcast'}
+              {editor.id ? (editor.scheduledAt ? 'Save schedule' : 'Save broadcast') : editor.scheduledAt ? 'Schedule broadcast' : 'Publish broadcast'}
             </button>
           </form>
         </section>
 
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <header className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">Recent broadcasts</h3>
-              <p className="text-sm text-slate-500">Review performance and keep evergreen announcements fresh.</p>
-            </div>
-          </header>
+        <div className="space-y-6">
+          <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <header>
+              <h3 className="text-lg font-semibold text-slate-900">Live preview</h3>
+              <p className="text-sm text-slate-500">Review the announcement exactly as members will see it.</p>
+            </header>
+            <article className="space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+              <header className="space-y-1">
+                <h4 className="text-base font-semibold text-slate-900">{broadcastPreview.title || 'Broadcast title'}</h4>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <span className="rounded-full bg-primary/10 px-2 py-1 font-semibold text-primary">
+                    {broadcastPreview.visibility === 'public' ? 'Public' : 'Members'}
+                  </span>
+                  {broadcastPreview.scheduledAt && <span>Goes live {new Date(broadcastPreview.scheduledAt).toLocaleString()}</span>}
+                  <span>
+                    Channels:
+                    {' '}
+                    {(broadcastPreview.channels ?? [])
+                      .map((channel) => broadcastChannels.find((item) => item.id === channel)?.label ?? channel)
+                      .join(', ')}
+                  </span>
+                </div>
+              </header>
+              <p className="text-sm text-slate-600 whitespace-pre-line">{broadcastPreview.body || 'Your announcement copy renders here.'}</p>
+              {broadcastPreview.mediaUrl && (
+                <div className="overflow-hidden rounded-lg border border-slate-200">
+                  <img src={broadcastPreview.mediaUrl} alt="Preview media" className="h-40 w-full object-cover" />
+                </div>
+              )}
+              {broadcastPreview.ctaUrl && (
+                <a
+                  href={broadcastPreview.ctaUrl}
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary/90"
+                >
+                  {broadcastPreview.ctaText || 'Learn more'}
+                </a>
+              )}
+            </article>
+          </section>
 
-          {loading && !posts.length ? (
-            <DashboardStateMessage title="Loading broadcasts" tone="loading" />
-          ) : posts.length ? (
-            <ul className="space-y-4">
-              {posts.map((post) => {
-                const metadata = post.metadata ?? {};
-                const reactionTotal = post.reactionSummary
-                  ? Object.values(post.reactionSummary).reduce((total, count) => total + Number(count || 0), 0)
-                  : 0;
-                return (
-                  <li key={post.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-2">
-                        <h4 className="text-base font-semibold text-slate-900">{post.title ?? 'Untitled broadcast'}</h4>
-                        <p className="text-sm text-slate-600 line-clamp-3">{post.body}</p>
-                        {metadata.mediaUrl && (
-                          <div className="overflow-hidden rounded-lg border border-slate-200">
-                            <img src={metadata.mediaUrl} alt="Broadcast media" className="h-32 w-full object-cover" />
+          <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <header className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">Recent broadcasts</h3>
+                  <p className="text-sm text-slate-500">
+                    Track engagement, iterate quickly, and archive content that is no longer relevant.
+                  </p>
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <input
+                  type="search"
+                  value={filters.query}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  placeholder="Search broadcasts..."
+                />
+                <select
+                  value={filters.visibility}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, visibility: event.target.value }))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="">All visibility</option>
+                  <option value="members">Members only</option>
+                  <option value="public">Public</option>
+                </select>
+                <select
+                  value={filters.channelId}
+                  onChange={(event) => setFilters((prev) => ({ ...prev, channelId: event.target.value }))}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="">All channels</option>
+                  {broadcastChannels.map((channel) => (
+                    <option key={channel.id} value={channel.id}>
+                      {channel.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </header>
+
+            {loading && !posts.length ? (
+              <DashboardStateMessage title="Loading broadcasts" tone="loading" />
+            ) : posts.length ? (
+              <ul className="space-y-4">
+                {posts.map((post) => {
+                  const metadata = post.metadata ?? {};
+                  const reactionTotal = post.reactionSummary
+                    ? Object.values(post.reactionSummary).reduce((total, count) => total + Number(count || 0), 0)
+                    : 0;
+                  return (
+                    <li key={post.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="space-y-2">
+                          <h4 className="text-base font-semibold text-slate-900">{post.title ?? 'Untitled broadcast'}</h4>
+                          <p className="text-sm text-slate-600 line-clamp-3">{post.body}</p>
+                          {metadata.mediaUrl && (
+                            <div className="overflow-hidden rounded-lg border border-slate-200">
+                              <img src={metadata.mediaUrl} alt="Broadcast media" className="h-32 w-full object-cover" />
+                            </div>
+                          )}
+                          <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                            <span>Visibility: {post.visibility}</span>
+                            {metadata.channels?.length && <span>Channels: {metadata.channels.join(', ')}</span>}
+                            {post.publishedAt && <span>Published {new Date(post.publishedAt).toLocaleString()}</span>}
+                            <span>Reactions: {reactionTotal}</span>
                           </div>
-                        )}
-                        <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                          <span>Visibility: {post.visibility}</span>
-                          {post.publishedAt && <span>Published {new Date(post.publishedAt).toLocaleString()}</span>}
-                          <span>Reactions: {reactionTotal}</span>
+                        </div>
+                        <div className="flex flex-col gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleEdit(post)}
+                            className="rounded-lg border border-primary/40 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(post.id)}
+                            className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
+                          >
+                            Archive
+                          </button>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(post)}
-                          className="rounded-lg border border-primary/40 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(post.id)}
-                          className="rounded-lg border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50"
-                        >
-                          Archive
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <DashboardStateMessage
-              title="No broadcasts yet"
-              description="Create an announcement to welcome new members or promote your latest course."
-            />
-          )}
-        </section>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <DashboardStateMessage
+                title="No broadcasts yet"
+                description="Create an announcement to welcome new members or promote your latest course."
+              />
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
@@ -887,6 +1396,7 @@ function SafetyPanel({ communityId, token }) {
   const [feedback, setFeedback] = useState(null);
   const [filters, setFilters] = useState({ status: 'pending', severity: '' });
   const [resolutionNotes, setResolutionNotes] = useState({});
+  const [expandedIncidentId, setExpandedIncidentId] = useState(null);
 
   const loadIncidents = useCallback(
     async (signal) => {
@@ -957,7 +1467,7 @@ function SafetyPanel({ communityId, token }) {
         title="Safety centre"
         description="Track escalations from moderators, close out incidents, and leave audit-ready notes."
         actions={
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <select
               value={filters.status}
               onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
@@ -980,6 +1490,37 @@ function SafetyPanel({ communityId, token }) {
               <option value="high">High</option>
               <option value="critical">Critical</option>
             </select>
+            <button
+              type="button"
+              onClick={() => {
+                if (!incidents.length) return;
+                const headers = ['ID', 'Title', 'Severity', 'Status', 'Created At', 'Reporter'];
+                const rows = incidents.map((incident) => {
+                  const reporter = incident.reporter?.name || incident.reporter?.email || '';
+                  return [
+                    incident.publicId ?? incident.id ?? '',
+                    (incident.title ?? '').replace(/"/g, '""'),
+                    incident.severity ?? '',
+                    incident.status ?? '',
+                    incident.createdAt ?? '',
+                    reporter.replace(/"/g, '""')
+                  ];
+                });
+                const csv = [headers.join(','), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(','))].join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `incidents-${communityId ?? 'community'}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+              }}
+              className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+            >
+              Export CSV
+            </button>
           </div>
         }
       />
@@ -1051,9 +1592,46 @@ function SafetyPanel({ communityId, token }) {
                       >
                         Mark resolved
                       </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedIncidentId((current) => (current === incident.id ? null : incident.id))
+                        }
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+                      >
+                        {expandedIncidentId === incident.id ? 'Hide details' : 'View details'}
+                      </button>
                     </div>
                   </td>
                 </tr>
+                {expandedIncidentId === incident.id && (
+                  <tr>
+                    <td colSpan={5} className="bg-slate-50 px-6 py-4 text-sm text-slate-600">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                          <span>Reporter: {incident.reporter?.name ?? incident.reporter?.email ?? 'Unknown'}</span>
+                          {incident.updatedAt && <span>Last updated {new Date(incident.updatedAt).toLocaleString()}</span>}
+                          {incident.tags?.length && <span>Tags: {incident.tags.join(', ')}</span>}
+                        </div>
+                        {incident.attachments?.length ? (
+                          <div className="flex flex-wrap gap-3">
+                            {incident.attachments.map((attachment) => (
+                              <a
+                                key={attachment.url}
+                                href={attachment.url}
+                                className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-primary hover:border-primary hover:bg-primary/10"
+                              >
+                                {attachment.label ?? 'Download attachment'}
+                              </a>
+                            ))}
+                          </div>
+                        ) : (
+                          <p>No attachments linked to this incident.</p>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
               ))}
             </tbody>
           </table>
@@ -1082,6 +1660,7 @@ function SubscriptionsPanel({ communityId, token }) {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [filter, setFilter] = useState('');
+  const [query, setQuery] = useState('');
 
   const loadSubscriptions = useCallback(
     async (signal) => {
@@ -1092,7 +1671,7 @@ function SubscriptionsPanel({ communityId, token }) {
           communityId,
           token,
           signal,
-          params: { status: filter || undefined }
+          params: { status: filter || undefined, query: query || undefined }
         });
         if (signal?.aborted) return;
         setSubscriptions(response?.data ?? []);
@@ -1105,7 +1684,7 @@ function SubscriptionsPanel({ communityId, token }) {
         }
       }
     },
-    [communityId, token, filter]
+    [communityId, token, filter, query]
   );
 
   useEffect(() => {
@@ -1134,31 +1713,97 @@ function SubscriptionsPanel({ communityId, token }) {
     [communityId, token, loadSubscriptions]
   );
 
+  const filteredSubscriptions = useMemo(() => {
+    if (!query.trim()) return subscriptions;
+    return subscriptions.filter((subscription) => {
+      const member = subscription.user ?? {};
+      const haystack = `${member.name ?? ''} ${member.email ?? ''}`.toLowerCase();
+      return haystack.includes(query.trim().toLowerCase());
+    });
+  }, [subscriptions, query]);
+
+  const subscriptionSummary = useMemo(() => {
+    const total = subscriptions.length;
+    const active = subscriptions.filter((item) => item.status === 'active').length;
+    const paused = subscriptions.filter((item) => item.status === 'paused').length;
+    const canceled = subscriptions.filter((item) => item.status === 'canceled').length;
+    return { total, active, paused, canceled };
+  }, [subscriptions]);
+
+  const handleExport = useCallback(() => {
+    if (!subscriptions.length) return;
+    const headers = ['Member', 'Email', 'Tier', 'Status', 'Renewal'];
+    const rows = subscriptions.map((subscription) => {
+      const member = subscription.user ?? {};
+      const tier = subscription.tier ?? {};
+      return [
+        (member.name ?? '').replace(/"/g, '""'),
+        (member.email ?? '').replace(/"/g, '""'),
+        (tier.name ?? '').replace(/"/g, '""'),
+        subscription.status ?? '',
+        subscription.currentPeriodEnd ?? ''
+      ];
+    });
+    const csv = [headers.join(','), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `subscriptions-${communityId ?? 'community'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, [subscriptions, communityId]);
+
   return (
     <div className="space-y-8">
       <SectionHeader
         title="Subscriptions"
         description="Audit subscriber activity and take action on paused or overdue accounts."
         actions={
-          <select
-            value={filter}
-            onChange={(event) => setFilter(event.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-          >
-            <option value="">All statuses</option>
-            <option value="active">Active</option>
-            <option value="paused">Paused</option>
-            <option value="canceled">Canceled</option>
-            <option value="pending">Pending</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 sm:w-56"
+              placeholder="Search by name or email"
+            />
+            <select
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+              <option value="canceled">Canceled</option>
+              <option value="pending">Pending</option>
+            </select>
+            <button
+              type="button"
+              onClick={handleExport}
+              className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+            >
+              Export CSV
+            </button>
+          </div>
         }
       />
 
       {feedback && <DashboardActionFeedback {...feedback} onDismiss={() => setFeedback(null)} />}
 
-      {loading && !subscriptions.length ? (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard title="Total subscribers" value={subscriptionSummary.total} />
+        <StatCard title="Active" value={subscriptionSummary.active} description="Billing on schedule." />
+        <StatCard title="Paused" value={subscriptionSummary.paused} description="Temporarily on hold." />
+        <StatCard title="Canceled" value={subscriptionSummary.canceled} description="Seats that churned." />
+      </div>
+
+      {loading && !filteredSubscriptions.length ? (
         <DashboardStateMessage title="Loading subscriptions" tone="loading" />
-      ) : subscriptions.length ? (
+      ) : filteredSubscriptions.length ? (
         <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
@@ -1171,7 +1816,7 @@ function SubscriptionsPanel({ communityId, token }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white text-sm">
-              {subscriptions.map((subscription) => {
+              {filteredSubscriptions.map((subscription) => {
                 const tier = subscription.tier ?? {};
                 const member = subscription.user ?? {};
                 const formatter = new Intl.NumberFormat(undefined, {
@@ -1253,6 +1898,8 @@ function MembersPanel({ communityId, token }) {
     location: '',
     notes: ''
   });
+  const [bulkEmails, setBulkEmails] = useState('');
+  const [importing, setImporting] = useState(false);
 
   const loadMembers = useCallback(
     async (signal) => {
@@ -1371,6 +2018,76 @@ function MembersPanel({ communityId, token }) {
     [communityId, token, selectedMember, loadMembers, resetDraft]
   );
 
+  const handleBulkInvite = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!communityId || !token) return;
+      const emails = bulkEmails
+        .split(/[\s,]+/)
+        .map((email) => email.trim())
+        .filter(Boolean);
+      if (!emails.length) {
+        setFeedback({ tone: 'error', message: 'Add at least one email to invite.' });
+        return;
+      }
+      setImporting(true);
+      try {
+        const results = await Promise.allSettled(
+          emails.map((email) =>
+            createCommunityMember({
+              communityId,
+              token,
+              payload: {
+                email,
+                role: 'member',
+                status: 'invited',
+                notes: 'Bulk import invite'
+              }
+            })
+          )
+        );
+        const failed = results.filter((result) => result.status === 'rejected').length;
+        if (failed) {
+          setFeedback({ tone: 'info', message: `${emails.length - failed} invites sent. ${failed} failed.` });
+        } else {
+          setFeedback({ tone: 'success', message: `Invited ${emails.length} members.` });
+        }
+        setBulkEmails('');
+        loadMembers();
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to send bulk invites.' });
+      } finally {
+        setImporting(false);
+      }
+    },
+    [bulkEmails, communityId, token, loadMembers]
+  );
+
+  const handleExportMembers = useCallback(() => {
+    if (!members.length) return;
+    const headers = ['Name', 'Email', 'Role', 'Status', 'Location'];
+    const rows = members.map((member) => {
+      const user = member.user ?? {};
+      return [
+        (user.name ?? '').replace(/"/g, '""'),
+        (user.email ?? '').replace(/"/g, '""'),
+        member.role ?? '',
+        member.status ?? '',
+        (member.location ?? '').replace(/"/g, '""')
+      ];
+    });
+    const csv = [headers.join(','), ...rows.map((row) => row.map((cell) => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `members-${communityId ?? 'community'}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, [members, communityId]);
+
   const startEdit = useCallback((member) => {
     setSelectedMember(member);
     const metadata = member.metadata ?? {};
@@ -1390,13 +2107,22 @@ function MembersPanel({ communityId, token }) {
         title="Member roster"
         description="Invite new learners, adjust roles, and maintain a clean directory."
         actions={
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search members"
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
-          />
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search members"
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+            <button
+              type="button"
+              onClick={handleExportMembers}
+              className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+            >
+              Export CSV
+            </button>
+          </div>
         }
       />
 
@@ -1493,6 +2219,32 @@ function MembersPanel({ communityId, token }) {
               )}
             </div>
           </form>
+          {!selectedMember && (
+            <form className="space-y-3 rounded-lg border border-dashed border-slate-300 p-4" onSubmit={handleBulkInvite}>
+              <label className="block text-sm font-medium text-slate-700">
+                Bulk invite emails
+                <textarea
+                  rows={3}
+                  value={bulkEmails}
+                  onChange={(event) => setBulkEmails(event.target.value)}
+                  placeholder="name@example.com, teammate@example.com"
+                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={importing}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition ${
+                    importing ? 'cursor-not-allowed bg-slate-300 text-slate-500' : 'bg-slate-900 hover:bg-slate-700'
+                  }`}
+                >
+                  {importing ? 'Sending invites…' : 'Send bulk invites'}
+                </button>
+                <p className="text-xs text-slate-500">Paste comma or newline separated emails to invite multiple members.</p>
+              </div>
+            </form>
+          )}
         </section>
 
         <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1574,7 +2326,10 @@ function ManagePanel({ communityId, token, community }) {
     coverImageUrl: '',
     visibility: 'public',
     welcomeMessage: '',
-    contactEmail: ''
+    contactEmail: '',
+    brandColor: '#2563eb',
+    supportPhone: '',
+    faqUrl: ''
   });
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -1588,7 +2343,10 @@ function ManagePanel({ communityId, token, community }) {
       coverImageUrl: community.coverImageUrl ?? '',
       visibility: community.visibility ?? 'public',
       welcomeMessage: community.metadata?.welcomeMessage ?? '',
-      contactEmail: community.metadata?.contactEmail ?? ''
+      contactEmail: community.metadata?.contactEmail ?? '',
+      brandColor: community.metadata?.brandColor ?? '#2563eb',
+      supportPhone: community.metadata?.supportPhone ?? '',
+      faqUrl: community.metadata?.faqUrl ?? ''
     });
   }, [community]);
 
@@ -1611,7 +2369,10 @@ function ManagePanel({ communityId, token, community }) {
             metadata: {
               ...(community?.metadata ?? {}),
               welcomeMessage: form.welcomeMessage || null,
-              contactEmail: form.contactEmail || null
+              contactEmail: form.contactEmail || null,
+              brandColor: form.brandColor || '#2563eb',
+              supportPhone: form.supportPhone || null,
+              faqUrl: form.faqUrl || null
             }
           }
         });
@@ -1688,6 +2449,37 @@ function ManagePanel({ communityId, token, community }) {
             </select>
           </label>
         </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <label className="block text-sm font-medium text-slate-700">
+            Accent color
+            <input
+              type="color"
+              value={form.brandColor}
+              onChange={(event) => setForm((prev) => ({ ...prev, brandColor: event.target.value }))}
+              className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-slate-200"
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            Support phone
+            <input
+              type="tel"
+              value={form.supportPhone}
+              onChange={(event) => setForm((prev) => ({ ...prev, supportPhone: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="+1 555 123 4567"
+            />
+          </label>
+          <label className="block text-sm font-medium text-slate-700">
+            FAQ URL
+            <input
+              type="url"
+              value={form.faqUrl}
+              onChange={(event) => setForm((prev) => ({ ...prev, faqUrl: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40"
+              placeholder="https://docs.example.com/faq"
+            />
+          </label>
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="block text-sm font-medium text-slate-700">
             Welcome message
@@ -1714,6 +2506,12 @@ function ManagePanel({ communityId, token, community }) {
             <img src={form.coverImageUrl} alt="Community cover" className="h-48 w-full object-cover" />
           </div>
         )}
+        <div className="flex items-center gap-3 text-sm text-slate-600">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200" style={{ backgroundColor: form.brandColor }}>
+            <span className="sr-only">Brand color swatch</span>
+          </span>
+          <span>Accent color preview ({form.brandColor})</span>
+        </div>
         <button
           type="submit"
           disabled={loading}
