@@ -58,8 +58,12 @@ class _MaterialMetadataSheetState extends State<MaterialMetadataSheet> {
     _badgeController = TextEditingController(text: _draft.badge ?? '');
     _ctaLabelController = TextEditingController(text: _draft.callToActionLabel ?? '');
     _ctaUrlController = TextEditingController(text: _draft.callToActionUrl ?? '');
-    _categories = List<String>.from(_draft.categories);
-    _tags = List<String>.from(_draft.tags);
+    _categories = _dedupeCaseInsensitive(
+      _draft.categories.map((value) => _normalizeCategory(value) ?? value),
+    );
+    _tags = _dedupeCaseInsensitive(
+      _draft.tags.map((value) => _normalizeTag(value) ?? value),
+    );
     _gallery = List<MaterialMediaItem>.from(_draft.gallery);
     _pinned = _draft.showcasePinned;
     _visibility = _draft.visibility ?? widget.asset.visibility ?? 'workspace';
@@ -83,46 +87,69 @@ class _MaterialMetadataSheetState extends State<MaterialMetadataSheet> {
     super.dispose();
   }
 
-  void _addCategory() {
-    final value = _categoryInput.text.trim();
-    if (value.isEmpty) return;
-    if (_categories.contains(value)) {
-      _categoryInput.clear();
+  void _addCategory(BuildContext context) {
+    final normalized = _normalizeCategory(_categoryInput.text);
+    _categoryInput.clear();
+    if (normalized == null) {
+      return;
+    }
+    final exists = _categories.any((value) => value.toLowerCase() == normalized.toLowerCase());
+    if (_categories.length >= 12 && !exists) {
+      _showSnackBar(context, 'You can add up to 12 categories.');
       return;
     }
     setState(() {
-      _categories = List<String>.from(_categories)..add(value);
-      _categoryInput.clear();
+      final next = List<String>.from(_categories);
+      if (!exists) {
+        next.add(normalized);
+      }
+      _categories = next;
     });
   }
 
   void _removeCategory(String category) {
     setState(() {
-      _categories = _categories.where((item) => item != category).toList();
+      _categories = _categories
+          .where((item) => item.toLowerCase() != category.toLowerCase())
+          .toList();
     });
   }
 
-  void _addTag() {
-    final value = _tagInput.text.trim();
-    if (value.isEmpty) return;
-    if (_tags.contains(value)) {
-      _tagInput.clear();
+  void _addTag(BuildContext context) {
+    final raw = _tagInput.text;
+    final normalized = _normalizeTag(raw);
+    _tagInput.clear();
+    if (normalized == null) {
+      if (raw.trim().isNotEmpty) {
+        _showSnackBar(context, 'Tags can include letters, numbers, hyphen, or underscore.');
+      }
+      return;
+    }
+    final exists = _tags.any((value) => value.toLowerCase() == normalized.toLowerCase());
+    if (_tags.length >= 24 && !exists) {
+      _showSnackBar(context, 'You can add up to 24 tags.');
       return;
     }
     setState(() {
-      _tags = List<String>.from(_tags)..add(value);
-      _tagInput.clear();
+      final next = List<String>.from(_tags);
+      if (!exists) {
+        next.add(normalized);
+      }
+      _tags = next;
     });
   }
 
   void _removeTag(String tag) {
     setState(() {
-      _tags = _tags.where((item) => item != tag).toList();
+      _tags = _tags.where((item) => item.toLowerCase() != tag.toLowerCase()).toList();
     });
   }
 
-  void _addGalleryItem() {
-    if (_gallery.length >= 8) return;
+  void _addGalleryItem(BuildContext context) {
+    if (_gallery.length >= 8) {
+      _showSnackBar(context, 'Gallery supports up to 8 items.');
+      return;
+    }
     setState(() {
       _gallery = List<MaterialMediaItem>.from(_gallery)
         ..add(MaterialMediaItem(url: '', caption: '', kind: MaterialMediaKind.image));
@@ -143,27 +170,132 @@ class _MaterialMetadataSheetState extends State<MaterialMetadataSheet> {
     });
   }
 
+  String? _normalizeCategory(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String? _normalizeTag(String raw) {
+    final trimmed = raw.replaceAll('#', '').trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final collapsed = trimmed.replaceAll(RegExp(r'\s+'), '-');
+    final filtered = collapsed.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '').toLowerCase();
+    final normalized =
+        filtered.replaceAll(RegExp(r'-{2,}'), '-').replaceAll(RegExp(r'^[-_]+|[-_]+$'), '');
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
+  }
+
+  void _showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
+  }
+
+  bool _isSecureUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    return uri != null && uri.hasScheme && uri.host.isNotEmpty && uri.scheme == 'https';
+  }
+
+  String? _validateBeforeSave() {
+    final urlChecks = <String, String>{
+      'Cover image URL': _coverUrlController.text,
+      'Video URL': _videoUrlController.text,
+      'Video poster image': _videoPosterController.text,
+      'Call to action URL': _ctaUrlController.text,
+    };
+    for (final entry in urlChecks.entries) {
+      final value = entry.value.trim();
+      if (value.isEmpty) {
+        continue;
+      }
+      if (!_isSecureUrl(value)) {
+        return '${entry.key} must be a valid https:// link.';
+      }
+    }
+    for (var i = 0; i < _gallery.length; i++) {
+      final url = _gallery[i].url.trim();
+      if (url.isEmpty) {
+        continue;
+      }
+      if (!_isSecureUrl(url)) {
+        return 'Gallery item ${i + 1} must use a valid https:// link.';
+      }
+    }
+    return null;
+  }
+
+  List<String> _dedupeCaseInsensitive(Iterable<String> values) {
+    final seen = <String>{};
+    final result = <String>[];
+    for (final value in values) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) {
+        continue;
+      }
+      final key = trimmed.toLowerCase();
+      if (seen.add(key)) {
+        result.add(trimmed);
+      }
+    }
+    return result;
+  }
+
+  String? _valueOrNull(String text) {
+    final trimmed = text.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   Future<void> _save() async {
     setState(() {
       _saving = true;
       _error = null;
       _feedback = null;
     });
+    final validationError = _validateBeforeSave();
+    if (validationError != null) {
+      setState(() {
+        _saving = false;
+        _error = validationError;
+      });
+      return;
+    }
+    final categories = _dedupeCaseInsensitive(
+      _categories.map((value) => _normalizeCategory(value) ?? value),
+    );
+    final tags = _dedupeCaseInsensitive(
+      _tags.map((value) => _normalizeTag(value) ?? value),
+    );
+    final gallery = _gallery
+        .where((item) => item.url.trim().isNotEmpty)
+        .map(
+          (item) => item.copyWith(
+            url: item.url.trim(),
+            caption: _valueOrNull(item.caption ?? ''),
+          ),
+        )
+        .toList();
     final update = MaterialMetadataUpdate(
-      title: _titleController.text,
-      description: _descriptionController.text,
-      categories: _categories,
-      tags: _tags,
-      coverImageUrl: _coverUrlController.text,
-      coverImageAlt: _coverAltController.text,
-      gallery: _gallery,
-      videoUrl: _videoUrlController.text,
-      videoPosterUrl: _videoPosterController.text,
-      headline: _headlineController.text,
-      subheadline: _subheadlineController.text,
-      callToActionLabel: _ctaLabelController.text,
-      callToActionUrl: _ctaUrlController.text,
-      badge: _badgeController.text,
+      title: _valueOrNull(_titleController.text),
+      description: _valueOrNull(_descriptionController.text),
+      categories: categories,
+      tags: tags,
+      coverImageUrl: _valueOrNull(_coverUrlController.text),
+      coverImageAlt: _valueOrNull(_coverAltController.text),
+      gallery: gallery,
+      videoUrl: _valueOrNull(_videoUrlController.text),
+      videoPosterUrl: _valueOrNull(_videoPosterController.text),
+      headline: _valueOrNull(_headlineController.text),
+      subheadline: _valueOrNull(_subheadlineController.text),
+      callToActionLabel: _valueOrNull(_ctaLabelController.text),
+      callToActionUrl: _valueOrNull(_ctaUrlController.text),
+      badge: _valueOrNull(_badgeController.text),
       visibility: _visibility,
       showcasePinned: _pinned,
     );
@@ -273,17 +405,17 @@ class _MaterialMetadataSheetState extends State<MaterialMetadataSheet> {
                     helper: 'Up to 12 categories for catalog placement.',
                     values: _categories,
                     controller: _categoryInput,
-                    onAdd: _addCategory,
+                    onAdd: () => _addCategory(context),
                     onRemove: _removeCategory,
                   ),
                   const SizedBox(height: 16),
                   _buildChipEditor(
                     context,
                     title: 'Tags',
-                    helper: 'Long-tail tags to support discovery.',
+                    helper: 'Up to 24 long-tail tags to support discovery.',
                     values: _tags,
                     controller: _tagInput,
-                    onAdd: _addTag,
+                    onAdd: () => _addTag(context),
                     onRemove: _removeTag,
                   ),
                   const SizedBox(height: 16),
@@ -376,7 +508,7 @@ class _MaterialMetadataSheetState extends State<MaterialMetadataSheet> {
                   if (_gallery.length < 8) ...[
                     const SizedBox(height: 12),
                     OutlinedButton.icon(
-                      onPressed: _addGalleryItem,
+                      onPressed: () => _addGalleryItem(context),
                       icon: const Icon(Icons.add),
                       label: const Text('Add gallery item'),
                     ),

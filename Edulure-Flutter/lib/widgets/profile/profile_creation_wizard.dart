@@ -290,12 +290,14 @@ class _ProfileCreationWizardState extends State<ProfileCreationWizard> {
     }
   }
 
-  void _addSkill([String? raw]) {
-    final value = (raw ?? _skillController.text).trim();
+  void _addSkill(String raw) {
+    final value = raw.trim();
     if (value.isEmpty) {
+      _skillController.clear();
       return;
     }
-    if (_skills.contains(value)) {
+    final exists = _skills.any((skill) => skill.toLowerCase() == value.toLowerCase());
+    if (exists) {
       _skillController.clear();
       return;
     }

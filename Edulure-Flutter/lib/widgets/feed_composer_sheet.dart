@@ -63,7 +63,13 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
       _visibility = post.visibility;
       _status = post.status;
       _scheduledAt = post.scheduledAt;
-      _tags.addAll(post.tags);
+      for (final tag in post.tags) {
+        final normalized = _normalizeTag(tag) ?? tag.trim();
+        if (normalized.isEmpty) {
+          continue;
+        }
+        _tags.add(normalized);
+      }
     }
   }
 
@@ -115,6 +121,7 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
                       _buildPostTypeSelector(context),
                       const SizedBox(height: 16),
                       TextFormField(
+                        key: const ValueKey('feed_composer_title'),
                         controller: _titleController,
                         decoration: const InputDecoration(
                           labelText: 'Headline',
@@ -125,6 +132,7 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
+                        key: const ValueKey('feed_composer_body'),
                         controller: _bodyController,
                         decoration: const InputDecoration(
                           labelText: 'Update',
@@ -152,6 +160,7 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
                       _buildSchedulePicker(context),
                       const SizedBox(height: 24),
                       FilledButton.icon(
+                        key: const ValueKey('feed_composer_submit'),
                         onPressed: _submit,
                         icon: Icon(isEditing ? Icons.save : Icons.send),
                         label: Text(isEditing ? 'Update post' : 'Publish to community'),
@@ -232,21 +241,23 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
                   onDeleted: () => setState(() => _tags.remove(tag)),
                 )),
             SizedBox(
-              width: 180,
+              width: 200,
               child: TextField(
+                key: const ValueKey('feed_composer_tag_input'),
                 controller: _tagsController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Add tag',
-                  border: OutlineInputBorder(),
+                  helperText: 'Up to 12 tags',
+                  border: const OutlineInputBorder(),
                   isDense: true,
+                  suffixIcon: IconButton(
+                    onPressed: () => _addTag(context, _tagsController.text),
+                    icon: const Icon(Icons.add),
+                    tooltip: 'Add tag',
+                  ),
                 ),
-                onSubmitted: (value) {
-                  final tag = value.trim();
-                  if (tag.isNotEmpty) {
-                    setState(() => _tags.add(tag));
-                    _tagsController.clear();
-                  }
-                },
+                textInputAction: TextInputAction.done,
+                onSubmitted: (value) => _addTag(context, value),
               ),
             )
           ],
@@ -262,6 +273,7 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
         Text('Media & links', style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 12),
         TextFormField(
+          key: const ValueKey('feed_composer_image_url'),
           controller: _imageController,
           decoration: const InputDecoration(
             labelText: 'Image URL',
@@ -269,9 +281,11 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
             border: OutlineInputBorder(),
           ),
           keyboardType: TextInputType.url,
+          validator: _validateOptionalUrl,
         ),
         const SizedBox(height: 12),
         TextFormField(
+          key: const ValueKey('feed_composer_video_url'),
           controller: _videoController,
           decoration: const InputDecoration(
             labelText: 'Video link',
@@ -279,6 +293,7 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
             border: OutlineInputBorder(),
           ),
           keyboardType: TextInputType.url,
+          validator: _validateOptionalUrl,
         ),
       ],
     );
@@ -304,9 +319,16 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
         SwitchListTile.adaptive(
           title: const Text('Publish immediately'),
           subtitle: const Text('Turn off to keep as draft until scheduled'),
-          value: _status == 'published',
+          value: _status != 'draft',
           onChanged: (value) {
-            setState(() => _status = value ? 'published' : 'draft');
+            setState(() {
+              if (value) {
+                _status = _scheduledAt != null ? 'scheduled' : 'published';
+              } else {
+                _status = 'draft';
+                _scheduledAt = null;
+              }
+            });
           },
         )
       ],
@@ -367,26 +389,96 @@ class _FeedComposerSheetState extends State<FeedComposerSheet> {
     );
   }
 
+  void _addTag(BuildContext context, String raw) {
+    final normalized = _normalizeTag(raw);
+    _tagsController.clear();
+    if (normalized == null) {
+      if (raw.trim().isNotEmpty) {
+        _showSnackBar(context, 'Tags can include letters, numbers, hyphen, or underscore.');
+      }
+      return;
+    }
+    if (_tags.length >= 12 && !_tags.contains(normalized)) {
+      _showSnackBar(context, 'You can add up to 12 tags.');
+      return;
+    }
+    setState(() {
+      _tags.add(normalized);
+    });
+  }
+
+  String? _validateOptionalUrl(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+      return 'Enter a valid https:// link';
+    }
+    if (uri.scheme != 'https') {
+      return 'Enter a valid https:// link';
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _buildMediaMetadata() {
+    final image = _imageController.text.trim();
+    final video = _videoController.text.trim();
+    final media = <String, dynamic>{
+      if (image.isNotEmpty) 'imageUrl': image,
+      if (video.isNotEmpty) 'videoUrl': video,
+    };
+    if (media.isEmpty) {
+      return null;
+    }
+    return media;
+  }
+
+  String? _normalizeTag(String raw) {
+    final trimmed = raw.replaceAll('#', '').trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final collapsed = trimmed.replaceAll(RegExp(r'\s+'), '-');
+    final filtered = collapsed.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '').toLowerCase();
+    final normalized =
+        filtered.replaceAll(RegExp(r'-{2,}'), '-').replaceAll(RegExp(r'^[-_]+|[-_]+$'), '');
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
+  }
+
+  void _showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message), duration: const Duration(seconds: 2)));
+  }
+
   void _submit() {
     final form = _formKey.currentState;
     if (form == null) return;
     if (!form.validate()) return;
     final community = _selectedCommunity;
     if (community == null) return;
-    final metadata = <String, dynamic>{
-      'media': <String, dynamic>{
-        if (_imageController.text.trim().isNotEmpty) 'imageUrl': _imageController.text.trim(),
-        if (_videoController.text.trim().isNotEmpty) 'videoUrl': _videoController.text.trim(),
-      }
-    };
+    final metadata = <String, dynamic>{};
+    final media = _buildMediaMetadata();
+    if (media != null) {
+      metadata['media'] = media;
+    }
+    final normalizedStatus = _status == 'draft'
+        ? 'draft'
+        : (_scheduledAt != null ? 'scheduled' : 'published');
+    final scheduledAt = normalizedStatus == 'draft' ? null : _scheduledAt;
+    final tags = List<String>.from(_tags)..sort();
     final input = CreateCommunityPostInput(
       body: _bodyController.text.trim(),
       title: _titleController.text.trim().isEmpty ? null : _titleController.text.trim(),
-      tags: _tags.toList(),
+      tags: tags,
       postType: _postType,
       visibility: _visibility,
-      status: _status,
-      scheduledAt: _scheduledAt,
+      status: normalizedStatus,
+      scheduledAt: scheduledAt,
       metadata: metadata,
     );
     Navigator.of(context).pop(

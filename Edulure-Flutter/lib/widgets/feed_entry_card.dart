@@ -106,7 +106,7 @@ class FeedEntryCard extends StatelessWidget {
                 if (ad.ctaUrl != null && ad.ctaUrl!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: () => launchUrl(Uri.parse(ad.ctaUrl!), mode: LaunchMode.externalApplication),
+                    onPressed: () => _openExternalUrl(context, ad.ctaUrl!),
                     style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
                     child: const Text('Open campaign'),
                   )
@@ -255,7 +255,7 @@ class FeedEntryCard extends StatelessWidget {
           if (videoUrl != null && videoUrl.isNotEmpty) ...[
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => launchUrl(Uri.parse(videoUrl), mode: LaunchMode.externalApplication),
+              onPressed: () => _openExternalUrl(context, videoUrl),
               icon: const Icon(Icons.play_circle_outline),
               label: const Text('Open linked video'),
             )
@@ -300,6 +300,32 @@ class FeedEntryCard extends StatelessWidget {
       );
     }
     return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
+
+  Future<void> _openExternalUrl(BuildContext context, String url) async {
+    final parsed = Uri.tryParse(url.trim());
+    if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty) {
+      _notifyLaunchFailure(context);
+      return;
+    }
+    if (parsed.scheme != 'https' && parsed.scheme != 'http') {
+      _notifyLaunchFailure(context);
+      return;
+    }
+    try {
+      final launched = await launchUrl(parsed, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        _notifyLaunchFailure(context);
+      }
+    } catch (_) {
+      _notifyLaunchFailure(context);
+    }
+  }
+
+  void _notifyLaunchFailure(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Unable to open the link. Please try again later.')),
+    );
   }
 
   Widget _buildMetadata(BuildContext context, CommunityPost post) {
