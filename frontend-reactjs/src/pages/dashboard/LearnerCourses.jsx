@@ -2,9 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import usePersistentCollection from '../../hooks/usePersistentCollection.js';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
 import { createCourseGoal, exportTutorSchedule } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+
+const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD'
+});
 
 export default function LearnerCourses() {
   const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('courses');
@@ -12,15 +18,50 @@ export default function LearnerCourses() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
 
+  const storageKey = useMemo(
+    () => `edulure.learner.orders.v1:${session?.user?.id ?? 'anonymous'}`,
+    [session?.user?.id]
+  );
+  const initialOrders = useMemo(() => (Array.isArray(data?.orders) ? data.orders : []), [data?.orders]);
+  const {
+    items: orders,
+    addItem: addOrder,
+    updateItem: updateOrder,
+    removeItem: removeOrder,
+    replaceItems: replaceOrders,
+    reset: resetOrders
+  } = usePersistentCollection(storageKey, initialOrders);
+
   const [activeCourses, setActiveCourses] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
   const [statusMessage, setStatusMessage] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const [orderForm, setOrderForm] = useState({
+    title: '',
+    amount: '',
+    status: 'Processing',
+    reference: '',
+    purchaseDate: new Date().toISOString().slice(0, 10)
+  });
+  const [editingOrderId, setEditingOrderId] = useState(null);
+  const [orderFeedback, setOrderFeedback] = useState(null);
 
   useEffect(() => {
     setActiveCourses(Array.isArray(data?.active) ? data.active : []);
     setRecommendations(Array.isArray(data?.recommendations) ? data.recommendations : []);
   }, [data]);
+
+  useEffect(() => {
+    if (!Array.isArray(data?.orders) || data.orders.length === 0) {
+      return;
+    }
+    const missing = data.orders.filter(
+      (order) => order?.id && !orders.some((existing) => existing.id === order.id)
+    );
+    if (missing.length) {
+      replaceOrders([...orders, ...missing]);
+    }
+  }, [data?.orders, orders, replaceOrders]);
 
   useEffect(() => {
     if (error) {
@@ -30,6 +71,14 @@ export default function LearnerCourses() {
       });
     }
   }, [error]);
+
+  useEffect(() => {
+    if (!orderFeedback) {
+      return undefined;
+    }
+    const timeout = window.setTimeout(() => setOrderFeedback(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [orderFeedback]);
 
   if (!isLearner) {
     return (
@@ -62,6 +111,93 @@ export default function LearnerCourses() {
   }
 
   const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
+  const ordersSorted = useMemo(() => {
+    return [...orders].sort((a, b) => {
+      const aTime = new Date(a.purchaseDate ?? a.createdAt ?? 0).getTime();
+      const bTime = new Date(b.purchaseDate ?? b.createdAt ?? 0).getTime();
+      return bTime - aTime;
+    });
+  }, [orders]);
+
+  const resetOrderForm = useCallback(() => {
+    setOrderForm({
+      title: '',
+      amount: '',
+      status: 'Processing',
+      reference: '',
+      purchaseDate: new Date().toISOString().slice(0, 10)
+    });
+    setEditingOrderId(null);
+  }, []);
+
+  const handleOrderChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setOrderForm((current) => ({ ...current, [name]: value }));
+  }, []);
+
+  const handleEditOrder = useCallback((order) => {
+    setEditingOrderId(order.id);
+    setOrderForm({
+      title: order.title ?? '',
+      amount: order.amount != null ? String(order.amount) : '',
+      status: order.status ?? 'Processing',
+      reference: order.reference ?? '',
+      purchaseDate: order.purchaseDate ? order.purchaseDate.slice(0, 10) : new Date().toISOString().slice(0, 10)
+    });
+  }, []);
+
+  const handleOrderSubmit = useCallback(
+    (event) => {
+      event.preventDefault();
+      const rawAmount = Number.parseFloat(orderForm.amount);
+      const amount = Number.isFinite(rawAmount) ? Math.round(rawAmount * 100) / 100 : 0;
+      const payload = {
+        title: orderForm.title.trim() || 'Course order',
+        amount,
+        status: orderForm.status,
+        reference: orderForm.reference.trim() || undefined,
+        purchaseDate: orderForm.purchaseDate || new Date().toISOString().slice(0, 10)
+      };
+      if (editingOrderId) {
+        updateOrder(editingOrderId, payload);
+        setOrderFeedback('Order updated.');
+      } else {
+        addOrder(payload);
+        setOrderFeedback('Order added to your records.');
+      }
+      resetOrderForm();
+    },
+    [addOrder, editingOrderId, orderForm, resetOrderForm, updateOrder]
+  );
+
+  const handleDeleteOrder = useCallback(
+    (id) => {
+      const confirmed = window.confirm('Remove this course order from your history?');
+      if (!confirmed) return;
+      removeOrder(id);
+      setOrderFeedback('Order removed.');
+    },
+    [removeOrder]
+  );
+
+  const handleToggleOrderStatus = useCallback(
+    (order) => {
+      const nextStatus = order.status === 'Paid' ? 'Processing' : 'Paid';
+      updateOrder(order.id, { status: nextStatus });
+      setOrderFeedback(
+        nextStatus === 'Paid' ? 'Marked order as paid.' : 'Order moved back to processing.'
+      );
+    },
+    [updateOrder]
+  );
+
+  const handleResetOrders = useCallback(() => {
+    const confirmed = window.confirm('Clear the locally stored course orders on this device?');
+    if (!confirmed) return;
+    resetOrders();
+    setOrderFeedback('Order history cleared.');
+    resetOrderForm();
+  }, [resetOrders, resetOrderForm]);
 
   const handleCreateGoal = useCallback(async () => {
     if (!token) {
@@ -225,6 +361,176 @@ export default function LearnerCourses() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="dashboard-section">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Course orders & receipts</h2>
+            <p className="text-sm text-slate-600">
+              Log purchases, scholarships, and independent enrolments so finance conversations stay tidy.
+            </p>
+          </div>
+          <button type="button" className="dashboard-pill" onClick={handleResetOrders}>
+            Clear history
+          </button>
+        </div>
+
+        <form
+          onSubmit={handleOrderSubmit}
+          className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-5"
+        >
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Course
+            <input
+              type="text"
+              name="title"
+              value={orderForm.title}
+              onChange={handleOrderChange}
+              required
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Amount
+            <input
+              type="number"
+              name="amount"
+              min="0"
+              step="0.01"
+              value={orderForm.amount}
+              onChange={handleOrderChange}
+              required
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Purchase date
+            <input
+              type="date"
+              name="purchaseDate"
+              value={orderForm.purchaseDate}
+              onChange={handleOrderChange}
+              required
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Status
+            <select
+              name="status"
+              value={orderForm.status}
+              onChange={handleOrderChange}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="Processing">Processing</option>
+              <option value="Paid">Paid</option>
+              <option value="Refunded">Refunded</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Reference
+            <input
+              type="text"
+              name="reference"
+              value={orderForm.reference}
+              onChange={handleOrderChange}
+              placeholder="Optional"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <div className="flex items-center justify-end gap-2 md:col-span-2 lg:col-span-5">
+            {editingOrderId ? (
+              <button type="button" className="dashboard-pill" onClick={resetOrderForm}>
+                Cancel edit
+              </button>
+            ) : null}
+            <button type="submit" className="dashboard-primary-pill">
+              {editingOrderId ? 'Save order' : 'Add order'}
+            </button>
+          </div>
+        </form>
+
+        {orderFeedback ? (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-primary"
+          >
+            {orderFeedback}
+          </p>
+        ) : null}
+
+        <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+          {ordersSorted.length ? (
+            <table className="w-full text-left text-sm text-slate-700">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Course</th>
+                  <th className="px-4 py-3">Amount</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Reference</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {ordersSorted.map((order) => (
+                  <tr key={order.id}>
+                    <td className="px-4 py-3 font-medium text-slate-900">{order.title}</td>
+                    <td className="px-4 py-3">{CURRENCY_FORMATTER.format(order.amount ?? 0)}</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          order.status === 'Paid'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : order.status === 'Refunded'
+                              ? 'bg-amber-100 text-amber-700'
+                              : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {order.purchaseDate ? new Date(order.purchaseDate).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{order.reference ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className="dashboard-pill"
+                          onClick={() => handleToggleOrderStatus(order)}
+                        >
+                          {order.status === 'Paid' ? 'Mark processing' : 'Mark paid'}
+                        </button>
+                        <button
+                          type="button"
+                          className="dashboard-pill"
+                          onClick={() => handleEditOrder(order)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="dashboard-pill text-rose-600 hover:border-rose-200 hover:text-rose-700"
+                          onClick={() => handleDeleteOrder(order.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="px-4 py-6 text-sm text-slate-500">
+              No course orders recorded yet. Capture purchases or scholarships to see them here.
+            </p>
+          )}
         </div>
       </section>
 

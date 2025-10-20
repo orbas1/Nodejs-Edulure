@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 import logger from '../config/logger.js';
+import LearnerSupportRepository from '../repositories/LearnerSupportRepository.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
 
 function safeJsonParse(value, fallback) {
@@ -16,6 +17,57 @@ function safeJsonParse(value, fallback) {
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 let operatorDashboardService;
 const log = logger.child({ service: 'DashboardService' });
+
+const DEFAULT_SUPPORT_KB = [
+  {
+    id: 'kb-billing',
+    title: 'Resolve billing discrepancies fast',
+    excerpt: 'Step-by-step workflow to reconcile invoices, credits, and refunds without disrupting learner access.',
+    url: 'https://support.edulure.test/articles/billing-reconciliation',
+    category: 'Billing',
+    minutes: 4
+  },
+  {
+    id: 'kb-classroom',
+    title: 'Stabilise live classroom sessions',
+    excerpt: 'Mitigate live classroom drops by refreshing keys, re-inviting facilitators, and notifying impacted cohorts.',
+    url: 'https://support.edulure.test/articles/live-classroom',
+    category: 'Live learning',
+    minutes: 5
+  },
+  {
+    id: 'kb-community',
+    title: 'Moderate community escalations with confidence',
+    excerpt: 'Use templated macros and audit trails to resolve moderation flags in under ten minutes.',
+    url: 'https://support.edulure.test/articles/community-escalations',
+    category: 'Community',
+    minutes: 6
+  }
+];
+
+const DEFAULT_SUPPORT_CONTACTS = [
+  {
+    id: 'email',
+    label: 'Email learner success',
+    description: 'Raise a ticket for complex issues. Average first response under two hours.',
+    action: 'Send email',
+    href: 'mailto:support@edulure.test'
+  },
+  {
+    id: 'live-chat',
+    label: 'Live concierge chat',
+    description: 'Weekday concierge with escalation to instructors and operations in real time.',
+    action: 'Start chat',
+    href: 'https://support.edulure.test/chat'
+  },
+  {
+    id: 'call',
+    label: 'Book a callback',
+    description: 'Schedule a 20 minute call for billing or classroom incident review.',
+    action: 'Schedule call',
+    href: 'https://support.edulure.test/call'
+  }
+];
 
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
@@ -264,12 +316,16 @@ export function buildLearnerDashboard({
   enrollments = [],
   courses = [],
   courseProgress = [],
+  assignments = [],
   tutorBookings = [],
   tutorAvailability = [],
   liveClassrooms = [],
+  instructorDirectory = new Map(),
   ebookProgress = [],
   ebooks = new Map(),
   invoices = [],
+  paymentIntents = [],
+  ebookRecommendations = [],
   communityMemberships = [],
   communityEvents = [],
   communityPipelines = [],
@@ -292,6 +348,7 @@ export function buildLearnerDashboard({
   }
 
   const courseMap = new Map();
+  const instructorDirectoryMap = ensureMap(instructorDirectory);
   courses.forEach((course) => {
     if (!course || !course.id) return;
     const metadata = safeJsonParse(course.metadata, {});
@@ -399,13 +456,18 @@ export function buildLearnerDashboard({
       ? Math.round((completedLessons / totalLessons) * 100)
       : 0;
     const nextLesson = totalLessons && completedLessons < totalLessons ? `Lesson ${completedLessons + 1}` : null;
+    const instructorRecord = course?.instructorId ? instructorDirectoryMap.get(course.instructorId) : null;
+    const instructorName = instructorRecord
+      ? resolveName(instructorRecord.firstName, instructorRecord.lastName, instructorRecord.email)
+      : course?.metadata?.instructorName ?? (course?.instructorId ? `Instructor #${course.instructorId}` : 'Instructor');
 
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
+      courseId: enrollment.courseId,
       title: course?.title ?? `Course ${enrollment.courseId}`,
       status: enrollment.status,
       progress: Math.max(0, Math.min(100, progressPercent)),
-      instructor: course?.metadata?.instructorName ?? (course?.instructorId ? `Instructor #${course.instructorId}` : 'Instructor'),
+      instructor: instructorName,
       nextLesson
     };
   });
@@ -420,6 +482,13 @@ export function buildLearnerDashboard({
       rating: course.ratingAverage ? `${course.ratingAverage.toFixed(1)} (${course.ratingCount ?? 0})` : null
     }));
 
+  const { orders: courseOrders, invoices: normalisedInvoices } = normaliseLearnerPayments({
+    invoices,
+    paymentIntents,
+    courseMap,
+    now
+  });
+
   const communityEngagement = communityMemberships.map((community) => {
     const members = coercePositiveInteger(community.stats?.members ?? community.stats?.memberCount ?? 0);
     const posts = coercePositiveInteger(community.stats?.posts ?? 0);
@@ -432,16 +501,63 @@ export function buildLearnerDashboard({
 
   const learningUpcoming = [];
   upcomingTutorBookings.forEach((booking) => {
+    const startAtIso = booking.scheduledStart ? booking.scheduledStart.toISOString() : null;
+    const endAtIso = booking.scheduledEnd
+      ? booking.scheduledEnd.toISOString()
+      : booking.scheduledStart
+        ? new Date(booking.scheduledStart.getTime() + booking.durationMinutes * 60 * 1000).toISOString()
+        : null;
     learningUpcoming.push({
       id: booking.publicId ?? `tutor-booking-${booking.id}`,
       title: booking.metadata?.topic ?? 'Mentorship session',
       type: 'Mentorship',
-      date: booking.scheduledStart ? booking.scheduledStart.toISOString() : null,
+      calendarType: 'classroom',
+      startAt: startAtIso,
+      endAt: endAtIso,
+      date: startAtIso,
       host: booking.tutorName
         ? booking.tutorName
         : resolveName(booking.tutorFirstName, booking.tutorLastName, 'Tutor'),
+      location: booking.metadata?.location ?? 'Mentor lounge',
+      description: booking.metadata?.summary ?? booking.metadata?.notes ?? null,
+      resources: booking.metadata?.resources ?? null,
       action: booking.meetingUrl ?? booking.metadata?.meetingUrl ?? null,
       dateLabel: formatRelativeDay(booking.scheduledStart, now)
+    });
+  });
+
+  upcomingLiveSessions.forEach((session) => {
+    const metadata = safeJsonParse(session.metadata, {});
+    const startAtIso = session.startAt ? session.startAt.toISOString() : null;
+    const endDate = session.endAt ?? (session.startAt ? new Date(session.startAt.getTime() + 60 * 60 * 1000) : null);
+    const endAtIso = endDate ? endDate.toISOString() : null;
+    const facilitators = Array.isArray(metadata.facilitators)
+      ? metadata.facilitators
+      : metadata.facilitator
+        ? [metadata.facilitator]
+        : metadata.host
+          ? [metadata.host]
+          : [];
+    learningUpcoming.push({
+      id: session.publicId ?? `live-session-${session.id ?? crypto.randomUUID()}`,
+      title: session.title ?? 'Live classroom',
+      type: session.type ?? 'Live classroom',
+      calendarType: ['livestream', 'podcast', 'classroom'].includes(String(session.type).toLowerCase())
+        ? String(session.type).toLowerCase()
+        : 'classroom',
+      startAt: startAtIso,
+      endAt: endAtIso,
+      date: startAtIso,
+      host: facilitators.length ? facilitators.join(', ') : metadata.communityName ?? 'Facilitator',
+      communityId: session.communityId ?? metadata.communityId ?? null,
+      location: metadata.location ?? metadata.room ?? 'Virtual classroom',
+      description: metadata.summary ?? metadata.description ?? null,
+      resources: metadata.resources ?? metadata.prep ?? null,
+      capacity: session.capacity ?? metadata.capacity ?? null,
+      timezone: metadata.timezone ?? null,
+      stage: metadata.stage ?? 'Live classroom',
+      action: metadata.meetingUrl ?? metadata.joinUrl ?? null,
+      dateLabel: formatRelativeDay(session.startAt, now)
     });
   });
 
@@ -454,41 +570,60 @@ export function buildLearnerDashboard({
         id: event.id ? `community-event-${event.id}` : `community-event-${event.communityId}`,
         title: event.title ?? 'Community event',
         type: 'Community',
+        calendarType: 'event',
+        startAt: event.startAt.toISOString(),
+        endAt: event.endAt ? new Date(event.endAt).toISOString() : null,
         date: event.startAt.toISOString(),
         host: event.facilitator ?? event.communityName ?? 'Community team',
+        communityId: event.communityId ?? null,
+        location: event.location ?? 'Community hub',
+        description: event.description ?? null,
+        resources: event.resources ?? null,
         action: event.meetingUrl ?? null,
         dateLabel: formatRelativeDay(event.startAt, now)
       });
     });
 
-  invoices
-    .filter((invoice) => invoice.status && invoice.status !== 'paid')
+  normalisedInvoices
+    .filter((invoice) => isInvoiceOpen(invoice.status))
     .forEach((invoice) => {
       const invoiceDate = normaliseDate(invoice.date);
+      const endAt = invoiceDate ? new Date(invoiceDate.getTime() + 30 * 60 * 1000) : null;
       learningUpcoming.push({
-        id: invoice.id ?? `invoice-${invoice.publicId ?? crypto.randomUUID()}`,
+        id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
         title: invoice.label ?? 'Invoice payment',
         type: 'Billing',
+        calendarType: 'event',
+        startAt: invoiceDate ? invoiceDate.toISOString() : null,
+        endAt: endAt ? endAt.toISOString() : null,
         date: invoiceDate ? invoiceDate.toISOString() : null,
         host: invoice.currency ?? 'USD',
+        location: 'Billing desk',
+        description: invoice.reference ? `Reference ${invoice.reference}` : null,
         action: null,
         dateLabel: invoiceDate ? formatRelativeDay(invoiceDate, now) : null
       });
     });
 
-  const calendarMap = new Map();
-  const dayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  learningUpcoming.forEach((item) => {
-    if (!item.date) return;
-    const dayIso = item.date.slice(0, 10);
-    const dayEntry = calendarMap.get(dayIso) ?? {
-      id: `calendar-${dayIso}`,
-      day: dayFormatter.format(new Date(item.date)),
-      items: []
-    };
-    dayEntry.items.push(item.title);
-    calendarMap.set(dayIso, dayEntry);
-  });
+  const calendarEvents = learningUpcoming
+    .filter((item) => item.startAt)
+    .map((item) => ({
+      id: `calendar-${item.id}`,
+      title: item.title,
+      type: (item.calendarType ?? item.type ?? 'event').toLowerCase(),
+      startAt: item.startAt,
+      endAt: item.endAt ?? item.startAt,
+      location: item.location ?? 'Virtual',
+      facilitator: item.host ?? null,
+      communityId: item.communityId ?? null,
+      description: item.description ?? null,
+      resources: item.resources ?? null,
+      timezone: item.timezone ?? null,
+      capacity: item.capacity ?? null,
+      stage: item.stage ?? null,
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString()
+    }));
 
   const activeTutorBookings = upcomingTutorBookings.map((booking) => ({
     id: booking.publicId ?? `tutor-booking-${booking.id}`,
@@ -527,7 +662,7 @@ export function buildLearnerDashboard({
   });
 
   const activeSubscriptions = communitySubscriptions.filter((subscription) => subscription.status === 'active');
-  const pendingInvoices = invoices.filter((invoice) => invoice.status && invoice.status !== 'paid');
+  const pendingInvoices = normalisedInvoices.filter((invoice) => isInvoiceOpen(invoice.status));
 
   const financialSummary = [
     {
@@ -547,10 +682,10 @@ export function buildLearnerDashboard({
     }
   ];
 
-  const invoiceEntries = invoices.map((invoice) => ({
-    id: invoice.id ?? `invoice-${invoice.publicId ?? crypto.randomUUID()}`,
+  const invoiceEntries = normalisedInvoices.map((invoice) => ({
+    id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
     label: invoice.label ?? 'Invoice',
-    amount: formatCurrency(invoice.amountCents ?? invoice.amount ?? 0, invoice.currency ?? 'USD'),
+    amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
     status: invoice.status ?? 'open',
     date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
   }));
@@ -585,6 +720,12 @@ export function buildLearnerDashboard({
     notificationsEnabled: messagingSummary?.notificationsEnabled ?? true
   };
 
+  const communityNameMap = new Map();
+  communityMemberships.forEach((community) => {
+    if (!community) return;
+    communityNameMap.set(community.id, community.name ?? `Community ${community.id}`);
+  });
+
   const communitySettings = communityMemberships.map((community) => ({
     id: `community-setting-${community.id}`,
     name: community.name ?? `Community ${community.id}`,
@@ -598,6 +739,315 @@ export function buildLearnerDashboard({
     pending: Array.isArray(followerSummary.pending) ? followerSummary.pending : [],
     outgoing: Array.isArray(followerSummary.outgoing) ? followerSummary.outgoing : [],
     recommendations: Array.isArray(followerSummary.recommendations) ? followerSummary.recommendations : []
+  };
+
+  const activeCourseProgressMap = new Map();
+  activeCourses.forEach((course) => {
+    if (course.courseId) {
+      activeCourseProgressMap.set(course.courseId, course);
+    }
+  });
+
+  const activeEnrollmentsByCourse = new Map();
+  activeEnrollments.forEach((enrollment) => {
+    const list = activeEnrollmentsByCourse.get(enrollment.courseId) ?? [];
+    list.push(enrollment);
+    activeEnrollmentsByCourse.set(enrollment.courseId, list);
+  });
+
+  const assignmentsTimeline = { upcoming: [], overdue: [], completed: [] };
+  const courseAssessmentSummaries = new Map();
+  const analyticsByType = new Map();
+  const resourceRecommendations = new Set();
+  const studyPlanBlocks = [];
+  const scheduleEvents = [];
+  const gradingQueue = [];
+  const flaggedQueue = [];
+
+  let dueSoonCount = 0;
+  let completedCount = 0;
+  let overdueCount = 0;
+  let pendingReviewCount = 0;
+  let totalLeadTimeDays = 0;
+  let leadTimeSamples = 0;
+
+  assignments.forEach((assignment) => {
+    if (!assignment) return;
+    const course = courseMap.get(assignment.courseId);
+    const metadata = assignment.metadata ?? {};
+    const enrollmentsForCourse = activeEnrollmentsByCourse.get(assignment.courseId) ?? [];
+    let dueDate = null;
+    enrollmentsForCourse.forEach((enrollment) => {
+      const candidate = resolveLearnerAssignmentDueDate({ assignment, course, enrollment });
+      if (candidate && (!dueDate || candidate < dueDate)) {
+        dueDate = candidate;
+      }
+    });
+    if (!dueDate) {
+      const fallbackDue = resolveLearnerAssignmentDueDate({ assignment, course, enrollment: null });
+      if (fallbackDue) {
+        dueDate = fallbackDue;
+      }
+    }
+
+    const statusLabel = String(metadata.status ?? metadata.state ?? '').toLowerCase();
+    const completed = Boolean(
+      metadata.completed ||
+        metadata.graded ||
+        statusLabel.includes('graded') ||
+        statusLabel.includes('complete') ||
+        statusLabel === 'closed'
+    );
+    const requiresReview = Boolean(metadata.requiresReview || statusLabel.includes('review'));
+    if (requiresReview) {
+      pendingReviewCount += 1;
+    }
+    const flagged = Array.isArray(metadata.flags) && metadata.flags.length > 0;
+    const submitted = Boolean(
+      metadata.submitted ||
+        metadata.lastSubmissionAt ||
+        (Array.isArray(metadata.submissions) && metadata.submissions.length > 0)
+    );
+
+    const rawScore = Number(metadata.score ?? metadata.latestScore ?? metadata.result?.score);
+    const maxScore = Number(metadata.maxScore ?? assignment.maxScore ?? metadata.totalScore ?? 0);
+    const scorePercent = Number.isFinite(rawScore) && Number.isFinite(maxScore) && maxScore > 0
+      ? Math.max(0, Math.min(100, Math.round((rawScore / maxScore) * 100)))
+      : null;
+
+    const typeLabel = metadata.type ?? metadata.category ?? 'Assessment';
+    const dueLabel = dueDate ? formatDateTime(dueDate, { dateStyle: 'medium', timeStyle: undefined }) : 'TBD';
+    const dueInLabel = dueDate ? formatRelativeDay(dueDate, now) : null;
+
+    let timelineStatus = 'Scheduled';
+    if (completed) {
+      timelineStatus = 'Completed';
+      completedCount += 1;
+    } else if (dueDate && dueDate.getTime() < now.getTime()) {
+      timelineStatus = 'Overdue';
+      overdueCount += 1;
+    } else if (dueDate && dueDate.getTime() - now.getTime() <= 3 * DAY_IN_MS) {
+      timelineStatus = 'Due soon';
+      dueSoonCount += 1;
+    } else if (submitted) {
+      timelineStatus = 'Submitted';
+    }
+
+    if (dueDate) {
+      const leadDays = Math.round((dueDate.getTime() - now.getTime()) / DAY_IN_MS);
+      if (Number.isFinite(leadDays)) {
+        totalLeadTimeDays += leadDays;
+        leadTimeSamples += 1;
+      }
+      scheduleEvents.push({
+        id: `assessment-${assignment.id ?? crypto.randomUUID()}`,
+        title: assignment.title ?? 'Assessment',
+        date: dueLabel
+      });
+    }
+
+    const timelineEntry = {
+      id: assignment.id ?? `assignment-${crypto.randomUUID()}`,
+      title: assignment.title ?? 'Assessment',
+      course: course?.title ?? (assignment.courseId ? `Course ${assignment.courseId}` : 'Course'),
+      due: dueLabel,
+      dueIn: dueInLabel,
+      status: timelineStatus,
+      type: typeLabel,
+      mode: metadata.mode ?? metadata.format ?? 'Assessment',
+      weight: metadata.weight ? `${metadata.weight}%` : metadata.difficulty ?? null,
+      score: scorePercent !== null ? `${scorePercent}%` : null,
+      submissionUrl: metadata.submissionUrl ?? metadata.links?.submission ?? null,
+      recommended: metadata.recommended ?? metadata.prepNotes ?? null
+    };
+
+    if (timelineStatus === 'Completed') {
+      assignmentsTimeline.completed.push(timelineEntry);
+    } else if (timelineStatus === 'Overdue') {
+      assignmentsTimeline.overdue.push(timelineEntry);
+    } else {
+      assignmentsTimeline.upcoming.push(timelineEntry);
+    }
+
+    const summaryKey = assignment.courseId ?? crypto.randomUUID();
+    const courseSummary = courseAssessmentSummaries.get(summaryKey) ?? {
+      id: course?.publicId ?? `course-${summaryKey}`,
+      name: course?.title ?? `Course ${summaryKey}`,
+      progress: (() => {
+        const courseProgressEntry = activeCourseProgressMap.get(assignment.courseId);
+        if (courseProgressEntry) {
+          return `${courseProgressEntry.progress}% complete`;
+        }
+        return course?.status ? `${course.status}` : 'Active';
+      })(),
+      status: course?.status ?? 'active',
+      upcoming: 0,
+      awaitingFeedback: 0,
+      overdue: 0,
+      completed: 0,
+      scores: []
+    };
+
+    if (timelineStatus === 'Completed') {
+      courseSummary.completed += 1;
+    } else if (timelineStatus === 'Overdue') {
+      courseSummary.overdue += 1;
+    } else {
+      courseSummary.upcoming += 1;
+    }
+    if (requiresReview) {
+      courseSummary.awaitingFeedback += 1;
+    }
+    if (scorePercent !== null) {
+      courseSummary.scores.push(scorePercent);
+    }
+    courseAssessmentSummaries.set(summaryKey, courseSummary);
+
+    const analyticsEntry = analyticsByType.get(typeLabel) ?? { type: typeLabel, count: 0, scores: [] };
+    analyticsEntry.count += 1;
+    if (scorePercent !== null) {
+      analyticsEntry.scores.push(scorePercent);
+    }
+    analyticsByType.set(typeLabel, analyticsEntry);
+
+    if (Array.isArray(metadata.resources)) {
+      metadata.resources.filter(Boolean).forEach((resource) => resourceRecommendations.add(resource));
+    } else if (typeof metadata.resources === 'string') {
+      metadata.resources
+        .split(',')
+        .map((resource) => resource.trim())
+        .filter(Boolean)
+        .forEach((resource) => resourceRecommendations.add(resource));
+    }
+    if (metadata.prepMaterial) {
+      resourceRecommendations.add(metadata.prepMaterial);
+    }
+
+    if (!completed && dueDate) {
+      const durationMinutes = Number(metadata.studyMinutes ?? metadata.estimatedMinutes ?? 90);
+      const safeDuration = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : 90;
+      const start = new Date(Math.max(now.getTime() + 30 * 60 * 1000, dueDate.getTime() - 24 * 60 * 60 * 1000));
+      const end = new Date(start.getTime() + safeDuration * 60 * 1000);
+      const materials = Array.isArray(metadata.resources)
+        ? metadata.resources
+        : typeof metadata.resources === 'string'
+          ? metadata.resources
+              .split(',')
+              .map((resource) => resource.trim())
+              .filter(Boolean)
+          : metadata.prepMaterial
+            ? [metadata.prepMaterial]
+            : [];
+
+      studyPlanBlocks.push({
+        id: `study-${assignment.id ?? crypto.randomUUID()}`,
+        focus: `Prep: ${assignment.title ?? 'Assessment'}`,
+        course: course?.title ?? (assignment.courseId ? `Course ${assignment.courseId}` : 'Course'),
+        startAt: start.toISOString(),
+        endAt: end.toISOString(),
+        durationMinutes: safeDuration,
+        mode: metadata.studyMode ?? 'Deep work',
+        materials,
+        submissionUrl: metadata.submissionUrl ?? metadata.links?.submission ?? null,
+        notes: metadata.studyNotes ?? metadata.summary ?? (assignment.instructions ? String(assignment.instructions).slice(0, 160) : ''),
+        status: 'scheduled'
+      });
+    }
+
+    if (requiresReview) {
+      gradingQueue.push({
+        id: assignment.id ?? `assignment-${crypto.randomUUID()}`,
+        title: assignment.title ?? 'Assessment',
+        course: course?.title ?? (assignment.courseId ? `Course ${assignment.courseId}` : 'Course'),
+        pending: 'Awaiting review',
+        lastSubmission: metadata.lastSubmissionAt ? formatRelativeDay(metadata.lastSubmissionAt, now) : 'Queued',
+        due: dueLabel
+      });
+    }
+    if (flagged) {
+      flaggedQueue.push({
+        id: assignment.id ?? `assignment-${crypto.randomUUID()}`,
+        title: assignment.title ?? 'Assessment',
+        flagged: 'Flagged',
+        status: dueLabel
+      });
+    }
+  });
+
+  const courseAssessments = Array.from(courseAssessmentSummaries.values()).map((summary) => ({
+    id: summary.id,
+    name: summary.name,
+    progress: summary.progress,
+    status: summary.status,
+    upcoming: summary.upcoming,
+    awaitingFeedback: summary.awaitingFeedback,
+    overdue: summary.overdue,
+    averageScore:
+      summary.scores.length > 0
+        ? `${Math.round(summary.scores.reduce((sum, value) => sum + value, 0) / summary.scores.length)}%`
+        : '—'
+  }));
+
+  const analyticsByTypeList = Array.from(analyticsByType.values()).map((entry) => ({
+    type: entry.type,
+    count: entry.count,
+    averageScore:
+      entry.scores.length > 0
+        ? Math.round(entry.scores.reduce((sum, value) => sum + value, 0) / entry.scores.length)
+        : null
+  }));
+
+  const studyPlan = studyPlanBlocks
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+    .slice(0, 12);
+
+  const scheduleEventList = scheduleEvents
+    .sort((a, b) => {
+      if (!a.date || !b.date) return 0;
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    })
+    .slice(0, 12);
+
+  ebookRecommendations
+    .map((rec) => (typeof rec === 'string' ? rec : rec?.title))
+    .filter(Boolean)
+    .forEach((title) => resourceRecommendations.add(title));
+
+  const resourcesList = Array.from(resourceRecommendations).slice(0, 12);
+
+  const averageLeadTime = leadTimeSamples ? Math.max(0, Math.round(totalLeadTimeDays / leadTimeSamples)) : null;
+  const workloadWeight = assignments.length
+    ? Math.min(
+        100,
+        Math.round(((assignmentsTimeline.upcoming.length + assignmentsTimeline.overdue.length) / assignments.length) * 100)
+      )
+    : 0;
+
+  const assessmentsSection = {
+    overview: [
+      { id: 'assessments-upcoming', label: 'Upcoming assessments', value: `${assignmentsTimeline.upcoming.length}` },
+      { id: 'assessments-due-soon', label: 'Due soon', value: `${dueSoonCount}` },
+      { id: 'assessments-overdue', label: 'Overdue assessments', value: `${overdueCount}` },
+      { id: 'assessments-completed', label: 'Completed assessments', value: `${completedCount}` }
+    ],
+    timeline: assignmentsTimeline,
+    courses: courseAssessments,
+    schedule: {
+      studyPlan,
+      events: scheduleEventList
+    },
+    analytics: {
+      byType: analyticsByTypeList,
+      pendingReviews: pendingReviewCount,
+      overdue: overdueCount,
+      averageLeadTimeDays: averageLeadTime,
+      workloadWeight
+    },
+    resources: resourcesList,
+    grading: {
+      queue: gradingQueue.slice(0, 10),
+      flagged: flaggedQueue.slice(0, 10)
+    }
   };
 
   const managedCommunities = communityMemberships.map((community) => {
@@ -644,6 +1094,220 @@ export function buildLearnerDashboard({
       });
     });
 
+  const liveSessionsDetailed = liveClassrooms.map((session) => {
+    const metadata = safeJsonParse(session.metadata, {});
+    const startAt = normaliseDate(session.startAt);
+    const endAt = normaliseDate(session.endAt) ?? (startAt ? new Date(startAt.getTime() + 60 * 60 * 1000) : null);
+    const facilitators = Array.isArray(metadata.facilitators)
+      ? metadata.facilitators
+      : metadata.facilitator
+        ? [metadata.facilitator]
+        : metadata.host
+          ? [metadata.host]
+          : [];
+    const occupancyReserved = Number(metadata.reservedSeats ?? metadata.registrationCount ?? session.reservedSeats ?? 0);
+    const occupancyCapacity = Number(metadata.capacity ?? session.capacity ?? 0);
+    const occupancyRate = occupancyCapacity
+      ? Math.min(100, Math.round((occupancyReserved / occupancyCapacity) * 100))
+      : null;
+    const securityMeta = metadata.security ?? {};
+    const whiteboardMeta = metadata.whiteboard ?? {};
+    const stage = metadata.stage ?? (session.type ? String(session.type).replace(/_/g, ' ') : 'Live classroom');
+    const communityId = session.communityId ?? metadata.communityId ?? null;
+    const communityName = communityId ? communityNameMap.get(communityId) ?? `Community ${communityId}` : metadata.communityName;
+
+    const nowTime = now.getTime();
+    const startTime = startAt ? startAt.getTime() : null;
+    const endTime = endAt ? endAt.getTime() : null;
+    let phase = session.status ? String(session.status).toLowerCase() : 'scheduled';
+    if (startTime && endTime) {
+      if (nowTime >= startTime && nowTime <= endTime) {
+        phase = 'live';
+      } else if (startTime > nowTime) {
+        phase = 'scheduled';
+      } else if (endTime < nowTime) {
+        phase = 'completed';
+      }
+    }
+
+    let callToAction = null;
+    if (phase === 'live') {
+      callToAction = { action: 'join', label: 'Join session', enabled: true };
+    } else if (phase === 'scheduled') {
+      const hoursUntil = startTime ? (startTime - nowTime) / (60 * 60 * 1000) : null;
+      const isSoon = hoursUntil !== null && hoursUntil <= 1;
+      callToAction = {
+        action: isSoon ? 'join' : 'check-in',
+        label: isSoon ? 'Join session' : 'Check in',
+        enabled: true
+      };
+    }
+
+    const whiteboard = {
+      template: whiteboardMeta.template ?? whiteboardMeta.name ?? stage,
+      summary: whiteboardMeta.summary ?? whiteboardMeta.description ?? null,
+      lastUpdatedLabel: whiteboardMeta.updatedAt ? formatRelativeDay(whiteboardMeta.updatedAt, now) : null,
+      ready: whiteboardMeta.ready !== false,
+      url: whiteboardMeta.url ?? null
+    };
+
+    const breakoutRooms = Array.isArray(metadata.breakoutRooms)
+      ? metadata.breakoutRooms.map((room, index) => ({
+          name: room?.name ?? `Room ${index + 1}`,
+          capacity: room?.capacity ?? null
+        }))
+      : [];
+
+    const sessionSnapshots = Array.isArray(whiteboardMeta.snapshots)
+      ? whiteboardMeta.snapshots
+          .map((snapshot, index) => ({
+            id: `${session.id ?? crypto.randomUUID()}-snapshot-${index}`,
+            template: snapshot?.template ?? whiteboard.template ?? stage,
+            summary: snapshot?.summary ?? snapshot?.description ?? 'Latest collaborative updates shared.',
+            updatedAt: snapshot?.updatedAt ? formatRelativeDay(snapshot.updatedAt, now) : 'Moments ago'
+          }))
+      : whiteboard.template
+        ? [
+            {
+              id: `${session.id ?? crypto.randomUUID()}-snapshot`,
+              template: whiteboard.template,
+              summary: whiteboard.summary ?? `Templates prepared for ${stage}.`,
+              updatedAt: whiteboard.lastUpdatedLabel ?? 'Ready'
+            }
+          ]
+        : [];
+
+    const security = {
+      waitingRoom: securityMeta.waitingRoom !== false,
+      passcodeRequired: securityMeta.passcodeRequired !== false
+    };
+
+    const readinessStatuses = [
+      {
+        id: `${session.id ?? crypto.randomUUID()}-whiteboard`,
+        label: `${session.title ?? 'Session'} whiteboard`,
+        status: whiteboard.ready ? 'ready' : 'attention',
+        owner: facilitators[0] ?? 'Facilitator'
+      },
+      {
+        id: `${session.id ?? crypto.randomUUID()}-security`,
+        label: `${session.title ?? 'Session'} security`,
+        status: security.waitingRoom && security.passcodeRequired ? 'ready' : 'attention',
+        owner: securityMeta.owner ?? 'Classroom ops'
+      }
+    ];
+
+    return {
+      id: session.id ?? session.publicId ?? crypto.randomUUID(),
+      title: session.title ?? 'Live classroom',
+      stage,
+      startLabel: startAt ? formatDateTime(startAt, { dateStyle: 'medium', timeStyle: 'short' }) : 'TBC',
+      timezone: metadata.timezone ?? 'UTC',
+      community: communityName ?? metadata.community ?? 'Learner community',
+      communityId,
+      summary: metadata.summary ?? metadata.description ?? null,
+      occupancy: {
+        reserved: occupancyReserved,
+        capacity: occupancyCapacity,
+        rate: occupancyRate
+      },
+      callToAction,
+      status: phase,
+      whiteboard,
+      facilitators,
+      breakoutRooms,
+      security,
+      currency: metadata.currency ?? 'USD',
+      eventId: metadata.eventId ?? session.publicId ?? session.id,
+      startAt,
+      endAt,
+      metadata,
+      whiteboardSnapshots: sessionSnapshots,
+      readiness: readinessStatuses
+    };
+  });
+
+  liveSessionsDetailed.sort((a, b) => {
+    if (!a.startAt || !b.startAt) return 0;
+    return a.startAt.getTime() - b.startAt.getTime();
+  });
+
+  const activeSessions = liveSessionsDetailed.filter((session) => session.status === 'live');
+  const upcomingSessions = liveSessionsDetailed.filter((session) => session.status === 'scheduled');
+  const completedSessions = liveSessionsDetailed.filter((session) => session.status === 'completed');
+
+  const uniqueCommunities = new Set(liveSessionsDetailed.map((session) => session.communityId).filter(Boolean));
+  const fillRates = liveSessionsDetailed
+    .map((session) => session.occupancy?.rate)
+    .filter((rate) => typeof rate === 'number');
+  const averageFillRate = fillRates.length
+    ? Math.round(fillRates.reduce((sum, value) => sum + value, 0) / fillRates.length)
+    : 0;
+
+  const liveMetrics = [
+    {
+      label: 'Live today',
+      value: `${activeSessions.length}`,
+      change: `${upcomingSessions.length} upcoming`,
+      trend: activeSessions.length ? 'up' : 'neutral'
+    },
+    {
+      label: 'Average fill rate',
+      value: `${averageFillRate}%`,
+      change: fillRates.length ? 'Across cohorts' : 'Need promotion',
+      trend: averageFillRate < 40 ? 'down' : 'up'
+    },
+    {
+      label: 'Communities engaged',
+      value: `${uniqueCommunities.size}`,
+      change: `${communityMemberships.length} total`,
+      trend: uniqueCommunities.size ? 'up' : 'neutral'
+    }
+  ];
+
+  const cohortGroups = new Map();
+  activeEnrollments.forEach((enrollment) => {
+    const cohortLabel = enrollment.metadata?.cohort ?? 'General';
+    const course = courseMap.get(enrollment.courseId);
+    const key = `${enrollment.courseId}:${cohortLabel}`;
+    const entry = cohortGroups.get(key) ?? {
+      id: key,
+      name: `${course?.title ?? 'Course'} · ${cohortLabel}`,
+      members: 0
+    };
+    entry.members += 1;
+    cohortGroups.set(key, entry);
+  });
+
+  const liveGroups = Array.from(cohortGroups.values())
+    .sort((a, b) => b.members - a.members)
+    .slice(0, 6)
+    .map((entry) => ({ id: entry.id, name: entry.name, members: entry.members }));
+
+  const whiteboardSnapshots = [];
+  const readinessList = [];
+  liveSessionsDetailed.forEach((session) => {
+    if (Array.isArray(session.whiteboardSnapshots)) {
+      whiteboardSnapshots.push(...session.whiteboardSnapshots);
+    }
+    if (Array.isArray(session.readiness)) {
+      readinessList.push(...session.readiness);
+    }
+  });
+
+  const liveDashboard = {
+    metrics: liveMetrics,
+    active: activeSessions.slice(0, 4),
+    upcoming: upcomingSessions.slice(0, 8),
+    completed: completedSessions.slice(0, 6),
+    groups: liveGroups,
+    whiteboard: {
+      snapshots: whiteboardSnapshots.slice(0, 8),
+      readiness: readinessList.slice(0, 8)
+    }
+  };
+
+
   const dashboard = {
     metrics,
     analytics: {
@@ -660,9 +1324,10 @@ export function buildLearnerDashboard({
     },
     courses: {
       active: activeCourses,
-      recommendations: recommendedCourses
+      recommendations: recommendedCourses,
+      orders: courseOrders
     },
-    calendar: Array.from(calendarMap.values()),
+    calendar: calendarEvents,
     tutorBookings: {
       active: activeTutorBookings,
       history: historicalTutorEntries
@@ -680,33 +1345,23 @@ export function buildLearnerDashboard({
       unreadMessages: messaging.unreadThreads ?? 0,
       items: notificationsList
     },
-    assessments: {
-      overview: [
-        { id: 'assessments-upcoming', label: 'Upcoming assignments', value: 0 },
-        { id: 'assessments-completed', label: 'Completed assessments', value: completionEntries.length }
-      ],
-      timeline: {
-        upcoming: [],
-        overdue: [],
-        completed: []
-      },
-      courses: activeCourses.map((course) => ({
-        id: course.id,
-        title: course.title,
-        pendingAssessments: 0
-      })),
-      schedule: {
-        studyPlan: [],
-        events: []
-      },
-      analytics: {
-        byType: [],
-        pendingReviews: 0,
-        overdue: 0,
-        averageLeadTimeDays: null,
-        workloadWeight: completionEntries.length
-      },
-      resources: []
+    assessments: assessmentsSection,
+    liveClassrooms: liveDashboard,
+    support: {
+      cases: supportCases,
+      knowledgeBase: DEFAULT_SUPPORT_KB,
+      contacts: DEFAULT_SUPPORT_CONTACTS,
+      serviceWindow: '24/7 global support',
+      metrics: {
+        open: supportMetrics.open,
+        waiting: supportMetrics.waiting,
+        resolved: supportMetrics.resolved,
+        closed: supportMetrics.closed,
+        awaitingLearner: supportMetrics.awaitingLearner,
+        averageResponseMinutes: supportMetrics.averageResponseMinutes,
+        latestUpdatedAt: supportMetrics.latestUpdatedAt,
+        firstResponseMinutes: supportMetrics.averageResponseMinutes || 42
+      }
     },
     followers: followerSection,
     settings: {
@@ -744,6 +1399,27 @@ export function buildLearnerDashboard({
       title: 'Learner overview',
       url: '/dashboard/learner'
     },
+    {
+      id: 'learner-assessments',
+      role: 'learner',
+      type: 'Section',
+      title: 'Assessments',
+      url: '/dashboard/assessments'
+    },
+    {
+      id: 'learner-live',
+      role: 'learner',
+      type: 'Section',
+      title: 'Live classrooms',
+      url: '/dashboard/live-classes'
+    },
+    {
+      id: 'learner-calendar',
+      role: 'learner',
+      type: 'Section',
+      title: 'Calendar',
+      url: '/dashboard/calendar'
+    },
     ...activeCourses.map((course) => ({
       id: `learner-course-${course.id}`,
       role: 'learner',
@@ -768,6 +1444,19 @@ export function buildLearnerDashboard({
   }
   if (ebookLibrary.length) {
     feedHighlights.push(`Reading ${ebookLibrary[0].title} (${ebookLibrary[0].progress}% complete).`);
+  }
+  if (assignmentsTimeline.upcoming.length) {
+    const upcomingAssessment = assignmentsTimeline.upcoming[0];
+    feedHighlights.push(
+      `Next assessment: ${upcomingAssessment.title} ${upcomingAssessment.dueIn ? `· ${upcomingAssessment.dueIn}` : ''}`.trim()
+    );
+  }
+  if (upcomingSessions.length) {
+    feedHighlights.push(
+      `Upcoming live session: ${upcomingSessions[0].title} ${
+        upcomingSessions[0].startLabel ? `on ${upcomingSessions[0].startLabel}` : 'scheduled'
+      }.`
+    );
   }
 
   return {
@@ -1404,6 +2093,103 @@ function resolveAssignmentDueDate(assignment, course) {
     return null;
   }
   return new Date(releaseAt.getTime() + offsetDays * DAY_IN_MS);
+}
+
+function resolveLearnerAssignmentDueDate({ assignment, course, enrollment }) {
+  const metadata = assignment?.metadata ?? {};
+  const dueCandidates = [
+    metadata.dueAt,
+    metadata.dueDate,
+    metadata.schedule?.dueAt,
+    metadata.timeline?.dueAt,
+    metadata.window?.dueAt,
+    metadata.window?.endAt,
+    metadata.availability?.dueAt
+  ];
+  for (const candidate of dueCandidates) {
+    const parsed = normaliseDate(candidate);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  const offsetCandidates = [metadata.dueInDays, assignment?.dueOffsetDays];
+  const enrollmentStart = enrollment ? normaliseDate(enrollment.startedAt) : null;
+  const anchorDate = enrollmentStart ?? normaliseDate(course?.releaseAt) ?? normaliseDate(course?.createdAt);
+  for (const offset of offsetCandidates) {
+    const numeric = Number(offset);
+    if (anchorDate && Number.isFinite(numeric)) {
+      return new Date(anchorDate.getTime() + numeric * DAY_IN_MS);
+    }
+  }
+
+  const fallback = resolveAssignmentDueDate(assignment, course);
+  return fallback ? new Date(fallback) : null;
+}
+
+function mapOrderStatus(status, amountRefunded = 0, amountTotal = 0) {
+  const normalised = String(status ?? '').toLowerCase();
+  if (Number(amountRefunded ?? 0) > 0 && Number(amountTotal ?? 0) > 0) {
+    return 'Refunded';
+  }
+  if (['succeeded', 'paid', 'complete', 'completed'].includes(normalised)) {
+    return 'Paid';
+  }
+  if (['canceled', 'cancelled', 'refunded'].includes(normalised)) {
+    return 'Refunded';
+  }
+  return 'Processing';
+}
+
+function isInvoiceOpen(status) {
+  const normalised = String(status ?? '').toLowerCase();
+  if (!normalised) return true;
+  if (['succeeded', 'paid', 'complete', 'completed'].includes(normalised)) {
+    return false;
+  }
+  return true;
+}
+
+function normaliseLearnerPayments({ invoices = [], paymentIntents = [], courseMap, now = new Date() }) {
+  const source = Array.isArray(paymentIntents) && paymentIntents.length ? paymentIntents : invoices;
+  const orders = [];
+  const normalisedInvoices = [];
+
+  source.forEach((entry) => {
+    if (!entry) return;
+    const metadata = safeJsonParse(entry.metadata, {});
+    const amountCents = Number(entry.amountCents ?? entry.amountTotal ?? entry.amount ?? 0);
+    const currency = entry.currency ?? metadata.currency ?? 'USD';
+    const createdAt = normaliseDate(entry.createdAt ?? entry.date ?? entry.updatedAt) ?? now;
+    const label = entry.label ?? metadata.description ?? metadata.courseTitle ?? 'Course order';
+    const courseId = metadata.courseId ?? metadata.course?.id ?? entry.courseId ?? entry.entityId ?? null;
+    const course = courseId ? courseMap?.get?.(courseId) : null;
+    const reference = metadata.reference ?? entry.reference ?? entry.publicId ?? null;
+    const orderTitle = course?.title ?? metadata.courseTitle ?? label;
+    const orderId = entry.publicId ?? `order-${entry.id ?? crypto.randomUUID()}`;
+
+    orders.push({
+      id: orderId,
+      title: orderTitle,
+      amount: Math.round(amountCents) / 100,
+      status: mapOrderStatus(entry.status, entry.amountRefunded ?? metadata.amountRefunded, amountCents),
+      reference,
+      purchaseDate: createdAt ? createdAt.toISOString().slice(0, 10) : null
+    });
+
+    normalisedInvoices.push({
+      id: entry.publicId ?? `invoice-${entry.id ?? crypto.randomUUID()}`,
+      label,
+      amountCents,
+      currency,
+      status: entry.status ?? 'open',
+      date: createdAt ? createdAt.toISOString() : null,
+      metadata,
+      reference
+    });
+  });
+
+  return { orders, invoices: normalisedInvoices };
 }
 
 function resolveNextLesson(lessons = [], stats = {}) {
@@ -2342,6 +3128,74 @@ export default class DashboardService {
       throw error;
     }
 
+    let supportCases = [];
+    const supportMetrics = {
+      open: 0,
+      waiting: 0,
+      resolved: 0,
+      closed: 0,
+      awaitingLearner: 0,
+      averageResponseMinutes: 0,
+      latestUpdatedAt: null
+    };
+    try {
+      supportCases = await LearnerSupportRepository.listCases(user.id);
+      const responseDurations = [];
+      supportCases.forEach((supportCase) => {
+        const status = (supportCase.status ?? 'open').toLowerCase();
+        if (supportMetrics[status] !== undefined) {
+          supportMetrics[status] += 1;
+        } else {
+          supportMetrics.open += 1;
+        }
+        const messages = Array.isArray(supportCase.messages) ? supportCase.messages : [];
+        if (messages.length) {
+          const latestMessage = messages[messages.length - 1];
+          if (latestMessage.author !== 'learner' && status !== 'resolved' && status !== 'closed') {
+            supportMetrics.awaitingLearner += 1;
+          }
+          messages.forEach((message, index) => {
+            if (message.author !== 'learner') {
+              for (let previous = index - 1; previous >= 0; previous -= 1) {
+                const candidate = messages[previous];
+                if (candidate.author === 'learner') {
+                  const agentDate = new Date(message.createdAt ?? 0);
+                  const learnerDate = new Date(candidate.createdAt ?? 0);
+                  if (!Number.isNaN(agentDate.getTime()) && !Number.isNaN(learnerDate.getTime())) {
+                    const diffMinutes = Math.max(
+                      0,
+                      Math.round((agentDate.getTime() - learnerDate.getTime()) / (60 * 1000))
+                    );
+                    responseDurations.push(diffMinutes);
+                  }
+                  break;
+                }
+              }
+            }
+          });
+          const latestTimestamp = latestMessage.createdAt ?? supportCase.updatedAt;
+          if (latestTimestamp) {
+            const latestDate = new Date(latestTimestamp);
+            if (!Number.isNaN(latestDate.getTime())) {
+              if (!supportMetrics.latestUpdatedAt) {
+                supportMetrics.latestUpdatedAt = latestDate.toISOString();
+              } else if (new Date(supportMetrics.latestUpdatedAt) < latestDate) {
+                supportMetrics.latestUpdatedAt = latestDate.toISOString();
+              }
+            }
+          }
+        }
+      });
+      if (responseDurations.length) {
+        supportMetrics.averageResponseMinutes = Math.round(
+          responseDurations.reduce((sum, value) => sum + value, 0) / responseDurations.length
+        );
+      }
+    } catch (error) {
+      log.warn({ err: error }, 'Failed to load learner support workspace data');
+      supportCases = [];
+    }
+
     let courseWorkspaceInput = {
       courses: [],
       modules: [],
@@ -2777,9 +3631,11 @@ export default class DashboardService {
           enrollments,
           courses,
           courseProgress,
+          assignments: courseWorkspaceInput?.assignments ?? [],
           tutorBookings,
           tutorAvailability,
           liveClassrooms,
+          instructorDirectory: courseWorkspaceInput?.collaboratorDirectory ?? new Map(),
           ebookProgress,
           ebooks: ebookCatalog,
           invoices,
@@ -2932,6 +3788,7 @@ export default class DashboardService {
         { default: CourseEnrollmentModel },
         { default: CourseProgressModel },
         { default: CourseModel },
+        { default: CourseAssignmentModel },
         { default: TutorBookingModel },
         { default: LiveClassroomModel },
         { default: EbookProgressModel },
@@ -2947,6 +3804,7 @@ export default class DashboardService {
         import('../models/CourseEnrollmentModel.js'),
         import('../models/CourseProgressModel.js'),
         import('../models/CourseModel.js'),
+        import('../models/CourseAssignmentModel.js'),
         import('../models/TutorBookingModel.js'),
         import('../models/LiveClassroomModel.js'),
         import('../models/EbookProgressModel.js'),
@@ -2981,6 +3839,7 @@ export default class DashboardService {
       communityMemberships = memberships ?? [];
       const courseIds = Array.from(new Set(learnerEnrollments.map((enrollment) => enrollment.courseId).filter(Boolean)));
       const learnerCourses = courseIds.length ? await CourseModel.listByIds(courseIds) : [];
+      const learnerAssignments = courseIds.length ? await CourseAssignmentModel.listByCourseIds(courseIds) : [];
       const recommendedCourses = await CourseModel.listPublished({ limit: 6, excludeIds: courseIds });
 
       const instructorDirectory = new Map();
@@ -3048,6 +3907,7 @@ export default class DashboardService {
           enrollments: learnerEnrollments,
           courses: [...learnerCourses, ...recommendedCourses],
           courseProgress: learnerProgress,
+          assignments: learnerAssignments,
           instructorDirectory,
           tutorBookings: learnerBookings,
           liveClassrooms: learnerLiveClassrooms,

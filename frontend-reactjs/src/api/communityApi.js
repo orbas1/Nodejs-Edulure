@@ -406,6 +406,21 @@ export async function scheduleCommunityEvent({ communityId, token, payload }) {
   return mapResponse(response);
 }
 
+export async function createCommunityLiveDonation({ communityId, token, payload, signal } = {}) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/live/donations`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:funding`, `community:${communityId}:events`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
 export async function fetchCommunitySponsorships({ communityId, token }) {
   const response = await httpClient.get(`/communities/${communityId}/sponsorships`, {
     token,
@@ -515,16 +530,6 @@ export async function createCommunityEvent({ communityId, token, payload }) {
     token,
     cache: {
       invalidateTags: [`community:${communityId}:events`]
-    }
-  });
-  return mapResponse(response);
-}
-
-export async function createCommunityResource({ communityId, token, payload }) {
-  const response = await httpClient.post(`/communities/${communityId}/resources`, payload, {
-    token,
-    cache: {
-      invalidateTags: [`community:${communityId}:resources`]
     }
   });
   return mapResponse(response);

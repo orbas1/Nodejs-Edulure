@@ -128,4 +128,67 @@ export default class LearnerDashboardController {
       return next(error);
     }
   }
+
+  static async listSupportTickets(req, res, next) {
+    try {
+      const tickets = await LearnerDashboardService.listSupportTickets(req.user.id);
+      return success(res, {
+        data: { tickets },
+        message: 'Support tickets loaded'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createSupportTicket(req, res, next) {
+    try {
+      const ticket = await LearnerDashboardService.createSupportTicket(req.user.id, req.body);
+      return success(res, {
+        data: { ticket },
+        message: 'Support request submitted'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateSupportTicket(req, res, next) {
+    try {
+      const { ticketId } = req.params;
+      const ticket = await LearnerDashboardService.updateSupportTicket(req.user.id, ticketId, req.body);
+      return success(res, {
+        data: { ticket },
+        message: 'Support request updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async replyToSupportTicket(req, res, next) {
+    try {
+      const { ticketId } = req.params;
+      const message = await LearnerDashboardService.addSupportTicketMessage(req.user.id, ticketId, req.body);
+      return success(res, {
+        data: { message },
+        message: 'Reply posted to support case'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async closeSupportTicket(req, res, next) {
+    try {
+      const { ticketId } = req.params;
+      const ticket = await LearnerDashboardService.closeSupportTicket(req.user.id, ticketId, req.body);
+      return success(res, {
+        data: { ticket },
+        message: 'Support request closed'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
 }

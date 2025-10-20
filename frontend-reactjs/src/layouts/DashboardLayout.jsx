@@ -24,6 +24,7 @@ import {
   MegaphoneIcon,
   PuzzlePieceIcon,
   PlayCircleIcon,
+  LifebuoyIcon,
   ShieldCheckIcon,
   ShieldExclamationIcon,
   SparklesIcon,
@@ -85,6 +86,7 @@ const navigationByRole = {
       name: 'Support',
       icon: UsersIcon,
       children: [
+        { id: 'learner-support-hub', name: 'Support hub', to: `${basePath}/support`, icon: LifebuoyIcon },
         { id: 'learner-bookings', name: 'Bookings', to: `${basePath}/bookings`, icon: UsersIcon },
         { id: 'learner-field', name: 'Field', to: `${basePath}/field-services`, icon: MapIcon },
         { id: 'learner-ebooks', name: 'Ebooks', to: `${basePath}/ebooks`, icon: BookOpenIcon },
