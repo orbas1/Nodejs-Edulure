@@ -191,6 +191,9 @@ export default class CommunityModel {
     if (updates.visibility !== undefined) {
       payload.visibility = updates.visibility;
     }
+    if (updates.ownerId !== undefined) {
+      payload.owner_id = updates.ownerId;
+    }
     if (updates.metadata !== undefined) {
       payload.metadata = JSON.stringify(updates.metadata ?? {});
     }
@@ -254,27 +257,6 @@ export default class CommunityModel {
 
     const result = await query.count({ total: '*' }).first();
     return Number(result?.total ?? 0);
-  }
-
-  static async updateById(id, updates, connection = db) {
-    const payload = {};
-    if (updates.name !== undefined) payload.name = updates.name;
-    if (updates.slug !== undefined) payload.slug = updates.slug;
-    if (updates.description !== undefined) payload.description = updates.description ?? null;
-    if (updates.coverImageUrl !== undefined) payload.cover_image_url = updates.coverImageUrl ?? null;
-    if (updates.visibility !== undefined) payload.visibility = updates.visibility;
-    if (updates.ownerId !== undefined) payload.owner_id = updates.ownerId;
-    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
-
-    if (Object.keys(payload).length === 0) {
-      return this.findById(id, connection);
-    }
-
-    await connection('communities')
-      .where({ id })
-      .update({ ...payload, updated_at: connection.fn.now() });
-
-    return this.findById(id, connection);
   }
 
   static async softDeleteById(id, connection = db) {

@@ -139,7 +139,7 @@ export default class ProviderTransitionAnnouncementModel {
       status: row.status,
       effectiveFrom: row.effectiveFrom ? new Date(row.effectiveFrom) : null,
       effectiveTo: row.effectiveTo ? new Date(row.effectiveTo) : null,
-      ackRequired: row.ackRequired === undefined ? true : !!row.ackRequired,
+      ackRequired: row.ackRequired === undefined ? true : Boolean(row.ackRequired),
       ackDeadline: row.ackDeadline ? new Date(row.ackDeadline) : null,
       ownerEmail: row.ownerEmail ?? null,
       tenantScope: row.tenantScope ?? 'global',

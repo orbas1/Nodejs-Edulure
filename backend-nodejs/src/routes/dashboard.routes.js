@@ -9,11 +9,19 @@ const router = Router();
 router.get('/me', auth(), DashboardController.current);
 router.get('/learner/tutor-bookings', auth(), LearnerDashboardController.listTutorBookings);
 router.post('/learner/tutor-bookings', auth(), LearnerDashboardController.createTutorBooking);
-router.patch('/learner/tutor-bookings/:bookingId', auth(), LearnerDashboardController.updateTutorBooking);
-router.post('/learner/tutor-bookings/:bookingId/cancel', auth(), LearnerDashboardController.cancelTutorBooking);
 router.post('/learner/tutor-bookings/export', auth(), LearnerDashboardController.exportTutorSchedule);
 router.patch('/learner/tutor-bookings/:bookingId', auth(), LearnerDashboardController.updateTutorBooking);
 router.post('/learner/tutor-bookings/:bookingId/cancel', auth(), LearnerDashboardController.cancelTutorBooking);
+router.patch(
+  '/learner/tutor-booking-requests/:bookingId',
+  auth(),
+  LearnerDashboardController.updateTutorBookingRequest
+);
+router.post(
+  '/learner/tutor-booking-requests/:bookingId/cancel',
+  auth(),
+  LearnerDashboardController.cancelTutorBookingRequest
+);
 router.post('/learner/courses/:courseId/goals', auth(), LearnerDashboardController.createCourseGoal);
 router.post('/learner/ebooks/:ebookId/resume', auth(), LearnerDashboardController.resumeEbook);
 router.post('/learner/ebooks/:ebookId/share', auth(), LearnerDashboardController.shareEbook);

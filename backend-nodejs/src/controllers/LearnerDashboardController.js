@@ -425,7 +425,7 @@ export default class LearnerDashboardController {
     }
   }
 
-  static async updateTutorBooking(req, res, next) {
+  static async updateTutorBookingRequest(req, res, next) {
     try {
       const { bookingId } = req.params;
       const acknowledgement = await LearnerDashboardService.updateTutorBookingRequest(
@@ -442,7 +442,7 @@ export default class LearnerDashboardController {
     }
   }
 
-  static async cancelTutorBooking(req, res, next) {
+  static async cancelTutorBookingRequest(req, res, next) {
     try {
       const { bookingId } = req.params;
       const acknowledgement = await LearnerDashboardService.cancelTutorBookingRequest(

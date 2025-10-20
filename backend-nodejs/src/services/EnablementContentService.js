@@ -163,7 +163,7 @@ function computeWordCount(markdown) {
   }
   const plain = markdown
     .replace(/`{1,3}[\s\S]*?`{1,3}/g, ' ')
-    .replace(/[#>*_\-]/g, ' ')
+    .replace(/[#>*_-]/g, ' ')
     .replace(/\[(.*?)\]\((.*?)\)/g, '$1');
   return plain
     .split(/\s+/)
@@ -182,7 +182,7 @@ function createExcerpt(markdown, length = 60) {
   }
   const words = markdown
     .replace(/`{1,3}[\s\S]*?`{1,3}/g, ' ')
-    .replace(/[#>*_\-]/g, ' ')
+    .replace(/[#>*_-]/g, ' ')
     .replace(/\[(.*?)\]\((.*?)\)/g, '$1')
     .split(/\s+/)
     .map((word) => word.trim())
