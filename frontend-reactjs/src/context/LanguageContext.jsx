@@ -60,10 +60,49 @@ const TRANSLATIONS = {
             title: 'Creator tea digest',
             meta: 'Fresh drops every Monday',
             cta: 'Read now'
+      }
+    },
+    instructorPill: "I'm an instructor",
+    illustrationAlt: 'Collage of instructors and learners collaborating'
+      },
+      perks: {
+        eyebrow: 'Playful perks',
+        headline: 'Perks that keep the learning energy high',
+        subhead: 'Playful boosts designed for curious learners and hands-on instructors.',
+        learnersLabel: 'For Learners',
+        instructorsLabel: 'For Instructors',
+        items: {
+          communityMagnetism: {
+            title: 'Community magnetism',
+            learners: 'Drop into cozy rooms, prompts, and rituals that make momentum feel fun.',
+            instructors: 'Spin up playful spaces and nudge everyone into flow without friction.'
+          },
+          liveStudioVibes: {
+            title: 'Live studio vibes',
+            learners: 'Jump into interactive jams with polls, whiteboards, and breakout sparks.',
+            instructors: 'Host agenda-driven sessions and remix formats without juggling ten tools.'
+          },
+          contentPlayground: {
+            title: 'Content playground',
+            learners: 'Binge micro lessons, swipeable clips, and peer-built templates on demand.',
+            instructors: 'Ship drops, challenges, and resources in minutes with beautiful defaults.'
+          },
+          signalBoosts: {
+            title: 'Signal boosts',
+            learners: 'Show off wins, gather kudos, and feel the community cheering you on.',
+            instructors: 'Spot rising stars and amplify milestones automatically in the feed.'
+          },
+          supportLoop: {
+            title: 'Support loop',
+            learners: 'Ask for help in context-aware threads and get replies that stick.',
+            instructors: 'Keep DMs tidy while automations route FAQs and follow-ups for you.'
+          },
+          growthOps: {
+            title: 'Growth ops',
+            learners: 'Unlock badges, levels, and surprise drops as you keep showing up.',
+            instructors: 'Track funnels, revenue, and experiments with dashboards built for learning ops.'
           }
-        },
-        instructorPill: "I'm an instructor",
-        illustrationAlt: 'Collage of instructors and learners collaborating'
+        }
       }
     }
   },
@@ -114,6 +153,46 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Je suis instructeur·rice',
         illustrationAlt: "Collage d'instructeurs et d'apprenants en collaboration"
+      },
+      perks: {
+        eyebrow: 'Avantages ludiques',
+        headline: 'Des avantages qui maintiennent l\'énergie d\'apprentissage',
+        subhead:
+          'Des boosts ludiques pensés pour les apprenant·e·s curieux·ses et les instructeur·rice·s impliqué·e·s.',
+        learnersLabel: 'Pour les apprenant·e·s',
+        instructorsLabel: 'Pour les instructeur·rice·s',
+        items: {
+          communityMagnetism: {
+            title: 'Magnétisme communautaire',
+            learners: 'Entrez dans des salons chaleureux, des invites et des rituels qui rendent l\'élan joyeux.',
+            instructors: 'Créez des espaces ludiques et mettez tout le monde en mouvement sans friction.'
+          },
+          liveStudioVibes: {
+            title: 'Ambiance studio en direct',
+            learners: 'Participez à des jams interactifs avec sondages, tableaux blancs et éclats en sous-groupes.',
+            instructors: 'Animez des sessions structurées et remixez les formats sans jongler avec dix outils.'
+          },
+          contentPlayground: {
+            title: 'Terrain de jeu de contenus',
+            learners: 'Dévorez micro-leçons, clips swipeables et modèles créés par les pairs à la demande.',
+            instructors: 'Publiez drops, défis et ressources en quelques minutes avec de beaux gabarits.'
+          },
+          signalBoosts: {
+            title: 'Boosts de signal',
+            learners: 'Mettez vos réussites en avant, récoltez des kudos et sentez la communauté vous encourager.',
+            instructors: 'Repérez les talents émergents et amplifiez les jalons automatiquement dans le fil.'
+          },
+          supportLoop: {
+            title: 'Boucle de soutien',
+            learners: 'Demandez de l\'aide dans des fils contextualisés et recevez des réponses qui restent.',
+            instructors: 'Gardez les messages privés ordonnés pendant que les automatisations routent FAQ et relances.'
+          },
+          growthOps: {
+            title: 'Opérations de croissance',
+            learners: 'Débloquez badges, niveaux et surprises au fil de votre engagement.',
+            instructors: 'Suivez tunnels, revenus et expérimentations avec des tableaux de bord dédiés aux learning ops.'
+          }
+        }
       }
     }
   },
@@ -164,6 +243,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Soy instructor/a',
         illustrationAlt: 'Collage de instructores y estudiantes colaborando'
+      },
+      perks: {
+        eyebrow: 'Beneficios con chispa',
+        headline: 'Beneficios que mantienen la energía de aprendizaje',
+        subhead: 'Impulsos lúdicos pensados para aprendices curiosos y docentes prácticos.',
+        learnersLabel: 'Para estudiantes',
+        instructorsLabel: 'Para instructores',
+        items: {
+          communityMagnetism: {
+            title: 'Magnetismo comunitario',
+            learners: 'Entra en salas acogedoras, prompts y rituales que hacen que el impulso sea divertido.',
+            instructors: 'Crea espacios juguetones y guía a todos hacia el flujo sin fricción.'
+          },
+          liveStudioVibes: {
+            title: 'Vibras de estudio en vivo',
+            learners: 'Participa en jams interactivos con encuestas, pizarras y chispas en subgrupos.',
+            instructors: 'Dirige sesiones con agenda y remezcla formatos sin malabarear diez herramientas.'
+          },
+          contentPlayground: {
+            title: 'Parque de contenidos',
+            learners: 'Maratonea microlecciones, clips deslizables y plantillas creadas por pares cuando quieras.',
+            instructors: 'Lanza drops, desafíos y recursos en minutos con presets hermosos.'
+          },
+          signalBoosts: {
+            title: 'Impulsos de señal',
+            learners: 'Presume logros, gana kudos y siente a la comunidad animándote.',
+            instructors: 'Detecta talentos emergentes y amplifica hitos automáticamente en el feed.'
+          },
+          supportLoop: {
+            title: 'Bucle de soporte',
+            learners: 'Pide ayuda en hilos con contexto y recibe respuestas que perduran.',
+            instructors: 'Mantén los mensajes privados ordenados mientras las automatizaciones dirigen FAQs y seguimientos por ti.'
+          },
+          growthOps: {
+            title: 'Operaciones de crecimiento',
+            learners: 'Desbloquea insignias, niveles y sorpresas mientras sigues participando.',
+            instructors: 'Controla embudos, ingresos y experimentos con tableros hechos para learning ops.'
+          }
+        }
       }
     }
   },
@@ -214,6 +332,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Sou instrutor(a)',
         illustrationAlt: 'Colagem de instrutores e aprendizes colaborando'
+      },
+      perks: {
+        eyebrow: 'Benefícios divertidos',
+        headline: 'Benefícios que mantêm a energia de aprendizagem',
+        subhead: 'Impulsos lúdicos pensados para aprendizes curiosos e instrutores práticos.',
+        learnersLabel: 'Para estudantes',
+        instructorsLabel: 'Para instrutores',
+        items: {
+          communityMagnetism: {
+            title: 'Magnetismo da comunidade',
+            learners: 'Entre em salas acolhedoras, prompts e rituais que deixam o ritmo mais leve.',
+            instructors: 'Crie espaços divertidos e coloque todo mundo em fluxo sem atrito.'
+          },
+          liveStudioVibes: {
+            title: 'Vibes de estúdio ao vivo',
+            learners: 'Participe de jams interativos com enquetes, quadros brancos e faíscas em grupos.',
+            instructors: 'Conduza sessões guiadas por agenda e remixe formatos sem equilibrar dez ferramentas.'
+          },
+          contentPlayground: {
+            title: 'Parque de conteúdos',
+            learners: 'Maratone microaulas, clipes deslizáveis e modelos feitos pelos pares sob demanda.',
+            instructors: 'Lance drops, desafios e recursos em minutos com padrões lindos.'
+          },
+          signalBoosts: {
+            title: 'Impulsos de sinal',
+            learners: 'Mostre conquistas, receba elogios e sinta a comunidade torcendo por você.',
+            instructors: 'Identifique talentos em ascensão e amplifique marcos automaticamente no feed.'
+          },
+          supportLoop: {
+            title: 'Círculo de suporte',
+            learners: 'Peça ajuda em tópicos cheios de contexto e receba respostas que ficam.',
+            instructors: 'Mantenha as mensagens privadas em ordem enquanto as automações cuidam das dúvidas e follow-ups.'
+          },
+          growthOps: {
+            title: 'Operações de crescimento',
+            learners: 'Desbloqueie insígnias, níveis e surpresas conforme continua aparecendo.',
+            instructors: 'Acompanhe funis, receita e experimentos com dashboards feitos para learning ops.'
+          }
+        }
       }
     }
   },
@@ -264,6 +421,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Sono un* istruttore/trice',
         illustrationAlt: 'Collage di istruttori e studenti che collaborano'
+      },
+      perks: {
+        eyebrow: 'Benefit giocosi',
+        headline: 'Benefit che mantengono alta l\'energia dell\'apprendimento',
+        subhead: 'Boost giocosi pensati per chi apprende con curiosità e per chi insegna sul campo.',
+        learnersLabel: 'Per chi apprende',
+        instructorsLabel: 'Per chi insegna',
+        items: {
+          communityMagnetism: {
+            title: 'Magnetismo della community',
+            learners: 'Entra in stanze accoglienti, prompt e rituali che rendono lo slancio divertente.',
+            instructors: 'Crea spazi giocosi e accompagna tutti nel flow senza attriti.'
+          },
+          liveStudioVibes: {
+            title: 'Vibrazioni da studio live',
+            learners: 'Partecipa a jam interattive con sondaggi, lavagne e scintille nei breakout.',
+            instructors: 'Conduci sessioni guidate dall\'agenda e remixa i formati senza giostrare dieci strumenti.'
+          },
+          contentPlayground: {
+            title: 'Parco giochi dei contenuti',
+            learners: 'Divora micro-lezioni, clip scorrevoli e template creati dai pari on demand.',
+            instructors: 'Rilascia drop, sfide e risorse in pochi minuti con preset curati.'
+          },
+          signalBoosts: {
+            title: 'Potenti booster di segnale',
+            learners: 'Metti in mostra i traguardi, raccogli kudos e senti la community che ti sostiene.',
+            instructors: 'Individua talenti emergenti e amplifica automaticamente le tappe nel feed.'
+          },
+          supportLoop: {
+            title: 'Ciclo di supporto',
+            learners: 'Chiedi aiuto in thread ricchi di contesto e ricevi risposte che restano.',
+            instructors: 'Tieni in ordine i messaggi privati mentre le automazioni gestiscono FAQ e follow-up.'
+          },
+          growthOps: {
+            title: 'Ops di crescita',
+            learners: 'Sblocca badge, livelli e sorprese continuando a farti vedere.',
+            instructors: 'Monitora funnel, entrate ed esperimenti con dashboard pensate per le learning ops.'
+          }
+        }
       }
     }
   },
@@ -314,6 +510,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Jestem instruktorem',
         illustrationAlt: 'Kolaż instruktorów i uczniów współpracujących ze sobą'
+      },
+      perks: {
+        eyebrow: 'Pogodne korzyści',
+        headline: 'Korzyści, które podtrzymują energię uczenia',
+        subhead: 'Lekkie zastrzyki energii dla ciekawych uczniów i praktycznych instruktorów.',
+        learnersLabel: 'Dla uczestników',
+        instructorsLabel: 'Dla instruktorów',
+        items: {
+          communityMagnetism: {
+            title: 'Magnetyzm społeczności',
+            learners: 'Wskakuj do przytulnych pokoi, promptów i rytuałów, które nadają rozpędu zabawie.',
+            instructors: 'Twórz pełne luzu przestrzenie i wprowadzaj wszystkich w flow bez tarcia.'
+          },
+          liveStudioVibes: {
+            title: 'Studyjne wibracje na żywo',
+            learners: 'Dołącz do interaktywnych jamów z ankietami, tablicami i błyskami breakout.',
+            instructors: 'Prowadź sesje z agendą i miksuj formaty bez żonglowania dziesięcioma narzędziami.'
+          },
+          contentPlayground: {
+            title: 'Plac zabaw treści',
+            learners: 'Pochłaniaj mikro lekcje, przewijane klipy i szablony tworzone przez społeczność na żądanie.',
+            instructors: 'Wypuszczaj dropy, wyzwania i zasoby w kilka minut dzięki dopracowanym wzorcom.'
+          },
+          signalBoosts: {
+            title: 'Wzmacniacze sygnału',
+            learners: 'Pokazuj sukcesy, zbieraj pochwały i czuj doping społeczności.',
+            instructors: 'Wypatruj wschodzących gwiazd i automatycznie nagłaśniaj kamienie milowe w feedzie.'
+          },
+          supportLoop: {
+            title: 'Pętla wsparcia',
+            learners: 'Proś o pomoc w wątkach pełnych kontekstu i otrzymuj odpowiedzi, które zostają.',
+            instructors: 'Trzymaj wiadomości w ryzach, a automatyzacje zajmą się FAQ i follow-upami.'
+          },
+          growthOps: {
+            title: 'Operacje wzrostu',
+            learners: 'Odblokowuj odznaki, poziomy i niespodzianki, gdy konsekwentnie się pojawiasz.',
+            instructors: 'Śledź lejki, przychody i eksperymenty na pulpitach zaprojektowanych dla learning ops.'
+          }
+        }
       }
     }
   },
@@ -364,6 +599,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'मैं प्रशिक्षक हूँ',
         illustrationAlt: 'प्रशिक्षकों और शिक्षार्थियों के सहयोग का कोलाज'
+      },
+      perks: {
+        eyebrow: 'मज़ेदार लाभ',
+        headline: 'ऐसे लाभ जो सीखने की ऊर्जा बनाए रखें',
+        subhead: 'जिज्ञासु शिक्षार्थियों और व्यवहारिक प्रशिक्षकों के लिए तैयार किए गए चंचल बूस्ट।',
+        learnersLabel: 'सीखने वालों के लिए',
+        instructorsLabel: 'प्रशिक्षकों के लिए',
+        items: {
+          communityMagnetism: {
+            title: 'समुदाय का चुंबकत्व',
+            learners: 'आरामदायक कमरों, प्रॉम्प्ट्स और रिवाज़ों में उतरें जो गति को मज़ेदार बना देते हैं।',
+            instructors: 'बिना घर्षण के सबको प्रवाह में लाने वाले खिलंदड़े स्थान तैयार करें।'
+          },
+          liveStudioVibes: {
+            title: 'लाइव स्टूडियो वाइब्स',
+            learners: 'मतदान, व्हाइटबोर्ड और ब्रेकआउट चमक के साथ इंटरऐक्टिव जैम में शामिल हों।',
+            instructors: 'दस टूल सँभाले बिना एजेंडा-चालित सत्र चलाएँ और फ़ॉर्मैट्स को रीमिक्स करें।'
+          },
+          contentPlayground: {
+            title: 'कंटेंट प्लेग्राउंड',
+            learners: 'माइक्रो पाठ, स्वाइपेबल क्लिप्स और साथियों द्वारा बनाए टेम्पलेट्स ऑन-डिमांड देखें।',
+            instructors: 'सुंदर डिफ़ॉल्ट्स के साथ मिनटों में ड्रॉप्स, चुनौतियाँ और संसाधन जारी करें।'
+          },
+          signalBoosts: {
+            title: 'सिग्नल बूस्ट्स',
+            learners: 'अपनी उपलब्धियाँ दिखाएँ, सराहना पाएँ और समुदाय का उत्साह महसूस करें।',
+            instructors: 'उभरते सितारों को पहचानें और मील के पत्थरों को फ़ीड में स्वतः उजागर करें।'
+          },
+          supportLoop: {
+            title: 'सपोर्ट लूप',
+            learners: 'संदर्भित थ्रेड्स में मदद माँगें और टिकाऊ जवाब पाएँ।',
+            instructors: 'स्वचालन को FAQ और फ़ॉलो-अप सँभालने दें, जबकि आप डीएम सुव्यवस्थित रखें।'
+          },
+          growthOps: {
+            title: 'ग्रोथ ऑप्स',
+            learners: 'लगातार भाग लेते हुए बैज, लेवल और सरप्राइज़ अनलॉक करें।',
+            instructors: 'लर्निंग ऑप्स के लिए बनाए डैशबोर्ड पर फ़नल, राजस्व और प्रयोगों को ट्रैक करें।'
+          }
+        }
       }
     }
   },
@@ -414,6 +688,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'أنا مدرّس/ة',
         illustrationAlt: 'مجموعة صور لمدربين ومتعلّمين يتعاونون'
+      },
+      perks: {
+        eyebrow: 'مزايا مرحة',
+        headline: 'مزايا تُبقي طاقة التعلّم مرتفعة',
+        subhead: 'دفعات مرحة صُممت للمتعلمين الفضوليين والمدربين العمليين.',
+        learnersLabel: 'للمتعلمين',
+        instructorsLabel: 'للمدرسين',
+        items: {
+          communityMagnetism: {
+            title: 'جاذبية المجتمع',
+            learners: 'ادخل إلى غرف دافئة ومحفزات وطقوس تجعل الاندفاع ممتعًا.',
+            instructors: 'أنشئ مساحات مرحة وادفع الجميع إلى حالة التدفق دون احتكاك.'
+          },
+          liveStudioVibes: {
+            title: 'أجواء الاستوديو المباشر',
+            learners: 'انضم إلى جلسات تفاعلية مع استطلاعات ولوحات ومجموعات فرعية تلهم الشرارة.',
+            instructors: 'قد جلسات منظمة وغيّر الصيغ دون الاضطرار إلى إدارة عشرة أدوات.'
+          },
+          contentPlayground: {
+            title: 'ملعب المحتوى',
+            learners: 'استمتع بدروس مصغرة ومقاطع قابلة للتمرير وقوالب يصنعها الأقران عند الطلب.',
+            instructors: 'أطلق المواد والتحديات والموارد في دقائق مع إعدادات جميلة جاهزة.'
+          },
+          signalBoosts: {
+            title: 'تعزيزات الإشارة',
+            learners: 'اعرض إنجازاتك، واجمع عبارات التشجيع، واشعر بحماس المجتمع من حولك.',
+            instructors: 'اكتشف المواهب الصاعدة ووسّع إبراز المحطات تلقائيًا في الخلاصة.'
+          },
+          supportLoop: {
+            title: 'حلقة الدعم',
+            learners: 'اطلب المساعدة داخل نقاشات غنية بالسياق واحصل على ردود تبقى.',
+            instructors: 'حافظ على ترتيب الرسائل الخاصة بينما تتولى الأتمتة الأسئلة الشائعة والمتابعات.'
+          },
+          growthOps: {
+            title: 'عمليات النمو',
+            learners: 'افتح الشارات والمستويات والمفاجآت كلما واصلت المشاركة.',
+            instructors: 'تتبع القمع والإيرادات والتجارب عبر لوحات معلومات مصممة لعمليات التعلّم.'
+          }
+        }
       }
     }
   },
@@ -464,6 +777,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Ich bin Trainer:in',
         illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
+      },
+      perks: {
+        eyebrow: 'Verspielte Vorteile',
+        headline: 'Vorteile, die die Lernenergie hochhalten',
+        subhead: 'Verspielte Impulse für neugierige Lernende und pragmatische Lehrende.',
+        learnersLabel: 'Für Lernende',
+        instructorsLabel: 'Für Lehrende',
+        items: {
+          communityMagnetism: {
+            title: 'Community-Magnetismus',
+            learners: 'Tauche in gemütliche Räume, Impulse und Rituale ein, die Schwung in Spaß verwandeln.',
+            instructors: 'Erstelle verspielte Bereiche und bring alle mühelos in den Flow.'
+          },
+          liveStudioVibes: {
+            title: 'Live-Studio-Vibes',
+            learners: 'Mach bei interaktiven Jams mit Umfragen, Whiteboards und Breakout-Funken mit.',
+            instructors: 'Moderiere Agenda-Sessions und remixe Formate, ohne zehn Tools jonglieren zu müssen.'
+          },
+          contentPlayground: {
+            title: 'Content-Spielplatz',
+            learners: 'Schau dir Micro-Lektionen, swipebare Clips und Peer-Vorlagen on demand an.',
+            instructors: 'Veröffentliche Drops, Challenges und Ressourcen in Minuten mit liebevollen Presets.'
+          },
+          signalBoosts: {
+            title: 'Signal-Booster',
+            learners: 'Zeig Erfolge, sammle Kudos und spüre, wie dich die Community anfeuert.',
+            instructors: 'Erkenne aufstrebende Talente und verstärke Meilensteine automatisch im Feed.'
+          },
+          supportLoop: {
+            title: 'Support-Schleife',
+            learners: 'Bitte in kontextreichen Threads um Hilfe und erhalte Antworten, die bleiben.',
+            instructors: 'Halte DMs sortiert, während Automationen FAQs und Follow-ups übernehmen.'
+          },
+          growthOps: {
+            title: 'Growth Ops',
+            learners: 'Schalte Abzeichen, Levels und Überraschungen frei, wenn du dranbleibst.',
+            instructors: 'Verfolge Funnels, Umsatz und Experimente mit Dashboards für Learning Ops.'
+          }
+        }
       }
     }
   },
@@ -514,6 +866,45 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Я преподаватель',
         illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'
+      },
+      perks: {
+        eyebrow: 'Игривые бонусы',
+        headline: 'Бонусы, которые держат энергию обучения',
+        subhead: 'Небольшие игривые импульсы для любознательных учащихся и практичных наставников.',
+        learnersLabel: 'Для учащихся',
+        instructorsLabel: 'Для наставников',
+        items: {
+          communityMagnetism: {
+            title: 'Магнетизм сообщества',
+            learners: 'Заглядывайте в уютные комнаты, подсказки и ритуалы, чтобы движение вперёд было в радость.',
+            instructors: 'Создавайте игривые пространства и мягко вводите всех в состояние потока без трения.'
+          },
+          liveStudioVibes: {
+            title: 'Живые студийные вибрации',
+            learners: 'Подключайтесь к интерактивным джемам с опросами, досками и вспышками брейкаутов.',
+            instructors: 'Ведите сессии по повестке и миксуйте форматы, не жонглируя десятком инструментов.'
+          },
+          contentPlayground: {
+            title: 'Площадка контента',
+            learners: 'Смотрите микроуроки, свайп-клипы и шаблоны от коллег по запросу.',
+            instructors: 'Выпускайте дропы, челленджи и ресурсы за минуты благодаря готовым пресетам.'
+          },
+          signalBoosts: {
+            title: 'Усиление сигнала',
+            learners: 'Делитесь победами, собирайте поддержку и чувствуйте энергию сообщества.',
+            instructors: 'Замечайте восходящие таланты и автоматически подсвечивайте в ленте ключевые этапы.'
+          },
+          supportLoop: {
+            title: 'Цикл поддержки',
+            learners: 'Просите помощи в ветках с контекстом и получайте ответы, которые не теряются.',
+            instructors: 'Держите личные сообщения в порядке, пока автоматизация обрабатывает FAQ и напоминания.'
+          },
+          growthOps: {
+            title: 'Операции роста',
+            learners: 'Открывайте бейджи, уровни и сюрпризы, продолжая появляться.',
+            instructors: 'Отслеживайте воронки, доходы и эксперименты на дашбордах, созданных для учебных операций.'
+          }
+        }
       }
     }
   }
