@@ -8,7 +8,6 @@ import {
   ClockIcon,
   CloudArrowDownIcon,
   DocumentMagnifyingGlassIcon,
-  EnvelopeOpenIcon,
   ExclamationTriangleIcon,
   MegaphoneIcon,
   PhoneIcon,

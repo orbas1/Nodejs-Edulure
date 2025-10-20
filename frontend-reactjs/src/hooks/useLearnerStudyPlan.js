@@ -163,7 +163,7 @@ function enrichStudyBlock(block) {
 
 export default function useLearnerStudyPlan(initialPlan = [], options = {}) {
   const { session: sessionOverride, userId: userIdOverride } = options;
-  const auth = sessionOverride ? null : useAuth();
+  const auth = useAuth();
   const session = sessionOverride ?? auth?.session ?? null;
   const userId = userIdOverride ?? session?.user?.id ?? 'anonymous';
   const storageKey = `${STORAGE_NAMESPACE}:${userId}`;

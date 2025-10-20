@@ -41,7 +41,7 @@ function catalogueToCsv(rows) {
         .map((value) => {
           if (value === null || value === undefined) return '';
           const stringValue = String(value);
-          if (stringValue.includes(',') || stringValue.includes('\"')) {
+          if (stringValue.includes(',') || stringValue.includes('"')) {
             return `"${stringValue.replaceAll('"', '""')}"`;
           }
           return stringValue;

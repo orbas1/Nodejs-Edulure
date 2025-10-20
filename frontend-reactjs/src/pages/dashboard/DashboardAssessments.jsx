@@ -932,6 +932,19 @@ export default function DashboardAssessments() {
     };
   }, [isLearner]);
 
+  const schedule = assessments?.schedule ?? {};
+  const studyPlanRaw = Array.isArray(schedule.studyPlan) ? schedule.studyPlan : [];
+  const {
+    plan: learnerStudyPlan,
+    stats: studyStats,
+    createBlock,
+    updateBlock,
+    removeBlock,
+    toggleCompletion,
+    duplicateBlock,
+    reset: resetStudyPlan
+  } = useLearnerStudyPlan(isLearner ? studyPlanRaw : []);
+
   if (!assessments) {
     return (
       <DashboardStateMessage
@@ -946,23 +959,10 @@ export default function DashboardAssessments() {
   const overview = assessments.overview ?? [];
   const timeline = assessments.timeline ?? { upcoming: [], overdue: [], completed: [] };
   const courses = assessments.courses ?? [];
-  const schedule = assessments.schedule ?? {};
   const analytics = assessments.analytics ?? {};
   const resources = assessments.resources ?? [];
   const grading = assessments.grading ?? {};
   const events = Array.isArray(schedule.events) ? schedule.events : [];
-  const studyPlan = Array.isArray(schedule.studyPlan) ? schedule.studyPlan : [];
-
-  const {
-    plan: learnerStudyPlan,
-    stats: studyStats,
-    createBlock,
-    updateBlock,
-    removeBlock,
-    toggleCompletion,
-    duplicateBlock,
-    reset: resetStudyPlan
-  } = useLearnerStudyPlan(isLearner ? studyPlan : []);
 
   const timelineColumns = isLearner
     ? [

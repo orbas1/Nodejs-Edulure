@@ -27,10 +27,6 @@ export default function LearnerManagementSection({ learners }) {
   const roster = Array.isArray(learners?.roster) ? learners.roster : [];
   const riskAlerts = Array.isArray(learners?.riskAlerts) ? learners.riskAlerts : [];
 
-  if (roster.length === 0 && riskAlerts.length === 0) {
-    return null;
-  }
-
   const rosterWithSort = useMemo(
     () =>
       [...roster].sort((a, b) => {
@@ -63,6 +59,10 @@ export default function LearnerManagementSection({ learners }) {
       topRiskCount: totals.risk[topRiskKey] ?? 0
     };
   }, [roster]);
+
+  if (rosterWithSort.length === 0 && riskAlerts.length === 0) {
+    return null;
+  }
 
   const handleEscalate = (entry) => {
     if (typeof window === 'undefined') return;

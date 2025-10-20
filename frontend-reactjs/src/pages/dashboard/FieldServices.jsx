@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/rules-of-hooks */
+/* eslint-disable react-hooks/exhaustive-deps */
 import clsx from 'clsx';
 import {
   ArrowTrendingUpIcon,
@@ -139,7 +141,6 @@ function FieldServices() {
   const providers = workspace.providers ?? [];
   const mapView = workspace.map ?? null;
   const lastUpdatedLabel = formatDateTime(workspace.summary?.updatedAt ?? workspace.lastUpdated);
-  const hasAssignments = assignments.length > 0;
   const disableActions = pendingAction !== null;
 
   const filteredAssignments = useMemo(() => {

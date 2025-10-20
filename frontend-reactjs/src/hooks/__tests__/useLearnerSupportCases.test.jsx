@@ -1,7 +1,8 @@
 import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-jest.mock('../../api/learnerDashboardApi.js', () => ({
-  fetchSupportTickets: jest.fn().mockResolvedValue({ data: { tickets: [] } })
+vi.mock('../../api/learnerDashboardApi.js', () => ({
+  fetchSupportTickets: vi.fn().mockResolvedValue({ data: { tickets: [] } })
 }));
 
 import useLearnerSupportCases from '../useLearnerSupportCases.js';
@@ -11,6 +12,10 @@ function createSession(id = 'tester-support') {
 }
 
 describe('useLearnerSupportCases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('normalises initial cases and computes metrics', () => {
     const initialCases = [
       {

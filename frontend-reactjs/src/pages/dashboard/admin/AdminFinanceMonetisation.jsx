@@ -8,7 +8,6 @@ import {
   ChartBarIcon,
   CheckCircleIcon,
   CloudArrowDownIcon,
-  ClockIcon,
   CreditCardIcon,
   ExclamationTriangleIcon,
   ShieldCheckIcon,

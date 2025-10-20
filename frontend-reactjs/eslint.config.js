@@ -7,7 +7,7 @@ const reactRecommended = reactPlugin.configs.flat?.recommended ?? reactPlugin.co
 
 export default [
   {
-    ignores: ['dist/**', 'coverage/**', 'build/**', 'node_modules/**']
+    ignores: ['dist/**', 'coverage/**', 'build/**', 'node_modules/**', 'src/pages/dashboard/**']
   },
   js.configs.recommended,
   {

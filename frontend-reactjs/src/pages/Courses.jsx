@@ -904,7 +904,6 @@ export default function Courses() {
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
   const [uploadState, setUploadState] = useState({});
-  const isAuthenticated = Boolean(token);
 
   const updateUploadState = useCallback((field, patch) => {
     setUploadState((current) => ({
