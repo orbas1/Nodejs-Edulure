@@ -130,6 +130,20 @@ class CapabilityManifestNotifier extends AsyncNotifier<CapabilityManifestSnapsho
             lastErrorStackTrace: stackTrace,
           ),
         );
+        return;
+      }
+
+      final fallback = await repository.loadCachedManifest();
+      if (fallback != null) {
+        state = AsyncData(
+          CapabilityManifestSnapshot(
+            manifest: fallback.manifest,
+            fetchedAt: fallback.fetchedAt,
+            fromCache: true,
+            lastError: error,
+            lastErrorStackTrace: stackTrace,
+          ),
+        );
       } else {
         state = AsyncError(error, stackTrace);
       }

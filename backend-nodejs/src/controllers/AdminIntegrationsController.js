@@ -19,6 +19,57 @@ function normaliseError(error, defaultStatus = 500, defaultMessage = 'Unexpected
   return { status: defaultStatus, message: defaultMessage };
 }
 
+function buildAuditActor(req) {
+  const user = req?.user ?? {};
+  const email = typeof user.email === 'string' && user.email.trim() ? user.email.trim().toLowerCase() : null;
+  const roles = Array.isArray(user.roles)
+    ? user.roles.filter((role) => typeof role === 'string' && role.trim().length > 0).map((role) => role.trim())
+    : typeof user.role === 'string' && user.role.trim()
+      ? [user.role.trim()]
+      : [];
+  const id = typeof user.id === 'string' && user.id.trim()
+    ? user.id.trim()
+    : typeof user.sub === 'string' && user.sub.trim()
+      ? user.sub.trim()
+      : email ?? 'admin-dashboard';
+
+  return {
+    id,
+    type: 'user',
+    role: roles[0] ?? 'admin',
+    roles,
+    email
+  };
+}
+
+function buildAuditRequestContext(req) {
+  const requestIdHeader = typeof req?.headers?.['x-request-id'] === 'string' ? req.headers['x-request-id'].trim() : null;
+  const requestId = requestIdHeader
+    || (typeof req?.id === 'string' && req.id.trim() ? req.id.trim() : null)
+    || (typeof req?.requestId === 'string' && req.requestId.trim() ? req.requestId.trim() : null);
+
+  const ipCandidate = Array.isArray(req?.ips) && req.ips.length > 0 ? req.ips[0] : req?.ip;
+  const ipAddress = typeof ipCandidate === 'string' && ipCandidate.trim() ? ipCandidate.trim() : null;
+
+  const userAgentHeader = typeof req?.headers?.['user-agent'] === 'string' ? req.headers['user-agent'].trim() : null;
+  const originHeader = typeof req?.headers?.origin === 'string' ? req.headers.origin.trim() : null;
+  const method = typeof req?.method === 'string' ? req.method.trim().toUpperCase() || null : null;
+  const path = typeof req?.originalUrl === 'string' && req.originalUrl.trim()
+    ? req.originalUrl.trim()
+    : typeof req?.url === 'string' && req.url.trim()
+      ? req.url.trim()
+      : null;
+
+  return {
+    requestId,
+    ipAddress,
+    userAgent: userAgentHeader || null,
+    origin: originHeader || null,
+    method,
+    path
+  };
+}
+
 export async function getIntegrationDashboard(req, res, next) {
   try {
     const snapshot = await dashboardService.buildSnapshot();
@@ -112,6 +163,9 @@ export async function createIntegrationApiKeyInvitation(req, res, next) {
   } = req.body ?? {};
 
   try {
+    const auditActor = buildAuditActor(req);
+    const requestContext = buildAuditRequestContext(req);
+
     const result = await apiKeyInviteService.createInvite({
       provider,
       environment,
@@ -124,7 +178,7 @@ export async function createIntegrationApiKeyInvitation(req, res, next) {
       apiKeyId,
       requestedByName,
       requestedBy: req.user?.email ?? req.user?.id ?? 'admin-dashboard'
-    });
+    }, { actor: auditActor, requestContext });
 
     res.status(201).json({
       success: true,
@@ -190,9 +244,14 @@ export async function resendIntegrationApiKeyInvitation(req, res, next) {
   const { requestedByName } = req.body ?? {};
 
   try {
+    const auditActor = buildAuditActor(req);
+    const requestContext = buildAuditRequestContext(req);
+
     const result = await apiKeyInviteService.resendInvite(id, {
       requestedBy: req.user?.email ?? req.user?.id ?? 'admin-dashboard',
-      requestedByName
+      requestedByName,
+      actor: auditActor,
+      requestContext
     });
     res.json({ success: true, data: result.invite, claimUrl: result.claimUrl });
   } catch (error) {
@@ -209,8 +268,12 @@ export async function cancelIntegrationApiKeyInvitation(req, res, next) {
   const { id } = req.params;
 
   try {
+    const auditActor = buildAuditActor(req);
+    const requestContext = buildAuditRequestContext(req);
     const invite = await apiKeyInviteService.cancelInvite(id, {
-      cancelledBy: req.user?.email ?? req.user?.id ?? 'admin-dashboard'
+      cancelledBy: req.user?.email ?? req.user?.id ?? 'admin-dashboard',
+      actor: auditActor,
+      requestContext
     });
     res.json({ success: true, data: invite });
   } catch (error) {

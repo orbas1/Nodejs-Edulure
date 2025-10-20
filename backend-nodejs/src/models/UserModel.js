@@ -88,8 +88,8 @@ export default class UserModel {
     return this.findById(id, connection);
   }
 
-  static async list({ limit = 20, offset = 0 } = {}) {
-    return db('users')
+  static async list({ limit = 20, offset = 0 } = {}, connection = db) {
+    return connection('users')
       .select(BASE_COLUMNS)
       .orderBy('created_at', 'desc')
       .limit(limit)

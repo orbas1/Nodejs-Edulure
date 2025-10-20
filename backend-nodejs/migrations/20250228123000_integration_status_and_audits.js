@@ -1,3 +1,5 @@
+const JSON_EMPTY_OBJECT = JSON.stringify({});
+
 export async function up(knex) {
   await knex.schema.createTable('integration_statuses', (table) => {
     table.increments('id').primary();
@@ -21,9 +23,12 @@ export async function up(knex) {
     table.timestamp('last_failure_at').nullable();
     table.integer('open_incident_count').unsigned().notNullable().defaultTo(0);
     table.integer('consecutive_failures').unsigned().notNullable().defaultTo(0);
-    table.json('metadata').nullable();
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-    table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
+    table
+      .timestamp('updated_at')
+      .notNullable()
+      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
 
     table.unique(['integration', 'environment'], 'integration_statuses_integration_env_unique');
     table.index(['status', 'updated_at'], 'integration_statuses_status_updated_idx');
@@ -60,7 +65,7 @@ export async function up(knex) {
     table.string('triggered_by', 64).nullable();
     table.string('correlation_id', 64).nullable();
     table.text('notes').nullable();
-    table.json('metadata').nullable();
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.timestamp('recorded_at').notNullable().defaultTo(knex.fn.now());
 
     table.index(['integration', 'recorded_at'], 'integration_status_events_integration_idx');
@@ -89,7 +94,7 @@ export async function up(knex) {
     table.string('triggered_by', 64).nullable();
     table.string('error_code', 64).nullable();
     table.text('error_message').nullable();
-    table.json('metadata').nullable();
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.timestamp('called_at').notNullable().defaultTo(knex.fn.now());
 
     table.index(['integration', 'called_at'], 'integration_call_audits_integration_idx');

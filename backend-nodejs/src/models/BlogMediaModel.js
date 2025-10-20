@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { safeJsonParse, safeJsonStringify } from '../utils/modelUtils.js';
 
 const TABLE = 'blog_media';
 
@@ -20,7 +21,7 @@ function serialise(media) {
     alt_text: media.altText ?? null,
     media_type: media.mediaType ?? 'image',
     display_order: media.displayOrder ?? 0,
-    metadata: JSON.stringify(media.metadata ?? {})
+    metadata: safeJsonStringify(media.metadata)
   };
 }
 
@@ -30,10 +31,7 @@ export default class BlogMediaModel {
       .select(BASE_COLUMNS)
       .where({ post_id: postId })
       .orderBy('display_order', 'asc');
-    return rows.map((row) => ({
-      ...row,
-      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : row.metadata
-    }));
+    return rows.map((row) => this.deserialize(row));
   }
 
   static async replaceForPost(postId, mediaEntries = [], connection = db) {
@@ -51,5 +49,12 @@ export default class BlogMediaModel {
     );
     await connection(TABLE).insert(payload);
     return this.listForPost(postId, connection);
+  }
+
+  static deserialize(row) {
+    return {
+      ...row,
+      metadata: safeJsonParse(row.metadata, {})
+    };
   }
 }

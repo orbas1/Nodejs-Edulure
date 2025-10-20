@@ -4,6 +4,7 @@ node_modules/
 # Reports and generated artefacts
 reports/
 sbom/
+backend-nodejs/pnpm-lock.yaml
 
 # Build outputs
 frontend-reactjs/dist/

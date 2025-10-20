@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../network/dio_provider.dart';
+import '../security/session_manager_facade.dart';
 import 'provider_transition_models.dart';
 import 'provider_transition_repository.dart';
 import '../../services/provider_transition_service.dart';
@@ -20,27 +21,31 @@ class ProviderTransitionAnnouncementsController
   @override
   Future<ProviderTransitionAnnouncementsState> build() async {
     final repository = ref.watch(providerTransitionRepositoryProvider);
-    return repository.loadAnnouncements();
+    final baseState = await repository.loadAnnouncements();
+    return _attachPermissions(baseState);
   }
 
   Future<void> refresh({bool forceNetwork = true}) async {
     final repository = ref.watch(providerTransitionRepositoryProvider);
     final previous = state.value;
     state = AsyncValue.loading(previous: previous);
-    state = await AsyncValue.guard(
-      () => repository.loadAnnouncements(forceRefresh: forceNetwork),
-    );
+    state = await AsyncValue.guard(() async {
+      final refreshed = await repository.loadAnnouncements(forceRefresh: forceNetwork);
+      return _attachPermissions(refreshed);
+    });
   }
 
   Future<void> acknowledge(
     String slug,
     ProviderTransitionAcknowledgementRequest request,
   ) async {
+    _ensureActionAllowed(ProviderTransitionAction.acknowledge);
     final repository = ref.watch(providerTransitionRepositoryProvider);
     state = AsyncValue.loading(previous: state.value);
     state = await AsyncValue.guard(() async {
       await repository.acknowledge(slug, request);
-      return repository.loadAnnouncements();
+      final refreshed = await repository.loadAnnouncements();
+      return _attachPermissions(refreshed);
     });
   }
 
@@ -50,6 +55,7 @@ class ProviderTransitionAnnouncementsController
     String? providerReference,
     String? notes,
   }) async {
+    _ensureActionAllowed(ProviderTransitionAction.recordStatus);
     final repository = ref.watch(providerTransitionRepositoryProvider);
     state = AsyncValue.loading(previous: state.value);
     state = await AsyncValue.guard(() async {
@@ -59,7 +65,8 @@ class ProviderTransitionAnnouncementsController
         providerReference: providerReference,
         notes: notes,
       );
-      return repository.loadAnnouncements();
+      final refreshed = await repository.loadAnnouncements();
+      return _attachPermissions(refreshed);
     });
   }
 
@@ -69,6 +76,35 @@ class ProviderTransitionAnnouncementsController
   }) async {
     final repository = ref.watch(providerTransitionRepositoryProvider);
     return repository.fetchAnnouncementDetail(slug, forceRefresh: forceRefresh);
+  }
+
+  ProviderTransitionAnnouncementsState _attachPermissions(
+    ProviderTransitionAnnouncementsState state,
+  ) {
+    final permissions = _resolvePermissions(offlineFallback: state.offlineFallback);
+    return state.copyWith(permissions: permissions);
+  }
+
+  ProviderTransitionPermissions _resolvePermissions({bool offlineFallback = false}) {
+    final facade = ref.read(sessionManagerFacadeProvider);
+    var permissions = ProviderTransitionPermissions.fromSession(
+      session: facade.session,
+      activeRole: facade.activeRole,
+    );
+    if (offlineFallback) {
+      permissions = permissions.restrictForOffline();
+    }
+    return permissions;
+  }
+
+  void _ensureActionAllowed(ProviderTransitionAction action) {
+    final permissions = state.value?.permissions ?? _resolvePermissions();
+    if (!permissions.allows(action)) {
+      throw ProviderTransitionAccessDeniedException(
+        action,
+        reason: permissions.denialReasonFor(action),
+      );
+    }
   }
 }
 

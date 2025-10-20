@@ -1,3 +1,5 @@
+const JSON_EMPTY_OBJECT = JSON.stringify({});
+
 export async function up(knex) {
   await knex.schema.createTable('integration_api_keys', (table) => {
     table.increments('id').primary();
@@ -16,11 +18,14 @@ export async function up(knex) {
     table.timestamp('expires_at').nullable();
     table.timestamp('disabled_at').nullable();
     table.string('status', 24).notNullable().defaultTo('active');
-    table.json('metadata').nullable();
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.string('created_by', 128).notNullable();
     table.string('updated_by', 128).nullable();
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-    table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
+    table
+      .timestamp('updated_at')
+      .notNullable()
+      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
 
     table.unique(['provider', 'environment', 'alias'], 'integration_api_keys_alias_unique');
     table.index(['provider', 'environment'], 'integration_api_keys_provider_env_idx');

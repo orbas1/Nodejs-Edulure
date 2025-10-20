@@ -1,3 +1,5 @@
+import { isPostgres, jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasFeatureFlagsTable = await knex.schema.hasTable('feature_flags');
   if (!hasFeatureFlagsTable) {
@@ -18,7 +20,10 @@ export async function up(knex) {
       table.integer('rollout_percentage').unsigned().notNullable().defaultTo(100);
       table.json('segment_rules');
       table.json('variants');
-      table.json('environments').notNullable().defaultTo(JSON.stringify(['development', 'staging', 'production']));
+      table
+        .json('environments')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, ['development', 'staging', 'production']));
       table.json('metadata');
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
@@ -269,8 +274,10 @@ export async function down(knex) {
     await knex.schema.dropTable('feature_flags');
   }
 
-  await knex.raw('DROP TYPE IF EXISTS configuration_environment_scope');
-  await knex.raw('DROP TYPE IF EXISTS configuration_value_type');
-  await knex.raw('DROP TYPE IF EXISTS configuration_exposure_level');
-  await knex.raw('DROP TYPE IF EXISTS feature_flag_rollout_strategy');
+  if (isPostgres(knex)) {
+    await knex.raw('DROP TYPE IF EXISTS configuration_environment_scope');
+    await knex.raw('DROP TYPE IF EXISTS configuration_value_type');
+    await knex.raw('DROP TYPE IF EXISTS configuration_exposure_level');
+    await knex.raw('DROP TYPE IF EXISTS feature_flag_rollout_strategy');
+  }
 }

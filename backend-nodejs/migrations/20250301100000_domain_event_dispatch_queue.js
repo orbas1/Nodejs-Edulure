@@ -7,6 +7,7 @@ const STATUS_ENUM = [
   'failed',
   'discarded'
 ];
+const JSON_EMPTY_OBJECT = JSON.stringify({});
 
 export async function up(knex) {
   const exists = await knex.schema.hasTable(TABLE_NAME);
@@ -49,7 +50,7 @@ export async function up(knex) {
     table.string('last_error', 500);
     table.timestamp('last_error_at');
     table.string('payload_checksum', 128).notNullable();
-    table.json('metadata').notNullable().defaultTo('{}');
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.boolean('dry_run').notNullable().defaultTo(false);
     table.string('trace_id', 64);
     table.string('correlation_id', 64);

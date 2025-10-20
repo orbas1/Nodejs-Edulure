@@ -65,26 +65,45 @@ function buildBookingPayload(payload, actorId) {
     }
   };
 
-  if (payload.tutorId !== undefined) result.tutorId = payload.tutorId;
-  if (payload.learnerId !== undefined) result.learnerId = payload.learnerId;
-  if (payload.requestedAt !== undefined)
+  if (payload.tutorId !== undefined) {
+    result.tutorId = payload.tutorId;
+  }
+  if (payload.learnerId !== undefined) {
+    result.learnerId = payload.learnerId;
+  }
+  if (payload.requestedAt !== undefined) {
     result.requestedAt = payload.requestedAt ? new Date(payload.requestedAt) : null;
-  if (payload.confirmedAt !== undefined)
+  }
+  if (payload.confirmedAt !== undefined) {
     result.confirmedAt = payload.confirmedAt ? new Date(payload.confirmedAt) : null;
-  if (payload.cancelledAt !== undefined)
+  }
+  if (payload.cancelledAt !== undefined) {
     result.cancelledAt = payload.cancelledAt ? new Date(payload.cancelledAt) : null;
-  if (payload.completedAt !== undefined)
+  }
+  if (payload.completedAt !== undefined) {
     result.completedAt = payload.completedAt ? new Date(payload.completedAt) : null;
-  if (payload.scheduledStart !== undefined)
+  }
+  if (payload.scheduledStart !== undefined) {
     result.scheduledStart = payload.scheduledStart ? new Date(payload.scheduledStart) : null;
-  if (payload.scheduledEnd !== undefined)
+  }
+  if (payload.scheduledEnd !== undefined) {
     result.scheduledEnd = payload.scheduledEnd ? new Date(payload.scheduledEnd) : null;
-  if (payload.durationMinutes !== undefined) result.durationMinutes = payload.durationMinutes;
-  if (payload.hourlyRateAmount !== undefined) result.hourlyRateAmount = payload.hourlyRateAmount;
-  if (payload.hourlyRateCurrency !== undefined)
+  }
+  if (payload.durationMinutes !== undefined) {
+    result.durationMinutes = payload.durationMinutes;
+  }
+  if (payload.hourlyRateAmount !== undefined) {
+    result.hourlyRateAmount = payload.hourlyRateAmount;
+  }
+  if (payload.hourlyRateCurrency !== undefined) {
     result.hourlyRateCurrency = payload.hourlyRateCurrency;
-  if (payload.meetingUrl !== undefined) result.meetingUrl = payload.meetingUrl ?? null;
-  if (payload.status !== undefined) result.status = payload.status;
+  }
+  if (payload.meetingUrl !== undefined) {
+    result.meetingUrl = payload.meetingUrl ?? null;
+  }
+  if (payload.status !== undefined) {
+    result.status = payload.status;
+  }
 
   return result;
 }
