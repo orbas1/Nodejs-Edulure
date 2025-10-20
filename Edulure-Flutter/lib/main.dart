@@ -14,6 +14,7 @@ import 'screens/community_hub_screen.dart';
 import 'screens/content_library_screen.dart';
 import 'screens/course_management_screen.dart';
 import 'screens/course_purchase_screen.dart';
+import 'screens/community_subscription_screen.dart';
 import 'screens/explorer_screen.dart';
 import 'screens/feed_screen.dart';
 import 'screens/home_screen.dart';
@@ -83,6 +84,7 @@ class EdulureApp extends ConsumerWidget {
             return CommunityProfileScreen(communityId: communityId);
           },
           '/community/hub': (_) => const CommunityHubScreen(),
+          '/community/subscribe': (_) => const CommunitySubscriptionScreen(),
           '/feed': (_) => const FeedScreen(),
           '/calendar': (_) => const CalendarScreen(),
           '/explorer': (_) => const ExplorerScreen(),

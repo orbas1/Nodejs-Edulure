@@ -129,6 +129,13 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/communities'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.subscriptions_outlined),
+                    title: const Text('Community subscriptions'),
+                    subtitle: const Text('Manage membership tiers, payments, and renewals.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/community/subscribe'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.dashboard_customize_outlined),
                     title: const Text('Live feed'),
                     subtitle: const Text('Monitor updates across Learnspaces.'),
