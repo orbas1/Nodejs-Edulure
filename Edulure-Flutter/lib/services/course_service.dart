@@ -6,102 +6,95 @@ import 'service_suite_models.dart';
 import 'session_manager.dart';
 
 class CourseService {
-  CourseService()
-      : _dio = Dio(
-          BaseOptions(
-            baseUrl: apiBaseUrl,
-            connectTimeout: const Duration(seconds: 12),
-            receiveTimeout: const Duration(seconds: 30),
-          ),
-        );
+  CourseService({Dio? client})
+      : _dio = client ?? ApiConfig.createHttpClient(requiresAuth: true);
 
   final Dio _dio;
 
   Future<CourseDashboard> fetchDashboard() async {
-    final token = SessionManager.getAccessToken();
-    if (token == null) {
-      throw Exception('Authentication required');
-    }
-
-    final response = await _dio.get(
-      '/dashboard/me',
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
-    );
-
-    final payload = response.data;
-    if (payload is! Map<String, dynamic>) {
-      throw Exception('Unexpected dashboard payload');
-    }
-
-    final data = payload['data'];
-    if (data is! Map<String, dynamic>) {
-      throw Exception('Malformed dashboard response');
-    }
-
-    final dashboards = data['dashboards'];
-    if (dashboards is! Map<String, dynamic>) {
-      throw Exception('Dashboards not available for this account');
-    }
-
-    final instructor = dashboards['instructor'];
-    if (instructor is! Map<String, dynamic>) {
-      throw Exception('Instructor Learnspace is not configured for this account');
-    }
-
+    final instructor = await _fetchInstructorPayload();
     return CourseDashboard.fromJson(instructor);
-    final dashboards = data['dashboards'];
-    Map<String, dynamic> instructorJson = <String, dynamic>{};
-    if (dashboards is Map<String, dynamic>) {
-      final instructor = dashboards['instructor'];
-      if (instructor is Map<String, dynamic>) {
-        instructorJson = Map<String, dynamic>.from(instructor);
-      }
-    }
-
-    if (instructorJson.isEmpty) {
-      instructorJson = Map<String, dynamic>.from(data);
-    }
-
-    return CourseDashboard.fromJson(instructorJson);
   }
 
   Future<ServiceSuite> fetchServiceSuite() async {
+    final instructor = await _fetchInstructorPayload();
+    final services = _ensureMap(
+      instructor['services'],
+      'Service suite is not configured for this Learnspace.',
+    );
+    return ServiceSuite.fromJson(services);
+  }
+
+  Future<Map<String, dynamic>> _fetchInstructorPayload() async {
     final token = SessionManager.getAccessToken();
     if (token == null) {
-      throw Exception('Authentication required');
+      throw DashboardException('Authentication required to load dashboard data.');
     }
 
-    final response = await _dio.get(
-      '/dashboard/me',
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
+    final headers = <String, dynamic>{
+      ..._dio.options.headers,
+      'Authorization': 'Bearer $token',
+    };
+
+    final requestOptions = Options(
+      headers: headers,
+      extra: {
+        ...?_dio.options.extra,
+        'requiresAuth': true,
+      },
     );
 
-    final payload = response.data;
-    if (payload is! Map<String, dynamic>) {
-      throw Exception('Unexpected dashboard payload');
+    try {
+      final response = await _dio.get(
+        '/dashboard/me',
+        options: requestOptions,
+      );
+      final payload = _ensureMap(response.data, 'Unexpected dashboard payload.');
+      return _extractInstructor(payload);
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      if (status == 401) {
+        throw DashboardException('Your session has expired. Please sign in again.');
+      }
+      throw DashboardException(_resolveErrorMessage(error) ?? 'Unable to load dashboard data.');
+    } catch (_) {
+      throw DashboardException('Unable to load dashboard data.');
     }
+  }
 
-    final data = payload['data'];
-    if (data is! Map<String, dynamic>) {
-      throw Exception('Malformed dashboard response');
-    }
-
-    final dashboards = data['dashboards'];
-    if (dashboards is! Map<String, dynamic>) {
-      throw Exception('Dashboards not available for this account');
-    }
-
+  Map<String, dynamic> _extractInstructor(Map<String, dynamic> payload) {
+    final data = _ensureMap(payload['data'], 'Malformed dashboard response.');
+    final dashboards =
+        _ensureMap(data['dashboards'], 'Dashboards not available for this account.');
     final instructor = dashboards['instructor'];
-    if (instructor is! Map<String, dynamic>) {
-      throw Exception('Instructor Learnspace is not configured for this account');
+    if (instructor is Map<String, dynamic>) {
+      return instructor;
     }
-
-    final services = instructor['services'];
-    if (services is! Map<String, dynamic>) {
-      throw Exception('Service suite is not configured for this Learnspace');
+    if (instructor is Map) {
+      return Map<String, dynamic>.from(instructor as Map);
     }
+    throw DashboardException('Instructor Learnspace is not configured for this account.');
+  }
 
-    return ServiceSuite.fromJson(Map<String, dynamic>.from(services));
+  Map<String, dynamic> _ensureMap(dynamic value, String errorMessage) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value as Map);
+    }
+    throw DashboardException(errorMessage);
+  }
+
+  String? _resolveErrorMessage(DioException error) {
+    final data = error.response?.data;
+    if (data is Map && data['message'] is String) {
+      return data['message'] as String;
+    }
+    if (data is Map && data['errors'] is List && data['errors'].isNotEmpty) {
+      return data['errors'].first.toString();
+    }
+    return error.message;
   }
 }
 
@@ -115,162 +108,8 @@ class CourseDashboard {
     required this.sessions,
     required this.insights,
     this.ads,
-  });
-
-  factory CourseDashboard.fromJson(Map<String, dynamic> json) {
-    final metrics = <DashboardMetric>[];
-    final revenueMix = <RevenueSlice>[];
-    final courses = json['courses'];
-    final pricing = json['pricing'];
-    final adsJson = json['ads'];
     this.liveClassrooms,
   });
-
-  factory CourseDashboard.fromJson(Map<String, dynamic> json) {
-    final coursesSection = json['courses'] is Map<String, dynamic>
-        ? Map<String, dynamic>.from(json['courses'] as Map)
-        : json;
-    final pricingSection = json['pricing'] is Map<String, dynamic>
-        ? Map<String, dynamic>.from(json['pricing'] as Map)
-        : <String, dynamic>{};
-    final liveClassroomsJson = json['liveClassrooms'] is Map
-        ? Map<String, dynamic>.from(json['liveClassrooms'] as Map)
-        : null;
-
-    final pipeline = <CoursePipelineEntry>[];
-    final production = <CourseProductionTask>[];
-    final offers = <CourseOffer>[];
-    final sessions = <CourseSession>[];
-    final insights = <String>[];
-    AdsWorkspace? ads;
-
-    final rawMetrics = json['metrics'];
-    if (rawMetrics is List) {
-      for (final entry in rawMetrics) {
-        if (entry is Map<String, dynamic>) {
-          metrics.add(DashboardMetric.fromJson(entry));
-        }
-      }
-    }
-
-    final analytics = json['analytics'];
-    if (analytics is Map<String, dynamic>) {
-      final rawRevenue = analytics['revenueStreams'];
-      if (rawRevenue is List) {
-        for (final entry in rawRevenue) {
-          if (entry is Map<String, dynamic>) {
-            revenueMix.add(RevenueSlice.fromJson(entry));
-          }
-        }
-      }
-    }
-
-    final courses = json['courses'];
-    if (courses is Map<String, dynamic>) {
-      final rawPipeline = courses['pipeline'];
-      if (rawPipeline is List) {
-        for (final item in rawPipeline) {
-          if (item is Map<String, dynamic>) {
-            pipeline.add(CoursePipelineEntry.fromJson(item));
-          }
-        }
-      }
-
-      final rawProduction = courses['production'];
-      if (rawProduction is List) {
-        for (final item in rawProduction) {
-          if (item is Map<String, dynamic>) {
-            production.add(CourseProductionTask.fromJson(item));
-          }
-        }
-      }
-    }
-
-    final pricing = json['pricing'];
-    if (pricing is Map<String, dynamic>) {
-      final rawOffers = pricing['offers'];
-      if (rawOffers is List) {
-        for (final item in rawOffers) {
-          if (item is Map<String, dynamic>) {
-            offers.add(CourseOffer.fromJson(item));
-          }
-        }
-      }
-
-      final rawSessions = pricing['sessions'];
-      if (rawSessions is List) {
-        for (final item in rawSessions) {
-          if (item is Map<String, dynamic>) {
-            sessions.add(CourseSession.fromJson(item));
-          }
-        }
-      }
-
-      final rawInsights = pricing['insights'];
-      if (rawInsights is List) {
-        for (final insight in rawInsights) {
-          if (insight is String && insight.trim().isNotEmpty) {
-            insights.add(insight.trim());
-          }
-    final rawPipeline = coursesSection['pipeline'];
-    if (rawPipeline is List) {
-      for (final item in rawPipeline) {
-        if (item is Map<String, dynamic>) {
-          pipeline.add(CoursePipelineEntry.fromJson(item));
-        }
-      }
-    }
-    final rawProduction = coursesSection['production'];
-    if (rawProduction is List) {
-      for (final item in rawProduction) {
-        if (item is Map<String, dynamic>) {
-          production.add(CourseProductionTask.fromJson(item));
-        }
-      }
-    }
-
-    final rawOffers = pricingSection['offers'];
-    if (rawOffers is List) {
-      for (final item in rawOffers) {
-        if (item is Map<String, dynamic>) {
-          offers.add(CourseOffer.fromJson(item));
-        }
-      }
-    }
-    final rawSessions = pricingSection['sessions'];
-    if (rawSessions is List) {
-      for (final item in rawSessions) {
-        if (item is Map<String, dynamic>) {
-          sessions.add(CourseSession.fromJson(item));
-        }
-      }
-    }
-    final rawInsights = pricingSection['insights'];
-    if (rawInsights is List) {
-      for (final item in rawInsights) {
-        if (item is String && item.trim().isNotEmpty) {
-          insights.add(item.trim());
-        }
-      }
-    }
-
-    if (adsJson is Map<String, dynamic>) {
-      ads = AdsWorkspace.fromJson(adsJson);
-    }
-
-    return CourseDashboard(
-      metrics: metrics,
-      revenueMix: revenueMix,
-      pipeline: pipeline,
-      production: production,
-      offers: offers,
-      sessions: sessions,
-      insights: insights,
-      ads: ads,
-      liveClassrooms:
-          liveClassroomsJson == null ? null : LiveClassroomsSnapshot.fromJson(liveClassroomsJson),
-    );
-  }
 
   final List<DashboardMetric> metrics;
   final List<RevenueSlice> revenueMix;
@@ -282,39 +121,86 @@ class CourseDashboard {
   final AdsWorkspace? ads;
   final LiveClassroomsSnapshot? liveClassrooms;
 
-  bool get hasSignals =>
-      metrics.isNotEmpty ||
-      revenueMix.isNotEmpty ||
-      pipeline.isNotEmpty ||
-      production.isNotEmpty ||
-      offers.isNotEmpty ||
-      sessions.isNotEmpty ||
-      insights.isNotEmpty;
-}
+  factory CourseDashboard.fromJson(Map<String, dynamic> json) {
+    final metrics = _parseList(json['metrics'], (map) => DashboardMetric.fromJson(map));
+    final analytics = _coerceMap(json['analytics']);
+    final revenueMix = _parseList(analytics['revenueStreams'], (map) => RevenueSlice.fromJson(map));
 
-class DashboardMetric {
-  DashboardMetric({
-    required this.label,
-    required this.value,
-    this.change,
-    this.trend,
-  });
+    final coursesSection = _coerceMap(json['courses']);
+    final pipeline = _parseList(coursesSection['pipeline'], (map) => CoursePipelineEntry.fromJson(map));
+    final production = _parseList(coursesSection['production'], (map) => CourseProductionTask.fromJson(map));
 
-  factory DashboardMetric.fromJson(Map<String, dynamic> json) {
-    return DashboardMetric(
-      label: (json['label'] ?? 'Metric').toString(),
-      value: (json['value'] ?? '').toString(),
-      change: json['change']?.toString(),
-      trend: json['trend']?.toString(),
+    final pricingSection = _coerceMap(json['pricing']);
+    final offers = _parseList(pricingSection['offers'], (map) => CourseOffer.fromJson(map));
+    final sessions = _parseList(pricingSection['sessions'], (map) => CourseSession.fromJson(map));
+    final insights = pricingSection['insights'] is List
+        ? (pricingSection['insights'] as List)
+            .map((item) => item.toString())
+            .where((item) => item.trim().isNotEmpty)
+            .toList()
+        : <String>[];
+
+    final adsJson = json['ads'];
+    final ads = adsJson is Map
+        ? AdsWorkspace.fromJson(Map<String, dynamic>.from(adsJson as Map))
+        : null;
+
+    final liveClassroomsJson = json['liveClassrooms'];
+    final liveClassrooms = liveClassroomsJson is Map
+        ? LiveClassroomsSnapshot.fromJson(Map<String, dynamic>.from(liveClassroomsJson as Map))
+        : null;
+
+    return CourseDashboard(
+      metrics: metrics,
+      revenueMix: revenueMix,
+      pipeline: pipeline,
+      production: production,
+      offers: offers,
+      sessions: sessions,
+      insights: insights,
+      ads: ads,
+      liveClassrooms: liveClassrooms,
     );
   }
 
-  final String label;
-  final String value;
-  final String? change;
-  final String? trend;
+  bool get hasSignals {
+    final liveSignals = liveClassrooms != null &&
+        (liveClassrooms!.metrics.isNotEmpty ||
+            liveClassrooms!.active.isNotEmpty ||
+            liveClassrooms!.upcoming.isNotEmpty ||
+            liveClassrooms!.completed.isNotEmpty ||
+            liveClassrooms!.readiness.isNotEmpty);
 
-  bool get isDownward => (trend ?? '').toLowerCase() == 'down';
+    return metrics.isNotEmpty ||
+        revenueMix.isNotEmpty ||
+        pipeline.isNotEmpty ||
+        production.isNotEmpty ||
+        offers.isNotEmpty ||
+        sessions.isNotEmpty ||
+        insights.isNotEmpty ||
+        (ads?.hasSignals ?? false) ||
+        liveSignals;
+  }
+
+  static Map<String, dynamic> _coerceMap(dynamic value) {
+    if (value is Map<String, dynamic>) {
+      return value;
+    }
+    if (value is Map) {
+      return Map<String, dynamic>.from(value as Map);
+    }
+    return <String, dynamic>{};
+  }
+
+  static List<T> _parseList<T>(dynamic value, T Function(Map<String, dynamic> map) mapper) {
+    if (value is List) {
+      return value
+          .whereType<Map>()
+          .map((item) => mapper(Map<String, dynamic>.from(item)))
+          .toList();
+    }
+    return <T>[];
+  }
 }
 
 class RevenueSlice {
@@ -326,9 +212,10 @@ class RevenueSlice {
   factory RevenueSlice.fromJson(Map<String, dynamic> json) {
     final value = json['percent'] ?? json['value'] ?? 0;
     final numeric = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0;
+    final clamped = numeric.clamp(0, 100).toDouble();
     return RevenueSlice(
       name: (json['name'] ?? 'Stream').toString(),
-      percent: numeric.clamp(0, 100),
+      percent: clamped,
     );
   }
 
@@ -336,14 +223,6 @@ class RevenueSlice {
   final double percent;
 
   String get formattedPercent => '${percent.toStringAsFixed(percent % 1 == 0 ? 0 : 1)}%';
-      insights.isNotEmpty ||
-      (ads?.hasSignals ?? false);
-      (liveClassrooms != null &&
-          (liveClassrooms!.metrics.isNotEmpty ||
-              liveClassrooms!.active.isNotEmpty ||
-              liveClassrooms!.upcoming.isNotEmpty ||
-              liveClassrooms!.completed.isNotEmpty ||
-              liveClassrooms!.readiness.isNotEmpty));
 }
 
 class CoursePipelineEntry {
