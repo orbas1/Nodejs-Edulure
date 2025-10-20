@@ -197,6 +197,18 @@ export async function removePaymentMethod({ token, methodId, signal } = {}) {
   });
 }
 
+export async function deleteBillingContact({ token, contactId, signal } = {}) {
+  ensureToken(token);
+  if (!contactId) {
+    throw new Error('A billing contact identifier is required to remove the record');
+  }
+  return httpClient.delete(`/dashboard/learner/financial/billing-contacts/${contactId}`, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export async function joinLiveSession({ token, sessionId, signal } = {}) {
   ensureToken(token);
   if (!sessionId) {
@@ -241,6 +253,170 @@ export async function triggerCommunityAction({ token, communityId, payload, sign
       invalidateTags: [`dashboard:me:${token}`]
     }
   );
+}
+
+export async function createGrowthInitiative({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/growth/initiatives', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateGrowthInitiative({ token, initiativeId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!initiativeId) {
+    throw new Error('A growth initiative identifier is required to update the record');
+  }
+  return httpClient.patch(`/dashboard/learner/growth/initiatives/${initiativeId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function deleteGrowthInitiative({ token, initiativeId, signal } = {}) {
+  ensureToken(token);
+  if (!initiativeId) {
+    throw new Error('A growth initiative identifier is required to remove the record');
+  }
+  return httpClient.delete(`/dashboard/learner/growth/initiatives/${initiativeId}`, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function createGrowthExperiment({ token, initiativeId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!initiativeId) {
+    throw new Error('A growth initiative identifier is required to add an experiment');
+  }
+  return httpClient.post(
+    `/dashboard/learner/growth/initiatives/${initiativeId}/experiments`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      invalidateTags: [`dashboard:me:${token}`]
+    }
+  );
+}
+
+export async function updateGrowthExperiment({
+  token,
+  initiativeId,
+  experimentId,
+  payload,
+  signal
+} = {}) {
+  ensureToken(token);
+  if (!initiativeId || !experimentId) {
+    throw new Error('Both initiative and experiment identifiers are required to update the record');
+  }
+  return httpClient.patch(
+    `/dashboard/learner/growth/initiatives/${initiativeId}/experiments/${experimentId}`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      invalidateTags: [`dashboard:me:${token}`]
+    }
+  );
+}
+
+export async function deleteGrowthExperiment({ token, initiativeId, experimentId, signal } = {}) {
+  ensureToken(token);
+  if (!initiativeId || !experimentId) {
+    throw new Error('Both initiative and experiment identifiers are required to remove the record');
+  }
+  return httpClient.delete(
+    `/dashboard/learner/growth/initiatives/${initiativeId}/experiments/${experimentId}`,
+    {
+      token,
+      signal,
+      invalidateTags: [`dashboard:me:${token}`]
+    }
+  );
+}
+
+export async function createAffiliateChannel({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/affiliate/channels', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateAffiliateChannel({ token, channelId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!channelId) {
+    throw new Error('An affiliate channel identifier is required to update the record');
+  }
+  return httpClient.patch(`/dashboard/learner/affiliate/channels/${channelId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function deleteAffiliateChannel({ token, channelId, signal } = {}) {
+  ensureToken(token);
+  if (!channelId) {
+    throw new Error('An affiliate channel identifier is required to remove the record');
+  }
+  return httpClient.delete(`/dashboard/learner/affiliate/channels/${channelId}`, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function recordAffiliatePayout({ token, channelId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!channelId) {
+    throw new Error('An affiliate channel identifier is required to record the payout');
+  }
+  return httpClient.post(`/dashboard/learner/affiliate/channels/${channelId}/payouts`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function createAdCampaign({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/ads/campaigns', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateAdCampaign({ token, campaignId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!campaignId) {
+    throw new Error('An ad campaign identifier is required to update the record');
+  }
+  return httpClient.patch(`/dashboard/learner/ads/campaigns/${campaignId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function deleteAdCampaign({ token, campaignId, signal } = {}) {
+  ensureToken(token);
+  if (!campaignId) {
+    throw new Error('An ad campaign identifier is required to remove the record');
+  }
+  return httpClient.delete(`/dashboard/learner/ads/campaigns/${campaignId}`, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
 }
 
 export async function createSupportTicket({ token, payload, signal } = {}) {
@@ -334,6 +510,33 @@ export async function closeFieldServiceAssignment({ token, assignmentId, payload
   );
 }
 
+export async function fetchInstructorApplication({ token, signal } = {}) {
+  ensureToken(token);
+  return httpClient.get('/dashboard/learner/teach/application', {
+    token,
+    signal,
+    cache: { enabled: false }
+  });
+}
+
+export async function saveInstructorApplication({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.put('/dashboard/learner/teach/application', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function submitInstructorApplication({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/teach/application/submit', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export const learnerDashboardApi = {
   createTutorBookingRequest,
   exportTutorSchedule,
@@ -350,9 +553,23 @@ export const learnerDashboardApi = {
   createPaymentMethod,
   updatePaymentMethod,
   removePaymentMethod,
+  deleteBillingContact,
   joinLiveSession,
   checkInToLiveSession,
   triggerCommunityAction,
+  createGrowthInitiative,
+  updateGrowthInitiative,
+  deleteGrowthInitiative,
+  createGrowthExperiment,
+  updateGrowthExperiment,
+  deleteGrowthExperiment,
+  createAffiliateChannel,
+  updateAffiliateChannel,
+  deleteAffiliateChannel,
+  recordAffiliatePayout,
+  createAdCampaign,
+  updateAdCampaign,
+  deleteAdCampaign,
   createSupportTicket,
   fetchSupportTickets,
   updateSupportTicket,
@@ -360,7 +577,10 @@ export const learnerDashboardApi = {
   closeSupportTicket,
   createFieldServiceAssignment,
   updateFieldServiceAssignment,
-  closeFieldServiceAssignment
+  closeFieldServiceAssignment,
+  fetchInstructorApplication,
+  saveInstructorApplication,
+  submitInstructorApplication
 };
 
 export default learnerDashboardApi;

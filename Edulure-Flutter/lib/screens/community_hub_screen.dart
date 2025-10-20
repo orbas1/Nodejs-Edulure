@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/community/community_hub_controller.dart';
 import '../services/community_hub_models.dart';
+import '../widgets/calendar_entry_editor.dart';
 
 class CommunityHubScreen extends ConsumerStatefulWidget {
   const CommunityHubScreen({super.key});
@@ -1120,208 +1121,51 @@ class _CommunityHubScreenState extends ConsumerState<CommunityHubScreen>
     CommunityHubController controller, {
     CommunityCalendarEntry? initial,
   }) async {
-    final titleController = TextEditingController(text: initial?.title ?? '');
-    final descriptionController = TextEditingController(text: initial?.description ?? '');
-    final locationController = TextEditingController(text: initial?.location ?? '');
-    final organiserController = TextEditingController(text: initial?.organiser ?? '');
-    final communityController = TextEditingController(text: initial?.communityId ?? '');
-    final tagsController = TextEditingController(text: (initial?.tags ?? <String>[]).join(', '));
-    final coverController = TextEditingController(text: initial?.coverImageUrl ?? '');
-    DateTime start = initial?.startTime ?? DateTime.now().add(const Duration(hours: 2));
-    DateTime end = initial?.endTime ?? start.add(const Duration(hours: 1));
-    final reminders = List<Duration>.from(initial?.reminders ?? const <Duration>[]);
-    final reminderController = TextEditingController(
-      text: reminders.map((duration) => duration.inMinutes.toString()).join(', '),
-    );
-    final formKey = GlobalKey<FormState>();
-
-    final saved = await showModalBottomSheet<bool>(
+    final result = await showCalendarEntryEditor(
       context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.75,
-            minChildSize: 0.55,
-            maxChildSize: 0.95,
-            builder: (context, scrollController) {
-              return StatefulBuilder(
-                builder: (context, setModalState) {
-                  return SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.all(24),
-                    child: Form(
-                      key: formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                initial == null ? 'Add calendar entry' : 'Edit calendar entry',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                              IconButton(
-                                onPressed: () => Navigator.of(context).pop(false),
-                                icon: const Icon(Icons.close),
-                              )
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: titleController,
-                            decoration: const InputDecoration(labelText: 'Title'),
-                            validator: (value) =>
-                                value == null || value.trim().isEmpty ? 'Enter the event title' : null,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: organiserController,
-                            decoration: const InputDecoration(labelText: 'Organiser'),
-                            validator: (value) => value == null || value.trim().isEmpty
-                                ? 'Enter organiser'
-                                : null,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: descriptionController,
-                            decoration: const InputDecoration(
-                              labelText: 'Description',
-                              alignLabelWithHint: true,
-                            ),
-                            maxLines: 4,
-                            validator: (value) => value == null || value.trim().isEmpty
-                                ? 'Describe the event'
-                                : null,
-                          ),
-                          const SizedBox(height: 12),
-                          _DateTile(
-                            label: 'Start time',
-                            value: start,
-                            onChanged: (value) {
-                              setModalState(() => start = value);
-                              if (end.isBefore(value)) {
-                                end = value.add(const Duration(hours: 1));
-                              }
-                            },
-                          ),
-                          const SizedBox(height: 8),
-                          _DateTile(
-                            label: 'End time',
-                            value: end,
-                            onChanged: (value) {
-                              setModalState(() => end = value);
-                            },
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: locationController,
-                            decoration: const InputDecoration(labelText: 'Location / Meeting link'),
-                            validator: (value) => value == null || value.trim().isEmpty
-                                ? 'Enter the location'
-                                : null,
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: communityController,
-                            decoration: const InputDecoration(
-                              labelText: 'Community ID (optional)',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: tagsController,
-                            decoration: const InputDecoration(
-                              labelText: 'Tags',
-                              helperText: 'Comma separated contexts',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: reminderController,
-                            decoration: const InputDecoration(
-                              labelText: 'Reminder minutes',
-                              helperText: 'Example: 60, 30, 10',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextFormField(
-                            controller: coverController,
-                            decoration: const InputDecoration(
-                              labelText: 'Cover image URL (optional)',
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: () {
-                                if (!formKey.currentState!.validate()) {
-                                  return;
-                                }
-                                Navigator.of(context).pop(true);
-                              },
-                              child:
-                                  Text(initial == null ? 'Add to calendar' : 'Save changes'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        );
-      },
+      initial: initial,
     );
 
-    if (saved != true) {
+    if (result == null) {
       return;
     }
 
-    final tags = _splitList(tagsController.text);
-    final reminderDurations = _splitList(reminderController.text)
-        .map((minutes) => int.tryParse(minutes))
-        .whereType<int>()
-        .map(Duration(minutes: minutes))
-        .toList();
+    final reminderDurations = result.reminderMinutes
+        .map((minutes) => Duration(minutes: minutes))
+        .toList(growable: false);
 
     if (initial == null) {
       await controller.createCalendarEntry(
-        title: titleController.text.trim(),
-        description: descriptionController.text.trim(),
-        startTime: start,
-        endTime: end,
-        location: locationController.text.trim(),
-        organiser: organiserController.text.trim(),
-        communityId:
-            communityController.text.trim().isEmpty ? null : communityController.text.trim(),
-        tags: tags,
+        title: result.title,
+        description: result.description,
+        startTime: result.startTime,
+        endTime: result.endTime,
+        location: result.location,
+        organiser: result.organiser,
+        communityId: result.communityId,
         reminders: reminderDurations,
-        coverImageUrl: coverController.text.trim().isEmpty ? null : coverController.text.trim(),
+        tags: result.tags,
+        coverImageUrl: result.coverImageUrl,
+        meetingUrl: result.meetingUrl,
+        notes: result.notes,
+        attachments: result.attachments,
       );
     } else {
       await controller.updateCalendarEntry(
         initial.copyWith(
-          title: titleController.text.trim(),
-          description: descriptionController.text.trim(),
-          startTime: start,
-          endTime: end,
-          location: locationController.text.trim(),
-          organiser: organiserController.text.trim(),
-          communityId:
-              communityController.text.trim().isEmpty ? null : communityController.text.trim(),
-          tags: tags,
+          title: result.title,
+          description: result.description,
+          startTime: result.startTime,
+          endTime: result.endTime,
+          location: result.location,
+          organiser: result.organiser,
+          communityId: result.communityId,
           reminders: reminderDurations,
-          coverImageUrl: coverController.text.trim().isEmpty ? null : coverController.text.trim(),
+          tags: result.tags,
+          coverImageUrl: result.coverImageUrl,
+          meetingUrl: result.meetingUrl,
+          notes: result.notes,
+          attachments: result.attachments,
         ),
       );
     }
@@ -3022,12 +2866,71 @@ class _CalendarCard extends StatelessWidget {
                 Text(entry.location),
               ],
             ),
+            if ((entry.meetingUrl ?? '').isNotEmpty) ...[
+              const SizedBox(height: 8),
+              InkWell(
+                onTap: () => launchUrl(Uri.parse(entry.meetingUrl!)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.video_call_outlined, size: 16),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        entry.meetingUrl!,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            if ((entry.notes ?? '').isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                entry.notes!,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey[700]),
+              ),
+            ],
+            if (entry.tags.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: entry.tags
+                    .map((tag) => Chip(label: Text('#$tag')))
+                    .toList(),
+              ),
+            ],
             if (entry.reminders.isNotEmpty) ...[
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
                 children: entry.reminders
                     .map((duration) => Chip(label: Text('${duration.inMinutes} min reminder')))
+                    .toList(),
+              ),
+            ],
+            if (entry.attachments.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: entry.attachments
+                    .map(
+                      (attachment) => ActionChip(
+                        avatar: const Icon(Icons.attach_file_outlined),
+                        label: Text('Resource'),
+                        onPressed: () => launchUrl(Uri.parse(attachment)),
+                      ),
+                    )
                     .toList(),
               ),
             ],

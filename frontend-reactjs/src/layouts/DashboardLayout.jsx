@@ -20,6 +20,7 @@ import {
   DocumentTextIcon,
   IdentificationIcon,
   InboxStackIcon,
+  BeakerIcon,
   MapIcon,
   MegaphoneIcon,
   PuzzlePieceIcon,
@@ -99,7 +100,9 @@ const navigationByRole = {
       name: 'Growth',
       icon: SparklesIcon,
       children: [
+        { id: 'learner-growth-workspace', name: 'Growth workspace', to: `${basePath}/growth`, icon: ChartBarIcon },
         { id: 'learner-affiliate', name: 'Affiliate', to: `${basePath}/affiliate`, icon: UserPlusIcon },
+        { id: 'learner-ads', name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
         { id: 'learner-settings', name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
         { id: 'learner-teach', name: 'Teach', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
       ]
@@ -175,6 +178,7 @@ const navigationByRole = {
       name: 'Growth',
       icon: ChartBarIcon,
       children: [
+        { id: 'instructor-growth-hub', name: 'Growth hub', to: `${basePath}/growth`, icon: BeakerIcon },
         { id: 'instructor-pricing', name: 'Pricing', to: `${basePath}/pricing`, icon: BanknotesIcon },
         { id: 'instructor-affiliate', name: 'Affiliate', to: `${basePath}/affiliate`, icon: UserPlusIcon },
         { id: 'instructor-ads', name: 'Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },

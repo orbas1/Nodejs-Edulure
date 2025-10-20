@@ -32,6 +32,7 @@ import DashboardCalendar from './pages/dashboard/DashboardCalendar.jsx';
 import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.jsx';
 import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
 import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
+import LearnerGrowth from './pages/dashboard/LearnerGrowth.jsx';
 import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
 import DashboardAffiliate from './pages/dashboard/DashboardAffiliate.jsx';
 import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
@@ -51,6 +52,7 @@ import InstructorTutorManagement from './pages/dashboard/InstructorTutorManageme
 import InstructorServiceSuite from './pages/dashboard/InstructorServiceSuite.jsx';
 import InstructorProjects from './pages/dashboard/InstructorProjects.jsx';
 import InstructorEbookCreate from './pages/dashboard/InstructorEbookCreate.jsx';
+import InstructorGrowth from './pages/dashboard/InstructorGrowth.jsx';
 import EdulureAds from './pages/dashboard/EdulureAds.jsx';
 import InstructorPricing from './pages/dashboard/InstructorPricing.jsx';
 import DashboardInbox from './pages/dashboard/DashboardInbox.jsx';
@@ -170,6 +172,7 @@ function App() {
         <Route path="support" element={<LearnerSupport />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
+        <Route path="growth" element={<LearnerGrowth />} />
         <Route path="affiliate" element={<DashboardAffiliate />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
         <Route path="field-services" element={<FieldServices />} />
@@ -238,6 +241,7 @@ function App() {
         <Route path="courses/library" element={<InstructorCourseLibrary />} />
         <Route path="courses/manage" element={<InstructorCourseManage />} />
         <Route path="inbox" element={<DashboardInbox />} />
+        <Route path="growth" element={<InstructorGrowth />} />
         <Route path="pricing" element={<InstructorPricing />} />
         <Route path="lesson-schedule" element={<InstructorLessonSchedule />} />
         <Route path="tutor-schedule" element={<InstructorTutorSchedule />} />
@@ -322,12 +326,11 @@ function App() {
             </ProtectedRoute>
           )}
         />
-        <Route path="ads" element={<EdulureAds />} />
         <Route path="settings" element={<DashboardSettings />} />
         <Route
           path="ads"
           element={(
-            <ProtectedRoute allowedRoles={['instructor']}>
+            <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin']}>
               <EdulureAds />
             </ProtectedRoute>
           )}

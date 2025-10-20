@@ -234,6 +234,9 @@ class CommunityHubController extends StateNotifier<CommunityHubState> {
     List<Duration>? reminders,
     List<String>? tags,
     String? coverImageUrl,
+    String? meetingUrl,
+    String? notes,
+    List<String>? attachments,
   }) async {
     final entry = CommunityCalendarEntry(
       id: _uuid.v4(),
@@ -247,6 +250,9 @@ class CommunityHubController extends StateNotifier<CommunityHubState> {
       reminders: reminders ?? const <Duration>[],
       tags: tags ?? const <String>[],
       coverImageUrl: coverImageUrl,
+      meetingUrl: meetingUrl,
+      notes: notes,
+      attachments: attachments ?? const <String>[],
     );
     final snapshot = state.snapshot.copyWith(
       calendarEntries: [...state.snapshot.calendarEntries, entry]..sort((a, b) => a.startTime.compareTo(b.startTime)),

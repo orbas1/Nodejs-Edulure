@@ -8,6 +8,14 @@ import ComplianceService from './ComplianceService.js';
 import AuditEventService from './AuditEventService.js';
 import dataPartitionService from './DataPartitionService.js';
 import storageService from './StorageService.js';
+import PlatformSettingsService, {
+  normaliseAdminProfile,
+  normalisePaymentSettings,
+  normaliseEmailSettings,
+  normaliseSecuritySettings,
+  normaliseFinanceSettings,
+  normaliseMonetization
+} from './PlatformSettingsService.js';
 
 const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 const INCIDENT_SEVERITIES = ['critical', 'high', 'medium', 'low'];
@@ -862,6 +870,35 @@ export default class OperatorDashboardService {
     };
   }
 
+  async #loadSettingsSnapshot() {
+    const safeCall = async (factory, fallback) => {
+      try {
+        return await factory();
+      } catch (error) {
+        this.logger.warn({ err: error }, 'Failed to load admin settings snapshot');
+        return fallback;
+      }
+    };
+
+    const [profile, payments, emails, security, finance, monetization] = await Promise.all([
+      safeCall(() => PlatformSettingsService.getAdminProfileSettings(), normaliseAdminProfile({})),
+      safeCall(() => PlatformSettingsService.getPaymentSettings(), normalisePaymentSettings({})),
+      safeCall(() => PlatformSettingsService.getEmailSettings(), normaliseEmailSettings({})),
+      safeCall(() => PlatformSettingsService.getSecuritySettings(), normaliseSecuritySettings({})),
+      safeCall(() => PlatformSettingsService.getFinanceSettings(), normaliseFinanceSettings({})),
+      safeCall(() => PlatformSettingsService.getMonetizationSettings(), normaliseMonetization({}))
+    ]);
+
+    return {
+      profile: profile ?? normaliseAdminProfile({}),
+      payments: payments ?? normalisePaymentSettings({}),
+      emails: emails ?? normaliseEmailSettings({}),
+      security: security ?? normaliseSecuritySettings({}),
+      finance: finance ?? normaliseFinanceSettings({}),
+      monetization: monetization ?? normaliseMonetization({})
+    };
+  }
+
   async build({ user, tenantId = 'global', now = this.nowProvider() } = {}) {
     const userContext = {
       userId: user?.id ?? null,
@@ -869,7 +906,7 @@ export default class OperatorDashboardService {
       tenantId
     };
 
-    const [manifest, activeIncidents, resolvedIncidents, integrationSnapshot] = await Promise.all([
+    const [manifest, activeIncidents, resolvedIncidents, integrationSnapshot, settingsSnapshot] = await Promise.all([
       this.manifestService
         .buildManifest({
           audience: 'ops',
@@ -892,7 +929,8 @@ export default class OperatorDashboardService {
         .catch((error) => {
           this.logger.error({ err: error }, 'Failed to build integration dashboard snapshot');
           return null;
-        })
+        }),
+      this.#loadSettingsSnapshot()
     ]);
 
     const queueSummary = summariseIncidentQueue(activeIncidents, { now });
@@ -932,7 +970,8 @@ export default class OperatorDashboardService {
         runbooks,
         timeline,
         integrations: integrationSnapshot,
-        compliance: complianceSnapshot
+        compliance: complianceSnapshot,
+        settings: settingsSnapshot
       },
       searchIndex: [
         ...buildSearchIndex(activeIncidents, runbooks),
