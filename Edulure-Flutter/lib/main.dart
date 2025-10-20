@@ -17,6 +17,7 @@ import 'screens/course_purchase_screen.dart';
 import 'screens/explorer_screen.dart';
 import 'screens/feed_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/calendar_screen.dart';
 import 'screens/inbox_screen.dart';
 import 'screens/instructor_dashboard_screen.dart';
 import 'screens/learner_dashboard_screen.dart';
@@ -37,6 +38,8 @@ import 'screens/course_progress_screen.dart';
 import 'screens/support_screen.dart';
 import 'screens/about_us_screen.dart';
 import 'screens/privacy_policy_screen.dart';
+import 'screens/splash_screen.dart';
+import 'screens/user_profile_view_screen.dart';
 import 'services/language_service.dart';
 import 'widgets/capability_status_banner.dart';
 
@@ -64,7 +67,8 @@ class EdulureApp extends ConsumerWidget {
         );
 
         final routes = <String, WidgetBuilder>{
-          '/': (_) => const HomeScreen(),
+          '/': (_) => const SplashScreen(),
+          '/home': (_) => const HomeScreen(),
           '/login': (_) => const LoginScreen(),
           '/register': (_) => const RegisterScreen(),
           '/communities': (_) => const CommunitiesScreen(),
@@ -80,9 +84,15 @@ class EdulureApp extends ConsumerWidget {
           },
           '/community/hub': (_) => const CommunityHubScreen(),
           '/feed': (_) => const FeedScreen(),
+          '/calendar': (_) => const CalendarScreen(),
           '/explorer': (_) => const ExplorerScreen(),
           '/inbox': (_) => const InboxScreen(),
           '/profile': (_) => const ProfileScreen(),
+          '/profile/viewer': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            final profileId = args is String ? args : null;
+            return UserProfileViewScreen(initialProfileId: profileId);
+          },
           '/dashboard/learner': (_) => const LearnerDashboardScreen(),
           '/dashboard/assessments': (_) => const AssessmentsScreen(),
           '/dashboard/community': (_) => const CommunityDashboardScreen(),

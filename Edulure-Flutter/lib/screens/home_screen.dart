@@ -171,6 +171,13 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/profile'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.event_note_outlined),
+                    title: const Text('Calendar'),
+                    subtitle: const Text('Plan launches, AMAs, and live classrooms.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/calendar'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.calendar_month_outlined),
                     title: const Text('Tutor bookings'),
                     subtitle: const Text('Manage mentor requests and schedules.'),

@@ -80,6 +80,9 @@ class CommunityHubRepository {
         communityId: 'global',
         reminders: const [Duration(hours: 24), Duration(minutes: 30)],
         tags: const ['mentorship'],
+        meetingUrl: 'https://meet.example.com/mentor-office-hours',
+        notes: 'Auto-syncs with mentor CRM. Hosts rotate weekly.',
+        attachments: const ['https://docs.example.com/mentor-playbook.pdf'],
       ),
     ];
 
