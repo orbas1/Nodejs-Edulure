@@ -174,6 +174,43 @@ function expandDevelopmentOrigins(exactOrigins, options) {
   }
 }
 
+function addCanonicalDomainAliases(exactOrigins) {
+  const aliases = new Set();
+
+  for (const origin of exactOrigins) {
+    const components = parseOriginComponents(origin);
+    if (!components) {
+      continue;
+    }
+
+    const { protocol, hostname, port } = components;
+
+    if (isLocalAddress(hostname)) {
+      continue;
+    }
+
+    if (/^\d+(?:\.\d+){3}$/.test(hostname)) {
+      continue;
+    }
+
+    if (hostname.startsWith('www.')) {
+      const bareHost = hostname.slice(4);
+      if (bareHost.split('.').length >= 2) {
+        aliases.add(formatOrigin(protocol, bareHost, port));
+      }
+      continue;
+    }
+
+    if (hostname.split('.').length === 2) {
+      aliases.add(formatOrigin(protocol, `www.${hostname}`, port));
+    }
+  }
+
+  for (const alias of aliases) {
+    exactOrigins.add(alias);
+  }
+}
+
 function expandConfiguredOrigin(origin) {
   const trimmed = origin.trim();
   if (!trimmed) {
@@ -282,7 +319,14 @@ export function parseCorsOrigins(input) {
 }
 
 export function createCorsOriginValidator(originsInput, options = {}) {
-  const entries = [...parseCorsOrigins(originsInput), ...parseCorsOrigins(options.additionalOrigins)];
+  const {
+    additionalOrigins,
+    allowDevelopmentOrigins,
+    developmentPortHints,
+    includeWwwAliases = true
+  } = options;
+
+  const entries = [...parseCorsOrigins(originsInput), ...parseCorsOrigins(additionalOrigins)];
   let allowAll = entries.length === 0;
   const exactOrigins = new Set();
   const wildcardMatchers = [];
@@ -319,7 +363,11 @@ export function createCorsOriginValidator(originsInput, options = {}) {
     }
   }
 
-  expandDevelopmentOrigins(exactOrigins, options);
+  expandDevelopmentOrigins(exactOrigins, { allowDevelopmentOrigins, developmentPortHints });
+
+  if (includeWwwAliases) {
+    addCanonicalDomainAliases(exactOrigins);
+  }
 
   if (!allowAll && exactOrigins.size === 0 && wildcardMatchers.length === 0) {
     allowAll = true;

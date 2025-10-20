@@ -29,6 +29,21 @@ describe('createCorsOriginValidator', () => {
     expect(policy.isOriginAllowed('https://example.org')).toBe(false);
   });
 
+  it('automatically adds www aliases for apex domains', () => {
+    const policy = createCorsOriginValidator(['https://example.com']);
+
+    expect(policy.isOriginAllowed('https://example.com')).toBe(true);
+    expect(policy.isOriginAllowed('https://www.example.com')).toBe(true);
+    expect(policy.isOriginAllowed('https://blog.example.com')).toBe(false);
+  });
+
+  it('normalizes origins defined with www prefixes back to the apex domain', () => {
+    const policy = createCorsOriginValidator(['https://www.example.org']);
+
+    expect(policy.isOriginAllowed('https://www.example.org')).toBe(true);
+    expect(policy.isOriginAllowed('https://example.org')).toBe(true);
+  });
+
   it('treats null origins as configurable entries', () => {
     const policy = createCorsOriginValidator(['null']);
 
