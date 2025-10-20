@@ -40,11 +40,19 @@ class _SupportScreenState extends ConsumerState<SupportScreen> {
     }).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-    _selectedTicketId ??= filtered.isNotEmpty ? filtered.first.id : null;
-    final selectedTicket = filtered.firstWhere(
-      (ticket) => ticket.id == _selectedTicketId,
-      orElse: () => filtered.isEmpty ? null : filtered.first,
-    );
+    if (filtered.isEmpty) {
+      _selectedTicketId = null;
+    } else if (_selectedTicketId == null ||
+        !filtered.any((ticket) => ticket.id == _selectedTicketId)) {
+      _selectedTicketId = filtered.first.id;
+    }
+
+    final SupportTicket? selectedTicket = _selectedTicketId == null
+        ? null
+        : filtered.firstWhere(
+            (ticket) => ticket.id == _selectedTicketId,
+            orElse: () => filtered.first,
+          );
 
     return Scaffold(
       appBar: AppBar(

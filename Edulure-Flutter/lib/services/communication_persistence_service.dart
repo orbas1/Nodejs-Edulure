@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive/hive.dart';
 
 import '../provider/communication/communication_models.dart';
 
@@ -13,16 +13,28 @@ abstract class CommunicationPersistence {
 
   Future<List<SupportTicket>?> loadSupportTickets();
   Future<void> saveSupportTickets(List<SupportTicket> tickets);
+
+  Future<void> reset();
+
+  Future<void> close();
 }
 
 class CommunicationPersistenceService implements CommunicationPersistence {
-  CommunicationPersistenceService({String boxName = _defaultBox}) : _boxName = boxName;
+  CommunicationPersistenceService({
+    String boxName = _defaultBox,
+    HiveInterface? hive,
+    HiveCipher? cipher,
+  })  : _boxName = boxName,
+        _hive = hive ?? Hive,
+        _cipher = cipher;
 
   static const _defaultBox = 'communications.cache';
   static const _threadsKey = 'threads';
   static const _ticketsKey = 'tickets';
 
   final String _boxName;
+  final HiveInterface _hive;
+  final HiveCipher? _cipher;
   Box<String>? _cachedBox;
 
   Future<Box<String>> _box() async {
@@ -30,7 +42,10 @@ class CommunicationPersistenceService implements CommunicationPersistence {
     if (cached != null && cached.isOpen) {
       return cached;
     }
-    final box = await Hive.openBox<String>(_boxName);
+    final box = await _hive.openBox<String>(
+      _boxName,
+      encryptionCipher: _cipher,
+    );
     _cachedBox = box;
     return box;
   }
@@ -69,6 +84,21 @@ class CommunicationPersistenceService implements CommunicationPersistence {
     );
   }
 
+  @override
+  Future<void> reset() async {
+    final box = await _box();
+    await box.clear();
+  }
+
+  @override
+  Future<void> close() async {
+    final cached = _cachedBox;
+    if (cached != null && cached.isOpen) {
+      await cached.close();
+    }
+    _cachedBox = null;
+  }
+
   Future<List<T>?> _readList<T>(
     String key,
     T Function(Map<String, dynamic> json) mapper,
@@ -86,6 +116,10 @@ class CommunicationPersistenceService implements CommunicationPersistence {
     } catch (error, stackTrace) {
       debugPrint('Failed to hydrate $key: $error');
       debugPrint('$stackTrace');
+      try {
+        final box = await _box();
+        await box.delete(key);
+      } catch (_) {}
       return null;
     }
   }
