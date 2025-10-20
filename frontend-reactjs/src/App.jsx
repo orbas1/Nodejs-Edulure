@@ -87,7 +87,7 @@ function App() {
         <Route
           path="/communities"
           element={(
-            <ProtectedRoute allowedRoles={['admin', 'moderator', 'owner', 'member', 'non-member']}>
+            <ProtectedRoute allowGuests allowedRoles={['admin', 'moderator', 'owner', 'member', 'non-member']}>
               <Communities />
             </ProtectedRoute>
           )}
@@ -95,7 +95,7 @@ function App() {
         <Route
           path="/feed"
           element={(
-            <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin', 'moderator']}>
+            <ProtectedRoute allowGuests allowedRoles={['learner', 'instructor', 'admin', 'moderator']}>
               <Feed />
             </ProtectedRoute>
           )}

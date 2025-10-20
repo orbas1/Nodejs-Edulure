@@ -25,6 +25,8 @@ import CommunityHero from '../components/CommunityHero.jsx';
 import CommunityResourceEditor from '../components/community/CommunityResourceEditor.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import { communities as DEMO_COMMUNITIES_SOURCE } from '../data/mockData.js';
+import { DEMO_FEED_ADS_META, DEMO_FEED_INSIGHTS, DEMO_FEED_ITEMS, DEMO_FEED_POST_COUNT } from '../data/feedDemoContent.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -88,6 +90,26 @@ const FEATURED_CREATORS = [
   { name: 'Leo Okafor', handle: '@buildwithleo', highlight: 'Scaled async micro-courses to $80k ARR', trust: 92 }
 ];
 
+const DEMO_COMMUNITIES = DEMO_COMMUNITIES_SOURCE.map((community) => {
+  const members = Number.isFinite(community.members) ? community.members : 0;
+  const admins = Number.isFinite(community.admins) ? community.admins : 1;
+  return {
+    id: community.id,
+    name: community.name,
+    description: community.description,
+    slug: community.id,
+    coverImageUrl: community.image,
+    stats: {
+      members,
+      resources: Math.max(12, admins * 6),
+      posts: Math.max(180, Math.round(members * 1.4))
+    },
+    metadata: {
+      tagline: community.description
+    }
+  };
+});
+
 const COUNT_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const DECIMAL_FORMATTER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
 const CURRENCY_FORMATTER = new Intl.NumberFormat('en-US', {
@@ -138,6 +160,7 @@ export default function Feed() {
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken;
   const { canAccessCommunityFeed, canPostToCommunities, canJoinCommunities } = useAuthorization();
+  const isGuestView = !isAuthenticated || !token;
 
   const [communities, setCommunities] = useState([ALL_COMMUNITIES_NODE]);
   const [isLoadingCommunities, setIsLoadingCommunities] = useState(false);
@@ -302,6 +325,32 @@ export default function Feed() {
       isMounted = false;
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!isGuestView) {
+      return;
+    }
+
+    setCommunities([ALL_COMMUNITIES_NODE, ...DEMO_COMMUNITIES]);
+    setCommunitiesError(null);
+    setSelectedCommunity((prev) => (prev && prev.id ? prev : ALL_COMMUNITIES_NODE));
+    setFeedItems(DEMO_FEED_ITEMS);
+    setFeedMeta({
+      page: 1,
+      perPage: DEMO_FEED_ITEMS.length,
+      total: DEMO_FEED_POST_COUNT,
+      pageCount: 1
+    });
+    setFeedAdsMeta(DEMO_FEED_ADS_META.count ? DEMO_FEED_ADS_META : null);
+    setFeedRange(DEMO_FEED_INSIGHTS.range ?? '30d');
+    setFeedInsights({ ...DEMO_FEED_INSIGHTS });
+    setFeedInsightsError(null);
+    setFeedError(null);
+    setIsLoadingCommunities(false);
+    setIsLoadingFeed(false);
+    setIsLoadingMore(false);
+    setIsLoadingInsights(false);
+  }, [isGuestView]);
 
   const loadFeed = useCallback(
     async ({ page = 1, append = false, queryOverride } = {}) => {
@@ -895,7 +944,7 @@ export default function Feed() {
   );
   const isRangeControlDisabled = isLoadingFeed || isLoadingInsights;
 
-  if (!canAccessCommunityFeed) {
+  if (!canAccessCommunityFeed && !isGuestView) {
     return (
       <div className="bg-slate-50/80 py-24">
         <div className="mx-auto max-w-2xl rounded-4xl border border-slate-200 bg-white px-8 py-12 text-center shadow-card">
