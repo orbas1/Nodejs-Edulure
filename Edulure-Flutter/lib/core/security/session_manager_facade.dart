@@ -7,10 +7,20 @@ class SessionManagerFacade {
 
   String? get accessToken => SessionManager.getAccessToken();
 
+  String? get refreshToken => SessionManager.getRefreshToken();
+
   String? get activeRole => SessionManager.getActiveRole();
 
   Future<void> saveSession(Map<String, dynamic> session) {
     return SessionManager.saveSession(session);
+  }
+
+  Future<void> persistAccessToken(String accessToken) {
+    return SessionManager.persistAccessToken(accessToken);
+  }
+
+  Future<void> persistRefreshToken(String refreshToken) {
+    return SessionManager.persistRefreshToken(refreshToken);
   }
 
   Future<void> clear() {
