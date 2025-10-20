@@ -7,7 +7,10 @@ import auth from '../middleware/auth.js';
 const router = Router();
 
 router.get('/me', auth(), DashboardController.current);
+router.get('/learner/tutor-bookings', auth(), LearnerDashboardController.listTutorBookings);
 router.post('/learner/tutor-bookings', auth(), LearnerDashboardController.createTutorBooking);
+router.patch('/learner/tutor-bookings/:bookingId', auth(), LearnerDashboardController.updateTutorBooking);
+router.post('/learner/tutor-bookings/:bookingId/cancel', auth(), LearnerDashboardController.cancelTutorBooking);
 router.post('/learner/tutor-bookings/export', auth(), LearnerDashboardController.exportTutorSchedule);
 router.patch('/learner/tutor-bookings/:bookingId', auth(), LearnerDashboardController.updateTutorBooking);
 router.post('/learner/tutor-bookings/:bookingId/cancel', auth(), LearnerDashboardController.cancelTutorBooking);

@@ -26,16 +26,6 @@ export async function createCommunity({ token, payload }) {
   return mapResponse(response);
 }
 
-export async function updateCommunity({ communityId, token, payload }) {
-  const response = await httpClient.put(`/communities/${communityId}`, payload, {
-    token,
-    cache: {
-      invalidateTags: [`community:${communityId}:detail`, 'communities:list']
-    }
-  });
-  return mapResponse(response);
-}
-
 export async function deleteCommunity({ communityId, token, reason }) {
   const response = await httpClient.delete(`/communities/${communityId}`, {
     token,
@@ -58,16 +48,6 @@ export async function fetchCommunityDetail(communityId, token) {
     cache: {
       ttl: 1000 * 60 * 3,
       tags: [`community:${communityId}:detail`]
-    }
-  });
-  return mapResponse(response);
-}
-
-export async function updateCommunity({ communityId, token, payload }) {
-  const response = await httpClient.put(`/communities/${communityId}`, payload, {
-    token,
-    cache: {
-      invalidateTags: [`community:${communityId}:detail`, 'communities:list']
     }
   });
   return mapResponse(response);
@@ -544,6 +524,57 @@ export async function createCommunityLiveDonation({ communityId, token, payload,
   return mapResponse(response);
 }
 
+export async function listCommunityPaywallTiers({ communityId, token, includeInactive = false, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/paywall/tiers`, {
+    token,
+    signal,
+    params: { includeInactive },
+    cache: {
+      ttl: 5_000,
+      tags: [`community:${communityId}:paywall`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function startCommunitySubscriptionCheckout({ communityId, token, payload, signal } = {}) {
+  const response = await httpClient.post(`/communities/${communityId}/paywall/checkout`, payload ?? {}, {
+    token,
+    signal,
+    cache: {
+      invalidateTags: [`community:${communityId}:subscriptions`, `community:${communityId}:revenue`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function listMyCommunitySubscriptions({ communityId, token, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/subscriptions/me`, {
+    token,
+    signal,
+    cache: {
+      ttl: 5_000,
+      tags: [`community:${communityId}:subscriptions:me`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function cancelMyCommunitySubscription({ communityId, subscriptionId, token, payload, signal } = {}) {
+  const response = await httpClient.post(
+    `/communities/${communityId}/subscriptions/${subscriptionId}/cancel`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: {
+        invalidateTags: [`community:${communityId}:subscriptions`, `community:${communityId}:subscriptions:me`]
+      }
+    }
+  );
+  return mapResponse(response);
+}
+
 export async function fetchCommunitySponsorships({ communityId, token }) {
   const response = await httpClient.get(`/communities/${communityId}/sponsorships`, {
     token,
@@ -584,6 +615,39 @@ export async function updateCommunityTier({ communityId, tierId, token, payload 
       }
     }
   );
+  return mapResponse(response);
+}
+
+export async function listCommunityTiers({ communityId, token, params = {}, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/paywall/tiers`, {
+    token,
+    signal,
+    params,
+    cache: {
+      ttl: 5000,
+      tags: [`community:${communityId}:paywall`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function createCommunityTier({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/paywall/tiers`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:paywall`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function deleteCommunityTier({ communityId, tierId, token }) {
+  const response = await httpClient.delete(`/communities/${communityId}/paywall/tiers/${tierId}`, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:paywall`, `community:${communityId}:detail`]
+    }
+  });
   return mapResponse(response);
 }
 

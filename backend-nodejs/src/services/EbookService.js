@@ -41,6 +41,23 @@ function normaliseArray(value) {
   return [];
 }
 
+function normalisePriceAmount(amount, fallback = 0) {
+  if (amount === null || amount === undefined) {
+    return fallback;
+  }
+  if (typeof amount === 'string' && amount.trim().length === 0) {
+    return fallback;
+  }
+  const numeric = typeof amount === 'string' ? Number.parseFloat(amount) : Number(amount);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return fallback;
+  }
+  if (!Number.isInteger(numeric)) {
+    return Math.round(numeric * 100);
+  }
+  return Math.round(numeric);
+}
+
 function serialiseEbookToApi(ebook, { downloads = 0, readers = 0, purchases = 0, revenueCents = 0 } = {}) {
   if (!ebook) return null;
   return {
@@ -50,6 +67,9 @@ function serialiseEbookToApi(ebook, { downloads = 0, readers = 0, purchases = 0,
     slug: ebook.slug,
     subtitle: ebook.subtitle,
     description: ebook.description,
+    coverImageUrl: ebook.coverImageUrl ?? null,
+    sampleDownloadUrl: ebook.sampleDownloadUrl ?? null,
+    audiobookUrl: ebook.audiobookUrl ?? null,
     price: {
       currency: ebook.priceCurrency,
       amountCents: Number(ebook.priceAmount ?? 0),
@@ -125,6 +145,7 @@ export default class EbookService {
       }
 
       const slug = payload.slug ? payload.slug : await ensureUniqueSlug(payload.title, trx);
+      const priceAmount = normalisePriceAmount(payload.priceAmount);
       const ebook = await EbookModel.create(
         {
           publicId: randomUUID(),
@@ -133,6 +154,9 @@ export default class EbookService {
           slug,
           subtitle: payload.subtitle,
           description: payload.description,
+          coverImageUrl: payload.coverImageUrl ?? null,
+          sampleDownloadUrl: payload.sampleDownloadUrl ?? null,
+          audiobookUrl: payload.audiobookUrl ?? null,
           authors: normaliseArray(payload.authors),
           tags: normaliseArray(payload.tags),
           categories: normaliseArray(payload.categories),
@@ -142,7 +166,7 @@ export default class EbookService {
           isbn: payload.isbn,
           readingTimeMinutes: payload.readingTimeMinutes ?? 0,
           priceCurrency: (payload.priceCurrency ?? 'USD').toUpperCase(),
-          priceAmount: payload.priceAmount ?? 0,
+          priceAmount,
           metadata: payload.metadata ?? {},
           status: payload.status ?? 'draft',
           isPublic: payload.isPublic ?? false,
@@ -175,6 +199,9 @@ export default class EbookService {
         title: payload.title ?? ebook.title,
         subtitle: payload.subtitle ?? ebook.subtitle,
         description: payload.description ?? ebook.description,
+        coverImageUrl: payload.coverImageUrl,
+        sampleDownloadUrl: payload.sampleDownloadUrl,
+        audiobookUrl: payload.audiobookUrl,
         authors: payload.authors ? normaliseArray(payload.authors) : undefined,
         tags: payload.tags ? normaliseArray(payload.tags) : undefined,
         categories: payload.categories ? normaliseArray(payload.categories) : undefined,
@@ -182,7 +209,7 @@ export default class EbookService {
         isbn: payload.isbn,
         readingTimeMinutes: payload.readingTimeMinutes,
         priceCurrency: payload.priceCurrency ? payload.priceCurrency.toUpperCase() : undefined,
-        priceAmount: payload.priceAmount,
+        priceAmount: payload.priceAmount !== undefined ? normalisePriceAmount(payload.priceAmount) : undefined,
         metadata: payload.metadata ? { ...ebook.metadata, ...payload.metadata } : undefined,
         status: payload.status,
         isPublic: payload.isPublic,
@@ -438,11 +465,12 @@ export default class EbookService {
           name: ebook.title,
           description: ebook.subtitle ?? ebook.description ?? undefined,
           unitAmount: Number(ebook.priceAmount ?? 0),
-          quantity: 1,
+          quantity: payload.quantity ?? 1,
           metadata: {
             ebookId: ebook.publicId,
             assetId: asset.publicId,
-            sellerId: asset.createdBy
+            sellerId: asset.createdBy,
+            quantity: payload.quantity ?? 1
           }
         }
       ],
@@ -451,7 +479,8 @@ export default class EbookService {
         ebookId: ebook.publicId,
         ebookTitle: ebook.title,
         assetId: asset.publicId,
-        sellerId: asset.createdBy
+        sellerId: asset.createdBy,
+        quantity: payload.quantity ?? 1
       },
       entity: {
         id: ebook.publicId,
@@ -459,7 +488,8 @@ export default class EbookService {
         name: ebook.title,
         description: ebook.subtitle ?? ebook.description ?? undefined
       },
-      receiptEmail: payload.receiptEmail
+      receiptEmail: payload.receiptEmail,
+      tax: payload.tax
     };
 
     if (provider === 'paypal') {

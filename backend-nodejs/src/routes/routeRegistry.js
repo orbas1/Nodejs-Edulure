@@ -31,6 +31,7 @@ import releaseRoutes from './release.routes.js';
 import catalogueRoutes from './catalogue.routes.js';
 import { apiRouteMetadata } from './routeMetadata.js';
 import instructorRoutes from './instructor.routes.js';
+import mediaRoutes from './media.routes.js';
 
 const routerMap = {
   auth: authRoutes,
@@ -64,7 +65,8 @@ const routerMap = {
   governance: governanceRoutes,
   instructor: instructorRoutes,
   release: releaseRoutes,
-  catalogue: catalogueRoutes
+  catalogue: catalogueRoutes,
+  media: mediaRoutes
 };
 
 export const apiRouteRegistry = apiRouteMetadata.map((descriptor) => ({

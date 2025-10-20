@@ -9,7 +9,11 @@ import {
   fetchCommunityFeed,
   fetchCommunityResources,
   joinCommunity,
-  leaveCommunity
+  leaveCommunity,
+  listCommunityPaywallTiers,
+  startCommunitySubscriptionCheckout,
+  listMyCommunitySubscriptions,
+  cancelMyCommunitySubscription
 } from '../api/communityApi.js';
 import CommunitySwitcher from '../components/CommunitySwitcher.jsx';
 import CommunityProfile from '../components/CommunityProfile.jsx';
@@ -22,6 +26,7 @@ import CommunityMap from '../components/community/CommunityMap.jsx';
 import CommunityAboutPanel from '../components/community/CommunityAboutPanel.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import { isAbortError } from '../utils/errors.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -242,6 +247,17 @@ function formatDate(value) {
   return date.toLocaleString();
 }
 
+function formatCurrency(amount, currency = 'USD') {
+  if (amount === null || amount === undefined || Number.isNaN(Number(amount))) {
+    return `${currency} 0.00`;
+  }
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(Number(amount));
+  } catch (_error) {
+    return `${currency} ${Number(amount).toFixed(2)}`;
+  }
+}
+
 function normaliseDetail(detail, resources) {
   if (!detail) {
     return { ...FALLBACK_COMMUNITY_DETAIL, classrooms: { ...FALLBACK_COMMUNITY_DETAIL.classrooms, recorded: resources } };
@@ -361,8 +377,31 @@ export default function Communities() {
 
   const [selectedPlanId, setSelectedPlanId] = useState(null);
   const [selectedAddons, setSelectedAddons] = useState([]);
+  const [paywallTiers, setPaywallTiers] = useState([]);
+  const [paywallLoading, setPaywallLoading] = useState(false);
+  const [subscriptionForm, setSubscriptionForm] = useState({
+    provider: 'stripe',
+    couponCode: '',
+    receiptEmail: session?.user?.email ?? '',
+    taxCountry: 'US',
+    taxRegion: '',
+    taxPostalCode: '',
+    affiliateCode: ''
+  });
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [mySubscriptions, setMySubscriptions] = useState([]);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState(null);
+  const [subscriptionCheckouts, setSubscriptionCheckouts] = useState([]);
 
   const selectedCommunityId = selectedCommunity?.id ?? null;
+
+  useEffect(() => {
+    setSubscriptionForm((current) => ({
+      ...current,
+      receiptEmail: session?.user?.email ?? current.receiptEmail ?? ''
+    }));
+  }, [session?.user?.email]);
 
   useEffect(() => {
     if (!token || !canAccessCommunityFeed) {
@@ -606,39 +645,284 @@ export default function Communities() {
     leaderboardEntries
   ]);
 
-  useEffect(() => {
-    if (!resolvedDetail?.subscription?.plans) return;
-    if (!selectedPlanId) {
-      setSelectedPlanId(resolvedDetail.subscription.plans[0]?.id ?? null);
+  const subscriptionPlans = useMemo(() => {
+    if (paywallTiers.length > 0) {
+      return paywallTiers.map((tier) => ({
+        id: tier.id,
+        name: tier.name,
+        description: tier.description ?? '',
+        priceCents: Number.isFinite(Number(tier.priceCents)) ? Number(tier.priceCents) : 0,
+        currency: tier.currency ?? resolvedDetail.subscription.currency ?? 'USD',
+        interval: tier.billingInterval ?? resolvedDetail.subscription.billingInterval ?? 'monthly',
+        seats: tier.metadata?.seats ?? null,
+        trialPeriodDays: Number.isFinite(Number(tier.trialPeriodDays)) ? Number(tier.trialPeriodDays) : null,
+        benefits: Array.isArray(tier.benefits) ? tier.benefits : [],
+        metadata: tier.metadata ?? {}
+      }));
     }
-  }, [resolvedDetail, selectedPlanId]);
+
+    return (resolvedDetail.subscription.plans ?? []).map((plan) => ({
+      ...plan,
+      priceCents: Number.isFinite(Number(plan.priceCents))
+        ? Number(plan.priceCents)
+        : Number.isFinite(Number(plan.price))
+          ? Math.round(Number(plan.price) * 100)
+          : 0,
+      currency: plan.currency ?? resolvedDetail.subscription.currency ?? 'USD',
+      interval: plan.interval ?? resolvedDetail.subscription.billingInterval ?? 'monthly',
+      seats: plan.seats ?? null,
+      trialPeriodDays: plan.trialPeriodDays ?? null,
+      benefits: Array.isArray(plan.benefits) ? plan.benefits : []
+    }));
+  }, [paywallTiers, resolvedDetail.subscription]);
+
+  const subscriptionAddons = useMemo(() => {
+    return (resolvedDetail.subscription.addons ?? []).map((addon) => ({
+      ...addon,
+      priceCents: Number.isFinite(Number(addon.priceCents))
+        ? Number(addon.priceCents)
+        : Number.isFinite(Number(addon.price))
+          ? Math.round(Number(addon.price) * 100)
+          : 0
+    }));
+  }, [resolvedDetail.subscription.addons]);
+
+  useEffect(() => {
+    if (!subscriptionPlans.length) return;
+    if (!selectedPlanId || !subscriptionPlans.some((plan) => plan.id === selectedPlanId)) {
+      setSelectedPlanId(subscriptionPlans[0]?.id ?? null);
+    }
+  }, [subscriptionPlans, selectedPlanId]);
 
   useEffect(() => {
     setSelectedAddons([]);
+    setSubscriptionStatus(null);
+    setSubscriptionError(null);
+    setSubscriptionCheckouts([]);
   }, [selectedCommunityId]);
 
   const selectedPlan = useMemo(() => {
-    if (!resolvedDetail?.subscription?.plans) return null;
-    return resolvedDetail.subscription.plans.find((plan) => plan.id === selectedPlanId) ?? null;
-  }, [resolvedDetail, selectedPlanId]);
+    if (!subscriptionPlans.length) return null;
+    return subscriptionPlans.find((plan) => plan.id === selectedPlanId) ?? subscriptionPlans[0] ?? null;
+  }, [subscriptionPlans, selectedPlanId]);
 
-  const totalSubscriptionCost = useMemo(() => {
-    const base = selectedPlan ? Number(selectedPlan.price ?? 0) : 0;
-    const addons = resolvedDetail?.subscription?.addons ?? [];
-    const addOnTotal = selectedAddons.reduce((total, addOnId) => {
-      const addOn = addons.find((item) => item.id === addOnId);
-      return total + Number(addOn?.price ?? 0);
+  const subscriptionCurrency = selectedPlan?.currency ?? subscriptionPlans[0]?.currency ?? 'USD';
+
+  const totalSubscriptionCostCents = useMemo(() => {
+    if (!selectedPlan) return 0;
+    const addonTotal = selectedAddons.reduce((total, addonId) => {
+      const addon = subscriptionAddons.find((item) => item.id === addonId);
+      return addon ? total + Number(addon.priceCents ?? 0) : total;
     }, 0);
-    return base + addOnTotal;
-  }, [selectedPlan, selectedAddons, resolvedDetail?.subscription?.addons]);
+    return Number(selectedPlan.priceCents ?? 0) + addonTotal;
+  }, [selectedPlan, selectedAddons, subscriptionAddons]);
 
-  const handleAddOnToggle = (addOnId) => {
-    setSelectedAddons((prev) => {
-      if (prev.includes(addOnId)) {
-        return prev.filter((id) => id !== addOnId);
+  const totalSubscriptionCostDisplay = formatCurrency(totalSubscriptionCostCents / 100, subscriptionCurrency);
+
+  const handleAddOnToggle = (addonId) => {
+    setSelectedAddons((prev) => (prev.includes(addonId) ? prev.filter((id) => id !== addonId) : [...prev, addonId]));
+  };
+
+  const loadPaywallTiers = useCallback(
+    async ({ signal } = {}) => {
+      if (!token || !selectedCommunityId || selectedCommunityId === 'all') {
+        setPaywallTiers([]);
+        return;
       }
-      return [...prev, addOnId];
-    });
+      setPaywallLoading(true);
+      try {
+        const response = await listCommunityPaywallTiers({
+          communityId: selectedCommunityId,
+          token,
+          includeInactive: false,
+          signal
+        });
+        if (!signal?.aborted) {
+          setPaywallTiers(response?.data ?? []);
+        }
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
+          return;
+        }
+        setPaywallTiers([]);
+        setSubscriptionError(error.message ?? 'Unable to load paywall tiers');
+      } finally {
+        if (!signal?.aborted) {
+          setPaywallLoading(false);
+        }
+      }
+    },
+    [selectedCommunityId, token]
+  );
+
+  const loadMySubscriptions = useCallback(
+    async ({ signal } = {}) => {
+      if (!token || !selectedCommunityId || selectedCommunityId === 'all') {
+        setMySubscriptions([]);
+        return;
+      }
+      setSubscriptionLoading(true);
+      setSubscriptionError(null);
+      try {
+        const response = await listMyCommunitySubscriptions({
+          communityId: selectedCommunityId,
+          token,
+          signal
+        });
+        if (!signal?.aborted) {
+          setMySubscriptions(response?.data ?? response ?? []);
+        }
+      } catch (error) {
+        if (isAbortError(error) || signal?.aborted) {
+          return;
+        }
+        setSubscriptionError(error.message ?? 'Unable to load subscriptions');
+        setMySubscriptions([]);
+      } finally {
+        if (!signal?.aborted) {
+          setSubscriptionLoading(false);
+        }
+      }
+    },
+    [selectedCommunityId, token]
+  );
+
+  useEffect(() => {
+    if (!token || !selectedCommunityId || selectedCommunityId === 'all') {
+      setPaywallTiers([]);
+      setMySubscriptions([]);
+      return undefined;
+    }
+    const controller = new AbortController();
+    loadPaywallTiers({ signal: controller.signal });
+    loadMySubscriptions({ signal: controller.signal });
+    return () => controller.abort();
+  }, [token, selectedCommunityId, loadPaywallTiers, loadMySubscriptions]);
+
+  const handleSubscriptionFormChange = (event) => {
+    const { name, value } = event.target;
+    setSubscriptionForm((current) => ({
+      ...current,
+      [name]: value
+    }));
+  };
+
+  const handleSubscriptionCheckout = async (event) => {
+    event.preventDefault();
+    if (!token) {
+      setSubscriptionStatus({ type: 'error', message: 'Sign in to start a subscription checkout.' });
+      return;
+    }
+    if (!selectedCommunityId || selectedCommunityId === 'all') {
+      setSubscriptionStatus({ type: 'error', message: 'Select a community to continue.' });
+      return;
+    }
+    if (!selectedPlan) {
+      setSubscriptionStatus({ type: 'error', message: 'Select a subscription tier to continue.' });
+      return;
+    }
+
+    const tierId = selectedPlan?.id;
+    if (!Number.isInteger(Number(tierId))) {
+      setSubscriptionStatus({
+        type: 'error',
+        message: 'This community does not have live paywall tiers yet. Contact an administrator.'
+      });
+      return;
+    }
+
+    setSubscriptionStatus({ type: 'pending', message: 'Preparing subscription checkout…' });
+    setSubscriptionError(null);
+    try {
+      const payload = {
+        tierId: Number(tierId),
+        provider: subscriptionForm.provider,
+        couponCode: subscriptionForm.couponCode?.trim() || undefined,
+        receiptEmail: subscriptionForm.receiptEmail?.trim() || undefined,
+        affiliateCode: subscriptionForm.affiliateCode?.trim() || undefined
+      };
+      if (subscriptionForm.taxCountry) {
+        payload.tax = {
+          country: subscriptionForm.taxCountry,
+          region: subscriptionForm.taxRegion?.trim() || undefined,
+          postalCode: subscriptionForm.taxPostalCode?.trim() || undefined
+        };
+      }
+      const response = await startCommunitySubscriptionCheckout({
+        communityId: selectedCommunityId,
+        token,
+        payload
+      });
+      const payment = response?.data?.payment ?? response?.payment ?? {};
+      const subscription = response?.data?.subscription ?? response?.subscription ?? {};
+      const approvalHint = payment.approvalUrl
+        ? `Approval URL ready: ${payment.approvalUrl}`
+        : payment.clientSecret
+          ? `Stripe client secret issued: ${payment.clientSecret}`
+          : 'Payment reference generated. Continue in your billing provider to confirm.';
+      setSubscriptionStatus({
+        type: 'success',
+        message: `Checkout created. Payment ${payment.paymentId ?? 'pending'} · ${approvalHint}`
+      });
+      setSubscriptionCheckouts((current) => [
+        {
+          id: payment.paymentId ?? `${subscription.publicId ?? tierId}-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          paymentId: payment.paymentId ?? null,
+          approvalUrl: payment.approvalUrl ?? null,
+          clientSecret: payment.clientSecret ?? null,
+          provider: subscriptionForm.provider,
+          tierName: selectedPlan.name,
+          amountCents: totalSubscriptionCostCents,
+          currency: subscriptionCurrency
+        },
+        ...current.slice(0, 7)
+      ]);
+      await loadMySubscriptions();
+    } catch (error) {
+      setSubscriptionStatus({
+        type: 'error',
+        message: error.message ?? 'Unable to start subscription checkout.'
+      });
+    }
+  };
+
+  const handleRefreshSubscriptions = () => {
+    setSubscriptionStatus(null);
+    setSubscriptionError(null);
+    loadMySubscriptions();
+  };
+
+  const handleRefreshPaywall = () => {
+    setSubscriptionError(null);
+    loadPaywallTiers();
+  };
+
+  const handleCancelSubscription = async (subscriptionId, cancelAtPeriodEnd = false) => {
+    if (!token || !selectedCommunityId || !subscriptionId) {
+      return;
+    }
+    setSubscriptionStatus({ type: 'pending', message: 'Processing cancellation…' });
+    try {
+      await cancelMyCommunitySubscription({
+        communityId: selectedCommunityId,
+        subscriptionId,
+        token,
+        payload: { cancelAtPeriodEnd }
+      });
+      setSubscriptionStatus({
+        type: 'success',
+        message: cancelAtPeriodEnd
+          ? 'Cancellation scheduled for the end of the billing cycle.'
+          : 'Subscription cancelled.'
+      });
+      await loadMySubscriptions();
+    } catch (error) {
+      setSubscriptionStatus({
+        type: 'error',
+        message: error.message ?? 'Unable to cancel subscription.'
+      });
+    }
   };
 
   const handleLoadMoreResources = useCallback(async () => {
@@ -1170,7 +1454,21 @@ export default function Communities() {
                   )}
                 </div>
                 <div className="mt-6 space-y-4">
-                  {resolvedDetail.subscription.plans.map((plan) => (
+                  <div className="flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <span>Available tiers</span>
+                    <button
+                      type="button"
+                      onClick={handleRefreshPaywall}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-slate-500 transition hover:border-primary hover:text-primary"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  {paywallLoading ? <p className="text-xs text-slate-500">Loading live pricing…</p> : null}
+                  {subscriptionPlans.length === 0 && !paywallLoading ? (
+                    <p className="text-sm text-slate-500">No billing tiers published yet. Use the operations console to launch monetisation.</p>
+                  ) : null}
+                  {subscriptionPlans.map((plan) => (
                     <button
                       key={plan.id}
                       type="button"
@@ -1182,16 +1480,29 @@ export default function Communities() {
                       }`}
                       disabled={!canManageCommunitySubscriptions}
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="space-y-2">
                           <p className="text-sm font-semibold">{plan.name}</p>
-                          <p className="mt-1 text-xs text-slate-500">{plan.description}</p>
+                          <p className="text-xs text-slate-500">{plan.description || 'Modular cohort access with governed collaboration.'}</p>
+                          {plan.benefits?.length ? (
+                            <ul className="space-y-1 text-xs text-slate-500">
+                              {plan.benefits.map((benefit) => (
+                                <li key={benefit} className="flex items-center gap-2">
+                                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">✓</span>
+                                  <span>{benefit}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-semibold text-primary">
-                            {resolvedDetail.subscription.currency} {numberFormatter.format(plan.price)} / {resolvedDetail.subscription.billingInterval}
+                            {formatCurrency((plan.priceCents ?? 0) / 100, plan.currency)} / {plan.interval}
                           </p>
-                          <p className="text-xs text-slate-500">{plan.seats} seats</p>
+                          {plan.trialPeriodDays ? (
+                            <p className="text-xs text-emerald-600">{plan.trialPeriodDays}-day trial</p>
+                          ) : null}
+                          {plan.seats ? <p className="text-xs text-slate-500">{plan.seats} seats</p> : null}
                         </div>
                       </div>
                     </button>
@@ -1199,7 +1510,7 @@ export default function Communities() {
                 </div>
                 <div className="mt-6 space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-primary">Add-ons</p>
-                  {resolvedDetail.subscription.addons.map((addon) => {
+                  {subscriptionAddons.map((addon) => {
                     const selected = selectedAddons.includes(addon.id);
                     return (
                       <label
@@ -1220,15 +1531,158 @@ export default function Communities() {
                           <p className="mt-1 text-xs text-slate-500">{addon.description}</p>
                         </div>
                         <span className="text-sm font-semibold text-primary">
-                          +{resolvedDetail.subscription.currency} {numberFormatter.format(addon.price)}
+                          +{formatCurrency((addon.priceCents ?? 0) / 100, subscriptionCurrency)}
                         </span>
                       </label>
                     );
                   })}
                 </div>
-                <div className="mt-6 rounded-3xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
-                  Total investment: {resolvedDetail.subscription.currency} {numberFormatter.format(totalSubscriptionCost)} /{' '}
-                  {resolvedDetail.subscription.billingInterval}
+                <div className="mt-6 space-y-4">
+                  <div className="rounded-3xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary">
+                    Total investment: {totalSubscriptionCostDisplay}
+                  </div>
+                  <form className="space-y-4" onSubmit={handleSubscriptionCheckout}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Billing provider
+                        <select
+                          name="provider"
+                          value={subscriptionForm.provider}
+                          onChange={handleSubscriptionFormChange}
+                          className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        >
+                          <option value="stripe">Stripe</option>
+                          <option value="paypal">PayPal</option>
+                        </select>
+                      </label>
+                      <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Receipt email
+                        <input
+                          type="email"
+                          name="receiptEmail"
+                          value={subscriptionForm.receiptEmail}
+                          onChange={handleSubscriptionFormChange}
+                          placeholder="finance@example.com"
+                          className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                      <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Coupon code
+                        <input
+                          type="text"
+                          name="couponCode"
+                          value={subscriptionForm.couponCode}
+                          onChange={handleSubscriptionFormChange}
+                          placeholder="GROWTH2024"
+                          className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                      <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Affiliate code
+                        <input
+                          type="text"
+                          name="affiliateCode"
+                          value={subscriptionForm.affiliateCode}
+                          onChange={handleSubscriptionFormChange}
+                          placeholder="PARTNER-OPS"
+                          className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Tax country
+                        <input
+                          type="text"
+                          name="taxCountry"
+                          maxLength={2}
+                          value={subscriptionForm.taxCountry}
+                          onChange={handleSubscriptionFormChange}
+                          className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold uppercase text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                      <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Tax region
+                        <input
+                          type="text"
+                          name="taxRegion"
+                          value={subscriptionForm.taxRegion}
+                          onChange={handleSubscriptionFormChange}
+                          className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold uppercase text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                      <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Tax postal code
+                        <input
+                          type="text"
+                          name="taxPostalCode"
+                          value={subscriptionForm.taxPostalCode}
+                          onChange={handleSubscriptionFormChange}
+                          className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                      </label>
+                    </div>
+                    <button
+                      type="submit"
+                      className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark"
+                    >
+                      Start checkout
+                    </button>
+                  </form>
+                  {subscriptionStatus ? (
+                    <p
+                      className={`rounded-3xl px-4 py-3 text-sm font-semibold ${
+                        subscriptionStatus.type === 'success'
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : subscriptionStatus.type === 'error'
+                            ? 'bg-rose-50 text-rose-600'
+                            : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {subscriptionStatus.message}
+                    </p>
+                  ) : null}
+                  {subscriptionError ? (
+                    <p className="rounded-3xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">{subscriptionError}</p>
+                  ) : null}
+                  {subscriptionCheckouts.length > 0 ? (
+                    <div className="space-y-2 text-xs text-slate-500">
+                      <p className="font-semibold uppercase tracking-[0.3em] text-slate-400">Recent checkouts</p>
+                      <ul className="space-y-2">
+                        {subscriptionCheckouts.map((entry) => (
+                          <li
+                            key={entry.id}
+                            className="rounded-3xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="font-semibold text-slate-900">{entry.tierName}</span>
+                              <span className="text-[10px] uppercase tracking-[0.3em] text-slate-400">
+                                {new Date(entry.createdAt).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs">
+                              {formatCurrency((entry.amountCents ?? 0) / 100, entry.currency)} · {entry.provider}
+                            </p>
+                            {entry.approvalUrl ? (
+                              <p className="mt-1">
+                                <a
+                                  href={entry.approvalUrl}
+                                  className="text-primary underline"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  View approval link
+                                </a>
+                              </p>
+                            ) : null}
+                            {entry.clientSecret ? (
+                              <p className="mt-1 break-all text-[10px] text-slate-400">Client secret: {entry.clientSecret}</p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 
@@ -1311,6 +1765,99 @@ export default function Communities() {
                 </div>
               </div>
             </aside>
+          </section>
+
+          <section className="rounded-4xl border border-slate-200 bg-white/90 p-6 shadow-xl">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">My subscriptions</p>
+                <h2 className="mt-1 text-xl font-semibold text-slate-900">Billing lifecycle</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                  Track active tiers, renewal windows, and cancellation status. Actions sync with the billing service instantly.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRefreshSubscriptions}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 transition hover:border-primary hover:text-primary"
+              >
+                Refresh
+              </button>
+            </div>
+            {subscriptionLoading ? (
+              <p className="mt-4 text-sm text-slate-500">Loading subscription records…</p>
+            ) : null}
+            {!subscriptionLoading && mySubscriptions.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">
+                No subscription records yet. Launch a checkout above to activate your membership.
+              </p>
+            ) : null}
+            <div className="mt-6 grid gap-4">
+              {mySubscriptions.map((subscription) => {
+                const tierName = subscription.tier?.name ?? selectedPlan?.name ?? 'Community subscription';
+                const status = subscription.status ?? 'pending';
+                const started = subscription.startedAt ? new Date(subscription.startedAt).toLocaleDateString() : 'Pending';
+                const renews = subscription.currentPeriodEnd
+                  ? new Date(subscription.currentPeriodEnd).toLocaleDateString()
+                  : 'TBC';
+                const cancelScheduled = subscription.cancelAtPeriodEnd;
+                return (
+                  <div
+                    key={subscription.publicId ?? subscription.id}
+                    className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-primary/5 to-white p-5 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-sm font-semibold text-slate-900">{tierName}</h3>
+                          <span
+                            className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] ${
+                              status === 'active'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : status === 'canceled' || status === 'cancelled'
+                                  ? 'bg-rose-100 text-rose-600'
+                                  : 'bg-slate-200 text-slate-600'
+                            }`}
+                          >
+                            {status}
+                          </span>
+                          {cancelScheduled ? (
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] text-amber-700">
+                              Cancel at period end
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-slate-500">Started {started} · Renews {renews}</p>
+                        {subscription.latestPaymentIntentId ? (
+                          <p className="text-xs text-slate-500">Latest payment intent: {subscription.latestPaymentIntentId}</p>
+                        ) : null}
+                        {subscription.metadata?.couponCode ? (
+                          <p className="text-xs text-slate-500">Coupon: {subscription.metadata.couponCode}</p>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCancelSubscription(subscription.publicId, true)}
+                          className="inline-flex items-center gap-2 rounded-full border border-amber-200 px-4 py-2 text-xs font-semibold text-amber-600 transition hover:border-amber-300 hover:bg-amber-50"
+                          disabled={status === 'canceled' || status === 'cancelled'}
+                        >
+                          Cancel at renewal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCancelSubscription(subscription.publicId, false)}
+                          className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50"
+                          disabled={status === 'canceled' || status === 'cancelled'}
+                        >
+                          Cancel now
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </section>
         </div>
       </div>
