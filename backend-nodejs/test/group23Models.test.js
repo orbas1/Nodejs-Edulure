@@ -7,6 +7,7 @@ import MonetizationRevenueScheduleModel from '../src/models/MonetizationRevenueS
 import MonetizationUsageRecordModel from '../src/models/MonetizationUsageRecordModel.js';
 import PaymentCouponModel from '../src/models/PaymentCouponModel.js';
 import PaymentIntentModel from '../src/models/PaymentIntentModel.js';
+import PaymentLedgerEntryModel from '../src/models/PaymentLedgerEntryModel.js';
 import PaymentRefundModel from '../src/models/PaymentRefundModel.js';
 import PlatformSettingModel from '../src/models/PlatformSettingModel.js';
 import PodcastEpisodeModel from '../src/models/PodcastEpisodeModel.js';
@@ -34,6 +35,7 @@ const TABLE_ORDER = [
   'payment_coupon_redemptions',
   'payment_intents',
   'payment_refunds',
+  'payment_ledger_entries',
   'platform_settings',
   'podcast_shows',
   'podcast_episodes',
@@ -219,6 +221,17 @@ const TABLE_DEFINITIONS = {
     table.string('sensitive_details_hash');
     table.string('classification_tag');
     table.string('encryption_key_version');
+    table.timestamp('created_at').defaultTo(connection.fn.now());
+    table.timestamp('updated_at').defaultTo(connection.fn.now());
+  },
+  payment_ledger_entries(table) {
+    table.increments('id');
+    table.string('payment_intent_id').notNullable();
+    table.string('entry_type').notNullable();
+    table.integer('amount').defaultTo(0);
+    table.string('currency').notNullable();
+    table.text('details');
+    table.timestamp('recorded_at').notNullable().defaultTo(connection.fn.now());
     table.timestamp('created_at').defaultTo(connection.fn.now());
     table.timestamp('updated_at').defaultTo(connection.fn.now());
   },
@@ -621,6 +634,33 @@ describe('Group 23 model flows', () => {
       connection
     );
     expect(processed).toMatchObject({ status: 'succeeded', processedAt: iso('2024-02-01') });
+
+    await expect(PaymentLedgerEntryModel.record({ entryType: 'credit' }, connection)).rejects.toThrow(
+      /paymentIntentId is required/
+    );
+
+    const ledgerEntry = await PaymentLedgerEntryModel.record(
+      {
+        paymentIntentId: intent.publicId,
+        entryType: 'Captured Revenue',
+        amount: 3600.49,
+        currency: 'gbp',
+        details: { source: 'checkout', reference: 'order-123' }
+      },
+      connection
+    );
+
+    expect(ledgerEntry).toMatchObject({
+      paymentIntentId: intent.publicId,
+      entryType: 'captured-revenue',
+      amount: 3600,
+      currency: 'GBP'
+    });
+    expect(ledgerEntry.details).toMatchObject({ source: 'checkout', currency: 'GBP', entryType: 'captured-revenue' });
+
+    const ledgerEntries = await PaymentLedgerEntryModel.listForPayment(intent.publicId, connection);
+    expect(ledgerEntries).toHaveLength(1);
+    expect(ledgerEntries[0].recordedAt).toBeTruthy();
   });
 
   it('stores platform settings and synchronises podcast show and episode metadata', async () => {
