@@ -48,17 +48,18 @@ function getQueryConnection(connection) {
     return null;
   }
 
+  if (isQueryableConnection(resolved)) {
+    return resolved;
+  }
+
   if (resolved?.isTransaction?.() && typeof resolved !== 'function') {
     const fallback = resolveConnection();
     return isQueryableConnection(fallback) ? fallback : null;
   }
 
-  if (isQueryableConnection(resolved)) {
-    return resolved;
-  }
-
-  if (resolved && typeof resolved === 'object' && typeof resolved.isTransaction !== 'function') {
-    return resolved;
+  if (typeof resolved?.transaction === 'function') {
+    const fallback = resolveConnection();
+    return isQueryableConnection(fallback) ? fallback : null;
   }
 
   return null;
