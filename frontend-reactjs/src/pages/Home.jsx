@@ -1,6 +1,7 @@
 import HomeHero from '../components/home/HomeHero.jsx';
 import FeatureGrid from '../components/FeatureGrid.jsx';
 import Testimonials from '../components/Testimonials.jsx';
+import CoursesAdventure from '../components/home/CoursesAdventure.jsx';
 
 export default function Home() {
   return (
@@ -8,6 +9,7 @@ export default function Home() {
       <HomeHero />
       <FeatureGrid />
       <Testimonials />
+      <CoursesAdventure />
     </div>
   );
 }
