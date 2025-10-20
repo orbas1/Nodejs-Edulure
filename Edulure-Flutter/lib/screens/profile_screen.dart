@@ -8,6 +8,7 @@ import '../provider/community/community_hub_controller.dart';
 import '../provider/profile/user_profile_controller.dart';
 import '../services/community_hub_models.dart';
 import '../services/user_profile_repository.dart';
+import '../widgets/profile/profile_creation_wizard.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -251,31 +252,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 24,
-            right: 24,
-            top: 12,
-          ),
-          child: _ProfileForm(
-            onSubmit: (payload) async {
-              await controller.createProfile(
-                displayName: payload.displayName,
-                headline: payload.headline,
-                email: payload.email,
-                phone: payload.phone,
-                location: payload.location,
-                avatarUrl: payload.avatarUrl,
-                bannerUrl: payload.bannerUrl,
-                bio: payload.bio,
-                videoIntroUrl: payload.videoIntroUrl,
-                calendarUrl: payload.calendarUrl,
-                portfolioUrl: payload.portfolioUrl,
-                skills: payload.skills,
-              );
-            },
-          ),
+        return ProfileCreationWizard(
+          onSubmit: (payload) async {
+            await controller.createProfile(
+              displayName: payload.displayName,
+              headline: payload.headline,
+              email: payload.email,
+              phone: payload.phone,
+              location: payload.location,
+              avatarUrl: payload.avatarUrl,
+              bannerUrl: payload.bannerUrl,
+              bio: payload.bio,
+              videoIntroUrl: payload.videoIntroUrl,
+              calendarUrl: payload.calendarUrl,
+              portfolioUrl: payload.portfolioUrl,
+              skills: payload.skills,
+            );
+          },
         );
       },
     );
@@ -1405,41 +1398,11 @@ class _EmptyState extends StatelessWidget {
 }
 
 
-class _ProfileFormPayload {
-  _ProfileFormPayload({
-    required this.displayName,
-    required this.headline,
-    required this.email,
-    required this.phone,
-    required this.location,
-    required this.avatarUrl,
-    required this.bannerUrl,
-    required this.bio,
-    required this.videoIntroUrl,
-    required this.calendarUrl,
-    required this.portfolioUrl,
-    required this.skills,
-  });
-
-  final String displayName;
-  final String headline;
-  final String email;
-  final String phone;
-  final String location;
-  final String avatarUrl;
-  final String bannerUrl;
-  final String bio;
-  final String videoIntroUrl;
-  final String calendarUrl;
-  final String portfolioUrl;
-  final List<String> skills;
-}
-
 class _ProfileForm extends StatefulWidget {
   const _ProfileForm({required this.onSubmit, this.initial});
 
   final UserProfile? initial;
-  final Future<void> Function(_ProfileFormPayload payload) onSubmit;
+  final Future<void> Function(ProfileFormData payload) onSubmit;
 
   @override
   State<_ProfileForm> createState() => _ProfileFormState();
@@ -1618,7 +1581,7 @@ class _ProfileFormState extends State<_ProfileForm> {
       return;
     }
     setState(() => _saving = true);
-    final payload = _ProfileFormPayload(
+    final payload = ProfileFormData(
       displayName: _nameController.text.trim(),
       headline: _headlineController.text.trim(),
       email: _emailController.text.trim(),
