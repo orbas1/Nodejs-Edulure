@@ -6,6 +6,7 @@ import CommunityChatController from '../controllers/CommunityChatController.js';
 import CommunityMonetizationController from '../controllers/CommunityMonetizationController.js';
 import CommunityMemberAdminController from '../controllers/CommunityMemberAdminController.js';
 import CommunityOperationsController from '../controllers/CommunityOperationsController.js';
+import CommunityProgrammingController from '../controllers/CommunityProgrammingController.js';
 import auth from '../middleware/auth.js';
 
 const router = Router();
@@ -28,6 +29,37 @@ router.get('/:communityId/resources', auth(), CommunityController.listResources)
 router.post('/:communityId/resources', auth(), CommunityController.createResource);
 router.put('/:communityId/resources/:resourceId', auth(), CommunityController.updateResource);
 router.delete('/:communityId/resources/:resourceId', auth(), CommunityController.deleteResource);
+
+router.get('/:communityId/webinars', auth(), CommunityProgrammingController.listWebinars);
+router.post('/:communityId/webinars', auth(), CommunityProgrammingController.createWebinar);
+router.put('/:communityId/webinars/:webinarId', auth(), CommunityProgrammingController.updateWebinar);
+router.delete('/:communityId/webinars/:webinarId', auth(), CommunityProgrammingController.deleteWebinar);
+
+router.get('/:communityId/podcasts', auth(), CommunityProgrammingController.listPodcastEpisodes);
+router.post('/:communityId/podcasts', auth(), CommunityProgrammingController.createPodcastEpisode);
+router.put('/:communityId/podcasts/:episodeId', auth(), CommunityProgrammingController.updatePodcastEpisode);
+router.delete('/:communityId/podcasts/:episodeId', auth(), CommunityProgrammingController.deletePodcastEpisode);
+
+router.get(
+  '/:communityId/growth/experiments',
+  auth(),
+  CommunityProgrammingController.listGrowthExperiments
+);
+router.post(
+  '/:communityId/growth/experiments',
+  auth(),
+  CommunityProgrammingController.createGrowthExperiment
+);
+router.put(
+  '/:communityId/growth/experiments/:experimentId',
+  auth(),
+  CommunityProgrammingController.updateGrowthExperiment
+);
+router.delete(
+  '/:communityId/growth/experiments/:experimentId',
+  auth(),
+  CommunityProgrammingController.deleteGrowthExperiment
+);
 
 router.get('/:communityId/members', auth('instructor'), CommunityMemberAdminController.list);
 router.post('/:communityId/members', auth('instructor'), CommunityMemberAdminController.create);

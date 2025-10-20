@@ -104,6 +104,9 @@ export async function seed(knex) {
     await trx('feature_flags').del();
     await trx('configuration_entries').del();
     await trx('community_resources').del();
+    await trx('community_growth_experiments').del();
+    await trx('community_podcast_episodes').del();
+    await trx('community_webinars').del();
     await trx('community_message_moderation_actions').del();
     await trx('community_message_reactions').del();
     await trx('community_channel_members').del();
@@ -790,6 +793,114 @@ export async function seed(knex) {
         published_at: trx.fn.now(),
         metadata: JSON.stringify({ requiresSso: true })
     });
+
+    const upcomingOpsWebinarStartAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+    const followUpOpsWebinarStartAt = new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString();
+
+    await trx('community_webinars').insert([
+      {
+        community_id: opsCommunityId,
+        created_by: instructorId,
+        topic: 'Incident command rehearsal',
+        host: 'Learning Ops Guild',
+        start_at: upcomingOpsWebinarStartAt,
+        status: 'announced',
+        registrant_count: 128,
+        watch_url: 'https://events.edulure.test/ops-incident-command',
+        description:
+          'Live tabletop drill walking through classroom failover, paging flows, and escalation runbooks ahead of launch week.',
+        metadata: JSON.stringify({ track: 'operations', tags: ['automation', 'qa'] })
+      },
+      {
+        community_id: opsCommunityId,
+        created_by: instructorId,
+        topic: 'Automation war room retrospective',
+        host: 'Amina Diallo',
+        start_at: followUpOpsWebinarStartAt,
+        status: 'draft',
+        registrant_count: 64,
+        watch_url: 'https://events.edulure.test/ops-automation-retro',
+        description:
+          'Post-launch retrospective covering automation wins, failure points, and roadmap items queued for the next sprint.',
+        metadata: JSON.stringify({ track: 'operations', requiresPrep: true })
+      }
+    ]);
+
+    const primaryPodcastReleaseOn = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const teaserPodcastReleaseOn = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    await trx('community_podcast_episodes').insert([
+      {
+        community_id: growthCommunityId,
+        created_by: adminId,
+        title: 'Paid social lift-off',
+        host: 'Kai Growth',
+        stage: 'recording',
+        release_on: teaserPodcastReleaseOn,
+        duration_minutes: 28,
+        summary:
+          'Creative teardown of the top performing reels and how they ladder into the multi-touch nurture sequence.',
+        audio_url: 'https://cdn.edulure.test/audio/paid-social-liftoff.mp3',
+        cover_art_url: 'https://cdn.edulure.test/podcasts/growth-lab/cover.jpg',
+        metadata: JSON.stringify({ keywords: ['paid', 'creative'], transcriptAvailable: true })
+      },
+      {
+        community_id: growthCommunityId,
+        created_by: adminId,
+        title: 'Lifecycle automation AMA',
+        host: 'Creator Growth Lab',
+        stage: 'scheduled',
+        release_on: primaryPodcastReleaseOn,
+        duration_minutes: 42,
+        summary:
+          'Answering community questions on lifecycle segmentation, audience syncs, and nurture performance benchmarks.',
+        audio_url: null,
+        cover_art_url: 'https://cdn.edulure.test/podcasts/growth-lab/lifecycle-ama.png',
+        metadata: JSON.stringify({ guests: ['Amina Diallo'], format: 'ask-me-anything' })
+      }
+    ]);
+
+    const growthExperimentStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const growthExperimentEnd = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    await trx('community_growth_experiments').insert([
+      {
+        community_id: growthCommunityId,
+        created_by: adminId,
+        title: 'Creator onboarding nurture revamp',
+        owner_name: 'Kai Growth',
+        status: 'building',
+        target_metric: 'Activation rate',
+        baseline_value: 32.5,
+        target_value: 45.0,
+        impact_score: 4.5,
+        start_date: growthExperimentStart,
+        end_date: growthExperimentEnd,
+        hypothesis:
+          'If we layer interactive briefs into the onboarding sequence, creators will publish their first campaign faster.',
+        notes: 'Needs updated product education assets from the ops guild.',
+        experiment_url: 'https://analytics.edulure.test/exp/onboarding-nurture-revamp',
+        metadata: JSON.stringify({ segment: 'new_creators', squad: 'growth' })
+      },
+      {
+        community_id: opsCommunityId,
+        created_by: instructorId,
+        title: 'Tutor readiness scoring',
+        owner_name: 'Learning Ops Guild',
+        status: 'design',
+        target_metric: 'Tutor NPS',
+        baseline_value: 71.2,
+        target_value: 78.0,
+        impact_score: 3.8,
+        start_date: growthExperimentStart,
+        end_date: null,
+        hypothesis:
+          'A readiness score combining rehearsal attendance and quiz scores will surface at-risk tutors before launch.',
+        notes: 'Requires data feed from rehearsal attendance tool.',
+        experiment_url: null,
+        metadata: JSON.stringify({ requiresModeling: true })
+      }
+    ]);
 
     await trx('domain_events').insert([
       {

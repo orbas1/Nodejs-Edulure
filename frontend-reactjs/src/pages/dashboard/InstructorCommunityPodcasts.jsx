@@ -1,10 +1,18 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
+import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
-import usePersistentCollection from '../../hooks/usePersistentCollection.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { fetchCommunities } from '../../api/communityApi.js';
+import {
+  createCommunityPodcastEpisode,
+  deleteCommunityPodcastEpisode,
+  listCommunityPodcastEpisodes,
+  updateCommunityPodcastEpisode
+} from '../../api/communityProgrammingApi.js';
 
-const STAGE_OPTIONS = ['Planning', 'Recording', 'Editing', 'QA', 'Scheduled', 'Live'];
+const STAGE_OPTIONS = ['Planning', 'Recording', 'Editing', 'QA', 'Scheduled', 'Live', 'Archived'];
 
 const createEpisodeDraft = () => ({
   episode: '',
@@ -17,48 +25,120 @@ const createEpisodeDraft = () => ({
   coverArtUrl: ''
 });
 
+function normaliseEpisode(episode) {
+  const stageValue = String(episode.stage ?? 'planning').toLowerCase();
+  const stageLabel = stageValue.charAt(0).toUpperCase() + stageValue.slice(1);
+  const release = episode.releaseOn ?? episode.release ?? new Date().toISOString().slice(0, 10);
+  return {
+    id: episode.id ?? `${episode.title}-${release}`,
+    episode: episode.title ?? episode.episode ?? 'Untitled episode',
+    stage: stageLabel,
+    stageValue,
+    release,
+    host: episode.host ?? 'Community host',
+    duration: Number(episode.durationMinutes ?? episode.duration ?? 0),
+    summary: episode.summary ?? '',
+    audioUrl: episode.audioUrl ?? '',
+    coverArtUrl: episode.coverArtUrl ?? '',
+    permissions: episode.permissions ?? { canEdit: true }
+  };
+}
+
 export default function InstructorCommunityPodcasts() {
   const { dashboard, refresh } = useOutletContext();
-  const seedEpisodes = useMemo(
-    () =>
-      (Array.isArray(dashboard?.communities?.podcasts) ? dashboard.communities.podcasts : []).map((episode) => ({
-        id: episode.id ?? `${episode.episode}-${episode.release}`,
-        episode: episode.episode,
-        stage: episode.stage ?? 'Planning',
-        release: episode.release ?? new Date().toISOString().slice(0, 10),
-        host: episode.host ?? 'Community team',
-        duration: Number(episode.duration ?? 30),
-        summary: episode.summary ?? '',
-        audioUrl: episode.audioUrl ?? '',
-        coverArtUrl: episode.coverArtUrl ?? ''
-      })),
-    [dashboard?.communities?.podcasts]
-  );
+  const { session, isAuthenticated } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
 
-  const {
-    items: episodes,
-    addItem,
-    updateItem,
-    removeItem,
-    reset: resetEpisodes
-  } = usePersistentCollection('edulure.community.podcasts', () => seedEpisodes);
+  const [communitiesState, setCommunitiesState] = useState({ items: [], loading: false, error: null });
+  const [selectedCommunityId, setSelectedCommunityId] = useState(null);
 
+  const [episodesState, setEpisodesState] = useState({ items: [], loading: false, error: null });
   const [draft, setDraft] = useState(createEpisodeDraft);
   const [editingId, setEditingId] = useState(null);
   const [stageFilter, setStageFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const [feedback, setFeedback] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const loadCommunities = useCallback(async () => {
+    if (!token || !isAuthenticated) {
+      setCommunitiesState({ items: [], loading: false, error: null });
+      setSelectedCommunityId(null);
+      return;
+    }
+    setCommunitiesState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const response = await fetchCommunities(token);
+      const items = Array.isArray(response.data) ? response.data : [];
+      setCommunitiesState({ items, loading: false, error: null });
+      setSelectedCommunityId((current) => {
+        if (current && items.some((community) => String(community.id) === String(current))) {
+          return current;
+        }
+        return items[0] ? String(items[0].id) : null;
+      });
+    } catch (error) {
+      setCommunitiesState({ items: [], loading: false, error });
+      setSelectedCommunityId(null);
+    }
+  }, [isAuthenticated, token]);
+
+  useEffect(() => {
+    loadCommunities();
+  }, [loadCommunities]);
+
+  const loadEpisodes = useCallback(
+    async (communityId, { showFeedback = false } = {}) => {
+      if (!token || !communityId) {
+        setEpisodesState({ items: [], loading: false, error: null });
+        return;
+      }
+      setEpisodesState((prev) => ({ ...prev, loading: true, error: null }));
+      try {
+        const response = await listCommunityPodcastEpisodes({
+          communityId,
+          token,
+          params: { order: 'desc', limit: 200 }
+        });
+        const items = response.data.map(normaliseEpisode);
+        setEpisodesState({ items, loading: false, error: null });
+        if (showFeedback) {
+          setFeedback({ tone: 'success', message: 'Podcast studio synced successfully.' });
+        }
+      } catch (error) {
+        setEpisodesState({ items: [], loading: false, error });
+      }
+    },
+    [token]
+  );
+
+  useEffect(() => {
+    if (selectedCommunityId) {
+      loadEpisodes(selectedCommunityId);
+    } else {
+      setEpisodesState({ items: [], loading: false, error: null });
+    }
+  }, [loadEpisodes, selectedCommunityId]);
+
+  useEffect(() => {
+    if (Array.isArray(dashboard?.communities?.podcasts) && episodesState.items.length === 0 && selectedCommunityId) {
+      const seeded = dashboard.communities.podcasts.map(normaliseEpisode);
+      setEpisodesState({ items: seeded, loading: false, error: null });
+    }
+  }, [dashboard?.communities?.podcasts, episodesState.items.length, selectedCommunityId]);
 
   const productionStats = useMemo(() => {
-    const totalMinutes = episodes.reduce((total, episode) => total + Number(episode.duration ?? 0), 0);
-    const byStage = episodes.reduce((acc, episode) => {
-      acc[episode.stage] = (acc[episode.stage] ?? 0) + 1;
+    const totalMinutes = episodesState.items.reduce((total, episode) => total + Number(episode.duration ?? 0), 0);
+    const byStage = episodesState.items.reduce((acc, episode) => {
+      const stage = episode.stage;
+      acc[stage] = (acc[stage] ?? 0) + 1;
       return acc;
     }, {});
     return { totalMinutes, byStage };
-  }, [episodes]);
+  }, [episodesState.items]);
 
   const filteredEpisodes = useMemo(() => {
-    return episodes.filter((episode) => {
+    return episodesState.items.filter((episode) => {
       const matchesStage = stageFilter === 'All' || episode.stage === stageFilter;
       if (!matchesStage) {
         return false;
@@ -72,33 +152,7 @@ export default function InstructorCommunityPodcasts() {
         .toLowerCase()
         .includes(query);
     });
-  }, [episodes, searchTerm, stageFilter]);
-
-  const handleSubmit = useCallback(
-    (event) => {
-      event.preventDefault();
-      const payload = {
-        episode: draft.episode || 'Untitled episode',
-        stage: draft.stage,
-        release: draft.release,
-        host: draft.host || 'Community host',
-        duration: Number.isNaN(Number(draft.duration)) ? 0 : Number(draft.duration),
-        summary: draft.summary,
-        audioUrl: draft.audioUrl,
-        coverArtUrl: draft.coverArtUrl
-      };
-
-      if (editingId) {
-        updateItem(editingId, payload);
-      } else {
-        addItem(payload);
-      }
-
-      setDraft(createEpisodeDraft());
-      setEditingId(null);
-    },
-    [addItem, draft, editingId, updateItem]
-  );
+  }, [episodesState.items, searchTerm, stageFilter]);
 
   const handleEdit = useCallback((episode) => {
     setEditingId(episode.id);
@@ -110,7 +164,7 @@ export default function InstructorCommunityPodcasts() {
       duration: episode.duration,
       summary: episode.summary,
       audioUrl: episode.audioUrl,
-      coverArtUrl: episode.coverArtUrl ?? ''
+      coverArtUrl: episode.coverArtUrl
     });
   }, []);
 
@@ -119,17 +173,123 @@ export default function InstructorCommunityPodcasts() {
     setDraft(createEpisodeDraft());
   }, []);
 
+  const handleSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!selectedCommunityId || !token) {
+        setFeedback({ tone: 'error', message: 'Select a community to manage podcast episodes.' });
+        return;
+      }
+      const payload = {
+        title: draft.episode || 'Untitled episode',
+        host: draft.host || 'Community host',
+        stage: draft.stage.toLowerCase(),
+        releaseOn: draft.release || null,
+        durationMinutes: Number.isNaN(Number(draft.duration)) ? 0 : Number(draft.duration),
+        summary: draft.summary || undefined,
+        audioUrl: draft.audioUrl || undefined,
+        coverArtUrl: draft.coverArtUrl || undefined
+      };
+
+      setSaving(true);
+      try {
+        if (editingId) {
+          await updateCommunityPodcastEpisode({
+            communityId: selectedCommunityId,
+            episodeId: editingId,
+            token,
+            payload
+          });
+          setFeedback({ tone: 'success', message: 'Episode updated successfully.' });
+        } else {
+          await createCommunityPodcastEpisode({ communityId: selectedCommunityId, token, payload });
+          setFeedback({ tone: 'success', message: 'Episode added to the production studio.' });
+        }
+        setDraft(createEpisodeDraft());
+        setEditingId(null);
+        await loadEpisodes(selectedCommunityId);
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to save episode. Please try again.' });
+      } finally {
+        setSaving(false);
+      }
+    },
+    [draft, editingId, loadEpisodes, selectedCommunityId, token]
+  );
+
   const handleAdvanceStage = useCallback(
-    (episode) => {
+    async (episode) => {
+      if (!episode?.id || !selectedCommunityId || !token) return;
       const currentIndex = STAGE_OPTIONS.indexOf(episode.stage);
       const nextStage = STAGE_OPTIONS[Math.min(STAGE_OPTIONS.length - 1, currentIndex + 1)];
-      updateItem(episode.id, { stage: nextStage });
+      try {
+        await updateCommunityPodcastEpisode({
+          communityId: selectedCommunityId,
+          episodeId: episode.id,
+          token,
+          payload: { stage: nextStage.toLowerCase() }
+        });
+        await loadEpisodes(selectedCommunityId);
+        setFeedback({ tone: 'success', message: 'Episode advanced to the next production stage.' });
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to advance stage.' });
+      }
     },
-    [updateItem]
+    [loadEpisodes, selectedCommunityId, token]
   );
+
+  const handleDelete = useCallback(
+    async (episodeId) => {
+      if (!selectedCommunityId || !token) return;
+      try {
+        await deleteCommunityPodcastEpisode({ communityId: selectedCommunityId, episodeId, token });
+        await loadEpisodes(selectedCommunityId);
+        setFeedback({ tone: 'success', message: 'Episode removed from the studio.' });
+        if (editingId === episodeId) {
+          handleCancelEdit();
+        }
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to delete episode.' });
+      }
+    },
+    [editingId, handleCancelEdit, loadEpisodes, selectedCommunityId, token]
+  );
+
+  const handleReset = useCallback(() => {
+    setStageFilter('All');
+    setSearchTerm('');
+    setDraft(createEpisodeDraft());
+    setEditingId(null);
+    if (selectedCommunityId) {
+      loadEpisodes(selectedCommunityId, { showFeedback: true });
+    }
+  }, [loadEpisodes, selectedCommunityId]);
+
+  const productionTotals = useMemo(() => {
+    const stageSummary = {};
+    STAGE_OPTIONS.forEach((stage) => {
+      stageSummary[stage] = productionStats.byStage[stage] ?? 0;
+    });
+    return stageSummary;
+  }, [productionStats.byStage]);
+
+  const isAuthenticatedInstructor = Boolean(token && isAuthenticated);
+
+  if (!isAuthenticatedInstructor) {
+    return (
+      <DashboardStateMessage
+        title="Instructor session required"
+        description="Sign in with an instructor account to manage podcast production."
+        actionLabel="Back"
+        onAction={() => window.history.back()}
+      />
+    );
+  }
 
   return (
     <div className="space-y-8">
+      <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
+
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Community podcast studio</h1>
@@ -138,7 +298,7 @@ export default function InstructorCommunityPodcasts() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" className="dashboard-pill px-4 py-2" onClick={resetEpisodes}>
+          <button type="button" className="dashboard-pill px-4 py-2" onClick={handleReset}>
             Reset queue
           </button>
           <button type="button" className="dashboard-primary-pill" onClick={() => refresh?.()}>
@@ -155,7 +315,7 @@ export default function InstructorCommunityPodcasts() {
         </div>
         <div className="dashboard-card-muted p-5">
           <p className="text-xs uppercase tracking-wide text-slate-500">Episodes</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{episodes.length}</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{episodesState.items.length}</p>
           <p className="mt-1 text-xs text-slate-500">Active episodes monitored in the studio board.</p>
         </div>
         <div className="dashboard-card-muted p-5">
@@ -164,7 +324,7 @@ export default function InstructorCommunityPodcasts() {
             {STAGE_OPTIONS.map((stage) => (
               <li key={stage} className="flex items-center justify-between">
                 <span>{stage}</span>
-                <span className="font-semibold text-slate-700">{productionStats.byStage[stage] ?? 0}</span>
+                <span className="font-semibold text-slate-700">{productionTotals[stage]}</span>
               </li>
             ))}
           </ul>
@@ -178,6 +338,17 @@ export default function InstructorCommunityPodcasts() {
             <h2 className="text-lg font-semibold text-slate-900">Create or import a new episode</h2>
           </div>
           <div className="flex flex-wrap items-center gap-3">
+            <select
+              className="dashboard-input h-10"
+              value={selectedCommunityId ?? ''}
+              onChange={(event) => setSelectedCommunityId(event.target.value || null)}
+            >
+              {communitiesState.items.map((community) => (
+                <option key={community.id} value={community.id}>
+                  {community.name ?? `Community ${community.id}`}
+                </option>
+              ))}
+            </select>
             <select
               className="dashboard-input h-10"
               value={stageFilter}
@@ -293,7 +464,7 @@ export default function InstructorCommunityPodcasts() {
             </label>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <button type="submit" className="dashboard-primary-pill px-6 py-2">
+            <button type="submit" className="dashboard-primary-pill px-6 py-2" disabled={saving}>
               {editingId ? 'Update episode' : 'Add episode to studio'}
             </button>
           </div>
@@ -301,7 +472,7 @@ export default function InstructorCommunityPodcasts() {
 
         <div className="space-y-4">
           {filteredEpisodes.map((episode) => (
-            <article key={episode.id} className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm">
+            <article key={episode.id} className="rounded-2xl border border-slate-200 bg-white/80 p-5 shadow-sm">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-3">
                   <p className="text-xs uppercase tracking-wide text-slate-500">{episode.stage}</p>
@@ -320,13 +491,15 @@ export default function InstructorCommunityPodcasts() {
                       type="button"
                       className="dashboard-pill px-3 py-1"
                       onClick={() => handleAdvanceStage(episode)}
+                      disabled={!episode.permissions?.canEdit}
                     >
                       Advance stage
                     </button>
                     <button
                       type="button"
                       className="dashboard-pill border-transparent bg-rose-50 px-3 py-1 text-rose-600 hover:border-rose-200"
-                      onClick={() => removeItem(episode.id)}
+                      onClick={() => handleDelete(episode.id)}
+                      disabled={!episode.permissions?.canEdit}
                     >
                       Delete
                     </button>
@@ -355,14 +528,24 @@ export default function InstructorCommunityPodcasts() {
 
         {filteredEpisodes.length === 0 ? (
           <DashboardStateMessage
-            title={episodes.length === 0 ? 'No podcast episodes in production' : 'No episodes match your filters'}
+            title={episodesState.items.length === 0 ? 'No podcast episodes in production' : 'No episodes match your filters'}
             description={
-              episodes.length === 0
+              episodesState.items.length === 0
                 ? 'Use the composer above to add your first episode or refresh from your studio integrations.'
                 : 'Broaden the stage filter or clear your search to continue managing the production queue.'
             }
-            actionLabel={episodes.length === 0 ? 'Create episode' : undefined}
-            onAction={episodes.length === 0 ? () => setEditingId(null) : undefined}
+            actionLabel={episodesState.items.length === 0 ? 'Create episode' : undefined}
+            onAction={episodesState.items.length === 0 ? () => setEditingId(null) : undefined}
+          />
+        ) : null}
+
+        {episodesState.error ? (
+          <DashboardStateMessage
+            tone="error"
+            title="Unable to load podcast episodes"
+            description={episodesState.error?.message ?? 'Check your connection and try again.'}
+            actionLabel="Retry"
+            onAction={() => selectedCommunityId && loadEpisodes(selectedCommunityId)}
           />
         ) : null}
       </section>
