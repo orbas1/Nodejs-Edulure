@@ -40,18 +40,19 @@ BEGIN
       email VARCHAR(255) NULL,
       phone VARCHAR(64) NULL,
       status ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
-      specialties JSON NULL,
+      specialties JSON NULL DEFAULT (JSON_ARRAY()),
       rating DECIMAL(3,2) NOT NULL DEFAULT 0.00,
       last_check_in_at DATETIME NULL,
       location_lat DECIMAL(10,7) NULL,
       location_lng DECIMAL(10,7) NULL,
       location_label VARCHAR(255) NULL,
       location_updated_at DATETIME NULL,
-      metadata JSON NULL,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_field_service_providers_status (status),
       INDEX idx_field_service_providers_user (user_id),
+      INDEX idx_field_service_providers_location_updated (location_updated_at),
       CONSTRAINT fk_field_service_providers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   END IF;
@@ -63,7 +64,8 @@ BEGIN
   ) THEN
     ALTER TABLE field_service_providers
       ADD INDEX IF NOT EXISTS idx_field_service_providers_status (status),
-      ADD INDEX IF NOT EXISTS idx_field_service_providers_user (user_id);
+      ADD INDEX IF NOT EXISTS idx_field_service_providers_user (user_id),
+      ADD INDEX IF NOT EXISTS idx_field_service_providers_location_updated (location_updated_at);
   END IF;
 
   IF NOT EXISTS (
@@ -94,13 +96,14 @@ BEGIN
       region VARCHAR(120) NULL,
       postal_code VARCHAR(24) NULL,
       country VARCHAR(2) NOT NULL DEFAULT 'GB',
-      metadata JSON NULL,
+      metadata JSON NOT NULL DEFAULT (JSON_OBJECT()),
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY unique_field_service_order_reference (reference),
       INDEX idx_field_service_orders_status (status),
       INDEX idx_field_service_orders_customer (customer_user_id),
       INDEX idx_field_service_orders_provider (provider_id),
+      INDEX idx_field_service_orders_scheduled (scheduled_for),
       CONSTRAINT fk_field_service_orders_customer FOREIGN KEY (customer_user_id) REFERENCES users(id) ON DELETE CASCADE,
       CONSTRAINT fk_field_service_orders_provider FOREIGN KEY (provider_id) REFERENCES field_service_providers(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -114,7 +117,8 @@ BEGIN
     ALTER TABLE field_service_orders
       ADD INDEX IF NOT EXISTS idx_field_service_orders_status (status),
       ADD INDEX IF NOT EXISTS idx_field_service_orders_customer (customer_user_id),
-      ADD INDEX IF NOT EXISTS idx_field_service_orders_provider (provider_id);
+      ADD INDEX IF NOT EXISTS idx_field_service_orders_provider (provider_id),
+      ADD INDEX IF NOT EXISTS idx_field_service_orders_scheduled (scheduled_for);
   END IF;
 
   IF NOT EXISTS (
@@ -130,7 +134,7 @@ BEGIN
       notes TEXT NULL,
       author VARCHAR(160) NULL,
       occurred_at DATETIME NOT NULL,
-      metadata JSON NULL,
+      metadata JSON NULL DEFAULT (JSON_OBJECT()),
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_field_service_events_order (order_id),
       INDEX idx_field_service_events_occurred_at (occurred_at),

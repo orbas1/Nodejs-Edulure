@@ -30,7 +30,16 @@
       "indexes": [
         { "name": "PRIMARY", "columns": ["id"], "unique": true },
         { "name": "users_email_unique", "columns": ["email"], "unique": true },
-        { "name": "idx_users_role", "columns": ["role"], "unique": false }
+        { "name": "idx_users_role", "columns": ["role"], "unique": false },
+        { "name": "idx_users_email_verified_at", "columns": ["email_verified_at"], "unique": false },
+        { "name": "idx_users_locked_until", "columns": ["locked_until"], "unique": false },
+        { "name": "idx_users_last_login_at", "columns": ["last_login_at"], "unique": false },
+        { "name": "idx_users_two_factor_enabled", "columns": ["two_factor_enabled"], "unique": false },
+        {
+          "name": "idx_users_two_factor_last_verified",
+          "columns": ["two_factor_last_verified_at"],
+          "unique": false
+        }
       ]
     },
     "communities": {
@@ -50,7 +59,9 @@
       "indexes": [
         { "name": "PRIMARY", "columns": ["id"], "unique": true },
         { "name": "idx_communities_owner", "columns": ["owner_id"], "unique": false },
-        { "name": "unique_community_slug", "columns": ["slug"], "unique": true }
+        { "name": "unique_community_slug", "columns": ["slug"], "unique": true },
+        { "name": "idx_communities_slug", "columns": ["slug"], "unique": false },
+        { "name": "idx_communities_deleted_at", "columns": ["deleted_at"], "unique": false }
       ]
     },
     "community_members": {
@@ -66,8 +77,10 @@
       },
       "indexes": [
         { "name": "PRIMARY", "columns": ["id"], "unique": true },
-        { "name": "unique_member", "columns": ["community_id", "user_id"], "unique": true },
-        { "name": "idx_cm_user_status", "columns": ["user_id", "status"], "unique": false }
+        { "name": "community_members_unique_user", "columns": ["community_id", "user_id"], "unique": true },
+        { "name": "idx_community_members_user_status", "columns": ["user_id", "status"], "unique": false },
+        { "name": "idx_community_members_role", "columns": ["community_id", "role"], "unique": false },
+        { "name": "idx_community_members_left_at", "columns": ["left_at"], "unique": false }
       ]
     },
     "field_service_providers": {
@@ -78,21 +91,26 @@
         "email": { "dataType": "varchar", "columnType": "varchar(255)", "isNullable": true, "columnDefault": null },
         "phone": { "dataType": "varchar", "columnType": "varchar(64)", "isNullable": true, "columnDefault": null },
         "status": { "dataType": "enum", "columnType": "enum('active','inactive','suspended')", "isNullable": false, "columnDefault": "active" },
-        "specialties": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "specialties": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": "[]" },
         "rating": { "dataType": "decimal", "columnType": "decimal(3,2)", "isNullable": false, "columnDefault": "0.00" },
         "last_check_in_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": true, "columnDefault": null },
         "location_lat": { "dataType": "decimal", "columnType": "decimal(10,7)", "isNullable": true, "columnDefault": null },
         "location_lng": { "dataType": "decimal", "columnType": "decimal(10,7)", "isNullable": true, "columnDefault": null },
         "location_label": { "dataType": "varchar", "columnType": "varchar(255)", "isNullable": true, "columnDefault": null },
         "location_updated_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": true, "columnDefault": null },
-        "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
         "created_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
         { "name": "PRIMARY", "columns": ["id"], "unique": true },
         { "name": "idx_field_service_providers_status", "columns": ["status"], "unique": false },
-        { "name": "idx_field_service_providers_user", "columns": ["user_id"], "unique": false }
+        { "name": "idx_field_service_providers_user", "columns": ["user_id"], "unique": false },
+        {
+          "name": "idx_field_service_providers_location_updated",
+          "columns": ["location_updated_at"],
+          "unique": false
+        }
       ]
     },
     "field_service_orders": {
@@ -119,7 +137,7 @@
         "region": { "dataType": "varchar", "columnType": "varchar(120)", "isNullable": true, "columnDefault": null },
         "postal_code": { "dataType": "varchar", "columnType": "varchar(24)", "isNullable": true, "columnDefault": null },
         "country": { "dataType": "varchar", "columnType": "varchar(2)", "isNullable": false, "columnDefault": "GB" },
-        "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": false, "columnDefault": "{}" },
         "created_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" },
         "updated_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" }
       },
@@ -128,6 +146,7 @@
         { "name": "idx_field_service_orders_status", "columns": ["status"], "unique": false },
         { "name": "idx_field_service_orders_customer", "columns": ["customer_user_id"], "unique": false },
         { "name": "idx_field_service_orders_provider", "columns": ["provider_id"], "unique": false },
+        { "name": "idx_field_service_orders_scheduled", "columns": ["scheduled_for"], "unique": false },
         { "name": "unique_field_service_order_reference", "columns": ["reference"], "unique": true }
       ]
     },
@@ -140,7 +159,7 @@
         "notes": { "dataType": "text", "columnType": "text", "isNullable": true, "columnDefault": null },
         "author": { "dataType": "varchar", "columnType": "varchar(160)", "isNullable": true, "columnDefault": null },
         "occurred_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": false, "columnDefault": null },
-        "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": null },
+        "metadata": { "dataType": "json", "columnType": "json", "isNullable": true, "columnDefault": "{}" },
         "created_at": { "dataType": "datetime", "columnType": "datetime", "isNullable": false, "columnDefault": "CURRENT_TIMESTAMP" }
       },
       "indexes": [
