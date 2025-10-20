@@ -334,7 +334,7 @@
 - `backend-nodejs/src/controllers/InstructorBookingController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/controllers/InstructorOrchestrationController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/controllers/InstructorSchedulingController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `backend-nodejs/src/controllers/IntegrationKeyInviteController.js` (Syntax:90 | Functionality:85 | Real World Ready:82 | Live Data:70 | Error:90 | Logic Flow:88 | Release Readiness:85 | Tests:88 | Overall:85)
+- `backend-nodejs/src/controllers/IntegrationKeyInviteController.js` (Syntax:96 | Functionality:92 | Real World Ready:90 | Live Data:75 | Error:95 | Logic Flow:93 | Release Readiness:92 | Tests:94 | Overall:91)
 
 ## 15. Group 15 (Files 281-300 of 1169)
 

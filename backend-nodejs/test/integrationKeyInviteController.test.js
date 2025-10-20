@@ -132,4 +132,54 @@ describe('IntegrationKeyInviteController', () => {
     expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'invite-123' } });
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('falls back to authenticated context when actor metadata not provided', async () => {
+    const req = {
+      params: { token: 'token-value-1234567890' },
+      body: { key: 'sk_test_12345678901234567890' },
+      user: { email: 'actor@example.com', name: 'Example Owner' }
+    };
+    const res = createMockRes();
+    const next = vi.fn();
+
+    const resultPayload = { invite: { id: 'invite-2' }, apiKey: { token: 'masked' } };
+    mockService.submitInvitation.mockResolvedValue(resultPayload);
+
+    await submitInvitation(req, res, next);
+
+    const [, payloadArg] = mockService.submitInvitation.mock.calls[0];
+    expect(payloadArg.actorEmail).toBe('actor@example.com');
+    expect(payloadArg.actorName).toBe('Example Owner');
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('translates handled service errors without invoking next', async () => {
+    const req = { params: { token: 'token-value-1234567890' } };
+    const res = createMockRes();
+    const next = vi.fn();
+
+    const notFoundError = Object.assign(new Error('Invitation missing'), { status: 404 });
+    mockService.getInvitationDetails.mockRejectedValueOnce(notFoundError);
+
+    await getInvitation(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.body).toMatchObject({ success: false, message: 'Invitation missing' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('delegates unhandled server errors to next middleware', async () => {
+    const req = { params: { token: 'token-value-1234567890' } };
+    const res = createMockRes();
+    const next = vi.fn();
+
+    const fatalError = Object.assign(new Error('database unavailable'), { status: 503 });
+    mockService.getInvitationDetails.mockRejectedValueOnce(fatalError);
+
+    await getInvitation(req, res, next);
+
+    expect(next).toHaveBeenCalledWith(fatalError);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
+  });
 });

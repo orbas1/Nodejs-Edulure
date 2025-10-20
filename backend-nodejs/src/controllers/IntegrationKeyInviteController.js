@@ -4,7 +4,8 @@ import IntegrationApiKeyInviteService from '../services/IntegrationApiKeyInviteS
 import {
   MAX_ROTATION_DAYS,
   MIN_ROTATION_DAYS,
-  MIN_KEY_LENGTH
+  MIN_KEY_LENGTH,
+  isValidEmail
 } from '../services/IntegrationApiKeyService.js';
 
 const tokenParamSchema = Joi.object({
@@ -30,17 +31,39 @@ export function __resetInviteService() {
   inviteService = new IntegrationApiKeyInviteService();
 }
 
+function resolveStatus(error, fallback) {
+  const statusCandidates = [
+    error?.status,
+    error?.statusCode,
+    error?.response?.status,
+    error?.httpStatus
+  ];
+  const status = statusCandidates.find((value) => typeof value === 'number' && Number.isInteger(value));
+  return status ?? fallback;
+}
+
+function resolveMessage(error, fallback) {
+  if (typeof error?.message === 'string' && error.message.trim()) {
+    return error.message;
+  }
+  if (typeof error?.response?.data?.message === 'string' && error.response.data.message.trim()) {
+    return error.response.data.message;
+  }
+  return fallback;
+}
+
 function normaliseError(error, defaultStatus = 500, defaultMessage = 'Unexpected integration invite error') {
   if (!error) {
     return { status: defaultStatus, message: defaultMessage };
   }
-  if (typeof error.status === 'number' && error.message) {
-    return { status: error.status, message: error.message };
-  }
   if (error instanceof Error) {
-    return { status: error.status ?? defaultStatus, message: error.message || defaultMessage };
+    const status = resolveStatus(error, defaultStatus);
+    const message = resolveMessage(error, defaultMessage);
+    return { status, message };
   }
-  return { status: defaultStatus, message: defaultMessage };
+  const status = resolveStatus(error, defaultStatus);
+  const message = resolveMessage(error, defaultMessage);
+  return { status, message };
 }
 
 export async function getInvitation(req, res, next) {
@@ -82,7 +105,24 @@ export async function submitInvitation(req, res, next) {
       stripUnknown: true
     });
 
-    const result = await inviteService.submitInvitation(token, payload);
+    const actorEmailFromContext = typeof req.user?.email === 'string' && isValidEmail(req.user.email)
+      ? req.user.email.trim().toLowerCase()
+      : null;
+    const actorNameFromContext = typeof req.user?.name === 'string'
+      ? req.user.name.trim().slice(0, 120)
+      : null;
+
+    const normalisedActorName = actorNameFromContext && actorNameFromContext.trim().length > 0
+      ? actorNameFromContext
+      : null;
+
+    const submission = {
+      ...payload,
+      actorEmail: payload.actorEmail ?? actorEmailFromContext ?? null,
+      actorName: payload.actorName ?? normalisedActorName
+    };
+
+    const result = await inviteService.submitInvitation(token, submission);
 
     res.status(201).json({
       success: true,
@@ -100,7 +140,7 @@ export async function submitInvitation(req, res, next) {
       });
       return;
     }
-    const { status, message } = normaliseError(error, error.status ?? 400, error.message);
+    const { status, message } = normaliseError(error, 400, 'Unable to submit invitation');
     if (status >= 500) {
       next(error);
       return;
