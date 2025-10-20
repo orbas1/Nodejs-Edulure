@@ -2,15 +2,15 @@
 
 | Area | Score (0-100) | Notes |
 | --- | --- | --- |
-| Syntax | 0 | Initial baseline; update as work progresses. |
-| Functionality | 0 | Initial baseline; update as work progresses. |
-| Real World Ready | 0 | Initial baseline; update as work progresses. |
-| Live Data | 0 | Initial baseline; update as work progresses. |
-| Error | 0 | Initial baseline; update as work progresses. |
-| Logic Flow | 0 | Initial baseline; update as work progresses. |
-| Release Readiness | 0 | Initial baseline; update as work progresses. |
-| Tests | 0 | Initial baseline; update as work progresses. |
-| Overall Completion Average | 0 | Mean of tracked areas. |
+| Syntax |  | Initial baseline; update as work progresses. |
+| Functionality |  | Initial baseline; update as work progresses. |
+| Real World Ready |  | Initial baseline; update as work progresses. |
+| Live Data |  | Initial baseline; update as work progresses. |
+| Error |  | Initial baseline; update as work progresses. |
+| Logic Flow |  | Initial baseline; update as work progresses. |
+| Release Readiness |  | Initial baseline; update as work progresses. |
+| Tests |  | Initial baseline; update as work progresses. |
+| Overall Completion Average |  | Mean of tracked areas. |
 
 # Task List
 
