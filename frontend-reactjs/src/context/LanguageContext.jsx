@@ -98,6 +98,21 @@ const TRANSLATIONS = {
           }
         }
       },
+      testimonials: {
+        heading: 'Trusted by ambitious learning operators',
+        items: {
+          lena: {
+            quote: 'We shipped our cohort in two weeks with the templates and live ops tools.',
+            name: 'Lena Ortiz',
+            role: 'Founder, CohortCraft'
+          },
+          noah: {
+            quote: 'Billing, scheduling, and community rooms finally live in one workflow.',
+            name: 'Noah Winter',
+            role: 'Director, Global Learning Lab'
+          }
+        }
+      },
       perks: {
         eyebrow: 'Playful perks',
         headline: 'Perks that keep the learning energy high',
@@ -2069,6 +2084,54 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Ich bin Trainer:in',
         illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
+      },
+      featureGrid: {
+        eyebrow: 'Workflow-Abkürzungen',
+        headline: 'Von der Idee zum Launch ohne Umwege',
+        categories: {
+          programs: {
+            title: 'Programme',
+            helper: 'Cohorts schnell aufbauen',
+            actions: {
+              cohort: 'Neue Kohorte',
+              library: 'Modulbibliothek',
+              studio: 'Lektionsstudio'
+            }
+          },
+          engagement: {
+            title: 'Engagement',
+            helper: 'Räume aktiv halten',
+            actions: {
+              rooms: 'Live-Räume',
+              calendar: 'Kalender',
+              inbox: 'Posteingang'
+            }
+          },
+          revenue: {
+            title: 'Umsatz',
+            helper: 'Verfolgen und wachsen',
+            actions: {
+              pricing: 'Preise',
+              affiliate: 'Partnerprogramm',
+              ads: 'Anzeigen'
+            }
+          }
+        }
+      },
+      testimonials: {
+        heading: 'Vertraut von ambitionierten Learning-Operator:innen',
+        items: {
+          lena: {
+            quote: 'Wir haben unsere Kohorte in zwei Wochen mit den Templates und Live-Ops-Tools gestartet.',
+            name: 'Lena Ortiz',
+            role: 'Gründerin, CohortCraft'
+          },
+          noah: {
+            quote: 'Abrechnung, Terminplanung und Community-Räume leben endlich in einem Workflow.',
+            name: 'Noah Winter',
+            role: 'Direktor, Global Learning Lab'
+          }
+        }
       },
       perks: {
         eyebrow: 'Verspielte Vorteile',
