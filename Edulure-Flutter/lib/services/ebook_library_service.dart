@@ -47,9 +47,11 @@ class EbookLibraryService implements EbookReaderBackend {
   Directory? _libraryDirectory;
   Future<void>? _ensureReadyFuture;
   bool _ready = false;
-  final Map<String, Future<String>> _inFlightDownloads = <String, Future<String>>{};
+  final Map<String, _DownloadHandle> _inFlightDownloads = <String, _DownloadHandle>{};
   StreamController<List<DownloadedEbook>>? _downloadsController;
   StreamSubscription<BoxEvent>? _downloadsSubscription;
+  StreamController<EbookDownloadEvent>? _downloadEventsController;
+  final Map<String, _ProgressSnapshot> _progressSnapshots = <String, _ProgressSnapshot>{};
 
   Future<void> ensureReady() async {
     if (_ready) {
@@ -73,46 +75,26 @@ class EbookLibraryService implements EbookReaderBackend {
     await ensureReady();
     final cachedPath = await _validateCachedDownload(ebook.id, ebook);
     if (cachedPath != null) {
+      _publishDownloadEvent(
+        EbookDownloadEvent.completed(
+          ebookId: ebook.id,
+          path: cachedPath,
+          ebook: ebook,
+          fromCache: true,
+        ),
+      );
       return cachedPath;
     }
 
-    return _inFlightDownloads.putIfAbsent(ebook.id, () async {
-      try {
-        final cachedWhileQueued = await _validateCachedDownload(ebook.id, ebook);
-        if (cachedWhileQueued != null) {
-          return cachedWhileQueued;
-        }
+    final existing = _inFlightDownloads[ebook.id];
+    if (existing != null) {
+      return existing.future;
+    }
 
-        final directory = await _resolveLibraryDirectory();
-        final fileName = _buildFileName(ebook);
-        final filePath = '${directory.path}/$fileName';
-        final file = File(filePath);
-        await file.parent.create(recursive: true);
-
-        try {
-          await _client.download(ebook.fileUrl, filePath);
-          final metadata = await _buildCacheEntry(ebook, filePath);
-          await _filesBox?.put(ebook.id, metadata.toJson());
-          await _rebalanceCache(exemptId: ebook.id);
-          _notifyLibraryChanged();
-          return metadata.path;
-        } on DioException catch (error) {
-          await _cleanupFailedDownload(file, ebook.id);
-          throw EbookDownloadException(
-            'Failed to download "${ebook.title}". Check your connection and try again.',
-            error,
-          );
-        } catch (error) {
-          await _cleanupFailedDownload(file, ebook.id);
-          throw EbookDownloadException(
-            'Failed to save "${ebook.title}" to your offline library.',
-            error,
-          );
-        }
-      } finally {
-        _inFlightDownloads.remove(ebook.id);
-      }
-    });
+    final cancelToken = CancelToken();
+    final future = _downloadAndCache(ebook, cancelToken);
+    _inFlightDownloads[ebook.id] = _DownloadHandle(future: future, cancelToken: cancelToken);
+    return future;
   }
 
   Future<void> removeDownload(String ebookId) async {
@@ -148,6 +130,21 @@ class EbookLibraryService implements EbookReaderBackend {
     unawaited(_filesBox?.put(ebookId, touched.toJson()));
     _notifyLibraryChanged();
     return true;
+  }
+
+  Future<void> cancelDownload(String ebookId) async {
+    final handle = _inFlightDownloads[ebookId];
+    if (handle == null) {
+      return;
+    }
+    if (!handle.cancelToken.isCancelled) {
+      handle.cancelToken.cancel('Cancelled by user');
+    }
+    try {
+      await handle.future;
+    } catch (_) {
+      // The awaiting caller receives the cancellation error. Swallow it here.
+    }
   }
 
   Future<EbookProgress?> loadCachedProgress(String ebookId) async {
@@ -257,13 +254,34 @@ class EbookLibraryService implements EbookReaderBackend {
     return _downloadsController!.stream;
   }
 
+  Stream<EbookDownloadEvent> watchDownloadEvents({String? ebookId}) {
+    _downloadEventsController ??= StreamController<EbookDownloadEvent>.broadcast();
+    final stream = _downloadEventsController!.stream;
+    if (ebookId == null) {
+      return stream;
+    }
+    return stream.where((event) => event.ebookId == ebookId);
+  }
+
   Future<void> dispose() async {
+    if (_inFlightDownloads.isNotEmpty) {
+      for (final handle in _inFlightDownloads.values) {
+        if (!handle.cancelToken.isCancelled) {
+          handle.cancelToken.cancel('Service disposed');
+        }
+      }
+    }
     await _teardownDownloadsWatch();
     final controller = _downloadsController;
     if (controller != null && !controller.isClosed) {
       await controller.close();
     }
     _downloadsController = null;
+    final downloadEventsController = _downloadEventsController;
+    if (downloadEventsController != null && !downloadEventsController.isClosed) {
+      await downloadEventsController.close();
+    }
+    _downloadEventsController = null;
     await _filesBox?.close();
     await _progressBox?.close();
     await _preferencesBox?.close();
@@ -274,6 +292,7 @@ class EbookLibraryService implements EbookReaderBackend {
     _ready = false;
     _ensureReadyFuture = null;
     _inFlightDownloads.clear();
+    _progressSnapshots.clear();
   }
 
   Future<Directory> _prepareLibraryDirectory() async {
@@ -327,6 +346,14 @@ class EbookLibraryService implements EbookReaderBackend {
     unawaited(_emitCurrentDownloads());
   }
 
+  void _publishDownloadEvent(EbookDownloadEvent event) {
+    final controller = _downloadEventsController;
+    if (controller == null || controller.isClosed) {
+      return;
+    }
+    controller.add(event);
+  }
+
   Future<void> _initialize() async {
     _filesBox ??= await Hive.openBox<dynamic>(_filesBoxName);
     _progressBox ??= await Hive.openBox<dynamic>(_progressBoxName);
@@ -342,6 +369,7 @@ class EbookLibraryService implements EbookReaderBackend {
       await file.delete();
     }
     await _filesBox?.delete(ebookId);
+    _progressSnapshots.remove(ebookId);
     _notifyLibraryChanged();
   }
 
@@ -400,6 +428,115 @@ class EbookLibraryService implements EbookReaderBackend {
       downloadedAt: now,
       ebookJson: _serializeEbook(ebook),
     );
+  }
+
+  Future<String> _downloadAndCache(Ebook ebook, CancelToken cancelToken) async {
+    _publishDownloadEvent(
+      EbookDownloadEvent.queued(
+        ebookId: ebook.id,
+        ebook: ebook,
+      ),
+    );
+
+    final cachedWhileQueued = await _validateCachedDownload(ebook.id, ebook);
+    if (cachedWhileQueued != null) {
+      _publishDownloadEvent(
+        EbookDownloadEvent.completed(
+          ebookId: ebook.id,
+          path: cachedWhileQueued,
+          ebook: ebook,
+          fromCache: true,
+        ),
+      );
+      _progressSnapshots.remove(ebook.id);
+      return cachedWhileQueued;
+    }
+
+    final directory = await _resolveLibraryDirectory();
+    final fileName = _buildFileName(ebook);
+    final filePath = '${directory.path}/$fileName';
+    final file = File(filePath);
+    await file.parent.create(recursive: true);
+
+    void handleProgress(int received, int total) {
+      final previous = _progressSnapshots[ebook.id];
+      if (previous != null && previous.receivedBytes == received && previous.totalBytes == total) {
+        return;
+      }
+      _progressSnapshots[ebook.id] = _ProgressSnapshot(
+        receivedBytes: received,
+        totalBytes: total,
+      );
+      _publishDownloadEvent(
+        EbookDownloadEvent.inProgress(
+          ebookId: ebook.id,
+          receivedBytes: received,
+          totalBytes: total,
+          ebook: ebook,
+        ),
+      );
+    }
+
+    try {
+      await _client.download(
+        ebook.fileUrl,
+        filePath,
+        cancelToken: cancelToken,
+        onReceiveProgress: handleProgress,
+      );
+      final metadata = await _buildCacheEntry(ebook, filePath);
+      await _filesBox?.put(ebook.id, metadata.toJson());
+      await _rebalanceCache(exemptId: ebook.id);
+      _notifyLibraryChanged();
+      _progressSnapshots.remove(ebook.id);
+      _publishDownloadEvent(
+        EbookDownloadEvent.completed(
+          ebookId: ebook.id,
+          path: metadata.path,
+          ebook: ebook,
+        ),
+      );
+      return metadata.path;
+    } on DioException catch (error) {
+      await _cleanupFailedDownload(file, ebook.id);
+      final isCancelled = CancelToken.isCancel(error);
+      final message = isCancelled
+          ? 'Download for "${ebook.title}" was cancelled.'
+          : 'Failed to download "${ebook.title}". Check your connection and try again.';
+      _publishDownloadEvent(
+        isCancelled
+            ? EbookDownloadEvent.cancelled(
+                ebookId: ebook.id,
+                ebook: ebook,
+                message: message,
+              )
+            : EbookDownloadEvent.failed(
+                ebookId: ebook.id,
+                ebook: ebook,
+                error: error,
+                message: message,
+              ),
+      );
+      throw EbookDownloadException(message, error);
+    } catch (error) {
+      await _cleanupFailedDownload(file, ebook.id);
+      const message = 'Failed to save the ebook to your offline library.';
+      _publishDownloadEvent(
+        EbookDownloadEvent.failed(
+          ebookId: ebook.id,
+          ebook: ebook,
+          error: error,
+          message: message,
+        ),
+      );
+      throw EbookDownloadException(
+        'Failed to save "${ebook.title}" to your offline library.',
+        error,
+      );
+    } finally {
+      _inFlightDownloads.remove(ebook.id);
+      _progressSnapshots.remove(ebook.id);
+    }
   }
 
   Map<String, dynamic> _serializeEbook(Ebook ebook) {
@@ -513,6 +650,23 @@ class _CacheRecord {
   final _CachedFile file;
 }
 
+class _DownloadHandle {
+  _DownloadHandle({required this.future, required this.cancelToken});
+
+  final Future<String> future;
+  final CancelToken cancelToken;
+}
+
+class _ProgressSnapshot {
+  _ProgressSnapshot({
+    required this.receivedBytes,
+    required this.totalBytes,
+  });
+
+  final int receivedBytes;
+  final int totalBytes;
+}
+
 class DownloadedEbook {
   const DownloadedEbook({
     required this.ebook,
@@ -571,6 +725,116 @@ class DownloadedEbook {
       downloadedAt: cached.downloadedAt,
       lastAccessedAt: cached.lastAccessedAt,
     );
+  }
+}
+
+enum EbookDownloadState { queued, inProgress, completed, failed, cancelled }
+
+class EbookDownloadEvent {
+  const EbookDownloadEvent({
+    required this.ebookId,
+    required this.state,
+    this.receivedBytes,
+    this.totalBytes,
+    this.ebook,
+    this.path,
+    this.error,
+    this.message,
+    this.fromCache = false,
+  });
+
+  factory EbookDownloadEvent.queued({
+    required String ebookId,
+    Ebook? ebook,
+  }) {
+    return EbookDownloadEvent(
+      ebookId: ebookId,
+      state: EbookDownloadState.queued,
+      ebook: ebook,
+    );
+  }
+
+  factory EbookDownloadEvent.inProgress({
+    required String ebookId,
+    required int receivedBytes,
+    required int totalBytes,
+    Ebook? ebook,
+  }) {
+    return EbookDownloadEvent(
+      ebookId: ebookId,
+      state: EbookDownloadState.inProgress,
+      receivedBytes: receivedBytes,
+      totalBytes: totalBytes,
+      ebook: ebook,
+    );
+  }
+
+  factory EbookDownloadEvent.completed({
+    required String ebookId,
+    required String path,
+    Ebook? ebook,
+    bool fromCache = false,
+  }) {
+    return EbookDownloadEvent(
+      ebookId: ebookId,
+      state: EbookDownloadState.completed,
+      path: path,
+      ebook: ebook,
+      fromCache: fromCache,
+    );
+  }
+
+  factory EbookDownloadEvent.failed({
+    required String ebookId,
+    Object? error,
+    Ebook? ebook,
+    String? message,
+  }) {
+    return EbookDownloadEvent(
+      ebookId: ebookId,
+      state: EbookDownloadState.failed,
+      error: error,
+      ebook: ebook,
+      message: message,
+    );
+  }
+
+  factory EbookDownloadEvent.cancelled({
+    required String ebookId,
+    Ebook? ebook,
+    String? message,
+  }) {
+    return EbookDownloadEvent(
+      ebookId: ebookId,
+      state: EbookDownloadState.cancelled,
+      ebook: ebook,
+      message: message,
+    );
+  }
+
+  final String ebookId;
+  final EbookDownloadState state;
+  final int? receivedBytes;
+  final int? totalBytes;
+  final Ebook? ebook;
+  final String? path;
+  final Object? error;
+  final String? message;
+  final bool fromCache;
+
+  bool get isTerminal =>
+      state == EbookDownloadState.completed ||
+      state == EbookDownloadState.failed ||
+      state == EbookDownloadState.cancelled;
+
+  double? get progressPercent {
+    final total = totalBytes;
+    final received = receivedBytes;
+    if (total == null || total <= 0 || received == null) {
+      return null;
+    }
+    final ratio = received / total;
+    return ratio.clamp(0, 1).toDouble();
   }
 }
 

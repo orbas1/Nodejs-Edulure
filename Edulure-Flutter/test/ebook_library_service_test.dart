@@ -335,6 +335,99 @@ void main() {
     expect(metadata.ebook.author, 'Revised Author');
   });
 
+  test('watchDownloadEvents emits queued, progress, and completion updates', () async {
+    final ebook = _buildEbook(
+      id: 'events-1',
+      fileUrl: 'https://cdn.edulure.com/assets/library/events-1.epub',
+    );
+
+    final events = <EbookDownloadEvent>[];
+    final subscription = service.watchDownloadEvents(ebookId: ebook.id).listen(events.add);
+
+    final path = await service.ensureDownloaded(ebook);
+    await pumpEventQueue();
+
+    await subscription.cancel();
+
+    expect(events, isNotEmpty);
+    expect(events.first.state, EbookDownloadState.queued);
+    expect(events.last.state, EbookDownloadState.completed);
+    expect(events.last.path, path);
+    expect(events.last.fromCache, isFalse);
+    expect(events.where((event) => event.state == EbookDownloadState.inProgress), isNotEmpty);
+    expect(
+      events.where((event) => event.state == EbookDownloadState.inProgress).last.progressPercent,
+      isNotNull,
+    );
+  });
+
+  test('cancelDownload aborts active download and reports cancellation event', () async {
+    final controlledDio = _ControlledDio(totalBytes: 1024);
+    service = EbookLibraryService(
+      httpClient: controlledDio,
+      libraryDirectoryBuilder: libraryBuilder,
+      clock: testClock.call,
+    );
+    disposables.add(service);
+    await service.ensureReady();
+
+    final ebook = _buildEbook(
+      id: 'events-2',
+      fileUrl: 'https://cdn.edulure.com/assets/library/events-2.epub',
+    );
+
+    final events = <EbookDownloadEvent>[];
+    final subscription = service.watchDownloadEvents(ebookId: ebook.id).listen(events.add);
+
+    final downloadFuture = service.ensureDownloaded(ebook);
+    await controlledDio.started.future;
+    await pumpEventQueue();
+
+    await service.cancelDownload(ebook.id);
+    await pumpEventQueue();
+
+    await expectLater(
+      downloadFuture,
+      throwsA(
+        isA<EbookDownloadException>().having(
+          (error) => error.message,
+          'message',
+          contains('cancelled'),
+        ),
+      ),
+    );
+
+    await subscription.cancel();
+
+    expect(events.first.state, EbookDownloadState.queued);
+    expect(events.last.state, EbookDownloadState.cancelled);
+    expect(events.where((event) => event.state == EbookDownloadState.completed), isEmpty);
+  });
+
+  test('ensureDownloaded emits cache hit events when download already exists', () async {
+    final ebook = _buildEbook(
+      id: 'events-3',
+      fileUrl: 'https://cdn.edulure.com/assets/library/events-3.epub',
+    );
+
+    final events = <EbookDownloadEvent>[];
+    final subscription = service.watchDownloadEvents(ebookId: ebook.id).listen(events.add);
+
+    final path = await service.ensureDownloaded(ebook);
+    await pumpEventQueue();
+
+    final cachedPath = await service.ensureDownloaded(ebook);
+    await pumpEventQueue();
+
+    await subscription.cancel();
+
+    expect(path, cachedPath);
+    final completedEvents = events.where((event) => event.state == EbookDownloadState.completed).toList();
+    expect(completedEvents.length, greaterThanOrEqualTo(2));
+    expect(completedEvents.last.fromCache, isTrue);
+    expect(completedEvents.last.path, cachedPath);
+  });
+
   test('watchDownloads emits updates for library lifecycle events', () async {
     final updates = <List<DownloadedEbook>>[];
     final subscription = service.watchDownloads().listen(updates.add);
@@ -418,6 +511,9 @@ Ebook _buildEbook({
 }
 
 class _FakeDio extends Dio {
+  _FakeDio({this.totalBytes = 4096});
+
+  final int totalBytes;
   int downloadCalls = 0;
 
   @override
@@ -434,7 +530,22 @@ class _FakeDio extends Dio {
     downloadCalls++;
     final file = File(savePath.toString());
     await file.create(recursive: true);
-    await file.writeAsString('mocked data for $urlPath');
+    var received = 0;
+    final chunkSize = (totalBytes / 4).ceil();
+    while (received < totalBytes) {
+      if (cancelToken?.isCancelled == true) {
+        throw DioException(
+          requestOptions: RequestOptions(path: urlPath),
+          error: cancelToken?.cancelError,
+          type: DioExceptionType.cancel,
+        );
+      }
+      final remaining = totalBytes - received;
+      final step = remaining < chunkSize ? remaining : chunkSize;
+      received += step;
+      onReceiveProgress?.call(received, totalBytes);
+    }
+    await file.writeAsBytes(List<int>.filled(totalBytes, downloadCalls));
     return Response<dynamic>(
       requestOptions: RequestOptions(path: urlPath),
       statusCode: 200,
@@ -443,8 +554,11 @@ class _FakeDio extends Dio {
 }
 
 class _ControlledDio extends Dio {
+  _ControlledDio({this.totalBytes = 2048});
+
   final Completer<void> started = Completer<void>();
   final Completer<void> allowCompletion = Completer<void>();
+  final int totalBytes;
   int downloadCalls = 0;
 
   @override
@@ -459,13 +573,29 @@ class _ControlledDio extends Dio {
     Options? options,
   }) async {
     downloadCalls++;
+    onReceiveProgress?.call(0, totalBytes);
     if (!started.isCompleted) {
       started.complete();
     }
-    await allowCompletion.future;
+
+    final cancelFuture = cancelToken?.whenCancel;
+    if (cancelFuture != null) {
+      await Future.any(<Future<dynamic>>[allowCompletion.future, cancelFuture]);
+      if (cancelToken!.isCancelled) {
+        throw DioException(
+          requestOptions: RequestOptions(path: urlPath),
+          error: cancelToken.cancelError,
+          type: DioExceptionType.cancel,
+        );
+      }
+    } else {
+      await allowCompletion.future;
+    }
+
     final file = File(savePath.toString());
     await file.create(recursive: true);
     await file.writeAsString('controlled data for $urlPath');
+    onReceiveProgress?.call(totalBytes, totalBytes);
     return Response<dynamic>(
       requestOptions: RequestOptions(path: urlPath),
       statusCode: 200,
@@ -491,6 +621,7 @@ class _FailingDio extends Dio {
     final file = File(savePath.toString());
     await file.create(recursive: true);
     await file.writeAsString('partial data');
+    onReceiveProgress?.call(512, 1024);
     throw DioException(
       requestOptions: RequestOptions(path: urlPath),
       error: 'Simulated offline mode',
@@ -519,6 +650,21 @@ class _SizedDio extends Dio {
     downloadCalls++;
     final file = File(savePath.toString());
     await file.create(recursive: true);
+    var received = 0;
+    final chunkSize = bytes < 4 ? 1 : (bytes / 4).ceil();
+    while (received < bytes) {
+      if (cancelToken?.isCancelled == true) {
+        throw DioException(
+          requestOptions: RequestOptions(path: urlPath),
+          error: cancelToken?.cancelError,
+          type: DioExceptionType.cancel,
+        );
+      }
+      final remaining = bytes - received;
+      final step = remaining < chunkSize ? remaining : chunkSize;
+      received += step;
+      onReceiveProgress?.call(received, bytes);
+    }
     await file.writeAsBytes(List<int>.filled(bytes, downloadCalls));
     return Response<dynamic>(
       requestOptions: RequestOptions(path: urlPath),
