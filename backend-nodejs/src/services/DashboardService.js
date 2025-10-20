@@ -2,6 +2,20 @@ import crypto from 'crypto';
 
 import logger from '../config/logger.js';
 import LearnerSupportRepository from '../repositories/LearnerSupportRepository.js';
+import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
+import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
+import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
+import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
+import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
+import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
+import LearnerAffiliatePayoutModel from '../models/LearnerAffiliatePayoutModel.js';
+import LearnerAdCampaignModel from '../models/LearnerAdCampaignModel.js';
+import InstructorApplicationModel from '../models/InstructorApplicationModel.js';
+import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
+import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
+import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
+import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
+import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
 
 function safeJsonParse(value, fallback) {
@@ -333,7 +347,9 @@ export function buildLearnerDashboard({
   followerSummary = {},
   privacySettings = null,
   messagingSummary = null,
-  notifications = []
+  notifications = [],
+  libraryEntries = [],
+  fieldServiceWorkspace = null
 } = {}) {
   const hasSignals =
     enrollments.length ||
@@ -647,19 +663,48 @@ export function buildLearnerDashboard({
     rating: booking.metadata?.rating ?? null
   }));
 
-  const ebookLibrary = ebookProgress.map((progress) => {
-    const catalogEntry = ebooks.get(progress.assetId) ?? {};
-    return {
-      id: catalogEntry.id ?? `ebook-${progress.assetId}`,
-      title: catalogEntry.title ?? `Ebook ${progress.assetId}`,
-      status: progress.progressPercent >= 100 ? 'Completed' : 'In progress',
-      progress: Number(progress.progressPercent ?? 0),
-      price: formatCurrency(catalogEntry.priceAmount ?? 0, catalogEntry.priceCurrency ?? 'USD'),
-      highlights: Number(progress.metadata?.highlights ?? 0),
-      bookmarks: Number(progress.metadata?.bookmarks ?? 0),
-      timeSpent: formatTimeSpent(progress.timeSpentSeconds)
-    };
-  });
+  const formattedLibraryEntries = Array.isArray(libraryEntries)
+    ? libraryEntries.map((entry) => {
+        const progressValue = Number(entry.progress ?? 0);
+        return {
+          id: entry.id ?? `library-${crypto.randomUUID()}`,
+          title: entry.title ?? 'Library entry',
+          format: entry.format ?? 'E-book',
+          status: progressValue >= 100 ? 'Completed' : 'In progress',
+          progress: progressValue,
+          lastOpened: entry.lastOpened ?? null,
+          lastOpenedLabel: entry.lastOpened
+            ? formatDateTime(entry.lastOpened, { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Not opened yet',
+          url: entry.url ?? null,
+          summary: entry.summary ?? null,
+          author: entry.author ?? null,
+          coverUrl: entry.coverUrl ?? null,
+          tags: Array.isArray(entry.tags) ? entry.tags : [],
+          highlights: Array.isArray(entry.highlights) ? entry.highlights : [],
+          timeSpent: entry.metadata?.timeSpentSeconds
+            ? formatTimeSpent(entry.metadata.timeSpentSeconds)
+            : null,
+          price: null
+        };
+      })
+    : [];
+
+  const ebookLibrary = formattedLibraryEntries.length
+    ? formattedLibraryEntries
+    : ebookProgress.map((progress) => {
+        const catalogEntry = ebooks.get(progress.assetId) ?? {};
+        return {
+          id: catalogEntry.id ?? `ebook-${progress.assetId}`,
+          title: catalogEntry.title ?? `Ebook ${progress.assetId}`,
+          status: progress.progressPercent >= 100 ? 'Completed' : 'In progress',
+          progress: Number(progress.progressPercent ?? 0),
+          price: formatCurrency(catalogEntry.priceAmount ?? 0, catalogEntry.priceCurrency ?? 'USD'),
+          highlights: Number(progress.metadata?.highlights ?? 0),
+          bookmarks: Number(progress.metadata?.bookmarks ?? 0),
+          timeSpent: formatTimeSpent(progress.timeSpentSeconds)
+        };
+      });
 
   const activeSubscriptions = communitySubscriptions.filter((subscription) => subscription.status === 'active');
   const pendingInvoices = normalisedInvoices.filter((invoice) => isInvoiceOpen(invoice.status));
@@ -682,13 +727,36 @@ export function buildLearnerDashboard({
     }
   ];
 
-  const invoiceEntries = normalisedInvoices.map((invoice) => ({
-    id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
-    label: invoice.label ?? 'Invoice',
-    amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
-    status: invoice.status ?? 'open',
-    date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
-  }));
+      const invoiceEntries = normalisedInvoices.map((invoice) => ({
+        id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
+        label: invoice.label ?? 'Invoice',
+        amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
+        status: invoice.status ?? 'open',
+        date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
+      }));
+
+      const paymentMethods = paymentMethodsRaw.map((method) => ({
+        id: method.id,
+        label: method.label,
+        brand: method.brand,
+        last4: method.last4,
+        expiry: method.expiry,
+        primary: Boolean(method.primary)
+      }));
+
+      const billingContacts = billingContactsRaw.map((contact) => ({
+        id: contact.id,
+        name: contact.name,
+        email: contact.email,
+        phone: contact.phone,
+        company: contact.company
+      }));
+
+      const financialPreferences = {
+        autoPay: { enabled: Boolean(financialProfileRaw?.autoPayEnabled) },
+        reserveTarget: Math.round((financialProfileRaw?.reserveTargetCents ?? 0) / 100),
+        reserveTargetCents: financialProfileRaw?.reserveTargetCents ?? 0
+      };
 
   const notificationsList = [...notifications];
   activeTutorBookings.forEach((booking) => {
@@ -708,10 +776,244 @@ export function buildLearnerDashboard({
     });
   });
 
-  const privacy = {
-    visibility: privacySettings?.profileVisibility ?? 'public',
-    followApprovalRequired: Boolean(privacySettings?.followApprovalRequired),
-    shareActivity: privacySettings?.shareActivity ?? true,
+  const learnerFieldServices = fieldServiceWorkspace?.customer ?? null;
+  const fieldServiceAssignments = Array.isArray(learnerFieldServices?.assignments)
+    ? learnerFieldServices.assignments
+    : [];
+  const fieldServiceSearchEntries = Array.isArray(fieldServiceWorkspace?.searchIndex)
+    ? fieldServiceWorkspace.searchIndex.filter((entry) => entry.role === 'learner')
+    : [];
+
+      const growthInitiatives = growthInitiativesRaw.map((initiative) => ({
+        id: initiative.id,
+        slug: initiative.slug,
+        title: initiative.title,
+        status: initiative.status,
+        objective: initiative.objective,
+        primaryMetric: initiative.primaryMetric,
+        baselineValue: initiative.baselineValue,
+        targetValue: initiative.targetValue,
+        currentValue: initiative.currentValue,
+        startAt: initiative.startAt,
+        endAt: initiative.endAt,
+        tags: initiative.tags,
+        experiments: (growthExperimentsByInitiative.get(initiative.id) ?? []).map((experiment) => ({
+          id: experiment.id,
+          name: experiment.name,
+          status: experiment.status,
+          hypothesis: experiment.hypothesis,
+          metric: experiment.metric,
+          baselineValue: experiment.baselineValue,
+          targetValue: experiment.targetValue,
+          resultValue: experiment.resultValue,
+          startAt: experiment.startAt,
+          endAt: experiment.endAt,
+          segments: experiment.segments
+        }))
+      }));
+
+      const totalGrowthExperiments = growthInitiatives.reduce(
+        (count, initiative) => count + (initiative.experiments?.length ?? 0),
+        0
+      );
+
+      const growthSection = {
+        initiatives: growthInitiatives,
+        metrics: [
+          { label: 'Active initiatives', value: growthInitiatives.filter((item) => item.status === 'active').length },
+          { label: 'Experiments running', value: totalGrowthExperiments },
+          {
+            label: 'Targets hitting',
+            value: growthInitiatives.filter(
+              (initiative) =>
+                initiative.currentValue != null &&
+                initiative.targetValue != null &&
+                Number(initiative.currentValue) >= Number(initiative.targetValue)
+            ).length
+          }
+        ]
+      };
+
+      const affiliateChannels = affiliateChannelsRaw.map((channel) => {
+        const payouts = affiliatePayoutsRaw.filter((payout) => payout.channelId === channel.id);
+        const outstandingCents = Math.max(0, channel.totalEarningsCents - channel.totalPaidCents);
+        const nextPayout = payouts
+          .filter((payout) => payout.status === 'scheduled' || payout.status === 'processing')
+          .sort((a, b) => {
+            const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+            const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+            return aTime - bTime;
+          })[0];
+        return {
+          id: channel.id,
+          platform: channel.platform,
+          handle: channel.handle,
+          referralCode: channel.referralCode,
+          trackingUrl: channel.trackingUrl,
+          status: channel.status,
+          commissionRateBps: channel.commissionRateBps,
+          totalEarningsFormatted: formatCurrency(channel.totalEarningsCents),
+          totalPaidFormatted: formatCurrency(channel.totalPaidCents),
+          outstandingFormatted: formatCurrency(outstandingCents),
+          notes: channel.notes,
+          performance: channel.performance,
+          nextPayout: nextPayout
+            ? {
+                amount: formatCurrency(nextPayout.amountCents, nextPayout.currency),
+                scheduledAt: nextPayout.scheduledAt,
+                status: nextPayout.status
+              }
+            : null
+        };
+      });
+
+      const affiliateSection = {
+        channels: affiliateChannels,
+        payouts: affiliatePayoutsRaw.map((payout) => ({
+          id: payout.id,
+          channelId: payout.channelId,
+          amount: formatCurrency(payout.amountCents, payout.currency),
+          status: payout.status,
+          scheduledAt: payout.scheduledAt,
+          processedAt: payout.processedAt,
+          reference: payout.reference
+        })),
+        summary: {
+          totalChannels: affiliateChannels.length,
+          activeChannels: affiliateChannels.filter((channel) => channel.status === 'active').length,
+          outstanding: formatCurrency(
+            affiliateChannelsRaw.reduce(
+              (total, channel) => total + Math.max(0, channel.totalEarningsCents - channel.totalPaidCents),
+              0
+            )
+          )
+        }
+      };
+
+      const adCampaigns = adCampaignsRaw.map((campaign) => {
+        const metrics = campaign.metrics && typeof campaign.metrics === 'object' ? campaign.metrics : {};
+        const targeting = campaign.targeting && typeof campaign.targeting === 'object' ? campaign.targeting : {};
+        return {
+          id: campaign.id,
+          name: campaign.name,
+          status: campaign.status,
+          objective: campaign.objective,
+          dailyBudget: formatCurrency(campaign.dailyBudgetCents),
+          dailyBudgetCents: Number(campaign.dailyBudgetCents ?? 0),
+          totalSpend: formatCurrency(campaign.totalSpendCents),
+          totalSpendCents: Number(campaign.totalSpendCents ?? 0),
+          startAt: campaign.startAt,
+          endAt: campaign.endAt,
+          lastSyncedAt: campaign.lastSyncedAt,
+          metrics: {
+            impressions: Number(metrics.impressions ?? metrics.totals?.impressions ?? 0),
+            clicks: Number(metrics.clicks ?? metrics.totals?.clicks ?? 0),
+            conversions: Number(metrics.conversions ?? metrics.totals?.conversions ?? 0),
+            spendCents: Number(metrics.spendCents ?? metrics.totals?.spendCents ?? 0),
+            revenueCents: Number(metrics.revenueCents ?? metrics.totals?.revenueCents ?? 0),
+            ctr: metrics.ctr ?? metrics.averageCtr ?? null,
+            cpc: metrics.cpc ?? metrics.cpcCents ?? null,
+            cpa: metrics.cpa ?? metrics.cpaCents ?? null,
+            roas: metrics.roas ?? null,
+            lastSyncedAt: metrics.lastSyncedAt ?? campaign.lastSyncedAt ?? null
+          },
+          targeting: {
+            keywords: Array.isArray(targeting.keywords) ? targeting.keywords : [],
+            audiences: Array.isArray(targeting.audiences) ? targeting.audiences : [],
+            locations: Array.isArray(targeting.locations) ? targeting.locations : [],
+            languages: Array.isArray(targeting.languages) ? targeting.languages : [],
+            summary: targeting.summary ?? ''
+          },
+          creative: campaign.creative && typeof campaign.creative === 'object'
+            ? {
+                headline: campaign.creative.headline ?? 'Untitled creative',
+                description: campaign.creative.description ?? '',
+                url: campaign.creative.url ?? null
+              }
+            : { headline: 'Untitled creative', description: '', url: null },
+          placements: Array.isArray(campaign.placements) ? campaign.placements : []
+        };
+      });
+
+      const adsSection = {
+        campaigns: adCampaigns,
+        summary: {
+          activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
+          totalSpend: formatCurrency(
+            adCampaignsRaw.reduce((total, campaign) => total + (campaign.totalSpendCents ?? 0), 0)
+          ),
+          averageDailyBudget: adCampaignsRaw.length
+            ? formatCurrency(
+                Math.round(
+                  adCampaignsRaw.reduce((total, campaign) => total + (campaign.dailyBudgetCents ?? 0), 0) /
+                    adCampaignsRaw.length
+                )
+              )
+            : formatCurrency(0)
+        }
+      };
+
+      const instructorApplication = instructorApplicationRaw
+        ? {
+            id: instructorApplicationRaw.id,
+            status: instructorApplicationRaw.status,
+            stage: instructorApplicationRaw.stage,
+            motivation: instructorApplicationRaw.motivation,
+            portfolioUrl: instructorApplicationRaw.portfolioUrl,
+            experienceYears: instructorApplicationRaw.experienceYears,
+            teachingFocus: instructorApplicationRaw.teachingFocus,
+            availability: instructorApplicationRaw.availability,
+            marketingAssets: instructorApplicationRaw.marketingAssets,
+            submittedAt: instructorApplicationRaw.submittedAt,
+            reviewedAt: instructorApplicationRaw.reviewedAt,
+            decisionNote: instructorApplicationRaw.decisionNote
+          }
+        : null;
+
+      const teachSection = {
+        application: instructorApplication,
+        status: instructorApplication?.status ?? 'draft',
+        nextSteps: (() => {
+          if (!instructorApplication) {
+            return [
+              'Complete your instructor application to access cohort production resources.',
+              'Prepare a portfolio link that highlights flagship teaching moments.'
+            ];
+          }
+          if (instructorApplication.status === 'submitted') {
+            return [
+              'Our partnerships team is reviewing your submission.',
+              'Expect an interview scheduling link within 48 hours.'
+            ];
+          }
+          if (instructorApplication.status === 'interview') {
+            return [
+              'Confirm your cohort launch availability and desired curriculum focus.',
+              'Upload marketing assets to accelerate go-to-market planning.'
+            ];
+          }
+          if (instructorApplication.status === 'approved') {
+            return [
+              'Schedule onboarding workshop with curriculum producers.',
+              'Share campaign creative for Edulure Ads placement.'
+            ];
+          }
+          if (instructorApplication.status === 'rejected') {
+            return [
+              'Review decision notes and request feedback from the instructor partnerships team.'
+            ];
+          }
+          return [
+            'Document your teaching motivation and curriculum outcomes.',
+            'Add marketing assets to strengthen your application.'
+          ];
+        })()
+      };
+
+      const privacy = {
+        visibility: privacySettings?.profileVisibility ?? 'public',
+        followApprovalRequired: Boolean(privacySettings?.followApprovalRequired),
+        shareActivity: privacySettings?.shareActivity ?? true,
     messagePermission: privacySettings?.messagePermission ?? 'followers'
   };
 
@@ -1338,13 +1640,21 @@ export function buildLearnerDashboard({
     },
     financial: {
       summary: financialSummary,
-      invoices: invoiceEntries
+      invoices: invoiceEntries,
+      paymentMethods,
+      billingContacts,
+      preferences: financialPreferences
     },
     notifications: {
       total: notificationsList.length,
       unreadMessages: messaging.unreadThreads ?? 0,
       items: notificationsList
     },
+    growth: growthSection,
+    affiliate: affiliateSection,
+    ads: adsSection,
+    fieldServices: learnerFieldServices,
+    teach: teachSection,
     assessments: assessmentsSection,
     liveClassrooms: liveDashboard,
     support: {
@@ -1377,6 +1687,10 @@ export function buildLearnerDashboard({
     { label: 'Mentor sessions', value: `${tutorBookings.length} total` }
   ];
 
+  if (fieldServiceAssignments.length) {
+    profileStats.push({ label: 'Field assignments', value: `${fieldServiceAssignments.length} active` });
+  }
+
   const profileBioSegments = [];
   if (activeEnrollments.length) {
     profileBioSegments.push(`Learning across ${activeEnrollments.length} course${activeEnrollments.length === 1 ? '' : 's'}`);
@@ -1388,6 +1702,13 @@ export function buildLearnerDashboard({
     profileBioSegments.push(`while participating in ${communityMemberships.length} communit${
       communityMemberships.length === 1 ? 'y' : 'ies'
     }.`);
+  }
+  if (fieldServiceAssignments.length) {
+    profileBioSegments.push(
+      `Co-ordinating ${fieldServiceAssignments.length} field servic${
+        fieldServiceAssignments.length === 1 ? 'e' : 'es'
+      } in progress.`
+    );
   }
   const profileBio = profileBioSegments.join(' ').trim() || null;
 
@@ -1433,7 +1754,8 @@ export function buildLearnerDashboard({
       type: 'Community',
       title: community.name,
       url: '/dashboard/learner/communities'
-    }))
+    })),
+    ...fieldServiceSearchEntries
   ];
 
   const feedHighlights = [];
@@ -1444,6 +1766,14 @@ export function buildLearnerDashboard({
   }
   if (ebookLibrary.length) {
     feedHighlights.push(`Reading ${ebookLibrary[0].title} (${ebookLibrary[0].progress}% complete).`);
+  }
+  if (fieldServiceAssignments.length) {
+    const assignment = fieldServiceAssignments[0];
+    feedHighlights.push(
+      `Field service ${assignment.serviceType ?? 'assignment'} ${
+        assignment.statusLabel ? assignment.statusLabel.toLowerCase() : 'in progress'
+      }.`
+    );
   }
   if (assignmentsTimeline.upcoming.length) {
     const upcomingAssessment = assignmentsTimeline.upcoming[0];
@@ -3521,6 +3851,39 @@ export default class DashboardService {
         date: row.createdAt ? new Date(row.createdAt) : null
       }));
 
+      const [
+        paymentMethodsRaw,
+        billingContactsRaw,
+        financialProfileRaw,
+        growthInitiativesRaw,
+        affiliateChannelsRaw,
+        adCampaignsRaw,
+        instructorApplicationRaw
+      ] = await Promise.all([
+        LearnerPaymentMethodModel.listByUserId(user.id),
+        LearnerBillingContactModel.listByUserId(user.id),
+        LearnerFinancialProfileModel.findByUserId(user.id),
+        LearnerGrowthInitiativeModel.listByUserId(user.id),
+        LearnerAffiliateChannelModel.listByUserId(user.id),
+        LearnerAdCampaignModel.listByUserId(user.id),
+        InstructorApplicationModel.findByUserId(user.id)
+      ]);
+
+      const affiliateChannelIds = affiliateChannelsRaw.map((channel) => channel.id).filter(Boolean);
+      const affiliatePayoutsRaw = affiliateChannelIds.length
+        ? await LearnerAffiliatePayoutModel.listByChannelIds(affiliateChannelIds)
+        : [];
+
+      const growthExperimentsByInitiative = new Map();
+      if (growthInitiativesRaw.length) {
+        await Promise.all(
+          growthInitiativesRaw.map(async (initiative) => {
+            const experiments = await LearnerGrowthExperimentModel.listByInitiativeId(initiative.id);
+            growthExperimentsByInitiative.set(initiative.id, experiments);
+          })
+        );
+      }
+
       const communitySubscriptions = await CommunitySubscriptionModel.listByUser(user.id);
 
       const [followersCount, followingCount, pendingFollowersData, outgoingFollowersData, recommendationData, privacySettings] =
@@ -3837,6 +4200,7 @@ export default class DashboardService {
       ]);
 
       communityMemberships = memberships ?? [];
+      const libraryEntries = await LearnerLibraryEntryModel.listByUserId(user.id);
       const courseIds = Array.from(new Set(learnerEnrollments.map((enrollment) => enrollment.courseId).filter(Boolean)));
       const learnerCourses = courseIds.length ? await CourseModel.listByIds(courseIds) : [];
       const learnerAssignments = courseIds.length ? await CourseAssignmentModel.listByCourseIds(courseIds) : [];
@@ -3900,6 +4264,28 @@ export default class DashboardService {
         }));
       });
 
+      const fieldServiceOrders = await FieldServiceOrderModel.listForUser(user.id);
+      let learnerFieldServiceWorkspace = null;
+      if (fieldServiceOrders.length) {
+        const fieldServiceOrderIds = fieldServiceOrders.map((order) => order.id).filter(Boolean);
+        const fieldServiceEvents = fieldServiceOrderIds.length
+          ? await FieldServiceEventModel.listByOrderIds(fieldServiceOrderIds)
+          : [];
+        const providerIds = Array.from(
+          new Set(fieldServiceOrders.map((order) => order.providerId).filter(Boolean))
+        );
+        const fieldServiceProviders = providerIds.length
+          ? await FieldServiceProviderModel.listByIds(providerIds)
+          : [];
+        learnerFieldServiceWorkspace = buildFieldServiceWorkspace({
+          now: referenceDate,
+          user,
+          orders: fieldServiceOrders,
+          events: fieldServiceEvents,
+          providers: fieldServiceProviders
+        });
+      }
+
       learnerSnapshot =
         buildLearnerDashboard({
           user,
@@ -3916,7 +4302,9 @@ export default class DashboardService {
           ebookRecommendations,
           paymentIntents: learnerPaymentIntents,
           communities: communityMemberships,
-          communityPipelines
+          communityPipelines,
+          libraryEntries,
+          fieldServiceWorkspace: learnerFieldServiceWorkspace
         }) ?? undefined;
 
       communitySnapshot =

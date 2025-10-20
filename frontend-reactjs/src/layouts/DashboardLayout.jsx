@@ -99,7 +99,9 @@ const navigationByRole = {
       name: 'Growth',
       icon: SparklesIcon,
       children: [
+        { id: 'learner-growth-workspace', name: 'Growth workspace', to: `${basePath}/growth`, icon: ChartBarIcon },
         { id: 'learner-affiliate', name: 'Affiliate', to: `${basePath}/affiliate`, icon: UserPlusIcon },
+        { id: 'learner-ads', name: 'Edulure Ads', to: `${basePath}/ads`, icon: MegaphoneIcon },
         { id: 'learner-settings', name: 'Settings', to: `${basePath}/settings`, icon: Cog6ToothIcon },
         { id: 'learner-teach', name: 'Teach', to: `${basePath}/become-instructor`, icon: ArrowTopRightOnSquareIcon }
       ]

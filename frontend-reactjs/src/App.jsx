@@ -32,6 +32,7 @@ import DashboardCalendar from './pages/dashboard/DashboardCalendar.jsx';
 import DashboardBookingsSwitch from './pages/dashboard/DashboardBookingsSwitch.jsx';
 import DashboardEbooksSwitch from './pages/dashboard/DashboardEbooksSwitch.jsx';
 import LearnerFinancial from './pages/dashboard/LearnerFinancial.jsx';
+import LearnerGrowth from './pages/dashboard/LearnerGrowth.jsx';
 import BecomeInstructor from './pages/dashboard/BecomeInstructor.jsx';
 import DashboardAffiliate from './pages/dashboard/DashboardAffiliate.jsx';
 import DashboardLiveClassesSwitch from './pages/dashboard/DashboardLiveClassesSwitch.jsx';
@@ -170,6 +171,7 @@ function App() {
         <Route path="support" element={<LearnerSupport />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
+        <Route path="growth" element={<LearnerGrowth />} />
         <Route path="affiliate" element={<DashboardAffiliate />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />
         <Route path="field-services" element={<FieldServices />} />
@@ -322,12 +324,11 @@ function App() {
             </ProtectedRoute>
           )}
         />
-        <Route path="ads" element={<EdulureAds />} />
         <Route path="settings" element={<DashboardSettings />} />
         <Route
           path="ads"
           element={(
-            <ProtectedRoute allowedRoles={['instructor']}>
+            <ProtectedRoute allowedRoles={['learner', 'instructor', 'admin']}>
               <EdulureAds />
             </ProtectedRoute>
           )}
