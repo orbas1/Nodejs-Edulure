@@ -75,7 +75,9 @@ const limiter = expressRateLimit({
   legacyHeaders: false
 });
 
-const corsPolicy = createCorsOriginValidator(env.app.corsOrigins);
+const corsPolicy = createCorsOriginValidator(env.app.corsOrigins, {
+  allowDevelopmentOrigins: !env.isProduction
+});
 
 app.use(requestContextMiddleware);
 app.use(runtimeConfigMiddleware);

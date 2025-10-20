@@ -49,7 +49,9 @@ class RealtimeService {
       return this.io;
     }
 
-    const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? []);
+    const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? [], {
+      allowDevelopmentOrigins: !env.isProduction
+    });
     this.io = new Server(httpServer, {
       cors: {
         origin: (origin, callback) => {

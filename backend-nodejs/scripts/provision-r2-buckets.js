@@ -100,7 +100,9 @@ async function ensureBucketConfiguration(bucket) {
 }
 
 async function main() {
-  const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? []);
+  const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? [], {
+    allowDevelopmentOrigins: !env.isProduction
+  });
   const corsOrigins = corsPolicy.allowAll
     ? ['*']
     : Array.from(new Set([...corsPolicy.getExactOrigins(), ...corsPolicy.getWildcardOrigins()]));

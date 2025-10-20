@@ -44,4 +44,33 @@ describe('createCorsOriginValidator', () => {
     expect(policy.isOriginAllowed('https://localhost:3000')).toBe(true);
     expect(policy.isOriginAllowed('http://localhost:4000')).toBe(false);
   });
+
+  it('treats dot-localhost hostnames without protocols as local', () => {
+    const policy = createCorsOriginValidator(['app.localhost:5173']);
+
+    expect(policy.isOriginAllowed('http://app.localhost:5173')).toBe(true);
+    expect(policy.isOriginAllowed('https://app.localhost:5173')).toBe(true);
+  });
+
+  it('expands localhost origins with development aliases when enabled', () => {
+    const policy = createCorsOriginValidator(['http://localhost:5173'], {
+      allowDevelopmentOrigins: true,
+      developmentPortHints: [3000]
+    });
+
+    expect(policy.isOriginAllowed('http://localhost:3000')).toBe(true);
+    expect(policy.isOriginAllowed('https://localhost:3000')).toBe(true);
+    expect(policy.isOriginAllowed('http://127.0.0.1:3000')).toBe(true);
+    expect(policy.isOriginAllowed('http://0.0.0.0:3000')).toBe(true);
+  });
+
+  it('can disable development aliases for strict production enforcement', () => {
+    const policy = createCorsOriginValidator(['http://localhost:5173'], {
+      allowDevelopmentOrigins: false,
+      developmentPortHints: [3000]
+    });
+
+    expect(policy.isOriginAllowed('http://127.0.0.1:5173')).toBe(false);
+    expect(policy.isOriginAllowed('http://localhost:3000')).toBe(false);
+  });
 });

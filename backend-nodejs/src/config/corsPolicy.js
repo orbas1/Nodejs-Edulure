@@ -2,6 +2,25 @@ import cors from 'cors';
 
 const ORIGIN_DELIMITER = /[\s,]+/;
 const PROTOCOL_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
+const DEFAULT_DEVELOPMENT_PORT_HINTS = [
+  3000,
+  3001,
+  3002,
+  5173,
+  5174,
+  4173,
+  4174,
+  4200,
+  4321,
+  5000,
+  5175,
+  6006,
+  7000,
+  8000,
+  8080,
+  9000,
+  19006
+];
 
 function formatUrlOrigin(url) {
   const protocol = url.protocol.toLowerCase();
@@ -34,8 +53,125 @@ function isLocalAddress(value) {
     host === '127.0.0.1' ||
     host === '0.0.0.0' ||
     host === '[::1]' ||
-    host.endsWith('.local')
+    host === '::1' ||
+    host.endsWith('.local') ||
+    host.endsWith('.localhost')
   );
+}
+
+function parseOriginComponents(origin) {
+  try {
+    const url = new URL(origin);
+    const protocol = url.protocol.toLowerCase();
+    const hostname = url.hostname.toLowerCase();
+    const port = url.port ? Number(url.port) : null;
+
+    return {
+      protocol,
+      hostname,
+      port: Number.isFinite(port) ? port : null
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function formatOrigin(protocol, hostname, port) {
+  const effectivePort = Number.isFinite(port) ? Number(port) : null;
+  const omitPort =
+    (protocol === 'https:' && (effectivePort === null || effectivePort === 443)) ||
+    (protocol === 'http:' && (effectivePort === null || effectivePort === 80));
+  const needsBrackets = hostname.includes(':') && !hostname.startsWith('[') && !hostname.endsWith(']');
+  const host = needsBrackets ? `[${hostname}]` : hostname;
+
+  return `${protocol}//${host}${omitPort ? '' : `:${effectivePort}`}`;
+}
+
+function expandDevelopmentOrigins(exactOrigins, options) {
+  const {
+    allowDevelopmentOrigins = process.env.NODE_ENV !== 'production',
+    developmentPortHints = DEFAULT_DEVELOPMENT_PORT_HINTS
+  } = options ?? {};
+
+  if (!allowDevelopmentOrigins) {
+    return;
+  }
+
+  const portHints = developmentPortHints
+    .map((port) => Number(port))
+    .filter((port) => Number.isFinite(port) && port > 0);
+
+  const additionalOrigins = new Set();
+
+  for (const origin of exactOrigins) {
+    const components = parseOriginComponents(origin);
+    if (!components) {
+      continue;
+    }
+
+    const { protocol, hostname, port } = components;
+    if (!isLocalAddress(hostname)) {
+      continue;
+    }
+
+    const aliasHosts = new Set([hostname]);
+    if (hostname === 'localhost') {
+      aliasHosts.add('127.0.0.1');
+      aliasHosts.add('0.0.0.0');
+      aliasHosts.add('::1');
+      aliasHosts.add('[::1]');
+    } else if (hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+      aliasHosts.add('localhost');
+      aliasHosts.add('::1');
+      aliasHosts.add('[::1]');
+    } else if (hostname === '::1' || hostname === '[::1]') {
+      aliasHosts.add('localhost');
+      aliasHosts.add('127.0.0.1');
+      aliasHosts.add('0.0.0.0');
+      aliasHosts.add('[::1]');
+    }
+
+    if (aliasHosts.has('::1')) {
+      aliasHosts.add('[::1]');
+    }
+    if (aliasHosts.has('[::1]')) {
+      aliasHosts.add('::1');
+    }
+
+    const schemeCandidates = new Set([protocol]);
+    if (protocol === 'http:' || protocol === 'https:') {
+      schemeCandidates.add('http:');
+      schemeCandidates.add('https:');
+    }
+
+    for (const aliasHost of aliasHosts) {
+      for (const scheme of schemeCandidates) {
+        const portsForScheme = new Set();
+
+        if (scheme === 'http:' || scheme === 'https:') {
+          portsForScheme.add(null);
+          for (const hint of portHints) {
+            portsForScheme.add(hint);
+          }
+          if (Number.isFinite(port)) {
+            portsForScheme.add(port);
+          }
+        } else if (Number.isFinite(port)) {
+          portsForScheme.add(port);
+        } else {
+          portsForScheme.add(null);
+        }
+
+        for (const candidatePort of portsForScheme) {
+          additionalOrigins.add(formatOrigin(scheme, aliasHost, candidatePort));
+        }
+      }
+    }
+  }
+
+  for (const origin of additionalOrigins) {
+    exactOrigins.add(origin);
+  }
 }
 
 function expandConfiguredOrigin(origin) {
@@ -145,8 +281,8 @@ export function parseCorsOrigins(input) {
   return [];
 }
 
-export function createCorsOriginValidator(originsInput) {
-  const entries = parseCorsOrigins(originsInput);
+export function createCorsOriginValidator(originsInput, options = {}) {
+  const entries = [...parseCorsOrigins(originsInput), ...parseCorsOrigins(options.additionalOrigins)];
   let allowAll = entries.length === 0;
   const exactOrigins = new Set();
   const wildcardMatchers = [];
@@ -182,6 +318,8 @@ export function createCorsOriginValidator(originsInput) {
       exactOrigins.add(variant);
     }
   }
+
+  expandDevelopmentOrigins(exactOrigins, options);
 
   if (!allowAll && exactOrigins.size === 0 && wildcardMatchers.length === 0) {
     allowAll = true;
@@ -237,9 +375,10 @@ export function createCorsOriginValidator(originsInput) {
 }
 
 export function createCorsMiddleware(originsInput, options = {}) {
-  const policy = createCorsOriginValidator(originsInput);
+  const { policyOptions = {}, ...corsOptions } = options;
+  const policy = createCorsOriginValidator(originsInput, policyOptions);
   return {
     policy,
-    middleware: policy.middleware(options)
+    middleware: policy.middleware(corsOptions)
   };
 }
