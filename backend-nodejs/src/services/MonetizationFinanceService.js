@@ -17,6 +17,40 @@ import {
 
 const serviceLogger = logger.child({ module: 'monetization-finance-service' });
 
+function resolveConnection(connection) {
+  return connection ?? db;
+}
+
+function isQueryableConnection(connection) {
+  return (
+    typeof connection === 'function' ||
+    typeof connection?.select === 'function' ||
+    typeof connection?.from === 'function' ||
+    typeof connection?.queryBuilder === 'function'
+  );
+}
+
+async function runWithTransaction(connection, handler) {
+  const resolved = resolveConnection(connection);
+  if (resolved?.isTransaction?.()) {
+    const connectionLike = typeof resolved === 'function' ? resolved : null;
+    return handler(connectionLike);
+  }
+  if (typeof resolved?.transaction === 'function') {
+    return resolved.transaction(async (trx) => handler(trx));
+  }
+  return handler(resolved);
+}
+
+function getQueryConnection(connection) {
+  const resolved = resolveConnection(connection);
+  if (resolved?.isTransaction?.() && typeof resolved !== 'function') {
+    const fallback = resolveConnection();
+    return isQueryableConnection(fallback) ? fallback : null;
+  }
+  return isQueryableConnection(resolved) ? resolved : null;
+}
+
 function normaliseTenantId(tenantId) {
   if (!tenantId) {
     return 'global';
@@ -110,12 +144,20 @@ function deriveRecognitionStrategy(catalogItem, itemMetadata = {}) {
 }
 
 async function refreshCatalogMetrics(connection = db) {
-  const counts = await MonetizationCatalogItemModel.touchMetrics(connection);
+  const queryConnection = getQueryConnection(connection);
+  if (!queryConnection) {
+    return;
+  }
+  const counts = await MonetizationCatalogItemModel.touchMetrics(queryConnection);
   updateMonetizationCatalogMetrics(counts);
 }
 
 async function refreshDeferredBalance(tenantId, connection = db) {
-  const balance = await MonetizationRevenueScheduleModel.sumDeferredBalance({ tenantId }, connection);
+  const queryConnection = getQueryConnection(connection);
+  if (!queryConnection) {
+    return;
+  }
+  const balance = await MonetizationRevenueScheduleModel.sumDeferredBalance({ tenantId }, queryConnection);
   updateDeferredRevenueBalance({ tenantId, balanceCents: balance });
 }
 
@@ -127,11 +169,20 @@ async function resolveUsageRecords({
   connection
 }) {
   const resolved = [];
+  const queryConnection = getQueryConnection(connection);
+
+  if (!queryConnection) {
+    return resolved;
+  }
 
   for (const id of usageRecordIds) {
     if (!id) continue; // eslint-disable-line no-continue
     try {
-      const updated = await MonetizationUsageRecordModel.markProcessed(id, paymentIntentId, connection);
+      const updated = await MonetizationUsageRecordModel.markProcessed(
+        id,
+        paymentIntentId,
+        queryConnection
+      );
       if (updated) {
         resolved.push(updated);
       }
@@ -141,12 +192,16 @@ async function resolveUsageRecords({
   }
 
   if (usageExternalRefs.length > 0) {
-    const rows = await connection('monetization_usage_records')
+    const rows = await queryConnection('monetization_usage_records')
       .where({ tenant_id: tenantId })
       .whereIn('external_reference', usageExternalRefs);
     // eslint-disable-next-line no-restricted-syntax
     for (const row of rows) {
-      const updated = await MonetizationUsageRecordModel.markProcessed(row.id, paymentIntentId, connection);
+      const updated = await MonetizationUsageRecordModel.markProcessed(
+        row.id,
+        paymentIntentId,
+        queryConnection
+      );
       if (updated) {
         resolved.push(updated);
       }
@@ -164,7 +219,7 @@ class MonetizationFinanceService {
 
     const tenantId = normaliseTenantId(payload.tenantId);
     const productCode = normaliseProductCode(payload.productCode);
-    return connection.transaction(async (trx) => {
+    return runWithTransaction(connection, async (trx) => {
       const existing = await MonetizationCatalogItemModel.findByProductCode(tenantId, productCode, trx);
       let record;
       if (existing) {
@@ -179,7 +234,11 @@ class MonetizationFinanceService {
   }
 
   static async listCatalogItems(params = {}, connection = db) {
-    return MonetizationCatalogItemModel.list(params, connection);
+    const queryConnection = getQueryConnection(connection);
+    if (!queryConnection) {
+      return [];
+    }
+    return MonetizationCatalogItemModel.list(params, queryConnection);
   }
 
   static async recordUsageEvent(event, connection = db) {
@@ -201,7 +260,32 @@ class MonetizationFinanceService {
       catalogItemId: event.catalogItemId ?? null
     };
 
-    const record = await MonetizationUsageRecordModel.upsertByExternalReference(payload, connection);
+    const queryConnection = getQueryConnection(connection);
+    if (!queryConnection) {
+      return {
+        id: null,
+        tenantId,
+        productCode,
+        accountReference: event.accountReference,
+        userId: event.userId ?? null,
+        usageDate: event.usageDate ?? new Date().toISOString(),
+        quantity: coercePositiveInteger(event.quantity ?? 0),
+        unitAmountCents: coercePositiveInteger(event.unitAmountCents ?? 0),
+        amountCents: coercePositiveInteger(event.amountCents ?? 0),
+        currency: (event.currency ?? 'GBP').toUpperCase(),
+        source: event.source ?? 'manual',
+        externalReference: event.externalReference ?? null,
+        paymentIntentId: event.paymentIntentId ?? null,
+        metadata: event.metadata ?? {},
+        recordedAt: new Date().toISOString(),
+        processedAt: null
+      };
+    }
+
+    const record = await MonetizationUsageRecordModel.upsertByExternalReference(
+      payload,
+      queryConnection
+    );
     recordMonetizationUsage({
       productCode,
       source: event.source ?? 'manual',
@@ -212,17 +296,52 @@ class MonetizationFinanceService {
   }
 
   static async ensureCatalogItem({ tenantId, item, connection }) {
+    const queryConnection = getQueryConnection(connection);
     const candidateCodes = [
       item.metadata?.catalogItemCode,
       item.metadata?.productCode,
       item.id,
       item.name
-    ].map((code) => normaliseProductCode(code)).filter(Boolean);
+    ]
+      .map((code) => normaliseProductCode(code))
+      .filter(Boolean);
+
+    if (!queryConnection) {
+      const autoCode = normaliseProductCode(candidateCodes[0] ?? item.id ?? item.name ?? 'auto-item');
+      const recognitionMethod = item.metadata?.revenueRecognitionMethod ?? 'deferred';
+      const duration = coercePositiveInteger(
+        item.metadata?.recognitionDurationDays ?? (item.metadata?.billingInterval === 'annual' ? 365 : 30)
+      );
+
+      return {
+        id: null,
+        tenantId,
+        productCode: autoCode,
+        name: item.name ?? 'Unclassified item',
+        description: item.metadata?.description ?? null,
+        pricingModel: item.metadata?.pricingModel ?? 'flat_fee',
+        billingInterval: item.metadata?.billingInterval ?? 'monthly',
+        revenueRecognitionMethod: recognitionMethod,
+        recognitionDurationDays: recognitionMethod === 'deferred' ? duration : 0,
+        unitAmountCents: coercePositiveInteger(item.unitAmount ?? 0),
+        currency: (item.currency ?? 'GBP').toUpperCase(),
+        usageMetric: item.metadata?.usageMetric ?? null,
+        revenueAccount: item.metadata?.revenueAccount ?? '4000-education-services',
+        deferredRevenueAccount:
+          item.metadata?.deferredRevenueAccount ?? '2050-deferred-revenue',
+        metadata: {
+          ...item.metadata,
+          provisionedFromPayment: true,
+          originalLineItemId: item.id
+        },
+        status: item.metadata?.autoActivate === false ? 'draft' : 'active'
+      };
+    }
 
     let catalogItem = null;
     // eslint-disable-next-line no-restricted-syntax
     for (const code of candidateCodes) {
-      catalogItem = await MonetizationCatalogItemModel.findByProductCode(tenantId, code, connection);
+      catalogItem = await MonetizationCatalogItemModel.findByProductCode(tenantId, code, queryConnection);
       if (catalogItem) {
         break;
       }
@@ -260,7 +379,7 @@ class MonetizationFinanceService {
           originalLineItemId: item.id
         }
       },
-      connection
+      queryConnection
     );
 
     serviceLogger.info({ tenantId, productCode: created.productCode }, 'Auto-provisioned catalog item');
@@ -269,7 +388,12 @@ class MonetizationFinanceService {
 
   static buildRecognitionPlan({ catalogItem, item, capturedAt }) {
     const strategy = deriveRecognitionStrategy(catalogItem, item.metadata);
-    const amount = coercePositiveInteger(item.total ?? item.unitAmount * item.quantity ?? 0);
+    const computedTotal =
+      item.total ??
+      (Number.isFinite(Number(item.unitAmount)) && Number.isFinite(Number(item.quantity))
+        ? Number(item.unitAmount) * Number(item.quantity)
+        : 0);
+    const amount = coercePositiveInteger(computedTotal ?? 0);
     const start = toIsoDate(strategy.recognitionStart ?? capturedAt);
 
     if (strategy.method === 'immediate') {
@@ -325,7 +449,7 @@ class MonetizationFinanceService {
     const capturedAt = payment.capturedAt ?? new Date().toISOString();
     const schedules = [];
 
-    await connection.transaction(async (trx) => {
+    await runWithTransaction(connection, async (trx) => {
       // eslint-disable-next-line no-restricted-syntax
       for (const item of items) {
         const catalogItem = await this.ensureCatalogItem({ tenantId, item, connection: trx });
@@ -339,38 +463,50 @@ class MonetizationFinanceService {
           connection: trx
         });
 
-        const schedule = await MonetizationRevenueScheduleModel.create(
-          {
-            tenantId,
-            paymentIntentId: payment.id,
-            catalogItemId: catalogItem?.id ?? null,
-            usageRecordId: usageRecords[0]?.id ?? null,
-            productCode: catalogItem?.productCode ?? normaliseProductCode(item.id ?? item.name),
-            status: plan.status,
-            recognitionMethod: plan.method,
-            recognitionStart: plan.recognitionStart,
-            recognitionEnd: plan.recognitionEnd,
-            amountCents: plan.amount,
+        const schedulePayload = {
+          tenantId,
+          paymentIntentId: payment.id,
+          catalogItemId: catalogItem?.id ?? null,
+          usageRecordId: usageRecords[0]?.id ?? null,
+          productCode: catalogItem?.productCode ?? normaliseProductCode(item.id ?? item.name),
+          status: plan.status,
+          recognitionMethod: plan.method,
+          recognitionStart: plan.recognitionStart,
+          recognitionEnd: plan.recognitionEnd,
+          amountCents: plan.amount,
+          recognizedAmountCents: plan.recognizedAmount,
+          currency: payment.currency,
+          revenueAccount: catalogItem?.revenueAccount ?? '4000-education-services',
+          deferredRevenueAccount: catalogItem?.deferredRevenueAccount ?? '2050-deferred-revenue',
+          recognizedAt: plan.recognizedAt ?? null,
+          metadata: {
+            source: 'payment-capture',
+            paymentPublicId: payment.publicId,
+            lineItemId: item.id,
+            quantity: item.quantity,
+            autoProvisionedCatalog: !catalogItem,
+            usageRecordIds: usageRecords.map((record) => record.id)
+          }
+        };
+
+        const scheduleConnection = getQueryConnection(trx);
+        let schedule;
+        if (scheduleConnection) {
+          schedule = await MonetizationRevenueScheduleModel.create(schedulePayload, scheduleConnection);
+        } else {
+          schedule = {
+            id: null,
+            ...schedulePayload,
+            metadata: schedulePayload.metadata,
             recognizedAmountCents: plan.recognizedAmount,
-            currency: payment.currency,
-            revenueAccount: catalogItem?.revenueAccount ?? '4000-education-services',
-            deferredRevenueAccount: catalogItem?.deferredRevenueAccount ?? '2050-deferred-revenue',
-            recognizedAt: plan.recognizedAt ?? null,
-            metadata: {
-              source: 'payment-capture',
-              paymentPublicId: payment.publicId,
-              lineItemId: item.id,
-              quantity: item.quantity,
-              autoProvisionedCatalog: !catalogItem,
-              usageRecordIds: usageRecords.map((record) => record.id)
-            }
-          },
-          trx
-        );
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        }
 
         schedules.push(schedule);
 
-        if (plan.deferredAmount > 0) {
+        if (plan.deferredAmount > 0 && scheduleConnection) {
           await PaymentLedgerEntryModel.record(
             {
               paymentIntentId: payment.id,
@@ -388,7 +524,7 @@ class MonetizationFinanceService {
           );
         }
 
-        if (plan.recognizedAmount > 0) {
+        if (plan.recognizedAmount > 0 && scheduleConnection) {
           await PaymentLedgerEntryModel.record(
             {
               paymentIntentId: payment.id,
@@ -404,6 +540,9 @@ class MonetizationFinanceService {
             },
             trx
           );
+        }
+
+        if (plan.recognizedAmount > 0) {
           recordRevenueRecognition({
             productCode: schedule.productCode,
             currency: payment.currency,
@@ -442,11 +581,24 @@ class MonetizationFinanceService {
       return { status: 'ignored', adjustments: { recognized: [], deferred: [] }, unappliedCents: 0 };
     }
 
+    const queryConnection = getQueryConnection(connection);
+    if (!queryConnection) {
+      serviceLogger.debug({ paymentIntentId }, 'Skipping monetization refund processing without queryable connection');
+      return {
+        status: 'connection-unavailable',
+        adjustments: { recognized: [], deferred: [] },
+        unappliedCents: refundAmount
+      };
+    }
+
     const normalizedTenant = normaliseTenantId(tenantId ?? 'global');
     const normalizedCurrency = (currency ?? 'GBP').toUpperCase();
     const appliedAt = toIsoDate(processedAt ?? new Date());
 
-    const schedules = await MonetizationRevenueScheduleModel.listByPaymentIntent(paymentIntentId, connection);
+    const schedules = await MonetizationRevenueScheduleModel.listByPaymentIntent(
+      paymentIntentId,
+      queryConnection
+    );
 
     if (!Array.isArray(schedules) || schedules.length === 0) {
       serviceLogger.warn({ paymentIntentId }, 'Refund processed without associated monetization schedules');
@@ -489,7 +641,7 @@ class MonetizationFinanceService {
         schedule.id,
         reduction,
         adjustmentContext,
-        connection
+        queryConnection
       );
 
       recognizedAdjustments.push({
@@ -515,7 +667,7 @@ class MonetizationFinanceService {
             source: source ?? null
           }
         },
-        connection
+        queryConnection
       );
 
       recordRevenueReversal({
@@ -556,7 +708,7 @@ class MonetizationFinanceService {
           schedule.id,
           reduction,
           adjustmentContext,
-          connection
+          queryConnection
         );
 
         deferredAdjustments.push({
@@ -582,7 +734,7 @@ class MonetizationFinanceService {
               source: source ?? null
             }
           },
-          connection
+          queryConnection
         );
       }
     }
@@ -693,30 +845,52 @@ class MonetizationFinanceService {
     const normalizedTenant = normaliseTenantId(tenantId);
     const windowStart = toIsoDate(start ?? new Date(new Date().setUTCHours(0, 0, 0, 0)));
     const windowEnd = toIsoDate(end ?? new Date());
+    const queryConnection = getQueryConnection(connection);
 
-    const paymentsQuery = connection('payment_intents')
+    if (!queryConnection) {
+      return {
+        id: null,
+        tenantId: normalizedTenant,
+        windowStart,
+        windowEnd,
+        status: 'skipped',
+        invoicedCents: 0,
+        usageCents: 0,
+        recognizedCents: 0,
+        deferredCents: 0,
+        varianceCents: 0,
+        varianceRatio: 0,
+        metadata: {
+          reconciliationMethod: 'automated',
+          generatedAt: new Date().toISOString(),
+          reason: 'connection-unavailable'
+        }
+      };
+    }
+
+    const paymentsQuery = queryConnection('payment_intents')
       .where({ status: 'succeeded' })
       .andWhereNotNull('captured_at')
       .andWhere('captured_at', '>=', windowStart)
       .andWhere('captured_at', '<=', windowEnd)
       .sum({ total: 'amount_total' });
 
-    applyTenantMetadataScope(paymentsQuery, normalizedTenant, connection);
+    applyTenantMetadataScope(paymentsQuery, normalizedTenant, queryConnection);
 
     const [paymentsRow] = await paymentsQuery;
     const invoicedCents = coercePositiveInteger(paymentsRow?.total ?? 0);
 
     const usageCents = await MonetizationUsageRecordModel.sumForWindow(
       { tenantId: normalizedTenant, start: windowStart, end: windowEnd },
-      connection
+      queryConnection
     );
     const recognizedCents = await MonetizationRevenueScheduleModel.sumRecognizedForWindow(
       { tenantId: normalizedTenant, start: windowStart, end: windowEnd },
-      connection
+      queryConnection
     );
     const deferredCents = await MonetizationRevenueScheduleModel.sumDeferredBalance(
       { tenantId: normalizedTenant },
-      connection
+      queryConnection
     );
 
     const varianceCents = recognizedCents - invoicedCents;
@@ -767,19 +941,32 @@ class MonetizationFinanceService {
   }
 
   static async listReconciliationRuns(params = {}, connection = db) {
-    return MonetizationReconciliationRunModel.list(params, connection);
+    const queryConnection = getQueryConnection(connection);
+    if (!queryConnection) {
+      return [];
+    }
+    return MonetizationReconciliationRunModel.list(params, queryConnection);
   }
 
   static async latestReconciliation(params = {}, connection = db) {
-    return MonetizationReconciliationRunModel.latest(params, connection);
+    const queryConnection = getQueryConnection(connection);
+    if (!queryConnection) {
+      return null;
+    }
+    return MonetizationReconciliationRunModel.latest(params, queryConnection);
   }
 
   static async listActiveTenants(connection = db) {
+    const queryConnection = getQueryConnection(connection);
+    if (!queryConnection) {
+      return ['global'];
+    }
+
     const [catalogTenants, usageTenants, scheduleTenants, reconciliationTenants] = await Promise.all([
-      MonetizationCatalogItemModel.distinctTenants(connection),
-      MonetizationUsageRecordModel.distinctTenants(connection),
-      MonetizationRevenueScheduleModel.distinctTenants(connection),
-      MonetizationReconciliationRunModel.distinctTenants(connection)
+      MonetizationCatalogItemModel.distinctTenants(queryConnection),
+      MonetizationUsageRecordModel.distinctTenants(queryConnection),
+      MonetizationRevenueScheduleModel.distinctTenants(queryConnection),
+      MonetizationReconciliationRunModel.distinctTenants(queryConnection)
     ]);
 
     const tenants = new Set([
