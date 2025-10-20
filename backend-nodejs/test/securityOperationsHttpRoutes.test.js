@@ -87,7 +87,10 @@ describe('Security operations HTTP routes', () => {
         title: '  Third-party outage ',
         description: ' Vendor SOC2 revoked. ',
         mitigationPlan: '  Documented  ',
-        reviewCadenceDays: 45
+        reviewCadenceDays: 45,
+        tags: [' vendor-risk ', '', 'x'.repeat(120)],
+        detectionControls: ['  audit-log '],
+        mitigationControls: '  playbook  '
       })
       .set('Authorization', 'Bearer token');
 
@@ -97,7 +100,10 @@ describe('Security operations HTTP routes', () => {
         title: 'Third-party outage',
         description: 'Vendor SOC2 revoked.',
         mitigationPlan: 'Documented',
-        reviewCadenceDays: 45
+        reviewCadenceDays: 45,
+        detectionControls: ['audit-log'],
+        mitigationControls: ['playbook'],
+        tags: ['vendor-risk', 'x'.repeat(100)]
       })
     );
   });
@@ -188,6 +194,65 @@ describe('Security operations HTTP routes', () => {
     expect(payload.reason).toBe('x'.repeat(500));
   });
 
+  it('normalises risk register filters and sorting', async () => {
+    listRiskRegister.mockResolvedValue({
+      items: [],
+      pagination: { total: 0, limit: 50, offset: 10 },
+      summary: {}
+    });
+
+    const response = await request(app)
+      .get(
+        '/api/v1/security/risk-register?limit=50&offset=10&ownerId=5&includeClosed=no&sortBy=updated_at&sortDirection=ASC&search=  outage  '
+      )
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(200);
+    expect(listRiskRegister).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: 50,
+        offset: 10,
+        ownerId: 5,
+        includeClosed: false,
+        sortBy: 'updatedAt',
+        sortDirection: 'asc',
+        search: 'outage'
+      })
+    );
+  });
+
+  it('rejects risk register listings when pagination values are invalid', async () => {
+    const response = await request(app)
+      .get('/api/v1/security/risk-register?limit=-1&offset=-10')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('limit must be a positive integer not exceeding 100');
+    expect(listRiskRegister).not.toHaveBeenCalled();
+  });
+
+  it('rejects risk register listings when sort values are invalid', async () => {
+    const response = await request(app)
+      .get('/api/v1/security/risk-register?sortBy=unknown&sortDirection=sideways')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe(
+      'sortBy must be one of residualRisk, inherentRisk, updatedAt, createdAt, nextReviewAt, status'
+    );
+    expect(listRiskRegister).not.toHaveBeenCalled();
+  });
+
+  it('rejects risk register listings when includeClosed is not boolean-like', async () => {
+    const response = await request(app)
+      .get('/api/v1/security/risk-register?includeClosed=maybe')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('includeClosed must be a boolean value');
+    expect(listRiskRegister).not.toHaveBeenCalled();
+  });
+
   it('lists audit evidence with filtering', async () => {
     listAuditEvidence.mockResolvedValue({
       items: [],
@@ -202,6 +267,16 @@ describe('Security operations HTTP routes', () => {
     expect(listAuditEvidence).toHaveBeenCalledWith(expect.objectContaining({ framework: 'SOC2', limit: 5 }));
   });
 
+  it('rejects audit evidence listings with invalid filters', async () => {
+    const response = await request(app)
+      .get('/api/v1/security/audit-evidence?riskId=-4&limit=200')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('riskId must be a positive integer');
+    expect(listAuditEvidence).not.toHaveBeenCalled();
+  });
+
   it('records audit evidence submissions', async () => {
     recordAuditEvidence.mockResolvedValue({ evidenceUuid: 'evidence-uuid-1' });
 
@@ -211,7 +286,8 @@ describe('Security operations HTTP routes', () => {
         storagePath: '  s3://evidence/path.pdf  ',
         framework: ' SOC2 ',
         controlReference: ' CC-1 ',
-        capturedAt: '2024-05-01T00:00:00.000Z'
+        capturedAt: '2024-05-01T00:00:00.000Z',
+        sources: [' policy ', '', null]
       })
       .set('Authorization', 'Bearer token');
 
@@ -221,7 +297,8 @@ describe('Security operations HTTP routes', () => {
         storagePath: 's3://evidence/path.pdf',
         framework: 'SOC2',
         controlReference: 'CC-1',
-        capturedAt: expect.any(Date)
+        capturedAt: expect.any(Date),
+        sources: ['policy']
       })
     );
   });
@@ -237,6 +314,17 @@ describe('Security operations HTTP routes', () => {
     expect(recordAuditEvidence).not.toHaveBeenCalled();
   });
 
+  it('rejects audit evidence submissions when the riskId is invalid', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/audit-evidence')
+      .send({ storagePath: 's3://bucket', riskId: -1 })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('riskId must be a positive integer');
+    expect(recordAuditEvidence).not.toHaveBeenCalled();
+  });
+
   it('logs business continuity exercises', async () => {
     logContinuityExercise.mockResolvedValue({ exerciseUuid: 'exercise-uuid-1', scenarioKey: 'rds-drill' });
 
@@ -245,14 +333,40 @@ describe('Security operations HTTP routes', () => {
       .send({
         scenarioKey: ' rds-drill ',
         scenarioSummary: ' RDS failover validation ',
-        exerciseType: 'tabletop'
+        exerciseType: 'tabletop',
+        followUpActions: ['  notify ']
       })
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(201);
     expect(logContinuityExercise).toHaveBeenCalledWith(
-      expect.objectContaining({ scenarioKey: 'rds-drill', scenarioSummary: 'RDS failover validation' })
+      expect.objectContaining({
+        scenarioKey: 'rds-drill',
+        scenarioSummary: 'RDS failover validation',
+        followUpActions: ['notify']
+      })
     );
+  });
+
+  it('rejects continuity exercise listings with invalid date filters', async () => {
+    const response = await request(app)
+      .get('/api/v1/security/continuity/exercises?since=not-a-date')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('since must be a valid date');
+    expect(listContinuityExercises).not.toHaveBeenCalled();
+  });
+
+  it('rejects continuity exercise submissions with invalid durations', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/continuity/exercises')
+      .send({ scenarioKey: 'drill', scenarioSummary: 'summary', actualRtoMinutes: -1 })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('actualRtoMinutes must be a non-negative integer');
+    expect(logContinuityExercise).not.toHaveBeenCalled();
   });
 
   it('requires a positive identifier when recording risk reviews', async () => {
@@ -277,6 +391,27 @@ describe('Security operations HTTP routes', () => {
     expect(recordRiskReview).not.toHaveBeenCalled();
   });
 
+  it('records risk reviews with sanitised payloads', async () => {
+    recordRiskReview.mockResolvedValue({ reviewUuid: 'review-uuid-1' });
+
+    const response = await request(app)
+      .post('/api/v1/security/risk-register/12/reviews')
+      .send({
+        status: ' in_review ',
+        notes: '  Needs approval  ',
+        evidenceReferences: ['  doc-ref ', '', null],
+        reviewer: { id: 'admin-1', displayName: ' Security Lead ' }
+      })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(201);
+    const [[payload]] = recordRiskReview.mock.calls.slice(-1);
+    expect(payload.status).toBe('in_review');
+    expect(payload.notes).toBe('Needs approval');
+    expect(payload.evidenceReferences).toEqual(['doc-ref']);
+    expect(payload.reviewer).toEqual(expect.objectContaining({ id: 'admin-1' }));
+  });
+
   it('rejects audit evidence submissions with invalid timestamps', async () => {
     const response = await request(app)
       .post('/api/v1/security/audit-evidence')
@@ -286,6 +421,16 @@ describe('Security operations HTTP routes', () => {
     expect(response.status).toBe(400);
     expect(response.body.error).toBe('capturedAt must be a valid date');
     expect(recordAuditEvidence).not.toHaveBeenCalled();
+  });
+
+  it('rejects assessment listings with invalid pagination', async () => {
+    const response = await request(app)
+      .get('/api/v1/security/assessments?limit=0')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('limit must be a positive integer not exceeding 100');
+    expect(listAssessments).not.toHaveBeenCalled();
   });
 
   it('rejects schedule assessment requests without required fields', async () => {
@@ -318,7 +463,8 @@ describe('Security operations HTTP routes', () => {
       .send({
         assessmentType: '  pentest ',
         scheduledFor: '2025-01-01T00:00:00.000Z',
-        scope: '  External perimeter  '
+        scope: '  External perimeter  ',
+        methodology: '  OWASP  '
       })
       .set('Authorization', 'Bearer token');
 
@@ -327,7 +473,8 @@ describe('Security operations HTTP routes', () => {
       expect.objectContaining({
         assessmentType: 'pentest',
         scheduledFor: expect.any(Date),
-        scope: 'External perimeter'
+        scope: 'External perimeter',
+        methodology: 'OWASP'
       })
     );
   });
