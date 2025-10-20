@@ -1,5 +1,7 @@
 import db from '../config/database.js';
 
+const TABLE_NAME = 'user_sessions';
+
 const BASE_COLUMNS = [
   'id',
   'user_id as userId',
@@ -16,13 +18,63 @@ const BASE_COLUMNS = [
   'deleted_at as deletedAt'
 ];
 
-export default class UserSessionModel {
-  static query(connection = db, { includeDeleted = false } = {}) {
-    const builder = connection('user_sessions');
-    if (!includeDeleted) {
-      builder.whereNull('deleted_at');
+function baseQuery(connection, { includeDeleted = false } = {}) {
+  const builder = connection(TABLE_NAME);
+  if (!includeDeleted) {
+    builder.whereNull('deleted_at');
+  }
+  return builder;
+}
+
+function resolveInsertedId(result) {
+  if (result === null || result === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(result)) {
+    if (result.length === 0) {
+      return null;
     }
-    return builder;
+    if (result.length === 1) {
+      return resolveInsertedId(result[0]);
+    }
+    const [first] = result;
+    return resolveInsertedId(first);
+  }
+
+  if (typeof result === 'object') {
+    if (result.id !== undefined && result.id !== null) {
+      return result.id;
+    }
+    if (result.insertId !== undefined && result.insertId !== null) {
+      return result.insertId;
+    }
+    if (result.insertedId !== undefined && result.insertedId !== null) {
+      return result.insertedId;
+    }
+    if (typeof result.toString === 'function' && result.toString !== Object.prototype.toString) {
+      const numeric = Number(result);
+      if (!Number.isNaN(numeric)) {
+        return numeric;
+      }
+    }
+    return null;
+  }
+
+  if (typeof result === 'bigint') {
+    return Number(result);
+  }
+
+  if (typeof result === 'number' || typeof result === 'string') {
+    return result;
+  }
+
+  return null;
+}
+
+export default class UserSessionModel {
+  static query(connection = db, options = {}) {
+    return baseQuery(connection, options);
   }
 
   static async create(session, connection = db) {
@@ -34,27 +86,46 @@ export default class UserSessionModel {
       expires_at: session.expiresAt,
       last_used_at: connection.fn.now()
     };
-    const [id] = await this.query(connection, { includeDeleted: true }).insert(payload);
-    return this.findById(id, connection);
+
+    const insertResult = await baseQuery(connection, { includeDeleted: true }).insert(payload, ['id']);
+    let sessionId = resolveInsertedId(insertResult);
+
+    if (sessionId === null || sessionId === undefined) {
+      const fallback = await baseQuery(connection, { includeDeleted: true })
+        .select('id')
+        .where({ user_id: session.userId, refresh_token_hash: session.refreshTokenHash })
+        .orderBy('created_at', 'desc')
+        .first();
+      sessionId = fallback?.id ?? null;
+    }
+
+    return sessionId !== null && sessionId !== undefined ? this.findById(sessionId, connection) : null;
   }
 
   static async findById(id, connection = db, { forUpdate = false } = {}) {
-    const query = this.query(connection).select(BASE_COLUMNS).where({ id }).first();
-    return forUpdate ? query.forUpdate() : query;
+    const builder = baseQuery(connection).select(BASE_COLUMNS).where({ id });
+    if (forUpdate) {
+      builder.forUpdate();
+    }
+    return builder.first();
   }
 
   static async findActiveByHash(refreshTokenHash, connection = db, { forUpdate = false } = {}) {
-    const query = this.query(connection)
+    const builder = baseQuery(connection)
       .select(BASE_COLUMNS)
       .where({ refresh_token_hash: refreshTokenHash })
       .whereNull('revoked_at')
-      .andWhere('expires_at', '>', connection.fn.now())
-      .first();
-    return forUpdate ? query.forUpdate() : query;
+      .andWhere('expires_at', '>', connection.fn.now());
+
+    if (forUpdate) {
+      builder.forUpdate();
+    }
+
+    return builder.first();
   }
 
   static async revokeById(id, reason, connection = db, revokedBy = null) {
-    return this.query(connection)
+    return baseQuery(connection)
       .where({ id })
       .update({
         revoked_at: connection.fn.now(),
@@ -64,19 +135,19 @@ export default class UserSessionModel {
   }
 
   static async markRotated(id, connection = db) {
-    return this.query(connection)
+    return baseQuery(connection)
       .where({ id })
       .update({ rotated_at: connection.fn.now() });
   }
 
   static async revokeByHash(refreshTokenHash, reason, connection = db) {
-    return this.query(connection)
+    return baseQuery(connection)
       .where({ refresh_token_hash: refreshTokenHash })
       .update({ revoked_at: connection.fn.now(), revoked_reason: reason ?? null });
   }
 
   static async revokeOtherSessions(userId, excludeSessionId, reason, connection = db, revokedBy = null) {
-    const sessions = await this.query(connection)
+    const sessions = await baseQuery(connection)
       .select('id')
       .where({ user_id: userId })
       .modify((query) => {
@@ -91,7 +162,7 @@ export default class UserSessionModel {
     }
 
     const sessionIds = sessions.map((session) => session.id);
-    await this.query(connection)
+    await baseQuery(connection)
       .whereIn('id', sessionIds)
       .update({
         revoked_at: connection.fn.now(),
@@ -102,7 +173,7 @@ export default class UserSessionModel {
   }
 
   static async revokeExpiredSessions(userId, connection = db) {
-    const expired = await this.query(connection)
+    const expired = await baseQuery(connection)
       .select('id')
       .where({ user_id: userId })
       .where('expires_at', '<=', connection.fn.now())
@@ -113,7 +184,7 @@ export default class UserSessionModel {
     }
 
     const ids = expired.map((session) => session.id);
-    await this.query(connection)
+    await baseQuery(connection)
       .whereIn('id', ids)
       .update({ revoked_at: connection.fn.now(), revoked_reason: 'expired' });
     return ids;
@@ -124,7 +195,7 @@ export default class UserSessionModel {
       return [];
     }
 
-    const activeSessions = await this.query(connection)
+    const activeSessions = await baseQuery(connection)
       .select('id')
       .where({ user_id: userId })
       .whereNull('revoked_at')
@@ -136,15 +207,20 @@ export default class UserSessionModel {
     }
 
     const toRevoke = activeSessions.slice(keep).map((session) => session.id);
-    await this.query(connection)
+    await baseQuery(connection)
       .whereIn('id', toRevoke)
       .update({ revoked_at: connection.fn.now(), revoked_reason: 'session_limit_exceeded' });
     return toRevoke;
   }
 
   static async touch(sessionId, connection = db) {
-    return this.query(connection)
+    return baseQuery(connection)
       .where({ id: sessionId })
       .update({ last_used_at: connection.fn.now() });
   }
 }
+
+export const __testables = {
+  resolveInsertedId,
+  baseQuery
+};
