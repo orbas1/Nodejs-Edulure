@@ -43,6 +43,10 @@ describe('Security operations HTTP routes', () => {
     app = express();
     app.use(express.json());
     app.use('/api/v1/security', securityRouter);
+    app.use((error, _req, res, _next) => {
+      const status = error?.status ?? 500;
+      res.status(status).json({ success: false, error: error?.message ?? 'Internal Server Error' });
+    });
   });
 
   beforeEach(() => {
@@ -107,11 +111,38 @@ describe('Security operations HTTP routes', () => {
 
     const response = await request(app)
       .delete('/api/v1/security/risk-register/23')
+      .send({ reason: '  Duplicate entry resolved  ' })
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual({ success: true });
-    expect(deleteRisk).toHaveBeenCalledWith(expect.objectContaining({ riskId: 23 }));
+    expect(deleteRisk).toHaveBeenCalledWith(
+      expect.objectContaining({ riskId: 23, reason: 'Duplicate entry resolved' })
+    );
+  });
+
+  it('rejects delete operations when the identifier is invalid', async () => {
+    const response = await request(app)
+      .delete('/api/v1/security/risk-register/not-a-number')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error).toBe('A valid riskId is required');
+    expect(deleteRisk).not.toHaveBeenCalled();
+  });
+
+  it('truncates excessively long deletion reasons', async () => {
+    deleteRisk.mockResolvedValue({ success: true });
+    const longReason = 'x'.repeat(600);
+
+    await request(app)
+      .delete('/api/v1/security/risk-register/42')
+      .send({ reason: longReason })
+      .set('Authorization', 'Bearer token');
+
+    const [[payload]] = deleteRisk.mock.calls.slice(-1);
+    expect(payload.reason).toBe('x'.repeat(500));
   });
 
   it('lists audit evidence with filtering', async () => {
