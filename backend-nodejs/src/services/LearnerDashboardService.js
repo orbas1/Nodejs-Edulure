@@ -12,6 +12,11 @@ import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel
 import LearnerAffiliatePayoutModel from '../models/LearnerAffiliatePayoutModel.js';
 import LearnerAdCampaignModel from '../models/LearnerAdCampaignModel.js';
 import InstructorApplicationModel from '../models/InstructorApplicationModel.js';
+import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
+import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
+import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
+import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
+import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -29,6 +34,63 @@ function buildAcknowledgement({
     message,
     meta
   };
+}
+
+function formatLastOpenedLabel(value) {
+  if (!value) {
+    return 'Not opened yet';
+  }
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Not opened yet';
+    }
+    return new Intl.DateTimeFormat('en-GB', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    }).format(date);
+  } catch (_error) {
+    return 'Not opened yet';
+  }
+}
+
+function formatLibraryEntry(entry) {
+  if (!entry) return null;
+  return {
+    id: entry.id,
+    title: entry.title,
+    format: entry.format,
+    progress: Number(entry.progress ?? 0),
+    lastOpened: entry.lastOpened ?? null,
+    lastOpenedLabel: formatLastOpenedLabel(entry.lastOpened),
+    url: entry.url ?? null,
+    summary: entry.summary ?? null,
+    author: entry.author ?? null,
+    coverUrl: entry.coverUrl ?? null,
+    tags: Array.isArray(entry.tags) ? entry.tags : [],
+    highlights: Array.isArray(entry.highlights) ? entry.highlights : [],
+    audioUrl: entry.audioUrl ?? null,
+    previewUrl: entry.previewUrl ?? null,
+    metadata: entry.metadata ?? {}
+  };
+}
+
+async function buildFieldServiceAssignment({ userId, order, connection = db }) {
+  if (!order) return null;
+  const [events, providers] = await Promise.all([
+    FieldServiceEventModel.listByOrderIds([order.id], connection),
+    order.providerId ? FieldServiceProviderModel.listByIds([order.providerId], connection) : []
+  ]);
+
+  const workspace = buildFieldServiceWorkspace({
+    now: new Date(),
+    user: { id: userId },
+    orders: [order],
+    events,
+    providers
+  });
+
+  return workspace.customer?.assignments?.find((assignment) => assignment.id === order.id) ?? null;
 }
 
 export default class LearnerDashboardService {
@@ -480,6 +542,41 @@ export default class LearnerDashboardService {
     });
   }
 
+  static async updateTutorBookingRequest(userId, bookingId, payload = {}) {
+    if (!bookingId) {
+      const error = new Error('Tutor booking identifier is required');
+      error.status = 400;
+      throw error;
+    }
+
+    log.info({ userId, bookingId, payload }, 'Learner updated tutor booking');
+    return buildAcknowledgement({
+      reference: bookingId,
+      message: 'Tutor booking updated',
+      meta: {
+        status: payload.status ?? 'updated',
+        topic: payload.topic ?? null,
+        preferredDate: payload.preferredDate ?? null
+      }
+    });
+  }
+
+  static async cancelTutorBookingRequest(userId, bookingId, payload = {}) {
+    if (!bookingId) {
+      const error = new Error('Tutor booking identifier is required');
+      error.status = 400;
+      throw error;
+    }
+    log.info({ userId, bookingId, payload }, 'Learner cancelled tutor booking');
+    return buildAcknowledgement({
+      reference: bookingId,
+      message: 'Tutor booking cancelled',
+      meta: {
+        reason: payload.reason ?? null
+      }
+    });
+  }
+
   static async createCourseGoal(userId, courseId, payload = {}) {
     const goalId = generateReference('goal');
     log.info({ userId, courseId, goalId, payload }, 'Learner created a new course goal');
@@ -511,6 +608,74 @@ export default class LearnerDashboardService {
       meta: {
         recipients: Array.isArray(payload.recipients) ? payload.recipients : payload.recipient ? [payload.recipient] : []
       }
+    });
+  }
+
+  static async createLearnerLibraryEntry(userId, payload = {}) {
+    if (!payload.title) {
+      throw new Error('A title is required to add a library entry');
+    }
+
+    const entry = await LearnerLibraryEntryModel.create({
+      userId,
+      title: payload.title.trim(),
+      format: payload.format?.trim() || 'E-book',
+      progress: Math.max(0, Math.min(100, Number(payload.progress ?? 0))),
+      lastOpened: payload.lastOpened ?? null,
+      url: payload.url ?? null,
+      summary: payload.summary ?? null,
+      author: payload.author ?? null,
+      coverUrl: payload.coverUrl ?? null,
+      tags: Array.isArray(payload.tags) ? payload.tags : payload.tags ? [payload.tags].flat() : [],
+      metadata: { source: 'learner-dashboard' }
+    });
+
+    return formatLibraryEntry(entry);
+  }
+
+  static async updateLearnerLibraryEntry(userId, entryId, payload = {}) {
+    const entry = await LearnerLibraryEntryModel.findByIdForUser(userId, entryId);
+    if (!entry) {
+      const error = new Error('Library entry not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const updated = await LearnerLibraryEntryModel.updateByIdForUser(userId, entryId, {
+      title: payload.title !== undefined ? payload.title.trim() : undefined,
+      format: payload.format !== undefined ? payload.format.trim() : undefined,
+      progress:
+        payload.progress !== undefined
+          ? Math.max(0, Math.min(100, Number(payload.progress)))
+          : undefined,
+      lastOpened: payload.lastOpened !== undefined ? payload.lastOpened : undefined,
+      url: payload.url !== undefined ? payload.url : undefined,
+      summary: payload.summary !== undefined ? payload.summary : undefined,
+      author: payload.author !== undefined ? payload.author : undefined,
+      coverUrl: payload.coverUrl !== undefined ? payload.coverUrl : undefined,
+      tags:
+        payload.tags !== undefined
+          ? Array.isArray(payload.tags)
+            ? payload.tags
+            : [payload.tags].flat().filter(Boolean)
+          : undefined
+    });
+
+    return formatLibraryEntry(updated);
+  }
+
+  static async deleteLearnerLibraryEntry(userId, entryId) {
+    const deleted = await LearnerLibraryEntryModel.deleteByIdForUser(userId, entryId);
+    if (!deleted) {
+      const error = new Error('Library entry not found');
+      error.status = 404;
+      throw error;
+    }
+
+    return buildAcknowledgement({
+      reference: entryId,
+      message: 'Library entry removed',
+      meta: { entryId }
     });
   }
 
@@ -590,6 +755,204 @@ export default class LearnerDashboardService {
         communityId,
         action: payload.action ?? 'general'
       }
+    });
+  }
+
+  static async createFieldServiceAssignment(userId, payload = {}) {
+    if (!payload.serviceType) {
+      throw new Error('Service type is required to dispatch a field service assignment');
+    }
+
+    const owner = payload.owner?.trim();
+    if (!owner) {
+      throw new Error('An assignment owner is required');
+    }
+
+    return db.transaction(async (trx) => {
+      const reference = generateReference('fs');
+      const metadata = {
+        owner,
+        supportChannel: payload.supportChannel ?? null,
+        briefUrl: payload.briefUrl ?? null,
+        fieldNotes: payload.fieldNotes ?? null,
+        equipment: payload.equipment ?? null,
+        attachments: Array.isArray(payload.attachments)
+          ? payload.attachments.map((item) => String(item).trim()).filter(Boolean)
+          : [],
+        debriefHost: payload.debriefHost ?? null,
+        debriefAt: payload.debriefAt ?? null
+      };
+
+      const order = await FieldServiceOrderModel.createAssignment(
+        {
+          reference,
+          customerUserId: userId,
+          status: payload.status ? String(payload.status).toLowerCase() : 'dispatched',
+          priority: payload.priority ? String(payload.priority).toLowerCase() : 'standard',
+          serviceType: payload.serviceType.trim(),
+          summary: payload.fieldNotes ?? null,
+          requestedAt: new Date().toISOString(),
+          scheduledFor: payload.scheduledFor ?? null,
+          locationLabel: payload.location ?? null,
+          metadata
+        },
+        trx
+      );
+
+      await FieldServiceEventModel.create(
+        {
+          orderId: order.id,
+          eventType: 'dispatch_created',
+          status: order.status,
+          notes: payload.fieldNotes ?? null,
+          author: owner,
+          metadata: {
+            supportChannel: payload.supportChannel ?? null
+          }
+        },
+        trx
+      );
+
+      const assignment = await buildFieldServiceAssignment({ userId, order, connection: trx });
+      return assignment ?? {
+        id: order.id,
+        reference: order.reference,
+        status: order.status,
+        serviceType: order.serviceType,
+        priority: order.priority
+      };
+    });
+  }
+
+  static async updateFieldServiceAssignment(userId, assignmentId, payload = {}) {
+    const order = await FieldServiceOrderModel.findByIdForCustomer(userId, assignmentId);
+    if (!order) {
+      const error = new Error('Field service assignment not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const metadata = { ...order.metadata };
+    if (payload.owner !== undefined) {
+      metadata.owner = payload.owner?.trim() || null;
+    }
+    if (payload.supportChannel !== undefined) {
+      metadata.supportChannel = payload.supportChannel || null;
+    }
+    if (payload.briefUrl !== undefined) {
+      metadata.briefUrl = payload.briefUrl || null;
+    }
+    if (payload.fieldNotes !== undefined) {
+      metadata.fieldNotes = payload.fieldNotes || null;
+    }
+    if (payload.equipment !== undefined) {
+      metadata.equipment = payload.equipment || null;
+    }
+    if (payload.attachments !== undefined) {
+      metadata.attachments = Array.isArray(payload.attachments)
+        ? payload.attachments.map((item) => String(item).trim()).filter(Boolean)
+        : [];
+    }
+    if (payload.debriefHost !== undefined) {
+      metadata.debriefHost = payload.debriefHost || null;
+    }
+    if (payload.debriefAt !== undefined) {
+      metadata.debriefAt = payload.debriefAt || null;
+    }
+    if (payload.escalation) {
+      metadata.escalatedAt = new Date().toISOString();
+    }
+
+    return db.transaction(async (trx) => {
+      const updated = await FieldServiceOrderModel.updateById(
+        order.id,
+        {
+          status: payload.status ? String(payload.status).toLowerCase() : undefined,
+          priority: payload.priority ? String(payload.priority).toLowerCase() : undefined,
+          serviceType: payload.serviceType ? payload.serviceType.trim() : undefined,
+          summary: payload.fieldNotes !== undefined ? payload.fieldNotes : undefined,
+          scheduledFor: payload.scheduledFor !== undefined ? payload.scheduledFor : undefined,
+          locationLabel: payload.location !== undefined ? payload.location : undefined,
+          metadata
+        },
+        trx
+      );
+
+      const eventType = payload.status
+        ? `status_${String(payload.status).toLowerCase()}`
+        : 'details_updated';
+
+      await FieldServiceEventModel.create(
+        {
+          orderId: order.id,
+          eventType,
+          status: payload.status ? String(payload.status).toLowerCase() : updated.status,
+          notes: payload.fieldNotes ?? payload.notes ?? null,
+          author: metadata.owner ?? 'Learner operations',
+          metadata: {
+            supportChannel: metadata.supportChannel ?? null,
+            escalation: Boolean(payload.escalation ?? false)
+          }
+        },
+        trx
+      );
+
+      const assignment = await buildFieldServiceAssignment({ userId, order: updated, connection: trx });
+      return assignment ?? {
+        id: updated.id,
+        status: updated.status,
+        serviceType: updated.serviceType,
+        priority: updated.priority
+      };
+    });
+  }
+
+  static async closeFieldServiceAssignment(userId, assignmentId, payload = {}) {
+    const order = await FieldServiceOrderModel.findByIdForCustomer(userId, assignmentId);
+    if (!order) {
+      const error = new Error('Field service assignment not found');
+      error.status = 404;
+      throw error;
+    }
+
+    return db.transaction(async (trx) => {
+      const metadata = {
+        ...order.metadata,
+        resolution: payload.resolution ?? null,
+        closedAt: new Date().toISOString(),
+        closedBy: userId
+      };
+
+      const updated = await FieldServiceOrderModel.updateById(
+        order.id,
+        {
+          status: 'closed',
+          metadata
+        },
+        trx
+      );
+
+      await FieldServiceEventModel.create(
+        {
+          orderId: order.id,
+          eventType: 'job_completed',
+          status: 'closed',
+          notes: payload.resolution ?? null,
+          author: metadata.owner ?? 'Learner operations',
+          metadata: {
+            resolution: payload.resolution ?? null
+          }
+        },
+        trx
+      );
+
+      return buildAcknowledgement({
+        reference: updated.reference ?? `fs-${updated.id}`,
+        message: 'Field service assignment closed',
+        meta: {
+          assignmentId: updated.id
+        }
+      });
     });
   }
 

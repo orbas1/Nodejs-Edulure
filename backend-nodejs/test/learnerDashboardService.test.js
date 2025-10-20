@@ -37,12 +37,34 @@ const mocks = vi.hoisted(() => ({
     findByUserId: vi.fn(),
     upsertForUser: vi.fn()
   },
+  libraryEntryModel: {
+    create: vi.fn(),
+    findByIdForUser: vi.fn(),
+    updateByIdForUser: vi.fn(),
+    deleteByIdForUser: vi.fn()
+  },
+  fieldServiceOrderModel: {
+    createAssignment: vi.fn(),
+    findByIdForCustomer: vi.fn(),
+    updateById: vi.fn()
+  },
+  fieldServiceEventModel: {
+    create: vi.fn(),
+    listByOrderIds: vi.fn()
+  },
+  fieldServiceProviderModel: {
+    listByIds: vi.fn()
+  },
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn()
-  }
+  },
+  db: {
+    transaction: vi.fn()
+  },
+  fieldServiceWorkspaceBuilder: vi.fn()
 }));
 
 vi.mock('../src/models/LearnerGrowthInitiativeModel.js', () => ({
@@ -69,8 +91,34 @@ vi.mock('../src/models/InstructorApplicationModel.js', () => ({
   default: mocks.instructorApplicationModel
 }));
 
+vi.mock('../src/models/LearnerLibraryEntryModel.js', () => ({
+  default: mocks.libraryEntryModel
+}));
+
+vi.mock('../src/models/FieldServiceOrderModel.js', () => ({
+  default: mocks.fieldServiceOrderModel
+}));
+
+vi.mock('../src/models/FieldServiceEventModel.js', () => ({
+  default: mocks.fieldServiceEventModel
+}));
+
+vi.mock('../src/models/FieldServiceProviderModel.js', () => ({
+  default: mocks.fieldServiceProviderModel
+}));
+
 vi.mock('../src/config/logger.js', () => ({
   default: { child: () => mocks.logger }
+}));
+
+vi.mock('../src/config/database.js', () => ({
+  default: {
+    transaction: (handler) => mocks.db.transaction(handler)
+  }
+}));
+
+vi.mock('../src/services/FieldServiceWorkspace.js', () => ({
+  default: (...args) => mocks.fieldServiceWorkspaceBuilder(...args)
 }));
 
 import LearnerDashboardService from '../src/services/LearnerDashboardService.js';
@@ -81,12 +129,19 @@ const {
   affiliateChannelModel,
   affiliatePayoutModel,
   adCampaignModel,
-  instructorApplicationModel
+  instructorApplicationModel,
+  libraryEntryModel,
+  fieldServiceOrderModel,
+  fieldServiceEventModel,
+  fieldServiceProviderModel,
+  db,
+  fieldServiceWorkspaceBuilder
 } = mocks;
 
 describe('LearnerDashboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.transaction.mockImplementation(async (handler) => handler('trx'));
   });
 
   it('rejects duplicate growth initiative slugs', async () => {
@@ -172,5 +227,226 @@ describe('LearnerDashboardService', () => {
       meta: { status: 'submitted', stage: 'portfolio' }
     });
     expect(instructorApplicationModel.upsertForUser).toHaveBeenCalledWith(42, expect.objectContaining({ status: 'submitted' }));
+  });
+
+  it('creates a learner library entry and normalises payload values', async () => {
+    const lastOpened = '2024-05-01T10:00:00.000Z';
+    libraryEntryModel.create.mockResolvedValue({
+      id: 'lib-1',
+      title: 'Focus Playbook',
+      format: 'Guide',
+      progress: 100,
+      lastOpened,
+      url: 'https://edulure.example/playbook',
+      tags: ['growth'],
+      highlights: [],
+      metadata: {}
+    });
+
+    const entry = await LearnerDashboardService.createLearnerLibraryEntry(42, {
+      title: '  Focus Playbook  ',
+      format: 'Guide',
+      progress: 120,
+      lastOpened,
+      url: 'https://edulure.example/playbook',
+      tags: 'growth'
+    });
+
+    expect(libraryEntryModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 42,
+        title: 'Focus Playbook',
+        format: 'Guide',
+        progress: 100,
+        tags: ['growth'],
+        metadata: { source: 'learner-dashboard' }
+      })
+    );
+    expect(entry).toMatchObject({
+      id: 'lib-1',
+      title: 'Focus Playbook',
+      format: 'Guide',
+      progress: 100,
+      lastOpened,
+      url: 'https://edulure.example/playbook',
+      tags: ['growth']
+    });
+    expect(entry.lastOpenedLabel).toBeDefined();
+  });
+
+  it('throws a 404 error when updating a missing library entry', async () => {
+    libraryEntryModel.findByIdForUser.mockResolvedValue(null);
+
+    await expect(
+      LearnerDashboardService.updateLearnerLibraryEntry(42, 'missing', { title: 'Updated' })
+    ).rejects.toMatchObject({ status: 404 });
+    expect(libraryEntryModel.updateByIdForUser).not.toHaveBeenCalled();
+  });
+
+  it('updates a learner library entry and normalises tags', async () => {
+    libraryEntryModel.findByIdForUser.mockResolvedValue({ id: 'lib-2', userId: 42, tags: [] });
+    libraryEntryModel.updateByIdForUser.mockResolvedValue({
+      id: 'lib-2',
+      title: 'Updated Title',
+      format: 'Guide',
+      progress: 25,
+      tags: ['focus', 'growth']
+    });
+
+    const entry = await LearnerDashboardService.updateLearnerLibraryEntry(42, 'lib-2', {
+      tags: ['focus', 'growth', ''],
+      progress: 25,
+      title: 'Updated Title'
+    });
+
+    expect(libraryEntryModel.updateByIdForUser).toHaveBeenCalledWith(
+      42,
+      'lib-2',
+      expect.objectContaining({
+        title: 'Updated Title',
+        progress: 25,
+        tags: ['focus', 'growth']
+      })
+    );
+    expect(entry).toMatchObject({ id: 'lib-2', progress: 25, tags: ['focus', 'growth'] });
+  });
+
+  it('deletes a learner library entry and returns an acknowledgement', async () => {
+    libraryEntryModel.deleteByIdForUser.mockResolvedValue(true);
+
+    const acknowledgement = await LearnerDashboardService.deleteLearnerLibraryEntry(42, 'lib-3');
+
+    expect(libraryEntryModel.deleteByIdForUser).toHaveBeenCalledWith(42, 'lib-3');
+    expect(acknowledgement).toMatchObject({
+      reference: 'lib-3',
+      message: 'Library entry removed'
+    });
+  });
+
+  it('creates a field service assignment and records the dispatch event', async () => {
+    const order = {
+      id: 'order-1',
+      reference: 'fs_123',
+      status: 'dispatched',
+      priority: 'standard',
+      serviceType: 'lab setup',
+      metadata: {}
+    };
+    fieldServiceOrderModel.createAssignment.mockResolvedValue(order);
+    fieldServiceEventModel.create.mockResolvedValue({ id: 'evt-1' });
+    fieldServiceEventModel.listByOrderIds.mockResolvedValue([]);
+    fieldServiceProviderModel.listByIds.mockResolvedValue([]);
+    fieldServiceWorkspaceBuilder.mockReturnValue({
+      customer: { assignments: [{ id: 'order-1', serviceType: 'lab setup', status: 'dispatched' }] }
+    });
+
+    const assignment = await LearnerDashboardService.createFieldServiceAssignment(42, {
+      serviceType: 'Lab Setup',
+      owner: 'Operations',
+      priority: 'Critical',
+      attachments: ['  checklist.pdf  ']
+    });
+
+    expect(db.transaction).toHaveBeenCalled();
+    expect(fieldServiceOrderModel.createAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reference: expect.stringMatching(/^fs_/),
+        customerUserId: 42,
+        serviceType: 'Lab Setup',
+        priority: 'critical',
+        metadata: expect.objectContaining({
+          owner: 'Operations',
+          attachments: ['checklist.pdf']
+        })
+      }),
+      'trx'
+    );
+    expect(fieldServiceEventModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-1',
+        eventType: 'dispatch_created',
+        status: 'dispatched'
+      }),
+      'trx'
+    );
+    expect(assignment).toEqual({ id: 'order-1', serviceType: 'lab setup', status: 'dispatched' });
+  });
+
+  it('updates a field service assignment and captures timeline events', async () => {
+    const order = {
+      id: 'order-2',
+      reference: 'fs_456',
+      status: 'dispatched',
+      priority: 'standard',
+      serviceType: 'lab setup',
+      metadata: { owner: 'Ops' }
+    };
+    fieldServiceOrderModel.findByIdForCustomer.mockResolvedValue(order);
+    fieldServiceOrderModel.updateById.mockResolvedValue({ ...order, status: 'on_site' });
+    fieldServiceEventModel.create.mockResolvedValue({ id: 'evt-2' });
+    fieldServiceEventModel.listByOrderIds.mockResolvedValue([]);
+    fieldServiceProviderModel.listByIds.mockResolvedValue([]);
+    fieldServiceWorkspaceBuilder.mockReturnValue({
+      customer: { assignments: [{ id: 'order-2', status: 'on_site', serviceType: 'lab setup' }] }
+    });
+
+    const result = await LearnerDashboardService.updateFieldServiceAssignment(42, 'order-2', {
+      status: 'on_site',
+      fieldNotes: 'Team arrived on-site',
+      attachments: ['report.pdf']
+    });
+
+    expect(fieldServiceOrderModel.updateById).toHaveBeenCalledWith(
+      'order-2',
+      expect.objectContaining({
+        status: 'on_site',
+        metadata: expect.objectContaining({ attachments: ['report.pdf'] })
+      }),
+      'trx'
+    );
+    expect(fieldServiceEventModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-2',
+        eventType: 'status_on_site',
+        status: 'on_site'
+      }),
+      'trx'
+    );
+    expect(result).toEqual({ id: 'order-2', status: 'on_site', serviceType: 'lab setup' });
+  });
+
+  it('closes a field service assignment and returns an acknowledgement', async () => {
+    const order = {
+      id: 'order-3',
+      reference: 'fs_789',
+      status: 'on_site',
+      metadata: { owner: 'Ops' }
+    };
+    fieldServiceOrderModel.findByIdForCustomer.mockResolvedValue(order);
+    fieldServiceOrderModel.updateById.mockResolvedValue({ ...order, status: 'closed' });
+    fieldServiceEventModel.create.mockResolvedValue({ id: 'evt-3' });
+
+    const acknowledgement = await LearnerDashboardService.closeFieldServiceAssignment(42, 'order-3', {
+      resolution: 'Completed successfully'
+    });
+
+    expect(fieldServiceOrderModel.updateById).toHaveBeenCalledWith(
+      'order-3',
+      expect.objectContaining({ status: 'closed' }),
+      'trx'
+    );
+    expect(fieldServiceEventModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: 'order-3',
+        eventType: 'job_completed',
+        status: 'closed'
+      }),
+      'trx'
+    );
+    expect(acknowledgement).toMatchObject({
+      reference: expect.stringMatching(/^fs_/),
+      message: 'Field service assignment closed',
+      meta: { assignmentId: 'order-3' }
+    });
   });
 });

@@ -11,6 +11,11 @@ import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel
 import LearnerAffiliatePayoutModel from '../models/LearnerAffiliatePayoutModel.js';
 import LearnerAdCampaignModel from '../models/LearnerAdCampaignModel.js';
 import InstructorApplicationModel from '../models/InstructorApplicationModel.js';
+import LearnerLibraryEntryModel from '../models/LearnerLibraryEntryModel.js';
+import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
+import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
+import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
+import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
 import OperatorDashboardService from './OperatorDashboardService.js';
 
 function safeJsonParse(value, fallback) {
@@ -342,7 +347,9 @@ export function buildLearnerDashboard({
   followerSummary = {},
   privacySettings = null,
   messagingSummary = null,
-  notifications = []
+  notifications = [],
+  libraryEntries = [],
+  fieldServiceWorkspace = null
 } = {}) {
   const hasSignals =
     enrollments.length ||
@@ -656,19 +663,48 @@ export function buildLearnerDashboard({
     rating: booking.metadata?.rating ?? null
   }));
 
-  const ebookLibrary = ebookProgress.map((progress) => {
-    const catalogEntry = ebooks.get(progress.assetId) ?? {};
-    return {
-      id: catalogEntry.id ?? `ebook-${progress.assetId}`,
-      title: catalogEntry.title ?? `Ebook ${progress.assetId}`,
-      status: progress.progressPercent >= 100 ? 'Completed' : 'In progress',
-      progress: Number(progress.progressPercent ?? 0),
-      price: formatCurrency(catalogEntry.priceAmount ?? 0, catalogEntry.priceCurrency ?? 'USD'),
-      highlights: Number(progress.metadata?.highlights ?? 0),
-      bookmarks: Number(progress.metadata?.bookmarks ?? 0),
-      timeSpent: formatTimeSpent(progress.timeSpentSeconds)
-    };
-  });
+  const formattedLibraryEntries = Array.isArray(libraryEntries)
+    ? libraryEntries.map((entry) => {
+        const progressValue = Number(entry.progress ?? 0);
+        return {
+          id: entry.id ?? `library-${crypto.randomUUID()}`,
+          title: entry.title ?? 'Library entry',
+          format: entry.format ?? 'E-book',
+          status: progressValue >= 100 ? 'Completed' : 'In progress',
+          progress: progressValue,
+          lastOpened: entry.lastOpened ?? null,
+          lastOpenedLabel: entry.lastOpened
+            ? formatDateTime(entry.lastOpened, { dateStyle: 'medium', timeStyle: 'short' })
+            : 'Not opened yet',
+          url: entry.url ?? null,
+          summary: entry.summary ?? null,
+          author: entry.author ?? null,
+          coverUrl: entry.coverUrl ?? null,
+          tags: Array.isArray(entry.tags) ? entry.tags : [],
+          highlights: Array.isArray(entry.highlights) ? entry.highlights : [],
+          timeSpent: entry.metadata?.timeSpentSeconds
+            ? formatTimeSpent(entry.metadata.timeSpentSeconds)
+            : null,
+          price: null
+        };
+      })
+    : [];
+
+  const ebookLibrary = formattedLibraryEntries.length
+    ? formattedLibraryEntries
+    : ebookProgress.map((progress) => {
+        const catalogEntry = ebooks.get(progress.assetId) ?? {};
+        return {
+          id: catalogEntry.id ?? `ebook-${progress.assetId}`,
+          title: catalogEntry.title ?? `Ebook ${progress.assetId}`,
+          status: progress.progressPercent >= 100 ? 'Completed' : 'In progress',
+          progress: Number(progress.progressPercent ?? 0),
+          price: formatCurrency(catalogEntry.priceAmount ?? 0, catalogEntry.priceCurrency ?? 'USD'),
+          highlights: Number(progress.metadata?.highlights ?? 0),
+          bookmarks: Number(progress.metadata?.bookmarks ?? 0),
+          timeSpent: formatTimeSpent(progress.timeSpentSeconds)
+        };
+      });
 
   const activeSubscriptions = communitySubscriptions.filter((subscription) => subscription.status === 'active');
   const pendingInvoices = normalisedInvoices.filter((invoice) => isInvoiceOpen(invoice.status));
@@ -731,14 +767,22 @@ export function buildLearnerDashboard({
       type: 'mentor'
     });
   });
-      pendingInvoices.forEach((invoice) => {
-        notificationsList.push({
-          id: `notification-invoice-${invoice.id}`,
-          title: `${invoice.label ?? 'Invoice'} due`,
-          timestamp: invoice.date,
-          type: 'billing'
-        });
-      });
+  pendingInvoices.forEach((invoice) => {
+    notificationsList.push({
+      id: `notification-invoice-${invoice.id}`,
+      title: `${invoice.label ?? 'Invoice'} due`,
+      timestamp: invoice.date,
+      type: 'billing'
+    });
+  });
+
+  const learnerFieldServices = fieldServiceWorkspace?.customer ?? null;
+  const fieldServiceAssignments = Array.isArray(learnerFieldServices?.assignments)
+    ? learnerFieldServices.assignments
+    : [];
+  const fieldServiceSearchEntries = Array.isArray(fieldServiceWorkspace?.searchIndex)
+    ? fieldServiceWorkspace.searchIndex.filter((entry) => entry.role === 'learner')
+    : [];
 
       const growthInitiatives = growthInitiativesRaw.map((initiative) => ({
         id: initiative.id,
@@ -1609,6 +1653,7 @@ export function buildLearnerDashboard({
     growth: growthSection,
     affiliate: affiliateSection,
     ads: adsSection,
+    fieldServices: learnerFieldServices,
     teach: teachSection,
     assessments: assessmentsSection,
     liveClassrooms: liveDashboard,
@@ -1642,6 +1687,10 @@ export function buildLearnerDashboard({
     { label: 'Mentor sessions', value: `${tutorBookings.length} total` }
   ];
 
+  if (fieldServiceAssignments.length) {
+    profileStats.push({ label: 'Field assignments', value: `${fieldServiceAssignments.length} active` });
+  }
+
   const profileBioSegments = [];
   if (activeEnrollments.length) {
     profileBioSegments.push(`Learning across ${activeEnrollments.length} course${activeEnrollments.length === 1 ? '' : 's'}`);
@@ -1653,6 +1702,13 @@ export function buildLearnerDashboard({
     profileBioSegments.push(`while participating in ${communityMemberships.length} communit${
       communityMemberships.length === 1 ? 'y' : 'ies'
     }.`);
+  }
+  if (fieldServiceAssignments.length) {
+    profileBioSegments.push(
+      `Co-ordinating ${fieldServiceAssignments.length} field servic${
+        fieldServiceAssignments.length === 1 ? 'e' : 'es'
+      } in progress.`
+    );
   }
   const profileBio = profileBioSegments.join(' ').trim() || null;
 
@@ -1698,7 +1754,8 @@ export function buildLearnerDashboard({
       type: 'Community',
       title: community.name,
       url: '/dashboard/learner/communities'
-    }))
+    })),
+    ...fieldServiceSearchEntries
   ];
 
   const feedHighlights = [];
@@ -1709,6 +1766,14 @@ export function buildLearnerDashboard({
   }
   if (ebookLibrary.length) {
     feedHighlights.push(`Reading ${ebookLibrary[0].title} (${ebookLibrary[0].progress}% complete).`);
+  }
+  if (fieldServiceAssignments.length) {
+    const assignment = fieldServiceAssignments[0];
+    feedHighlights.push(
+      `Field service ${assignment.serviceType ?? 'assignment'} ${
+        assignment.statusLabel ? assignment.statusLabel.toLowerCase() : 'in progress'
+      }.`
+    );
   }
   if (assignmentsTimeline.upcoming.length) {
     const upcomingAssessment = assignmentsTimeline.upcoming[0];
@@ -4135,6 +4200,7 @@ export default class DashboardService {
       ]);
 
       communityMemberships = memberships ?? [];
+      const libraryEntries = await LearnerLibraryEntryModel.listByUserId(user.id);
       const courseIds = Array.from(new Set(learnerEnrollments.map((enrollment) => enrollment.courseId).filter(Boolean)));
       const learnerCourses = courseIds.length ? await CourseModel.listByIds(courseIds) : [];
       const learnerAssignments = courseIds.length ? await CourseAssignmentModel.listByCourseIds(courseIds) : [];
@@ -4198,6 +4264,28 @@ export default class DashboardService {
         }));
       });
 
+      const fieldServiceOrders = await FieldServiceOrderModel.listForUser(user.id);
+      let learnerFieldServiceWorkspace = null;
+      if (fieldServiceOrders.length) {
+        const fieldServiceOrderIds = fieldServiceOrders.map((order) => order.id).filter(Boolean);
+        const fieldServiceEvents = fieldServiceOrderIds.length
+          ? await FieldServiceEventModel.listByOrderIds(fieldServiceOrderIds)
+          : [];
+        const providerIds = Array.from(
+          new Set(fieldServiceOrders.map((order) => order.providerId).filter(Boolean))
+        );
+        const fieldServiceProviders = providerIds.length
+          ? await FieldServiceProviderModel.listByIds(providerIds)
+          : [];
+        learnerFieldServiceWorkspace = buildFieldServiceWorkspace({
+          now: referenceDate,
+          user,
+          orders: fieldServiceOrders,
+          events: fieldServiceEvents,
+          providers: fieldServiceProviders
+        });
+      }
+
       learnerSnapshot =
         buildLearnerDashboard({
           user,
@@ -4214,7 +4302,9 @@ export default class DashboardService {
           ebookRecommendations,
           paymentIntents: learnerPaymentIntents,
           communities: communityMemberships,
-          communityPipelines
+          communityPipelines,
+          libraryEntries,
+          fieldServiceWorkspace: learnerFieldServiceWorkspace
         }) ?? undefined;
 
       communitySnapshot =

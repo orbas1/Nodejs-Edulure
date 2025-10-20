@@ -294,6 +294,40 @@ export default class LearnerDashboardController {
     }
   }
 
+  static async updateTutorBooking(req, res, next) {
+    try {
+      const { bookingId } = req.params;
+      const acknowledgement = await LearnerDashboardService.updateTutorBookingRequest(
+        req.user.id,
+        bookingId,
+        req.body
+      );
+      return success(res, {
+        data: acknowledgement,
+        message: acknowledgement.message ?? 'Tutor booking updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async cancelTutorBooking(req, res, next) {
+    try {
+      const { bookingId } = req.params;
+      const acknowledgement = await LearnerDashboardService.cancelTutorBookingRequest(
+        req.user.id,
+        bookingId,
+        req.body
+      );
+      return success(res, {
+        data: acknowledgement,
+        message: acknowledgement.message ?? 'Tutor booking cancelled'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async createCourseGoal(req, res, next) {
     try {
       const { courseId } = req.params;
@@ -327,6 +361,45 @@ export default class LearnerDashboardController {
       return success(res, {
         data: acknowledgement,
         message: 'E-book highlight shared'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createLibraryEntry(req, res, next) {
+    try {
+      const entry = await LearnerDashboardService.createLearnerLibraryEntry(req.user.id, req.body);
+      return success(res, {
+        data: entry,
+        message: 'Library entry created',
+        status: 201
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateLibraryEntry(req, res, next) {
+    try {
+      const { ebookId } = req.params;
+      const entry = await LearnerDashboardService.updateLearnerLibraryEntry(req.user.id, ebookId, req.body);
+      return success(res, {
+        data: entry,
+        message: 'Library entry updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteLibraryEntry(req, res, next) {
+    try {
+      const { ebookId } = req.params;
+      const acknowledgement = await LearnerDashboardService.deleteLearnerLibraryEntry(req.user.id, ebookId);
+      return success(res, {
+        data: acknowledgement,
+        message: acknowledgement.message ?? 'Library entry removed'
       });
     } catch (error) {
       return next(error);
@@ -391,6 +464,53 @@ export default class LearnerDashboardController {
       return success(res, {
         data: acknowledgement,
         message: 'Community action triggered'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createFieldServiceAssignment(req, res, next) {
+    try {
+      const assignment = await LearnerDashboardService.createFieldServiceAssignment(req.user.id, req.body);
+      return success(res, {
+        data: assignment,
+        message: 'Field service assignment dispatched',
+        status: 201
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateFieldServiceAssignment(req, res, next) {
+    try {
+      const { assignmentId } = req.params;
+      const assignment = await LearnerDashboardService.updateFieldServiceAssignment(
+        req.user.id,
+        assignmentId,
+        req.body
+      );
+      return success(res, {
+        data: assignment,
+        message: 'Field service assignment updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async closeFieldServiceAssignment(req, res, next) {
+    try {
+      const { assignmentId } = req.params;
+      const acknowledgement = await LearnerDashboardService.closeFieldServiceAssignment(
+        req.user.id,
+        assignmentId,
+        req.body
+      );
+      return success(res, {
+        data: acknowledgement,
+        message: acknowledgement.message ?? 'Field service assignment closed'
       });
     } catch (error) {
       return next(error);

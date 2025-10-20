@@ -9,9 +9,14 @@ const router = Router();
 router.get('/me', auth(), DashboardController.current);
 router.post('/learner/tutor-bookings', auth(), LearnerDashboardController.createTutorBooking);
 router.post('/learner/tutor-bookings/export', auth(), LearnerDashboardController.exportTutorSchedule);
+router.patch('/learner/tutor-bookings/:bookingId', auth(), LearnerDashboardController.updateTutorBooking);
+router.post('/learner/tutor-bookings/:bookingId/cancel', auth(), LearnerDashboardController.cancelTutorBooking);
 router.post('/learner/courses/:courseId/goals', auth(), LearnerDashboardController.createCourseGoal);
 router.post('/learner/ebooks/:ebookId/resume', auth(), LearnerDashboardController.resumeEbook);
 router.post('/learner/ebooks/:ebookId/share', auth(), LearnerDashboardController.shareEbook);
+router.post('/learner/ebooks', auth(), LearnerDashboardController.createLibraryEntry);
+router.patch('/learner/ebooks/:ebookId', auth(), LearnerDashboardController.updateLibraryEntry);
+router.delete('/learner/ebooks/:ebookId', auth(), LearnerDashboardController.deleteLibraryEntry);
 router.post('/learner/financial/payment-methods', auth(), LearnerDashboardController.createPaymentMethod);
 router.patch(
   '/learner/financial/payment-methods/:methodId',
@@ -81,6 +86,17 @@ router.post('/learner/teach/application/submit', auth(), LearnerDashboardControl
 router.post('/learner/live-sessions/:sessionId/join', auth(), LearnerDashboardController.joinLiveSession);
 router.post('/learner/live-sessions/:sessionId/check-in', auth(), LearnerDashboardController.checkInToLiveSession);
 router.post('/learner/communities/:communityId/actions', auth(), LearnerDashboardController.triggerCommunityAction);
+router.post('/learner/field-services/assignments', auth(), LearnerDashboardController.createFieldServiceAssignment);
+router.patch(
+  '/learner/field-services/assignments/:assignmentId',
+  auth(),
+  LearnerDashboardController.updateFieldServiceAssignment
+);
+router.post(
+  '/learner/field-services/assignments/:assignmentId/close',
+  auth(),
+  LearnerDashboardController.closeFieldServiceAssignment
+);
 router.get('/learner/support/tickets', auth(), LearnerDashboardController.listSupportTickets);
 router.post('/learner/support/tickets', auth(), LearnerDashboardController.createSupportTicket);
 router.put('/learner/support/tickets/:ticketId', auth(), LearnerDashboardController.updateSupportTicket);
