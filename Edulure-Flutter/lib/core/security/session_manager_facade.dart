@@ -59,6 +59,7 @@ class SessionManagerFacade {
       : _binding = binding ?? const DefaultSessionManagerBinding();
 
   final SessionManagerBinding _binding;
+  late final Listenable _sessionListenable = _binding.sessionListenable();
 
   Map<String, dynamic>? get session => _binding.getSession();
 
@@ -77,33 +78,83 @@ class SessionManagerFacade {
   }
 
   Future<void> setActiveRole(String role) {
-    return _binding.setActiveRole(role);
+    final trimmed = role.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(role, 'role', 'Active role cannot be empty');
+    }
+    return _binding.setActiveRole(trimmed);
   }
 
   Stream<Map<String, dynamic>?> sessionChanges() {
-    final listenable = _binding.sessionListenable();
-    final controller = StreamController<Map<String, dynamic>?>.broadcast();
-    VoidCallback? listener;
-
-    controller.onListen = () {
-      controller.add(_binding.getSession());
-      listener = () {
-        controller.add(_binding.getSession());
-      };
-      listenable.addListener(listener!);
-    };
-
-    controller.onCancel = () {
-      if (!controller.hasListener && listener != null) {
-        listenable.removeListener(listener!);
-        listener = null;
-      }
-    };
-
-    return controller.stream;
+    return _SessionChangesStream(_binding, _sessionListenable);
   }
 }
 
 final sessionManagerFacadeProvider = Provider<SessionManagerFacade>((ref) {
   return SessionManagerFacade();
 });
+
+class _SessionChangesStream extends Stream<Map<String, dynamic>?> {
+  _SessionChangesStream(this._binding, this._listenable);
+
+  final SessionManagerBinding _binding;
+  final Listenable _listenable;
+
+  @override
+  StreamSubscription<Map<String, dynamic>?> listen(
+    void Function(Map<String, dynamic>?)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) {
+    late final StreamController<Map<String, dynamic>?> controller;
+    var attached = false;
+
+    void emit() {
+      if (!controller.hasListener) {
+        return;
+      }
+      try {
+        controller.add(_binding.getSession());
+      } catch (error, stackTrace) {
+        controller.addError(error, stackTrace);
+      }
+    }
+
+    controller = StreamController<Map<String, dynamic>?>(
+      onListen: () {
+        emit();
+        if (!attached) {
+          _listenable.addListener(emit);
+          attached = true;
+        }
+      },
+      onPause: () {
+        if (attached) {
+          _listenable.removeListener(emit);
+          attached = false;
+        }
+      },
+      onResume: () {
+        if (!attached) {
+          _listenable.addListener(emit);
+          attached = true;
+          emit();
+        }
+      },
+      onCancel: () {
+        if (attached) {
+          _listenable.removeListener(emit);
+          attached = false;
+        }
+      },
+    );
+
+    return controller.stream.listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+}

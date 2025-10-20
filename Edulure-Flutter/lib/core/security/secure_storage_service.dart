@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorageService {
   SecureStorageService._(this._storage, {String keyPrefix = ''})
-      : _keyPrefix = keyPrefix;
+      : _keyPrefix = keyPrefix.trim();
 
   factory SecureStorageService.custom({
     FlutterSecureStorage? storage,
@@ -55,39 +55,77 @@ class SecureStorageService {
   }
 
   String _namespaced(String key) {
+    final validated = _validateKey(key);
     if (_keyPrefix.isEmpty) {
-      return key;
+      return validated;
     }
-    return '$_keyPrefix$key';
+    return '$_keyPrefix$validated';
+  }
+
+  String _validateKey(String key) {
+    final trimmed = key.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError.value(key, 'key', 'Secure storage key cannot be empty');
+    }
+    return trimmed;
   }
 
   Future<void> write({required String key, required String value}) {
-    return _runGuarded('write($key)', () => _storage.write(
-          key: _namespaced(key),
+    final resolvedKey = _namespaced(key);
+    return _runGuarded('write($resolvedKey)', () => _storage.write(
+          key: resolvedKey,
           value: value,
         ));
   }
 
   Future<String?> read({required String key}) {
-    return _runGuarded('read($key)', () => _storage.read(key: _namespaced(key)));
+    final resolvedKey = _namespaced(key);
+    return _runGuarded('read($resolvedKey)', () => _storage.read(key: resolvedKey));
   }
 
   Future<bool> containsKey({required String key}) {
-    return _runGuarded('containsKey($key)', () => _storage.containsKey(key: _namespaced(key)));
+    final resolvedKey = _namespaced(key);
+    return _runGuarded('containsKey($resolvedKey)', () => _storage.containsKey(key: resolvedKey));
   }
 
   Future<void> delete({required String key}) {
-    return _runGuarded('delete($key)', () => _storage.delete(key: _namespaced(key)));
+    final resolvedKey = _namespaced(key);
+    return _runGuarded('delete($resolvedKey)', () => _storage.delete(key: resolvedKey));
   }
 
   Future<void> deleteAll({Iterable<String>? keys}) {
     if (keys == null) {
-      return _runGuarded('deleteAll', () => _storage.deleteAll());
+      return _runGuarded('deleteAll', () async {
+        if (_keyPrefix.isEmpty) {
+          await _storage.deleteAll();
+          return;
+        }
+
+        final entries = await _storage.readAll();
+        final candidates = entries.keys
+            .whereType<String>()
+            .where((key) => key.startsWith(_keyPrefix))
+            .toList();
+
+        for (final key in candidates) {
+          await _storage.delete(key: key);
+        }
+      });
     }
 
-    final uniqueKeys = keys.toSet();
+    final filteredKeys = <String>{};
+    for (final key in keys) {
+      if (key is String && key.trim().isNotEmpty) {
+        filteredKeys.add(_validateKey(key));
+      }
+    }
+
+    if (filteredKeys.isEmpty) {
+      return Future<void>.value();
+    }
+
     return _runGuarded('deleteAll(keys)', () async {
-      for (final key in uniqueKeys) {
+      for (final key in filteredKeys) {
         await _storage.delete(key: _namespaced(key));
       }
     });

@@ -46,11 +46,16 @@ void main() {
 
       await facade.saveSession({'token': 'abc'});
       await facade.clear();
-      await facade.setActiveRole('instructor');
+      await facade.setActiveRole(' instructor ');
 
       verify(() => binding.saveSession({'token': 'abc'})).called(1);
       verify(() => binding.clear()).called(1);
       verify(() => binding.setActiveRole('instructor')).called(1);
+    });
+
+    test('setActiveRole throws when provided role is blank', () {
+      expect(() => facade.setActiveRole('  '), throwsArgumentError);
+      verifyNever(() => binding.setActiveRole(any()));
     });
 
     test('sessionChanges emits the latest session snapshot and updates', () async {
@@ -115,6 +120,7 @@ void main() {
       await subOne.cancel();
       await subTwo.cancel();
       verify(() => binding.sessionListenable()).called(1);
+      verify(() => binding.getSession()).called(4);
     });
   });
 }

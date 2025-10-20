@@ -113,6 +113,23 @@ void main() {
     expect(blocked.allowed, isFalse, reason: 'Manifest should block access when capability disabled');
   });
 
+  test('evaluateAccess throws when capability key is blank', () async {
+    final result = await repository.getMatrix();
+    repository.cacheResult(result);
+    repository.primeMatrix(result.matrix);
+
+    final context = ProviderRoleContext(
+      providerId: 'prov-123',
+      roles: {'coach'},
+      region: 'global',
+    );
+
+    expect(
+      () => repository.evaluateAccess(context: context, capability: '  '),
+      throwsArgumentError,
+    );
+  });
+
   test('returns cached matrix when refresh fails', () async {
     final first = await repository.getMatrix();
     expect(first.fromCache, isFalse);
@@ -138,6 +155,19 @@ void main() {
       throwsA(isA<RbacMatrixRepositoryException>()),
     );
     expect(requestCount, 1);
+  });
+
+  test('loadCachedMatrix purges corrupted cache values', () async {
+    final box = await Hive.openBox('rbac_matrix_provider_mobile');
+    await box.put('matrix', 'invalid');
+    await box.put('timestamp', 'bad');
+
+    final cached = await repository.loadCachedMatrix();
+
+    expect(cached, isNull);
+    expect(box.get('matrix'), isNull);
+    expect(box.get('timestamp'), isNull);
+    await box.close();
   });
 }
 

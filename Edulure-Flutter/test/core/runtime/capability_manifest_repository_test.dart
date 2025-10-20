@@ -110,6 +110,19 @@ void main() {
     );
     expect(requestCount, 1);
   });
+
+  test('loadCachedManifest clears corrupted cache entries', () async {
+    final box = await Hive.openBox('capability_manifest');
+    await box.put('manifest', 'invalid');
+    await box.put('timestamp', 'not-a-date');
+
+    final cached = await repository.loadCachedManifest();
+
+    expect(cached, isNull);
+    expect(box.get('manifest'), isNull);
+    expect(box.get('timestamp'), isNull);
+    await box.close();
+  });
 }
 
 class _FakeDio extends Dio {

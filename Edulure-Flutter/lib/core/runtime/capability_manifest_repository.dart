@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'capability_manifest_models.dart';
@@ -72,10 +73,17 @@ class CapabilityManifestRepository {
   }
 
   Future<Box> _ensureBox() async {
-    if (!Hive.isBoxOpen(_boxName)) {
-      await Hive.openBox(_boxName);
+    try {
+      if (!Hive.isBoxOpen(_boxName)) {
+        await Hive.openBox(_boxName);
+      }
+      return Hive.box(_boxName);
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        CapabilityManifestRepositoryException('Unable to access manifest cache', cause: error),
+        stackTrace,
+      );
     }
-    return Hive.box(_boxName);
   }
 
   Future<CapabilityManifestLoadResult?> loadCachedManifest() async {
@@ -84,13 +92,20 @@ class CapabilityManifestRepository {
     final timestamp = box.get(_timestampKey);
 
     if (rawManifest is Map && timestamp is String) {
-      final parsedManifest = CapabilityManifest.fromJson(Map<String, dynamic>.from(rawManifest));
-      final fetchedAt = DateTime.tryParse(timestamp) ?? DateTime.now().toUtc();
-      return CapabilityManifestLoadResult(
-        manifest: parsedManifest,
-        fetchedAt: fetchedAt,
-        fromCache: true,
-      );
+      try {
+        final parsedManifest = CapabilityManifest.fromJson(Map<String, dynamic>.from(rawManifest));
+        final fetchedAt = DateTime.tryParse(timestamp) ?? DateTime.now().toUtc();
+        return CapabilityManifestLoadResult(
+          manifest: parsedManifest,
+          fetchedAt: fetchedAt,
+          fromCache: true,
+        );
+      } on Object catch (error, stackTrace) {
+        debugPrint('CapabilityManifestRepository: unable to parse cached manifest: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        await box.delete(_manifestKey);
+        await box.delete(_timestampKey);
+      }
     }
 
     return null;

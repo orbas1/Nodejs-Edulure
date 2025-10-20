@@ -69,13 +69,33 @@ void main() {
       verifyNoMoreInteractions(storage);
     });
 
-    test('deleteAll without keys clears the secure storage namespace', () async {
-      when(() => storage.deleteAll()).thenAnswer((_) async {});
+    test('deleteAll without keys removes only entries in the namespace', () async {
+      when(() => storage.readAll()).thenAnswer((_) async => {
+            'ns.token': 'abc',
+            'other.value': '123',
+          });
+      when(() => storage.delete(key: any(named: 'key'))).thenAnswer((_) async {});
 
       await service.deleteAll();
 
-      verify(() => storage.deleteAll()).called(1);
+      verify(() => storage.readAll()).called(1);
+      verify(() => storage.delete(key: 'ns.token')).called(1);
+      verifyNever(() => storage.delete(key: 'other.value'));
       verifyNoMoreInteractions(storage);
+    });
+
+    test('deleteAll with keys ignores blanks', () async {
+      when(() => storage.delete(key: any(named: 'key'))).thenAnswer((_) async {});
+
+      await service.deleteAll(keys: const ['', '  ', 'token']);
+
+      verify(() => storage.delete(key: 'ns.token')).called(1);
+      verifyNoMoreInteractions(storage);
+    });
+
+    test('throws ArgumentError when key is blank', () {
+      expect(() => service.write(key: '  ', value: 'value'), throwsArgumentError);
+      verifyZeroInteractions(storage);
     });
 
     test('wraps failures in a SecureStorageException', () async {
@@ -86,7 +106,7 @@ void main() {
         service.write(key: 'token', value: 'abc'),
         throwsA(
           isA<SecureStorageException>()
-              .having((exception) => exception.action, 'action', 'write(token)')
+              .having((exception) => exception.action, 'action', 'write(ns.token)')
               .having((exception) => exception.cause, 'cause', isA<Exception>()),
         ),
       );

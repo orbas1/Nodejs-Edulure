@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../runtime/capability_manifest_models.dart';
@@ -73,10 +74,17 @@ class RbacMatrixRepository {
   }
 
   Future<Box> _ensureBox() async {
-    if (!Hive.isBoxOpen(_boxName)) {
-      await Hive.openBox(_boxName);
+    try {
+      if (!Hive.isBoxOpen(_boxName)) {
+        await Hive.openBox(_boxName);
+      }
+      return Hive.box(_boxName);
+    } catch (error, stackTrace) {
+      Error.throwWithStackTrace(
+        RbacMatrixRepositoryException('Unable to access RBAC cache', cause: error),
+        stackTrace,
+      );
     }
-    return Hive.box(_boxName);
   }
 
   Future<RbacMatrixLoadResult?> loadCachedMatrix() async {
@@ -85,9 +93,16 @@ class RbacMatrixRepository {
     final timestamp = box.get(_timestampKey);
 
     if (rawMatrix is Map && timestamp is String) {
-      final parsedMatrix = RbacMatrix.fromJson(Map<String, dynamic>.from(rawMatrix));
-      final fetchedAt = DateTime.tryParse(timestamp) ?? DateTime.now().toUtc();
-      return RbacMatrixLoadResult(matrix: parsedMatrix, fetchedAt: fetchedAt, fromCache: true);
+      try {
+        final parsedMatrix = RbacMatrix.fromJson(Map<String, dynamic>.from(rawMatrix));
+        final fetchedAt = DateTime.tryParse(timestamp) ?? DateTime.now().toUtc();
+        return RbacMatrixLoadResult(matrix: parsedMatrix, fetchedAt: fetchedAt, fromCache: true);
+      } on Object catch (error, stackTrace) {
+        debugPrint('RbacMatrixRepository: unable to parse cached matrix: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        await box.delete(_matrixKey);
+        await box.delete(_timestampKey);
+      }
     }
 
     return null;
@@ -154,9 +169,17 @@ class RbacMatrixRepository {
     String? action,
     CapabilityManifest? manifest,
   }) {
-    final allowed = resultForContext(context, capability: capability, action: action);
-    final policy = allowed.matrix.policyByCapability(capability);
-    final guardrail = allowed.matrix.guardrailByCapability(capability);
+    final normalisedCapability = capability.trim();
+    if (normalisedCapability.isEmpty) {
+      throw ArgumentError.value(capability, 'capability', 'Capability key cannot be empty');
+    }
+
+    final trimmedAction = action?.trim();
+    final actionKey = trimmedAction == null || trimmedAction.isEmpty ? null : trimmedAction;
+
+    final allowed = resultForContext(context, capability: normalisedCapability, action: actionKey);
+    final policy = allowed.matrix.policyByCapability(normalisedCapability);
+    final guardrail = allowed.matrix.guardrailByCapability(normalisedCapability);
 
     final requiresConsent = policy?.requiresConsent ?? false;
     final auditContext = policy == null
@@ -166,13 +189,13 @@ class RbacMatrixRepository {
               capability,
             );
 
-    final manifestCapability = manifest?.capabilityByKey(capability);
+    final manifestCapability = manifest?.capabilityByKey(normalisedCapability);
     final manifestAllows = manifestCapability == null
         ? true
         : manifestCapability.enabled && (manifestCapability.accessible || manifestCapability.isOperational);
 
     return CapabilityAccessEnvelope(
-      capability: capability,
+      capability: normalisedCapability,
       allowed: allowed.allowed && manifestAllows,
       requiresConsent: requiresConsent,
       guardrail: guardrail,
