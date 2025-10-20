@@ -1023,8 +1023,7 @@ const TRANSLATIONS = {
           }
         }
       }
-    }
-  },
+    },
   ru: {
     navigation: {
       login: 'Войти',
@@ -1136,7 +1135,6 @@ const TRANSLATIONS = {
         }
       }
     }
-  }
 };
 
 const LanguageContext = createContext({
