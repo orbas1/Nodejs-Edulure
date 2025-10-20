@@ -21,6 +21,28 @@ class CourseModule {
 
   double get completionRatio => lessonCount == 0 ? 0 : (completedLessons / lessonCount).clamp(0, 1);
 
+  factory CourseModule.fromJson(Map<String, dynamic> json) {
+    return CourseModule(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      lessonCount: (json['lessonCount'] as num?)?.toInt() ?? 0,
+      durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 0,
+      description: json['description'] as String? ?? '',
+      completedLessons: (json['completedLessons'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'lessonCount': lessonCount,
+      'durationMinutes': durationMinutes,
+      'description': description,
+      'completedLessons': completedLessons,
+    };
+  }
+
   CourseModule copyWith({
     String? id,
     String? title,
@@ -86,6 +108,54 @@ class Course {
     return (completed / totalLessons).clamp(0, 1);
   }
 
+  factory Course.fromJson(Map<String, dynamic> json) {
+    return Course(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      category: json['category'] as String,
+      level: json['level'] as String,
+      summary: json['summary'] as String,
+      thumbnailUrl: json['thumbnailUrl'] as String,
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+      modules: (json['modules'] as List<dynamic>? ?? const <dynamic>[])
+          .map((module) => CourseModule.fromJson((module as Map).cast<String, dynamic>()))
+          .toList(growable: false),
+      language: json['language'] as String,
+      tags: (json['tags'] as List<dynamic>? ?? const <dynamic>[])
+          .map((tag) => tag.toString())
+          .toList(growable: false),
+      isPublished: json['isPublished'] as bool? ?? false,
+      favorite: json['favorite'] as bool? ?? false,
+      rating: (json['rating'] as num?)?.toDouble(),
+      promoVideoUrl: json['promoVideoUrl'] as String?,
+      syllabusUrl: json['syllabusUrl'] as String?,
+      learningOutcomes: (json['learningOutcomes'] as List<dynamic>? ?? const <dynamic>[])
+          .map((outcome) => outcome.toString())
+          .toList(growable: false),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'category': category,
+      'level': level,
+      'summary': summary,
+      'thumbnailUrl': thumbnailUrl,
+      'price': price,
+      'modules': modules.map((module) => module.toJson()).toList(growable: false),
+      'language': language,
+      'tags': tags,
+      'isPublished': isPublished,
+      'favorite': favorite,
+      'rating': rating,
+      'promoVideoUrl': promoVideoUrl,
+      'syllabusUrl': syllabusUrl,
+      'learningOutcomes': learningOutcomes,
+    };
+  }
+
   Course copyWith({
     String? id,
     String? title,
@@ -140,6 +210,24 @@ class EbookChapter {
   final String title;
   final int pageCount;
   final String summary;
+
+  factory EbookChapter.fromJson(Map<String, dynamic> json) {
+    return EbookChapter(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      pageCount: (json['pageCount'] as num?)?.toInt() ?? 0,
+      summary: json['summary'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'pageCount': pageCount,
+      'summary': summary,
+    };
+  }
 }
 
 @immutable
@@ -175,6 +263,48 @@ class Ebook {
   final bool downloaded;
   final String? previewVideoUrl;
   final String? audioSampleUrl;
+
+  factory Ebook.fromJson(Map<String, dynamic> json) {
+    return Ebook(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      author: json['author'] as String,
+      coverUrl: json['coverUrl'] as String,
+      fileUrl: json['fileUrl'] as String,
+      description: json['description'] as String,
+      language: json['language'] as String,
+      tags: (json['tags'] as List<dynamic>? ?? const <dynamic>[])
+          .map((tag) => tag.toString())
+          .toList(growable: false),
+      chapters: (json['chapters'] as List<dynamic>? ?? const <dynamic>[])
+          .map((chapter) => EbookChapter.fromJson((chapter as Map).cast<String, dynamic>()))
+          .toList(growable: false),
+      progress: (json['progress'] as num?)?.toDouble() ?? 0,
+      rating: (json['rating'] as num?)?.toDouble(),
+      downloaded: json['downloaded'] as bool? ?? false,
+      previewVideoUrl: json['previewVideoUrl'] as String?,
+      audioSampleUrl: json['audioSampleUrl'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'author': author,
+      'coverUrl': coverUrl,
+      'fileUrl': fileUrl,
+      'description': description,
+      'language': language,
+      'tags': tags,
+      'chapters': chapters.map((chapter) => chapter.toJson()).toList(growable: false),
+      'progress': progress,
+      'rating': rating,
+      'downloaded': downloaded,
+      'previewVideoUrl': previewVideoUrl,
+      'audioSampleUrl': audioSampleUrl,
+    };
+  }
 
   Ebook copyWith({
     String? id,
@@ -222,6 +352,22 @@ class TutorAvailability {
   final String weekday;
   final String startTime;
   final String endTime;
+
+  factory TutorAvailability.fromJson(Map<String, dynamic> json) {
+    return TutorAvailability(
+      weekday: json['weekday'] as String,
+      startTime: json['startTime'] as String,
+      endTime: json['endTime'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'weekday': weekday,
+      'startTime': startTime,
+      'endTime': endTime,
+    };
+  }
 }
 
 @immutable
@@ -255,6 +401,50 @@ class Tutor {
   final int reviewCount;
   final String? introVideoUrl;
   final List<String> certifications;
+
+  factory Tutor.fromJson(Map<String, dynamic> json) {
+    return Tutor(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      headline: json['headline'] as String,
+      expertise: (json['expertise'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString())
+          .toList(growable: false),
+      bio: json['bio'] as String,
+      languages: (json['languages'] as List<dynamic>? ?? const <dynamic>[])
+          .map((language) => language.toString())
+          .toList(growable: false),
+      avatarUrl: json['avatarUrl'] as String,
+      availability: (json['availability'] as List<dynamic>? ?? const <dynamic>[])
+          .map((slot) => TutorAvailability.fromJson((slot as Map).cast<String, dynamic>()))
+          .toList(growable: false),
+      rating: (json['rating'] as num?)?.toDouble(),
+      sessionCount: (json['sessionCount'] as num?)?.toInt() ?? 0,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      introVideoUrl: json['introVideoUrl'] as String?,
+      certifications: (json['certifications'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item.toString())
+          .toList(growable: false),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'headline': headline,
+      'expertise': expertise,
+      'bio': bio,
+      'languages': languages,
+      'avatarUrl': avatarUrl,
+      'availability': availability.map((slot) => slot.toJson()).toList(growable: false),
+      'rating': rating,
+      'sessionCount': sessionCount,
+      'reviewCount': reviewCount,
+      'introVideoUrl': introVideoUrl,
+      'certifications': certifications,
+    };
+  }
 
   Tutor copyWith({
     String? id,
@@ -298,6 +488,20 @@ class LiveSessionResource {
 
   final String label;
   final String url;
+
+  factory LiveSessionResource.fromJson(Map<String, dynamic> json) {
+    return LiveSessionResource(
+      label: json['label'] as String,
+      url: json['url'] as String,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'label': label,
+      'url': url,
+    };
+  }
 }
 
 @immutable
@@ -333,6 +537,48 @@ class LiveSession {
   final bool isRecordingAvailable;
   final String? recordingUrl;
   final List<String> agenda;
+
+  factory LiveSession.fromJson(Map<String, dynamic> json) {
+    return LiveSession(
+      id: json['id'] as String,
+      title: json['title'] as String,
+      courseId: json['courseId'] as String,
+      tutorId: json['tutorId'] as String,
+      description: json['description'] as String,
+      startTime: DateTime.tryParse(json['startTime'] as String? ?? '') ?? DateTime.now(),
+      endTime: DateTime.tryParse(json['endTime'] as String? ?? '') ?? DateTime.now(),
+      roomLink: json['roomLink'] as String,
+      resources: (json['resources'] as List<dynamic>? ?? const <dynamic>[])
+          .map((resource) => LiveSessionResource.fromJson((resource as Map).cast<String, dynamic>()))
+          .toList(growable: false),
+      capacity: (json['capacity'] as num?)?.toInt() ?? 0,
+      enrolled: (json['enrolled'] as num?)?.toInt() ?? 0,
+      isRecordingAvailable: json['isRecordingAvailable'] as bool? ?? false,
+      recordingUrl: json['recordingUrl'] as String?,
+      agenda: (json['agenda'] as List<dynamic>? ?? const <dynamic>[])
+          .map((entry) => entry.toString())
+          .toList(growable: false),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'courseId': courseId,
+      'tutorId': tutorId,
+      'description': description,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
+      'roomLink': roomLink,
+      'resources': resources.map((resource) => resource.toJson()).toList(growable: false),
+      'capacity': capacity,
+      'enrolled': enrolled,
+      'isRecordingAvailable': isRecordingAvailable,
+      'recordingUrl': recordingUrl,
+      'agenda': agenda,
+    };
+  }
 
   LiveSession copyWith({
     String? id,
@@ -386,6 +632,28 @@ class ModuleProgressLog {
   final DateTime timestamp;
   final String notes;
   final int completedLessons;
+
+  factory ModuleProgressLog.fromJson(Map<String, dynamic> json) {
+    return ModuleProgressLog(
+      id: json['id'] as String,
+      courseId: json['courseId'] as String,
+      moduleId: json['moduleId'] as String,
+      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
+      notes: json['notes'] as String,
+      completedLessons: (json['completedLessons'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'courseId': courseId,
+      'moduleId': moduleId,
+      'timestamp': timestamp.toIso8601String(),
+      'notes': notes,
+      'completedLessons': completedLessons,
+    };
+  }
 }
 
 @immutable

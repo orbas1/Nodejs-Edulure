@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../services/learning_persistence_service.dart';
 import 'learning_models.dart';
 
 final _random = Random();
@@ -11,8 +14,95 @@ String _generateId(String prefix) {
   return '$prefix-$seed';
 }
 
-class CourseStore extends StateNotifier<List<Course>> {
-  CourseStore() : super(_seedCourses());
+abstract class PersistentLearningStore<T> extends StateNotifier<List<T>> {
+  PersistentLearningStore({
+    required List<T> seed,
+  })  : _seed = List<T>.from(seed),
+        super(List<T>.from(seed)) {
+    unawaited(_hydrate());
+  }
+
+  final List<T> _seed;
+  bool _hydrated = false;
+  final Completer<void> _hydrationCompleter = Completer<void>();
+
+  Future<void> get ready => _hydrationCompleter.future;
+
+  @protected
+  Future<List<T>?> readFromPersistence();
+
+  @protected
+  Future<void> writeToPersistence(List<T> value);
+
+  Future<void> refreshFromPersistence() async {
+    try {
+      final restored = await readFromPersistence();
+      if (restored != null) {
+        super.state = restored;
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Failed to refresh ${runtimeType.toString()}: $error');
+      debugPrint('$stackTrace');
+    }
+  }
+
+  Future<void> restoreSeedData() async {
+    state = List<T>.from(_seed);
+  }
+
+  List<T> snapshotSeed() => List<T>.from(_seed);
+
+  @override
+  set state(List<T> value) {
+    super.state = value;
+    if (_hydrated) {
+      unawaited(Future<void>(() async {
+        try {
+          await writeToPersistence(value);
+        } catch (error, stackTrace) {
+          debugPrint('Failed to persist ${runtimeType.toString()}: $error');
+          debugPrint('$stackTrace');
+        }
+      }));
+    }
+  }
+
+  Future<void> _hydrate() async {
+    try {
+      final restored = await readFromPersistence();
+      if (restored != null && restored.isNotEmpty) {
+        super.state = restored;
+      } else {
+        await writeToPersistence(super.state);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Failed to hydrate ${runtimeType.toString()}: $error');
+      debugPrint('$stackTrace');
+    } finally {
+      _hydrated = true;
+      if (!_hydrationCompleter.isCompleted) {
+        _hydrationCompleter.complete();
+      }
+    }
+  }
+}
+
+class CourseStore extends PersistentLearningStore<Course> {
+  CourseStore({LearningPersistence? persistence})
+      : _persistence = persistence ?? LearningPersistenceService(),
+        super(seed: _seedCourses());
+
+  final LearningPersistence _persistence;
+
+  @override
+  Future<List<Course>?> readFromPersistence() {
+    return _persistence.loadCourses();
+  }
+
+  @override
+  Future<void> writeToPersistence(List<Course> value) {
+    return _persistence.saveCourses(value);
+  }
 
   static List<Course> _seedCourses() {
     return [
@@ -180,48 +270,65 @@ class CourseStore extends StateNotifier<List<Course>> {
   }
 }
 
-class EbookStore extends StateNotifier<List<Ebook>> {
-  EbookStore()
-      : super([
-          Ebook(
-            id: 'ebook-1',
-            title: 'Designing Accountability Systems',
-            author: 'Isabelle Cormier',
-            coverUrl: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f',
-            fileUrl: 'https://cdn.example.com/ebooks/accountability.epub',
-            description: 'A field guide for course builders creating measurable learner checkpoints.',
-            language: 'English',
-            tags: const ['Learning', 'Operations'],
-            chapters: const [
-              EbookChapter(id: 'ch-1', title: 'Setting the cadence', pageCount: 22),
-              EbookChapter(id: 'ch-2', title: 'Feedback rituals', pageCount: 18),
-              EbookChapter(id: 'ch-3', title: 'Scaling assessments', pageCount: 16),
-            ],
-            progress: 0.32,
-            rating: 4.7,
-            downloaded: true,
-            previewVideoUrl: 'https://videos.example.com/ebooks/accountability/overview.mp4',
-            audioSampleUrl: 'https://cdn.example.com/ebooks/accountability/sample.mp3',
-          ),
-          Ebook(
-            id: 'ebook-2',
-            title: 'Community Activation Playbook',
-            author: 'Devon Harper',
-            coverUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba',
-            fileUrl: 'https://cdn.example.com/ebooks/community.epub',
-            description: 'Spark momentum in private communities with measurable onboarding flows.',
-            language: 'Spanish',
-            tags: const ['Community', 'Engagement'],
-            chapters: const [
-              EbookChapter(id: 'ch-4', title: 'Signals of belonging', pageCount: 20),
-              EbookChapter(id: 'ch-5', title: 'Designing rituals', pageCount: 24),
-            ],
-            progress: 0.12,
-            rating: 4.5,
-            previewVideoUrl: 'https://videos.example.com/ebooks/community/preview.mp4',
-            audioSampleUrl: 'https://cdn.example.com/ebooks/community/sample.mp3',
-          ),
-        ]);
+class EbookStore extends PersistentLearningStore<Ebook> {
+  EbookStore({LearningPersistence? persistence})
+      : _persistence = persistence ?? LearningPersistenceService(),
+        super(seed: _seedEbooks());
+
+  final LearningPersistence _persistence;
+
+  static List<Ebook> _seedEbooks() {
+    return [
+      Ebook(
+        id: 'ebook-1',
+        title: 'Designing Accountability Systems',
+        author: 'Isabelle Cormier',
+        coverUrl: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f',
+        fileUrl: 'https://cdn.example.com/ebooks/accountability.epub',
+        description: 'A field guide for course builders creating measurable learner checkpoints.',
+        language: 'English',
+        tags: const ['Learning', 'Operations'],
+        chapters: const [
+          EbookChapter(id: 'ch-1', title: 'Setting the cadence', pageCount: 22),
+          EbookChapter(id: 'ch-2', title: 'Feedback rituals', pageCount: 18),
+          EbookChapter(id: 'ch-3', title: 'Scaling assessments', pageCount: 16),
+        ],
+        progress: 0.32,
+        rating: 4.7,
+        downloaded: true,
+        previewVideoUrl: 'https://videos.example.com/ebooks/accountability/overview.mp4',
+        audioSampleUrl: 'https://cdn.example.com/ebooks/accountability/sample.mp3',
+      ),
+      Ebook(
+        id: 'ebook-2',
+        title: 'Community Activation Playbook',
+        author: 'Devon Harper',
+        coverUrl: 'https://images.unsplash.com/photo-1519681393784-d120267933ba',
+        fileUrl: 'https://cdn.example.com/ebooks/community.epub',
+        description: 'Spark momentum in private communities with measurable onboarding flows.',
+        language: 'Spanish',
+        tags: const ['Community', 'Engagement'],
+        chapters: const [
+          EbookChapter(id: 'ch-4', title: 'Signals of belonging', pageCount: 20),
+          EbookChapter(id: 'ch-5', title: 'Designing rituals', pageCount: 24),
+        ],
+        progress: 0.12,
+        rating: 4.5,
+        previewVideoUrl: 'https://videos.example.com/ebooks/community/preview.mp4',
+        audioSampleUrl: 'https://cdn.example.com/ebooks/community/sample.mp3',
+      ),
+    ];
+  }
+
+  @override
+  Future<List<Ebook>?> readFromPersistence() {
+    return _persistence.loadEbooks();
+  }
+
+  @override
+  Future<void> writeToPersistence(List<Ebook> value) {
+    return _persistence.saveEbooks(value);
+  }
 
   void createEbook(Ebook ebook) {
     state = [...state, ebook];
@@ -273,46 +380,63 @@ class EbookStore extends StateNotifier<List<Ebook>> {
   }
 }
 
-class TutorStore extends StateNotifier<List<Tutor>> {
-  TutorStore()
-      : super([
-          Tutor(
-            id: 'tutor-1',
-            name: 'Akira Sato',
-            headline: 'Fractional product discovery coach',
-            expertise: const ['Product Research', 'Interviewing'],
-            bio: 'Led discovery sprints for 30+ venture-backed products. Coaches teams on decision narratives.',
-            languages: const ['English', 'Japanese'],
-            avatarUrl: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe',
-            availability: const [
-              TutorAvailability(weekday: 'Tuesday', startTime: '09:00', endTime: '12:00'),
-              TutorAvailability(weekday: 'Thursday', startTime: '13:00', endTime: '17:00'),
-            ],
-            rating: 4.9,
-            sessionCount: 128,
-            reviewCount: 42,
-            introVideoUrl: 'https://videos.example.com/tutors/akira/intro.mp4',
-            certifications: const ['IDEO Design Thinking', 'Product Strategy Guild'],
-          ),
-          Tutor(
-            id: 'tutor-2',
-            name: 'Leila Haddad',
-            headline: 'Community experience architect',
-            expertise: const ['Community Ops', 'Facilitation'],
-            bio: 'Community architect for global accelerators. Hosts immersive cohort rituals.',
-            languages: const ['English', 'Arabic', 'French'],
-            avatarUrl: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39',
-            availability: const [
-              TutorAvailability(weekday: 'Wednesday', startTime: '10:00', endTime: '14:00'),
-              TutorAvailability(weekday: 'Friday', startTime: '09:00', endTime: '11:00'),
-            ],
-            rating: 4.8,
-            sessionCount: 96,
-            reviewCount: 36,
-            introVideoUrl: 'https://videos.example.com/tutors/leila/intro.mp4',
-            certifications: const ['IAF Certified Facilitator', 'CMX Masterclass Graduate'],
-          ),
-        ]);
+class TutorStore extends PersistentLearningStore<Tutor> {
+  TutorStore({LearningPersistence? persistence})
+      : _persistence = persistence ?? LearningPersistenceService(),
+        super(seed: _seedTutors());
+
+  final LearningPersistence _persistence;
+
+  static List<Tutor> _seedTutors() {
+    return [
+      Tutor(
+        id: 'tutor-1',
+        name: 'Akira Sato',
+        headline: 'Fractional product discovery coach',
+        expertise: const ['Product Research', 'Interviewing'],
+        bio: 'Led discovery sprints for 30+ venture-backed products. Coaches teams on decision narratives.',
+        languages: const ['English', 'Japanese'],
+        avatarUrl: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe',
+        availability: const [
+          TutorAvailability(weekday: 'Tuesday', startTime: '09:00', endTime: '12:00'),
+          TutorAvailability(weekday: 'Thursday', startTime: '13:00', endTime: '17:00'),
+        ],
+        rating: 4.9,
+        sessionCount: 128,
+        reviewCount: 42,
+        introVideoUrl: 'https://videos.example.com/tutors/akira/intro.mp4',
+        certifications: const ['IDEO Design Thinking', 'Product Strategy Guild'],
+      ),
+      Tutor(
+        id: 'tutor-2',
+        name: 'Leila Haddad',
+        headline: 'Community experience architect',
+        expertise: const ['Community Ops', 'Facilitation'],
+        bio: 'Community architect for global accelerators. Hosts immersive cohort rituals.',
+        languages: const ['English', 'Arabic', 'French'],
+        avatarUrl: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39',
+        availability: const [
+          TutorAvailability(weekday: 'Wednesday', startTime: '10:00', endTime: '14:00'),
+          TutorAvailability(weekday: 'Friday', startTime: '09:00', endTime: '11:00'),
+        ],
+        rating: 4.8,
+        sessionCount: 96,
+        reviewCount: 36,
+        introVideoUrl: 'https://videos.example.com/tutors/leila/intro.mp4',
+        certifications: const ['IAF Certified Facilitator', 'CMX Masterclass Graduate'],
+      ),
+    ];
+  }
+
+  @override
+  Future<List<Tutor>?> readFromPersistence() {
+    return _persistence.loadTutors();
+  }
+
+  @override
+  Future<void> writeToPersistence(List<Tutor> value) {
+    return _persistence.saveTutors(value);
+  }
 
   void createTutor(Tutor tutor) {
     state = [...state, tutor];
@@ -362,54 +486,71 @@ class TutorStore extends StateNotifier<List<Tutor>> {
   }
 }
 
-class LiveSessionStore extends StateNotifier<List<LiveSession>> {
-  LiveSessionStore()
-      : super([
-          LiveSession(
-            id: 'session-1',
-            title: 'Opportunity Assessment Workshop',
-            courseId: 'course-1',
-            tutorId: 'tutor-1',
-            description: 'Live working session to stress-test cohort problem statements.',
-            startTime: DateTime.now().add(const Duration(days: 2, hours: 3)),
-            endTime: DateTime.now().add(const Duration(days: 2, hours: 5)),
-            roomLink: 'https://meet.edulure.com/rooms/opportunity',
-            resources: const [
-              LiveSessionResource(label: 'Brief template', url: 'https://cdn.example.com/files/brief-template.pdf'),
-              LiveSessionResource(label: 'Session board', url: 'https://miro.com/app/board/opportunity'),
-            ],
-            capacity: 50,
-            enrolled: 32,
-            isRecordingAvailable: true,
-            recordingUrl: 'https://videos.example.com/sessions/opportunity-recording.mp4',
-            agenda: const [
-              '00:00 – Check-in and context framing',
-              '00:20 – Persona signal review',
-              '01:10 – Breakout board working session',
-              '01:50 – Retro and next steps',
-            ],
-          ),
-          LiveSession(
-            id: 'session-2',
-            title: 'Community Ritual Lab',
-            courseId: 'course-2',
-            tutorId: 'tutor-2',
-            description: 'Design ritual calendars and practice facilitation flows with peers.',
-            startTime: DateTime.now().add(const Duration(days: 5, hours: 1)),
-            endTime: DateTime.now().add(const Duration(days: 5, hours: 3)),
-            roomLink: 'https://meet.edulure.com/rooms/rituals',
-            resources: const [
-              LiveSessionResource(label: 'Facilitator handbook', url: 'https://cdn.example.com/files/facilitation.pdf'),
-            ],
-            capacity: 35,
-            enrolled: 20,
-            agenda: const [
-              '00:00 – Ritual design warm-up',
-              '00:35 – Community journey mapping',
-              '01:20 – Live facilitation labs',
-            ],
-          ),
-        ]);
+class LiveSessionStore extends PersistentLearningStore<LiveSession> {
+  LiveSessionStore({LearningPersistence? persistence})
+      : _persistence = persistence ?? LearningPersistenceService(),
+        super(seed: _seedSessions());
+
+  final LearningPersistence _persistence;
+
+  static List<LiveSession> _seedSessions() {
+    return [
+      LiveSession(
+        id: 'session-1',
+        title: 'Opportunity Assessment Workshop',
+        courseId: 'course-1',
+        tutorId: 'tutor-1',
+        description: 'Live working session to stress-test cohort problem statements.',
+        startTime: DateTime.now().add(const Duration(days: 2, hours: 3)),
+        endTime: DateTime.now().add(const Duration(days: 2, hours: 5)),
+        roomLink: 'https://meet.edulure.com/rooms/opportunity',
+        resources: const [
+          LiveSessionResource(label: 'Brief template', url: 'https://cdn.example.com/files/brief-template.pdf'),
+          LiveSessionResource(label: 'Session board', url: 'https://miro.com/app/board/opportunity'),
+        ],
+        capacity: 50,
+        enrolled: 32,
+        isRecordingAvailable: true,
+        recordingUrl: 'https://videos.example.com/sessions/opportunity-recording.mp4',
+        agenda: const [
+          '00:00 – Check-in and context framing',
+          '00:20 – Persona signal review',
+          '01:10 – Breakout board working session',
+          '01:50 – Retro and next steps',
+        ],
+      ),
+      LiveSession(
+        id: 'session-2',
+        title: 'Community Ritual Lab',
+        courseId: 'course-2',
+        tutorId: 'tutor-2',
+        description: 'Design ritual calendars and practice facilitation flows with peers.',
+        startTime: DateTime.now().add(const Duration(days: 5, hours: 1)),
+        endTime: DateTime.now().add(const Duration(days: 5, hours: 3)),
+        roomLink: 'https://meet.edulure.com/rooms/rituals',
+        resources: const [
+          LiveSessionResource(label: 'Facilitator handbook', url: 'https://cdn.example.com/files/facilitation.pdf'),
+        ],
+        capacity: 35,
+        enrolled: 20,
+        agenda: const [
+          '00:00 – Ritual design warm-up',
+          '00:35 – Community journey mapping',
+          '01:20 – Live facilitation labs',
+        ],
+      ),
+    ];
+  }
+
+  @override
+  Future<List<LiveSession>?> readFromPersistence() {
+    return _persistence.loadLiveSessions();
+  }
+
+  @override
+  Future<void> writeToPersistence(List<LiveSession> value) {
+    return _persistence.saveLiveSessions(value);
+  }
 
   void createSession(LiveSession session) {
     state = [...state, session];
@@ -461,26 +602,43 @@ class LiveSessionStore extends StateNotifier<List<LiveSession>> {
   }
 }
 
-class ProgressStore extends StateNotifier<List<ModuleProgressLog>> {
-  ProgressStore()
-      : super([
-          ModuleProgressLog(
-            id: 'log-1',
-            courseId: 'course-1',
-            moduleId: 'module-1',
-            timestamp: DateTime.now().subtract(const Duration(days: 2, hours: 3)),
-            notes: 'Completed persona interview synthesis. Ready for validation sprint.',
-            completedLessons: 2,
-          ),
-          ModuleProgressLog(
-            id: 'log-2',
-            courseId: 'course-1',
-            moduleId: 'module-2',
-            timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 4)),
-            notes: 'Drafted messaging matrix and shared with tutor for review.',
-            completedLessons: 1,
-          ),
-        ]);
+class ProgressStore extends PersistentLearningStore<ModuleProgressLog> {
+  ProgressStore({LearningPersistence? persistence})
+      : _persistence = persistence ?? LearningPersistenceService(),
+        super(seed: _seedLogs());
+
+  final LearningPersistence _persistence;
+
+  static List<ModuleProgressLog> _seedLogs() {
+    return [
+      ModuleProgressLog(
+        id: 'log-1',
+        courseId: 'course-1',
+        moduleId: 'module-1',
+        timestamp: DateTime.now().subtract(const Duration(days: 2, hours: 3)),
+        notes: 'Completed persona interview synthesis. Ready for validation sprint.',
+        completedLessons: 2,
+      ),
+      ModuleProgressLog(
+        id: 'log-2',
+        courseId: 'course-1',
+        moduleId: 'module-2',
+        timestamp: DateTime.now().subtract(const Duration(days: 1, hours: 4)),
+        notes: 'Drafted messaging matrix and shared with tutor for review.',
+        completedLessons: 1,
+      ),
+    ];
+  }
+
+  @override
+  Future<List<ModuleProgressLog>?> readFromPersistence() {
+    return _persistence.loadProgressLogs();
+  }
+
+  @override
+  Future<void> writeToPersistence(List<ModuleProgressLog> value) {
+    return _persistence.saveProgressLogs(value);
+  }
 
   void recordProgress(ModuleProgressLog log) {
     state = [...state, log];
@@ -509,22 +667,31 @@ class ProgressStore extends StateNotifier<List<ModuleProgressLog>> {
   }
 }
 
+final learningPersistenceProvider = Provider<LearningPersistence>((ref) {
+  return LearningPersistenceService();
+});
+
 final courseStoreProvider = StateNotifierProvider<CourseStore, List<Course>>((ref) {
-  return CourseStore();
+  final persistence = ref.watch(learningPersistenceProvider);
+  return CourseStore(persistence: persistence);
 });
 
 final ebookStoreProvider = StateNotifierProvider<EbookStore, List<Ebook>>((ref) {
-  return EbookStore();
+  final persistence = ref.watch(learningPersistenceProvider);
+  return EbookStore(persistence: persistence);
 });
 
 final tutorStoreProvider = StateNotifierProvider<TutorStore, List<Tutor>>((ref) {
-  return TutorStore();
+  final persistence = ref.watch(learningPersistenceProvider);
+  return TutorStore(persistence: persistence);
 });
 
 final liveSessionStoreProvider = StateNotifierProvider<LiveSessionStore, List<LiveSession>>((ref) {
-  return LiveSessionStore();
+  final persistence = ref.watch(learningPersistenceProvider);
+  return LiveSessionStore(persistence: persistence);
 });
 
 final progressStoreProvider = StateNotifierProvider<ProgressStore, List<ModuleProgressLog>>((ref) {
-  return ProgressStore();
+  final persistence = ref.watch(learningPersistenceProvider);
+  return ProgressStore(persistence: persistence);
 });

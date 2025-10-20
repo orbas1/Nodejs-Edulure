@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
 
+enum _EbookLibraryAction { refresh, restoreSeed }
+
 class EbookLibraryScreen extends ConsumerStatefulWidget {
   const EbookLibraryScreen({super.key});
 
@@ -40,7 +42,35 @@ class _EbookLibraryScreenState extends ConsumerState<EbookLibraryScreen> {
             tooltip: 'Upload e-book',
             icon: const Icon(Icons.cloud_upload_outlined),
             onPressed: () => _openEbookForm(),
-          )
+          ),
+          PopupMenuButton<_EbookLibraryAction>(
+            tooltip: 'Library sync options',
+            onSelected: _handleLibraryAction,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _EbookLibraryAction.refresh,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.sync, size: 20),
+                    SizedBox(width: 12),
+                    Text('Reload saved library'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: _EbookLibraryAction.restoreSeed,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.restore_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Restore demo library'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -114,6 +144,29 @@ class _EbookLibraryScreenState extends ConsumerState<EbookLibraryScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _handleLibraryAction(_EbookLibraryAction action) async {
+    final notifier = ref.read(ebookStoreProvider.notifier);
+    switch (action) {
+      case _EbookLibraryAction.refresh:
+        await notifier.refreshFromPersistence();
+        if (!mounted) return;
+        _showMessage('Reloaded saved library');
+        break;
+      case _EbookLibraryAction.restoreSeed:
+        await notifier.restoreSeedData();
+        if (!mounted) return;
+        _showMessage('Restored demo library');
+        break;
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 

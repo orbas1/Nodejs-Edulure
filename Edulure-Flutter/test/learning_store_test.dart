@@ -2,11 +2,74 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:edulure_mobile/provider/learning/learning_models.dart';
 import 'package:edulure_mobile/provider/learning/learning_store.dart';
+import 'package:edulure_mobile/services/learning_persistence_service.dart';
+
+class InMemoryLearningPersistence implements LearningPersistence {
+  List<Course>? _courses;
+  List<Ebook>? _ebooks;
+  List<Tutor>? _tutors;
+  List<LiveSession>? _sessions;
+  List<ModuleProgressLog>? _logs;
+
+  List<T>? _clone<T>(List<T>? source) {
+    return source == null ? null : List<T>.from(source);
+  }
+
+  @override
+  Future<List<Course>?> loadCourses() async => _clone(_courses);
+
+  @override
+  Future<void> saveCourses(List<Course> courses) async {
+    _courses = List<Course>.from(courses);
+  }
+
+  @override
+  Future<List<Ebook>?> loadEbooks() async => _clone(_ebooks);
+
+  @override
+  Future<void> saveEbooks(List<Ebook> ebooks) async {
+    _ebooks = List<Ebook>.from(ebooks);
+  }
+
+  @override
+  Future<List<Tutor>?> loadTutors() async => _clone(_tutors);
+
+  @override
+  Future<void> saveTutors(List<Tutor> tutors) async {
+    _tutors = List<Tutor>.from(tutors);
+  }
+
+  @override
+  Future<List<LiveSession>?> loadLiveSessions() async => _clone(_sessions);
+
+  @override
+  Future<void> saveLiveSessions(List<LiveSession> sessions) async {
+    _sessions = List<LiveSession>.from(sessions);
+  }
+
+  @override
+  Future<List<ModuleProgressLog>?> loadProgressLogs() async => _clone(_logs);
+
+  @override
+  Future<void> saveProgressLogs(List<ModuleProgressLog> logs) async {
+    _logs = List<ModuleProgressLog>.from(logs);
+  }
+
+  @override
+  Future<void> reset() async {
+    _courses = null;
+    _ebooks = null;
+    _tutors = null;
+    _sessions = null;
+    _logs = null;
+  }
+}
 
 void main() {
   group('CourseStore', () {
     test('creates courses with multimedia metadata', () {
-      final store = CourseStore();
+      final persistence = InMemoryLearningPersistence();
+      final store = CourseStore(persistence: persistence);
       final module = CourseModule(
         id: 'module-form',
         title: 'Live collaboration',
@@ -44,7 +107,8 @@ void main() {
 
   group('EbookStore', () {
     test('persists preview and audio sample URLs', () {
-      final store = EbookStore();
+      final persistence = InMemoryLearningPersistence();
+      final store = EbookStore(persistence: persistence);
       final chapter = EbookChapter(id: 'chap', title: 'Foundations', pageCount: 12, summary: 'Intro');
 
       final ebook = store.buildEbookFromForm(
@@ -70,7 +134,8 @@ void main() {
 
   group('TutorStore', () {
     test('captures credentials and intro media', () {
-      final store = TutorStore();
+      final persistence = InMemoryLearningPersistence();
+      final store = TutorStore(persistence: persistence);
       final tutor = store.buildTutorFromForm(
         name: 'Maya Patel',
         headline: 'Accountability systems architect',
@@ -99,7 +164,8 @@ void main() {
 
   group('LiveSessionStore', () {
     test('captures agenda timeline and recordings', () {
-      final store = LiveSessionStore();
+      final persistence = InMemoryLearningPersistence();
+      final store = LiveSessionStore(persistence: persistence);
       final resource = LiveSessionResource(label: 'Brief', url: 'https://example.com/brief.pdf');
       final start = DateTime.now().add(const Duration(days: 7));
       final end = start.add(const Duration(hours: 2));

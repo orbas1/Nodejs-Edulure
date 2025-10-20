@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
 
+enum _TutorDirectoryAction { refresh, restoreSeed }
+
 class TutorDirectoryScreen extends ConsumerStatefulWidget {
   const TutorDirectoryScreen({super.key});
 
@@ -40,7 +42,35 @@ class _TutorDirectoryScreenState extends ConsumerState<TutorDirectoryScreen> {
             tooltip: 'Invite tutor',
             icon: const Icon(Icons.person_add_alt_1_outlined),
             onPressed: () => _openTutorForm(),
-          )
+          ),
+          PopupMenuButton<_TutorDirectoryAction>(
+            tooltip: 'Directory sync options',
+            onSelected: _handleDirectoryAction,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _TutorDirectoryAction.refresh,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.sync, size: 20),
+                    SizedBox(width: 12),
+                    Text('Reload saved directory'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: _TutorDirectoryAction.restoreSeed,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.restore_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Restore demo tutors'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: Column(
@@ -109,6 +139,29 @@ class _TutorDirectoryScreenState extends ConsumerState<TutorDirectoryScreen> {
         label: const Text('Add tutor'),
         icon: const Icon(Icons.add_circle_outline),
       ),
+    );
+  }
+
+  Future<void> _handleDirectoryAction(_TutorDirectoryAction action) async {
+    final notifier = ref.read(tutorStoreProvider.notifier);
+    switch (action) {
+      case _TutorDirectoryAction.refresh:
+        await notifier.refreshFromPersistence();
+        if (!mounted) return;
+        _notify('Reloaded saved directory');
+        break;
+      case _TutorDirectoryAction.restoreSeed:
+        await notifier.restoreSeedData();
+        if (!mounted) return;
+        _notify('Restored demo tutors');
+        break;
+    }
+  }
+
+  void _notify(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 

@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
 
+enum _CourseCatalogAction { refresh, restoreSeed }
+
 class CourseViewerScreen extends ConsumerStatefulWidget {
   const CourseViewerScreen({super.key});
 
@@ -51,6 +53,34 @@ class _CourseViewerScreenState extends ConsumerState<CourseViewerScreen> {
             tooltip: 'Create course',
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () => _openCourseForm(),
+          ),
+          PopupMenuButton<_CourseCatalogAction>(
+            tooltip: 'Catalog sync options',
+            onSelected: _handleCatalogAction,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _CourseCatalogAction.refresh,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.sync, size: 20),
+                    SizedBox(width: 12),
+                    Text('Reload saved catalog'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: _CourseCatalogAction.restoreSeed,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.restore_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Restore demo catalog'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -154,6 +184,30 @@ class _CourseViewerScreenState extends ConsumerState<CourseViewerScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _handleCatalogAction(_CourseCatalogAction action) async {
+    final notifier = ref.read(courseStoreProvider.notifier);
+    switch (action) {
+      case _CourseCatalogAction.refresh:
+        await notifier.refreshFromPersistence();
+        if (!mounted) return;
+        _showSnackBar('Reloaded saved catalog');
+        break;
+      case _CourseCatalogAction.restoreSeed:
+        await notifier.restoreSeedData();
+        if (!mounted) return;
+        setState(() => _selectedCourseId = null);
+        _showSnackBar('Restored demo catalog');
+        break;
+    }
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 

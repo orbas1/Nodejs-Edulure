@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
 
+enum _LiveSessionAction { refresh, restoreSeed }
+
 class LiveSessionsScreen extends ConsumerStatefulWidget {
   const LiveSessionsScreen({super.key});
 
@@ -42,6 +44,34 @@ class _LiveSessionsScreenState extends ConsumerState<LiveSessionsScreen> {
             tooltip: 'Schedule session',
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () => _openSessionForm(),
+          ),
+          PopupMenuButton<_LiveSessionAction>(
+            tooltip: 'Session sync options',
+            onSelected: _handleSessionAction,
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _LiveSessionAction.refresh,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.sync, size: 20),
+                    SizedBox(width: 12),
+                    Text('Reload saved sessions'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: _LiveSessionAction.restoreSeed,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.restore_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Restore demo sessions'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -97,6 +127,29 @@ class _LiveSessionsScreenState extends ConsumerState<LiveSessionsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _handleSessionAction(_LiveSessionAction action) async {
+    final notifier = ref.read(liveSessionStoreProvider.notifier);
+    switch (action) {
+      case _LiveSessionAction.refresh:
+        await notifier.refreshFromPersistence();
+        if (!mounted) return;
+        _showSnackbar('Reloaded saved sessions');
+        break;
+      case _LiveSessionAction.restoreSeed:
+        await notifier.restoreSeedData();
+        if (!mounted) return;
+        _showSnackbar('Restored demo sessions');
+        break;
+    }
+  }
+
+  void _showSnackbar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 

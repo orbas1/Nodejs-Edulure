@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
 
+enum _ProgressAction { refresh, restoreSeed }
+
 class CourseProgressScreen extends ConsumerWidget {
   const CourseProgressScreen({super.key});
 
@@ -26,7 +28,35 @@ class CourseProgressScreen extends ConsumerWidget {
             icon: const Icon(Icons.note_add_outlined),
             tooltip: 'Record progress',
             onPressed: () => _openProgressForm(context, ref),
-          )
+          ),
+          PopupMenuButton<_ProgressAction>(
+            tooltip: 'Progress sync options',
+            onSelected: (action) => _handleProgressAction(context, ref, action),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: _ProgressAction.refresh,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.sync, size: 20),
+                    SizedBox(width: 12),
+                    Text('Reload saved logs'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: _ProgressAction.restoreSeed,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.restore_outlined, size: 20),
+                    SizedBox(width: 12),
+                    Text('Restore demo logs'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: courses.isEmpty
@@ -45,6 +75,35 @@ class CourseProgressScreen extends ConsumerWidget {
         icon: const Icon(Icons.add_chart_outlined),
         label: const Text('Log milestone'),
       ),
+    );
+  }
+
+  Future<void> _handleProgressAction(
+    BuildContext context,
+    WidgetRef ref,
+    _ProgressAction action,
+  ) async {
+    final courseNotifier = ref.read(courseStoreProvider.notifier);
+    final progressNotifier = ref.read(progressStoreProvider.notifier);
+    switch (action) {
+      case _ProgressAction.refresh:
+        await Future.wait([
+          courseNotifier.refreshFromPersistence(),
+          progressNotifier.refreshFromPersistence(),
+        ]);
+        _showSnackBar(context, 'Reloaded saved course logs');
+        break;
+      case _ProgressAction.restoreSeed:
+        await courseNotifier.restoreSeedData();
+        await progressNotifier.restoreSeedData();
+        _showSnackBar(context, 'Restored demo logs and modules');
+        break;
+    }
+  }
+
+  void _showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
