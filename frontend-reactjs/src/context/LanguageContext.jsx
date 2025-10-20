@@ -64,6 +64,81 @@ const TRANSLATIONS = {
         },
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
+      },
+      membership: {
+        pretitle: 'Membership snapshot',
+        title: 'Pick a playful path into the Edulure universe',
+        subtitle: 'Choose the vibe that fits your learning orbit — each plan unlocks new adventures with your crew.',
+        plans: {
+          freeExplorer: {
+            title: 'Free Explorer',
+            tagline: 'Dip your toes into community currents and join open sessions.',
+            price: 'Free forever',
+            features: [
+              'Drop into two live jams each month and meet fellow explorers.',
+              'Collect three community passports to sample premium spaces.',
+              'Get weekly micro-rituals from our cosmic crew.'
+            ],
+            note: 'Upgrade anytime — your progress comes with you.'
+          },
+          creatorPlus: {
+            title: 'Creator Plus',
+            tagline: 'Spin up playful programs with templates, analytics, and hype loops.',
+            price: 'Most loved',
+            features: [
+              'Host unlimited drops, quests, and synchronous events.',
+              'Launch collaborative build quests with accountability nudges.',
+              'Access priority feedback channels with veteran facilitators.'
+            ],
+            note: 'Best for creators ready to scale shared experiences.'
+          },
+          communityCaptain: {
+            title: 'Community Captain',
+            tagline: 'Steer a flagship learning universe with dedicated support.',
+            price: 'Custom energy',
+            features: [
+              'Craft a custom-branded hub for cohorts, clubs, and studios.',
+              'Pair with a success navigator for ongoing launch strategy.',
+              'Host quarterly salons with curated community talent.'
+            ],
+            note: 'Tell us your cosmic brief and we will co-create the path.'
+          }
+        },
+        cta: 'See full pricing',
+        disclaimer: 'Every plan comes with a 14-day joyride guarantee.'
+      },
+      faq: {
+        pretitle: 'FAQ',
+        title: 'Wondering how Edulure fits your flow?',
+        subtitle: 'Tap on a bubble to see how other creators stitch Edulure into their day-to-day magic.',
+        items: {
+          orbit: {
+            question: 'How quickly can I orbit into a live learning space?',
+            answer: 'Spin up a fresh circle in under ten minutes. Pick a template, invite your crew, and Edulure auto-syncs invites, reminders, and discussion prompts.'
+          },
+          cohorts: {
+            question: 'Can I run asynchronous and live cohorts together?',
+            answer: 'Yes! Thread pre-recorded drops, async quests, and live jams into one rhythm. Learners see a single timeline that adapts to their pace.'
+          },
+          pricing: {
+            question: 'What happens if I want to shift plans later?',
+            answer: 'You can slide between tiers anytime. Billing adjusts on the next cycle and your spaces, analytics, and automations stay intact.'
+          },
+          support: {
+            question: 'Do you offer onboarding support for teams?',
+            answer: 'Community Captains receive white-glove onboarding, while every plan includes live office hours, tutorial vaults, and a buzzing peer support lounge.'
+          }
+        },
+        mascotAlt: 'Playful mascot waving hello',
+        mascotCaption: 'Our cosmic courier keeps track of your questions and beams answers back at light speed.'
+      },
+      closingCta: {
+        pretitle: 'Ready when you are',
+        title: 'Let the sunset spark your next learning orbit',
+        subtitle: 'Lean into the glow—whether you are building your first circle or guiding a galaxy of learners, Edulure is ready.',
+        ctaLearners: 'Start as a learner',
+        ctaInstructors: 'Launch as an instructor',
+        footer: 'Dual launchpads, one vibrant universe.'
       }
     }
   },
