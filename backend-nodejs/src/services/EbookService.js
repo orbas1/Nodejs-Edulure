@@ -438,11 +438,12 @@ export default class EbookService {
           name: ebook.title,
           description: ebook.subtitle ?? ebook.description ?? undefined,
           unitAmount: Number(ebook.priceAmount ?? 0),
-          quantity: 1,
+          quantity: payload.quantity ?? 1,
           metadata: {
             ebookId: ebook.publicId,
             assetId: asset.publicId,
-            sellerId: asset.createdBy
+            sellerId: asset.createdBy,
+            quantity: payload.quantity ?? 1
           }
         }
       ],
@@ -451,7 +452,8 @@ export default class EbookService {
         ebookId: ebook.publicId,
         ebookTitle: ebook.title,
         assetId: asset.publicId,
-        sellerId: asset.createdBy
+        sellerId: asset.createdBy,
+        quantity: payload.quantity ?? 1
       },
       entity: {
         id: ebook.publicId,
@@ -459,7 +461,8 @@ export default class EbookService {
         name: ebook.title,
         description: ebook.subtitle ?? ebook.description ?? undefined
       },
-      receiptEmail: payload.receiptEmail
+      receiptEmail: payload.receiptEmail,
+      tax: payload.tax
     };
 
     if (provider === 'paypal') {

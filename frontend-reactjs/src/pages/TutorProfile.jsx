@@ -5,8 +5,14 @@ import ExplorerSearchSection from '../components/search/ExplorerSearchSection.js
 import FormStepper from '../components/forms/FormStepper.jsx';
 import adminControlApi from '../api/adminControlApi.js';
 import { searchExplorer } from '../api/explorerApi.js';
-import { createTutorBookingRequest } from '../api/learnerDashboardApi.js';
+import {
+  createTutorBookingRequest,
+  listTutorBookings,
+  updateTutorBooking,
+  cancelTutorBooking
+} from '../api/learnerDashboardApi.js';
 import { listPublicTutors } from '../api/catalogueApi.js';
+import { createPaymentIntent } from '../api/paymentsApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import { isAbortError } from '../utils/errors.js';
@@ -109,6 +115,32 @@ function formatRate(amount, currency = 'USD') {
   } catch (_error) {
     return `${currency} ${numeric}`;
   }
+}
+
+function formatCurrencyFromCents(amountCents, currency = 'USD') {
+  if (!Number.isFinite(Number(amountCents))) {
+    return `${currency} 0.00`;
+  }
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(Number(amountCents) / 100);
+  } catch (_error) {
+    return `${currency} ${(Number(amountCents) / 100).toFixed(2)}`;
+  }
+}
+
+function toDateTimeLocal(value) {
+  if (!value) return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (input) => String(input).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function formatDateTime(value) {
+  if (!value) return 'TBC';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return 'TBC';
+  return date.toLocaleString();
 }
 
 function TutorCard({ tutor, onRequest }) {
@@ -414,6 +446,24 @@ export default function TutorProfile() {
   const [bookingTopic, setBookingTopic] = useState('');
   const [bookingTutorId, setBookingTutorId] = useState('');
   const [bookingStatus, setBookingStatus] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsError, setBookingsError] = useState(null);
+  const [bookingActionNotice, setBookingActionNotice] = useState(null);
+  const [bookingActionError, setBookingActionError] = useState(null);
+  const [bookingActionPending, setBookingActionPending] = useState(false);
+  const [bookingEditor, setBookingEditor] = useState({
+    open: false,
+    bookingId: null,
+    form: {
+      scheduledStart: '',
+      durationMinutes: '',
+      topic: '',
+      message: '',
+      timezone: ''
+    }
+  });
+  const [bookingPayments, setBookingPayments] = useState([]);
 
   useEffect(() => {
     let active = true;
@@ -552,6 +602,34 @@ export default function TutorProfile() {
     [isAdmin, token]
   );
 
+  const loadBookings = useCallback(
+    async ({ signal } = {}) => {
+      if (!isAuthenticated || !token) {
+        setBookings([]);
+        return;
+      }
+
+      setBookingsLoading(true);
+      setBookingsError(null);
+      try {
+        const records = await listTutorBookings({ token, signal });
+        if (signal?.aborted) return;
+        setBookings(Array.isArray(records) ? records : []);
+      } catch (err) {
+        if (isAbortError(err) || signal?.aborted) {
+          return;
+        }
+        setBookings([]);
+        setBookingsError(err.message ?? 'Unable to load tutor bookings');
+      } finally {
+        if (!signal?.aborted) {
+          setBookingsLoading(false);
+        }
+      }
+    },
+    [isAuthenticated, token]
+  );
+
   useEffect(() => {
     if (!isAdmin || !token) {
       return undefined;
@@ -563,7 +641,21 @@ export default function TutorProfile() {
     };
   }, [isAdmin, token, loadTutors]);
 
+  useEffect(() => {
+    if (!isAuthenticated || !token) {
+      setBookings([]);
+      return undefined;
+    }
+    const controller = new AbortController();
+    loadBookings({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
+  }, [isAuthenticated, token, loadBookings]);
+
   useAutoDismissMessage(successMessage, () => setSuccessMessage(''));
+  useAutoDismissMessage(bookingActionNotice, () => setBookingActionNotice(null));
+  useAutoDismissMessage(bookingActionError, () => setBookingActionError(null));
 
   const resetForm = useCallback(() => {
     setForm(createEmptyForm());
@@ -662,9 +754,319 @@ export default function TutorProfile() {
       setBookingTutorId('');
       setBookingTopic('');
       setBookingMessage('');
+      await loadBookings();
+      setBookingActionNotice('Booking request submitted. Check the roster below for live status.');
     } catch (err) {
       setBookingStatus(err.message ?? 'Unable to submit tutor booking request');
     }
+  };
+
+  const handleRefreshBookings = () => {
+    setBookingActionError(null);
+    setBookingActionNotice(null);
+    loadBookings();
+  };
+
+  const openBookingEditor = (booking) => {
+    setBookingEditor({
+      open: true,
+      bookingId: booking.publicId,
+      form: {
+        scheduledStart: toDateTimeLocal(booking.scheduledStart),
+        durationMinutes: booking.durationMinutes ? String(booking.durationMinutes) : '',
+        topic: booking.metadata?.topic ?? '',
+        message: booking.metadata?.message ?? '',
+        timezone: booking.metadata?.timezone ?? ''
+      }
+    });
+  };
+
+  const closeBookingEditor = () => {
+    setBookingEditor({
+      open: false,
+      bookingId: null,
+      form: {
+        scheduledStart: '',
+        durationMinutes: '',
+        topic: '',
+        message: '',
+        timezone: ''
+      }
+    });
+  };
+
+  const handleBookingEditorChange = (event) => {
+    const { name, value } = event.target;
+    setBookingEditor((current) => ({
+      ...current,
+      form: {
+        ...current.form,
+        [name]: value
+      }
+    }));
+  };
+
+  const handleBookingEditorSubmit = async (event) => {
+    event.preventDefault();
+    if (!token || !bookingEditor.bookingId) {
+      return;
+    }
+    const payload = {};
+    if (bookingEditor.form.scheduledStart) {
+      const start = new Date(bookingEditor.form.scheduledStart);
+      if (!Number.isNaN(start.getTime())) {
+        payload.scheduledStart = start.toISOString();
+      }
+    }
+    if (bookingEditor.form.durationMinutes) {
+      payload.durationMinutes = Number(bookingEditor.form.durationMinutes);
+    }
+    if (bookingEditor.form.topic !== undefined) {
+      const trimmed = bookingEditor.form.topic.trim();
+      if (trimmed) {
+        payload.topic = trimmed;
+      }
+    }
+    if (bookingEditor.form.message !== undefined) {
+      payload.message = bookingEditor.form.message.trim();
+    }
+    if (bookingEditor.form.timezone !== undefined) {
+      const trimmed = bookingEditor.form.timezone.trim();
+      if (trimmed) {
+        payload.timezone = trimmed;
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setBookingActionError('Provide at least one update before saving changes.');
+      return;
+    }
+
+    setBookingActionPending(true);
+    setBookingActionError(null);
+    try {
+      const response = await updateTutorBooking({ token, bookingId: bookingEditor.bookingId, payload });
+      const message = response?.message ?? 'Tutor booking updated';
+      setBookingActionNotice(message);
+      closeBookingEditor();
+      await loadBookings();
+    } catch (err) {
+      setBookingActionError(err.message ?? 'Unable to update booking');
+    } finally {
+      setBookingActionPending(false);
+    }
+  };
+
+  const handleCancelBooking = async (booking) => {
+    if (!token || !booking?.publicId) {
+      return;
+    }
+    setBookingActionPending(true);
+    setBookingActionError(null);
+    try {
+      const response = await cancelTutorBooking({
+        token,
+        bookingId: booking.publicId,
+        payload: {
+          reason: 'learner_cancel',
+          notes: 'Cancelled from learner dashboard'
+        }
+      });
+      const message = response?.message ?? 'Tutor booking cancelled';
+      setBookingActionNotice(message);
+      await loadBookings();
+    } catch (err) {
+      setBookingActionError(err.message ?? 'Unable to cancel booking');
+    } finally {
+      setBookingActionPending(false);
+    }
+  };
+
+  const handleInitiateBookingPayment = async (booking) => {
+    if (!token || !booking) {
+      return;
+    }
+    const hourlyCents = Number(booking.hourlyRateAmount ?? 0);
+    const durationMinutes = Number(booking.durationMinutes ?? 60);
+    const totalCents = Number.isFinite(hourlyCents)
+      ? Math.max(0, Math.round((hourlyCents * durationMinutes) / 60))
+      : 0;
+
+    setBookingActionPending(true);
+    setBookingActionError(null);
+    try {
+      const payload = {
+        provider: 'stripe',
+        currency: booking.hourlyRateCurrency ?? 'USD',
+        items: [
+          {
+            id: booking.publicId,
+            name: `Tutor session with ${booking.tutorProfile?.displayName ?? 'Tutor'}`,
+            description: booking.metadata?.topic ?? 'Tutoring session',
+            unitAmount: totalCents,
+            quantity: 1,
+            metadata: {
+              bookingId: booking.publicId,
+              tutorId: booking.tutorId
+            }
+          }
+        ],
+        entity: {
+          id: booking.publicId,
+          type: 'tutor_booking',
+          name: booking.metadata?.topic ?? `Tutor session ${booking.publicId}`,
+          description: booking.metadata?.message ?? undefined
+        }
+      };
+      const payment = await createPaymentIntent({ token, payload });
+      const approvalHint = payment?.approvalUrl
+        ? `Approval URL ready: ${payment.approvalUrl}`
+        : payment?.clientSecret
+          ? `Stripe client secret issued: ${payment.clientSecret}`
+          : 'Payment reference generated.';
+      setBookingActionNotice(`Payment intent ${payment?.paymentId ?? 'created'}. ${approvalHint}`);
+      setBookingPayments((current) => [
+        {
+          id: payment?.paymentId ?? `${booking.publicId}-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          bookingId: booking.publicId,
+          provider: payload.provider,
+          approvalUrl: payment?.approvalUrl ?? null,
+          clientSecret: payment?.clientSecret ?? null,
+          amountCents: totalCents,
+          currency: payload.currency
+        },
+        ...current.slice(0, 4)
+      ]);
+    } catch (err) {
+      setBookingActionError(err.message ?? 'Unable to create payment intent');
+    } finally {
+      setBookingActionPending(false);
+    }
+  };
+
+  const bookingGroups = useMemo(() => {
+    if (!Array.isArray(bookings) || bookings.length === 0) {
+      return { upcoming: [], past: [] };
+    }
+    const now = Date.now();
+    const upcoming = [];
+    const past = [];
+    bookings.forEach((booking) => {
+      const startTime = booking.scheduledStart ? new Date(booking.scheduledStart).getTime() : 0;
+      const isHistorical =
+        booking.status === 'completed' ||
+        booking.status === 'cancelled' ||
+        booking.status === 'canceled' ||
+        (!Number.isNaN(startTime) && startTime < now);
+      if (isHistorical) {
+        past.push(booking);
+      } else {
+        upcoming.push(booking);
+      }
+    });
+    upcoming.sort((a, b) => new Date(a.scheduledStart ?? 0) - new Date(b.scheduledStart ?? 0));
+    past.sort((a, b) => new Date(b.scheduledStart ?? 0) - new Date(a.scheduledStart ?? 0));
+    return { upcoming, past };
+  }, [bookings]);
+
+  const renderBookingCard = (booking, { allowEdit = true, allowPayment = true } = {}) => {
+    const status = booking.status ?? 'requested';
+    const statusBadge = (() => {
+      switch (status) {
+        case 'confirmed':
+          return 'bg-emerald-100 text-emerald-700';
+        case 'completed':
+          return 'bg-slate-200 text-slate-600';
+        case 'cancelled':
+        case 'canceled':
+          return 'bg-rose-100 text-rose-600';
+        default:
+          return 'bg-amber-100 text-amber-700';
+      }
+    })();
+    const tutorName = booking.tutorProfile?.displayName ?? booking.tutorProfile?.user?.name ?? 'Tutor';
+    const scheduledAt = formatDateTime(booking.scheduledStart);
+    const durationMinutes = booking.durationMinutes ?? 60;
+    const hourlyRate = formatCurrencyFromCents(booking.hourlyRateAmount ?? 0, booking.hourlyRateCurrency ?? 'USD');
+    const totalCents = Number.isFinite(Number(booking.hourlyRateAmount))
+      ? Math.max(0, Math.round((Number(booking.hourlyRateAmount) * durationMinutes) / 60))
+      : 0;
+    const totalLabel = formatCurrencyFromCents(totalCents, booking.hourlyRateCurrency ?? 'USD');
+
+    return (
+      <div
+        key={booking.publicId}
+        className="rounded-3xl border border-slate-200 bg-white/90 p-5 shadow-sm"
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-slate-900">{booking.metadata?.topic ?? 'Tutor session'}</h3>
+              <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.3em] ${statusBadge}`}>
+                {status}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">Tutor · {tutorName}</p>
+            <p className="text-xs text-slate-500">Scheduled {scheduledAt}</p>
+            <p className="text-xs text-slate-500">Duration {durationMinutes} minutes</p>
+            <p className="text-xs text-slate-500">Hourly {hourlyRate} · Estimated total {totalLabel}</p>
+            {booking.metadata?.timezone ? (
+              <p className="text-xs text-slate-500">Timezone {booking.metadata.timezone}</p>
+            ) : null}
+            {booking.meetingUrl ? (
+              <p className="text-xs">
+                <a
+                  href={booking.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline"
+                >
+                  Join meeting
+                </a>
+              </p>
+            ) : null}
+            {booking.metadata?.message ? (
+              <p className="rounded-2xl bg-slate-100 px-3 py-2 text-xs text-slate-600">
+                {booking.metadata.message}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {allowEdit ? (
+              <button
+                type="button"
+                onClick={() => openBookingEditor(booking)}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                disabled={bookingActionPending}
+              >
+                Reschedule
+              </button>
+            ) : null}
+            {allowPayment ? (
+              <button
+                type="button"
+                onClick={() => handleInitiateBookingPayment(booking)}
+                className="inline-flex items-center gap-2 rounded-full border border-primary px-4 py-2 text-xs font-semibold text-primary transition hover:bg-primary hover:text-white"
+                disabled={bookingActionPending}
+              >
+                Generate payment
+              </button>
+            ) : null}
+            {allowEdit ? (
+              <button
+                type="button"
+                onClick={() => handleCancelBooking(booking)}
+                className="inline-flex items-center gap-2 rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-300 hover:bg-rose-50"
+                disabled={bookingActionPending}
+              >
+                Cancel session
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const adminPanel = useMemo(() => {
@@ -850,6 +1252,157 @@ export default function TutorProfile() {
               <p className="mt-3 rounded-2xl bg-slate-900/90 px-4 py-2 text-sm font-semibold text-white">{bookingStatus}</p>
             ) : null}
           </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-slate-900">My tutor bookings</h2>
+            <button
+              type="button"
+              onClick={handleRefreshBookings}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-500 transition hover:border-primary hover:text-primary"
+            >
+              Refresh
+            </button>
+          </div>
+          {bookingActionNotice ? (
+            <p className="rounded-3xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">{bookingActionNotice}</p>
+          ) : null}
+          {bookingActionError ? (
+            <p className="rounded-3xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">{bookingActionError}</p>
+          ) : null}
+          {bookingsError ? (
+            <p className="rounded-3xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600">{bookingsError}</p>
+          ) : null}
+          {bookingsLoading ? <p className="text-sm text-slate-500">Loading bookings…</p> : null}
+          {!bookingsLoading && bookingGroups.upcoming.length === 0 && bookingGroups.past.length === 0 ? (
+            <p className="text-sm text-slate-500">No bookings yet. Request a session above to populate your tutoring roster.</p>
+          ) : null}
+          {bookingGroups.upcoming.length > 0 ? (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Upcoming sessions</h3>
+              <div className="space-y-3">
+                {bookingGroups.upcoming.map((booking) => renderBookingCard(booking, { allowEdit: true, allowPayment: true }))}
+              </div>
+            </div>
+          ) : null}
+          {bookingGroups.past.length > 0 ? (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Completed & archived</h3>
+              <div className="space-y-3">
+                {bookingGroups.past.map((booking) => renderBookingCard(booking, { allowEdit: false, allowPayment: false }))}
+              </div>
+            </div>
+          ) : null}
+          {bookingEditor.open ? (
+            <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Reschedule booking</h3>
+              <form onSubmit={handleBookingEditorSubmit} className="mt-4 grid gap-4 md:grid-cols-2">
+                <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Start time
+                  <input
+                    type="datetime-local"
+                    name="scheduledStart"
+                    value={bookingEditor.form.scheduledStart}
+                    onChange={handleBookingEditorChange}
+                    className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+                <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Duration (minutes)
+                  <input
+                    type="number"
+                    min="15"
+                    max="600"
+                    name="durationMinutes"
+                    value={bookingEditor.form.durationMinutes}
+                    onChange={handleBookingEditorChange}
+                    className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+                <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Topic
+                  <input
+                    type="text"
+                    name="topic"
+                    value={bookingEditor.form.topic}
+                    onChange={handleBookingEditorChange}
+                    className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+                <label className="space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Timezone
+                  <input
+                    type="text"
+                    name="timezone"
+                    value={bookingEditor.form.timezone}
+                    onChange={handleBookingEditorChange}
+                    placeholder="America/New_York"
+                    className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+                <label className="md:col-span-2 space-y-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Message to tutor
+                  <textarea
+                    name="message"
+                    value={bookingEditor.form.message}
+                    onChange={handleBookingEditorChange}
+                    rows={3}
+                    className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </label>
+                <div className="md:col-span-2 flex items-center gap-3">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-primary-dark"
+                    disabled={bookingActionPending}
+                  >
+                    Save changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeBookingEditor}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-5 py-2 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+          {bookingPayments.length > 0 ? (
+            <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm">
+              <h3 className="text-sm font-semibold text-slate-900">Recent payment intents</h3>
+              <ul className="mt-3 space-y-2 text-xs text-slate-500">
+                {bookingPayments.map((payment) => (
+                  <li key={payment.id} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-900">{payment.bookingId}</span>
+                      <span className="text-[10px] uppercase tracking-[0.3em] text-slate-400">
+                        {new Date(payment.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs">{formatCurrencyFromCents(payment.amountCents, payment.currency)} · {payment.provider}</p>
+                    {payment.approvalUrl ? (
+                      <p className="mt-1">
+                        <a
+                          href={payment.approvalUrl}
+                          className="text-primary underline"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          View approval link
+                        </a>
+                      </p>
+                    ) : null}
+                    {payment.clientSecret ? (
+                      <p className="mt-1 break-all text-[10px] text-slate-400">Client secret: {payment.clientSecret}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
 
         <section className="space-y-6">

@@ -98,7 +98,13 @@ const purchaseSchema = Joi.object({
     otherwise: Joi.string().uri().optional()
   }),
   brandName: Joi.string().max(120).optional(),
-  receiptEmail: Joi.string().email().optional()
+  receiptEmail: Joi.string().email().optional(),
+  quantity: Joi.number().integer().min(1).max(200).default(1),
+  tax: Joi.object({
+    country: Joi.string().length(2).uppercase().required(),
+    region: Joi.string().max(3).uppercase().allow('', null),
+    postalCode: Joi.string().max(12).allow('', null)
+  }).optional()
 });
 
 function normaliseArray(value) {

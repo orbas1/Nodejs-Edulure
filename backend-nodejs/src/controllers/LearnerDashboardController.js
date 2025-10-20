@@ -14,6 +14,50 @@ export default class LearnerDashboardController {
     }
   }
 
+  static async listTutorBookings(req, res, next) {
+    try {
+      const bookings = await LearnerDashboardService.listTutorBookings(req.user.id);
+      return success(res, {
+        data: { bookings },
+        message: 'Tutor bookings loaded'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateTutorBooking(req, res, next) {
+    try {
+      const acknowledgement = await LearnerDashboardService.updateTutorBooking(
+        req.user.id,
+        req.params.bookingId,
+        req.body
+      );
+      return success(res, {
+        data: acknowledgement,
+        message: 'Tutor booking updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async cancelTutorBooking(req, res, next) {
+    try {
+      const acknowledgement = await LearnerDashboardService.cancelTutorBooking(
+        req.user.id,
+        req.params.bookingId,
+        req.body
+      );
+      return success(res, {
+        data: acknowledgement,
+        message: 'Tutor booking cancelled'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async exportTutorSchedule(req, res, next) {
     try {
       const acknowledgement = await LearnerDashboardService.exportTutorSchedule(req.user.id);
