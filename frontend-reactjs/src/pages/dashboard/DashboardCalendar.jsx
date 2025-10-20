@@ -216,10 +216,17 @@ function buildRunwayInsights(events) {
 
 export default function DashboardCalendar() {
   const { role, dashboard, refresh } = useOutletContext();
-  const seededEvents = useMemo(
-    () => normaliseSeededEvents(dashboard?.calendar),
-    [dashboard?.calendar]
-  );
+  const seededEvents = useMemo(() => {
+    if (!dashboard?.calendar) {
+      return normaliseSeededEvents();
+    }
+    const eventsSource = Array.isArray(dashboard.calendar?.events)
+      ? dashboard.calendar.events
+      : Array.isArray(dashboard.calendar)
+        ? dashboard.calendar
+        : [];
+    return normaliseSeededEvents(eventsSource);
+  }, [dashboard?.calendar]);
 
   const [events, setEvents] = useState(() => {
     const persisted = loadPersistentState(STORAGE_KEY, []);
