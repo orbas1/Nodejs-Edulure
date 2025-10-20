@@ -14,6 +14,17 @@ import auth from '../middleware/auth.js';
 
 const router = Router();
 
+router.get('/settings/appearance', auth('admin'), AdminSettingsController.getAppearanceSettings);
+router.put('/settings/appearance', auth('admin'), AdminSettingsController.updateAppearanceSettings);
+router.get('/settings/preferences', auth('admin'), AdminSettingsController.getPreferenceSettings);
+router.put('/settings/preferences', auth('admin'), AdminSettingsController.updatePreferenceSettings);
+router.get('/settings/system', auth('admin'), AdminSettingsController.getSystemSettings);
+router.put('/settings/system', auth('admin'), AdminSettingsController.updateSystemSettings);
+router.get('/settings/integrations', auth('admin'), AdminSettingsController.getIntegrationSettings);
+router.put('/settings/integrations', auth('admin'), AdminSettingsController.updateIntegrationSettings);
+router.get('/settings/third-party', auth('admin'), AdminSettingsController.getThirdPartySettings);
+router.put('/settings/third-party', auth('admin'), AdminSettingsController.updateThirdPartySettings);
+
 router.get('/monetization/settings', auth('admin'), AdminSettingsController.getMonetizationSettings);
 router.put('/monetization/settings', auth('admin'), AdminSettingsController.updateMonetizationSettings);
 router.get('/monetization/catalog', auth('admin'), AdminMonetizationController.listCatalogItems);

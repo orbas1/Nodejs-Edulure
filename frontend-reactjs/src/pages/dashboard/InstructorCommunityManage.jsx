@@ -592,8 +592,7 @@ export default function InstructorCommunityManage() {
                   value={form.playbooksInput}
                   onChange={handleFieldChange}
                   className="dashboard-input min-h-[120px]"
-                  placeholder={["Welcome circle", "Weekly co-working", "Demo day retro"].join("
-")}
+                  placeholder={["Welcome circle", "Weekly co-working", "Demo day retro"].join(", ")}
                 />
               </label>
               <div className="flex flex-wrap items-center justify-end gap-3">
