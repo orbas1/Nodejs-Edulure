@@ -275,7 +275,16 @@ describe('IntegrationApiKeyInviteService', () => {
     );
     expect(inviteModelMock.updateById).toHaveBeenCalledWith(
       'invite-uuid',
-      expect.objectContaining({ status: 'completed', completedBy: 'ops@example.com', apiKeyId: 5 }),
+      expect.objectContaining({
+        status: 'completed',
+        completedBy: 'ops@example.com',
+        apiKeyId: 5,
+        metadata: expect.objectContaining({
+          fulfilledBy: 'ops@example.com',
+          fulfilledByName: 'Ops Team',
+          fulfilledReason: 'Initial provision'
+        })
+      }),
       trxMock
     );
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 5, sanitized: true }));
@@ -325,7 +334,67 @@ describe('IntegrationApiKeyInviteService', () => {
       }),
       { connection: trxMock }
     );
+    const [, updatePayload] = inviteModelMock.updateById.mock.calls[0];
+    expect(updatePayload.metadata).toMatchObject({
+      fulfilledBy: 'rotator@example.com',
+      fulfilledByName: 'Rotator',
+      fulfilledReason: 'delegated-rotation'
+    });
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 9, sanitized: true }));
+  });
+
+  it('persists fulfilment context metadata when provided', async () => {
+    inviteModelMock.findActiveByTokenHash.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: null,
+      ownerEmail: 'ops@example.com',
+      status: 'pending',
+      rotationIntervalDays: 90,
+      keyExpiresAt: null,
+      metadata: { notes: 'Marketing automations' }
+    });
+
+    inviteModelMock.findById.mockResolvedValue({
+      id: 'invite-uuid',
+      provider: 'openai',
+      environment: 'production',
+      alias: 'Content Studio Bot',
+      apiKeyId: 12,
+      ownerEmail: 'ops@example.com',
+      status: 'completed'
+    });
+
+    apiKeyServiceMock.createKey.mockResolvedValue({ id: 12, alias: 'Content Studio Bot', status: 'active' });
+
+    await service.submitInvitation(
+      'token-xyz',
+      {
+        key: 'sk-live-example-credential-1234567890',
+        actorEmail: 'ops@example.com',
+        reason: 'Initial provision'
+      },
+      {
+        actorId: 'user-789',
+        actorRoles: ['admin', 'integrations', 'admin'],
+        requestId: 'req-123',
+        ipAddress: '203.0.113.5',
+        userAgent: 'Vitest Agent',
+        origin: 'https://portal.edulure.com'
+      }
+    );
+
+    const [, updatePayload] = inviteModelMock.updateById.mock.calls[0];
+    expect(updatePayload.metadata.fulfilmentContext).toEqual({
+      actorId: 'user-789',
+      actorRoles: ['admin', 'integrations'],
+      requestId: 'req-123',
+      ipAddress: '203.0.113.5',
+      userAgent: 'Vitest Agent',
+      origin: 'https://portal.edulure.com'
+    });
   });
 
   afterEach(() => {

@@ -127,6 +127,41 @@ function buildEmailPayload({ invite, claimUrl }) {
   };
 }
 
+function normaliseFulfilmentContext(context = {}) {
+  const { actorId, actorRoles, requestId, ipAddress, userAgent, origin } = context;
+
+  const cleaned = {};
+
+  if (typeof actorId === 'string' && actorId.trim()) {
+    cleaned.actorId = actorId.trim();
+  }
+
+  if (Array.isArray(actorRoles)) {
+    const roles = Array.from(new Set(actorRoles.filter((role) => typeof role === 'string' && role.trim().length > 0).map((role) => role.trim())));
+    if (roles.length > 0) {
+      cleaned.actorRoles = roles;
+    }
+  }
+
+  if (typeof requestId === 'string' && requestId.trim()) {
+    cleaned.requestId = requestId.trim();
+  }
+
+  if (typeof ipAddress === 'string' && ipAddress.trim()) {
+    cleaned.ipAddress = ipAddress.trim();
+  }
+
+  if (typeof userAgent === 'string' && userAgent.trim()) {
+    cleaned.userAgent = userAgent.trim();
+  }
+
+  if (typeof origin === 'string' && origin.trim()) {
+    cleaned.origin = origin.trim();
+  }
+
+  return cleaned;
+}
+
 export default class IntegrationApiKeyInviteService {
   constructor({
     inviteModel = IntegrationApiKeyInviteModel,
@@ -370,7 +405,7 @@ export default class IntegrationApiKeyInviteService {
     };
   }
 
-  async submitInvitation(token, { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason }) {
+  async submitInvitation(token, { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason }, context = {}) {
     const invite = await this.loadInviteByToken(token);
     const rotationDays = clampRotationInterval(rotationIntervalDays ?? invite.rotationIntervalDays, invite.provider);
     const expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : invite.keyExpiresAt;
@@ -386,6 +421,11 @@ export default class IntegrationApiKeyInviteService {
       fulfilledByName: actorName ?? null,
       fulfilledReason: reason ?? null
     };
+
+    const fulfilmentContext = normaliseFulfilmentContext(context);
+    if (Object.keys(fulfilmentContext).length > 0) {
+      metadata.fulfilmentContext = fulfilmentContext;
+    }
 
     let result;
     await this.database.transaction(async (trx) => {
@@ -432,7 +472,15 @@ export default class IntegrationApiKeyInviteService {
       );
     });
 
-    this.logger.info({ inviteId: invite.id, apiKeyId: result.id }, 'Integration API key invite fulfilled');
+    this.logger.info(
+      {
+        inviteId: invite.id,
+        apiKeyId: result.id,
+        actor,
+        ...fulfilmentContext
+      },
+      'Integration API key invite fulfilled'
+    );
 
     return {
       invite: await this.inviteModel.findById(invite.id),

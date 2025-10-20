@@ -11,12 +11,17 @@ function createMockRes() {
   const res = {
     statusCode: 200,
     body: undefined,
+    headers: {},
     status: vi.fn().mockImplementation((code) => {
       res.statusCode = code;
       return res;
     }),
     json: vi.fn().mockImplementation((payload) => {
       res.body = payload;
+      return res;
+    }),
+    set: vi.fn().mockImplementation((key, value) => {
+      res.headers[key] = value;
       return res;
     })
   };
@@ -62,7 +67,7 @@ describe('IntegrationKeyInviteController', () => {
     await submitInvitation(req, res, next);
 
     expect(mockService.submitInvitation).toHaveBeenCalledTimes(1);
-    const [tokenArg, payloadArg] = mockService.submitInvitation.mock.calls[0];
+    const [tokenArg, payloadArg, contextArg] = mockService.submitInvitation.mock.calls[0];
     expect(tokenArg).toBe('token-value-1234567890');
     expect(payloadArg).toMatchObject({
       key: 'sk_test_12345678901234567890',
@@ -72,7 +77,17 @@ describe('IntegrationKeyInviteController', () => {
       reason: 'rotation review'
     });
     expect(payloadArg.keyExpiresAt).toBeInstanceOf(Date);
+    expect(contextArg).toEqual({
+      actorId: null,
+      actorRoles: null,
+      requestId: null,
+      ipAddress: null,
+      userAgent: null,
+      origin: null
+    });
 
+    expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');
+    expect(res.headers['Cache-Control']).toBe('no-store, max-age=0, must-revalidate');
     expect(res.status).toHaveBeenCalledWith(201);
     expect(res.json).toHaveBeenCalledWith({
       success: true,
@@ -95,6 +110,7 @@ describe('IntegrationKeyInviteController', () => {
     await submitInvitation(req, res, next);
 
     expect(mockService.submitInvitation).not.toHaveBeenCalled();
+    expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');
     expect(res.status).toHaveBeenCalledWith(422);
     expect(res.body).toMatchObject({
       success: false,
@@ -113,6 +129,7 @@ describe('IntegrationKeyInviteController', () => {
     await getInvitation(req, res, next);
 
     expect(mockService.getInvitationDetails).not.toHaveBeenCalled();
+    expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.body).toMatchObject({ success: false, message: 'Invalid invitation token' });
     expect(next).not.toHaveBeenCalled();
@@ -128,6 +145,8 @@ describe('IntegrationKeyInviteController', () => {
     await getInvitation(req, res, next);
 
     expect(mockService.getInvitationDetails).toHaveBeenCalledWith('valid-token-1234567890');
+    expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');
+    expect(res.headers.Pragma).toBe('no-cache');
     expect(res.status).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith({ success: true, data: { id: 'invite-123' } });
     expect(next).not.toHaveBeenCalled();
@@ -181,5 +200,46 @@ describe('IntegrationKeyInviteController', () => {
     expect(next).toHaveBeenCalledWith(fatalError);
     expect(res.status).not.toHaveBeenCalled();
     expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('passes request metadata to the invite service and records headers', async () => {
+    const req = {
+      params: { token: 'token-value-1234567890' },
+      body: { key: 'sk_test_12345678901234567890' },
+      headers: {
+        'x-request-id': 'req-123',
+        'user-agent': 'Vitest Agent',
+        origin: 'https://portal.edulure.com'
+      },
+      ips: ['203.0.113.5'],
+      user: {
+        id: 'user-789',
+        email: 'actor@example.com',
+        name: 'Example Owner',
+        roles: ['admin', 'integrations']
+      },
+      log: { info: vi.fn() }
+    };
+    const res = createMockRes();
+    const next = vi.fn();
+
+    const resultPayload = { invite: { id: 'invite-ctx' }, apiKey: { token: 'masked' } };
+    mockService.submitInvitation.mockResolvedValue(resultPayload);
+
+    await submitInvitation(req, res, next);
+
+    const [, submissionArg, contextArg] = mockService.submitInvitation.mock.calls[0];
+    expect(submissionArg.actorEmail).toBe('actor@example.com');
+    expect(contextArg).toEqual({
+      actorId: 'user-789',
+      actorRoles: ['admin', 'integrations'],
+      requestId: 'req-123',
+      ipAddress: '203.0.113.5',
+      userAgent: 'Vitest Agent',
+      origin: 'https://portal.edulure.com'
+    });
+    expect(res.headers['Cache-Control']).toBe('no-store, max-age=0, must-revalidate');
+    expect(res.headers['X-Content-Type-Options']).toBe('nosniff');
+    expect(next).not.toHaveBeenCalled();
   });
 });

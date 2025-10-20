@@ -66,6 +66,65 @@ function normaliseError(error, defaultStatus = 500, defaultMessage = 'Unexpected
   return { status, message };
 }
 
+function normaliseHeaderValue(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0 ? String(value[0]).trim() || null : null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  return null;
+}
+
+function ensureSensitiveResponseHeaders(res) {
+  if (typeof res?.set !== 'function') {
+    return;
+  }
+
+  res.set('Cache-Control', 'no-store, max-age=0, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Cross-Origin-Resource-Policy', 'same-origin');
+}
+
+function extractSubmissionContext(req) {
+  const requestId = normaliseHeaderValue(req?.headers?.['x-request-id'])
+    ?? (typeof req?.id === 'string' ? req.id : null)
+    ?? (typeof req?.requestId === 'string' ? req.requestId : null);
+
+  const ipAddress = Array.isArray(req?.ips) && req.ips.length > 0
+    ? normaliseHeaderValue(req.ips[0])
+    : (typeof req?.ip === 'string' ? req.ip : null);
+
+  const userAgent = normaliseHeaderValue(req?.headers?.['user-agent']);
+  const origin = normaliseHeaderValue(req?.headers?.origin);
+
+  const actorId = typeof req?.user?.id === 'string'
+    ? req.user.id
+    : (typeof req?.user?.sub === 'string' ? req.user.sub : null);
+
+  const actorRoles = Array.isArray(req?.user?.roles)
+    ? req.user.roles.filter((role) => typeof role === 'string' && role.trim().length > 0)
+    : (typeof req?.user?.role === 'string' ? [req.user.role] : []);
+
+  return {
+    actorId: actorId ?? null,
+    actorRoles: actorRoles.length > 0 ? Array.from(new Set(actorRoles.map((role) => role.trim()))) : null,
+    requestId: requestId ?? null,
+    ipAddress: ipAddress ?? null,
+    userAgent: userAgent ?? null,
+    origin: origin ?? null
+  };
+}
+
 export async function getInvitation(req, res, next) {
   try {
     const { token } = await tokenParamSchema.validateAsync(req.params ?? {}, {
@@ -74,9 +133,11 @@ export async function getInvitation(req, res, next) {
     });
 
     const details = await inviteService.getInvitationDetails(token);
+    ensureSensitiveResponseHeaders(res);
     res.json({ success: true, data: details });
   } catch (error) {
     if (error.isJoi) {
+      ensureSensitiveResponseHeaders(res);
       res.status(400).json({
         success: false,
         message: 'Invalid invitation token',
@@ -89,6 +150,7 @@ export async function getInvitation(req, res, next) {
       next(error);
       return;
     }
+    ensureSensitiveResponseHeaders(res);
     res.status(status).json({ success: false, message });
   }
 }
@@ -122,8 +184,20 @@ export async function submitInvitation(req, res, next) {
       actorName: payload.actorName ?? normalisedActorName
     };
 
-    const result = await inviteService.submitInvitation(token, submission);
+    const submissionContext = extractSubmissionContext(req);
+    const result = await inviteService.submitInvitation(token, submission, submissionContext);
 
+    req.log?.info(
+      {
+        inviteToken: token,
+        inviteId: result.invite?.id ?? null,
+        actor: submission.actorEmail ?? actorEmailFromContext ?? null,
+        requestId: submissionContext.requestId ?? null
+      },
+      'Integration invite fulfilled'
+    );
+
+    ensureSensitiveResponseHeaders(res);
     res.status(201).json({
       success: true,
       data: {
@@ -133,6 +207,7 @@ export async function submitInvitation(req, res, next) {
     });
   } catch (error) {
     if (error.isJoi) {
+      ensureSensitiveResponseHeaders(res);
       res.status(422).json({
         success: false,
         message: 'Validation failed',
@@ -145,6 +220,7 @@ export async function submitInvitation(req, res, next) {
       next(error);
       return;
     }
+    ensureSensitiveResponseHeaders(res);
     res.status(status).json({ success: false, message });
   }
 }
