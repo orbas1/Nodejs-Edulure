@@ -179,22 +179,47 @@ export default class PodcastShowModel {
 
   static async updateById(id, updates, connection = db) {
     const payload = {};
-    if (updates.communityId !== undefined) payload.community_id = updates.communityId ?? null;
-    if (updates.ownerId !== undefined) payload.owner_id = updates.ownerId ?? null;
-    if (updates.title !== undefined) payload.title = updates.title;
-    if (updates.slug !== undefined) payload.slug = normaliseSlug(updates.slug, updates.title);
-    if (updates.subtitle !== undefined) payload.subtitle = updates.subtitle ?? null;
-    if (updates.description !== undefined) payload.description = updates.description ?? null;
-    if (updates.coverImageUrl !== undefined) payload.cover_image_url = updates.coverImageUrl ?? null;
-    if (updates.category !== undefined) payload.category = updates.category ?? null;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.isPublic !== undefined) payload.is_public = updates.isPublic;
-    if (updates.distributionChannels !== undefined)
+    if (updates.communityId !== undefined) {
+      payload.community_id = updates.communityId ?? null;
+    }
+    if (updates.ownerId !== undefined) {
+      payload.owner_id = updates.ownerId ?? null;
+    }
+    if (updates.title !== undefined) {
+      payload.title = updates.title;
+    }
+    if (updates.slug !== undefined) {
+      payload.slug = normaliseSlug(updates.slug, updates.title);
+    }
+    if (updates.subtitle !== undefined) {
+      payload.subtitle = updates.subtitle ?? null;
+    }
+    if (updates.description !== undefined) {
+      payload.description = updates.description ?? null;
+    }
+    if (updates.coverImageUrl !== undefined) {
+      payload.cover_image_url = updates.coverImageUrl ?? null;
+    }
+    if (updates.category !== undefined) {
+      payload.category = updates.category ?? null;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.isPublic !== undefined) {
+      payload.is_public = updates.isPublic;
+    }
+    if (updates.distributionChannels !== undefined) {
       payload.distribution_channels = Array.isArray(updates.distributionChannels)
         ? updates.distributionChannels.join(', ')
         : updates.distributionChannels ?? null;
-    if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata ?? {}, {});
-    if (updates.launchAt !== undefined) payload.launch_at = updates.launchAt ?? null;
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = serialiseJson(updates.metadata ?? {}, {});
+    }
+    if (updates.launchAt !== undefined) {
+      payload.launch_at = updates.launchAt ?? null;
+    }
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);

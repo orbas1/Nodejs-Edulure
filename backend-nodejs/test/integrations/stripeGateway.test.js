@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import StripeGateway from '../../src/integrations/StripeGateway.js';
 import IntegrationCircuitBreaker from '../../src/integrations/IntegrationCircuitBreaker.js';
@@ -35,6 +35,10 @@ function createGateway({ receiptResult } = {}) {
 
 describe('StripeGateway', () => {
   beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
     vi.useRealTimers();
   });
 
@@ -81,5 +85,41 @@ describe('StripeGateway', () => {
       status: 'processed',
       errorMessage: null
     });
+  });
+
+  it('does not retry non-retryable errors', async () => {
+    const { gateway, stripeClient } = createGateway();
+    const nonRetryable = Object.assign(new Error('bad request'), { statusCode: 400 });
+    stripeClient.paymentIntents.create.mockRejectedValue(nonRetryable);
+
+    await expect(gateway.createPaymentIntent({ amount: 200, currency: 'usd' })).rejects.toBe(
+      nonRetryable
+    );
+    expect(stripeClient.paymentIntents.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws informative error when webhook secret missing', async () => {
+    const stripeClient = {
+      paymentIntents: { create: vi.fn() },
+      refunds: { create: vi.fn() },
+      webhooks: { constructEvent: vi.fn() }
+    };
+    const receiptService = {
+      recordReceipt: vi.fn(),
+      markProcessed: vi.fn()
+    };
+
+    const gateway = new StripeGateway({
+      stripeClient,
+      webhookSecret: null,
+      circuitBreaker: null,
+      retry: { maxAttempts: 0 },
+      receiptService,
+      logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() }
+    });
+
+    await expect(gateway.verifyWebhook({ rawBody: '{}', signature: 'sig' })).rejects.toThrow(
+      /webhook secret/i
+    );
   });
 });

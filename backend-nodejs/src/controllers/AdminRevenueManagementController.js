@@ -65,14 +65,27 @@ function buildAdjustmentPayload(payload, actorId) {
     }
   };
 
-  if (payload.reference !== undefined) result.reference = payload.reference;
-  if (payload.category !== undefined) result.category = payload.category || 'general';
-  if (payload.status !== undefined) result.status = payload.status;
-  if (payload.currency !== undefined) result.currency = payload.currency;
-  if (payload.amount !== undefined)
+  if (payload.reference !== undefined) {
+    result.reference = payload.reference;
+  }
+  if (payload.category !== undefined) {
+    result.category = payload.category || 'general';
+  }
+  if (payload.status !== undefined) {
+    result.status = payload.status;
+  }
+  if (payload.currency !== undefined) {
+    result.currency = payload.currency;
+  }
+  if (payload.amount !== undefined) {
     result.amountCents = Math.round(Number(payload.amount ?? 0) * 100);
-  if (payload.effectiveAt !== undefined) result.effectiveAt = new Date(payload.effectiveAt);
-  if (payload.notes !== undefined) result.notes = payload.notes ?? null;
+  }
+  if (payload.effectiveAt !== undefined) {
+    result.effectiveAt = new Date(payload.effectiveAt);
+  }
+  if (payload.notes !== undefined) {
+    result.notes = payload.notes ?? null;
+  }
   result.updatedBy = actorId ?? null;
   if (actorId) {
     result.createdBy = actorId;

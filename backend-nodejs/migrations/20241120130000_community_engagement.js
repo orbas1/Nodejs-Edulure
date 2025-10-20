@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 const PARTICIPANT_STATUSES = ['going', 'interested', 'waitlisted', 'declined', 'checked_in'];
 const REMINDER_STATUSES = ['pending', 'processing', 'sent', 'failed', 'cancelled'];
 
@@ -25,7 +27,7 @@ export async function up(knex) {
       table.string('tier', 60).notNullable().defaultTo('bronze');
       table.timestamp('last_awarded_at');
       table.timestamp('last_activity_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -65,7 +67,7 @@ export async function up(knex) {
       table.string('reason', 240).notNullable();
       table.string('source', 120).notNullable().defaultTo('manual');
       table.string('reference_id', 120);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('awarded_at').defaultTo(knex.fn.now());
       table.index(['community_id', 'user_id'], 'community_points_user_idx');
       table.index(['community_id', 'awarded_at'], 'community_points_awarded_idx');
@@ -95,7 +97,7 @@ export async function up(knex) {
       table.integer('longest_streak_days').unsigned().notNullable().defaultTo(0);
       table.date('last_active_on');
       table.timestamp('resumed_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -144,7 +146,7 @@ export async function up(knex) {
       table.decimal('location_longitude', 10, 7);
       table.string('cover_image_url', 500);
       table.string('recurrence_rule', 240);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -177,7 +179,7 @@ export async function up(knex) {
       table.timestamp('rsvp_at').defaultTo(knex.fn.now());
       table.timestamp('check_in_at');
       table.timestamp('reminder_scheduled_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['event_id', 'user_id']);
       table.index(['event_id', 'status']);
     });
@@ -208,7 +210,7 @@ export async function up(knex) {
       table.timestamp('last_attempt_at');
       table.integer('attempt_count').unsigned().notNullable().defaultTo(0);
       table.string('failure_reason', 500);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['event_id', 'user_id', 'channel']);
       table.index(['status', 'remind_at']);
     });

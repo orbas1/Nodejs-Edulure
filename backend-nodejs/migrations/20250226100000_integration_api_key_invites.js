@@ -1,6 +1,8 @@
+const JSON_EMPTY_OBJECT = JSON.stringify({});
+
 export async function up(knex) {
   await knex.schema.createTable('integration_api_key_invites', (table) => {
-    table.uuid('id').primary();
+    table.uuid('id').primary().defaultTo(knex.raw('(UUID())'));
     table.string('provider', 64).notNullable();
     table.string('environment', 32).notNullable().defaultTo('production');
     table.string('alias', 128).notNullable();
@@ -24,9 +26,12 @@ export async function up(knex) {
     table.string('cancelled_by', 255).nullable();
     table.timestamp('last_sent_at').nullable();
     table.integer('send_count').unsigned().notNullable().defaultTo(1);
-    table.json('metadata').nullable();
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-    table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
+    table
+      .timestamp('updated_at')
+      .notNullable()
+      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
 
     table.index(['provider', 'environment'], 'integration_api_key_invites_provider_environment_idx');
     table.index(['owner_email'], 'integration_api_key_invites_owner_idx');

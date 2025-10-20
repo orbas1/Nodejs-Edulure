@@ -1,3 +1,6 @@
+const JSON_EMPTY_OBJECT = JSON.stringify({});
+const JSON_EMPTY_ARRAY = JSON.stringify([]);
+
 export async function up(knex) {
   await knex.schema.createTable('integration_sync_runs', (table) => {
     table.increments('id').primary();
@@ -16,9 +19,12 @@ export async function up(knex) {
     table.integer('records_failed').unsigned().notNullable().defaultTo(0);
     table.integer('records_skipped').unsigned().notNullable().defaultTo(0);
     table.text('last_error').nullable();
-    table.json('metadata').nullable();
+    table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-    table.timestamp('updated_at').notNullable().defaultTo(knex.fn.now());
+    table
+      .timestamp('updated_at')
+      .notNullable()
+      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
 
     table.unique(['integration', 'correlation_id'], 'integration_runs_correlation_unique');
     table.index(['integration', 'status', 'created_at'], 'integration_runs_status_created_idx');
@@ -43,7 +49,7 @@ export async function up(knex) {
     table.string('status', 24).notNullable();
     table.integer('retry_count').unsigned().notNullable().defaultTo(0);
     table.text('message').nullable();
-    table.json('payload').nullable();
+    table.json('payload').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.timestamp('occurred_at').notNullable().defaultTo(knex.fn.now());
 
     table.index(['integration', 'entity_type', 'entity_id'], 'integration_results_entity_idx');
@@ -56,9 +62,9 @@ export async function up(knex) {
     table.date('report_date').notNullable();
     table.string('status', 24).notNullable().defaultTo('completed');
     table.integer('mismatch_count').unsigned().notNullable().defaultTo(0);
-    table.json('missing_in_platform').nullable();
-    table.json('missing_in_integration').nullable();
-    table.json('extra_context').nullable();
+    table.json('missing_in_platform').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+    table.json('missing_in_integration').notNullable().defaultTo(JSON_EMPTY_ARRAY);
+    table.json('extra_context').notNullable().defaultTo(JSON_EMPTY_OBJECT);
     table.timestamp('generated_at').notNullable().defaultTo(knex.fn.now());
     table.string('correlation_id', 64).notNullable();
 

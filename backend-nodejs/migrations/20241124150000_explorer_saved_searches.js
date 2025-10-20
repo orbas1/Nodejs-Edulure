@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasTable = await knex.schema.hasTable('saved_searches');
   if (!hasTable) {
@@ -12,10 +14,10 @@ export async function up(knex) {
         .onDelete('CASCADE');
       table.string('name', 120).notNullable();
       table.string('search_query', 500).notNullable();
-      table.json('entity_types').notNullable().defaultTo('[]');
-      table.json('filters').notNullable().defaultTo('{}');
-      table.json('global_filters').notNullable().defaultTo('{}');
-      table.json('sort_preferences').notNullable().defaultTo('{}');
+      table.json('entity_types').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('filters').notNullable().defaultTo(jsonDefault(knex, {}));
+      table.json('global_filters').notNullable().defaultTo(jsonDefault(knex, {}));
+      table.json('sort_preferences').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('last_used_at');
       table.boolean('is_pinned').notNullable().defaultTo(false);
       table.timestamp('created_at').defaultTo(knex.fn.now());

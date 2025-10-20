@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 const ANNOUNCEMENTS_TABLE = 'provider_transition_announcements';
 const RESOURCES_TABLE = 'provider_transition_resources';
 const TIMELINE_TABLE = 'provider_transition_timeline_entries';
@@ -25,7 +27,7 @@ export async function up(knex) {
     table.timestamp('ack_deadline').nullable();
     table.string('owner_email', 150).nullable();
     table.string('tenant_scope', 80).notNullable().defaultTo('global');
-    table.json('metadata').defaultTo('{}');
+    table.json('metadata').defaultTo(jsonDefault(knex, {}));
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);
   });
@@ -86,7 +88,7 @@ export async function up(knex) {
     table.string('ack_method', 60).notNullable().defaultTo('portal');
     table.boolean('follow_up_required').notNullable().defaultTo(false);
     table.string('follow_up_notes', 500).nullable();
-    table.json('metadata').defaultTo('{}');
+    table.json('metadata').defaultTo(jsonDefault(knex, {}));
     table.timestamp('acknowledged_at').notNullable().defaultTo(knex.fn.now());
     table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
     timestampWithAutoUpdate(knex, table);

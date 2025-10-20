@@ -4,6 +4,34 @@ import db from '../config/database.js';
 
 const TABLE_NAME = 'integration_api_key_invites';
 
+function safeParseJson(value, fallback = {}) {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+
+  if (typeof value === 'object') {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function serialiseMetadata(metadata) {
+  if (metadata === undefined || metadata === null) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(metadata);
+  } catch (_error) {
+    return JSON.stringify({});
+  }
+}
+
 function mapRow(row) {
   if (!row) {
     return null;
@@ -21,15 +49,18 @@ function mapRow(row) {
     expiresAt: row.expires_at ? new Date(row.expires_at) : null,
     status: row.status,
     tokenHash: row.token_hash,
-    rotationIntervalDays: row.rotation_interval_days,
+    rotationIntervalDays:
+      row.rotation_interval_days !== undefined && row.rotation_interval_days !== null
+        ? Number(row.rotation_interval_days)
+        : null,
     keyExpiresAt: row.key_expires_at ? new Date(row.key_expires_at) : null,
     completedAt: row.completed_at ? new Date(row.completed_at) : null,
     completedBy: row.completed_by ?? null,
     cancelledAt: row.cancelled_at ? new Date(row.cancelled_at) : null,
     cancelledBy: row.cancelled_by ?? null,
     lastSentAt: row.last_sent_at ? new Date(row.last_sent_at) : null,
-    sendCount: row.send_count ?? 0,
-    metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata ?? {},
+    sendCount: row.send_count !== undefined && row.send_count !== null ? Number(row.send_count) : 0,
+    metadata: safeParseJson(row.metadata, {}),
     createdAt: row.created_at ? new Date(row.created_at) : null,
     updatedAt: row.updated_at ? new Date(row.updated_at) : null
   };
@@ -50,7 +81,6 @@ export default class IntegrationApiKeyInviteModel {
 
   static async create(payload, connection = db) {
     const insertPayload = {
-      id: payload.id,
       provider: payload.provider,
       environment: payload.environment,
       alias: payload.alias,
@@ -58,18 +88,37 @@ export default class IntegrationApiKeyInviteModel {
       owner_email: payload.ownerEmail,
       requested_by: payload.requestedBy,
       requested_at: payload.requestedAt ?? connection.fn.now(),
-      expires_at: payload.expiresAt,
+      expires_at: payload.expiresAt ?? null,
       status: payload.status ?? 'pending',
       token_hash: payload.tokenHash,
-      rotation_interval_days: payload.rotationIntervalDays,
+      rotation_interval_days: payload.rotationIntervalDays ?? null,
       key_expires_at: payload.keyExpiresAt ?? null,
-      metadata: payload.metadata ? JSON.stringify(payload.metadata) : null,
+      metadata: serialiseMetadata(payload.metadata),
       last_sent_at: payload.lastSentAt ?? connection.fn.now(),
       send_count: payload.sendCount ?? 1
     };
 
+    if (payload.id !== undefined && payload.id !== null) {
+      insertPayload.id = payload.id;
+    }
+
     const rows = await query(connection).insert(insertPayload).returning('*');
-    const row = Array.isArray(rows) ? rows[0] : await query(connection).where({ id: payload.id }).first();
+
+    let row = null;
+    if (Array.isArray(rows) && rows.length > 0) {
+      row = rows[0];
+    } else if (rows && typeof rows === 'object') {
+      row = rows;
+    } else {
+      const identifier = insertPayload.id ?? (Array.isArray(rows) ? undefined : rows);
+      const builder = query(connection);
+      if (identifier !== undefined && identifier !== null) {
+        row = await builder.where({ id: identifier }).first();
+      } else {
+        row = await builder.where({ token_hash: insertPayload.token_hash }).orderBy('created_at', 'desc').first();
+      }
+    }
+
     return mapRow(row);
   }
 
@@ -138,13 +187,13 @@ export default class IntegrationApiKeyInviteModel {
     if (updates.lastSentAt !== undefined) payload.last_sent_at = updates.lastSentAt;
     if (updates.sendCount !== undefined) payload.send_count = updates.sendCount;
     if (updates.rotationIntervalDays !== undefined) {
-      payload.rotation_interval_days = updates.rotationIntervalDays;
+      payload.rotation_interval_days = updates.rotationIntervalDays ?? null;
     }
     if (updates.keyExpiresAt !== undefined) {
-      payload.key_expires_at = updates.keyExpiresAt;
+      payload.key_expires_at = updates.keyExpiresAt ?? null;
     }
     if (updates.metadata !== undefined) {
-      payload.metadata = updates.metadata ? JSON.stringify(updates.metadata) : null;
+      payload.metadata = serialiseMetadata(updates.metadata);
     }
 
     await query(connection).where({ id }).update(payload);

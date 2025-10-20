@@ -5,6 +5,7 @@ import { env } from '../config/env.js';
 import db from '../config/database.js';
 import logger from '../config/logger.js';
 import MailService from './MailService.js';
+import AuditEventService from './AuditEventService.js';
 import IntegrationApiKeyModel from '../models/IntegrationApiKeyModel.js';
 import IntegrationApiKeyInviteModel from '../models/IntegrationApiKeyInviteModel.js';
 import IntegrationApiKeyService, {
@@ -22,6 +23,139 @@ const INVITE_STATUS = {
   CANCELLED: 'cancelled',
   EXPIRED: 'expired'
 };
+
+const AUDIT_ENTITY_TYPE = 'integration_api_key_invite';
+const DEFAULT_AUDIT_TENANT = 'integrations';
+
+function normaliseAuditRoles(roles) {
+  if (!roles) {
+    return [];
+  }
+
+  const values = Array.isArray(roles) ? roles : [roles];
+  const cleaned = values
+    .filter((role) => typeof role === 'string')
+    .map((role) => role.trim())
+    .filter((role) => role.length > 0);
+
+  return Array.from(new Set(cleaned));
+}
+
+function resolveAuditActorDescriptor({ actor = {}, fallbackEmail } = {}) {
+  const emailCandidate =
+    typeof actor.email === 'string' && actor.email.trim()
+      ? actor.email.trim().toLowerCase()
+      : typeof fallbackEmail === 'string' && fallbackEmail.trim()
+        ? fallbackEmail.trim().toLowerCase()
+        : null;
+
+  const roleCandidates = [];
+  if (typeof actor.role === 'string' && actor.role.trim()) {
+    roleCandidates.push(actor.role.trim());
+  }
+  roleCandidates.push(...normaliseAuditRoles(actor.roles));
+
+  const roles = Array.from(new Set(roleCandidates));
+  const primaryRole = roles[0] ?? 'external';
+
+  const actorId =
+    typeof actor.id === 'string' && actor.id.trim()
+      ? actor.id.trim()
+      : emailCandidate ?? 'external-user';
+
+  const actorType =
+    typeof actor.type === 'string' && actor.type.trim()
+      ? actor.type.trim()
+      : primaryRole === 'external'
+        ? 'external'
+        : 'user';
+
+  return {
+    auditActor: {
+      id: actorId,
+      type: actorType,
+      role: primaryRole
+    },
+    metadata: {
+      actorEmail: emailCandidate,
+      actorRoles: roles
+    }
+  };
+}
+
+function normaliseAuditRequestContext(context = {}) {
+  if (!context || typeof context !== 'object') {
+    return undefined;
+  }
+
+  const cleaned = {};
+
+  const assign = (key, transform = (value) => value) => {
+    const raw = context[key];
+    if (typeof raw === 'string') {
+      const value = transform(raw.trim());
+      if (value) {
+        cleaned[key] = value;
+      }
+    }
+  };
+
+  assign('requestId');
+  assign('traceId');
+  assign('spanId');
+  assign('ipAddress');
+  assign('userAgent');
+  assign('method', (value) => value.toUpperCase());
+  assign('path');
+
+  return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
+function buildAuditMetadata(metadata = {}) {
+  if (!metadata || typeof metadata !== 'object') {
+    return {};
+  }
+
+  return Object.entries(metadata).reduce((acc, [key, value]) => {
+    if (value === undefined) {
+      return acc;
+    }
+
+    if (Array.isArray(value)) {
+      const filtered = value
+        .map((entry) => (typeof entry === 'string' ? entry.trim() : entry))
+        .filter((entry) => {
+          if (entry === undefined || entry === null) {
+            return false;
+          }
+          if (typeof entry === 'string') {
+            return entry.length > 0;
+          }
+          return true;
+        });
+      if (filtered.length > 0) {
+        acc[key] = filtered;
+      }
+      return acc;
+    }
+
+    if (value instanceof Date) {
+      acc[key] = value.toISOString();
+      return acc;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        acc[key] = trimmed;
+      }
+      return acc;
+    }
+
+    acc[key] = value;
+    return acc;
+  }, {});
+}
 
 function resolveProviderMeta(provider) {
   return PROVIDER_CATALOGUE[provider] ?? { id: provider, label: provider };
@@ -127,6 +261,41 @@ function buildEmailPayload({ invite, claimUrl }) {
   };
 }
 
+function normaliseFulfilmentContext(context = {}) {
+  const { actorId, actorRoles, requestId, ipAddress, userAgent, origin } = context;
+
+  const cleaned = {};
+
+  if (typeof actorId === 'string' && actorId.trim()) {
+    cleaned.actorId = actorId.trim();
+  }
+
+  if (Array.isArray(actorRoles)) {
+    const roles = Array.from(new Set(actorRoles.filter((role) => typeof role === 'string' && role.trim().length > 0).map((role) => role.trim())));
+    if (roles.length > 0) {
+      cleaned.actorRoles = roles;
+    }
+  }
+
+  if (typeof requestId === 'string' && requestId.trim()) {
+    cleaned.requestId = requestId.trim();
+  }
+
+  if (typeof ipAddress === 'string' && ipAddress.trim()) {
+    cleaned.ipAddress = ipAddress.trim();
+  }
+
+  if (typeof userAgent === 'string' && userAgent.trim()) {
+    cleaned.userAgent = userAgent.trim();
+  }
+
+  if (typeof origin === 'string' && origin.trim()) {
+    cleaned.origin = origin.trim();
+  }
+
+  return cleaned;
+}
+
 export default class IntegrationApiKeyInviteService {
   constructor({
     inviteModel = IntegrationApiKeyInviteModel,
@@ -135,7 +304,9 @@ export default class IntegrationApiKeyInviteService {
     mailService = MailService,
     database = db,
     nowProvider = () => new Date(),
-    mailerLogger = logger.child({ component: 'integration-api-key-invite-service' })
+    mailerLogger = logger.child({ component: 'integration-api-key-invite-service' }),
+    auditLogger = new AuditEventService({ config: { tenantId: DEFAULT_AUDIT_TENANT } }),
+    auditTenantId = DEFAULT_AUDIT_TENANT
   } = {}) {
     this.inviteModel = inviteModel;
     this.apiKeyModel = apiKeyModel;
@@ -144,6 +315,8 @@ export default class IntegrationApiKeyInviteService {
     this.database = database;
     this.nowProvider = nowProvider;
     this.logger = mailerLogger;
+    this.auditLogger = auditLogger;
+    this.auditTenantId = auditTenantId ?? DEFAULT_AUDIT_TENANT;
   }
 
   sanitize(invite) {
@@ -167,7 +340,7 @@ export default class IntegrationApiKeyInviteService {
     requestedBy,
     requestedByName,
     apiKeyId
-  }) {
+  }, { actor = {}, requestContext = {} } = {}) {
     const normalisedProvider = normaliseProvider(provider);
     if (!normalisedProvider) {
       throw Object.assign(new Error('Provider is not recognised'), { status: 422 });
@@ -252,12 +425,38 @@ export default class IntegrationApiKeyInviteService {
     const claimUrl = buildClaimUrl(rawToken);
     await this.mailService.sendMail(buildEmailPayload({ invite, claimUrl }));
 
+    const sanitizedInvite = sanitizeInvite(invite);
     this.logger.info({ inviteId, ownerEmail: invite.ownerEmail }, 'Integration API key invite issued');
 
-    return { invite: sanitizeInvite(invite), token: rawToken, claimUrl };
+    const actorDescriptor = resolveAuditActorDescriptor({
+      actor,
+      fallbackEmail: requestedBy ?? sanitizedInvite.ownerEmail
+    });
+
+    await this.#recordAuditEvent({
+      eventType: 'integrations.invite.created',
+      entityId: sanitizedInvite.id,
+      actor: actorDescriptor.auditActor,
+      metadata: {
+        ...actorDescriptor.metadata,
+        provider: sanitizedInvite.provider,
+        environment: sanitizedInvite.environment,
+        alias: sanitizedInvite.alias,
+        ownerEmail: sanitizedInvite.ownerEmail,
+        rotationIntervalDays: sanitizedInvite.rotationIntervalDays,
+        expiresAt: sanitizedInvite.expiresAt,
+        requestedBy: requestedBy ?? null,
+        requestedByName: requestedByName ?? null,
+        requestOrigin: requestContext?.origin ?? null,
+        hasExistingKey: Boolean(sanitizedInvite.apiKeyId)
+      },
+      requestContext
+    });
+
+    return { invite: sanitizedInvite, token: rawToken, claimUrl };
   }
 
-  async resendInvite(id, { requestedBy: _requestedBy, requestedByName } = {}) {
+  async resendInvite(id, { requestedBy: _requestedBy, requestedByName, actor = {}, requestContext = {} } = {}) {
     const invite = await this.inviteModel.findById(id);
     if (!invite) {
       throw Object.assign(new Error('Invitation not found'), { status: 404 });
@@ -304,11 +503,34 @@ export default class IntegrationApiKeyInviteService {
     );
 
     this.logger.info({ inviteId: id, ownerEmail: updated.ownerEmail }, 'Integration API key invite resent');
+    const sanitizedInvite = sanitizeInvite(updated);
 
-    return { invite: sanitizeInvite(updated), token: rawToken, claimUrl };
+    const actorDescriptor = resolveAuditActorDescriptor({
+      actor,
+      fallbackEmail: sanitizedInvite.ownerEmail
+    });
+
+    await this.#recordAuditEvent({
+      eventType: 'integrations.invite.resent',
+      entityId: sanitizedInvite.id,
+      actor: actorDescriptor.auditActor,
+      metadata: {
+        ...actorDescriptor.metadata,
+        provider: sanitizedInvite.provider,
+        environment: sanitizedInvite.environment,
+        alias: sanitizedInvite.alias,
+        ownerEmail: sanitizedInvite.ownerEmail,
+        sendCount: sanitizedInvite.sendCount,
+        requestOrigin: requestContext?.origin ?? null,
+        requestedByName: sanitizedInvite.metadata?.requestedByName ?? requestedByName ?? null
+      },
+      requestContext
+    });
+
+    return { invite: sanitizedInvite, token: rawToken, claimUrl };
   }
 
-  async cancelInvite(id, { cancelledBy } = {}) {
+  async cancelInvite(id, { cancelledBy, actor = {}, requestContext = {} } = {}) {
     const invite = await this.inviteModel.findById(id);
     if (!invite) {
       throw Object.assign(new Error('Invitation not found'), { status: 404 });
@@ -333,7 +555,30 @@ export default class IntegrationApiKeyInviteService {
       this.database
     );
 
-    return sanitizeInvite(updated);
+    const sanitizedInvite = sanitizeInvite(updated);
+
+    const actorDescriptor = resolveAuditActorDescriptor({
+      actor,
+      fallbackEmail: cancelledBy ?? sanitizedInvite.ownerEmail
+    });
+
+    await this.#recordAuditEvent({
+      eventType: 'integrations.invite.cancelled',
+      entityId: sanitizedInvite.id,
+      actor: actorDescriptor.auditActor,
+      metadata: {
+        ...actorDescriptor.metadata,
+        provider: sanitizedInvite.provider,
+        environment: sanitizedInvite.environment,
+        alias: sanitizedInvite.alias,
+        ownerEmail: sanitizedInvite.ownerEmail,
+        cancelledBy: sanitizedInvite.cancelledBy ?? null,
+        requestOrigin: requestContext?.origin ?? null
+      },
+      requestContext
+    });
+
+    return sanitizedInvite;
   }
 
   async loadInviteByToken(token) {
@@ -370,7 +615,7 @@ export default class IntegrationApiKeyInviteService {
     };
   }
 
-  async submitInvitation(token, { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason }) {
+  async submitInvitation(token, { key, rotationIntervalDays, keyExpiresAt, actorEmail, actorName, reason }, context = {}) {
     const invite = await this.loadInviteByToken(token);
     const rotationDays = clampRotationInterval(rotationIntervalDays ?? invite.rotationIntervalDays, invite.provider);
     const expiresAt = keyExpiresAt ? new Date(keyExpiresAt) : invite.keyExpiresAt;
@@ -386,6 +631,14 @@ export default class IntegrationApiKeyInviteService {
       fulfilledByName: actorName ?? null,
       fulfilledReason: reason ?? null
     };
+
+    const fulfilmentContext = normaliseFulfilmentContext(context);
+    if (Object.keys(fulfilmentContext).length > 0) {
+      metadata.fulfilmentContext = fulfilmentContext;
+    }
+
+    const completedAt = this.nowProvider();
+    metadata.fulfilledAt = completedAt.toISOString();
 
     let result;
     await this.database.transaction(async (trx) => {
@@ -423,7 +676,7 @@ export default class IntegrationApiKeyInviteService {
         invite.id,
         {
           status: INVITE_STATUS.COMPLETED,
-          completedAt: this.nowProvider(),
+          completedAt,
           completedBy: actor,
           metadata,
           apiKeyId: result.id
@@ -432,12 +685,81 @@ export default class IntegrationApiKeyInviteService {
       );
     });
 
-    this.logger.info({ inviteId: invite.id, apiKeyId: result.id }, 'Integration API key invite fulfilled');
+    const completedInvite = await this.inviteModel.findById(invite.id);
+    const sanitizedInvite = sanitizeInvite(completedInvite);
+    const sanitizedKey = this.apiKeyService.sanitize(result);
+
+    this.logger.info(
+      {
+        inviteId: invite.id,
+        apiKeyId: sanitizedKey.id,
+        actor,
+        tokenFingerprint: context.tokenFingerprint ?? null,
+        ...fulfilmentContext
+      },
+      'Integration API key invite fulfilled'
+    );
+
+    const actorDescriptor = resolveAuditActorDescriptor({
+      actor: {
+        id: context.actorId,
+        roles: context.actorRoles,
+        role: Array.isArray(context.actorRoles) && context.actorRoles.length > 0 ? context.actorRoles[0] : undefined,
+        type: Array.isArray(context.actorRoles) && context.actorRoles.length > 0 ? 'user' : 'external',
+        email: actor
+      },
+      fallbackEmail: actor
+    });
+
+    await this.#recordAuditEvent({
+      eventType: 'integrations.invite.fulfilled',
+      entityId: sanitizedInvite.id,
+      actor: actorDescriptor.auditActor,
+      metadata: {
+        ...actorDescriptor.metadata,
+        provider: sanitizedInvite.provider,
+        environment: sanitizedInvite.environment,
+        alias: sanitizedInvite.alias,
+        ownerEmail: sanitizedInvite.ownerEmail,
+        rotationIntervalDays: rotationDays,
+        keyExpiresAt: sanitizedInvite.keyExpiresAt,
+        apiKeyId: sanitizedKey.id,
+        requestOrigin: context.origin ?? null,
+        tokenFingerprint: context.tokenFingerprint ?? null,
+        fulfilledReason: reason ?? null,
+        fulfilledByName: actorName ?? null
+      },
+      requestContext: context
+    });
 
     return {
-      invite: await this.inviteModel.findById(invite.id),
-      apiKey: this.apiKeyService.sanitize(result)
+      invite: completedInvite,
+      apiKey: sanitizedKey
     };
+  }
+
+  async #recordAuditEvent({ eventType, entityId, actor, metadata, requestContext, severity = 'notice' }) {
+    if (!this.auditLogger || typeof this.auditLogger.record !== 'function') {
+      return;
+    }
+
+    const auditMetadata = buildAuditMetadata(metadata);
+    const auditRequestContext = normaliseAuditRequestContext(requestContext);
+
+    try {
+      await this.auditLogger.record({
+        eventType,
+        entityType: AUDIT_ENTITY_TYPE,
+        entityId: String(entityId ?? 'unknown'),
+        severity,
+        actor: actor ?? { id: 'unknown', type: 'system', role: 'system' },
+        metadata: auditMetadata,
+        tenantId: this.auditTenantId,
+        requestContext: auditRequestContext
+      });
+    } catch (error) {
+      this.logger.warn({ err: error, eventType, entityId }, 'Failed to record integration invite audit event');
+    }
   }
 }
 
