@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownTrayIcon,
-  ArrowPathIcon,
   BookOpenIcon,
   BookmarkIcon,
   CreditCardIcon,
@@ -778,7 +777,6 @@ export default function Ebooks() {
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
   const [uploadState, setUploadState] = useState({});
-  const isAuthenticated = Boolean(token);
 
   const updateUploadState = useCallback((field, patch) => {
     setUploadState((current) => ({

@@ -39,7 +39,7 @@ function normaliseVideoEmbedUrl(rawUrl) {
 
 function createImagePreviewRenderer({ alt, fallbackText = 'Add an image URL to preview.' } = {}) {
   const baseClass = 'overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm';
-  return ({ value }) => {
+  const ImagePreviewRenderer = ({ value }) => {
     if (!value) {
       return <p className="text-xs text-slate-400">{fallbackText}</p>;
     }
@@ -50,11 +50,13 @@ function createImagePreviewRenderer({ alt, fallbackText = 'Add an image URL to p
       </figure>
     );
   };
+  ImagePreviewRenderer.displayName = 'ImagePreviewRenderer';
+  return ImagePreviewRenderer;
 }
 
 function createVideoPreviewRenderer({ fallbackText = 'Paste a video URL to preview.', rounded = true } = {}) {
   const containerClass = `${rounded ? 'overflow-hidden rounded-xl ' : ''}border border-slate-200 bg-slate-900/70 shadow-sm`;
-  return ({ value }) => {
+  const VideoPreviewRenderer = ({ value }) => {
     if (!value) {
       return <p className="text-xs text-slate-400">{fallbackText}</p>;
     }
@@ -82,6 +84,8 @@ function createVideoPreviewRenderer({ fallbackText = 'Paste a video URL to previ
       </video>
     );
   };
+  VideoPreviewRenderer.displayName = 'VideoPreviewRenderer';
+  return VideoPreviewRenderer;
 }
 
 function createExternalLinkPreviewRenderer({ label = 'Open link in new tab', icon = '↗', tone = 'primary' } = {}) {
@@ -92,7 +96,7 @@ function createExternalLinkPreviewRenderer({ label = 'Open link in new tab', ico
         ? 'text-indigo-600 hover:text-indigo-700'
         : 'text-primary hover:text-primary/80';
 
-  return ({ value }) => {
+  const ExternalLinkPreviewRenderer = ({ value }) => {
     if (!value) {
       return <p className="text-xs text-slate-400">Provide a URL to enable quick testing.</p>;
     }
@@ -109,6 +113,8 @@ function createExternalLinkPreviewRenderer({ label = 'Open link in new tab', ico
       </a>
     );
   };
+  ExternalLinkPreviewRenderer.displayName = 'ExternalLinkPreviewRenderer';
+  return ExternalLinkPreviewRenderer;
 }
 
 export function formatCurrency(amount, currency = 'USD') {

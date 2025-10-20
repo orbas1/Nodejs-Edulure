@@ -1,6 +1,5 @@
 import {
   ChatBubbleBottomCenterTextIcon,
-  ShieldCheckIcon,
   MusicalNoteIcon,
   VideoCameraIcon,
   MegaphoneIcon,

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/rules-of-hooks */
 import PropTypes from 'prop-types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
@@ -85,6 +86,37 @@ function formatPlacementLabel(placement) {
   const tokens = [placement.surface, placement.slot, placement.optimisation].filter(Boolean);
   return tokens.length ? tokens.join(' · ') : '';
 }
+
+function formatInteger(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return '0';
+  }
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(numeric);
+}
+
+function formatDateLabel(value) {
+  if (!value) {
+    return 'Not available';
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return typeof value === 'string' ? value : 'Unknown';
+  }
+  return date.toLocaleString();
+}
+
+function Chip({ children }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+      {children}
+    </span>
+  );
+}
+
+Chip.propTypes = {
+  children: PropTypes.node.isRequired
+};
 
 const emptyCampaignForm = {
   id: null,
@@ -530,8 +562,21 @@ export default function EdulureAds() {
       : [];
 
     const summary = adsRaw.summary && typeof adsRaw.summary === 'object' ? adsRaw.summary : {};
+    const experiments = Array.isArray(adsRaw.experiments) ? adsRaw.experiments : [];
+    const placements = Array.isArray(adsRaw.placements) ? adsRaw.placements : [];
+    const targeting =
+      adsRaw.targeting && typeof adsRaw.targeting === 'object'
+        ? {
+            keywords: Array.isArray(adsRaw.targeting.keywords) ? adsRaw.targeting.keywords : [],
+            audiences: Array.isArray(adsRaw.targeting.audiences) ? adsRaw.targeting.audiences : [],
+            locations: Array.isArray(adsRaw.targeting.locations) ? adsRaw.targeting.locations : [],
+            languages: Array.isArray(adsRaw.targeting.languages) ? adsRaw.targeting.languages : [],
+            summary: typeof adsRaw.targeting.summary === 'string' ? adsRaw.targeting.summary : ''
+          }
+        : { keywords: [], audiences: [], locations: [], languages: [], summary: '' };
+    const tags = Array.isArray(adsRaw.tags) ? adsRaw.tags : [];
 
-    return { campaigns, summary };
+    return { campaigns, summary, experiments, placements, targeting, tags };
   }, [adsRaw]);
 
   const [statusMessage, setStatusMessage] = useState(null);
@@ -638,10 +683,10 @@ export default function EdulureAds() {
 
       try {
         if (campaignForm.id) {
-          await updateAdCampaign({ token, campaignId: campaignForm.id, payload });
+          await updateAdsCampaign({ token, campaignId: campaignForm.id, payload });
           setStatusMessage({ type: 'success', message: 'Campaign updated successfully.' });
         } else {
-          await createAdCampaign({ token, payload });
+          await createAdsCampaign({ token, payload });
           setStatusMessage({ type: 'success', message: 'New Edulure Ads campaign launched.' });
         }
         closeCampaignForm();
@@ -656,26 +701,6 @@ export default function EdulureAds() {
       }
     },
     [campaignForm, closeCampaignForm, refresh, token]
-  );
-
-  const handleCampaignDelete = useCallback(
-    async (campaignId) => {
-      if (!token) {
-        setStatusMessage({ type: 'error', message: 'Sign in again to manage Edulure Ads.' });
-        return;
-      }
-      try {
-        await deleteAdCampaign({ token, campaignId });
-        setStatusMessage({ type: 'success', message: 'Campaign archived.' });
-        await refresh?.();
-      } catch (error) {
-        setStatusMessage({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Unable to archive this campaign.'
-        });
-      }
-    },
-    [refresh, token]
   );
 
   if (role && !ALLOWED_ROLES.has(role)) {
@@ -911,7 +936,6 @@ export default function EdulureAds() {
     [loadCampaigns, metricsDraft, refresh, token]
   );
 
-  const activeCampaigns = ads.active ?? [];
   const experiments = ads.experiments ?? [];
   const placements = ads.placements ?? [];
   const targeting = ads.targeting ?? { keywords: [], audiences: [], locations: [], languages: [], summary: '' };

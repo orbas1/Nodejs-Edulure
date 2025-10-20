@@ -182,6 +182,46 @@ export default function LearnerBookings() {
     []
   );
 
+  const filteredActive = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedStatus = statusFilter.toLowerCase();
+    return activeBookings.filter((booking) => {
+      const matchesStatus =
+        normalizedStatus === 'all' ||
+        (booking.status ?? '').toLowerCase().includes(normalizedStatus);
+      if (!matchesStatus) {
+        return false;
+      }
+      if (!normalizedSearch) {
+        return true;
+      }
+      const haystack = [booking.topic, booking.mentor, booking.notes, ...(booking.resources ?? [])]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+      return haystack.some((value) => value.includes(normalizedSearch));
+    });
+  }, [activeBookings, searchTerm, statusFilter]);
+
+  const filteredHistory = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    const normalizedStatus = statusFilter.toLowerCase();
+    return historicalBookings.filter((booking) => {
+      const matchesStatus =
+        normalizedStatus === 'all' ||
+        (booking.status ?? '').toLowerCase().includes(normalizedStatus);
+      if (!matchesStatus) {
+        return false;
+      }
+      if (!normalizedSearch) {
+        return true;
+      }
+      const haystack = [booking.topic, booking.mentor, booking.notes]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+      return haystack.some((value) => value.includes(normalizedSearch));
+    });
+  }, [historicalBookings, searchTerm, statusFilter]);
+
   const resetBookingForm = useCallback(() => {
     setBookingForm({
       topic: 'Mentorship session',
@@ -547,6 +587,153 @@ export default function LearnerBookings() {
     }
   }, [token]);
 
+  const closePrepShareModal = useCallback(() => {
+    setPrepShareModal({ ...prepShareDefaultState });
+    setPrepShareErrors([]);
+  }, []);
+
+  const openPrepShareModal = useCallback((booking) => {
+    setPrepShareModal({
+      open: true,
+      booking,
+      notes: booking.notes ?? '',
+      recipients: booking.mentorContact ?? booking.mentor ?? '',
+      includeResources: true,
+      channel: 'email'
+    });
+    setPrepShareErrors([]);
+  }, []);
+
+  const handlePrepShareChange = useCallback((event) => {
+    const { name, type, checked, value } = event.target;
+    setPrepShareModal((current) => ({
+      ...current,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  }, []);
+
+  const handlePrepShareSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!prepShareModal.booking) {
+        return;
+      }
+
+      const trimmedNotes = prepShareModal.notes?.trim() ?? '';
+      const recipients = (prepShareModal.recipients ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      const errors = [];
+      if (trimmedNotes.length < 10) {
+        errors.push('Provide at least a couple of sentences to brief your mentor.');
+      }
+      if (!recipients.length) {
+        errors.push('Include at least one recipient email or channel handle.');
+      }
+      if (errors.length) {
+        setPrepShareErrors(errors);
+        return;
+      }
+
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to share preparation notes.' });
+        return;
+      }
+
+      setPrepShareErrors([]);
+      setPendingAction(`share-${prepShareModal.booking.id}`);
+      setStatusMessage({
+        type: 'pending',
+        message: `Sharing prep notes for ${prepShareModal.booking.topic}…`
+      });
+      try {
+        await updateTutorBooking({
+          token,
+          bookingId: prepShareModal.booking.id,
+          payload: {
+            notes: trimmedNotes,
+            share: {
+              recipients,
+              channel: prepShareModal.channel,
+              includeResources: prepShareModal.includeResources
+            }
+          }
+        });
+        setActiveBookings((current) =>
+          current.map((booking) =>
+            booking.id === prepShareModal.booking.id
+              ? {
+                  ...booking,
+                  notes: trimmedNotes
+                }
+              : booking
+          )
+        );
+        setStatusMessage({
+          type: 'success',
+          message: `Prep notes shared with ${recipients.length} recipient${
+            recipients.length === 1 ? '' : 's'
+          }.`
+        });
+        closePrepShareModal();
+      } catch (shareError) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            shareError instanceof Error
+              ? shareError.message
+              : 'We were unable to share the preparation notes.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [closePrepShareModal, prepShareModal, setActiveBookings, token, updateTutorBooking]
+  );
+
+  const handleCompleteBooking = useCallback(
+    async (booking) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to complete sessions.' });
+        return;
+      }
+
+      setPendingAction(`complete-${booking.id}`);
+      setStatusMessage({ type: 'pending', message: `Wrapping up ${booking.topic}…` });
+      const firstMedia = (booking.resources ?? []).find((resource) =>
+        typeof resource === 'string' && /youtube|vimeo|loom/.test(resource.toLowerCase())
+      );
+      try {
+        await updateTutorBooking({ token, bookingId: booking.id, payload: { status: 'completed' } });
+        setActiveBookings((current) => current.filter((item) => item.id !== booking.id));
+        setHistoricalBookings((current) => [
+          {
+            ...booking,
+            status: 'Completed',
+            date: booking.date ?? new Date().toLocaleString(),
+            rating: booking.rating ?? '5',
+            recordingUrl: booking.recordingUrl ?? firstMedia ?? null
+          },
+          ...current
+        ]);
+        setStatusMessage({ type: 'success', message: `${booking.topic} has been archived.` });
+      } catch (completeError) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            completeError instanceof Error
+              ? completeError.message
+              : 'We were unable to complete this session.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [setActiveBookings, setHistoricalBookings, token, updateTutorBooking]
+  );
+
   if (!isLearner) {
     return (
       <DashboardStateMessage
@@ -576,46 +763,6 @@ export default function LearnerBookings() {
       />
     );
   }
-
-  const filteredActive = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    const normalizedStatus = statusFilter.toLowerCase();
-    return activeBookings.filter((booking) => {
-      const matchesStatus =
-        normalizedStatus === 'all' ||
-        (booking.status ?? '').toLowerCase().includes(normalizedStatus);
-      if (!matchesStatus) {
-        return false;
-      }
-      if (!normalizedSearch) {
-        return true;
-      }
-      const haystack = [booking.topic, booking.mentor, booking.notes, ...(booking.resources ?? [])]
-        .filter(Boolean)
-        .map((value) => String(value).toLowerCase());
-      return haystack.some((value) => value.includes(normalizedSearch));
-    });
-  }, [activeBookings, searchTerm, statusFilter]);
-
-  const filteredHistory = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLowerCase();
-    const normalizedStatus = statusFilter.toLowerCase();
-    return historicalBookings.filter((booking) => {
-      const matchesStatus =
-        normalizedStatus === 'all' ||
-        (booking.status ?? '').toLowerCase().includes(normalizedStatus);
-      if (!matchesStatus) {
-        return false;
-      }
-      if (!normalizedSearch) {
-        return true;
-      }
-      const haystack = [booking.topic, booking.mentor, booking.notes]
-        .filter(Boolean)
-        .map((value) => String(value).toLowerCase());
-      return haystack.some((value) => value.includes(normalizedSearch));
-    });
-  }, [historicalBookings, searchTerm, statusFilter]);
 
   const hasFilteredActive = filteredActive.length > 0;
   const hasFilteredHistory = filteredHistory.length > 0;
@@ -1231,149 +1378,3 @@ export default function LearnerBookings() {
     </div>
   );
 }
-  const closePrepShareModal = useCallback(() => {
-    setPrepShareModal({ ...prepShareDefaultState });
-    setPrepShareErrors([]);
-  }, []);
-
-  const openPrepShareModal = useCallback((booking) => {
-    setPrepShareModal({
-      open: true,
-      booking,
-      notes: booking.notes ?? '',
-      recipients: booking.mentorContact ?? booking.mentor ?? '',
-      includeResources: true,
-      channel: 'email'
-    });
-    setPrepShareErrors([]);
-  }, []);
-
-  const handlePrepShareChange = useCallback((event) => {
-    const { name, type, checked, value } = event.target;
-    setPrepShareModal((current) => ({
-      ...current,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-  }, []);
-
-  const handlePrepShareSubmit = useCallback(
-    async (event) => {
-      event.preventDefault();
-      if (!prepShareModal.booking) {
-        return;
-      }
-
-      const trimmedNotes = prepShareModal.notes?.trim() ?? '';
-      const recipients = (prepShareModal.recipients ?? '')
-        .split(',')
-        .map((value) => value.trim())
-        .filter(Boolean);
-
-      const errors = [];
-      if (trimmedNotes.length < 10) {
-        errors.push('Provide at least a couple of sentences to brief your mentor.');
-      }
-      if (!recipients.length) {
-        errors.push('Include at least one recipient email or channel handle.');
-      }
-      if (errors.length) {
-        setPrepShareErrors(errors);
-        return;
-      }
-
-      if (!token) {
-        setStatusMessage({ type: 'error', message: 'Sign in again to share preparation notes.' });
-        return;
-      }
-
-      setPrepShareErrors([]);
-      setPendingAction(`share-${prepShareModal.booking.id}`);
-      setStatusMessage({
-        type: 'pending',
-        message: `Sharing prep notes for ${prepShareModal.booking.topic}…`
-      });
-      try {
-        await updateTutorBooking({
-          token,
-          bookingId: prepShareModal.booking.id,
-          payload: {
-            notes: trimmedNotes,
-            share: {
-              recipients,
-              channel: prepShareModal.channel,
-              includeResources: prepShareModal.includeResources
-            }
-          }
-        });
-        setActiveBookings((current) =>
-          current.map((booking) =>
-            booking.id === prepShareModal.booking.id
-              ? {
-                  ...booking,
-                  notes: trimmedNotes
-                }
-              : booking
-          )
-        );
-        setStatusMessage({
-          type: 'success',
-          message: `Prep notes shared with ${recipients.length} recipient${
-            recipients.length === 1 ? '' : 's'
-          }.`
-        });
-        closePrepShareModal();
-      } catch (shareError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            shareError instanceof Error
-              ? shareError.message
-              : 'We were unable to share the preparation notes.'
-        });
-      } finally {
-        setPendingAction(null);
-      }
-    },
-    [closePrepShareModal, prepShareModal, setActiveBookings, token, updateTutorBooking]
-  );
-
-  const handleCompleteBooking = useCallback(
-    async (booking) => {
-      if (!token) {
-        setStatusMessage({ type: 'error', message: 'Sign in again to complete sessions.' });
-        return;
-      }
-
-      setPendingAction(`complete-${booking.id}`);
-      setStatusMessage({ type: 'pending', message: `Wrapping up ${booking.topic}…` });
-      const firstMedia = (booking.resources ?? []).find((resource) =>
-        typeof resource === 'string' && /youtube|vimeo|loom/.test(resource.toLowerCase())
-      );
-      try {
-        await updateTutorBooking({ token, bookingId: booking.id, payload: { status: 'completed' } });
-        setActiveBookings((current) => current.filter((item) => item.id !== booking.id));
-        setHistoricalBookings((current) => [
-          {
-            ...booking,
-            status: 'Completed',
-            date: booking.date ?? new Date().toLocaleString(),
-            rating: booking.rating ?? '5',
-            recordingUrl: booking.recordingUrl ?? firstMedia ?? null
-          },
-          ...current
-        ]);
-        setStatusMessage({ type: 'success', message: `${booking.topic} has been archived.` });
-      } catch (completeError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            completeError instanceof Error
-              ? completeError.message
-              : 'We were unable to complete this session.'
-        });
-      } finally {
-        setPendingAction(null);
-      }
-    },
-    [setActiveBookings, setHistoricalBookings, token, updateTutorBooking]
-  );

@@ -464,7 +464,7 @@ export default function Profile() {
   const [isLoadingFollowers, setIsLoadingFollowers] = useState(false);
   const [followersError, setFollowersError] = useState(null);
   const [pendingFollowers, setPendingFollowers] = useState([]);
-  const [isLoadingPendingFollowers, setIsLoadingPendingFollowers] = useState(false);
+  const [, setIsLoadingPendingFollowers] = useState(false);
   const [pendingFollowersError, setPendingFollowersError] = useState(null);
   const [following, setFollowing] = useState([]);
   const [followingMeta, setFollowingMeta] = useState({

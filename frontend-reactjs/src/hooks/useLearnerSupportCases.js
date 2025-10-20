@@ -204,7 +204,7 @@ function calculateStats(cases) {
 
 export default function useLearnerSupportCases(initialCases = [], options = {}) {
   const { session: sessionOverride, userId: userIdOverride } = options;
-  const auth = sessionOverride ? null : useAuth();
+  const auth = useAuth();
   const session = sessionOverride ?? auth?.session ?? null;
   const token = session?.tokens?.accessToken ?? null;
   const userId = userIdOverride ?? session?.user?.id ?? 'anonymous';
