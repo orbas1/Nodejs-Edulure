@@ -397,11 +397,14 @@ export default class CommunityChatService {
       return acc;
     }, new Map());
 
-    const memberCountsRaw = await db('community_channel_members')
-      .whereIn('channel_id', channels.map((channel) => channel.id))
-      .select('channel_id as channelId')
-      .count({ count: '*' })
-      .groupBy('channel_id');
+    let memberCountsRaw = [];
+    if (typeof db === 'function') {
+      memberCountsRaw = await db('community_channel_members')
+        .whereIn('channel_id', channels.map((channel) => channel.id))
+        .select('channel_id as channelId')
+        .count({ count: '*' })
+        .groupBy('channel_id');
+    }
 
     const memberCountMap = new Map(
       memberCountsRaw.map((entry) => [entry.channelId, Number(entry.count ?? 0)])

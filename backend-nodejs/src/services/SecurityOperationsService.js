@@ -410,6 +410,47 @@ export class SecurityOperationsService {
     };
   }
 
+  async deleteRisk({ riskId, tenantId = 'global', actor, reason, requestContext } = {}) {
+    if (!riskId) {
+      throw new Error('riskId is required to delete a risk');
+    }
+
+    const risk = await this.repository.getRiskById(riskId);
+    if (!risk) {
+      throw new Error(`Risk ${riskId} was not found`);
+    }
+
+    await this.repository.deleteRisk(riskId);
+
+    await this.#recordAudit({
+      eventType: 'risk.register.deleted',
+      tenantId: tenantId ?? risk.tenantId ?? 'global',
+      entityId: risk.riskUuid,
+      actor,
+      requestContext,
+      metadata: {
+        title: risk.title,
+        residualRiskScore: risk.residualRiskScore,
+        status: risk.status,
+        reason: reason ?? null
+      }
+    });
+
+    await this.#recordCdc({
+      entityName: 'security_risk_register',
+      entityId: risk.riskUuid,
+      operation: 'DELETE',
+      payload: {
+        riskId: risk.id,
+        status: risk.status,
+        residualRiskScore: risk.residualRiskScore,
+        reason: reason ?? null
+      }
+    });
+
+    return { success: true };
+  }
+
   async listAuditEvidence(params = {}) {
     return this.repository.listEvidence(params);
   }

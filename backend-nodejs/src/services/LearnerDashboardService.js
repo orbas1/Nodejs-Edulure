@@ -240,6 +240,53 @@ const DEFAULT_FINANCE_ALERTS = Object.freeze({
   notifyThresholdPercent: 80
 });
 
+const FIELD_SERVICE_PRIORITIES = new Set(['critical', 'high', 'standard', 'low']);
+
+function normaliseFieldServicePriority(value) {
+  if (!value) {
+    return 'standard';
+  }
+  const normalised = String(value).trim().toLowerCase();
+  if (FIELD_SERVICE_PRIORITIES.has(normalised)) {
+    return normalised;
+  }
+  if (['urgent', 'immediate'].includes(normalised)) {
+    return 'critical';
+  }
+  return 'standard';
+}
+
+function normaliseFieldServiceStatus(value, fallback = 'dispatched') {
+  if (!value) {
+    return fallback;
+  }
+  const normalised = String(value).trim().toLowerCase();
+  return normalised || fallback;
+}
+
+function normaliseFieldServiceAttachments(value) {
+  if (!value) {
+    return [];
+  }
+  const items = Array.isArray(value)
+    ? value
+    : String(value)
+        .split(',')
+        .map((entry) => entry.trim());
+  const seen = new Set();
+  const attachments = [];
+  items
+    .map((entry) => String(entry ?? '').trim())
+    .filter((entry) => entry.length > 0)
+    .forEach((entry) => {
+      if (!seen.has(entry.toLowerCase())) {
+        seen.add(entry.toLowerCase());
+        attachments.push(entry);
+      }
+    });
+  return attachments;
+}
+
 async function buildFieldServiceAssignment({ userId, order, connection = db }) {
   if (!order) return null;
   const [events, providers] = await Promise.all([
@@ -254,6 +301,12 @@ async function buildFieldServiceAssignment({ userId, order, connection = db }) {
     events,
     providers
   });
+
+  const customerAssignments = workspace.customer?.assignments ?? [];
+  const assignment =
+    customerAssignments.find((item) => item.id === order.id) ?? customerAssignments[0] ?? null;
+
+  return assignment ?? null;
 }
 
 export default class LearnerDashboardService {
@@ -1271,6 +1324,193 @@ export default class LearnerDashboardService {
       reference: entryId,
       message: 'Library entry removed',
       meta: { entryId }
+    });
+  }
+
+  static async createFieldServiceAssignment(userId, payload = {}) {
+    if (!userId) {
+      throw new Error('User is required to create a field service assignment');
+    }
+
+    const serviceType = typeof payload.serviceType === 'string' ? payload.serviceType.trim() : '';
+    if (!serviceType) {
+      const error = new Error('A service type is required to create a field service assignment');
+      error.status = 422;
+      throw error;
+    }
+
+    const priority = normaliseFieldServicePriority(payload.priority);
+    const status = normaliseFieldServiceStatus(payload.status, 'dispatched');
+    const attachments = normaliseFieldServiceAttachments(payload.attachments);
+    const owner = typeof payload.owner === 'string' ? payload.owner.trim() : payload.owner ?? null;
+    const metadata = {
+      ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}),
+      owner,
+      fieldNotes: payload.fieldNotes ?? null,
+      attachments
+    };
+
+    return db.transaction(async (trx) => {
+      const order = await FieldServiceOrderModel.createAssignment(
+        {
+          reference: payload.reference ?? generateReference('fs'),
+          customerUserId: userId,
+          providerId: payload.providerId ?? null,
+          serviceType,
+          priority,
+          status,
+          summary: payload.summary ?? null,
+          requestedAt: payload.requestedAt ?? undefined,
+          scheduledFor: payload.scheduledFor ?? null,
+          locationLabel: payload.locationLabel ?? null,
+          metadata
+        },
+        trx
+      );
+
+      await FieldServiceEventModel.create(
+        {
+          orderId: order.id,
+          eventType: 'dispatch_created',
+          status,
+          notes: payload.dispatchNotes ?? null,
+          author: userId,
+          metadata: {
+            owner,
+            attachments,
+            priority,
+            source: 'learner-dashboard'
+          }
+        },
+        trx
+      );
+
+      return buildFieldServiceAssignment({ userId, order, connection: trx });
+    });
+  }
+
+  static async updateFieldServiceAssignment(userId, orderId, payload = {}) {
+    const existing = await FieldServiceOrderModel.findByIdForCustomer(userId, orderId);
+    if (!existing) {
+      const error = new Error('Field service assignment not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const nextStatus = normaliseFieldServiceStatus(payload.status, existing.status);
+    const nextPriority =
+      payload.priority !== undefined
+        ? normaliseFieldServicePriority(payload.priority)
+        : existing.priority;
+    const attachments =
+      payload.attachments !== undefined
+        ? normaliseFieldServiceAttachments(payload.attachments)
+        : normaliseFieldServiceAttachments(existing.metadata?.attachments);
+
+    const owner =
+      payload.owner !== undefined
+        ? typeof payload.owner === 'string'
+          ? payload.owner.trim()
+          : payload.owner
+        : existing.metadata?.owner ?? null;
+
+    const metadata = {
+      ...(existing.metadata ?? {}),
+      ...(payload.metadata && typeof payload.metadata === 'object' ? payload.metadata : {}),
+      owner,
+      fieldNotes: payload.fieldNotes ?? existing.metadata?.fieldNotes ?? null,
+      attachments
+    };
+
+    return db.transaction(async (trx) => {
+      const updated = await FieldServiceOrderModel.updateById(
+        orderId,
+        {
+          status: nextStatus,
+          priority: nextPriority,
+          summary: payload.summary ?? existing.summary,
+          metadata,
+          providerId: payload.providerId ?? existing.providerId
+        },
+        trx
+      );
+
+      await FieldServiceEventModel.create(
+        {
+          orderId: updated.id,
+          eventType: payload.status ? `status_${nextStatus}` : 'assignment_updated',
+          status: nextStatus,
+          notes: payload.fieldNotes ?? null,
+          author: userId,
+          metadata: {
+            attachments,
+            owner,
+            updatedFields: Object.keys(payload)
+          }
+        },
+        trx
+      );
+
+      return buildFieldServiceAssignment({ userId, order: updated, connection: trx });
+    });
+  }
+
+  static async closeFieldServiceAssignment(userId, orderId, payload = {}) {
+    const existing = await FieldServiceOrderModel.findByIdForCustomer(userId, orderId);
+    if (!existing) {
+      const error = new Error('Field service assignment not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const resolution = payload.resolution ?? null;
+    const reason = payload.reason ?? null;
+    const attachments = normaliseFieldServiceAttachments(existing.metadata?.attachments);
+
+    return db.transaction(async (trx) => {
+      const metadata = {
+        ...(existing.metadata ?? {}),
+        attachments,
+        resolution,
+        closeNotes: payload.closeNotes ?? null,
+        closedAt: new Date().toISOString(),
+        closedBy: userId,
+        closureReason: reason ?? null
+      };
+
+      const updated = await FieldServiceOrderModel.updateById(
+        orderId,
+        {
+          status: 'closed',
+          metadata
+        },
+        trx
+      );
+
+      await FieldServiceEventModel.create(
+        {
+          orderId: updated.id,
+          eventType: 'job_completed',
+          status: 'closed',
+          notes: resolution,
+          author: userId,
+          metadata: {
+            resolution,
+            reason
+          }
+        },
+        trx
+      );
+
+      return buildAcknowledgement({
+        reference: updated.reference ?? generateReference('fs'),
+        message: 'Field service assignment closed',
+        meta: {
+          assignmentId: updated.id,
+          status: updated.status,
+          resolution
+        }
+      });
     });
   }
 

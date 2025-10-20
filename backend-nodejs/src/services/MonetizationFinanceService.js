@@ -44,11 +44,24 @@ async function runWithTransaction(connection, handler) {
 
 function getQueryConnection(connection) {
   const resolved = resolveConnection(connection);
+  if (!resolved) {
+    return null;
+  }
+
   if (resolved?.isTransaction?.() && typeof resolved !== 'function') {
     const fallback = resolveConnection();
     return isQueryableConnection(fallback) ? fallback : null;
   }
-  return isQueryableConnection(resolved) ? resolved : null;
+
+  if (isQueryableConnection(resolved)) {
+    return resolved;
+  }
+
+  if (resolved && typeof resolved === 'object' && typeof resolved.isTransaction !== 'function') {
+    return resolved;
+  }
+
+  return null;
 }
 
 function normaliseTenantId(tenantId) {
@@ -490,10 +503,26 @@ class MonetizationFinanceService {
         };
 
         const scheduleConnection = getQueryConnection(trx);
+        const writeConnection = scheduleConnection ??
+          (typeof trx === 'function' || typeof trx?.select === 'function' || typeof trx?.from === 'function'
+            ? trx
+            : typeof trx === 'object' && trx !== null
+              ? trx
+              : null);
+
         let schedule;
-        if (scheduleConnection) {
-          schedule = await MonetizationRevenueScheduleModel.create(schedulePayload, scheduleConnection);
-        } else {
+        if (writeConnection) {
+          try {
+            schedule = await MonetizationRevenueScheduleModel.create(schedulePayload, writeConnection);
+          } catch (error) {
+            serviceLogger.warn(
+              { err: error, tenantId, paymentIntentId: payment.id },
+              'Failed to persist monetization schedule with provided connection'
+            );
+          }
+        }
+
+        if (!schedule) {
           schedule = {
             id: null,
             ...schedulePayload,
