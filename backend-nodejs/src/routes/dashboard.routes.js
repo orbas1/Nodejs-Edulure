@@ -12,8 +12,72 @@ router.post('/learner/tutor-bookings/export', auth(), LearnerDashboardController
 router.post('/learner/courses/:courseId/goals', auth(), LearnerDashboardController.createCourseGoal);
 router.post('/learner/ebooks/:ebookId/resume', auth(), LearnerDashboardController.resumeEbook);
 router.post('/learner/ebooks/:ebookId/share', auth(), LearnerDashboardController.shareEbook);
+router.post('/learner/financial/payment-methods', auth(), LearnerDashboardController.createPaymentMethod);
+router.patch(
+  '/learner/financial/payment-methods/:methodId',
+  auth(),
+  LearnerDashboardController.updatePaymentMethod
+);
+router.delete(
+  '/learner/financial/payment-methods/:methodId',
+  auth(),
+  LearnerDashboardController.removePaymentMethod
+);
+router.delete(
+  '/learner/financial/billing-contacts/:contactId',
+  auth(),
+  LearnerDashboardController.deleteBillingContact
+);
 router.get('/learner/financial/invoices/:invoiceId/download', auth(), LearnerDashboardController.downloadInvoice);
 router.put('/learner/financial/preferences', auth(), LearnerDashboardController.updateBillingPreferences);
+router.post('/learner/growth/initiatives', auth(), LearnerDashboardController.createGrowthInitiative);
+router.patch(
+  '/learner/growth/initiatives/:initiativeId',
+  auth(),
+  LearnerDashboardController.updateGrowthInitiative
+);
+router.delete(
+  '/learner/growth/initiatives/:initiativeId',
+  auth(),
+  LearnerDashboardController.deleteGrowthInitiative
+);
+router.post(
+  '/learner/growth/initiatives/:initiativeId/experiments',
+  auth(),
+  LearnerDashboardController.createGrowthExperiment
+);
+router.patch(
+  '/learner/growth/initiatives/:initiativeId/experiments/:experimentId',
+  auth(),
+  LearnerDashboardController.updateGrowthExperiment
+);
+router.delete(
+  '/learner/growth/initiatives/:initiativeId/experiments/:experimentId',
+  auth(),
+  LearnerDashboardController.deleteGrowthExperiment
+);
+router.post('/learner/affiliate/channels', auth(), LearnerDashboardController.createAffiliateChannel);
+router.patch(
+  '/learner/affiliate/channels/:channelId',
+  auth(),
+  LearnerDashboardController.updateAffiliateChannel
+);
+router.delete(
+  '/learner/affiliate/channels/:channelId',
+  auth(),
+  LearnerDashboardController.deleteAffiliateChannel
+);
+router.post(
+  '/learner/affiliate/channels/:channelId/payouts',
+  auth(),
+  LearnerDashboardController.recordAffiliatePayout
+);
+router.post('/learner/ads/campaigns', auth(), LearnerDashboardController.createAdCampaign);
+router.patch('/learner/ads/campaigns/:campaignId', auth(), LearnerDashboardController.updateAdCampaign);
+router.delete('/learner/ads/campaigns/:campaignId', auth(), LearnerDashboardController.deleteAdCampaign);
+router.get('/learner/teach/application', auth(), LearnerDashboardController.getInstructorApplication);
+router.put('/learner/teach/application', auth(), LearnerDashboardController.saveInstructorApplication);
+router.post('/learner/teach/application/submit', auth(), LearnerDashboardController.submitInstructorApplication);
 router.post('/learner/live-sessions/:sessionId/join', auth(), LearnerDashboardController.joinLiveSession);
 router.post('/learner/live-sessions/:sessionId/check-in', auth(), LearnerDashboardController.checkInToLiveSession);
 router.post('/learner/communities/:communityId/actions', auth(), LearnerDashboardController.triggerCommunityAction);
