@@ -74,7 +74,7 @@ const DateTimeScalar = new GraphQLScalarType({
   }
 });
 
-function parseLiteral(ast) {
+function parseLiteralValue(ast) {
   switch (ast.kind) {
     case Kind.STRING:
     case Kind.BOOLEAN:
@@ -85,11 +85,11 @@ function parseLiteral(ast) {
     case Kind.NULL:
       return null;
     case Kind.LIST:
-      return ast.values.map(parseLiteral);
+      return ast.values.map(parseLiteralValue);
     case Kind.OBJECT: {
       const value = Object.create(null);
       for (const field of ast.fields) {
-        value[field.name.value] = parseLiteral(field.value);
+        value[field.name.value] = parseLiteralValue(field.value);
       }
       return value;
     }
@@ -107,7 +107,9 @@ const JSONScalar = new GraphQLScalarType({
   parseValue(value) {
     return value;
   },
-  parseLiteral
+  parseLiteral(ast) {
+    return parseLiteralValue(ast);
+  }
 });
 
 const FeedPostStatsType = new GraphQLObjectType({

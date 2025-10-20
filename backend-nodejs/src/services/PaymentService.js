@@ -129,6 +129,59 @@ function sanitizeMetadata(metadata) {
   return metadata;
 }
 
+function resolveQueryConnection(candidate) {
+  if (typeof candidate === 'function') {
+    return candidate;
+  }
+
+  if (candidate && typeof candidate === 'object') {
+    if (typeof candidate.connection === 'function') {
+      return candidate.connection.bind(candidate);
+    }
+
+    if (typeof candidate.query === 'function') {
+      return candidate.query.bind(candidate);
+    }
+
+    if (
+      typeof candidate.queryBuilder === 'function' ||
+      typeof candidate.select === 'function' ||
+      typeof candidate.from === 'function'
+    ) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function withEventConnection(options, candidate) {
+  const connection = resolveQueryConnection(candidate);
+  if (!connection) {
+    return options;
+  }
+
+  return { ...options, connection };
+}
+
+function isQueryableConnection(candidate) {
+  return (
+    typeof candidate === 'function' ||
+    typeof candidate?.select === 'function' ||
+    typeof candidate?.from === 'function' ||
+    typeof candidate?.queryBuilder === 'function'
+  );
+}
+
+function resolveFinanceConnection(candidate) {
+  const connection = resolveQueryConnection(candidate);
+  if (connection) {
+    return connection;
+  }
+
+  return isQueryableConnection(db) ? db : null;
+}
+
 function normalizeProviderStatus(provider, providerStatus) {
   if (provider === 'stripe') {
     switch (providerStatus) {
@@ -766,6 +819,8 @@ class PaymentService {
         return this.toApiIntent(intent);
       }
 
+      const financeConnection = resolveFinanceConnection(trx);
+
       let captureResponse;
       try {
         const paypalGateway = this.getPayPalGateway();
@@ -832,7 +887,9 @@ class PaymentService {
 
       await handleCommunityPaymentSucceeded(updatedIntent, trx);
       await handleDonationPaymentSucceeded(updatedIntent, trx);
-      await MonetizationFinanceService.handlePaymentCaptured(updatedIntent, trx);
+      if (financeConnection) {
+        await MonetizationFinanceService.handlePaymentCaptured(updatedIntent, financeConnection);
+      }
       await CommunityAffiliateCommissionService.handlePaymentCaptured(updatedIntent, trx);
 
       await webhookEventBusService.publish(
@@ -846,11 +903,13 @@ class PaymentService {
             : null,
           amountReceived: amountTotal
         }),
-        {
-          source: 'paypal-capture',
-          correlationId: updatedIntent.publicId ?? intent.publicId ?? capture.id,
-          connection: trx
-        }
+        withEventConnection(
+          {
+            source: 'paypal-capture',
+            correlationId: updatedIntent.publicId ?? intent.publicId ?? capture.id
+          },
+          trx
+        )
       );
 
       return this.toApiIntent(updatedIntent);
@@ -958,6 +1017,8 @@ class PaymentService {
     const charge = paymentIntentPayload.charges?.data?.[0];
 
     await db.transaction(async (trx) => {
+      const financeConnection = resolveFinanceConnection(trx);
+
       const intent = await PaymentIntentModel.findByProviderIntentId(providerIntentId, trx);
       if (!intent) {
         logger.warn({ providerIntentId }, 'Received success webhook for unknown payment intent');
@@ -1006,7 +1067,9 @@ class PaymentService {
 
       await handleCommunityPaymentSucceeded(updated, trx);
       await handleDonationPaymentSucceeded(updated, trx);
-      await MonetizationFinanceService.handlePaymentCaptured(updated, trx);
+      if (financeConnection) {
+        await MonetizationFinanceService.handlePaymentCaptured(updated, financeConnection);
+      }
       await CommunityAffiliateCommissionService.handlePaymentCaptured(updated, trx);
 
       await webhookEventBusService.publish(
@@ -1019,11 +1082,13 @@ class PaymentService {
           amountReceived,
           paymentMethodTypes: paymentIntentPayload.payment_method_types ?? []
         }),
-        {
-          source: 'stripe-webhook',
-          correlationId: updated.publicId ?? intent.publicId ?? providerIntentId,
-          connection: trx
-        }
+        withEventConnection(
+          {
+            source: 'stripe-webhook',
+            correlationId: updated.publicId ?? intent.publicId ?? providerIntentId
+          },
+          trx
+        )
       );
     });
   }
@@ -1033,6 +1098,8 @@ class PaymentService {
     const failure = paymentIntentPayload.last_payment_error;
 
     await db.transaction(async (trx) => {
+      const financeConnection = resolveFinanceConnection(trx);
+
       const intent = await PaymentIntentModel.findByProviderIntentId(providerIntentId, trx);
       if (!intent) {
         logger.warn({ providerIntentId }, 'Received failure webhook for unknown payment intent');
@@ -1058,11 +1125,13 @@ class PaymentService {
           providerErrorType: failure?.type ?? null,
           paymentMethodTypes: paymentIntentPayload.payment_method_types ?? []
         }),
-        {
-          source: 'stripe-webhook',
-          correlationId: updatedIntent.publicId ?? intent.publicId ?? providerIntentId,
-          connection: trx
-        }
+        withEventConnection(
+          {
+            source: 'stripe-webhook',
+            correlationId: updatedIntent.publicId ?? intent.publicId ?? providerIntentId
+          },
+          trx
+        )
       );
     });
   }
@@ -1113,19 +1182,21 @@ class PaymentService {
           },
           trx
         );
-        await MonetizationFinanceService.handleRefundProcessed(
-          {
-            paymentIntentId: intent.id,
-            amountCents: refundAmount,
-            currency: refundCurrency,
-            tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
-            processedAt: refund.created ? new Date(refund.created * 1000).toISOString() : new Date().toISOString(),
-            reason: refund.reason ?? null,
-            refundReference: refund.id,
-            source: 'stripe-webhook'
-          },
-          trx
-        );
+        if (financeConnection) {
+          await MonetizationFinanceService.handleRefundProcessed(
+            {
+              paymentIntentId: intent.id,
+              amountCents: refundAmount,
+              currency: refundCurrency,
+              tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
+              processedAt: refund.created ? new Date(refund.created * 1000).toISOString() : new Date().toISOString(),
+              reason: refund.reason ?? null,
+              refundReference: refund.id,
+              source: 'stripe-webhook'
+            },
+            financeConnection
+          );
+        }
         await PaymentIntentModel.incrementRefundAmount(intent.id, refundAmount, trx);
 
         trackPaymentRefundMetrics({
@@ -1148,11 +1219,13 @@ class PaymentService {
             refundCurrency,
             refundReason: refund.reason ?? null
           }),
-          {
-            source: 'stripe-webhook',
-            correlationId: updatedIntent.publicId ?? intent.publicId ?? providerIntentId,
-            connection: trx
-          }
+          withEventConnection(
+            {
+              source: 'stripe-webhook',
+              correlationId: updatedIntent.publicId ?? intent.publicId ?? providerIntentId
+            },
+            trx
+          )
         );
       }
 
@@ -1167,6 +1240,8 @@ class PaymentService {
 
   static async issueRefund({ paymentPublicId, amount, reason, requesterId }) {
     return db.transaction(async (trx) => {
+      const financeConnection = resolveFinanceConnection(trx);
+
       const intent = await PaymentIntentModel.lockByPublicId(paymentPublicId, trx);
       if (!intent) {
         const error = new Error('Payment intent not found.');
@@ -1241,12 +1316,32 @@ class PaymentService {
             requestedBy: requesterId ?? null,
             refundStatus: refund.status ?? 'pending'
           }),
-          {
-            source: 'payments-api',
-            correlationId: intent.publicId ?? paymentPublicId,
-            connection: trx
-          }
+          withEventConnection(
+            {
+              source: 'payments-api',
+              correlationId: intent.publicId ?? paymentPublicId
+            },
+            trx
+          )
         );
+
+        if (financeConnection) {
+          await MonetizationFinanceService.handleRefundProcessed(
+            {
+              paymentIntentId: intent.id,
+              amountCents: refundAmount,
+              currency: refundCurrency,
+              tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
+              processedAt: refund.created
+                ? new Date(refund.created * 1000).toISOString()
+                : new Date().toISOString(),
+              reason: refund.reason ?? reason ?? null,
+              refundReference: refund.id,
+              source: 'stripe-webhook'
+            },
+            financeConnection
+          );
+        }
       } else if (intent.provider === 'paypal') {
         if (!intent.providerCaptureId) {
           const error = new Error('Cannot issue a PayPal refund before the capture step.');
@@ -1299,11 +1394,13 @@ class PaymentService {
             requestedBy: requesterId ?? null,
             refundStatus: providerRefundStatus
           }),
-          {
-            source: 'payments-api',
-            correlationId: intent.publicId ?? paymentPublicId,
-            connection: trx
-          }
+          withEventConnection(
+            {
+              source: 'payments-api',
+              correlationId: intent.publicId ?? paymentPublicId
+            },
+            trx
+          )
         );
       } else {
         const error = new Error('Refunds are only supported for Stripe and PayPal payments.');
@@ -1330,19 +1427,21 @@ class PaymentService {
         trx
       );
 
-      await MonetizationFinanceService.handleRefundProcessed(
-        {
-          paymentIntentId: intent.id,
-          amountCents: refundAmount,
-          currency: intent.currency,
-          tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
-          processedAt: new Date().toISOString(),
-          reason: reason ?? null,
-          refundReference: providerRefundId,
-          source: 'payments-api'
-        },
-        trx
-      );
+      if (financeConnection) {
+        await MonetizationFinanceService.handleRefundProcessed(
+          {
+            paymentIntentId: intent.id,
+            amountCents: refundAmount,
+            currency: intent.currency,
+            tenantId: intent.metadata?.tenantId ?? intent.metadata?.tenant ?? 'global',
+            processedAt: new Date().toISOString(),
+            reason: reason ?? null,
+            refundReference: providerRefundId,
+            source: 'payments-api'
+          },
+          financeConnection
+        );
+      }
 
       trackPaymentRefundMetrics({
         provider: intent.provider,
@@ -1365,11 +1464,13 @@ class PaymentService {
           refundStatus: providerRefundStatus ?? finalIntent.status,
           refundId: providerRefundId
         }),
-        {
-          source: 'payments-api',
-          correlationId: finalIntent.publicId ?? paymentPublicId,
-          connection: trx
-        }
+        withEventConnection(
+          {
+            source: 'payments-api',
+            correlationId: finalIntent.publicId ?? paymentPublicId
+          },
+          trx
+        )
       );
 
       return this.toApiIntent(finalIntent);
