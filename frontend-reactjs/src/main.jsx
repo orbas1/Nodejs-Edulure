@@ -10,9 +10,33 @@ import { DashboardProvider } from './context/DashboardContext.jsx';
 import { RealtimeProvider } from './context/RealtimeContext.jsx';
 import { ServiceHealthProvider } from './context/ServiceHealthContext.jsx';
 
+function resolveRouterBasename(baseUrl = '/') {
+  if (!baseUrl || baseUrl === '/' || baseUrl === './') {
+    return '/';
+  }
+
+  let normalised = baseUrl;
+
+  if (normalised.startsWith('./')) {
+    normalised = normalised.slice(1);
+  }
+
+  if (!normalised.startsWith('/')) {
+    normalised = `/${normalised}`;
+  }
+
+  if (normalised.endsWith('/') && normalised !== '/') {
+    normalised = normalised.slice(0, -1);
+  }
+
+  return normalised || '/';
+}
+
+const routerBasename = resolveRouterBasename(import.meta.env.BASE_URL);
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={routerBasename === '/' ? undefined : routerBasename}>
       <LanguageProvider>
         <AuthProvider>
           <RuntimeConfigProvider>
