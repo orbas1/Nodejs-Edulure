@@ -1,4 +1,5 @@
 import db from '../config/database.js';
+import { safeJsonParse, safeJsonStringify } from '../utils/modelUtils.js';
 
 const TABLE = 'asset_ingestion_jobs';
 
@@ -23,7 +24,7 @@ export default class AssetIngestionJobModel {
       job_type: job.jobType,
       status: job.status ?? 'pending',
       attempts: job.attempts ?? 0,
-      result_metadata: JSON.stringify(job.resultMetadata ?? {})
+      result_metadata: safeJsonStringify(job.resultMetadata)
     };
     const [id] = await connection(TABLE).insert(payload);
     return this.findById(id, connection);
@@ -58,7 +59,7 @@ export default class AssetIngestionJobModel {
       .where({ id })
       .update({
         status: 'completed',
-        result_metadata: JSON.stringify(resultMetadata ?? {}),
+        result_metadata: safeJsonStringify(resultMetadata),
         completed_at: connection.fn.now(),
         updated_at: connection.fn.now()
       });
@@ -78,8 +79,7 @@ export default class AssetIngestionJobModel {
   static deserialize(row) {
     return {
       ...row,
-      resultMetadata:
-        typeof row.resultMetadata === 'string' ? JSON.parse(row.resultMetadata || '{}') : row.resultMetadata
+      resultMetadata: safeJsonParse(row.resultMetadata, {})
     };
   }
 }
