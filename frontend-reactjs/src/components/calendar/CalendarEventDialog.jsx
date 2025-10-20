@@ -18,7 +18,11 @@ const DEFAULT_FORM = {
   location: '',
   facilitator: '',
   capacity: '',
-  resources: ''
+  resources: '',
+  ctaLabel: '',
+  ctaUrl: '',
+  mediaUrl: '',
+  tags: ''
 };
 
 const FORM_LABEL_CLASS = 'text-sm font-medium text-slate-700';
@@ -32,7 +36,11 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
 
   useEffect(() => {
     if (isOpen) {
-      setForm({ ...DEFAULT_FORM, ...initialData });
+      setForm({
+        ...DEFAULT_FORM,
+        ...initialData,
+        tags: Array.isArray(initialData?.tags) ? initialData.tags.join(', ') : initialData?.tags ?? ''
+      });
       setErrors({});
       requestAnimationFrame(() => {
         dialogRef.current?.focus();
@@ -247,6 +255,58 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
               onChange={(event) => updateField('resources', event.target.value)}
               placeholder="Drop any prep docs, companion podcasts, or community posts."
             />
+          </div>
+          <div>
+            <label className={FORM_LABEL_CLASS} htmlFor="calendar-cta-label">
+              Call-to-action label
+            </label>
+            <input
+              id="calendar-cta-label"
+              className={FORM_INPUT_CLASS}
+              value={form.ctaLabel}
+              onChange={(event) => updateField('ctaLabel', event.target.value)}
+              placeholder="Join the cohort waitlist"
+            />
+          </div>
+          <div>
+            <label className={FORM_LABEL_CLASS} htmlFor="calendar-cta-url">
+              Call-to-action URL
+            </label>
+            <input
+              id="calendar-cta-url"
+              className={FORM_INPUT_CLASS}
+              value={form.ctaUrl}
+              onChange={(event) => updateField('ctaUrl', event.target.value)}
+              placeholder="https://edulure.test/apply"
+            />
+          </div>
+          <div className="md:col-span-2">
+            <label className={FORM_LABEL_CLASS} htmlFor="calendar-media-url">
+              Highlight media URL
+            </label>
+            <input
+              id="calendar-media-url"
+              className={FORM_INPUT_CLASS}
+              value={form.mediaUrl}
+              onChange={(event) => updateField('mediaUrl', event.target.value)}
+              placeholder="https://cdn.edulure.test/assets/launch-trailer.mp4"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Supports hosted images, mp4 clips, or YouTube/Vimeo links for richer previews.
+            </p>
+          </div>
+          <div className="md:col-span-2">
+            <label className={FORM_LABEL_CLASS} htmlFor="calendar-tags">
+              Tags
+            </label>
+            <input
+              id="calendar-tags"
+              className={FORM_INPUT_CLASS}
+              value={form.tags}
+              onChange={(event) => updateField('tags', event.target.value)}
+              placeholder="community, revenue, onboarding"
+            />
+            <p className="mt-1 text-xs text-slate-500">Comma separate tags to power filters and feed promotion.</p>
           </div>
         </div>
 
