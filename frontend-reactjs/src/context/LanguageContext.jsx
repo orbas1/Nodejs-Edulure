@@ -44,6 +44,24 @@ const TRANSLATIONS = {
           ebooks: 'E-books',
           tutors: '1:1 Tutors'
         },
+        cards: {
+          liveSession: {
+            title: 'Live cohort jam',
+            meta: 'Starts in 12 hours',
+            cta: 'Set reminder'
+          },
+          community: {
+            title: 'Community pulse',
+            status: 'Live now',
+            headline: 'Weekly build circle',
+            subhead: 'Swap launches, feedback, and wins with peers'
+          },
+          resource: {
+            title: 'Creator tea digest',
+            meta: 'Fresh drops every Monday',
+            cta: 'Read now'
+          }
+        },
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
       }
@@ -75,6 +93,24 @@ const TRANSLATIONS = {
           courses: 'Cours',
           ebooks: 'E-books',
           tutors: 'Mentors 1:1'
+        },
+        cards: {
+          liveSession: {
+            title: 'Session de cohorte en direct',
+            meta: 'Commence dans 12 heures',
+            cta: 'Définir un rappel'
+          },
+          community: {
+            title: 'Pouls de la communauté',
+            status: 'En direct',
+            headline: 'Cercle hebdomadaire de création',
+            subhead: 'Partagez lancements, retours et succès entre pairs'
+          },
+          resource: {
+            title: 'Digest des créateurs',
+            meta: 'Nouveautés chaque lundi',
+            cta: 'Lire maintenant'
+          }
         },
         instructorPill: 'Je suis instructeur·rice',
         illustrationAlt: "Collage d'instructeurs et d'apprenants en collaboration"
@@ -108,6 +144,24 @@ const TRANSLATIONS = {
           ebooks: 'E-books',
           tutors: 'Mentores 1:1'
         },
+        cards: {
+          liveSession: {
+            title: 'Sesión de cohorte en vivo',
+            meta: 'Comienza en 12 horas',
+            cta: 'Crear recordatorio'
+          },
+          community: {
+            title: 'Pulso de la comunidad',
+            status: 'En vivo',
+            headline: 'Círculo semanal de creación',
+            subhead: 'Comparte lanzamientos, feedback y logros con pares'
+          },
+          resource: {
+            title: 'Digest de creador/a',
+            meta: 'Novedades cada lunes',
+            cta: 'Leer ahora'
+          }
+        },
         instructorPill: 'Soy instructor/a',
         illustrationAlt: 'Collage de instructores y estudiantes colaborando'
       }
@@ -139,6 +193,24 @@ const TRANSLATIONS = {
           courses: 'Cursos',
           ebooks: 'E-books',
           tutors: 'Mentores 1:1'
+        },
+        cards: {
+          liveSession: {
+            title: 'Sessão de coorte ao vivo',
+            meta: 'Começa em 12 horas',
+            cta: 'Criar lembrete'
+          },
+          community: {
+            title: 'Pulso da comunidade',
+            status: 'Ao vivo agora',
+            headline: 'Círculo semanal de construção',
+            subhead: 'Compartilhe lançamentos, feedbacks e conquistas com os pares'
+          },
+          resource: {
+            title: 'Digest do criador',
+            meta: 'Novidades toda segunda-feira',
+            cta: 'Ler agora'
+          }
         },
         instructorPill: 'Sou instrutor(a)',
         illustrationAlt: 'Colagem de instrutores e aprendizes colaborando'
@@ -172,6 +244,24 @@ const TRANSLATIONS = {
           ebooks: 'E-book',
           tutors: 'Tutor 1:1'
         },
+        cards: {
+          liveSession: {
+            title: 'Sessione di coorte live',
+            meta: 'Inizia tra 12 ore',
+            cta: 'Imposta promemoria'
+          },
+          community: {
+            title: 'Bussola della community',
+            status: 'Live ora',
+            headline: 'Cerchio di build settimanale',
+            subhead: 'Condividi lanci, feedback e successi con i pari'
+          },
+          resource: {
+            title: 'Digest del creator',
+            meta: 'Nuove uscite ogni lunedì',
+            cta: 'Leggi ora'
+          }
+        },
         instructorPill: 'Sono un* istruttore/trice',
         illustrationAlt: 'Collage di istruttori e studenti che collaborano'
       }
@@ -203,6 +293,24 @@ const TRANSLATIONS = {
           courses: 'Kursy',
           ebooks: 'E-booki',
           tutors: 'Tutorzy 1:1'
+        },
+        cards: {
+          liveSession: {
+            title: 'Sesja kohorty na żywo',
+            meta: 'Start za 12 godzin',
+            cta: 'Ustaw przypomnienie'
+          },
+          community: {
+            title: 'Puls społeczności',
+            status: 'Na żywo',
+            headline: 'Cotygodniowy krąg twórców',
+            subhead: 'Dzielenie się premierami, feedbackiem i sukcesami z innymi'
+          },
+          resource: {
+            title: 'Digest twórców',
+            meta: 'Nowości w każdy poniedziałek',
+            cta: 'Czytaj teraz'
+          }
         },
         instructorPill: 'Jestem instruktorem',
         illustrationAlt: 'Kolaż instruktorów i uczniów współpracujących ze sobą'
@@ -236,6 +344,24 @@ const TRANSLATIONS = {
           ebooks: 'ई-पुस्तकें',
           tutors: '1:1 ट्यूटर'
         },
+        cards: {
+          liveSession: {
+            title: 'लाइव कोहोर्ट सत्र',
+            meta: '12 घंटे में शुरू होगा',
+            cta: 'रिमाइंडर सेट करें'
+          },
+          community: {
+            title: 'समुदाय की धड़कन',
+            status: 'अभी लाइव',
+            headline: 'साप्ताहिक बिल्ड सर्कल',
+            subhead: 'साथियों के साथ लॉन्च, फीडबैक और जीत साझा करें'
+          },
+          resource: {
+            title: 'क्रिएटर टी डाइजेस्ट',
+            meta: 'हर सोमवार नई सामग्री',
+            cta: 'अभी पढ़ें'
+          }
+        },
         instructorPill: 'मैं प्रशिक्षक हूँ',
         illustrationAlt: 'प्रशिक्षकों और शिक्षार्थियों के सहयोग का कोलाज'
       }
@@ -267,6 +393,24 @@ const TRANSLATIONS = {
           courses: 'الدورات',
           ebooks: 'الكتب الإلكترونية',
           tutors: 'مدرّسون فرديون'
+        },
+        cards: {
+          liveSession: {
+            title: 'جلسة دفعة مباشرة',
+            meta: 'تبدأ خلال 12 ساعة',
+            cta: 'تعيين تذكير'
+          },
+          community: {
+            title: 'نبض المجتمع',
+            status: 'مباشر الآن',
+            headline: 'حلقة بناء أسبوعية',
+            subhead: 'شارك الإطلاقات والتعقيبات والنجاحات مع الأقران'
+          },
+          resource: {
+            title: 'ملخص المبدعين',
+            meta: 'إصدارات جديدة كل يوم اثنين',
+            cta: 'اقرأ الآن'
+          }
         },
         instructorPill: 'أنا مدرّس/ة',
         illustrationAlt: 'مجموعة صور لمدربين ومتعلّمين يتعاونون'
@@ -300,6 +444,24 @@ const TRANSLATIONS = {
           ebooks: 'E-Books',
           tutors: '1:1 Tutor:innen'
         },
+        cards: {
+          liveSession: {
+            title: 'Live-Kohorten-Session',
+            meta: 'Startet in 12 Stunden',
+            cta: 'Erinnerung setzen'
+          },
+          community: {
+            title: 'Community-Puls',
+            status: 'Jetzt live',
+            headline: 'Wöchentlicher Build-Circle',
+            subhead: 'Teile Launches, Feedback und Erfolge mit Peers'
+          },
+          resource: {
+            title: 'Creator Tea Digest',
+            meta: 'Neue Drops jeden Montag',
+            cta: 'Jetzt lesen'
+          }
+        },
         instructorPill: 'Ich bin Trainer:in',
         illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
       }
@@ -331,6 +493,24 @@ const TRANSLATIONS = {
           courses: 'Курсы',
           ebooks: 'Электронные книги',
           tutors: 'Наставники 1:1'
+        },
+        cards: {
+          liveSession: {
+            title: 'Живой созвон потока',
+            meta: 'Старт через 12 часов',
+            cta: 'Поставить напоминание'
+          },
+          community: {
+            title: 'Пульс сообщества',
+            status: 'В эфире',
+            headline: 'Еженедельный круг создателей',
+            subhead: 'Делитесь релизами, обратной связью и победами с коллегами'
+          },
+          resource: {
+            title: 'Дайджест создателя',
+            meta: 'Новые выпуски каждый понедельник',
+            cta: 'Читать сейчас'
+          }
         },
         instructorPill: 'Я преподаватель',
         illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'

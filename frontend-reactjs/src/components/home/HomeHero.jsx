@@ -23,8 +23,6 @@ export default function HomeHero() {
   const primaryCta = t('home.hero.ctaPrimary', 'Get started');
   const secondaryCta = t('home.hero.ctaSecondary', 'Preview the community');
   const instructorLabel = t('home.hero.instructorPill', "I'm an instructor");
-  const illustrationSrc = t('home.hero.illustrationSrc', '');
-  const hasIllustration = illustrationSrc.trim().length > 0;
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
@@ -80,29 +78,73 @@ export default function HomeHero() {
           </div>
         </div>
         <div className="relative w-full lg:w-1/2">
-          <div className="relative mx-auto flex max-w-xl items-center justify-center">
-            <div className="absolute -left-12 -top-12 h-28 w-28 rounded-full bg-primary/40 blur-3xl" />
-            <div className="absolute -right-16 bottom-8 h-32 w-32 rounded-full bg-emerald-500/30 blur-3xl" />
-            <div className="absolute -bottom-12 left-1/3 h-24 w-24 -translate-x-1/2 rounded-full border border-white/30 bg-transparent" />
-            <div className="absolute right-8 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/10 text-xs font-semibold uppercase tracking-[0.3em] text-white/60 shadow-lg backdrop-blur-md animate-pulse">
+          <div className="relative mx-auto max-w-xl">
+            <span className="sr-only">{t('home.hero.illustrationAlt', 'Collage of instructors and learners collaborating')}</span>
+            <div className="absolute -left-16 -top-20 h-36 w-36 rounded-full bg-primary/40 blur-3xl" aria-hidden="true" />
+            <div className="absolute -right-10 bottom-0 h-48 w-48 rounded-full bg-emerald-500/30 blur-[140px]" aria-hidden="true" />
+            <div className="absolute left-12 top-12 h-16 w-16 rounded-full border border-white/20" aria-hidden="true" />
+            <div className="absolute right-10 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/30 bg-white/10 text-xs font-semibold uppercase tracking-[0.3em] text-white/60 shadow-lg backdrop-blur-md animate-pulse" aria-hidden="true">
               Flow
             </div>
-            <div className="relative overflow-hidden rounded-[3rem] border border-white/15 bg-white/5 p-6 shadow-[0_40px_80px_-32px_rgba(15,23,42,0.7)] backdrop-blur-xl">
-              <div className="absolute inset-0 animate-pulse rounded-[3rem] bg-gradient-to-br from-white/10 via-transparent to-white/5" />
-              {hasIllustration ? (
-                <img
-                  src={illustrationSrc}
-                  alt={t('home.hero.illustrationAlt', 'Collage of instructors and learners collaborating')}
-                  className="relative z-10 w-full max-w-md rounded-[2.5rem] object-cover shadow-2xl"
-                />
-              ) : (
-                <div
-                  className="relative z-10 flex aspect-[4/5] w-full max-w-md items-center justify-center rounded-[2.5rem] bg-[radial-gradient(circle_at_top,_rgba(79,70,229,0.35),_rgba(14,116,144,0.2)_60%,_rgba(15,23,42,0.9))] text-sm font-semibold uppercase tracking-[0.3em] text-white/40"
-                  aria-hidden="true"
-                >
-                  Edulure
+            <div className="relative grid gap-6 rounded-[3rem] border border-white/10 bg-white/5 p-8 shadow-[0_40px_80px_-32px_rgba(15,23,42,0.7)] backdrop-blur-xl">
+              <div className="absolute inset-0 rounded-[3rem] bg-gradient-to-br from-white/10 via-transparent to-white/5" aria-hidden="true" />
+              <div className="relative grid gap-5">
+                <div className="relative flex items-center gap-4 rounded-3xl border border-white/20 bg-slate-950/60 p-5 shadow-[0_24px_48px_-32px_rgba(56,189,248,0.5)]">
+                  <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-indigo-400 text-lg font-semibold text-white">
+                    <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-400" aria-hidden="true" />
+                    ✨
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">{t('home.hero.cards.liveSession.title', 'Live cohort jam')}</p>
+                    <p className="text-xs text-white/70">{t('home.hero.cards.liveSession.meta', 'Starts in 12 hours')}</p>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1 text-xs text-emerald-300">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                    {t('home.hero.cards.liveSession.cta', 'Set reminder')}
+                  </div>
                 </div>
-              )}
+                <div className="relative grid gap-4 rounded-[2.5rem] border border-white/15 bg-gradient-to-br from-indigo-500/30 via-slate-900/70 to-transparent p-6 shadow-[0_20px_60px_-28px_rgba(129,140,248,0.7)]">
+                  <div className="flex items-center justify-between text-xs uppercase tracking-[0.35em] text-white/60">
+                    <span>{t('home.hero.cards.community.title', 'Community pulse')}</span>
+                    <span className="inline-flex items-center gap-1 text-[0.65rem] text-emerald-300">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                      {t('home.hero.cards.community.status', 'Live now')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex -space-x-3">
+                      {[...Array(4)].map((_, index) => (
+                        <span
+                          // eslint-disable-next-line react/no-array-index-key
+                          key={index}
+                          className="relative inline-flex h-12 w-12 items-center justify-center rounded-full border-2 border-slate-900 bg-white/90 text-sm font-semibold text-slate-900"
+                          aria-hidden="true"
+                        >
+                          {['AK', 'JR', 'MT', 'LS'][index]}
+                        </span>
+                      ))}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{t('home.hero.cards.community.headline', 'Weekly build circle')}</p>
+                      <p className="text-xs text-white/70">{t('home.hero.cards.community.subhead', 'Swap launches, feedback, and wins with peers')}</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="relative flex items-center justify-between rounded-3xl border border-white/10 bg-white/5 p-5 text-xs text-white/70">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/20 text-base text-emerald-200">
+                      ☕
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{t('home.hero.cards.resource.title', 'Creator tea digest')}</p>
+                      <p>{t('home.hero.cards.resource.meta', 'Fresh drops every Monday')}</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-white/20 px-3 py-1 text-[0.65rem] uppercase tracking-[0.25em] text-white/60">
+                    {t('home.hero.cards.resource.cta', 'Read now')}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
