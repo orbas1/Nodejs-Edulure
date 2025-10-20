@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS learner_support_cases (
   INDEX idx_support_cases_user (user_id),
   INDEX idx_support_cases_status (status),
   CONSTRAINT fk_support_cases_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS learner_support_messages (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -29,4 +29,4 @@ CREATE TABLE IF NOT EXISTS learner_support_messages (
   INDEX idx_support_messages_case (case_id),
   INDEX idx_support_messages_created_at (created_at),
   CONSTRAINT fk_support_messages_case FOREIGN KEY (case_id) REFERENCES learner_support_cases(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

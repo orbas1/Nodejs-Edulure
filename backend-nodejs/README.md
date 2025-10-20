@@ -23,12 +23,17 @@ Key environment variables are validated on boot. Ensure the following are set be
 - `JWT_REFRESH_SECRET` – 32+ character secret for refresh token HMAC hashing.
 - `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` – database credentials. Set `DB_PROVISION_USER=true` only for local installs.
 - `TOKEN_EXPIRY_MINUTES`, `REFRESH_TOKEN_EXPIRY_DAYS` – optional overrides for token lifetimes.
+- `SESSION_VALIDATION_CACHE_TTL_MS`, `MAX_ACTIVE_SESSIONS_PER_USER` – govern how aggressively session state is cached and the maximum concurrent refresh sessions for any account.
 - `TWO_FACTOR_REQUIRED_ROLES` – comma-separated list of roles that must complete multi-factor authentication (e.g. `admin`).
 - `TWO_FACTOR_ISSUER`, `TWO_FACTOR_ENCRYPTION_KEY` – customise authenticator branding and secret encryption. Defaults derive from JWT refresh configuration for local environments.
+- `DATA_ENCRYPTION_PRIMARY_KEY`, `DATA_ENCRYPTION_ACTIVE_KEY_ID`, `DATA_ENCRYPTION_FALLBACK_KEYS` – enable at-rest encryption and staged key rotation for sensitive columns and document blobs.
 - `LOG_SERVICE_NAME`, `LOG_REDACTED_FIELDS` – customise log metadata and extend default secret/PII redaction.
+- `AUDIT_LOG_*` – define tenancy, redaction, and payload limits for immutable audit trails exposed to compliance teams.
 - `TRACE_HEADER_NAME`, `TRACING_SAMPLE_RATE` – tune inbound trace propagation and sampling for distributed telemetry.
 - `METRICS_ENABLED`, `METRICS_USERNAME`/`METRICS_PASSWORD` or `METRICS_BEARER_TOKEN`, `METRICS_ALLOWED_IPS` – secure Prometheus access for operations tooling.
+- `SLO_*` – configure objective windows, burn rates, and thresholds powering the readiness dashboards.
 - `DATA_RETENTION_ENABLED`, `DATA_RETENTION_CRON`, `DATA_RETENTION_TIMEZONE`, `DATA_RETENTION_MAX_FAILURES`, `DATA_RETENTION_FAILURE_BACKOFF_MINUTES` – control the automated retention scheduler, including execution window and resilience thresholds.
+- `DATA_PARTITIONING_*`, `DOMAIN_EVENTS_DISPATCH_*`, `WEBHOOK_BUS_*` – govern background partitioning, domain event delivery, and webhook fan-out reliability.
 - `FEATURE_FLAG_CACHE_TTL_SECONDS`, `FEATURE_FLAG_REFRESH_INTERVAL_SECONDS`, `RUNTIME_CONFIG_CACHE_TTL_SECONDS`, `RUNTIME_CONFIG_REFRESH_INTERVAL_SECONDS` – tune feature flag/runtime configuration cache behaviour for the API and CLI.
 
 `npm run db:install` provisions the schema (via Knex migrations) and seeds the database. Use `npm run migrate:latest`/`npm run
@@ -39,6 +44,10 @@ The bootstrap seed (`npm run seed`) now provisions an operator-ready dataset: ve
 communities with owner auto-enrolment, a production-style PowerPoint asset and its ingestion history, ebook reading telemetry,
 and active + stale refresh sessions for governance testing. Seeds intentionally cover scenarios referenced in retention policies
 so QA can validate the automation routines.
+
+### Session hardening & audit trails
+
+The authentication stack enforces account lockouts, refresh session ceilings, and cryptographically protected MFA secrets. Tune `SESSION_VALIDATION_CACHE_TTL_MS`, `MAX_ACTIVE_SESSIONS_PER_USER`, and the `ACCOUNT_LOCKOUT_*` window to match your production risk appetite. Immutable audit trails (`AUDIT_LOG_*`) redact sensitive fields by default while preserving the context required for compliance investigations. When encryption at rest is mandated, supply `DATA_ENCRYPTION_PRIMARY_KEY`, rotate with `DATA_ENCRYPTION_ACTIVE_KEY_ID`, and stage fallbacks via `DATA_ENCRYPTION_FALLBACK_KEYS`.
 
 ### Quality gates
 
@@ -99,6 +108,14 @@ Operational endpoints:
 - `GET /api/v1/analytics/bi/executive-overview` returns aggregated KPIs, revenue trends, community metrics, experiments, and telemetry health powering the operator dashboards. Use the optional `range` query parameter (`7d`, `14d`, `30d`, `90d`) to control KPI deltas.
 
 Exports stream to Cloudflare R2 (or the configured destination) using the background worker. The telemetry warehouse job is registered in `src/jobs/telemetryWarehouseJob.js` and honours the configured cron as well as manual triggers. Freshness checkpoints feed Prometheus metrics (`edulure_telemetry_ingestion_events_total`, `edulure_telemetry_export_lag_seconds`) so alerting can detect stale pipelines.
+
+### Operational instrumentation & SLOs
+
+Prometheus exporters surface latency, availability, and business throughput from every service boundary. Lock down scrape endpoints with `METRICS_USERNAME`/`METRICS_PASSWORD` or a `METRICS_BEARER_TOKEN`, and restrict networks via `METRICS_ALLOWED_IPS`. Service-level objectives configured through `SLO_*` control burn-rate calculations, alert routing, and the readiness dashboards embedded in `/api/v1/release/dashboard`.
+
+### Governance automation & eventing
+
+Retention, partitioning, and downstream webhooks execute from dedicated schedulers. Adjust `DATA_RETENTION_*` for archival cadence, `DATA_PARTITIONING_*` for long-lived table hygiene, and the `DOMAIN_EVENTS_DISPATCH_*` / `WEBHOOK_BUS_*` settings to guarantee reliable event delivery across tenant boundaries.
 
 ### Release readiness orchestration
 

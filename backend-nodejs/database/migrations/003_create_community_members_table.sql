@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS community_members (
   CONSTRAINT fk_cm_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE KEY unique_member (community_id, user_id),
   INDEX idx_cm_user_status (user_id, status)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

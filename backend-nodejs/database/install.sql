@@ -53,7 +53,17 @@ BEGIN
       INDEX idx_field_service_providers_status (status),
       INDEX idx_field_service_providers_user (user_id),
       CONSTRAINT fk_field_service_providers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB;
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'field_service_providers'
+  ) THEN
+    ALTER TABLE field_service_providers
+      ADD INDEX IF NOT EXISTS idx_field_service_providers_status (status),
+      ADD INDEX IF NOT EXISTS idx_field_service_providers_user (user_id);
   END IF;
 
   IF NOT EXISTS (
@@ -93,7 +103,18 @@ BEGIN
       INDEX idx_field_service_orders_provider (provider_id),
       CONSTRAINT fk_field_service_orders_customer FOREIGN KEY (customer_user_id) REFERENCES users(id) ON DELETE CASCADE,
       CONSTRAINT fk_field_service_orders_provider FOREIGN KEY (provider_id) REFERENCES field_service_providers(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB;
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'field_service_orders'
+  ) THEN
+    ALTER TABLE field_service_orders
+      ADD INDEX IF NOT EXISTS idx_field_service_orders_status (status),
+      ADD INDEX IF NOT EXISTS idx_field_service_orders_customer (customer_user_id),
+      ADD INDEX IF NOT EXISTS idx_field_service_orders_provider (provider_id);
   END IF;
 
   IF NOT EXISTS (
@@ -114,7 +135,17 @@ BEGIN
       INDEX idx_field_service_events_order (order_id),
       INDEX idx_field_service_events_occurred_at (occurred_at),
       CONSTRAINT fk_field_service_events_order FOREIGN KEY (order_id) REFERENCES field_service_orders(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB;
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'field_service_events'
+  ) THEN
+    ALTER TABLE field_service_events
+      ADD INDEX IF NOT EXISTS idx_field_service_events_order (order_id),
+      ADD INDEX IF NOT EXISTS idx_field_service_events_occurred_at (occurred_at);
   END IF;
 
   IF NOT EXISTS (
@@ -141,7 +172,17 @@ BEGIN
       INDEX idx_support_cases_user (user_id),
       INDEX idx_support_cases_status (status),
       CONSTRAINT fk_support_cases_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB;
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_support_cases'
+  ) THEN
+    ALTER TABLE learner_support_cases
+      ADD INDEX IF NOT EXISTS idx_support_cases_user (user_id),
+      ADD INDEX IF NOT EXISTS idx_support_cases_status (status);
   END IF;
 
   IF NOT EXISTS (
@@ -159,7 +200,17 @@ BEGIN
       INDEX idx_support_messages_case (case_id),
       INDEX idx_support_messages_created_at (created_at),
       CONSTRAINT fk_support_messages_case FOREIGN KEY (case_id) REFERENCES learner_support_cases(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB;
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+     WHERE table_schema = DATABASE()
+       AND table_name = 'learner_support_messages'
+  ) THEN
+    ALTER TABLE learner_support_messages
+      ADD INDEX IF NOT EXISTS idx_support_messages_case (case_id),
+      ADD INDEX IF NOT EXISTS idx_support_messages_created_at (created_at);
   END IF;
 END $$
 

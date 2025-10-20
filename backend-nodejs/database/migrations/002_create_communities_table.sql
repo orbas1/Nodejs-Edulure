@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS communities (
   INDEX idx_communities_owner (owner_id),
   UNIQUE KEY unique_community_slug (slug),
   CONSTRAINT fk_communities_owner FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

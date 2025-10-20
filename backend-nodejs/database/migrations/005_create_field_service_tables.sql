@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS field_service_providers (
   INDEX idx_field_service_providers_status (status),
   INDEX idx_field_service_providers_user (user_id),
   CONSTRAINT fk_field_service_providers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS field_service_orders (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS field_service_orders (
   INDEX idx_field_service_orders_provider (provider_id),
   CONSTRAINT fk_field_service_orders_customer FOREIGN KEY (customer_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_field_service_orders_provider FOREIGN KEY (provider_id) REFERENCES field_service_providers(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS field_service_events (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -67,4 +67,4 @@ CREATE TABLE IF NOT EXISTS field_service_events (
   INDEX idx_field_service_events_order (order_id),
   INDEX idx_field_service_events_occurred_at (occurred_at),
   CONSTRAINT fk_field_service_events_order FOREIGN KEY (order_id) REFERENCES field_service_orders(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
