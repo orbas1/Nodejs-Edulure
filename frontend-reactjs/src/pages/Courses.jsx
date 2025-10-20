@@ -7,9 +7,11 @@ import adminControlApi from '../api/adminControlApi.js';
 import { searchExplorer } from '../api/explorerApi.js';
 import { listPublicCourses } from '../api/catalogueApi.js';
 import { createPaymentIntent } from '../api/paymentsApi.js';
+import { requestMediaUpload } from '../api/mediaApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
 import { isAbortError } from '../utils/errors.js';
+import { computeFileChecksum } from '../utils/uploads.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'courses',
@@ -381,7 +383,10 @@ function CourseForm({
   submitting,
   mode,
   currentStep,
-  setCurrentStep
+  setCurrentStep,
+  uploadState = {},
+  onUploadRequest,
+  onRemoveUpload
 }) {
   const handleChange = (event) => {
     const { name, value, type, checked } = event.target;
@@ -390,6 +395,29 @@ function CourseForm({
       [name]: type === 'checkbox' ? checked : value
     });
   };
+
+  const handleFileChange = (field, kind) => (event) => {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      return;
+    }
+    if (typeof onUploadRequest === 'function') {
+      onUploadRequest(field, kind, file);
+    }
+    event.target.value = '';
+  };
+
+  const handleFileRemove = (field) => {
+    if (typeof onRemoveUpload === 'function') {
+      onRemoveUpload(field);
+    }
+  };
+
+  const thumbnailUpload = uploadState?.thumbnailUrl ?? {};
+  const heroUpload = uploadState?.heroImageUrl ?? {};
+  const trailerUpload = uploadState?.trailerUrl ?? {};
+  const promoUpload = uploadState?.promoVideoUrl ?? {};
+  const syllabusUpload = uploadState?.syllabusUrl ?? {};
 
   const disabled = submitting;
 
@@ -605,59 +633,204 @@ function CourseForm({
       {currentStep === 'media' ? (
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Thumbnail URL</span>
-            <input
-              type="url"
-              name="thumbnailUrl"
-              value={form.thumbnailUrl}
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              disabled={disabled}
-            />
+            <span className="text-sm font-semibold text-slate-700">Thumbnail image</span>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange('thumbnailUrl', 'image')}
+                className="block w-full cursor-pointer text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-dark disabled:cursor-not-allowed"
+                disabled={disabled}
+              />
+            </div>
+            {thumbnailUpload.status === 'uploading' ? (
+              <p className="text-xs font-semibold text-slate-500">Uploading thumbnail…</p>
+            ) : null}
+            {thumbnailUpload.error ? (
+              <p className="text-xs font-semibold text-rose-600">{thumbnailUpload.error}</p>
+            ) : null}
+            {form.thumbnailUrl ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                <a
+                  href={form.thumbnailUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary transition hover:underline"
+                >
+                  Preview thumbnail
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleFileRemove('thumbnailUrl')}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-50"
+                  disabled={disabled}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400">Upload a square thumbnail for catalogue cards.</p>
+            )}
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Hero image URL</span>
-            <input
-              type="url"
-              name="heroImageUrl"
-              value={form.heroImageUrl}
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              disabled={disabled}
-            />
+            <span className="text-sm font-semibold text-slate-700">Hero image</span>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange('heroImageUrl', 'image')}
+                className="block w-full cursor-pointer text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-dark disabled:cursor-not-allowed"
+                disabled={disabled}
+              />
+            </div>
+            {heroUpload.status === 'uploading' ? (
+              <p className="text-xs font-semibold text-slate-500">Uploading hero image…</p>
+            ) : null}
+            {heroUpload.error ? (
+              <p className="text-xs font-semibold text-rose-600">{heroUpload.error}</p>
+            ) : null}
+            {form.heroImageUrl ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                <a
+                  href={form.heroImageUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary transition hover:underline"
+                >
+                  Preview hero image
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleFileRemove('heroImageUrl')}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-50"
+                  disabled={disabled}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400">Upload a 16:9 hero to elevate the landing page.</p>
+            )}
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Trailer URL</span>
-            <input
-              type="url"
-              name="trailerUrl"
-              value={form.trailerUrl}
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              disabled={disabled}
-            />
+            <span className="text-sm font-semibold text-slate-700">Trailer video</span>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
+              <input
+                type="file"
+                accept="video/*"
+                onChange={handleFileChange('trailerUrl', 'video')}
+                className="block w-full cursor-pointer text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-dark disabled:cursor-not-allowed"
+                disabled={disabled}
+              />
+            </div>
+            {trailerUpload.status === 'uploading' ? (
+              <p className="text-xs font-semibold text-slate-500">Uploading trailer…</p>
+            ) : null}
+            {trailerUpload.error ? (
+              <p className="text-xs font-semibold text-rose-600">{trailerUpload.error}</p>
+            ) : null}
+            {form.trailerUrl ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                <a
+                  href={form.trailerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary transition hover:underline"
+                >
+                  Preview trailer
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleFileRemove('trailerUrl')}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-50"
+                  disabled={disabled}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400">Upload a teaser video to boost conversions.</p>
+            )}
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Promo video URL</span>
-            <input
-              type="url"
-              name="promoVideoUrl"
-              value={form.promoVideoUrl}
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              disabled={disabled}
-            />
+            <span className="text-sm font-semibold text-slate-700">Promo video</span>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
+              <input
+                type="file"
+                accept="video/*"
+                onChange={handleFileChange('promoVideoUrl', 'video')}
+                className="block w-full cursor-pointer text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-dark disabled:cursor-not-allowed"
+                disabled={disabled}
+              />
+            </div>
+            {promoUpload.status === 'uploading' ? (
+              <p className="text-xs font-semibold text-slate-500">Uploading promo video…</p>
+            ) : null}
+            {promoUpload.error ? (
+              <p className="text-xs font-semibold text-rose-600">{promoUpload.error}</p>
+            ) : null}
+            {form.promoVideoUrl ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                <a
+                  href={form.promoVideoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary transition hover:underline"
+                >
+                  Preview promo video
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleFileRemove('promoVideoUrl')}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-50"
+                  disabled={disabled}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400">Share a promotional clip for your sales teams.</p>
+            )}
           </label>
           <label className="space-y-2">
-            <span className="text-sm font-semibold text-slate-700">Syllabus URL</span>
-            <input
-              type="url"
-              name="syllabusUrl"
-              value={form.syllabusUrl}
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              disabled={disabled}
-            />
+            <span className="text-sm font-semibold text-slate-700">Syllabus file</span>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-3 shadow-sm">
+              <input
+                type="file"
+                accept="application/pdf,.pdf,.doc,.docx"
+                onChange={handleFileChange('syllabusUrl', 'document')}
+                className="block w-full cursor-pointer text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-primary-dark disabled:cursor-not-allowed"
+                disabled={disabled}
+              />
+            </div>
+            {syllabusUpload.status === 'uploading' ? (
+              <p className="text-xs font-semibold text-slate-500">Uploading syllabus…</p>
+            ) : null}
+            {syllabusUpload.error ? (
+              <p className="text-xs font-semibold text-rose-600">{syllabusUpload.error}</p>
+            ) : null}
+            {form.syllabusUrl ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-600">
+                <a
+                  href={form.syllabusUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary transition hover:underline"
+                >
+                  Preview syllabus
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleFileRemove('syllabusUrl')}
+                  className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-rose-400 hover:text-rose-600 disabled:opacity-50"
+                  disabled={disabled}
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400">Upload the syllabus to help learners evaluate the course.</p>
+            )}
           </label>
           <label className="md:col-span-2 space-y-2">
             <span className="text-sm font-semibold text-slate-700">Metadata (JSON)</span>
@@ -730,7 +903,109 @@ export default function Courses() {
   const [checkoutStatus, setCheckoutStatus] = useState(null);
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
+  const [uploadState, setUploadState] = useState({});
   const isAuthenticated = Boolean(token);
+
+  const updateUploadState = useCallback((field, patch) => {
+    setUploadState((current) => ({
+      ...current,
+      [field]: {
+        ...(current[field] ?? {}),
+        ...patch
+      }
+    }));
+  }, []);
+
+  const handleMediaUpload = useCallback(
+    async (field, kind, file) => {
+      if (!file) {
+        return;
+      }
+      if (!token) {
+        updateUploadState(field, {
+          status: 'error',
+          error: 'You must be signed in to upload files.'
+        });
+        return;
+      }
+
+      updateUploadState(field, {
+        status: 'uploading',
+        error: null,
+        filename: file.name
+      });
+
+      try {
+        const checksum = await computeFileChecksum(file);
+        const instruction = await requestMediaUpload({
+          token,
+          payload: {
+            kind,
+            filename: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            size: file.size,
+            checksum
+          }
+        });
+
+        if (!instruction?.upload?.url) {
+          throw new Error('Upload session did not include a destination URL.');
+        }
+
+        const uploadHeaders = instruction.upload.headers ?? {
+          'Content-Type': file.type || 'application/octet-stream'
+        };
+
+        await fetch(instruction.upload.url, {
+          method: instruction.upload.method ?? 'PUT',
+          headers: uploadHeaders,
+          body: file
+        });
+
+        const uploadedUrl = instruction.file?.publicUrl ?? null;
+        const storageKey = instruction.file?.storageKey ?? null;
+        const resolvedValue = uploadedUrl ?? storageKey ?? '';
+
+        setForm((current) => ({
+          ...current,
+          [field]: resolvedValue
+        }));
+
+        updateUploadState(field, {
+          status: 'uploaded',
+          error: null,
+          url: uploadedUrl,
+          filename: file.name,
+          storageKey,
+          visibility: instruction.file?.visibility ?? null
+        });
+      } catch (uploadError) {
+        const message = uploadError?.message ?? 'Failed to upload file.';
+        updateUploadState(field, {
+          status: 'error',
+          error: message
+        });
+      }
+    },
+    [token, updateUploadState, setForm]
+  );
+
+  const handleRemoveUpload = useCallback(
+    (field) => {
+      setForm((current) => ({
+        ...current,
+        [field]: ''
+      }));
+      updateUploadState(field, {
+        status: 'idle',
+        error: null,
+        url: null,
+        filename: null,
+        storageKey: null
+      });
+    },
+    [updateUploadState, setForm]
+  );
 
   useEffect(() => {
     setCheckoutForm((current) => ({
@@ -1002,6 +1277,7 @@ export default function Courses() {
     setMode('create');
     setEditingId(null);
     setCurrentStep('overview');
+    setUploadState({});
   }, []);
 
   const handleEdit = (course) => {
@@ -1031,6 +1307,13 @@ export default function Courses() {
       releaseAt: toDateInput(course.releaseAt),
       status: course.status ?? 'draft',
       metadata: course.metadata ? JSON.stringify(course.metadata, null, 2) : ''
+    });
+    setUploadState({
+      thumbnailUrl: course.thumbnailUrl ? { status: 'uploaded', url: course.thumbnailUrl } : { status: 'idle' },
+      heroImageUrl: course.heroImageUrl ? { status: 'uploaded', url: course.heroImageUrl } : { status: 'idle' },
+      trailerUrl: course.trailerUrl ? { status: 'uploaded', url: course.trailerUrl } : { status: 'idle' },
+      promoVideoUrl: course.promoVideoUrl ? { status: 'uploaded', url: course.promoVideoUrl } : { status: 'idle' },
+      syllabusUrl: course.syllabusUrl ? { status: 'uploaded', url: course.syllabusUrl } : { status: 'idle' }
     });
   };
 
@@ -1135,6 +1418,9 @@ export default function Courses() {
             mode={mode}
             currentStep={currentStep}
             setCurrentStep={setCurrentStep}
+            uploadState={uploadState}
+            onUploadRequest={handleMediaUpload}
+            onRemoveUpload={handleRemoveUpload}
           />
         </div>
         <div className="mt-10 space-y-4">
