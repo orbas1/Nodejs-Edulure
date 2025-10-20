@@ -73,7 +73,9 @@ describe('Live classrooms public catalogue behaviour', () => {
     render(<LiveClassrooms />);
 
     expect(await screen.findByText('Design Systems AMA')).toBeInTheDocument();
-    expect(listPublicLiveClassroomsMock).toHaveBeenCalledWith({ params: { limit: 12 } });
+    expect(listPublicLiveClassroomsMock).toHaveBeenCalledWith(
+      expect.objectContaining({ params: { limit: 12 } })
+    );
   });
 
   it('displays a friendly error when the catalogue request fails', async () => {

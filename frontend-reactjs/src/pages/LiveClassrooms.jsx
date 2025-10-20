@@ -15,6 +15,8 @@ import {
 } from '../api/learnerDashboardApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { listPublicLiveClassrooms } from '../api/catalogueApi.js';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import { isAbortError } from '../utils/errors.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'events',
@@ -521,33 +523,57 @@ export default function LiveClassrooms() {
   const [currentStep, setCurrentStep] = useState('basics');
   const [submitting, setSubmitting] = useState(false);
 
-  const loadLiveClassrooms = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      if (isAdmin && token) {
-        const response = await adminControlApi.listLiveStreams({ token, params: { perPage: 50 } });
-        setLiveClassrooms(response?.data ?? []);
-      } else {
-        const response = await listPublicLiveClassrooms({ params: { limit: 12 } });
-        setLiveClassrooms(response?.data ?? []);
+  const loadLiveClassrooms = useCallback(
+    async ({ signal } = {}) => {
+      if (signal?.aborted) {
+        return;
       }
-    } catch (err) {
-      setLiveClassrooms([]);
-      setError(err.message ?? 'Unable to load live classrooms');
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, token]);
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        if (isAdmin && token) {
+          const response = await adminControlApi.listLiveStreams({
+            token,
+            params: { perPage: 50 },
+            signal
+          });
+          if (signal?.aborted) {
+            return;
+          }
+          setLiveClassrooms(response?.data ?? []);
+        } else {
+          const response = await listPublicLiveClassrooms({ params: { limit: 12 }, signal });
+          if (signal?.aborted) {
+            return;
+          }
+          setLiveClassrooms(response?.data ?? []);
+        }
+      } catch (err) {
+        if (isAbortError(err) || signal?.aborted) {
+          return;
+        }
+        setLiveClassrooms([]);
+        setError(err.message ?? 'Unable to load live classrooms');
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [isAdmin, token]
+  );
 
   useEffect(() => {
-    let mounted = true;
-    if (!mounted) return () => {};
-    loadLiveClassrooms();
+    const controller = new AbortController();
+    loadLiveClassrooms({ signal: controller.signal });
     return () => {
-      mounted = false;
+      controller.abort();
     };
   }, [loadLiveClassrooms]);
+
+  useAutoDismissMessage(successMessage, () => setSuccessMessage(''));
 
   const resetForm = useCallback(() => {
     setForm(createEmptyForm());

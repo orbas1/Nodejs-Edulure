@@ -11,6 +11,8 @@ import FormStepper from '../components/forms/FormStepper.jsx';
 import adminControlApi from '../api/adminControlApi.js';
 import { listMarketplaceEbooks } from '../api/ebookApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import { isAbortError } from '../utils/errors.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'ebooks',
@@ -522,23 +524,47 @@ export default function Ebooks() {
     };
   }, []);
 
-  const loadEbooks = useCallback(async () => {
-    if (!isAdmin || !token) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await adminControlApi.listEbooks({ token, params: { perPage: 50 } });
-      setLiveEbooks(response?.data ?? []);
-    } catch (err) {
-      setError(err.message ?? 'Unable to load e-books');
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, token]);
+  const loadEbooks = useCallback(
+    async ({ signal } = {}) => {
+      if (!isAdmin || !token || signal?.aborted) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await adminControlApi.listEbooks({ token, params: { perPage: 50 }, signal });
+        if (signal?.aborted) {
+          return;
+        }
+        setLiveEbooks(response?.data ?? []);
+      } catch (err) {
+        if (isAbortError(err) || signal?.aborted) {
+          return;
+        }
+        setError(err.message ?? 'Unable to load e-books');
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [isAdmin, token]
+  );
 
   useEffect(() => {
-    loadEbooks();
-  }, [loadEbooks]);
+    if (!isAdmin || !token) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    loadEbooks({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
+  }, [isAdmin, token, loadEbooks]);
+
+  useAutoDismissMessage(successMessage, () => setSuccessMessage(''));
 
   const resetForm = useCallback(() => {
     setForm(createEmptyForm());

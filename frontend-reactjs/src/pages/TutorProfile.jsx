@@ -8,6 +8,8 @@ import { searchExplorer } from '../api/explorerApi.js';
 import { createTutorBookingRequest } from '../api/learnerDashboardApi.js';
 import { listPublicTutors } from '../api/catalogueApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import { isAbortError } from '../utils/errors.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'tutors',
@@ -521,23 +523,47 @@ export default function TutorProfile() {
     };
   }, []);
 
-  const loadTutors = useCallback(async () => {
-    if (!isAdmin || !token) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await adminControlApi.listTutors({ token, params: { perPage: 50 } });
-      setTutors(response?.data ?? []);
-    } catch (err) {
-      setError(err.message ?? 'Unable to load tutors');
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, token]);
+  const loadTutors = useCallback(
+    async ({ signal } = {}) => {
+      if (!isAdmin || !token || signal?.aborted) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await adminControlApi.listTutors({ token, params: { perPage: 50 }, signal });
+        if (signal?.aborted) {
+          return;
+        }
+        setTutors(response?.data ?? []);
+      } catch (err) {
+        if (isAbortError(err) || signal?.aborted) {
+          return;
+        }
+        setError(err.message ?? 'Unable to load tutors');
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [isAdmin, token]
+  );
 
   useEffect(() => {
-    loadTutors();
-  }, [loadTutors]);
+    if (!isAdmin || !token) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    loadTutors({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
+  }, [isAdmin, token, loadTutors]);
+
+  useAutoDismissMessage(successMessage, () => setSuccessMessage(''));
 
   const resetForm = useCallback(() => {
     setForm(createEmptyForm());

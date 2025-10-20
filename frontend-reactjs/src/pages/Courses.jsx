@@ -7,6 +7,8 @@ import adminControlApi from '../api/adminControlApi.js';
 import { searchExplorer } from '../api/explorerApi.js';
 import { listPublicCourses } from '../api/catalogueApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import { isAbortError } from '../utils/errors.js';
 
 const EXPLORER_CONFIG = {
   entityType: 'courses',
@@ -663,23 +665,47 @@ export default function Courses() {
     };
   }, []);
 
-  const loadCourses = useCallback(async () => {
-    if (!isAdmin || !token) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await adminControlApi.listCourses({ token, params: { perPage: 50 } });
-      setLiveCourses(response?.data ?? []);
-    } catch (err) {
-      setError(err.message ?? 'Unable to load courses');
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, token]);
+  const loadCourses = useCallback(
+    async ({ signal } = {}) => {
+      if (!isAdmin || !token || signal?.aborted) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await adminControlApi.listCourses({ token, params: { perPage: 50 }, signal });
+        if (signal?.aborted) {
+          return;
+        }
+        setLiveCourses(response?.data ?? []);
+      } catch (err) {
+        if (isAbortError(err) || signal?.aborted) {
+          return;
+        }
+        setError(err.message ?? 'Unable to load courses');
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [isAdmin, token]
+  );
 
   useEffect(() => {
-    loadCourses();
-  }, [loadCourses]);
+    if (!isAdmin || !token) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    loadCourses({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
+  }, [isAdmin, token, loadCourses]);
+
+  useAutoDismissMessage(successMessage, () => setSuccessMessage(''));
 
   const resetForm = useCallback(() => {
     setForm(createEmptyForm());
