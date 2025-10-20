@@ -895,6 +895,13 @@ export default function Feed() {
   );
   const isRangeControlDisabled = isLoadingFeed || isLoadingInsights;
 
+  const canManageCommunityResources = useMemo(() => {
+    if (!communityDetail) return false;
+    if (communityDetail.permissions?.canManageResources) return true;
+    const role = communityDetail.membership?.role;
+    return role ? ['owner', 'admin', 'moderator'].includes(role) : false;
+  }, [communityDetail]);
+
   if (!canAccessCommunityFeed) {
     return (
       <div className="bg-slate-50/80 py-24">
@@ -912,13 +919,6 @@ export default function Feed() {
   const joinDisabledReason = canJoinCommunities
     ? null
     : 'Your current role is limited to read-only access. Contact an administrator to manage membership changes.';
-
-  const canManageCommunityResources = useMemo(() => {
-    if (!communityDetail) return false;
-    if (communityDetail.permissions?.canManageResources) return true;
-    const role = communityDetail.membership?.role;
-    return role ? ['owner', 'admin', 'moderator'].includes(role) : false;
-  }, [communityDetail]);
 
   const isManagingResources = isResourceEditorOpen || isSavingResource || Boolean(deletingResourceId);
 

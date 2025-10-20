@@ -7,7 +7,6 @@ import {
   BoltIcon,
   CheckBadgeIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon,
   FlagIcon,
   InboxIcon,
   QueueListIcon,
@@ -70,13 +69,6 @@ function formatDateTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleString();
-}
-
-function formatDate(value) {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleDateString();
 }
 
 const relativeTime = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });

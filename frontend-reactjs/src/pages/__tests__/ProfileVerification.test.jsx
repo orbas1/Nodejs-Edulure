@@ -54,7 +54,7 @@ describe('<Profile /> verification workflow', () => {
       error: null,
       revokeConsent: vi.fn()
     });
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true }));
   });
 
   it('requests upload instructions, uploads files, and attaches verification documents', async () => {
@@ -114,7 +114,10 @@ describe('<Profile /> verification workflow', () => {
         mimeType: 'image/png'
       })
     });
-    expect(global.fetch).toHaveBeenCalledWith('https://uploads.example.com/front', expect.objectContaining({ method: 'PUT' }));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://uploads.example.com/front',
+      expect.objectContaining({ method: 'PUT' })
+    );
     expect(attachVerificationDocumentMock).toHaveBeenCalledWith({
       token: 'access-123',
       payload: expect.objectContaining({
