@@ -12,10 +12,16 @@ import {
   SignalIcon,
   UserCircleIcon
 } from '@heroicons/react/24/outline';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import {
+  createFieldServiceAssignment,
+  updateFieldServiceAssignment,
+  closeFieldServiceAssignment
+} from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const toneClasses = {
   success: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
@@ -74,6 +80,29 @@ function formatDateTime(value) {
 function FieldServices() {
   const { role, dashboard, refresh } = useOutletContext();
   const workspace = dashboard?.fieldServices ?? null;
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+
+  const [assignmentsState, setAssignmentsState] = useState([]);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [assignmentFormVisible, setAssignmentFormVisible] = useState(false);
+  const [assignmentFormMode, setAssignmentFormMode] = useState('create');
+  const [editingAssignmentId, setEditingAssignmentId] = useState(null);
+  const [assignmentFormErrors, setAssignmentFormErrors] = useState([]);
+  const [assignmentForm, setAssignmentForm] = useState({
+    serviceType: '',
+    priority: 'Standard',
+    owner: '',
+    location: '',
+    scheduledFor: '',
+    supportChannel: '',
+    briefUrl: ''
+  });
+  const [assignmentFormStep, setAssignmentFormStep] = useState(1);
+  const [assignmentSearchTerm, setAssignmentSearchTerm] = useState('');
+  const [assignmentStatusFilter, setAssignmentStatusFilter] = useState('all');
+  const [assignmentPriorityFilter, setAssignmentPriorityFilter] = useState('all');
 
   const allowedRoles = useMemo(() => new Set(['learner', 'instructor']), []);
   if (!allowedRoles.has(role)) {
@@ -98,13 +127,312 @@ function FieldServices() {
   }
 
   const summaryCards = workspace.summary?.cards ?? [];
-  const assignments = workspace.assignments ?? [];
+  const assignments = assignmentsState;
   const incidents = workspace.incidents ?? [];
   const timeline = workspace.timeline ?? [];
   const providers = workspace.providers ?? [];
   const mapView = workspace.map ?? null;
   const lastUpdatedLabel = formatDateTime(workspace.summary?.updatedAt ?? workspace.lastUpdated);
   const hasAssignments = assignments.length > 0;
+  const disableActions = pendingAction !== null;
+
+  const filteredAssignments = useMemo(() => {
+    const search = assignmentSearchTerm.trim().toLowerCase();
+    const statusFilterValue = assignmentStatusFilter.toLowerCase();
+    const priorityFilterValue = assignmentPriorityFilter.toLowerCase();
+    return assignmentsState.filter((assignment) => {
+      const matchesStatus =
+        statusFilterValue === 'all' || (assignment.status ?? '').toLowerCase() === statusFilterValue;
+      if (!matchesStatus) {
+        return false;
+      }
+      const matchesPriority =
+        priorityFilterValue === 'all' || (assignment.priority ?? '').toLowerCase() === priorityFilterValue;
+      if (!matchesPriority) {
+        return false;
+      }
+      if (!search) {
+        return true;
+      }
+      const haystack = [
+        assignment.serviceType,
+        assignment.owner,
+        assignment.location,
+        assignment.supportChannel,
+        assignment.customer?.name,
+        assignment.provider?.name,
+        assignment.briefUrl
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+      return haystack.some((value) => value.includes(search));
+    });
+  }, [assignmentsState, assignmentPriorityFilter, assignmentSearchTerm, assignmentStatusFilter]);
+  const hasFilteredAssignments = filteredAssignments.length > 0;
+
+  useEffect(() => {
+    setAssignmentsState(Array.isArray(workspace.assignments) ? workspace.assignments : []);
+  }, [workspace.assignments]);
+
+  const resetAssignmentForm = useCallback(() => {
+    setAssignmentForm({
+      serviceType: '',
+      priority: 'Standard',
+      owner: '',
+      location: '',
+      scheduledFor: '',
+      supportChannel: '',
+      briefUrl: ''
+    });
+    setAssignmentFormErrors([]);
+    setEditingAssignmentId(null);
+    setAssignmentFormMode('create');
+    setAssignmentFormStep(1);
+  }, []);
+
+  const closeAssignmentForm = useCallback(() => {
+    setAssignmentFormVisible(false);
+    resetAssignmentForm();
+  }, [resetAssignmentForm]);
+
+  const openAssignmentCreateForm = useCallback(() => {
+    resetAssignmentForm();
+    setAssignmentFormMode('create');
+    setAssignmentFormVisible(true);
+  }, [resetAssignmentForm]);
+
+  const openAssignmentEditForm = useCallback((assignment) => {
+    setAssignmentFormMode('edit');
+    setEditingAssignmentId(assignment.id);
+    setAssignmentForm({
+      serviceType: assignment.serviceType ?? '',
+      priority: assignment.priority ?? 'Standard',
+      owner: assignment.owner ?? assignment.dispatchLead ?? '',
+      location: assignment.location ?? assignment.address ?? '',
+      scheduledFor: assignment.scheduledAtRaw ?? assignment.scheduledAt ?? '',
+      supportChannel: assignment.supportChannel ?? assignment.support?.channel ?? '',
+      briefUrl: assignment.briefUrl ?? assignment.briefing ?? assignment.playbook ?? ''
+    });
+    setAssignmentFormStep(1);
+    setAssignmentFormVisible(true);
+  }, []);
+
+  const handleAssignmentFormChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setAssignmentForm((current) => ({ ...current, [name]: value }));
+  }, []);
+
+  const validateAssignmentForm = useCallback(
+    (scope = 'all') => {
+      const errors = [];
+      const allowStep = (step) => scope === 'all' || scope === step;
+      if (allowStep(1)) {
+        if (!assignmentForm.serviceType || assignmentForm.serviceType.trim().length < 3) {
+          errors.push('Specify the service or incident type.');
+        }
+        if (!assignmentForm.owner || assignmentForm.owner.trim().length < 2) {
+          errors.push('Assign an accountable owner or squad.');
+        }
+        if (!assignmentForm.location || assignmentForm.location.trim().length < 3) {
+          errors.push('Provide the deployment location.');
+        }
+      }
+      if (allowStep(2)) {
+        if (!assignmentForm.scheduledFor) {
+          errors.push('Set the targeted arrival window.');
+        }
+        if (assignmentForm.briefUrl) {
+          try {
+            const parsed = new URL(assignmentForm.briefUrl);
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+              errors.push('Briefing links should start with http or https.');
+            }
+          } catch (error) {
+            errors.push('Provide a valid URL for the briefing link.');
+          }
+        }
+      }
+      setAssignmentFormErrors(errors);
+      return errors.length === 0;
+    },
+    [assignmentForm]
+  );
+
+  const handleAdvanceAssignmentForm = useCallback(() => {
+    if (validateAssignmentForm(1)) {
+      setAssignmentFormStep(2);
+      setAssignmentFormErrors([]);
+    }
+  }, [validateAssignmentForm]);
+
+  const handleRewindAssignmentForm = useCallback(() => {
+    setAssignmentFormStep(1);
+    setAssignmentFormErrors([]);
+  }, []);
+
+  const handleAssignmentFormSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage assignments.' });
+        return;
+      }
+      if (!validateAssignmentForm('all')) {
+        return;
+      }
+
+      const payload = {
+        serviceType: assignmentForm.serviceType.trim(),
+        priority: assignmentForm.priority,
+        owner: assignmentForm.owner.trim(),
+        location: assignmentForm.location.trim(),
+        scheduledFor: assignmentForm.scheduledFor,
+        supportChannel: assignmentForm.supportChannel?.trim() || undefined,
+        briefUrl: assignmentForm.briefUrl?.trim() || undefined
+      };
+
+      if (assignmentFormMode === 'create') {
+        setPendingAction('assignment-create');
+        setStatusMessage({ type: 'pending', message: `Dispatching ${payload.serviceType}…` });
+        try {
+          const response = await createFieldServiceAssignment({ token, payload });
+          const assignment = response?.data ?? {};
+          const newAssignment = {
+            id: assignment.id ?? `assignment-${Date.now()}`,
+            serviceType: assignment.serviceType ?? payload.serviceType,
+            priority: assignment.priority ?? payload.priority,
+            owner: assignment.owner ?? payload.owner,
+            location: assignment.location ?? payload.location,
+            scheduledAt: formatDateTime(assignment.scheduledFor ?? payload.scheduledFor),
+            scheduledAtRaw: assignment.scheduledFor ?? payload.scheduledFor,
+            status: assignment.status ?? 'dispatched',
+            statusLabel: assignment.statusLabel ?? 'Dispatched',
+            supportChannel: assignment.supportChannel ?? payload.supportChannel,
+            briefUrl: assignment.briefUrl ?? payload.briefUrl
+          };
+          setAssignmentsState((current) => [newAssignment, ...current]);
+          setStatusMessage({ type: 'success', message: `${newAssignment.serviceType} dispatched.` });
+          closeAssignmentForm();
+        } catch (createError) {
+          setStatusMessage({
+            type: 'error',
+            message: createError instanceof Error ? createError.message : 'Unable to dispatch assignment.'
+          });
+        } finally {
+          setPendingAction(null);
+        }
+        return;
+      }
+
+      setPendingAction(`assignment-update-${editingAssignmentId}`);
+      setStatusMessage({ type: 'pending', message: `Updating ${payload.serviceType}…` });
+      try {
+        await updateFieldServiceAssignment({ token, assignmentId: editingAssignmentId, payload });
+        setAssignmentsState((current) =>
+          current.map((assignment) =>
+            assignment.id === editingAssignmentId
+              ? {
+                  ...assignment,
+                  serviceType: payload.serviceType,
+                  priority: payload.priority,
+                  owner: payload.owner,
+                  location: payload.location,
+                  scheduledAt: formatDateTime(payload.scheduledFor),
+                  scheduledAtRaw: payload.scheduledFor,
+                  supportChannel: payload.supportChannel ?? assignment.supportChannel,
+                  briefUrl: payload.briefUrl ?? assignment.briefUrl
+                }
+              : assignment
+          )
+        );
+        setStatusMessage({ type: 'success', message: `${payload.serviceType} updated.` });
+        closeAssignmentForm();
+      } catch (updateError) {
+        setStatusMessage({
+          type: 'error',
+          message: updateError instanceof Error ? updateError.message : 'Unable to update assignment.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [
+      assignmentForm,
+      assignmentFormMode,
+      closeAssignmentForm,
+      createFieldServiceAssignment,
+      editingAssignmentId,
+      setAssignmentsState,
+      token,
+      updateFieldServiceAssignment,
+      validateAssignmentForm
+    ]
+  );
+
+  const handleAssignmentStatusChange = useCallback(
+    async (assignment, status) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage assignments.' });
+        return;
+      }
+      setPendingAction(`assignment-status-${assignment.id}`);
+      setStatusMessage({ type: 'pending', message: `Updating ${assignment.serviceType} status…` });
+      try {
+        await updateFieldServiceAssignment({ token, assignmentId: assignment.id, payload: { status } });
+        setAssignmentsState((current) =>
+          current.map((item) =>
+            item.id === assignment.id
+              ? {
+                  ...item,
+                  status,
+                  statusLabel:
+                    status === 'completed'
+                      ? 'Completed'
+                      : status === 'on_site'
+                        ? 'On site'
+                        : status === 'en_route'
+                          ? 'En route'
+                          : 'Dispatched'
+                }
+              : item
+          )
+        );
+        setStatusMessage({ type: 'success', message: `${assignment.serviceType} status updated.` });
+      } catch (statusError) {
+        setStatusMessage({
+          type: 'error',
+          message: statusError instanceof Error ? statusError.message : 'Unable to update status.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [setAssignmentsState, token, updateFieldServiceAssignment]
+  );
+
+  const handleResolveAssignment = useCallback(
+    async (assignment) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage assignments.' });
+        return;
+      }
+      setPendingAction(`assignment-close-${assignment.id}`);
+      setStatusMessage({ type: 'pending', message: `Closing ${assignment.serviceType}…` });
+      try {
+        await closeFieldServiceAssignment({ token, assignmentId: assignment.id, payload: { resolution: 'Learner closed' } });
+        setAssignmentsState((current) => current.filter((item) => item.id !== assignment.id));
+        setStatusMessage({ type: 'success', message: `${assignment.serviceType} closed.` });
+      } catch (closeError) {
+        setStatusMessage({
+          type: 'error',
+          message: closeError instanceof Error ? closeError.message : 'Unable to close assignment.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [closeFieldServiceAssignment, setAssignmentsState, token]
+  );
 
   return (
     <div className="space-y-10">
@@ -119,6 +447,9 @@ function FieldServices() {
         <div className="flex flex-wrap gap-3">
           <button type="button" className="dashboard-primary-pill" onClick={() => refresh?.()}>
             Sync latest telemetry
+          </button>
+          <button type="button" className="dashboard-pill" onClick={openAssignmentCreateForm}>
+            Schedule new dispatch
           </button>
           <button type="button" className="dashboard-pill">
             Export service ledger
@@ -165,12 +496,55 @@ function FieldServices() {
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <SignalIcon className="h-4 w-4" aria-hidden="true" />
-              <span>{assignments.length} in dashboard scope</span>
+              <span>
+                {filteredAssignments.length} of {assignments.length} in dashboard scope
+              </span>
             </div>
           </div>
-          {hasAssignments ? (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Search assignments
+              <input
+                type="search"
+                value={assignmentSearchTerm}
+                onChange={(event) => setAssignmentSearchTerm(event.target.value)}
+                placeholder="Search service, owner, or location"
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Status
+              <select
+                value={assignmentStatusFilter}
+                onChange={(event) => setAssignmentStatusFilter(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="all">All statuses</option>
+                <option value="dispatched">Dispatched</option>
+                <option value="en_route">En route</option>
+                <option value="on_site">On site</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </label>
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Priority
+              <select
+                value={assignmentPriorityFilter}
+                onChange={(event) => setAssignmentPriorityFilter(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="all">All priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="standard">Standard</option>
+                <option value="routine">Routine</option>
+              </select>
+            </label>
+          </div>
+          {hasFilteredAssignments ? (
             <div className="mt-6 space-y-4">
-              {assignments.map((assignment) => (
+              {filteredAssignments.map((assignment) => (
                 <article
                   key={assignment.id}
                   className="dashboard-card-muted relative overflow-hidden p-5 ring-1 ring-inset ring-slate-200 transition hover:-translate-y-0.5 hover:ring-primary/40"
@@ -250,8 +624,74 @@ function FieldServices() {
                             </p>
                           ) : null}
                         </div>
+                        {assignment.supportChannel ? (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <p className="font-semibold text-slate-600">Support channel</p>
+                            <p className="mt-1 text-slate-900">{assignment.supportChannel}</p>
+                          </div>
+                        ) : null}
+                        {assignment.briefUrl ? (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <p className="font-semibold text-slate-600">Briefing link</p>
+                            <a
+                              href={assignment.briefUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 text-primary hover:underline"
+                            >
+                              View playbook
+                            </a>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => openAssignmentEditForm(assignment)}
+                    >
+                      Edit briefing
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handleAssignmentStatusChange(assignment, 'en_route')}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-status-${assignment.id}` && assignment.status !== 'en_route'
+                        ? 'Updating…'
+                        : 'Mark en route'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handleAssignmentStatusChange(assignment, 'on_site')}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-status-${assignment.id}` && assignment.status !== 'on_site'
+                        ? 'Updating…'
+                        : 'Mark on site'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      onClick={() => handleAssignmentStatusChange(assignment, 'completed')}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-status-${assignment.id}` && assignment.status !== 'completed'
+                        ? 'Updating…'
+                        : 'Mark completed'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill bg-rose-50 text-rose-600 hover:bg-rose-100"
+                      onClick={() => handleResolveAssignment(assignment)}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-close-${assignment.id}` ? 'Closing…' : 'Close assignment'}
+                    </button>
                   </div>
                   {assignment.timeline?.length ? (
                     <div className="mt-5 grid gap-3 rounded-2xl border border-dashed border-slate-200 bg-white/60 p-4 text-xs text-slate-600 lg:grid-cols-2">
@@ -275,10 +715,22 @@ function FieldServices() {
           ) : (
             <div className="mt-6">
               <DashboardStateMessage
-                title="No live assignments"
-                description="Assign a provider or sync new jobs from your service hub to populate the operations board."
-                actionLabel="Refresh"
-                onAction={() => refresh?.()}
+                title={assignments.length ? 'No assignments match your filters' : 'No live assignments'}
+                description={
+                  assignments.length
+                    ? 'Adjust your search, status, or priority filters to surface relevant dispatches.'
+                    : 'Assign a provider or sync new jobs from your service hub to populate the operations board.'
+                }
+                actionLabel={assignments.length ? 'Reset filters' : 'Refresh'}
+                onAction={() => {
+                  if (assignments.length) {
+                    setAssignmentSearchTerm('');
+                    setAssignmentStatusFilter('all');
+                    setAssignmentPriorityFilter('all');
+                  } else {
+                    refresh?.();
+                  }
+                }}
               />
             </div>
           )}
@@ -475,6 +927,195 @@ function FieldServices() {
           )}
         </div>
       </section>
+
+      {statusMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            statusMessage.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : statusMessage.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {statusMessage.message}
+        </div>
+      ) : null}
+
+      {assignmentFormVisible ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="dashboard-kicker text-primary-dark">
+                  {assignmentFormMode === 'create' ? 'Schedule dispatch' : 'Update dispatch details'}
+                </p>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {assignmentFormMode === 'create'
+                    ? 'Book a new technician deployment'
+                    : 'Refine the current assignment brief'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Capture location, owner, and scheduling data to keep the operations hub in sync.
+                </p>
+              </div>
+              <button type="button" className="dashboard-pill" onClick={closeAssignmentForm}>
+                Close
+              </button>
+            </div>
+
+            {assignmentFormErrors.length ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                <ul className="list-disc space-y-1 pl-5">
+                  {assignmentFormErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <form className="mt-6 space-y-6" onSubmit={handleAssignmentFormSubmit}>
+              <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className={`flex items-center gap-2 ${assignmentFormStep === 1 ? 'text-primary' : ''}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      assignmentFormStep === 1 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    1
+                  </span>
+                  <span>Briefing details</span>
+                </div>
+                <span className="text-slate-300">—</span>
+                <div className={`flex items-center gap-2 ${assignmentFormStep === 2 ? 'text-primary' : ''}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      assignmentFormStep === 2 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    2
+                  </span>
+                  <span>Deployment logistics</span>
+                </div>
+              </div>
+
+              {assignmentFormStep === 1 ? (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-slate-900">
+                    Service type
+                    <input
+                      type="text"
+                      name="serviceType"
+                      value={assignmentForm.serviceType}
+                      onChange={handleAssignmentFormChange}
+                      required
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Network optimisation audit"
+                    />
+                  </label>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block text-sm font-medium text-slate-900">
+                      Priority
+                      <select
+                        name="priority"
+                        value={assignmentForm.priority}
+                        onChange={handleAssignmentFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <option value="Critical">Critical</option>
+                        <option value="High">High</option>
+                        <option value="Standard">Standard</option>
+                        <option value="Routine">Routine</option>
+                      </select>
+                    </label>
+                    <label className="block text-sm font-medium text-slate-900">
+                      Owner / Squad
+                      <input
+                        type="text"
+                        name="owner"
+                        value={assignmentForm.owner}
+                        onChange={handleAssignmentFormChange}
+                        required
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        placeholder="Ops Team Bravo"
+                      />
+                    </label>
+                  </div>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Service location
+                    <input
+                      type="text"
+                      name="location"
+                      value={assignmentForm.location}
+                      onChange={handleAssignmentFormChange}
+                      required
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Cape Town - Waterfront Campus"
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" className="dashboard-pill" onClick={closeAssignmentForm}>
+                      Cancel
+                    </button>
+                    <button type="button" className="dashboard-primary-pill" onClick={handleAdvanceAssignmentForm}>
+                      Continue to logistics
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-slate-900">
+                    Scheduled arrival
+                    <input
+                      type="datetime-local"
+                      name="scheduledFor"
+                      value={assignmentForm.scheduledFor}
+                      onChange={handleAssignmentFormChange}
+                      required
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Support channel (optional)
+                    <input
+                      type="text"
+                      name="supportChannel"
+                      value={assignmentForm.supportChannel}
+                      onChange={handleAssignmentFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="#field-support or hotline"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Briefing link (optional)
+                    <input
+                      type="url"
+                      name="briefUrl"
+                      value={assignmentForm.briefUrl}
+                      onChange={handleAssignmentFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="https://"
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" className="dashboard-pill" onClick={handleRewindAssignmentForm}>
+                      Back
+                    </button>
+                    <button type="button" className="dashboard-pill" onClick={closeAssignmentForm}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="dashboard-primary-pill" disabled={disableActions}>
+                      {assignmentFormMode === 'create' ? 'Dispatch assignment' : 'Save changes'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

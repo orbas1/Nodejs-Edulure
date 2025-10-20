@@ -6,7 +6,10 @@ import DashboardStateMessage from '../../components/dashboard/DashboardStateMess
 import { createEbookPurchaseIntent, listMarketplaceEbooks } from '../../api/ebookApi.js';
 import {
   resumeEbook,
-  shareEbookHighlight
+  shareEbookHighlight,
+  createLearnerLibraryEntry,
+  updateLearnerLibraryEntry,
+  deleteLearnerLibraryEntry
 } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
@@ -101,6 +104,35 @@ export default function LearnerEbooks() {
   const [pendingPurchaseId, setPendingPurchaseId] = useState(null);
   const [libraryStatus, setLibraryStatus] = useState(null);
   const [pendingLibraryId, setPendingLibraryId] = useState(null);
+  const [libraryEntries, setLibraryEntries] = useState([]);
+  const [libraryFormVisible, setLibraryFormVisible] = useState(false);
+  const [libraryFormMode, setLibraryFormMode] = useState('create');
+  const [editingLibraryId, setEditingLibraryId] = useState(null);
+  const [libraryFormErrors, setLibraryFormErrors] = useState([]);
+  const [libraryForm, setLibraryForm] = useState({
+    title: '',
+    format: 'E-book',
+    progress: 0,
+    lastOpened: '',
+    url: '',
+    summary: '',
+    author: '',
+    coverUrl: '',
+    tags: ''
+  });
+  const [libraryQuery, setLibraryQuery] = useState('');
+  const [libraryFormatFilter, setLibraryFormatFilter] = useState('all');
+  const [libraryFormStep, setLibraryFormStep] = useState(1);
+  const [highlightFormVisible, setHighlightFormVisible] = useState(false);
+  const [highlightEntryId, setHighlightEntryId] = useState(null);
+  const [highlightForm, setHighlightForm] = useState({
+    snippet: '',
+    context: '',
+    recipients: '',
+    shareWithCommunity: true
+  });
+  const [highlightErrors, setHighlightErrors] = useState([]);
+  const [highlightPending, setHighlightPending] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -131,7 +163,38 @@ export default function LearnerEbooks() {
     }
   }, [error]);
 
-  const library = ebooks?.library ?? [];
+  useEffect(() => {
+    setLibraryEntries(Array.isArray(ebooks?.library) ? ebooks.library : []);
+  }, [ebooks]);
+
+  const library = libraryEntries;
+  const availableFormats = useMemo(() => {
+    const formats = new Set(['all']);
+    libraryEntries.forEach((entry) => {
+      if (entry.format) {
+        formats.add(entry.format.toLowerCase());
+      }
+    });
+    return Array.from(formats);
+  }, [libraryEntries]);
+  const filteredLibrary = useMemo(() => {
+    const query = libraryQuery.trim().toLowerCase();
+    const format = libraryFormatFilter.toLowerCase();
+    return libraryEntries.filter((entry) => {
+      const matchesFormat = format === 'all' || (entry.format ?? '').toLowerCase() === format;
+      if (!matchesFormat) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
+      const haystack = [entry.title, entry.summary, entry.author, ...(normaliseTags(entry.tags) ?? [])]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+      return haystack.some((value) => value.includes(query));
+    });
+  }, [libraryEntries, libraryFormatFilter, libraryQuery]);
+  const hasFilteredLibrary = filteredLibrary.length > 0;
   const recommendations = useMemo(() => (ebooks?.recommendations ?? []).slice(0, 3), [ebooks?.recommendations]);
   const marketplaceHighlights = useMemo(() => marketplace.slice(0, 3), [marketplace]);
   const marketplaceCatalogue = useMemo(() => marketplace.slice(3, 12), [marketplace]);
@@ -142,6 +205,320 @@ export default function LearnerEbooks() {
       setPendingPurchaseId(null);
     }
   }, [activeTab, purchaseStatus]);
+
+  const resetLibraryForm = useCallback(() => {
+    setLibraryForm({
+      title: '',
+      format: 'E-book',
+      progress: 0,
+      lastOpened: '',
+      url: '',
+      summary: '',
+      author: '',
+      coverUrl: '',
+      tags: ''
+    });
+    setEditingLibraryId(null);
+    setLibraryFormMode('create');
+    setLibraryFormErrors([]);
+    setLibraryFormStep(1);
+  }, []);
+
+  const closeLibraryForm = useCallback(() => {
+    setLibraryFormVisible(false);
+    resetLibraryForm();
+  }, [resetLibraryForm]);
+
+  const openLibraryCreateForm = useCallback(() => {
+    resetLibraryForm();
+    setLibraryFormMode('create');
+    setLibraryFormVisible(true);
+  }, [resetLibraryForm]);
+
+  const openLibraryEditForm = useCallback((entry) => {
+    setLibraryFormMode('edit');
+    setEditingLibraryId(entry.id);
+    setLibraryForm({
+      title: entry.title ?? '',
+      format: entry.format ?? 'E-book',
+      progress: Number.isFinite(entry.progress) ? entry.progress : Number(entry.progress ?? 0),
+      lastOpened: entry.lastOpenedRaw ?? '',
+      url: entry.url ?? entry.link ?? '',
+      summary: entry.summary ?? '',
+      author: entry.author ?? '',
+      coverUrl: entry.coverUrl ?? entry.cover ?? '',
+      tags: normaliseTags(entry.tags).join(', ')
+    });
+    setLibraryFormStep(1);
+    setLibraryFormVisible(true);
+  }, []);
+
+  const handleLibraryFormChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setLibraryForm((current) => ({ ...current, [name]: value }));
+  }, []);
+
+  const validateLibraryForm = useCallback(
+    (scope = 'all') => {
+      const errors = [];
+      const allowStep = (step) => scope === 'all' || scope === step;
+      if (allowStep(1)) {
+        if (!libraryForm.title || libraryForm.title.trim().length < 3) {
+          errors.push('Add a descriptive title so the resource is easy to recognise.');
+        }
+        const progressValue = Number(libraryForm.progress);
+        if (Number.isNaN(progressValue) || progressValue < 0 || progressValue > 100) {
+          errors.push('Progress should be between 0 and 100%.');
+        }
+        if (libraryForm.author && libraryForm.author.trim().length < 3) {
+          errors.push('Author names should be at least three characters long.');
+        }
+      }
+      if (allowStep(2)) {
+        if (!libraryForm.lastOpened) {
+          errors.push('Capture the last opened date to keep your activity timeline accurate.');
+        }
+        const links = [libraryForm.url, libraryForm.coverUrl]
+          .filter((link) => link && link.trim().length > 0)
+          .map((link) => link.trim());
+        const invalidLinks = links.filter((link) => {
+          try {
+            const parsed = new URL(link);
+            return !['http:', 'https:'].includes(parsed.protocol);
+          } catch (error) {
+            return true;
+          }
+        });
+        if (invalidLinks.length) {
+          errors.push('Links should start with http or https.');
+        }
+      }
+      setLibraryFormErrors(errors);
+      return errors.length === 0;
+    },
+    [libraryForm]
+  );
+
+  const handleAdvanceLibraryFormStep = useCallback(() => {
+    if (validateLibraryForm(1)) {
+      setLibraryFormStep(2);
+      setLibraryFormErrors([]);
+    }
+  }, [validateLibraryForm]);
+
+  const handleRewindLibraryFormStep = useCallback(() => {
+    setLibraryFormStep(1);
+    setLibraryFormErrors([]);
+  }, []);
+
+  const handleLibraryFormSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!token) {
+        setLibraryStatus({ type: 'error', message: 'Sign in again to manage your library.' });
+        return;
+      }
+      if (!validateLibraryForm('all')) {
+        return;
+      }
+
+      const tags = normaliseTags(libraryForm.tags);
+      const payload = {
+        title: libraryForm.title.trim(),
+        format: libraryForm.format.trim(),
+        progress: Math.min(100, Math.max(0, Number(libraryForm.progress))),
+        lastOpened: libraryForm.lastOpened,
+        url: libraryForm.url?.trim() || undefined,
+        summary: libraryForm.summary?.trim() || undefined,
+        author: libraryForm.author?.trim() || undefined,
+        coverUrl: libraryForm.coverUrl?.trim() || undefined,
+        tags: tags.length ? tags : undefined
+      };
+
+      if (libraryFormMode === 'create') {
+        setPendingLibraryId('create');
+        setLibraryStatus({ type: 'pending', message: `Adding ${payload.title} to your library…` });
+        try {
+          const response = await createLearnerLibraryEntry({ token, payload });
+          const entry = response?.data ?? {};
+          const newEntry = {
+            id: entry.id ?? `library-${Date.now()}`,
+            title: entry.title ?? payload.title,
+            format: entry.format ?? payload.format,
+            progress: entry.progress ?? payload.progress,
+            lastOpened: entry.lastOpenedLabel ?? entry.lastOpened ?? payload.lastOpened,
+            lastOpenedRaw: entry.lastOpened ?? payload.lastOpened,
+            url: entry.url ?? payload.url,
+            summary: entry.summary ?? payload.summary,
+            author: entry.author ?? payload.author,
+            coverUrl: entry.coverUrl ?? payload.coverUrl,
+            tags: entry.tags ?? payload.tags ?? []
+          };
+          setLibraryEntries((current) => [newEntry, ...current]);
+          setLibraryStatus({ type: 'success', message: `${newEntry.title} added to your library.` });
+          closeLibraryForm();
+        } catch (createError) {
+          setLibraryStatus({
+            type: 'error',
+            message:
+              createError instanceof Error ? createError.message : 'We were unable to add the new resource.'
+          });
+        } finally {
+          setPendingLibraryId(null);
+        }
+        return;
+      }
+
+      setPendingLibraryId(editingLibraryId);
+      setLibraryStatus({ type: 'pending', message: `Updating ${payload.title}…` });
+      try {
+        await updateLearnerLibraryEntry({ token, ebookId: editingLibraryId, payload });
+        setLibraryEntries((current) =>
+          current.map((entry) =>
+            entry.id === editingLibraryId
+              ? {
+                  ...entry,
+                  title: payload.title,
+                  format: payload.format,
+                  progress: payload.progress,
+                  lastOpened: new Date(payload.lastOpened).toLocaleDateString(),
+                  lastOpenedRaw: payload.lastOpened,
+                  url: payload.url ?? entry.url,
+                  summary: payload.summary ?? entry.summary,
+                  author: payload.author ?? entry.author,
+                  coverUrl: payload.coverUrl ?? entry.coverUrl,
+                  tags: payload.tags ?? entry.tags
+                }
+              : entry
+          )
+        );
+        setLibraryStatus({ type: 'success', message: `${payload.title} updated.` });
+        closeLibraryForm();
+      } catch (updateError) {
+        setLibraryStatus({
+          type: 'error',
+          message: updateError instanceof Error ? updateError.message : 'We were unable to update the resource.'
+        });
+      } finally {
+        setPendingLibraryId(null);
+      }
+    },
+    [
+      closeLibraryForm,
+      createLearnerLibraryEntry,
+      editingLibraryId,
+      libraryForm,
+      libraryFormMode,
+      setLibraryEntries,
+      token,
+      updateLearnerLibraryEntry,
+      validateLibraryForm
+    ]
+  );
+
+  const handleRemoveLibraryEntry = useCallback(
+    async (entry) => {
+      if (!token) {
+        setLibraryStatus({ type: 'error', message: 'Sign in again to manage your library.' });
+        return;
+      }
+      setPendingLibraryId(entry.id);
+      setLibraryStatus({ type: 'pending', message: `Removing ${entry.title} from your library…` });
+      try {
+        await deleteLearnerLibraryEntry({ token, ebookId: entry.id });
+        setLibraryEntries((current) => current.filter((item) => item.id !== entry.id));
+        setLibraryStatus({ type: 'success', message: `${entry.title} removed from your library.` });
+      } catch (removeError) {
+        setLibraryStatus({
+          type: 'error',
+          message:
+            removeError instanceof Error ? removeError.message : 'We were unable to remove the resource.'
+        });
+      } finally {
+        setPendingLibraryId(null);
+      }
+    },
+    [deleteLearnerLibraryEntry, setLibraryEntries, token]
+  );
+
+  const openHighlightForm = useCallback((entry) => {
+    setHighlightEntryId(entry.id);
+    setHighlightForm({
+      snippet: '',
+      context: '',
+      recipients: '',
+      shareWithCommunity: true
+    });
+    setHighlightErrors([]);
+    setHighlightFormVisible(true);
+  }, []);
+
+  const closeHighlightForm = useCallback(() => {
+    setHighlightEntryId(null);
+    setHighlightFormVisible(false);
+    setHighlightErrors([]);
+    setHighlightPending(false);
+  }, []);
+
+  const handleHighlightFormChange = useCallback((event) => {
+    const { name, type, checked, value } = event.target;
+    setHighlightForm((current) => ({ ...current, [name]: type === 'checkbox' ? checked : value }));
+  }, []);
+
+  const validateHighlightForm = useCallback(() => {
+    const errors = [];
+    if (!highlightForm.snippet || highlightForm.snippet.trim().length < 10) {
+      errors.push('Share at least a short excerpt to contextualise the highlight.');
+    }
+    const recipients = highlightForm.recipients
+      .split(',')
+      .map((recipient) => recipient.trim())
+      .filter(Boolean);
+    const invalidRecipients = recipients.filter((recipient) => !recipient.includes('@'));
+    if (invalidRecipients.length) {
+      errors.push('Recipient emails should include an @ symbol.');
+    }
+    setHighlightErrors(errors);
+    return { valid: errors.length === 0, recipients };
+  }, [highlightForm]);
+
+  const handleHighlightFormSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!token) {
+        setLibraryStatus({ type: 'error', message: 'Sign in again to share highlights.' });
+        return;
+      }
+      const { valid, recipients } = validateHighlightForm();
+      if (!valid) {
+        return;
+      }
+      setHighlightPending(true);
+      setLibraryStatus({ type: 'pending', message: 'Publishing your highlight to peers…' });
+      try {
+        const payload = {
+          snippet: highlightForm.snippet.trim(),
+          note: highlightForm.context?.trim() || undefined,
+          shareWithCommunity: highlightForm.shareWithCommunity,
+          recipients
+        };
+        const response = await shareEbookHighlight({ token, ebookId: highlightEntryId, payload });
+        setLibraryStatus({
+          type: 'success',
+          message: response?.message ?? 'Highlight shared with your selected contacts.'
+        });
+        closeHighlightForm();
+      } catch (shareError) {
+        setLibraryStatus({
+          type: 'error',
+          message: shareError instanceof Error ? shareError.message : 'We were unable to share your highlight.'
+        });
+      } finally {
+        setHighlightPending(false);
+      }
+    },
+    [closeHighlightForm, highlightEntryId, highlightForm, shareEbookHighlight, token, validateHighlightForm]
+  );
 
   const handlePurchase = useCallback(
     async (ebook) => {
@@ -256,98 +633,182 @@ export default function LearnerEbooks() {
             </div>
           ) : null}
 
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-slate-900">Personal library</h2>
+            <button type="button" className="dashboard-primary-pill" onClick={openLibraryCreateForm}>
+              Add resource
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Search library
+              <input
+                type="search"
+                value={libraryQuery}
+                onChange={(event) => setLibraryQuery(event.target.value)}
+                placeholder="Search title, author, or tags"
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Format filter
+              <select
+                value={libraryFormatFilter}
+                onChange={(event) => setLibraryFormatFilter(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                {availableFormats.map((format) => (
+                  <option key={format} value={format}>
+                    {format === 'all' ? 'All formats' : format.replace(/(^\w|[-_\s]\w)/g, (match) => match.toUpperCase())}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="flex items-end justify-end">
+              <button
+                type="button"
+                className="dashboard-pill w-full justify-center px-4 py-2 text-xs"
+                onClick={() => {
+                  setLibraryQuery('');
+                  setLibraryFormatFilter('all');
+                }}
+              >
+                Reset filters
+              </button>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             {library.length > 0 ? (
-              library.map((ebook) => (
-                <div key={ebook.id} className="dashboard-section">
-                  <p className="dashboard-kicker">{ebook.format}</p>
-                  <h2 className="mt-2 text-lg font-semibold text-slate-900">{ebook.title}</h2>
-                  <p className="mt-2 text-sm text-slate-600">Last opened {ebook.lastOpened}</p>
-                  <div className="mt-4 h-2 rounded-full bg-slate-200">
-                    <div
-                      className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
-                      style={{ width: `${ebook.progress}%` }}
-                    />
+              hasFilteredLibrary ? (
+                filteredLibrary.map((ebook) => (
+                  <div key={ebook.id} className="dashboard-section flex flex-col">
+                    <div className="relative overflow-hidden rounded-2xl bg-slate-100">
+                      {ebook.coverUrl ? (
+                        <img
+                          src={ebook.coverUrl}
+                          alt="E-book cover art"
+                          className="h-40 w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-40 w-full items-center justify-center bg-gradient-to-br from-primary/10 via-white to-primary/20 text-sm font-semibold text-primary">
+                          {ebook.format}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      <p className="dashboard-kicker">{ebook.format}</p>
+                      <h2 className="text-lg font-semibold text-slate-900">{ebook.title}</h2>
+                      {ebook.author ? (
+                        <p className="text-xs uppercase tracking-wide text-slate-500">{ebook.author}</p>
+                      ) : null}
+                      <p className="text-sm text-slate-600">
+                        Last opened {ebook.lastOpened ?? new Date().toLocaleDateString()}
+                      </p>
+                      {ebook.summary ? <p className="text-xs text-slate-500">{ebook.summary}</p> : null}
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-wide text-slate-400">
+                        {normaliseTags(ebook.tags).slice(0, 4).map((tag) => (
+                          <span key={`${ebook.id}-${tag}`} className="dashboard-pill bg-white px-3 py-1">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="mt-4 h-2 rounded-full bg-slate-200">
+                      <div
+                        className="h-2 rounded-full bg-gradient-to-r from-primary to-primary-dark"
+                        style={{ width: `${Math.min(100, Number(ebook.progress ?? 0))}%` }}
+                      />
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">
+                      {Math.min(100, Number(ebook.progress ?? 0))}% complete
+                    </p>
+                    {ebook.url ? (
+                      <a
+                        href={ebook.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="dashboard-pill mt-3 inline-flex w-max items-center gap-2 px-3 py-1 text-xs"
+                      >
+                        Open resource
+                      </a>
+                    ) : null}
+                    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1"
+                        onClick={async () => {
+                          if (!token) {
+                            setLibraryStatus({
+                              type: 'error',
+                              message: 'Sign in again to resume your reading session.'
+                            });
+                            return;
+                          }
+                          setPendingLibraryId(ebook.id);
+                          setLibraryStatus({ type: 'pending', message: `Reopening ${ebook.title}…` });
+                          try {
+                            const response = await resumeEbook({ token, ebookId: ebook.id });
+                            setLibraryStatus({
+                              type: 'success',
+                              message: response?.message ?? `${ebook.title} is ready to continue.`
+                            });
+                          } catch (resumeError) {
+                            setLibraryStatus({
+                              type: 'error',
+                              message:
+                                resumeError instanceof Error
+                                  ? resumeError.message
+                                  : 'We were unable to resume your e-book.'
+                            });
+                          } finally {
+                            setPendingLibraryId(null);
+                          }
+                        }}
+                        disabled={pendingLibraryId === ebook.id}
+                      >
+                        {pendingLibraryId === ebook.id ? 'Resuming…' : 'Continue reading'}
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1"
+                        onClick={() => openHighlightForm(ebook)}
+                        disabled={highlightPending && highlightEntryId === ebook.id}
+                      >
+                        {highlightPending && highlightEntryId === ebook.id ? 'Preparing…' : 'Share highlight'}
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1"
+                        onClick={() => openLibraryEditForm(ebook)}
+                      >
+                        Edit details
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-pill bg-rose-50 text-rose-600 hover:bg-rose-100"
+                        onClick={() => handleRemoveLibraryEntry(ebook)}
+                        disabled={pendingLibraryId === ebook.id}
+                      >
+                        {pendingLibraryId === ebook.id ? 'Removing…' : 'Remove'}
+                      </button>
+                    </div>
                   </div>
-                  <p className="mt-3 text-xs text-slate-500">{ebook.progress}% complete</p>
-                  <div className="mt-4 flex items-center gap-3 text-xs text-slate-600">
-                    <button
-                      type="button"
-                      className="dashboard-pill px-3 py-1"
-                      onClick={async () => {
-                        if (!token) {
-                          setLibraryStatus({
-                            type: 'error',
-                            message: 'Sign in again to resume your reading session.'
-                          });
-                          return;
-                        }
-                        setPendingLibraryId(ebook.id);
-                        setLibraryStatus({ type: 'pending', message: `Reopening ${ebook.title}…` });
-                        try {
-                          const response = await resumeEbook({ token, ebookId: ebook.id });
-                          setLibraryStatus({
-                            type: 'success',
-                            message: response?.message ?? `${ebook.title} is ready to continue.`
-                          });
-                        } catch (resumeError) {
-                          setLibraryStatus({
-                            type: 'error',
-                            message:
-                              resumeError instanceof Error
-                                ? resumeError.message
-                                : 'We were unable to resume your e-book.'
-                          });
-                        } finally {
-                          setPendingLibraryId(null);
-                        }
-                      }}
-                      disabled={pendingLibraryId === ebook.id}
-                    >
-                      {pendingLibraryId === ebook.id ? 'Resuming…' : 'Continue reading'}
-                    </button>
-                    <button
-                      type="button"
-                      className="dashboard-pill px-3 py-1"
-                      onClick={async () => {
-                        if (!token) {
-                          setLibraryStatus({
-                            type: 'error',
-                            message: 'Sign in again to share highlights.'
-                          });
-                          return;
-                        }
-                        setPendingLibraryId(ebook.id);
-                        setLibraryStatus({ type: 'pending', message: `Sharing highlights from ${ebook.title}…` });
-                        try {
-                          const response = await shareEbookHighlight({
-                            token,
-                            ebookId: ebook.id,
-                            payload: { action: 'share', recipients: [] }
-                          });
-                          setLibraryStatus({
-                            type: 'success',
-                            message: response?.message ?? `${ebook.title} highlight shared.`
-                          });
-                        } catch (shareError) {
-                          setLibraryStatus({
-                            type: 'error',
-                            message:
-                              shareError instanceof Error
-                                ? shareError.message
-                                : 'We were unable to share your highlight.'
-                          });
-                        } finally {
-                          setPendingLibraryId(null);
-                        }
-                      }}
-                      disabled={pendingLibraryId === ebook.id}
-                    >
-                      {pendingLibraryId === ebook.id ? 'Sharing…' : 'Share highlight'}
-                    </button>
-                  </div>
-                </div>
-              ))
+                ))
+              ) : (
+                <DashboardStateMessage
+                  className="md:col-span-3"
+                  title="No titles match your filters"
+                  description="Adjust your search text or format filters to surface saved resources."
+                  actionLabel="Reset filters"
+                  onAction={() => {
+                    setLibraryQuery('');
+                    setLibraryFormatFilter('all');
+                  }}
+                />
+              )
             ) : (
               <DashboardStateMessage
                 className="md:col-span-3"
@@ -473,6 +934,281 @@ export default function LearnerEbooks() {
           ) : null}
         </section>
       )}
+
+      {libraryFormVisible ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="dashboard-kicker text-primary-dark">
+                  {libraryFormMode === 'create' ? 'Add to library' : 'Update library resource'}
+                </p>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {libraryFormMode === 'create'
+                    ? 'Capture new playbooks, handbooks, or notes'
+                    : 'Refresh metadata for this resource'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Track reading progress, resource links, and summaries to keep your curriculum organised.
+                </p>
+              </div>
+              <button type="button" className="dashboard-pill" onClick={closeLibraryForm}>
+                Close
+              </button>
+            </div>
+
+            {libraryFormErrors.length ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                <ul className="list-disc space-y-1 pl-5">
+                  {libraryFormErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <form className="mt-6 space-y-6" onSubmit={handleLibraryFormSubmit}>
+              <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className={`flex items-center gap-2 ${libraryFormStep === 1 ? 'text-primary' : ''}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      libraryFormStep === 1 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    1
+                  </span>
+                  <span>Resource basics</span>
+                </div>
+                <span className="text-slate-300">—</span>
+                <div className={`flex items-center gap-2 ${libraryFormStep === 2 ? 'text-primary' : ''}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      libraryFormStep === 2 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    2
+                  </span>
+                  <span>Enrichment</span>
+                </div>
+              </div>
+
+              {libraryFormStep === 1 ? (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-slate-900">
+                    Title
+                    <input
+                      type="text"
+                      name="title"
+                      required
+                      value={libraryForm.title}
+                      onChange={handleLibraryFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Example: Product analytics teardown"
+                    />
+                  </label>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block text-sm font-medium text-slate-900">
+                      Format
+                      <input
+                        type="text"
+                        name="format"
+                        value={libraryForm.format}
+                        onChange={handleLibraryFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-900">
+                      Author / creator
+                      <input
+                        type="text"
+                        name="author"
+                        value={libraryForm.author}
+                        onChange={handleLibraryFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        placeholder="Optional"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block text-sm font-medium text-slate-900">
+                      Progress (%)
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        name="progress"
+                        value={libraryForm.progress}
+                        onChange={handleLibraryFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-900">
+                      Last opened
+                      <input
+                        type="date"
+                        name="lastOpened"
+                        value={libraryForm.lastOpened}
+                        onChange={handleLibraryFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" className="dashboard-pill" onClick={closeLibraryForm}>
+                      Cancel
+                    </button>
+                    <button type="button" className="dashboard-primary-pill" onClick={handleAdvanceLibraryFormStep}>
+                      Continue to enrichment
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-slate-900">
+                    Resource link (optional)
+                    <input
+                      type="url"
+                      name="url"
+                      value={libraryForm.url}
+                      onChange={handleLibraryFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="https://"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Cover image URL (optional)
+                    <input
+                      type="url"
+                      name="coverUrl"
+                      value={libraryForm.coverUrl}
+                      onChange={handleLibraryFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="https://"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Tags (comma separated)
+                    <input
+                      type="text"
+                      name="tags"
+                      value={libraryForm.tags}
+                      onChange={handleLibraryFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Leadership, Growth, Design"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Summary
+                    <textarea
+                      name="summary"
+                      rows="4"
+                      value={libraryForm.summary}
+                      onChange={handleLibraryFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="What makes this resource valuable?"
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" className="dashboard-pill" onClick={handleRewindLibraryFormStep}>
+                      Back
+                    </button>
+                    <button type="button" className="dashboard-pill" onClick={closeLibraryForm}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="dashboard-primary-pill" disabled={pendingLibraryId !== null}>
+                      {libraryFormMode === 'create' ? 'Add to library' : 'Save changes'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {highlightFormVisible ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4">
+          <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="dashboard-kicker text-primary-dark">Share highlight</p>
+                <h2 className="text-xl font-semibold text-slate-900">Broadcast this insight</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Curate a snippet, add optional context, and choose whether to broadcast to your community.
+                </p>
+              </div>
+              <button type="button" className="dashboard-pill" onClick={closeHighlightForm}>
+                Close
+              </button>
+            </div>
+
+            {highlightErrors.length ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                <ul className="list-disc space-y-1 pl-5">
+                  {highlightErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <form className="mt-6 space-y-4" onSubmit={handleHighlightFormSubmit}>
+              <label className="block text-sm font-medium text-slate-900">
+                Highlight snippet
+                <textarea
+                  name="snippet"
+                  rows="4"
+                  value={highlightForm.snippet}
+                  onChange={handleHighlightFormChange}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Quote or excerpt you want to spotlight"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-900">
+                Optional context
+                <textarea
+                  name="context"
+                  rows="3"
+                  value={highlightForm.context}
+                  onChange={handleHighlightFormChange}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Add commentary for your peers"
+                />
+              </label>
+              <label className="block text-sm font-medium text-slate-900">
+                Email recipients (comma separated)
+                <input
+                  type="text"
+                  name="recipients"
+                  value={highlightForm.recipients}
+                  onChange={handleHighlightFormChange}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="team@example.com, mentor@example.com"
+                />
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  name="shareWithCommunity"
+                  checked={highlightForm.shareWithCommunity}
+                  onChange={handleHighlightFormChange}
+                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary/40"
+                />
+                Share with learner community feed
+              </label>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <button type="button" className="dashboard-pill" onClick={closeHighlightForm}>
+                  Cancel
+                </button>
+                <button type="submit" className="dashboard-primary-pill" disabled={highlightPending}>
+                  {highlightPending ? 'Sharing…' : 'Publish highlight'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -8,6 +8,8 @@ const useLearnerDashboardSectionMock = vi.hoisted(() => vi.fn());
 const useAuthMock = vi.hoisted(() => vi.fn());
 const createTutorBookingRequestMock = vi.hoisted(() => vi.fn());
 const exportTutorScheduleMock = vi.hoisted(() => vi.fn());
+const updateTutorBookingMock = vi.hoisted(() => vi.fn());
+const cancelTutorBookingMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../hooks/useLearnerDashboard.js', () => ({
   useLearnerDashboardSection: useLearnerDashboardSectionMock
@@ -19,7 +21,9 @@ vi.mock('../../../context/AuthContext.jsx', () => ({
 
 vi.mock('../../../api/learnerDashboardApi.js', () => ({
   createTutorBookingRequest: createTutorBookingRequestMock,
-  exportTutorSchedule: exportTutorScheduleMock
+  exportTutorSchedule: exportTutorScheduleMock,
+  updateTutorBooking: updateTutorBookingMock,
+  cancelTutorBooking: cancelTutorBookingMock
 }));
 
 describe('<LearnerBookings />', () => {
@@ -35,6 +39,7 @@ describe('<LearnerBookings />', () => {
             topic: 'Portfolio review',
             mentor: 'Avery Mentor',
             date: 'June 30',
+            rawDate: '2024-06-30T10:00',
             rating: 5
           }
         ],
@@ -58,20 +63,79 @@ describe('<LearnerBookings />', () => {
       message: 'Export prepared',
       data: { meta: { downloadUrl: '/exports/schedule.ics' } }
     });
+    updateTutorBookingMock.mockResolvedValue({ message: 'Mentor booking updated.' });
+    cancelTutorBookingMock.mockResolvedValue({ message: 'Booking cancelled.' });
   });
 
-  it('submits a new tutor booking request when the primary action is used', async () => {
+  it('submits a new tutor booking request via the booking form', async () => {
     const user = userEvent.setup();
     render(<LearnerBookings />);
 
     await user.click(screen.getByRole('button', { name: /request new session/i }));
 
+    const focusInput = screen.getByLabelText(/session focus/i);
+    const dateInput = screen.getByLabelText(/preferred date & time/i);
+
+    await user.clear(focusInput);
+    await user.type(focusInput, 'Product strategy deep-dive');
+    await user.type(dateInput, '2025-05-12T12:00');
+
+    await user.click(screen.getByRole('button', { name: /continue to preparation/i }));
+
+    await user.click(screen.getByRole('button', { name: /submit booking request/i }));
+
     await waitFor(() => {
       expect(createTutorBookingRequestMock).toHaveBeenCalledWith({
         token: 'token-123',
-        payload: expect.objectContaining({ topic: 'Mentorship session' })
+        payload: expect.objectContaining({ topic: 'Product strategy deep-dive', preferredDate: '2025-05-12T12:00' })
       });
       expect(screen.getByRole('status')).toHaveTextContent(/tutor booking request created/i);
+    });
+  });
+
+  it('updates an existing booking when the reschedule flow is used', async () => {
+    const user = userEvent.setup();
+    render(<LearnerBookings />);
+
+    await user.click(screen.getByRole('button', { name: /reschedule/i }));
+
+    const focusInput = screen.getByLabelText(/session focus/i);
+    const dateInput = screen.getByLabelText(/preferred date & time/i);
+
+    await user.clear(focusInput);
+    await user.type(focusInput, 'Portfolio follow-up workshop');
+    await user.clear(dateInput);
+    await user.type(dateInput, '2025-07-20T09:30');
+
+    await user.click(screen.getByRole('button', { name: /continue to preparation/i }));
+    await user.click(screen.getByRole('button', { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(updateTutorBookingMock).toHaveBeenCalledWith({
+        token: 'token-123',
+        bookingId: 'booking-1',
+        payload: expect.objectContaining({
+          topic: 'Portfolio follow-up workshop',
+          preferredDate: '2025-07-20T09:30'
+        })
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(/mentor booking updated/i);
+    });
+  });
+
+  it('cancels a booking and shows confirmation messaging', async () => {
+    const user = userEvent.setup();
+    render(<LearnerBookings />);
+
+    await user.click(screen.getByRole('button', { name: /cancel booking/i }));
+
+    await waitFor(() => {
+      expect(cancelTutorBookingMock).toHaveBeenCalledWith({
+        token: 'token-123',
+        bookingId: 'booking-1',
+        payload: expect.any(Object)
+      });
+      expect(screen.getByRole('status')).toHaveTextContent(/has been cancelled/i);
     });
   });
 
