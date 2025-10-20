@@ -1,8 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:edulure_mobile/provider/learning/learning_models.dart';
-import 'package:edulure_mobile/services/content_service.dart';
 import 'package:edulure_mobile/services/ebook_library_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
@@ -62,6 +62,53 @@ void main() {
     final secondPath = await service.ensureDownloaded(ebook);
     expect(secondPath, firstPath);
     expect(fakeDio.downloadCalls, 1);
+  });
+
+  test('ensureDownloaded reuses in-flight download for duplicate requests', () async {
+    final controlledDio = _ControlledDio();
+    service = EbookLibraryService(
+      httpClient: controlledDio,
+      libraryDirectoryBuilder: libraryBuilder,
+    );
+    await service.ensureReady();
+
+    final ebook = _buildEbook(
+      id: 'ebook-3',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-3.epub',
+    );
+
+    final firstFuture = service.ensureDownloaded(ebook);
+    await controlledDio.started.future;
+    final secondFuture = service.ensureDownloaded(ebook);
+
+    controlledDio.allowCompletion.complete();
+
+    final results = await Future.wait([firstFuture, secondFuture]);
+    expect(results[0], results[1]);
+    expect(controlledDio.downloadCalls, 1);
+  });
+
+  test('ensureDownloaded recreates missing directory and invalidates stale entries', () async {
+    final ebook = _buildEbook(
+      id: 'ebook-4',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-4.pdf',
+    );
+
+    final firstPath = await service.ensureDownloaded(ebook);
+    final firstFile = File(firstPath);
+    expect(firstFile.existsSync(), isTrue);
+
+    final libraryDir = Directory('${tempDir.path}/library');
+    await libraryDir.delete(recursive: true);
+    expect(await libraryDir.exists(), isFalse);
+
+    final secondPath = await service.ensureDownloaded(ebook);
+    expect(secondPath, firstPath);
+    expect(File(secondPath).existsSync(), isTrue);
+    expect(fakeDio.downloadCalls, 2);
+
+    final filesBox = Hive.box<dynamic>('ebook_library.files');
+    expect(filesBox.get(ebook.id), secondPath);
   });
 
   test('loadReaderPreferences restores persisted settings', () async {
@@ -160,6 +207,37 @@ class _FakeDio extends Dio {
     final file = File(savePath.toString());
     await file.create(recursive: true);
     await file.writeAsString('mocked data for $urlPath');
+    return Response<dynamic>(
+      requestOptions: RequestOptions(path: urlPath),
+      statusCode: 200,
+    );
+  }
+}
+
+class _ControlledDio extends Dio {
+  final Completer<void> started = Completer<void>();
+  final Completer<void> allowCompletion = Completer<void>();
+  int downloadCalls = 0;
+
+  @override
+  Future<Response<dynamic>> download(
+    String urlPath,
+    dynamic savePath, {
+    ProgressCallback? onReceiveProgress,
+    CancelToken? cancelToken,
+    bool deleteOnError = true,
+    String lengthHeader = Headers.contentLengthHeader,
+    Object? data,
+    Options? options,
+  }) async {
+    downloadCalls++;
+    if (!started.isCompleted) {
+      started.complete();
+    }
+    await allowCompletion.future;
+    final file = File(savePath.toString());
+    await file.create(recursive: true);
+    await file.writeAsString('controlled data for $urlPath');
     return Response<dynamic>(
       requestOptions: RequestOptions(path: urlPath),
       statusCode: 200,

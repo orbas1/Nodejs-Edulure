@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -5,7 +6,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../provider/learning/learning_models.dart';
-import 'content_service.dart';
 import 'ebook_reader_backend.dart';
 
 class EbookDownloadException implements Exception {
@@ -38,6 +38,7 @@ class EbookLibraryService implements EbookReaderBackend {
   Directory? _libraryDirectory;
   Future<void>? _ensureReadyFuture;
   bool _ready = false;
+  final Map<String, Future<String>> _inFlightDownloads = <String, Future<String>>{};
 
   Future<void> ensureReady() async {
     if (_ready) {
@@ -59,31 +60,45 @@ class EbookLibraryService implements EbookReaderBackend {
 
   Future<String> ensureDownloaded(Ebook ebook) async {
     await ensureReady();
-    final cached = _filesBox?.get(ebook.id);
-    if (cached is String && await File(cached).exists()) {
-      return cached;
+    final cachedPath = await _validateCachedDownload(ebook.id);
+    if (cachedPath != null) {
+      return cachedPath;
     }
-    final fileName = _buildFileName(ebook);
-    final directory = _libraryDirectory!;
-    final filePath = '${directory.path}/$fileName';
-    final file = File(filePath);
-    try {
-      await _client.download(ebook.fileUrl, filePath);
-      await _filesBox?.put(ebook.id, filePath);
-      return filePath;
-    } on DioException catch (error) {
-      await _cleanupFailedDownload(file, ebook.id);
-      throw EbookDownloadException(
-        'Failed to download "${ebook.title}". Check your connection and try again.',
-        error,
-      );
-    } catch (error) {
-      await _cleanupFailedDownload(file, ebook.id);
-      throw EbookDownloadException(
-        'Failed to save "${ebook.title}" to your offline library.',
-        error,
-      );
-    }
+
+    return _inFlightDownloads.putIfAbsent(ebook.id, () async {
+      try {
+        final cachedWhileQueued = await _validateCachedDownload(ebook.id);
+        if (cachedWhileQueued != null) {
+          return cachedWhileQueued;
+        }
+
+        final directory = await _resolveLibraryDirectory();
+        final fileName = _buildFileName(ebook);
+        final filePath = '${directory.path}/$fileName';
+        final file = File(filePath);
+        await file.parent.create(recursive: true);
+
+        try {
+          await _client.download(ebook.fileUrl, filePath);
+          await _filesBox?.put(ebook.id, filePath);
+          return filePath;
+        } on DioException catch (error) {
+          await _cleanupFailedDownload(file, ebook.id);
+          throw EbookDownloadException(
+            'Failed to download "${ebook.title}". Check your connection and try again.',
+            error,
+          );
+        } catch (error) {
+          await _cleanupFailedDownload(file, ebook.id);
+          throw EbookDownloadException(
+            'Failed to save "${ebook.title}" to your offline library.',
+            error,
+          );
+        }
+      } finally {
+        _inFlightDownloads.remove(ebook.id);
+      }
+    });
   }
 
   Future<void> removeDownload(String ebookId) async {
@@ -95,6 +110,8 @@ class EbookLibraryService implements EbookReaderBackend {
         await file.delete();
       }
       await _filesBox?.delete(ebookId);
+    } else if (cached != null) {
+      await _filesBox?.delete(ebookId);
     }
   }
 
@@ -103,7 +120,14 @@ class EbookLibraryService implements EbookReaderBackend {
     final cached = _filesBox?.get(ebookId);
     if (cached is String) {
       final file = File(cached);
-      return file.existsSync();
+      final exists = file.existsSync();
+      if (!exists) {
+        unawaited(_filesBox?.delete(ebookId));
+      }
+      return exists;
+    }
+    if (cached != null) {
+      unawaited(_filesBox?.delete(ebookId));
     }
     return false;
   }
@@ -131,6 +155,7 @@ class EbookLibraryService implements EbookReaderBackend {
     }
     await _filesBox?.clear();
     await _progressBox?.clear();
+    await _preferencesBox?.clear();
   }
 
   @override
@@ -199,11 +224,33 @@ class EbookLibraryService implements EbookReaderBackend {
     _preferencesBox ??= _maybeOpenBox(_preferencesBoxName);
   }
 
+  Future<String?> _validateCachedDownload(String ebookId) async {
+    final cached = _filesBox?.get(ebookId);
+    if (cached is String) {
+      final file = File(cached);
+      if (await file.exists()) {
+        return cached;
+      }
+      await _filesBox?.delete(ebookId);
+    } else if (cached != null) {
+      await _filesBox?.delete(ebookId);
+    }
+    return null;
+  }
+
   Box<dynamic>? _maybeOpenBox(String name) {
     if (Hive.isBoxOpen(name)) {
       return Hive.box<dynamic>(name);
     }
     return null;
+  }
+
+  Future<Directory> _resolveLibraryDirectory() async {
+    final directory = _libraryDirectory ??= await _prepareLibraryDirectory();
+    if (!await directory.exists()) {
+      await directory.create(recursive: true);
+    }
+    return directory;
   }
 
   static Future<Directory> _defaultLibraryDirectoryBuilder() async {
