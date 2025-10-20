@@ -24,13 +24,15 @@ vi.mock('../../../../components/dashboard/admin/AdminCrudResource.jsx', async ()
         title: 'Ops Playbooks 101',
         status: 'published',
         priceAmount: 15000,
-        releaseAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString()
+        releaseAt: new Date(Date.now() + 72 * 60 * 60 * 1000).toISOString(),
+        thumbnailUrl: 'https://cdn.edulure.com/course-thumb.jpg'
       },
       {
         id: 2,
         title: 'Automation Crash Course',
         status: 'draft',
-        priceAmount: 0
+        priceAmount: 0,
+        promoVideoUrl: 'https://cdn.edulure.com/promo.mp4'
       },
       {
         id: 3,
@@ -41,8 +43,14 @@ vi.mock('../../../../components/dashboard/admin/AdminCrudResource.jsx', async ()
       }
     ],
     ebook: [
-      { id: 1, status: 'published', isPublic: true, readingTimeMinutes: 45 },
-      { id: 2, status: 'draft', isPublic: false, readingTimeMinutes: 30 },
+      { id: 1, status: 'published', isPublic: true, readingTimeMinutes: 45, coverImageUrl: 'https://cdn.edulure.com/ebooks/cover.jpg' },
+      {
+        id: 2,
+        status: 'draft',
+        isPublic: false,
+        readingTimeMinutes: 30,
+        sampleDownloadUrl: 'https://cdn.edulure.com/ebooks/sample.pdf'
+      },
       { id: 3, status: 'published', isPublic: true, readingTimeMinutes: 60 }
     ],
     'live stream': [
@@ -232,6 +240,7 @@ describe('Admin operational sections', () => {
     expect(screen.getByText('Published').parentElement).toHaveTextContent('2');
     expect(screen.getByText('Average price').parentElement).toHaveTextContent('$80.00');
     expect(screen.getByText('In pipeline').parentElement).toHaveTextContent('1');
+    expect(screen.getByText('Media ready').parentElement).toHaveTextContent('2');
   });
 
   it('calculates ebook distribution metrics', async () => {
@@ -243,6 +252,7 @@ describe('Admin operational sections', () => {
     expect(screen.getByText('Published').parentElement).toHaveTextContent('2');
     expect(screen.getByText('Public distribution').parentElement).toHaveTextContent('2');
     expect(screen.getByText('Avg. reading time').parentElement).toHaveTextContent('45 mins');
+    expect(screen.getByText('Media ready').parentElement).toHaveTextContent('2');
   });
 
   it('highlights calendar capacity and next session details', async () => {

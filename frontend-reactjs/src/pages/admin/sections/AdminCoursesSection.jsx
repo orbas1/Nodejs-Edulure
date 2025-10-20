@@ -39,7 +39,8 @@ function calculateInsights(items) {
       published: 0,
       draft: 0,
       averagePrice: 0,
-      upcoming: 0
+      upcoming: 0,
+      mediaReady: 0
     };
   }
 
@@ -58,9 +59,12 @@ function calculateInsights(items) {
       if (course.priceAmount) {
         acc.priceTotal += Number(course.priceAmount ?? 0);
       }
+      if (course.thumbnailUrl || course.heroImageUrl || course.promoVideoUrl || course.trailerUrl) {
+        acc.mediaReady += 1;
+      }
       return acc;
     },
-    { total: 0, published: 0, draft: 0, upcoming: 0, priceTotal: 0 }
+    { total: 0, published: 0, draft: 0, upcoming: 0, priceTotal: 0, mediaReady: 0 }
   );
 
   const averagePrice = totals.total === 0 ? 0 : totals.priceTotal / totals.total;
@@ -70,13 +74,21 @@ function calculateInsights(items) {
     published: totals.published,
     draft: totals.draft,
     upcoming: totals.upcoming,
-    averagePrice
+    averagePrice,
+    mediaReady: totals.mediaReady
   };
 }
 
 export default function AdminCoursesSection({ sectionId, token }) {
   const config = useCourseConfig();
-  const [insights, setInsights] = useState({ total: 0, published: 0, draft: 0, averagePrice: 0, upcoming: 0 });
+  const [insights, setInsights] = useState({
+    total: 0,
+    published: 0,
+    draft: 0,
+    averagePrice: 0,
+    upcoming: 0,
+    mediaReady: 0
+  });
 
   const handleItemsChange = useCallback((items) => {
     setInsights(calculateInsights(items));
@@ -94,6 +106,11 @@ export default function AdminCoursesSection({ sectionId, token }) {
       label: 'Average price',
       value: formatCurrency(insights.averagePrice, 'USD'),
       helper: `${insights.draft} drafts awaiting publication`
+    },
+    {
+      label: 'Media ready',
+      value: insights.mediaReady,
+      helper: 'Courses with hero imagery or trailers'
     }
   ];
 
@@ -105,7 +122,7 @@ export default function AdminCoursesSection({ sectionId, token }) {
           Manage programme inventory, publishing cadence, and pricing visibility across the Edulure marketplace.
         </p>
       </header>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map((card) => (
           <SummaryCard key={card.label} {...card} />
         ))}

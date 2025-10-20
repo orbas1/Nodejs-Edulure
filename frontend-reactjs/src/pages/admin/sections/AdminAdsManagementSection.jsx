@@ -21,6 +21,111 @@ const CAMPAIGN_OBJECTIVES = [
   { value: 'cross_sell', label: 'Cross-sell' }
 ];
 
+function extractVideoIdentifier(pathname) {
+  if (!pathname) {
+    return null;
+  }
+  return pathname.replace(/^\//, '').split(/[/?#]/)[0] ?? null;
+}
+
+function normaliseVideoEmbedUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return null;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.toLowerCase();
+
+    if (hostname.includes('youtu.be')) {
+      const identifier = extractVideoIdentifier(url.pathname);
+      return identifier ? `https://www.youtube.com/embed/${identifier}` : null;
+    }
+
+    if (hostname.includes('youtube.com')) {
+      const videoId = url.searchParams.get('v') || extractVideoIdentifier(url.pathname.replace('/embed', ''));
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    if (hostname.includes('vimeo.com')) {
+      const identifier = extractVideoIdentifier(url.pathname);
+      return identifier ? `https://player.vimeo.com/video/${identifier}` : null;
+    }
+  } catch (_error) {
+    return null;
+  }
+
+  return null;
+}
+
+function detectCreativeType(url) {
+  if (!url || typeof url !== 'string') {
+    return 'empty';
+  }
+
+  const lower = url.toLowerCase();
+  if (lower.match(/\.(png|jpg|jpeg|gif|webp)$/)) {
+    return 'image';
+  }
+  if (lower.match(/\.(mp4|webm|mov)$/)) {
+    return 'video';
+  }
+  if (normaliseVideoEmbedUrl(url)) {
+    return 'embed';
+  }
+  return 'link';
+}
+
+const renderCreativePreview = ({ value }) => {
+  if (!value) {
+    return <p className="text-xs text-slate-400">Paste a creative or landing page URL to preview.</p>;
+  }
+
+  const type = detectCreativeType(value);
+
+  if (type === 'image') {
+    return (
+      <figure className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm">
+        <img src={value} alt="Creative preview" className="h-36 w-full object-cover" loading="lazy" />
+      </figure>
+    );
+  }
+
+  if (type === 'video' || type === 'embed') {
+    const embedUrl = type === 'embed' ? normaliseVideoEmbedUrl(value) : value;
+    return (
+      <div className="aspect-video w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900/70 shadow-sm">
+        {type === 'embed' ? (
+          <iframe
+            title="Creative video preview"
+            src={embedUrl}
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        ) : (
+          <video controls className="h-full w-full">
+            <source src={value} />
+            Your browser does not support embedded video playback.
+          </video>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={value}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80"
+    >
+      Open landing page
+      <span aria-hidden>↗</span>
+    </a>
+  );
+};
+
 const campaignFields = [
   { name: 'name', label: 'Campaign name', type: 'text', required: true },
   {
@@ -117,7 +222,13 @@ const campaignFields = [
   },
   { name: 'creativeHeadline', label: 'Headline', type: 'text' },
   { name: 'creativeDescription', label: 'Description', type: 'textarea', rows: 3 },
-  { name: 'creativeUrl', label: 'Landing page URL', type: 'text', placeholder: 'https://...' },
+  {
+    name: 'creativeUrl',
+    label: 'Landing page or creative URL',
+    type: 'url',
+    placeholder: 'https://...',
+    renderPreview: renderCreativePreview
+  },
   {
     name: 'metadata',
     label: 'Metadata (JSON)',
@@ -152,6 +263,18 @@ const campaignColumns = [
     key: 'spendTotalCents',
     label: 'Spend',
     render: (item) => formatCurrency(item.spendTotalCents ?? 0, item.spendCurrency ?? 'USD')
+  },
+  {
+    key: 'creativeUrl',
+    label: 'Creative',
+    render: (item) =>
+      item.creativeUrl ? (
+        <div className="max-w-[220px]">
+          {renderCreativePreview({ value: item.creativeUrl })}
+        </div>
+      ) : (
+        <span className="text-xs text-slate-400">No creative linked</span>
+      )
   },
   {
     key: 'performanceScore',

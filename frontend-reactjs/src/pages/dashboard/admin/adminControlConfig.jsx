@@ -1,5 +1,116 @@
 import adminControlApi from '../../../api/adminControlApi.js';
 
+function extractPathIdentifier(pathname) {
+  if (!pathname) {
+    return null;
+  }
+  return pathname.replace(/^\//, '').split(/[/?#]/)[0] ?? null;
+}
+
+function normaliseVideoEmbedUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') {
+    return null;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+    const hostname = url.hostname.toLowerCase();
+
+    if (hostname.includes('youtu.be')) {
+      const identifier = extractPathIdentifier(url.pathname);
+      return identifier ? `https://www.youtube.com/embed/${identifier}` : null;
+    }
+
+    if (hostname.includes('youtube.com')) {
+      const videoId = url.searchParams.get('v') || extractPathIdentifier(url.pathname.replace('/embed', ''));
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
+    }
+
+    if (hostname.includes('vimeo.com')) {
+      const identifier = extractPathIdentifier(url.pathname);
+      return identifier ? `https://player.vimeo.com/video/${identifier}` : null;
+    }
+  } catch (_error) {
+    return null;
+  }
+
+  return null;
+}
+
+function createImagePreviewRenderer({ alt, fallbackText = 'Add an image URL to preview.' } = {}) {
+  const baseClass = 'overflow-hidden rounded-xl border border-slate-200 bg-slate-50 shadow-sm';
+  return ({ value }) => {
+    if (!value) {
+      return <p className="text-xs text-slate-400">{fallbackText}</p>;
+    }
+
+    return (
+      <figure className={baseClass}>
+        <img src={value} alt={alt ?? 'Media preview'} className="h-36 w-full object-cover" loading="lazy" />
+      </figure>
+    );
+  };
+}
+
+function createVideoPreviewRenderer({ fallbackText = 'Paste a video URL to preview.', rounded = true } = {}) {
+  const containerClass = `${rounded ? 'overflow-hidden rounded-xl ' : ''}border border-slate-200 bg-slate-900/70 shadow-sm`;
+  return ({ value }) => {
+    if (!value) {
+      return <p className="text-xs text-slate-400">{fallbackText}</p>;
+    }
+
+    const embedUrl = normaliseVideoEmbedUrl(value);
+
+    if (embedUrl) {
+      return (
+        <div className={`${containerClass} aspect-video w-full`}>
+          <iframe
+            title="Video preview"
+            src={embedUrl}
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+      );
+    }
+
+    return (
+      <video className={`${containerClass} w-full`} controls>
+        <source src={value} />
+        Your browser does not support embedded video previews.
+      </video>
+    );
+  };
+}
+
+function createExternalLinkPreviewRenderer({ label = 'Open link in new tab', icon = '↗', tone = 'primary' } = {}) {
+  const toneClass =
+    tone === 'emerald'
+      ? 'text-emerald-600 hover:text-emerald-700'
+      : tone === 'indigo'
+        ? 'text-indigo-600 hover:text-indigo-700'
+        : 'text-primary hover:text-primary/80';
+
+  return ({ value }) => {
+    if (!value) {
+      return <p className="text-xs text-slate-400">Provide a URL to enable quick testing.</p>;
+    }
+
+    return (
+      <a
+        href={value}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline-flex items-center gap-1 text-xs font-semibold ${toneClass}`}
+      >
+        {label}
+        <span aria-hidden>{icon}</span>
+      </a>
+    );
+  };
+}
+
 export function formatCurrency(amount, currency = 'USD') {
   const numeric = typeof amount === 'number' ? amount / 100 : Number(amount ?? 0) / 100;
   if (!Number.isFinite(numeric)) {
@@ -144,7 +255,49 @@ export function createAdminControlResourceConfigs() {
             { value: 'blended', label: 'Blended' }
           ]
         },
-        { name: 'thumbnailUrl', label: 'Thumbnail URL', type: 'text', placeholder: 'https://...' },
+        {
+          name: 'thumbnailUrl',
+          label: 'Thumbnail URL',
+          type: 'url',
+          placeholder: 'https://assets.edulure.com/course-thumbnail.jpg',
+          renderPreview: createImagePreviewRenderer({ alt: 'Course thumbnail preview' })
+        },
+        {
+          name: 'heroImageUrl',
+          label: 'Hero image URL',
+          type: 'url',
+          allowEmpty: true,
+          placeholder: 'https://assets.edulure.com/course-hero.jpg',
+          renderPreview: createImagePreviewRenderer({ alt: 'Course hero image preview' })
+        },
+        {
+          name: 'promoVideoUrl',
+          label: 'Promo video URL',
+          type: 'url',
+          allowEmpty: true,
+          placeholder: 'https://video.edulure.com/promo.mp4',
+          renderPreview: createVideoPreviewRenderer({
+            fallbackText: 'Paste an MP4, Vimeo, or YouTube link for the promo reel.'
+          })
+        },
+        {
+          name: 'trailerUrl',
+          label: 'Trailer URL',
+          type: 'url',
+          allowEmpty: true,
+          placeholder: 'https://www.youtube.com/watch?v=...',
+          renderPreview: createVideoPreviewRenderer({
+            fallbackText: 'Paste a YouTube or Vimeo trailer to preview the embed.'
+          })
+        },
+        {
+          name: 'syllabusUrl',
+          label: 'Syllabus URL',
+          type: 'url',
+          allowEmpty: true,
+          placeholder: 'https://cdn.edulure.com/syllabus.pdf',
+          renderPreview: createExternalLinkPreviewRenderer({ label: 'Preview syllabus PDF', tone: 'indigo' })
+        },
         {
           name: 'priceAmount',
           label: 'Price',
@@ -199,6 +352,39 @@ export function createAdminControlResourceConfigs() {
           key: 'priceAmount',
           label: 'Price',
           render: (item) => formatCurrency(item.priceAmount, item.priceCurrency)
+        },
+        {
+          key: 'mediaAssets',
+          label: 'Media',
+          render: (item) => {
+            const badges = [];
+            if (item.thumbnailUrl || item.heroImageUrl) {
+              badges.push('Images');
+            }
+            if (item.promoVideoUrl || item.trailerUrl) {
+              badges.push('Video');
+            }
+            if (item.syllabusUrl) {
+              badges.push('Syllabus');
+            }
+
+            if (!badges.length) {
+              return <span className="text-xs text-slate-400">No media attached</span>;
+            }
+
+            return (
+              <div className="flex flex-wrap gap-2">
+                {badges.map((badge) => (
+                  <span
+                    key={badge}
+                    className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary"
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+            );
+          }
         }
       ]
     },
@@ -290,7 +476,31 @@ export function createAdminControlResourceConfigs() {
         { name: 'categories', label: 'Categories', type: 'tags', placeholder: 'ops, leadership' },
         { name: 'languages', label: 'Languages', type: 'tags', placeholder: 'en, fr' },
         { name: 'isbn', label: 'ISBN', type: 'text' },
+        {
+          name: 'coverImageUrl',
+          label: 'Cover image URL',
+          type: 'url',
+          allowEmpty: true,
+          placeholder: 'https://assets.edulure.com/ebooks/cover.jpg',
+          renderPreview: createImagePreviewRenderer({ alt: 'E-book cover preview' })
+        },
         { name: 'readingTimeMinutes', label: 'Reading time (minutes)', type: 'number', min: 0 },
+        {
+          name: 'sampleDownloadUrl',
+          label: 'Sample download URL',
+          type: 'url',
+          allowEmpty: true,
+          placeholder: 'https://cdn.edulure.com/ebooks/sample.pdf',
+          renderPreview: createExternalLinkPreviewRenderer({ label: 'Open sample PDF', tone: 'emerald' })
+        },
+        {
+          name: 'audiobookUrl',
+          label: 'Audiobook URL',
+          type: 'url',
+          allowEmpty: true,
+          placeholder: 'https://audio.edulure.com/ebooks/audio.mp3',
+          renderPreview: createExternalLinkPreviewRenderer({ label: 'Listen to audio edition', tone: 'indigo' })
+        },
         {
           name: 'priceAmount',
           label: 'Price',
@@ -339,6 +549,39 @@ export function createAdminControlResourceConfigs() {
           key: 'priceAmount',
           label: 'Price',
           render: (item) => formatCurrency(item.priceAmount, item.priceCurrency)
+        },
+        {
+          key: 'media',
+          label: 'Media',
+          render: (item) => {
+            const badges = [];
+            if (item.coverImageUrl) {
+              badges.push('Cover');
+            }
+            if (item.sampleDownloadUrl) {
+              badges.push('Sample');
+            }
+            if (item.audiobookUrl) {
+              badges.push('Audio');
+            }
+
+            if (!badges.length) {
+              return <span className="text-xs text-slate-400">No media linked</span>;
+            }
+
+            return (
+              <div className="flex flex-wrap gap-2">
+                {badges.map((badge) => (
+                  <span
+                    key={badge}
+                    className="rounded-full bg-indigo-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-indigo-600"
+                  >
+                    {badge}
+                  </span>
+                ))}
+              </div>
+            );
+          }
         }
       ]
     },

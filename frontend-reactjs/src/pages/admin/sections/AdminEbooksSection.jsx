@@ -39,7 +39,8 @@ function calculateInsights(items) {
       published: 0,
       publicCount: 0,
       averageReadingTime: 0,
-      draftCount: 0
+      draftCount: 0,
+      mediaReady: 0
     };
   }
 
@@ -51,9 +52,12 @@ function calculateInsights(items) {
       if (status === 'draft' || status === 'review') acc.draft += 1;
       if (ebook.isPublic) acc.publicCount += 1;
       if (ebook.readingTimeMinutes) acc.readingTimeTotal += Number(ebook.readingTimeMinutes ?? 0);
+      if (ebook.coverImageUrl || ebook.sampleDownloadUrl || ebook.audiobookUrl) {
+        acc.mediaReady += 1;
+      }
       return acc;
     },
-    { total: 0, published: 0, draft: 0, publicCount: 0, readingTimeTotal: 0 }
+    { total: 0, published: 0, draft: 0, publicCount: 0, readingTimeTotal: 0, mediaReady: 0 }
   );
 
   const averageReadingTime = totals.total === 0 ? 0 : Math.round(totals.readingTimeTotal / totals.total);
@@ -63,13 +67,21 @@ function calculateInsights(items) {
     published: totals.published,
     publicCount: totals.publicCount,
     averageReadingTime,
-    draftCount: totals.draft
+    draftCount: totals.draft,
+    mediaReady: totals.mediaReady
   };
 }
 
 export default function AdminEbooksSection({ sectionId, token }) {
   const config = useEbookConfig();
-  const [insights, setInsights] = useState({ total: 0, published: 0, publicCount: 0, averageReadingTime: 0, draftCount: 0 });
+  const [insights, setInsights] = useState({
+    total: 0,
+    published: 0,
+    publicCount: 0,
+    averageReadingTime: 0,
+    draftCount: 0,
+    mediaReady: 0
+  });
 
   const handleItemsChange = useCallback((items) => {
     setInsights(calculateInsights(items));
@@ -86,6 +98,11 @@ export default function AdminEbooksSection({ sectionId, token }) {
     {
       label: 'Avg. reading time',
       value: insights.averageReadingTime ? `${insights.averageReadingTime} mins` : 'N/A'
+    },
+    {
+      label: 'Media ready',
+      value: insights.mediaReady,
+      helper: 'Titles with covers, samples, or audio editions'
     }
   ];
 
@@ -97,7 +114,7 @@ export default function AdminEbooksSection({ sectionId, token }) {
           Curate, enrich, and launch immersive reading experiences with metadata, access tiers, and multilingual formats.
         </p>
       </header>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {summaryCards.map((card) => (
           <SummaryCard key={card.label} {...card} />
         ))}
