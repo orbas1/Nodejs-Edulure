@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import ReleaseManagementController from '../controllers/ReleaseManagementController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/checklist', auth('admin'), ReleaseManagementController.getChecklist);
 router.post('/runs', auth('admin'), ReleaseManagementController.scheduleRun);

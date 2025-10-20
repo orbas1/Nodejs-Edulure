@@ -1,5 +1,3 @@
-import { Router } from 'express';
-
 import AdminAdsController from '../controllers/AdminAdsController.js';
 import AdminBlogController from '../controllers/AdminBlogController.js';
 import AdminBookingController from '../controllers/AdminBookingController.js';
@@ -11,8 +9,9 @@ import AdminMonetizationController from '../controllers/AdminMonetizationControl
 import AdminGrowthController from '../controllers/AdminGrowthController.js';
 import AdminRevenueManagementController from '../controllers/AdminRevenueManagementController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/settings/profile', auth('admin'), AdminSettingsController.getAdminProfileSettings);
 router.put('/settings/profile', auth('admin'), AdminSettingsController.updateAdminProfileSettings);

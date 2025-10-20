@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import auth from '../middleware/auth.js';
 import ComplianceController from '../controllers/ComplianceController.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.use(auth('admin'));
 

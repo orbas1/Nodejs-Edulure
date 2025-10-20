@@ -1,8 +1,7 @@
-import { Router } from 'express';
-
 import CatalogueController from '../controllers/CatalogueController.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter({ allowedMethods: ['GET'] });
 
 router.get('/live-classrooms', CatalogueController.listLiveClassrooms);
 router.get('/courses', CatalogueController.listCourses);

@@ -1,10 +1,9 @@
-import { Router } from 'express';
-
 import DashboardController from '../controllers/DashboardController.js';
 import LearnerDashboardController from '../controllers/LearnerDashboardController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/me', auth(), DashboardController.current);
 router.get('/learner/tutor-bookings', auth(), LearnerDashboardController.listTutorBookings);

@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import EbookController from '../controllers/EbookController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/catalogue', auth('instructor'), EbookController.catalogue);
 router.post('/', auth('instructor'), EbookController.create);

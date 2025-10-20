@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import FeedController from '../controllers/FeedController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/', auth('user'), FeedController.getFeed);
 router.get('/analytics', auth('user'), FeedController.getAnalytics);

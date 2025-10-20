@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import MediaUploadController from '../controllers/MediaUploadController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router({ mergeParams: true });
+const router = createApiRouter();
 
 router.post('/uploads', auth(), MediaUploadController.requestUpload);
 
