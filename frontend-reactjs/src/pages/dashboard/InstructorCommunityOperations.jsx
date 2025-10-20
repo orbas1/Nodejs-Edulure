@@ -6,7 +6,11 @@ import {
   ShieldCheckIcon,
   UserGroupIcon,
   BanknotesIcon,
-  QueueListIcon
+  QueueListIcon,
+  PlayCircleIcon,
+  PhotoIcon,
+  ArrowDownTrayIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/react/24/outline';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
@@ -110,6 +114,8 @@ function RevenuePanel({ communityId, token }) {
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [tierDraft, setTierDraft] = useState({ name: '', priceCents: 4900, billingInterval: 'monthly' });
+  const [selectedTier, setSelectedTier] = useState(null);
+  const [tierEditor, setTierEditor] = useState({ name: '', priceCents: 0, description: '', benefits: '' });
 
   const loadRevenue = useCallback(async () => {
     if (!communityId || !token) return;
@@ -119,13 +125,27 @@ function RevenuePanel({ communityId, token }) {
       setSummary(response.data ?? null);
       const detail = await fetchCommunityDetail(communityId, token);
       const paywall = detail?.data?.paywall ?? {};
-      setTiers(Array.isArray(paywall.tiers) ? paywall.tiers : []);
+      const nextTiers = Array.isArray(paywall.tiers) ? paywall.tiers : [];
+      setTiers(nextTiers);
+      if (nextTiers.length && !selectedTier) {
+        const [firstTier] = nextTiers;
+        setSelectedTier(firstTier);
+        setTierEditor({
+          name: firstTier.name ?? '',
+          priceCents: firstTier.priceCents ?? 0,
+          description: firstTier.description ?? '',
+          benefits: Array.isArray(firstTier.benefits) ? firstTier.benefits.join(', ') : ''
+        });
+      } else if (!nextTiers.length) {
+        setSelectedTier(null);
+        setTierEditor({ name: '', priceCents: 0, description: '', benefits: '' });
+      }
     } catch (error) {
       setFeedback({ tone: 'error', message: error?.message ?? 'Unable to load revenue telemetry.' });
     } finally {
       setLoading(false);
     }
-  }, [communityId, token]);
+  }, [communityId, token, selectedTier]);
 
   useEffect(() => {
     loadRevenue();
@@ -178,6 +198,77 @@ function RevenuePanel({ communityId, token }) {
     },
     [communityId, token, loadRevenue]
   );
+
+  const handleTierSelection = useCallback((tier) => {
+    setSelectedTier(tier);
+    setTierEditor({
+      name: tier.name ?? '',
+      priceCents: tier.priceCents ?? 0,
+      description: tier.description ?? '',
+      benefits: Array.isArray(tier.benefits) ? tier.benefits.join(', ') : ''
+    });
+  }, []);
+
+  const handleTierUpdate = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!communityId || !token || !selectedTier) return;
+      setFeedback(null);
+      try {
+        await updateCommunityTier({
+          communityId,
+          tierId: selectedTier.id,
+          token,
+          payload: {
+            name: tierEditor.name || undefined,
+            priceCents: Number(tierEditor.priceCents) || undefined,
+            description: tierEditor.description || undefined,
+            benefits: tierEditor.benefits
+              ? tierEditor.benefits
+                  .split(',')
+                  .map((benefit) => benefit.trim())
+                  .filter(Boolean)
+              : undefined
+          }
+        });
+        setFeedback({ tone: 'success', message: `${tierEditor.name || selectedTier.name} updated.` });
+        loadRevenue();
+      } catch (error) {
+        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to update tier settings.' });
+      }
+    },
+    [communityId, token, selectedTier, tierEditor, loadRevenue]
+  );
+
+  const mrrTrend = useMemo(() => {
+    const rawTrend =
+      summary?.trends?.monthlyRecurring ?? summary?.trend?.monthlyRecurring ?? summary?.monthlyRecurring ?? [];
+    if (Array.isArray(rawTrend) && rawTrend.length) {
+      return rawTrend
+        .map((point) => ({
+          label: point.label ?? point.month ?? point.period ?? '',
+          value: Number(point.value ?? point.amount ?? 0)
+        }))
+        .filter((point) => point.label && Number.isFinite(point.value));
+    }
+    const fallbackBase = Number(summary?.totals?.monthlyRecurringCents ?? 0) / 100;
+    return Array.from({ length: 6 }).map((_, index) => {
+      const monthsAgo = 5 - index;
+      const date = new Date();
+      date.setMonth(date.getMonth() - monthsAgo);
+      return {
+        label: date.toLocaleString(undefined, { month: 'short' }),
+        value: Math.max(0, fallbackBase - monthsAgo * (fallbackBase * 0.05))
+      };
+    });
+  }, [summary]);
+
+  const topTiers = useMemo(() => {
+    if (!tiers.length) return [];
+    return [...tiers]
+      .sort((a, b) => (b.metrics?.activeMembers ?? 0) - (a.metrics?.activeMembers ?? 0))
+      .slice(0, 3);
+  }, [tiers]);
 
   if (!communityId) {
     return <DashboardStateMessage title="Choose a community" description="Select a community to review revenue." />;
@@ -233,23 +324,44 @@ function RevenuePanel({ communityId, token }) {
               </li>
             ) : (
               tiers.map((tier) => (
-                <li key={tier.id} className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{tier.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {new Intl.NumberFormat(undefined, { style: 'currency', currency: tier.currency ?? 'USD' }).format(
-                        (tier.priceCents ?? 0) / 100
-                      )}{' '}
-                      · {tier.billingInterval}
-                    </p>
+                <li
+                  key={tier.id}
+                  className={`flex flex-col gap-3 rounded-xl border p-4 transition ${
+                    selectedTier?.id === tier.id
+                      ? 'border-primary/60 bg-primary/5 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-primary/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{tier.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {new Intl.NumberFormat(undefined, { style: 'currency', currency: tier.currency ?? 'USD' }).format(
+                          (tier.priceCents ?? 0) / 100
+                        )}{' '}
+                        · {tier.billingInterval}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1 text-xs"
+                        onClick={() => handleToggleTier(tier)}
+                      >
+                        {tier.isActive ? 'Pause' : 'Activate'}
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1 text-xs"
+                        onClick={() => handleTierSelection(tier)}
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    className="dashboard-pill px-3 py-1 text-xs"
-                    onClick={() => handleToggleTier(tier)}
-                  >
-                    {tier.isActive ? 'Pause' : 'Activate'}
-                  </button>
+                  {tier.metrics?.activeMembers && (
+                    <p className="text-xs text-slate-500">{tier.metrics.activeMembers} active members</p>
+                  )}
                 </li>
               ))
             )}
@@ -299,6 +411,128 @@ function RevenuePanel({ communityId, token }) {
           </button>
         </form>
       </div>
+
+      <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+        <form className="rounded-2xl border border-primary/40 bg-white p-5 shadow-sm" onSubmit={handleTierUpdate}>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Tier configuration</h3>
+            {selectedTier && (
+              <span className="text-xs font-semibold uppercase text-primary">Editing {selectedTier.name}</span>
+            )}
+          </div>
+          <p className="mt-1 text-sm text-slate-600">
+            Fine-tune pricing, benefits and messaging before publishing changes live to members.
+          </p>
+          {selectedTier ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <label className="space-y-1 text-xs font-semibold text-slate-600">
+                Tier name
+                <input
+                  type="text"
+                  required
+                  value={tierEditor.name}
+                  onChange={(event) => setTierEditor((prev) => ({ ...prev, name: event.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-slate-600">
+                Price (cents)
+                <input
+                  type="number"
+                  min="100"
+                  value={tierEditor.priceCents}
+                  onChange={(event) => setTierEditor((prev) => ({ ...prev, priceCents: event.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                Description
+                <textarea
+                  rows={3}
+                  value={tierEditor.description}
+                  onChange={(event) => setTierEditor((prev) => ({ ...prev, description: event.target.value }))}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <label className="space-y-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                Benefits (comma separated)
+                <input
+                  type="text"
+                  value={tierEditor.benefits}
+                  onChange={(event) => setTierEditor((prev) => ({ ...prev, benefits: event.target.value }))}
+                  placeholder="Weekly coaching, Bonus lessons, Office hours"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <div className="md:col-span-2 flex justify-end gap-3">
+                <button type="button" className="dashboard-pill px-3 py-1 text-xs" onClick={() => setSelectedTier(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
+                  Save tier changes
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Select a tier to unlock advanced editing controls.
+            </div>
+          )}
+        </form>
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900">MRR trend</h3>
+            <p className="text-xs text-slate-500">Six-month look at monthly recurring revenue.</p>
+            <svg viewBox="0 0 240 120" className="mt-4 h-32 w-full">
+              <polyline
+                fill="none"
+                stroke="#4f46e5"
+                strokeWidth="3"
+                strokeLinecap="round"
+                points={mrrTrend
+                  .map((point, index) => {
+                    const x = (index / Math.max(mrrTrend.length - 1, 1)) * 220 + 10;
+                    const maxValue = Math.max(...mrrTrend.map((item) => item.value || 0), 1);
+                    const y = 100 - (Number(point.value || 0) / maxValue) * 90 + 10;
+                    return `${x},${y}`;
+                  })
+                  .join(' ')}
+              />
+              {mrrTrend.map((point, index) => {
+                const x = (index / Math.max(mrrTrend.length - 1, 1)) * 220 + 10;
+                const maxValue = Math.max(...mrrTrend.map((item) => item.value || 0), 1);
+                const y = 100 - (Number(point.value || 0) / maxValue) * 90 + 10;
+                return <circle key={point.label ?? index} cx={x} cy={y} r="3" fill="#4f46e5" />;
+              })}
+            </svg>
+            <div className="mt-3 flex justify-between text-xs text-slate-500">
+              {mrrTrend.map((point) => (
+                <span key={point.label}>{point.label}</span>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-lg font-semibold text-slate-900">Top tiers</h3>
+            <ul className="mt-3 space-y-3 text-sm text-slate-600">
+              {topTiers.length === 0 ? (
+                <li>No active tiers yet.</li>
+              ) : (
+                topTiers.map((tier) => (
+                  <li key={tier.id} className="flex items-center justify-between">
+                    <span className="font-semibold text-slate-900">{tier.name}</span>
+                    <span className="text-xs text-slate-500">
+                      {tier.metrics?.activeMembers ?? 0} members ·{' '}
+                      {new Intl.NumberFormat(undefined, { style: 'currency', currency: tier.currency ?? 'USD' }).format(
+                        (tier.priceCents ?? 0) / 100
+                      )}
+                    </span>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -314,9 +548,22 @@ RevenuePanel.defaultProps = {
 };
 function BroadcastPanel({ communityId, token }) {
   const [posts, setPosts] = useState([]);
-  const [draft, setDraft] = useState({ id: null, title: '', body: '', stage: 'Planning', scheduledAt: '' });
+  const [draft, setDraft] = useState({
+    id: null,
+    title: '',
+    body: '',
+    stage: 'Planning',
+    scheduledAt: '',
+    audience: 'all_members',
+    channels: ['email', 'in_app'],
+    mediaUrl: '',
+    ctaLabel: 'View update',
+    ctaUrl: ''
+  });
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const totalSteps = 3;
 
   const loadPosts = useCallback(async () => {
     if (!communityId || !token) return;
@@ -330,7 +577,8 @@ function BroadcastPanel({ communityId, token }) {
           title: broadcast.title ?? 'Broadcast',
           stage: broadcast.stage ?? broadcast.metadata?.stage ?? 'Planning',
           release: broadcast.release ?? broadcast.publishedAt ?? '',
-          body: broadcast.body ?? ''
+          body: broadcast.body ?? '',
+          metadata: broadcast.metadata ?? {}
         }))
       );
     } catch (error) {
@@ -344,7 +592,22 @@ function BroadcastPanel({ communityId, token }) {
     loadPosts();
   }, [loadPosts]);
 
-  const resetDraft = useCallback(() => setDraft({ id: null, title: '', body: '', stage: 'Planning', scheduledAt: '' }), []);
+  const resetDraft = useCallback(
+    () =>
+      setDraft({
+        id: null,
+        title: '',
+        body: '',
+        stage: 'Planning',
+        scheduledAt: '',
+        audience: 'all_members',
+        channels: ['email', 'in_app'],
+        mediaUrl: '',
+        ctaLabel: 'View update',
+        ctaUrl: ''
+      }),
+    []
+  );
 
   const handleSubmit = useCallback(
     async (event) => {
@@ -356,7 +619,16 @@ function BroadcastPanel({ communityId, token }) {
         body: draft.body,
         postType: 'update',
         status: draft.stage === 'Live' ? 'published' : 'scheduled',
-        metadata: { stage: draft.stage },
+        metadata: {
+          stage: draft.stage,
+          audience: draft.audience,
+          channels: draft.channels,
+          mediaUrl: draft.mediaUrl || undefined,
+          cta: {
+            label: draft.ctaLabel || undefined,
+            url: draft.ctaUrl || undefined
+          }
+        },
         scheduledAt: draft.scheduledAt || undefined
       };
       try {
@@ -368,6 +640,7 @@ function BroadcastPanel({ communityId, token }) {
           setFeedback({ tone: 'success', message: 'Broadcast created.' });
         }
         resetDraft();
+        setWizardStep(1);
         loadPosts();
       } catch (error) {
         setFeedback({ tone: 'error', message: error?.message ?? 'Unable to save broadcast.' });
@@ -376,9 +649,25 @@ function BroadcastPanel({ communityId, token }) {
     [communityId, token, draft, loadPosts, resetDraft]
   );
 
-  const handleEdit = useCallback((post) => {
-    setDraft({ id: post.id, title: post.title, body: post.body, stage: post.stage, scheduledAt: post.release ?? '' });
-  }, []);
+  const handleEdit = useCallback(
+    (post) => {
+      const metadata = post.metadata ?? {};
+      setDraft({
+        id: post.id,
+        title: post.title,
+        body: post.body,
+        stage: post.stage,
+        scheduledAt: post.release ?? '',
+        audience: metadata.audience ?? 'all_members',
+        channels: Array.isArray(metadata.channels) && metadata.channels.length ? metadata.channels : ['email'],
+        mediaUrl: metadata.mediaUrl ?? '',
+        ctaLabel: metadata.cta?.label ?? 'View update',
+        ctaUrl: metadata.cta?.url ?? ''
+      });
+      setWizardStep(totalSteps);
+    },
+    [totalSteps]
+  );
 
   const handleDelete = useCallback(
     async (postId) => {
@@ -395,6 +684,26 @@ function BroadcastPanel({ communityId, token }) {
     [communityId, token, loadPosts]
   );
 
+  const handleChannelToggle = useCallback((channel) => {
+    setDraft((prev) => {
+      const exists = prev.channels.includes(channel);
+      return {
+        ...prev,
+        channels: exists ? prev.channels.filter((item) => item !== channel) : [...prev.channels, channel]
+      };
+    });
+  }, []);
+
+  const goToStep = useCallback(
+    (step) => {
+      setWizardStep((current) => {
+        const next = typeof step === 'number' ? step : current + step;
+        return Math.min(Math.max(next, 1), totalSteps);
+      });
+    },
+    [totalSteps]
+  );
+
   if (!communityId) {
     return <DashboardStateMessage title="Choose a community" description="Select a community to plan broadcasts." />;
   }
@@ -409,60 +718,209 @@ function BroadcastPanel({ communityId, token }) {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <form className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm" onSubmit={handleSubmit}>
-          <h3 className="text-lg font-semibold text-slate-900">{draft.id ? 'Update broadcast' : 'Create broadcast'}</h3>
-          <div className="mt-4 space-y-3">
-            <label className="space-y-1 text-xs font-semibold text-slate-600">
-              Title
-              <input
-                type="text"
-                required
-                value={draft.title}
-                onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </label>
-            <label className="space-y-1 text-xs font-semibold text-slate-600">
-              Stage
-              <select
-                value={draft.stage}
-                onChange={(event) => setDraft((prev) => ({ ...prev, stage: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="Planning">Planning</option>
-                <option value="Preflight">Preflight</option>
-                <option value="Live">Live</option>
-                <option value="Complete">Complete</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-xs font-semibold text-slate-600">
-              Body
-              <textarea
-                rows={4}
-                required
-                value={draft.body}
-                onChange={(event) => setDraft((prev) => ({ ...prev, body: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </label>
-            <label className="space-y-1 text-xs font-semibold text-slate-600">
-              Release (optional)
-              <input
-                type="datetime-local"
-                value={draft.scheduledAt}
-                onChange={(event) => setDraft((prev) => ({ ...prev, scheduledAt: event.target.value }))}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </label>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">{draft.id ? 'Update broadcast' : 'Create broadcast'}</h3>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase text-slate-500">
+              {Array.from({ length: totalSteps }).map((_, index) => {
+                const stepNumber = index + 1;
+                const isActive = wizardStep === stepNumber;
+                return (
+                  <button
+                    key={stepNumber}
+                    type="button"
+                    onClick={() => goToStep(stepNumber)}
+                    className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs transition ${
+                      isActive
+                        ? 'border-primary bg-primary text-white'
+                        : 'border-slate-200 bg-white text-slate-500 hover:border-primary'
+                    }`}
+                  >
+                    {stepNumber}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="mt-4 flex items-center justify-end gap-3">
-            {draft.id && (
-              <button type="button" className="dashboard-pill px-3 py-1 text-xs" onClick={resetDraft}>
-                Cancel edit
-              </button>
+          <div className="mt-4 space-y-3">
+            {wizardStep === 1 && (
+              <>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Title
+                  <input
+                    type="text"
+                    required
+                    value={draft.title}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Stage
+                  <select
+                    value={draft.stage}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, stage: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    <option value="Planning">Planning</option>
+                    <option value="Preflight">Preflight</option>
+                    <option value="Live">Live</option>
+                    <option value="Complete">Complete</option>
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Broadcast body
+                  <textarea
+                    rows={4}
+                    required
+                    value={draft.body}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, body: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+              </>
             )}
-            <button type="submit" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
-              {draft.id ? 'Update broadcast' : 'Create broadcast'}
+            {wizardStep === 2 && (
+              <>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Target audience
+                  <select
+                    value={draft.audience}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, audience: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    <option value="all_members">All members</option>
+                    <option value="paying_members">Paying members</option>
+                    <option value="trial_members">Trial members</option>
+                    <option value="alumni">Alumni</option>
+                  </select>
+                </label>
+                <div className="space-y-2 rounded-xl border border-slate-200 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Channels</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'email', label: 'Email' },
+                      { id: 'in_app', label: 'In-app' },
+                      { id: 'sms', label: 'SMS' }
+                    ].map((channel) => {
+                      const isSelected = draft.channels.includes(channel.id);
+                      return (
+                        <button
+                          key={channel.id}
+                          type="button"
+                          onClick={() => handleChannelToggle(channel.id)}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                            isSelected ? 'bg-primary text-white' : 'border border-slate-200 text-slate-600 hover:border-primary'
+                          }`}
+                        >
+                          {channel.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Choose how we deliver the broadcast. SMS requires short copy and opt-in members.
+                  </p>
+                </div>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Featured media (optional)
+                  <input
+                    type="url"
+                    value={draft.mediaUrl}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, mediaUrl: event.target.value }))}
+                    placeholder="https://cdn.edulure.com/broadcast-cover.mp4"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+              </>
+            )}
+            {wizardStep === 3 && (
+              <>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Call-to-action label
+                  <input
+                    type="text"
+                    value={draft.ctaLabel}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, ctaLabel: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Call-to-action URL
+                  <input
+                    type="url"
+                    value={draft.ctaUrl}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, ctaUrl: event.target.value }))}
+                    placeholder="https://edulure.com/lesson/live"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+                <label className="space-y-1 text-xs font-semibold text-slate-600">
+                  Release (optional)
+                  <input
+                    type="datetime-local"
+                    value={draft.scheduledAt}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, scheduledAt: event.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </label>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                  <p className="font-semibold text-slate-900">Preview</p>
+                  <p className="mt-2">{draft.body || 'Broadcast body will appear here.'}</p>
+                  {draft.mediaUrl && (
+                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                      {draft.mediaUrl.endsWith('.mp4') || draft.mediaUrl.includes('youtube') ? (
+                        <video controls className="h-40 w-full object-cover">
+                          <source src={draft.mediaUrl} />
+                        </video>
+                      ) : (
+                        <img src={draft.mediaUrl} alt="Broadcast media" className="h-40 w-full object-cover" />
+                      )}
+                    </div>
+                  )}
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-1 text-xs font-semibold text-white">
+                    <PlayCircleIcon className="h-4 w-4" />
+                    {draft.ctaLabel || 'Open link'}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              className="dashboard-pill px-3 py-1 text-xs"
+              onClick={() => goToStep(wizardStep - 1)}
+              disabled={wizardStep === 1}
+            >
+              Back
             </button>
+            <div className="flex items-center gap-3">
+              {draft.id && (
+                <button
+                  type="button"
+                  className="dashboard-pill px-3 py-1 text-xs"
+                  onClick={() => {
+                    resetDraft();
+                    goToStep(1);
+                  }}
+                >
+                  Cancel edit
+                </button>
+              )}
+              {wizardStep < totalSteps ? (
+                <button
+                  type="button"
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white"
+                  onClick={() => goToStep(wizardStep + 1)}
+                >
+                  Continue
+                </button>
+              ) : (
+                <button type="submit" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
+                  {draft.id ? 'Update broadcast' : 'Create broadcast'}
+                </button>
+              )}
+            </div>
           </div>
         </form>
 
@@ -481,6 +939,14 @@ function BroadcastPanel({ communityId, token }) {
                     <p className="text-xs text-slate-500">
                       Stage {post.stage} · {post.release ? `Release ${post.release}` : 'Release TBD'}
                     </p>
+                    {post.metadata?.audience && (
+                      <p className="mt-1 text-xs text-slate-500">Audience: {post.metadata.audience}</p>
+                    )}
+                    {Array.isArray(post.metadata?.channels) && post.metadata.channels.length > 0 && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Channels: {post.metadata.channels.join(', ')}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button type="button" className="dashboard-pill px-3 py-1 text-xs" onClick={() => handleEdit(post)}>
@@ -521,6 +987,7 @@ function SafetyPanel({ communityId, token }) {
   const [feedback, setFeedback] = useState(null);
   const [loading, setLoading] = useState(false);
   const [resolutionDraft, setResolutionDraft] = useState(null);
+  const [selectedIncident, setSelectedIncident] = useState(null);
 
   const loadIncidents = useCallback(async () => {
     if (!communityId || !token) return;
@@ -550,6 +1017,28 @@ function SafetyPanel({ communityId, token }) {
   useEffect(() => {
     loadIncidents();
   }, [loadIncidents]);
+
+  const handleExportIncidents = useCallback(() => {
+    if (!incidents.length) return;
+    const blob = new Blob([JSON.stringify(incidents, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `community-${communityId}-incidents.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [incidents, communityId]);
+
+  const handleCopyIncident = useCallback(async (incident) => {
+    try {
+      await navigator.clipboard?.writeText(JSON.stringify(incident, null, 2));
+      setFeedback({ tone: 'success', message: 'Incident copied to clipboard.' });
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error?.message ?? 'Unable to copy incident.' });
+    }
+  }, []);
 
   const handleResolve = useCallback(
     async (event) => {
@@ -586,9 +1075,19 @@ function SafetyPanel({ communityId, token }) {
         title="Safety command centre"
         description="Triaging flagged content and escalations keeps your community trusted."
         actions={
-          <button type="button" className="dashboard-primary-pill" onClick={loadIncidents} disabled={loading}>
-            Refresh feed
-          </button>
+          <div className="flex gap-2">
+            <button type="button" className="dashboard-primary-pill" onClick={loadIncidents} disabled={loading}>
+              Refresh feed
+            </button>
+            <button
+              type="button"
+              className="dashboard-pill px-3 py-1 text-xs"
+              onClick={handleExportIncidents}
+              disabled={!incidents.length}
+            >
+              <ArrowDownTrayIcon className="mr-1 h-4 w-4" /> Export
+            </button>
+          </div>
         }
       />
 
@@ -659,7 +1158,20 @@ function SafetyPanel({ communityId, token }) {
             return (
               <div
                 key={incident.publicId ?? incident.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                className={`rounded-2xl border p-5 shadow-sm transition ${
+                  selectedIncident?.id === incident.id || selectedIncident?.publicId === incident.publicId
+                    ? 'border-primary/60 bg-primary/5'
+                    : 'border-slate-200 bg-white hover:border-primary/30'
+                }`}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedIncident(incident)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedIncident(incident);
+                  }
+                }}
               >
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
@@ -697,6 +1209,16 @@ function SafetyPanel({ communityId, token }) {
                         Follow-up: {operations.resolution.followUp}
                       </p>
                     )}
+                    <button
+                      type="button"
+                      className="dashboard-pill mt-3 inline-flex items-center gap-1 px-3 py-1 text-xs"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleCopyIncident(incident);
+                      }}
+                    >
+                      <ClipboardDocumentCheckIcon className="h-4 w-4" /> Copy report
+                    </button>
                   </div>
                   <div className="flex flex-col items-start gap-2 md:items-end">
                     <span
@@ -716,13 +1238,14 @@ function SafetyPanel({ communityId, token }) {
                       <button
                         type="button"
                         className="dashboard-pill px-3 py-1 text-xs"
-                        onClick={() =>
+                        onClick={(event) => {
+                          event.stopPropagation();
                           setResolutionDraft({
                             incident,
                             resolutionSummary: operations?.resolution?.resolutionSummary ?? '',
                             followUp: operations?.resolution?.followUp ?? ''
-                          })
-                        }
+                          });
+                        }}
                       >
                         Resolve
                       </button>
@@ -734,6 +1257,63 @@ function SafetyPanel({ communityId, token }) {
           })
         )}
       </div>
+
+      {selectedIncident && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Incident overview · {selectedIncident.publicId ?? selectedIncident.id}
+            </h3>
+            <button type="button" className="dashboard-pill px-3 py-1 text-xs" onClick={() => setSelectedIncident(null)}>
+              Close
+            </button>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Summary</p>
+              <p className="mt-1 text-sm text-slate-700">{selectedIncident.summary ?? selectedIncident.reason}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Member</p>
+              <p className="mt-1 text-sm text-slate-700">{selectedIncident.member?.name ?? 'Unknown member'}</p>
+              {selectedIncident.member?.email && (
+                <p className="text-xs text-slate-500">{selectedIncident.member.email}</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Timeline</p>
+              <ul className="mt-1 space-y-1 text-xs text-slate-600">
+                {selectedIncident.reportedAt && (
+                  <li>Reported {new Date(selectedIncident.reportedAt).toLocaleString()}</li>
+                )}
+                {selectedIncident.escalatedAt && (
+                  <li>Escalated {new Date(selectedIncident.escalatedAt).toLocaleString()}</li>
+                )}
+                {selectedIncident.resolvedAt && (
+                  <li>Resolved {new Date(selectedIncident.resolvedAt).toLocaleString()}</li>
+                )}
+              </ul>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Attachments</p>
+              {selectedIncident.evidence?.length ? (
+                <ul className="mt-1 space-y-1 text-xs text-slate-600">
+                  {selectedIncident.evidence.map((item) => (
+                    <li key={item.url} className="inline-flex items-center gap-2">
+                      <PhotoIcon className="h-4 w-4 text-slate-400" />
+                      <a href={item.url} className="text-primary" target="_blank" rel="noreferrer">
+                        {item.label ?? item.url}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">No attachments uploaded.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {resolutionDraft?.incident && (
         <form className="rounded-2xl border border-primary/40 bg-primary/5 p-5 shadow-inner" onSubmit={handleResolve}>
@@ -793,6 +1373,7 @@ function SubscriptionsPanel({ communityId, token }) {
   const [filters, setFilters] = useState({ status: 'active', search: '' });
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
 
   const loadSubscriptions = useCallback(async () => {
     if (!communityId || !token) return;
@@ -818,6 +1399,30 @@ function SubscriptionsPanel({ communityId, token }) {
   useEffect(() => {
     loadSubscriptions();
   }, [loadSubscriptions]);
+
+  const handleExport = useCallback(() => {
+    if (!subscriptions.length) return;
+    const header = 'subscription_id,member,tier,status,renewal\n';
+    const rows = subscriptions
+      .map((subscription) => {
+        const renewalLabel = subscription.currentPeriodEnd
+          ? new Date(subscription.currentPeriodEnd).toISOString()
+          : '';
+        const memberName = subscription.user?.name ?? '';
+        const tierName = subscription.tier?.name ?? '';
+        return `${subscription.publicId},"${memberName}","${tierName}",${subscription.status},${renewalLabel}`;
+      })
+      .join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `community-${communityId}-subscriptions.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [subscriptions, communityId]);
 
   const handleStatusUpdate = useCallback(
     async (subscription, status) => {
@@ -874,9 +1479,19 @@ function SubscriptionsPanel({ communityId, token }) {
         title="Subscription ledger"
         description="Track and manage every paying member in a single operations view."
         actions={
-          <button type="button" className="dashboard-primary-pill" onClick={loadSubscriptions} disabled={loading}>
-            Refresh ledger
-          </button>
+          <div className="flex gap-2">
+            <button type="button" className="dashboard-primary-pill" onClick={loadSubscriptions} disabled={loading}>
+              Refresh ledger
+            </button>
+            <button
+              type="button"
+              className="dashboard-pill px-3 py-1 text-xs"
+              onClick={handleExport}
+              disabled={!subscriptions.length}
+            >
+              <ArrowDownTrayIcon className="mr-1 h-4 w-4" /> Export CSV
+            </button>
+          </div>
         }
       />
 
@@ -1016,6 +1631,13 @@ function SubscriptionsPanel({ communityId, token }) {
                         Cancel
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1 text-xs"
+                      onClick={() => setSelectedSubscription(subscription)}
+                    >
+                      View
+                    </button>
                   </div>
                 </div>
               );
@@ -1023,6 +1645,58 @@ function SubscriptionsPanel({ communityId, token }) {
           )}
         </div>
       </div>
+
+      {selectedSubscription && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-900">Subscription details</h3>
+            <button type="button" className="dashboard-pill px-3 py-1 text-xs" onClick={() => setSelectedSubscription(null)}>
+              Close
+            </button>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Subscriber</p>
+              <p className="mt-1 text-sm text-slate-700">{selectedSubscription.user?.name ?? 'Member'}</p>
+              <p className="text-xs text-slate-500">{selectedSubscription.user?.email ?? 'No email'}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Tier</p>
+              <p className="mt-1 text-sm text-slate-700">{selectedSubscription.tier?.name ?? 'Custom tier'}</p>
+              <p className="text-xs text-slate-500">
+                {selectedSubscription.tier?.priceCents
+                  ? `${new Intl.NumberFormat(undefined, {
+                      style: 'currency',
+                      currency: selectedSubscription.tier?.currency ?? 'USD'
+                    }).format(selectedSubscription.tier.priceCents / 100)} / ${selectedSubscription.tier.interval}`
+                  : 'Custom rate'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Renewal</p>
+              <p className="mt-1 text-sm text-slate-700">
+                {selectedSubscription.currentPeriodEnd
+                  ? new Date(selectedSubscription.currentPeriodEnd).toLocaleString()
+                  : 'TBD'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Lifecycle</p>
+              <ul className="mt-1 space-y-1 text-xs text-slate-600">
+                {selectedSubscription.createdAt && (
+                  <li>Created {new Date(selectedSubscription.createdAt).toLocaleString()}</li>
+                )}
+                {selectedSubscription.statusTransitions?.pausedAt && (
+                  <li>Paused {new Date(selectedSubscription.statusTransitions.pausedAt).toLocaleString()}</li>
+                )}
+                {selectedSubscription.statusTransitions?.canceledAt && (
+                  <li>Canceled {new Date(selectedSubscription.statusTransitions.canceledAt).toLocaleString()}</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1043,6 +1717,7 @@ function MembersPanel({ communityId, token }) {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({ role: '', status: '', search: '' });
   const [newMember, setNewMember] = useState({ email: '', userId: '', role: 'member', status: 'active', title: '', location: '' });
+  const [bulkUpload, setBulkUpload] = useState({ rows: [], filename: '', uploading: false });
 
   const loadMembers = useCallback(async () => {
     if (!communityId || !token) return;
@@ -1170,6 +1845,56 @@ function MembersPanel({ communityId, token }) {
     [communityId, token, newMember, loadMembers]
   );
 
+  const handleBulkFile = useCallback((event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const contents = reader.result;
+      if (typeof contents !== 'string') return;
+      const [headerLine, ...rows] = contents.split(/\r?\n/).filter(Boolean);
+      const headers = headerLine.split(',').map((header) => header.trim().toLowerCase());
+      const parsedRows = rows.map((line) => {
+        const cells = line.split(',');
+        const record = {};
+        headers.forEach((header, index) => {
+          record[header] = cells[index]?.trim();
+        });
+        return record;
+      });
+      setBulkUpload({ rows: parsedRows, filename: file.name, uploading: false });
+    };
+    reader.readAsText(file);
+  }, []);
+
+  const handleBulkInvite = useCallback(async () => {
+    if (!communityId || !token || !bulkUpload.rows.length) return;
+    setBulkUpload((prev) => ({ ...prev, uploading: true }));
+    try {
+      for (const row of bulkUpload.rows) {
+        // eslint-disable-next-line no-await-in-loop
+        await createCommunityMember({
+          communityId,
+          token,
+          payload: {
+            email: row.email || undefined,
+            userId: row.userid ? Number(row.userid) : undefined,
+            role: row.role || 'member',
+            status: row.status || 'active',
+            title: row.title || undefined,
+            location: row.location || undefined
+          }
+        });
+      }
+      setFeedback({ tone: 'success', message: 'Bulk invitations queued.' });
+      setBulkUpload({ rows: [], filename: '', uploading: false });
+      loadMembers();
+    } catch (error) {
+      setFeedback({ tone: 'error', message: error?.message ?? 'Unable to process bulk upload.' });
+      setBulkUpload((prev) => ({ ...prev, uploading: false }));
+    }
+  }, [bulkUpload.rows, communityId, token, loadMembers]);
+
   if (!communityId) {
     return <DashboardStateMessage title="Choose a community" description="Select a community to manage members." />;
   }
@@ -1266,6 +1991,74 @@ function MembersPanel({ communityId, token }) {
           </button>
         </div>
       </form>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Bulk import roster</h3>
+            <p className="text-sm text-slate-600">
+              Upload a CSV file with headers <span className="font-semibold">email,userid,role,status,title,location</span> to
+              invite multiple members at once.
+            </p>
+          </div>
+          <label className="dashboard-primary-pill cursor-pointer">
+            <input type="file" accept=".csv" className="sr-only" onChange={handleBulkFile} />
+            Upload CSV
+          </label>
+        </div>
+        {bulkUpload.filename && (
+          <div className="mt-4 overflow-x-auto">
+            <div className="flex items-center justify-between text-sm text-slate-600">
+              <p>
+                Loaded <span className="font-semibold text-slate-900">{bulkUpload.rows.length}</span> rows from{' '}
+                <span className="font-semibold text-slate-900">{bulkUpload.filename}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="dashboard-pill px-3 py-1 text-xs"
+                  onClick={() => setBulkUpload({ rows: [], filename: '', uploading: false })}
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white"
+                  onClick={handleBulkInvite}
+                  disabled={bulkUpload.uploading}
+                >
+                  {bulkUpload.uploading ? 'Processing…' : 'Send invites'}
+                </button>
+              </div>
+            </div>
+            <table className="mt-3 w-full min-w-[500px] table-auto divide-y divide-slate-100 text-left text-xs text-slate-600">
+              <thead>
+                <tr className="text-slate-500">
+                  <th className="py-2 pr-4 font-semibold uppercase tracking-wide">Email</th>
+                  <th className="py-2 pr-4 font-semibold uppercase tracking-wide">User ID</th>
+                  <th className="py-2 pr-4 font-semibold uppercase tracking-wide">Role</th>
+                  <th className="py-2 pr-4 font-semibold uppercase tracking-wide">Status</th>
+                  <th className="py-2 pr-4 font-semibold uppercase tracking-wide">Title</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bulkUpload.rows.slice(0, 5).map((row, index) => (
+                  <tr key={`${row.email}-${index}`} className="border-b border-slate-100">
+                    <td className="py-2 pr-4">{row.email || '—'}</td>
+                    <td className="py-2 pr-4">{row.userid || '—'}</td>
+                    <td className="py-2 pr-4">{row.role || 'member'}</td>
+                    <td className="py-2 pr-4">{row.status || 'active'}</td>
+                    <td className="py-2 pr-4">{row.title || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {bulkUpload.rows.length > 5 && (
+              <p className="mt-2 text-xs text-slate-500">Showing first 5 rows.</p>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-3 md:grid-cols-4">
@@ -1444,7 +2237,9 @@ function ManagePanel({ communityId, token, onCommunityUpdated }) {
     coverImageUrl: '',
     visibility: 'public',
     tagline: '',
-    accentColor: '#0f172a'
+    accentColor: '#0f172a',
+    promoVideoUrl: '',
+    welcomeMessage: ''
   });
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -1464,7 +2259,9 @@ function ManagePanel({ communityId, token, onCommunityUpdated }) {
         coverImageUrl: data?.coverImageUrl ?? '',
         visibility: data?.visibility ?? 'public',
         tagline: data?.metadata?.tagline ?? '',
-        accentColor: data?.metadata?.accentColor ?? '#0f172a'
+        accentColor: data?.metadata?.accentColor ?? '#0f172a',
+        promoVideoUrl: data?.metadata?.promoVideoUrl ?? '',
+        welcomeMessage: data?.metadata?.welcomeMessage ?? ''
       });
     } catch (error) {
       setFeedback({ tone: 'error', message: error?.message ?? 'Unable to load community.' });
@@ -1492,7 +2289,9 @@ function ManagePanel({ communityId, token, onCommunityUpdated }) {
           metadata: {
             ...(detail?.metadata ?? {}),
             tagline: form.tagline || undefined,
-            accentColor: form.accentColor || undefined
+            accentColor: form.accentColor || undefined,
+            promoVideoUrl: form.promoVideoUrl || undefined,
+            welcomeMessage: form.welcomeMessage || undefined
           }
         };
         const response = await updateCommunity({ communityId, token, payload });
@@ -1581,6 +2380,16 @@ function ManagePanel({ communityId, token, onCommunityUpdated }) {
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                 />
               </label>
+              <label className="space-y-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                Welcome message
+                <textarea
+                  rows={4}
+                  value={form.welcomeMessage}
+                  onChange={(event) => setForm((prev) => ({ ...prev, welcomeMessage: event.target.value }))}
+                  placeholder="Share onboarding instructions that greet every new member."
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
             </div>
           </div>
           <div className="flex flex-col gap-5">
@@ -1607,6 +2416,56 @@ function ManagePanel({ communityId, token, onCommunityUpdated }) {
                     Cover image preview appears here
                   </div>
                 )}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-700 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-900">Promo video spotlight</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Drop in a short teaser video to autoplay on your community landing pages.
+              </p>
+              <label className="mt-3 block space-y-1 text-xs font-semibold text-slate-600">
+                Promo video URL
+                <input
+                  type="url"
+                  value={form.promoVideoUrl}
+                  onChange={(event) => setForm((prev) => ({ ...prev, promoVideoUrl: event.target.value }))}
+                  placeholder="https://videos.edulure.com/intro.mp4"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </label>
+              <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                {form.promoVideoUrl ? (
+                  form.promoVideoUrl.includes('youtube') || form.promoVideoUrl.includes('youtu.be') ? (
+                    <iframe
+                      title="Promo video preview"
+                      src={form.promoVideoUrl}
+                      className="h-40 w-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <video controls className="h-40 w-full object-cover">
+                      <source src={form.promoVideoUrl} />
+                    </video>
+                  )
+                ) : (
+                  <div className="flex h-40 items-center justify-center text-xs text-slate-500">
+                    Video preview appears here
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <h3 className="text-lg font-semibold text-slate-900">Hero preview</h3>
+              <div
+                className="mt-3 rounded-xl p-5 text-white shadow-inner"
+                style={{ backgroundColor: form.accentColor || '#0f172a' }}
+              >
+                <p className="text-sm uppercase tracking-wide opacity-80">{detail?.name ?? 'Instructor community'}</p>
+                <p className="mt-2 text-2xl font-semibold">{form.tagline || 'Inspire your learners every week.'}</p>
+                <p className="mt-3 text-sm opacity-90">
+                  {form.welcomeMessage || 'Welcome learners! Update this message to describe how to get started.'}
+                </p>
               </div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
