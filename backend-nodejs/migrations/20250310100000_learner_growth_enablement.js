@@ -22,6 +22,71 @@ function isPostgres(knex) {
   return DIALECTS.postgres.has(getDialect(knex));
 }
 
+function jsonDefault(knex, fallback = '{}') {
+  if (isPostgres(knex)) {
+    return knex.raw('?::jsonb', [fallback]);
+  }
+
+  if (isMysql(knex)) {
+    return knex.raw('CAST(? AS JSON)', [fallback]);
+  }
+
+  return knex.raw('?', [fallback]);
+}
+
+async function ensureUpdatedAtTrigger(knex, tableName) {
+  if (isMysql(knex)) {
+    await knex.raw(
+      `ALTER TABLE ?? MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      [tableName]
+    );
+    return;
+  }
+
+  if (isPostgres(knex)) {
+    await knex.raw(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at_timestamp') THEN
+          CREATE FUNCTION set_updated_at_timestamp() RETURNS trigger AS $$
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        END IF;
+      END;
+      $$;
+    `);
+
+    const triggerName = `${tableName}_updated_at_trg`;
+
+    await knex.raw(
+      `
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgname = '${triggerName}'
+          ) THEN
+            CREATE TRIGGER "${triggerName}"
+            BEFORE UPDATE ON "${tableName}"
+            FOR EACH ROW
+            EXECUTE FUNCTION set_updated_at_timestamp();
+          END IF;
+        END;
+        $$;
+      `
+    );
+  }
+}
+
+function addTimestamps(table, context) {
+  table.timestamp('created_at').notNullable().defaultTo(context.fn.now());
+  table.timestamp('updated_at').notNullable().defaultTo(context.fn.now());
+}
+
 function normaliseRows(result) {
   if (!result) {
     return [];
@@ -85,12 +150,8 @@ export async function up(knex) {
           .onDelete('CASCADE');
         table.boolean('auto_pay_enabled').notNullable().defaultTo(false);
         table.integer('reserve_target_cents').unsigned().notNullable().defaultTo(0);
-        table.json('preferences').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('preferences').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.unique(['user_id']);
       });
 
@@ -100,6 +161,7 @@ export async function up(knex) {
         'learner_financial_profiles_reserve_chk',
         'reserve_target_cents >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'learner_financial_profiles');
     }
 
     const hasPaymentMethods = await trx.schema.hasTable('learner_payment_methods');
@@ -118,15 +180,12 @@ export async function up(knex) {
         table.string('last4', 4).notNullable();
         table.string('expiry', 10).notNullable();
         table.boolean('is_primary').notNullable().defaultTo(false);
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.unique(['user_id', 'label']);
         table.index(['user_id', 'is_primary'], 'learner_payment_methods_user_primary_idx');
       });
+      await ensureUpdatedAtTrigger(trx, 'learner_payment_methods');
     }
 
     const hasBillingContacts = await trx.schema.hasTable('learner_billing_contacts');
@@ -144,15 +203,12 @@ export async function up(knex) {
         table.string('email', 180).notNullable();
         table.string('phone', 60);
         table.string('company', 150);
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.unique(['user_id', 'email']);
         table.index(['user_id'], 'learner_billing_contacts_user_idx');
       });
+      await ensureUpdatedAtTrigger(trx, 'learner_billing_contacts');
     }
 
     const hasGrowthInitiatives = await trx.schema.hasTable('learner_growth_initiatives');
@@ -176,13 +232,9 @@ export async function up(knex) {
         table.decimal('current_value', 10, 2);
         table.timestamp('start_at');
         table.timestamp('end_at');
-        table.json('tags').notNullable().defaultTo('[]');
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('tags').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.unique(['user_id', 'slug']);
         table.index(['user_id', 'status'], 'learner_growth_initiatives_status_idx');
       });
@@ -205,6 +257,7 @@ export async function up(knex) {
         'learner_growth_initiatives_current_chk',
         'current_value IS NULL OR current_value >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'learner_growth_initiatives');
     }
 
     const hasGrowthExperiments = await trx.schema.hasTable('learner_growth_experiments');
@@ -227,13 +280,9 @@ export async function up(knex) {
         table.decimal('result_value', 10, 2);
         table.timestamp('start_at');
         table.timestamp('end_at');
-        table.json('segments').notNullable().defaultTo('[]');
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('segments').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.index(['initiative_id', 'status'], 'learner_growth_experiments_status_idx');
       });
 
@@ -255,6 +304,7 @@ export async function up(knex) {
         'learner_growth_experiments_result_chk',
         'result_value IS NULL OR result_value >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'learner_growth_experiments');
     }
 
     const hasAffiliateChannels = await trx.schema.hasTable('learner_affiliate_channels');
@@ -276,14 +326,10 @@ export async function up(knex) {
         table.integer('commission_rate_bps').unsigned().notNullable().defaultTo(250);
         table.integer('total_earnings_cents').unsigned().notNullable().defaultTo(0);
         table.integer('total_paid_cents').unsigned().notNullable().defaultTo(0);
-        table.json('notes').notNullable().defaultTo('[]');
-        table.json('performance').notNullable().defaultTo('{}');
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('notes').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('performance').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.unique(['user_id', 'referral_code']);
         table.index(['user_id', 'status'], 'learner_affiliate_channels_status_idx');
       });
@@ -306,6 +352,7 @@ export async function up(knex) {
         'learner_affiliate_channels_paid_chk',
         'total_paid_cents >= 0 AND total_paid_cents <= total_earnings_cents'
       );
+      await ensureUpdatedAtTrigger(trx, 'learner_affiliate_channels');
     }
 
     const hasAffiliatePayouts = await trx.schema.hasTable('learner_affiliate_payouts');
@@ -326,12 +373,8 @@ export async function up(knex) {
         table.timestamp('processed_at');
         table.string('reference', 120);
         table.string('note', 500);
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.index(['channel_id', 'status'], 'learner_affiliate_payouts_status_idx');
       });
 
@@ -341,6 +384,7 @@ export async function up(knex) {
         'learner_affiliate_payouts_amount_chk',
         'amount_cents >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'learner_affiliate_payouts');
     }
 
     const hasLearnerAds = await trx.schema.hasTable('learner_ad_campaigns');
@@ -362,16 +406,12 @@ export async function up(knex) {
         table.timestamp('start_at');
         table.timestamp('end_at');
         table.timestamp('last_synced_at');
-        table.json('metrics').notNullable().defaultTo('{}');
-        table.json('targeting').notNullable().defaultTo('{}');
-        table.json('creative').notNullable().defaultTo('{}');
-        table.json('placements').notNullable().defaultTo('[]');
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metrics').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        table.json('targeting').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        table.json('creative').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        table.json('placements').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.index(['user_id', 'status'], 'learner_ad_campaigns_status_idx');
       });
 
@@ -387,6 +427,7 @@ export async function up(knex) {
         'learner_ad_campaigns_spend_chk',
         'total_spend_cents >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'learner_ad_campaigns');
     }
 
     const hasInstructorApplications = await trx.schema.hasTable('instructor_applications');
@@ -405,18 +446,14 @@ export async function up(knex) {
         table.text('motivation');
         table.string('portfolio_url', 500);
         table.integer('experience_years').unsigned().notNullable().defaultTo(0);
-        table.json('teaching_focus').notNullable().defaultTo('[]');
-        table.json('availability').notNullable().defaultTo('{}');
-        table.json('marketing_assets').notNullable().defaultTo('[]');
+        table.json('teaching_focus').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('availability').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        table.json('marketing_assets').notNullable().defaultTo(jsonDefault(trx, '[]'));
         table.timestamp('submitted_at');
         table.timestamp('reviewed_at');
         table.text('decision_note');
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.unique(['user_id']);
         table.index(['status'], 'instructor_applications_status_idx');
       });
@@ -427,6 +464,7 @@ export async function up(knex) {
         'instructor_applications_experience_chk',
         'experience_years >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'instructor_applications');
     }
   });
 }

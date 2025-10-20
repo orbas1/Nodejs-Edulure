@@ -15,6 +15,71 @@ function isPostgres(knex) {
   return DIALECTS.postgres.has(getDialect(knex));
 }
 
+function jsonDefault(knex, fallback = '{}') {
+  if (isPostgres(knex)) {
+    return knex.raw('?::jsonb', [fallback]);
+  }
+
+  if (isMysql(knex)) {
+    return knex.raw('CAST(? AS JSON)', [fallback]);
+  }
+
+  return knex.raw('?', [fallback]);
+}
+
+async function ensureUpdatedAtTrigger(knex, tableName) {
+  if (isMysql(knex)) {
+    await knex.raw(
+      `ALTER TABLE ?? MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      [tableName]
+    );
+    return;
+  }
+
+  if (isPostgres(knex)) {
+    await knex.raw(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at_timestamp') THEN
+          CREATE FUNCTION set_updated_at_timestamp() RETURNS trigger AS $$
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        END IF;
+      END;
+      $$;
+    `);
+
+    const triggerName = `${tableName}_updated_at_trg`;
+
+    await knex.raw(
+      `
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgname = '${triggerName}'
+          ) THEN
+            CREATE TRIGGER "${triggerName}"
+            BEFORE UPDATE ON "${tableName}"
+            FOR EACH ROW
+            EXECUTE FUNCTION set_updated_at_timestamp();
+          END IF;
+        END;
+        $$;
+      `
+    );
+  }
+}
+
+function addTimestamps(table, context) {
+  table.timestamp('created_at').notNullable().defaultTo(context.fn.now());
+  table.timestamp('updated_at').notNullable().defaultTo(context.fn.now());
+}
+
 function normaliseRows(result) {
   if (!result) {
     return [];
@@ -92,12 +157,8 @@ export async function up(knex) {
         table.integer('registrant_count').unsigned().defaultTo(0);
         table.string('watch_url', 500);
         table.text('description');
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.index(['community_id', 'start_at']);
         table.index(['status']);
       });
@@ -108,6 +169,7 @@ export async function up(knex) {
         'community_webinars_registrant_chk',
         'registrant_count >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'community_webinars');
     }
 
     const hasPodcastEpisodes = await trx.schema.hasTable('community_podcast_episodes');
@@ -138,12 +200,8 @@ export async function up(knex) {
         table.text('summary');
         table.string('audio_url', 500);
         table.string('cover_art_url', 500);
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.index(['community_id']);
         table.index(['stage']);
         table.index(['release_on']);
@@ -155,6 +213,7 @@ export async function up(knex) {
         'community_podcast_duration_chk',
         'duration_minutes >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'community_podcast_episodes');
     }
 
     const hasGrowth = await trx.schema.hasTable('community_growth_experiments');
@@ -189,12 +248,8 @@ export async function up(knex) {
         table.text('hypothesis');
         table.text('notes');
         table.string('experiment_url', 500);
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.index(['community_id']);
         table.index(['status']);
         table.index(['start_date']);
@@ -218,6 +273,7 @@ export async function up(knex) {
         'community_growth_experiments_impact_chk',
         'impact_score IS NULL OR impact_score >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, 'community_growth_experiments');
     }
   });
 }

@@ -20,6 +20,71 @@ function isPostgres(knex) {
   return DIALECTS.postgres.has(getDialect(knex));
 }
 
+function jsonDefault(knex, fallback = '{}') {
+  if (isPostgres(knex)) {
+    return knex.raw('?::jsonb', [fallback]);
+  }
+
+  if (isMysql(knex)) {
+    return knex.raw('CAST(? AS JSON)', [fallback]);
+  }
+
+  return knex.raw('?', [fallback]);
+}
+
+async function ensureUpdatedAtTrigger(knex, tableName) {
+  if (isMysql(knex)) {
+    await knex.raw(
+      `ALTER TABLE ?? MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      [tableName]
+    );
+    return;
+  }
+
+  if (isPostgres(knex)) {
+    await knex.raw(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at_timestamp') THEN
+          CREATE FUNCTION set_updated_at_timestamp() RETURNS trigger AS $$
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        END IF;
+      END;
+      $$;
+    `);
+
+    const triggerName = `${tableName}_updated_at_trg`;
+
+    await knex.raw(
+      `
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgname = '${triggerName}'
+          ) THEN
+            CREATE TRIGGER "${triggerName}"
+            BEFORE UPDATE ON "${tableName}"
+            FOR EACH ROW
+            EXECUTE FUNCTION set_updated_at_timestamp();
+          END IF;
+        END;
+        $$;
+      `
+    );
+  }
+}
+
+function addTimestamps(table, context) {
+  table.timestamp('created_at').notNullable().defaultTo(context.fn.now());
+  table.timestamp('updated_at').notNullable().defaultTo(context.fn.now());
+}
+
 function normaliseRows(result) {
   if (!result) {
     return [];
@@ -99,21 +164,14 @@ export async function up(knex) {
         table.string('usage_metric', 120);
         table.string('revenue_account', 120).notNullable().defaultTo('4000-education-services');
         table.string('deferred_revenue_account', 120).notNullable().defaultTo('2050-deferred-revenue');
-        table.json('metadata').notNullable().defaultTo('{}');
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
         table
           .enum('status', ['draft', 'active', 'retired'])
           .notNullable()
           .defaultTo('active');
         table.timestamp('effective_from').notNullable().defaultTo(trx.fn.now());
         table.timestamp('effective_to');
-        table
-          .timestamp('created_at')
-          .notNullable()
-          .defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        addTimestamps(table, trx);
         table.timestamp('retired_at');
 
         table.unique(['tenant_id', 'product_code'], 'monetization_catalog_tenant_code_unique');
@@ -133,6 +191,7 @@ export async function up(knex) {
         'monetization_catalog_recognition_duration_chk',
         'recognition_duration_days >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, CATALOG_TABLE);
     }
 
     const usageExists = await trx.schema.hasTable(USAGE_TABLE);
@@ -168,9 +227,10 @@ export async function up(knex) {
           .references('id')
           .inTable('payment_intents')
           .onDelete('SET NULL');
-        table.json('metadata').notNullable().defaultTo('{}');
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
         table.timestamp('recorded_at').notNullable().defaultTo(trx.fn.now());
         table.timestamp('processed_at');
+        addTimestamps(table, trx);
 
         table.index(['tenant_id', 'product_code', 'usage_date'], 'monetization_usage_tenant_product_date_idx');
         table.index(['tenant_id', 'external_reference'], 'monetization_usage_external_idx');
@@ -190,6 +250,7 @@ export async function up(knex) {
         'monetization_usage_amount_chk',
         'amount_cents >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, USAGE_TABLE);
     }
 
     const scheduleExists = await trx.schema.hasTable(SCHEDULE_TABLE);
@@ -233,12 +294,8 @@ export async function up(knex) {
         table.string('revenue_account', 120).notNullable().defaultTo('4000-education-services');
         table.string('deferred_revenue_account', 120).notNullable().defaultTo('2050-deferred-revenue');
         table.timestamp('recognized_at');
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
 
         table.index(['tenant_id', 'status'], 'monetization_schedule_status_idx');
         table.index(['tenant_id', 'recognition_end'], 'monetization_schedule_recognition_idx');
@@ -269,6 +326,7 @@ export async function up(knex) {
         'monetization_schedule_recognition_window_chk',
         'recognition_end >= recognition_start'
       );
+      await ensureUpdatedAtTrigger(trx, SCHEDULE_TABLE);
     }
 
     const reconExists = await trx.schema.hasTable(RECON_TABLE);
@@ -288,12 +346,8 @@ export async function up(knex) {
         table.bigInteger('deferred_cents').notNullable().defaultTo(0);
         table.bigInteger('variance_cents').notNullable().defaultTo(0);
         table.decimal('variance_ratio', 8, 4).notNullable().defaultTo(0);
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
 
         table.index(['tenant_id', 'created_at'], 'monetization_recon_created_idx');
         table.unique(['tenant_id', 'window_start', 'window_end'], 'monetization_recon_window_unique');
@@ -329,6 +383,7 @@ export async function up(knex) {
         'monetization_recon_deferred_chk',
         'deferred_cents >= 0'
       );
+      await ensureUpdatedAtTrigger(trx, RECON_TABLE);
     }
   });
 }

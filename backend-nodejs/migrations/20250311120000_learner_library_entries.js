@@ -17,6 +17,71 @@ function isPostgres(knex) {
   return DIALECTS.postgres.has(getDialect(knex));
 }
 
+function jsonDefault(knex, fallback = '{}') {
+  if (isPostgres(knex)) {
+    return knex.raw('?::jsonb', [fallback]);
+  }
+
+  if (isMysql(knex)) {
+    return knex.raw('CAST(? AS JSON)', [fallback]);
+  }
+
+  return knex.raw('?', [fallback]);
+}
+
+async function ensureUpdatedAtTrigger(knex, tableName) {
+  if (isMysql(knex)) {
+    await knex.raw(
+      `ALTER TABLE ?? MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      [tableName]
+    );
+    return;
+  }
+
+  if (isPostgres(knex)) {
+    await knex.raw(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at_timestamp') THEN
+          CREATE FUNCTION set_updated_at_timestamp() RETURNS trigger AS $$
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        END IF;
+      END;
+      $$;
+    `);
+
+    const triggerName = `${tableName}_updated_at_trg`;
+
+    await knex.raw(
+      `
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgname = '${triggerName}'
+          ) THEN
+            CREATE TRIGGER "${triggerName}"
+            BEFORE UPDATE ON "${tableName}"
+            FOR EACH ROW
+            EXECUTE FUNCTION set_updated_at_timestamp();
+          END IF;
+        END;
+        $$;
+      `
+    );
+  }
+}
+
+function addTimestamps(table, context) {
+  table.timestamp('created_at').notNullable().defaultTo(context.fn.now());
+  table.timestamp('updated_at').notNullable().defaultTo(context.fn.now());
+}
+
 function normaliseRows(result) {
   if (!result) {
     return [];
@@ -94,16 +159,12 @@ export async function up(knex) {
         table.text('summary');
         table.string('author', 180);
         table.string('cover_url', 500);
-        table.json('tags').notNullable().defaultTo('[]');
-        table.json('highlights').notNullable().defaultTo('[]');
+        table.json('tags').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('highlights').notNullable().defaultTo(jsonDefault(trx, '[]'));
         table.string('audio_url', 500);
         table.string('preview_url', 500);
-        table.json('metadata').notNullable().defaultTo('{}');
-        table.timestamp('created_at').notNullable().defaultTo(trx.fn.now());
-        table
-          .timestamp('updated_at')
-          .notNullable()
-          .defaultTo(trx.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        addTimestamps(table, trx);
         table.index(['user_id'], 'learner_library_entries_user_idx');
         table.index(['user_id', 'format'], 'learner_library_entries_format_idx');
       });
@@ -120,6 +181,7 @@ export async function up(knex) {
         'learner_library_entries_format_chk',
         `format IN (${formatList})`
       );
+      await ensureUpdatedAtTrigger(trx, 'learner_library_entries');
     }
 
     const tableStillExists = hasLibraryEntries || (await trx.schema.hasTable('learner_library_entries'));

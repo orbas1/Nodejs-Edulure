@@ -19,6 +19,66 @@ function isPostgres(knex) {
   return DIALECTS.postgres.has(getDialect(knex));
 }
 
+function jsonDefault(knex, fallback = '{}') {
+  if (isPostgres(knex)) {
+    return knex.raw('?::jsonb', [fallback]);
+  }
+
+  if (isMysql(knex)) {
+    return knex.raw('CAST(? AS JSON)', [fallback]);
+  }
+
+  return knex.raw('?', [fallback]);
+}
+
+async function ensureUpdatedAtTrigger(knex, tableName) {
+  if (isMysql(knex)) {
+    await knex.raw(
+      `ALTER TABLE ?? MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      [tableName]
+    );
+    return;
+  }
+
+  if (isPostgres(knex)) {
+    await knex.raw(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at_timestamp') THEN
+          CREATE FUNCTION set_updated_at_timestamp() RETURNS trigger AS $$
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        END IF;
+      END;
+      $$;
+    `);
+
+    const triggerName = `${tableName}_updated_at_trg`;
+
+    await knex.raw(
+      `
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgname = '${triggerName}'
+          ) THEN
+            CREATE TRIGGER "${triggerName}"
+            BEFORE UPDATE ON "${tableName}"
+            FOR EACH ROW
+            EXECUTE FUNCTION set_updated_at_timestamp();
+          END IF;
+        END;
+        $$;
+      `
+    );
+  }
+}
+
 function normaliseRows(result) {
   if (!result) {
     return [];
@@ -69,10 +129,7 @@ async function addCheckConstraint(knex, tableName, constraintName, expression) {
 
 function addTimestamps(table, context) {
   table.timestamp('created_at').notNullable().defaultTo(context.fn.now());
-  table
-    .timestamp('updated_at')
-    .notNullable()
-    .defaultTo(context.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+  table.timestamp('updated_at').notNullable().defaultTo(context.fn.now());
 }
 
 export async function up(knex) {
@@ -92,13 +149,14 @@ export async function up(knex) {
         table.boolean('auto_evaluated').notNullable().defaultTo(false);
         table.integer('weight').unsigned().notNullable().defaultTo(1);
         table.string('default_owner_email', 160);
-        table.json('success_criteria').notNullable().defaultTo('{}');
+        table.json('success_criteria').notNullable().defaultTo(jsonDefault(trx, '{}'));
         addTimestamps(table, trx);
 
         table.index(['category'], 'release_checklist_category_idx');
       });
 
       await addCheckConstraint(trx, CHECKLIST_TABLE, 'release_checklist_weight_chk', 'weight >= 0');
+      await ensureUpdatedAtTrigger(trx, CHECKLIST_TABLE);
     }
 
     const hasRuns = await trx.schema.hasTable(RUNS_TABLE);
@@ -120,8 +178,8 @@ export async function up(knex) {
         table.timestamp('change_window_start');
         table.timestamp('change_window_end');
         table.text('summary_notes');
-        table.json('checklist_snapshot').notNullable().defaultTo('[]');
-        table.json('metadata').notNullable().defaultTo('{}');
+        table.json('checklist_snapshot').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
         addTimestamps(table, trx);
 
         table.index(['environment', 'status'], 'release_runs_environment_status_idx');
@@ -135,6 +193,7 @@ export async function up(knex) {
         'release_runs_change_window_chk',
         'change_window_end IS NULL OR change_window_start IS NULL OR change_window_end >= change_window_start'
       );
+      await ensureUpdatedAtTrigger(trx, RUNS_TABLE);
     }
 
     const hasGates = await trx.schema.hasTable(GATES_TABLE);
@@ -160,7 +219,7 @@ export async function up(knex) {
           .notNullable()
           .defaultTo('pending');
         table.string('owner_email', 160);
-        table.json('metrics').notNullable().defaultTo('{}');
+        table.json('metrics').notNullable().defaultTo(jsonDefault(trx, '{}'));
         table.text('notes');
         table.string('evidence_url', 500);
         table.timestamp('last_evaluated_at');
@@ -169,6 +228,7 @@ export async function up(knex) {
         table.index(['run_id', 'status'], 'release_gate_run_status_idx');
         table.unique(['run_id', 'gate_key'], 'release_gate_run_gate_unique');
       });
+      await ensureUpdatedAtTrigger(trx, GATES_TABLE);
     }
   });
 }

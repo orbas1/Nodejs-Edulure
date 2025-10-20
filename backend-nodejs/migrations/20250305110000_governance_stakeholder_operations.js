@@ -20,6 +20,66 @@ function isPostgres(knex) {
   return DIALECTS.postgres.has(getDialect(knex));
 }
 
+function jsonDefault(knex, fallback = '{}') {
+  if (isPostgres(knex)) {
+    return knex.raw('?::jsonb', [fallback]);
+  }
+
+  if (isMysql(knex)) {
+    return knex.raw('CAST(? AS JSON)', [fallback]);
+  }
+
+  return knex.raw('?', [fallback]);
+}
+
+async function ensureUpdatedAtTrigger(knex, tableName) {
+  if (isMysql(knex)) {
+    await knex.raw(
+      `ALTER TABLE ?? MODIFY COLUMN updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      [tableName]
+    );
+    return;
+  }
+
+  if (isPostgres(knex)) {
+    await knex.raw(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'set_updated_at_timestamp') THEN
+          CREATE FUNCTION set_updated_at_timestamp() RETURNS trigger AS $$
+          BEGIN
+            NEW.updated_at = NOW();
+            RETURN NEW;
+          END;
+          $$ LANGUAGE plpgsql;
+        END IF;
+      END;
+      $$;
+    `);
+
+    const triggerName = `${tableName}_updated_at_trg`;
+
+    await knex.raw(
+      `
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_trigger
+            WHERE tgname = '${triggerName}'
+          ) THEN
+            CREATE TRIGGER "${triggerName}"
+            BEFORE UPDATE ON "${tableName}"
+            FOR EACH ROW
+            EXECUTE FUNCTION set_updated_at_timestamp();
+          END IF;
+        END;
+        $$;
+      `
+    );
+  }
+}
+
 function normaliseRows(result) {
   if (!result) {
     return [];
@@ -70,10 +130,7 @@ async function addCheckConstraint(knex, tableName, constraintName, expression) {
 
 function addTimestamps(table, context) {
   table.timestamp('created_at').notNullable().defaultTo(context.fn.now());
-  table
-    .timestamp('updated_at')
-    .notNullable()
-    .defaultTo(context.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+  table.timestamp('updated_at').notNullable().defaultTo(context.fn.now());
 }
 
 export async function up(knex) {
@@ -96,8 +153,8 @@ export async function up(knex) {
         table.date('effective_date').notNullable();
         table.date('renewal_date');
         table.date('termination_notice_date');
-        table.json('obligations').notNullable().defaultTo('[]');
-        table.json('metadata').notNullable().defaultTo('{}');
+        table.json('obligations').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
         table.timestamp('last_renewal_evaluated_at');
         table.timestamp('next_governance_check_at');
         addTimestamps(table, trx);
@@ -119,6 +176,7 @@ export async function up(knex) {
         'governance_contract_renewal_after_effective_chk',
         'renewal_date IS NULL OR renewal_date >= effective_date'
       );
+      await ensureUpdatedAtTrigger(trx, CONTRACTS_TABLE);
     }
 
     const hasAssessments = await trx.schema.hasTable(ASSESSMENTS_TABLE);
@@ -148,10 +206,10 @@ export async function up(knex) {
         table.date('last_assessed_at');
         table.date('next_review_at');
         table.string('owner_email', 160).notNullable();
-        table.json('findings').notNullable().defaultTo('[]');
-        table.json('remediation_plan').notNullable().defaultTo('{}');
-        table.json('evidence_links').notNullable().defaultTo('[]');
-        table.json('metadata').notNullable().defaultTo('{}');
+        table.json('findings').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('remediation_plan').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        table.json('evidence_links').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
         addTimestamps(table, trx);
 
         table.index(['vendor_name', 'assessment_type'], 'governance_vendor_assessment_vendor_idx');
@@ -165,6 +223,7 @@ export async function up(knex) {
         'governance_assessment_risk_score_chk',
         'risk_score >= 0 AND risk_score <= 100'
       );
+      await ensureUpdatedAtTrigger(trx, ASSESSMENTS_TABLE);
     }
 
     const hasReviews = await trx.schema.hasTable(REVIEWS_TABLE);
@@ -180,9 +239,9 @@ export async function up(knex) {
         table.date('start_date').notNullable();
         table.date('end_date');
         table.date('next_milestone_at');
-        table.json('focus_areas').notNullable().defaultTo('[]');
-        table.json('participants').notNullable().defaultTo('[]');
-        table.json('action_items').notNullable().defaultTo('[]');
+        table.json('focus_areas').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('participants').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('action_items').notNullable().defaultTo(jsonDefault(trx, '[]'));
         table.text('outcome_notes');
         table.integer('readiness_score').unsigned().notNullable().defaultTo(0);
         addTimestamps(table, trx);
@@ -197,6 +256,7 @@ export async function up(knex) {
         'governance_review_readiness_chk',
         'readiness_score >= 0 AND readiness_score <= 100'
       );
+      await ensureUpdatedAtTrigger(trx, REVIEWS_TABLE);
     }
 
     const hasCommunications = await trx.schema.hasTable(COMMUNICATIONS_TABLE);
@@ -219,14 +279,15 @@ export async function up(knex) {
         table.timestamp('schedule_at');
         table.timestamp('sent_at');
         table.string('owner_email', 160).notNullable();
-        table.json('metrics').notNullable().defaultTo('{}');
-        table.json('attachments').notNullable().defaultTo('[]');
-        table.json('metadata').notNullable().defaultTo('{}');
+        table.json('metrics').notNullable().defaultTo(jsonDefault(trx, '{}'));
+        table.json('attachments').notNullable().defaultTo(jsonDefault(trx, '[]'));
+        table.json('metadata').notNullable().defaultTo(jsonDefault(trx, '{}'));
         addTimestamps(table, trx);
 
         table.index(['status', 'schedule_at'], 'governance_comm_status_schedule_idx');
         table.index(['audience', 'channel'], 'governance_comm_audience_channel_idx');
       });
+      await ensureUpdatedAtTrigger(trx, COMMUNICATIONS_TABLE);
     }
   });
 }
