@@ -41,7 +41,7 @@ vi.mock('../src/config/logger.js', () => ({
   }
 }));
 
-const { adsCampaignModelMock, adsCampaignMetricModelMock, domainEventModelMock, logger } = mocks;
+const { adsCampaignModelMock, adsCampaignMetricModelMock, domainEventModelMock } = mocks;
 
 import AdsService from '../src/services/AdsService.js';
 

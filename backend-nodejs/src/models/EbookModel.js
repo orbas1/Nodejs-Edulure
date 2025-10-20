@@ -310,7 +310,7 @@ export default class EbookModel {
     if (categories?.length) {
       query.where((builder) => {
         for (const category of categories) {
-          builder.orWhereRaw("JSON_CONTAINS(ebooks.categories, '" + JSON.stringify(category) + "')");
+          builder.orWhereRaw('JSON_CONTAINS(ebooks.categories, ?)', [JSON.stringify(category)]);
         }
       });
     }
@@ -318,7 +318,7 @@ export default class EbookModel {
     if (tags?.length) {
       query.where((builder) => {
         for (const tag of tags) {
-          builder.orWhereRaw("JSON_CONTAINS(ebooks.tags, '" + JSON.stringify(tag) + "')");
+          builder.orWhereRaw('JSON_CONTAINS(ebooks.tags, ?)', [JSON.stringify(tag)]);
         }
       });
     }
@@ -326,7 +326,7 @@ export default class EbookModel {
     if (languages?.length) {
       query.where((builder) => {
         for (const language of languages) {
-          builder.orWhereRaw("JSON_CONTAINS(ebooks.languages, '" + JSON.stringify(language) + "')");
+          builder.orWhereRaw('JSON_CONTAINS(ebooks.languages, ?)', [JSON.stringify(language)]);
         }
       });
     }
