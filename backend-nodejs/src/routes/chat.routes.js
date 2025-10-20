@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import DirectMessageController from '../controllers/DirectMessageController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/threads', auth(), DirectMessageController.listThreads);
 router.post('/threads', auth(), DirectMessageController.createThread);

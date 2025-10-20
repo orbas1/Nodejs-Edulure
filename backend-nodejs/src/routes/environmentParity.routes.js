@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import EnvironmentParityController from '../controllers/EnvironmentParityController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter({ allowedMethods: ['GET'] });
 
 router.get('/environment/health', auth('admin'), EnvironmentParityController.health);
 

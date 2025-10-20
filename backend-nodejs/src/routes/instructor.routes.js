@@ -1,11 +1,10 @@
-import { Router } from 'express';
-
 import InstructorBookingController from '../controllers/InstructorBookingController.js';
 import InstructorOrchestrationController from '../controllers/InstructorOrchestrationController.js';
 import InstructorSchedulingController from '../controllers/InstructorSchedulingController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/bookings', auth('instructor'), InstructorBookingController.list);
 router.post('/bookings', auth('instructor'), InstructorBookingController.create);
