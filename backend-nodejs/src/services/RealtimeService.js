@@ -7,6 +7,7 @@ import { sessionRegistry } from './SessionRegistry.js';
 import UserModel from '../models/UserModel.js';
 import DirectMessageParticipantModel from '../models/DirectMessageParticipantModel.js';
 import courseLiveService from './CourseLiveService.js';
+import { createCorsOriginValidator } from '../config/corsPolicy.js';
 
 const log = logger.child({ service: 'RealtimeService' });
 
@@ -48,10 +49,18 @@ class RealtimeService {
       return this.io;
     }
 
-    const origins = env.app.corsOrigins ?? [];
+    const corsPolicy = createCorsOriginValidator(env.app.corsOrigins ?? []);
     this.io = new Server(httpServer, {
       cors: {
-        origin: origins.length ? origins : true,
+        origin: (origin, callback) => {
+          if (corsPolicy.isOriginAllowed(origin)) {
+            return callback(null, true);
+          }
+
+          const error = new Error(`Origin ${origin ?? '<unknown>'} not allowed by CORS policy`);
+          logger.warn({ origin, policy: corsPolicy.describe() }, 'Realtime connection blocked by CORS');
+          return callback(error);
+        },
         credentials: true
       }
     });

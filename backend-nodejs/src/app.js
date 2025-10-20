@@ -13,6 +13,7 @@ import swaggerUi from 'swagger-ui-express';
 
 import { env } from './config/env.js';
 import logger from './config/logger.js';
+import { createCorsOriginValidator } from './config/corsPolicy.js';
 import { healthcheck } from './config/database.js';
 import errorHandler from './middleware/errorHandler.js';
 import { success } from './utils/httpResponse.js';
@@ -74,7 +75,7 @@ const limiter = expressRateLimit({
   legacyHeaders: false
 });
 
-const corsOrigins = new Set(env.app.corsOrigins);
+const corsPolicy = createCorsOriginValidator(env.app.corsOrigins);
 
 app.use(requestContextMiddleware);
 app.use(runtimeConfigMiddleware);
@@ -115,11 +116,16 @@ app.use(
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || corsOrigins.has(origin)) {
+      if (corsPolicy.isOriginAllowed(origin)) {
         return callback(null, true);
       }
-      const error = new Error(`Origin ${origin} not allowed by CORS policy`);
+
+      const error = new Error(`Origin ${origin ?? '<unknown>'} not allowed by CORS policy`);
       error.status = 403;
+      logger.warn({
+        origin,
+        policy: corsPolicy.describe()
+      }, 'Request blocked by CORS policy');
       return callback(error);
     },
     credentials: true,
