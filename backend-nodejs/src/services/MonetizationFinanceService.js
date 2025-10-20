@@ -65,6 +65,20 @@ function getQueryConnection(connection) {
   return null;
 }
 
+function resolveModelConnection(connection) {
+  const queryConnection = getQueryConnection(connection);
+  if (queryConnection) {
+    return { connection: queryConnection, isQueryable: true };
+  }
+
+  const resolved = resolveConnection(connection);
+  if (!resolved) {
+    return { connection: null, isQueryable: false };
+  }
+
+  return { connection: resolved, isQueryable: isQueryableConnection(resolved) };
+}
+
 function normaliseTenantId(tenantId) {
   if (!tenantId) {
     return 'global';
@@ -158,21 +172,31 @@ function deriveRecognitionStrategy(catalogItem, itemMetadata = {}) {
 }
 
 async function refreshCatalogMetrics(connection = db) {
-  const queryConnection = getQueryConnection(connection);
-  if (!queryConnection) {
+  const { connection: targetConnection } = resolveModelConnection(connection);
+  if (!targetConnection) {
     return;
   }
-  const counts = await MonetizationCatalogItemModel.touchMetrics(queryConnection);
-  updateMonetizationCatalogMetrics(counts);
+
+  try {
+    const counts = await MonetizationCatalogItemModel.touchMetrics(targetConnection);
+    updateMonetizationCatalogMetrics(counts);
+  } catch (error) {
+    serviceLogger.warn({ err: error }, 'Failed to refresh monetization catalog metrics');
+  }
 }
 
 async function refreshDeferredBalance(tenantId, connection = db) {
-  const queryConnection = getQueryConnection(connection);
-  if (!queryConnection) {
+  const { connection: targetConnection } = resolveModelConnection(connection);
+  if (!targetConnection) {
     return;
   }
-  const balance = await MonetizationRevenueScheduleModel.sumDeferredBalance({ tenantId }, queryConnection);
-  updateDeferredRevenueBalance({ tenantId, balanceCents: balance });
+
+  try {
+    const balance = await MonetizationRevenueScheduleModel.sumDeferredBalance({ tenantId }, targetConnection);
+    updateDeferredRevenueBalance({ tenantId, balanceCents: balance });
+  } catch (error) {
+    serviceLogger.warn({ err: error, tenantId }, 'Failed to refresh deferred revenue balance');
+  }
 }
 
 async function resolveUsageRecords({
@@ -247,11 +271,11 @@ class MonetizationFinanceService {
   }
 
   static async listCatalogItems(params = {}, connection = db) {
-    const queryConnection = getQueryConnection(connection);
-    if (!queryConnection) {
+    const { connection: targetConnection } = resolveModelConnection(connection);
+    if (!targetConnection) {
       return [];
     }
-    return MonetizationCatalogItemModel.list(params, queryConnection);
+    return MonetizationCatalogItemModel.list(params, targetConnection);
   }
 
   static async recordUsageEvent(event, connection = db) {
@@ -273,8 +297,8 @@ class MonetizationFinanceService {
       catalogItemId: event.catalogItemId ?? null
     };
 
-    const queryConnection = getQueryConnection(connection);
-    if (!queryConnection) {
+    const { connection: targetConnection } = resolveModelConnection(connection);
+    if (!targetConnection) {
       return {
         id: null,
         tenantId,
@@ -295,10 +319,7 @@ class MonetizationFinanceService {
       };
     }
 
-    const record = await MonetizationUsageRecordModel.upsertByExternalReference(
-      payload,
-      queryConnection
-    );
+    const record = await MonetizationUsageRecordModel.upsertByExternalReference(payload, targetConnection);
     recordMonetizationUsage({
       productCode,
       source: event.source ?? 'manual',
@@ -309,7 +330,7 @@ class MonetizationFinanceService {
   }
 
   static async ensureCatalogItem({ tenantId, item, connection }) {
-    const queryConnection = getQueryConnection(connection);
+    const { connection: modelConnection, isQueryable } = resolveModelConnection(connection);
     const candidateCodes = [
       item.metadata?.catalogItemCode,
       item.metadata?.productCode,
@@ -319,13 +340,40 @@ class MonetizationFinanceService {
       .map((code) => normaliseProductCode(code))
       .filter(Boolean);
 
-    if (!queryConnection) {
-      const autoCode = normaliseProductCode(candidateCodes[0] ?? item.id ?? item.name ?? 'auto-item');
-      const recognitionMethod = item.metadata?.revenueRecognitionMethod ?? 'deferred';
-      const duration = coercePositiveInteger(
-        item.metadata?.recognitionDurationDays ?? (item.metadata?.billingInterval === 'annual' ? 365 : 30)
-      );
+    let catalogItem = null;
+    if (modelConnection) {
+      for (const code of candidateCodes) {
+        try {
+          catalogItem = await MonetizationCatalogItemModel.findByProductCode(tenantId, code, modelConnection);
+        } catch (error) {
+          if (isQueryable) {
+            throw error;
+          }
 
+          serviceLogger.warn(
+            { err: error, tenantId, code },
+            'Failed to resolve catalog item with provided connection'
+          );
+          break;
+        }
+
+        if (catalogItem) {
+          break;
+        }
+      }
+    }
+
+    if (catalogItem) {
+      return catalogItem;
+    }
+
+    const autoCode = normaliseProductCode(candidateCodes[0] ?? item.id ?? item.name ?? 'auto-item');
+    const recognitionMethod = item.metadata?.revenueRecognitionMethod ?? 'deferred';
+    const duration = coercePositiveInteger(
+      item.metadata?.recognitionDurationDays ?? (item.metadata?.billingInterval === 'annual' ? 365 : 30)
+    );
+
+    if (!modelConnection) {
       return {
         id: null,
         tenantId,
@@ -351,26 +399,46 @@ class MonetizationFinanceService {
       };
     }
 
-    let catalogItem = null;
-    for (const code of candidateCodes) {
-      catalogItem = await MonetizationCatalogItemModel.findByProductCode(tenantId, code, queryConnection);
-      if (catalogItem) {
-        break;
+    try {
+      const created = await MonetizationCatalogItemModel.create(
+        {
+          tenantId,
+          productCode: autoCode,
+          name: item.name ?? 'Unclassified item',
+          description:
+            item.metadata?.description ??
+            'Auto-provisioned from payment capture. Review configuration for accurate revenue policies.',
+          pricingModel: item.metadata?.pricingModel ?? 'flat_fee',
+          billingInterval: item.metadata?.billingInterval ?? 'monthly',
+          revenueRecognitionMethod: recognitionMethod,
+          recognitionDurationDays: recognitionMethod === 'deferred' ? duration : 0,
+          unitAmountCents: coercePositiveInteger(item.unitAmount ?? 0),
+          currency: item.currency ?? 'GBP',
+          usageMetric: item.metadata?.usageMetric ?? null,
+          status: item.metadata?.autoActivate === false ? 'draft' : 'active',
+          metadata: {
+            ...item.metadata,
+            provisionedFromPayment: true,
+            originalLineItemId: item.id
+          }
+        },
+        modelConnection
+      );
+
+      serviceLogger.info({ tenantId, productCode: created.productCode }, 'Auto-provisioned catalog item');
+      return created;
+    } catch (error) {
+      if (isQueryable) {
+        throw error;
       }
-    }
 
-    if (catalogItem) {
-      return catalogItem;
-    }
+      serviceLogger.warn(
+        { err: error, tenantId, productCode: autoCode },
+        'Failed to create catalog item with provided connection, returning fallback'
+      );
 
-    const autoCode = candidateCodes[0] ?? normaliseProductCode(`auto-${item.id ?? item.name}`);
-    const recognitionMethod = item.metadata?.revenueRecognitionMethod ?? 'deferred';
-    const duration = coercePositiveInteger(
-      item.metadata?.recognitionDurationDays ?? (item.metadata?.billingInterval === 'annual' ? 365 : 30)
-    );
-
-    const created = await MonetizationCatalogItemModel.create(
-      {
+      return {
+        id: null,
         tenantId,
         productCode: autoCode,
         name: item.name ?? 'Unclassified item',
@@ -382,20 +450,19 @@ class MonetizationFinanceService {
         revenueRecognitionMethod: recognitionMethod,
         recognitionDurationDays: recognitionMethod === 'deferred' ? duration : 0,
         unitAmountCents: coercePositiveInteger(item.unitAmount ?? 0),
-        currency: item.currency ?? 'GBP',
+        currency: (item.currency ?? 'GBP').toUpperCase(),
         usageMetric: item.metadata?.usageMetric ?? null,
-        status: item.metadata?.autoActivate === false ? 'draft' : 'active',
+        revenueAccount: item.metadata?.revenueAccount ?? '4000-education-services',
+        deferredRevenueAccount:
+          item.metadata?.deferredRevenueAccount ?? '2050-deferred-revenue',
         metadata: {
           ...item.metadata,
           provisionedFromPayment: true,
           originalLineItemId: item.id
-        }
-      },
-      queryConnection
-    );
-
-    serviceLogger.info({ tenantId, productCode: created.productCode }, 'Auto-provisioned catalog item');
-    return created;
+        },
+        status: item.metadata?.autoActivate === false ? 'draft' : 'active'
+      };
+    }
   }
 
   static buildRecognitionPlan({ catalogItem, item, capturedAt }) {
@@ -501,6 +568,7 @@ class MonetizationFinanceService {
         };
 
         const scheduleConnection = getQueryConnection(trx);
+        const { connection: ledgerConnection } = resolveModelConnection(trx);
         const writeConnection = scheduleConnection ??
           (typeof trx === 'function' || typeof trx?.select === 'function' || typeof trx?.from === 'function'
             ? trx
@@ -533,7 +601,7 @@ class MonetizationFinanceService {
 
         schedules.push(schedule);
 
-        if (plan.deferredAmount > 0 && scheduleConnection) {
+        if (plan.deferredAmount > 0 && ledgerConnection) {
           await PaymentLedgerEntryModel.record(
             {
               paymentIntentId: payment.id,
@@ -547,11 +615,11 @@ class MonetizationFinanceService {
                 capturedAt
               }
             },
-            trx
+            ledgerConnection
           );
         }
 
-        if (plan.recognizedAmount > 0 && scheduleConnection) {
+        if (plan.recognizedAmount > 0 && ledgerConnection) {
           await PaymentLedgerEntryModel.record(
             {
               paymentIntentId: payment.id,
@@ -565,7 +633,7 @@ class MonetizationFinanceService {
                 capturedAt
               }
             },
-            trx
+            ledgerConnection
           );
         }
 
@@ -608,8 +676,8 @@ class MonetizationFinanceService {
       return { status: 'ignored', adjustments: { recognized: [], deferred: [] }, unappliedCents: 0 };
     }
 
-    const queryConnection = getQueryConnection(connection);
-    if (!queryConnection) {
+    const { connection: modelConnection } = resolveModelConnection(connection);
+    if (!modelConnection) {
       serviceLogger.debug({ paymentIntentId }, 'Skipping monetization refund processing without queryable connection');
       return {
         status: 'connection-unavailable',
@@ -624,7 +692,7 @@ class MonetizationFinanceService {
 
     const schedules = await MonetizationRevenueScheduleModel.listByPaymentIntent(
       paymentIntentId,
-      queryConnection
+      modelConnection
     );
 
     if (!Array.isArray(schedules) || schedules.length === 0) {
@@ -668,7 +736,7 @@ class MonetizationFinanceService {
         schedule.id,
         reduction,
         adjustmentContext,
-        queryConnection
+        modelConnection
       );
 
       recognizedAdjustments.push({
@@ -694,7 +762,7 @@ class MonetizationFinanceService {
             source: source ?? null
           }
         },
-        queryConnection
+        modelConnection
       );
 
       recordRevenueReversal({
@@ -735,7 +803,7 @@ class MonetizationFinanceService {
           schedule.id,
           reduction,
           adjustmentContext,
-          queryConnection
+          modelConnection
         );
 
         deferredAdjustments.push({
@@ -761,7 +829,7 @@ class MonetizationFinanceService {
               source: source ?? null
             }
           },
-          queryConnection
+          modelConnection
         );
       }
     }
@@ -949,7 +1017,12 @@ class MonetizationFinanceService {
 
   static async listRevenueSchedules({ paymentIntentId, tenantId, status, limit = 50, offset = 0 } = {}) {
     const normalizedTenant = normaliseTenantId(tenantId ?? 'global');
-    const query = db('monetization_revenue_schedules')
+    const { connection: modelConnection, isQueryable } = resolveModelConnection(db);
+    if (!modelConnection || !isQueryable) {
+      return [];
+    }
+
+    const query = modelConnection('monetization_revenue_schedules')
       .where({ tenant_id: normalizedTenant })
       .orderBy('recognition_start', 'desc')
       .limit(Math.min(limit, 200))
@@ -967,32 +1040,32 @@ class MonetizationFinanceService {
   }
 
   static async listReconciliationRuns(params = {}, connection = db) {
-    const queryConnection = getQueryConnection(connection);
-    if (!queryConnection) {
+    const { connection: targetConnection } = resolveModelConnection(connection);
+    if (!targetConnection) {
       return [];
     }
-    return MonetizationReconciliationRunModel.list(params, queryConnection);
+    return MonetizationReconciliationRunModel.list(params, targetConnection);
   }
 
   static async latestReconciliation(params = {}, connection = db) {
-    const queryConnection = getQueryConnection(connection);
-    if (!queryConnection) {
+    const { connection: targetConnection } = resolveModelConnection(connection);
+    if (!targetConnection) {
       return null;
     }
-    return MonetizationReconciliationRunModel.latest(params, queryConnection);
+    return MonetizationReconciliationRunModel.latest(params, targetConnection);
   }
 
   static async listActiveTenants(connection = db) {
-    const queryConnection = getQueryConnection(connection);
-    if (!queryConnection) {
+    const { connection: targetConnection } = resolveModelConnection(connection);
+    if (!targetConnection) {
       return ['global'];
     }
 
     const [catalogTenants, usageTenants, scheduleTenants, reconciliationTenants] = await Promise.all([
-      MonetizationCatalogItemModel.distinctTenants(queryConnection),
-      MonetizationUsageRecordModel.distinctTenants(queryConnection),
-      MonetizationRevenueScheduleModel.distinctTenants(queryConnection),
-      MonetizationReconciliationRunModel.distinctTenants(queryConnection)
+      MonetizationCatalogItemModel.distinctTenants(targetConnection),
+      MonetizationUsageRecordModel.distinctTenants(targetConnection),
+      MonetizationRevenueScheduleModel.distinctTenants(targetConnection),
+      MonetizationReconciliationRunModel.distinctTenants(targetConnection)
     ]);
 
     const tenants = new Set([
