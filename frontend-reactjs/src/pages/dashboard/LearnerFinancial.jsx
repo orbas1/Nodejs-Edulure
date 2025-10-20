@@ -41,6 +41,10 @@ export default function LearnerFinancial() {
     phone: '',
     company: ''
   });
+  const [autoPayEnabled, setAutoPayEnabled] = useState(false);
+  const [autoPayLoading, setAutoPayLoading] = useState(false);
+  const [forecastMonths, setForecastMonths] = useState(6);
+  const [reserveTarget, setReserveTarget] = useState(500);
 
   useEffect(() => {
     if (error) {
@@ -58,6 +62,16 @@ export default function LearnerFinancial() {
   useEffect(() => {
     setBillingContacts(Array.isArray(financial?.billingContacts) ? financial.billingContacts : []);
   }, [financial?.billingContacts]);
+
+  useEffect(() => {
+    setAutoPayEnabled(Boolean(financial?.preferences?.autoPay?.enabled));
+    if (financial?.preferences?.reserveTarget != null) {
+      const parsed = Number(financial.preferences.reserveTarget);
+      if (!Number.isNaN(parsed)) {
+        setReserveTarget(parsed);
+      }
+    }
+  }, [financial?.preferences?.autoPay?.enabled, financial?.preferences?.reserveTarget]);
 
   if (!isLearner) {
     return (
@@ -110,6 +124,63 @@ export default function LearnerFinancial() {
   }, [invoiceSearch, invoiceStatusFilter, invoices]);
   const hasFilteredInvoices = filteredInvoices.length > 0;
   const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
+  const billingInsights = useMemo(() => {
+    const paid = invoices.filter((invoice) => (invoice.status ?? '').toLowerCase() === 'paid');
+    const outstanding = invoices.filter((invoice) => (invoice.status ?? '').toLowerCase() !== 'paid');
+    const sumNumeric = (collection, keyCandidates) =>
+      collection.reduce((total, item) => {
+        const value = keyCandidates.reduce((accumulator, key) => {
+          if (accumulator != null) {
+            return accumulator;
+          }
+          const raw = item[key];
+          if (raw == null) {
+            return null;
+          }
+          const numeric = Number.parseFloat(raw);
+          return Number.isNaN(numeric) ? null : numeric;
+        }, null);
+        return total + (value ?? 0);
+      }, 0);
+    const totalPaid = sumNumeric(paid, ['amount', 'total', 'amountPaid']);
+    const totalOutstanding = sumNumeric(outstanding, ['amountDue', 'balance', 'amount']);
+    const uniqueMonths = new Set();
+    paid.forEach((invoice) => {
+      if (!invoice.date) {
+        return;
+      }
+      const parsed = new Date(invoice.date);
+      if (Number.isNaN(parsed.getTime())) {
+        return;
+      }
+      uniqueMonths.add(`${parsed.getFullYear()}-${parsed.getMonth() + 1}`);
+    });
+    const averageMonthlySpend = uniqueMonths.size
+      ? totalPaid / uniqueMonths.size
+      : paid.length
+        ? totalPaid / paid.length
+        : 0;
+    return {
+      totalPaid,
+      totalOutstanding,
+      paidCount: paid.length,
+      outstandingCount: outstanding.length,
+      averageMonthlySpend
+    };
+  }, [invoices]);
+  const forecast = useMemo(() => {
+    const monthsValue = Number.parseInt(forecastMonths, 10);
+    const months = Number.isFinite(monthsValue) && monthsValue > 0 ? monthsValue : 6;
+    const projectedSpend = (billingInsights.averageMonthlySpend ?? 0) * months;
+    const recommendedReserve = projectedSpend / 3;
+    const reserveGap = Math.max(0, recommendedReserve - reserveTarget);
+    return {
+      months,
+      projectedSpend: Math.round(projectedSpend * 100) / 100,
+      reserveGap: Math.round(reserveGap * 100) / 100,
+      recommendedReserve: Math.round(recommendedReserve * 100) / 100
+    };
+  }, [billingInsights.averageMonthlySpend, forecastMonths, reserveTarget]);
 
   const resetPaymentForm = useCallback(() => {
     setPaymentForm({
@@ -313,6 +384,41 @@ export default function LearnerFinancial() {
     },
     [setPaymentMethods, token, updatePaymentMethod]
   );
+
+  const handleToggleAutoPay = useCallback(async () => {
+    if (!token) {
+      setStatusMessage({ type: 'error', message: 'Sign in again to update auto-pay preferences.' });
+      return;
+    }
+    const nextValue = !autoPayEnabled;
+    setAutoPayLoading(true);
+    setStatusMessage({
+      type: 'pending',
+      message: nextValue ? 'Enabling auto-pay for your tuition plan…' : 'Disabling auto-pay…'
+    });
+    try {
+      await updateBillingPreferences({ token, payload: { autoPay: { enabled: nextValue } } });
+      setAutoPayEnabled(nextValue);
+      setStatusMessage({
+        type: 'success',
+        message: nextValue ? 'Auto-pay enabled. We will collect on the due date automatically.' : 'Auto-pay disabled.'
+      });
+    } catch (toggleError) {
+      setStatusMessage({
+        type: 'error',
+        message: toggleError instanceof Error ? toggleError.message : 'Unable to update auto-pay preferences.'
+      });
+    } finally {
+      setAutoPayLoading(false);
+    }
+  }, [autoPayEnabled, token, updateBillingPreferences]);
+
+  const handleReserveTargetChange = useCallback((event) => {
+    const value = Number(event.target.value);
+    if (!Number.isNaN(value)) {
+      setReserveTarget(value);
+    }
+  }, []);
 
   const handleDownloadStatement = useCallback(async () => {
     if (!token) {
@@ -549,6 +655,77 @@ export default function LearnerFinancial() {
       </section>
 
       <section className="dashboard-section">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-slate-200 bg-white/70 p-5">
+            <p className="dashboard-kicker text-primary">Auto-pay management</p>
+            <h2 className="text-lg font-semibold text-slate-900">Recurring tuition autopay</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Stay current on tuition by letting us debit your primary method automatically on the due date.
+            </p>
+            <div className="mt-4 flex items-center gap-3">
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${
+                  autoPayEnabled ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {autoPayEnabled ? 'Auto-pay active' : 'Auto-pay off'}
+              </span>
+              <button
+                type="button"
+                className="dashboard-primary-pill"
+                onClick={handleToggleAutoPay}
+                disabled={autoPayLoading || disableActions}
+              >
+                {autoPayLoading ? 'Updating…' : autoPayEnabled ? 'Pause auto-pay' : 'Enable auto-pay'}
+              </button>
+            </div>
+            <ul className="mt-4 space-y-2 text-xs text-slate-600">
+              <li>Paid invoices · {billingInsights.paidCount.toLocaleString()}</li>
+              <li>Outstanding invoices · {billingInsights.outstandingCount.toLocaleString()}</li>
+              <li>Total outstanding · {billingInsights.totalOutstanding.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</li>
+            </ul>
+          </div>
+          <div className="rounded-3xl border border-slate-200 bg-white/70 p-5">
+            <p className="dashboard-kicker text-slate-500">Cash flow planner</p>
+            <h2 className="text-lg font-semibold text-slate-900">Forecast & reserve</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Project spend for the next {forecast.months} months and ensure you have at least a third of that value in reserve.
+            </p>
+            <label className="mt-4 block text-xs font-medium text-slate-600">
+              Forecast horizon · {forecast.months} months
+              <input
+                type="range"
+                min="3"
+                max="12"
+                value={forecastMonths}
+                onChange={(event) => setForecastMonths(event.target.value)}
+                className="mt-2 w-full"
+              />
+            </label>
+            <label className="mt-4 block text-xs font-medium text-slate-600">
+              Reserve target (USD)
+              <input
+                type="number"
+                min="0"
+                value={reserveTarget}
+                onChange={handleReserveTargetChange}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-xs text-primary">
+              <p>Projected spend · {forecast.projectedSpend.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}</p>
+              <p className="mt-1">
+                Recommended reserve · {forecast.recommendedReserve.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+              </p>
+              <p className="mt-1">
+                Reserve gap · {forecast.reserveGap.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="dashboard-section">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Invoices & renewals</h2>
@@ -564,6 +741,29 @@ export default function LearnerFinancial() {
           </button>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-rose-700">Outstanding</p>
+            <p className="mt-2 text-xl font-semibold text-rose-700">
+              {billingInsights.totalOutstanding.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+            </p>
+            <p className="mt-1 text-xs text-rose-700/80">Across {billingInsights.outstandingCount} invoices.</p>
+          </div>
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Paid to date</p>
+            <p className="mt-2 text-xl font-semibold text-emerald-700">
+              {billingInsights.totalPaid.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+            </p>
+            <p className="mt-1 text-xs text-emerald-700/80">All recorded settlements.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Avg monthly spend</p>
+            <p className="mt-2 text-xl font-semibold text-slate-900">
+              {billingInsights.averageMonthlySpend.toLocaleString(undefined, { style: 'currency', currency: 'USD' })}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">Based on your paid invoices.</p>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
           <label className="flex flex-col text-xs font-medium text-slate-600">
             Search invoices
             <input
@@ -738,6 +938,31 @@ export default function LearnerFinancial() {
               No billing contacts yet. Add a finance representative to receive statements and renewal notices.
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="dashboard-section grid gap-6 lg:grid-cols-2 lg:items-center">
+        <div>
+          <p className="dashboard-kicker text-primary">Finance lab</p>
+          <h2 className="text-xl font-semibold text-slate-900">Optimise your learning budget</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Watch a two-minute walkthrough on how top learners blend scholarships, credits, and auto-pay to stay current without
+            compromising cash flow.
+          </p>
+          <ul className="mt-3 list-disc space-y-2 pl-5 text-xs text-slate-600">
+            <li>Set reserve targets that mirror your projected spend.</li>
+            <li>Automate approvals with billing contacts and smart reminders.</li>
+            <li>Export insights to share with your finance partner.</li>
+          </ul>
+        </div>
+        <div className="aspect-video w-full overflow-hidden rounded-3xl border border-slate-200 shadow-inner">
+          <iframe
+            title="Financial wellness tutorial"
+            src="https://www.youtube.com/embed/5U7bI7pJcHc"
+            className="h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
         </div>
       </section>
 

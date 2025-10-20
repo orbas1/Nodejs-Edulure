@@ -133,6 +133,9 @@ export default function LearnerEbooks() {
   });
   const [highlightErrors, setHighlightErrors] = useState([]);
   const [highlightPending, setHighlightPending] = useState(false);
+  const [librarySort, setLibrarySort] = useState('recent');
+  const [insightsRange, setInsightsRange] = useState('30');
+  const [audioPreview, setAudioPreview] = useState(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -180,7 +183,7 @@ export default function LearnerEbooks() {
   const filteredLibrary = useMemo(() => {
     const query = libraryQuery.trim().toLowerCase();
     const format = libraryFormatFilter.toLowerCase();
-    return libraryEntries.filter((entry) => {
+    const filtered = libraryEntries.filter((entry) => {
       const matchesFormat = format === 'all' || (entry.format ?? '').toLowerCase() === format;
       if (!matchesFormat) {
         return false;
@@ -193,11 +196,105 @@ export default function LearnerEbooks() {
         .map((value) => String(value).toLowerCase());
       return haystack.some((value) => value.includes(query));
     });
-  }, [libraryEntries, libraryFormatFilter, libraryQuery]);
+    const sorter = [...filtered];
+    return sorter.sort((a, b) => {
+      if (librarySort === 'title') {
+        return String(a.title ?? '').localeCompare(String(b.title ?? ''));
+      }
+      if (librarySort === 'progress') {
+        return Number(b.progress ?? 0) - Number(a.progress ?? 0);
+      }
+      const aDate = a.lastOpened ? new Date(a.lastOpened) : null;
+      const bDate = b.lastOpened ? new Date(b.lastOpened) : null;
+      const aTime = aDate && !Number.isNaN(aDate.getTime()) ? aDate.getTime() : 0;
+      const bTime = bDate && !Number.isNaN(bDate.getTime()) ? bDate.getTime() : 0;
+      return bTime - aTime;
+    });
+  }, [libraryEntries, libraryFormatFilter, libraryQuery, librarySort]);
   const hasFilteredLibrary = filteredLibrary.length > 0;
   const recommendations = useMemo(() => (ebooks?.recommendations ?? []).slice(0, 3), [ebooks?.recommendations]);
   const marketplaceHighlights = useMemo(() => marketplace.slice(0, 3), [marketplace]);
   const marketplaceCatalogue = useMemo(() => marketplace.slice(3, 12), [marketplace]);
+  const readingInsights = useMemo(() => {
+    const parsedRange = Number.parseInt(insightsRange, 10);
+    const rangeDays = Number.isFinite(parsedRange) ? parsedRange : 30;
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+    const entries = libraryEntries.filter((entry) => {
+      if (!entry.lastOpened) {
+        return true;
+      }
+      const parsed = new Date(entry.lastOpened);
+      if (Number.isNaN(parsed.getTime())) {
+        return true;
+      }
+      return parsed >= cutoff;
+    });
+    const completed = entries.filter((entry) => Number(entry.progress ?? 0) >= 95);
+    const inProgress = entries.filter((entry) => {
+      const progress = Number(entry.progress ?? 0);
+      return progress > 0 && progress < 95;
+    });
+    const digitalNotes = entries.reduce(
+      (total, entry) => total + (Array.isArray(entry.highlights) ? entry.highlights.length : 0),
+      0
+    );
+    const audioCount = entries.filter((entry) => (entry.format ?? '').toLowerCase().includes('audio')).length;
+    const avgProgress = entries.length
+      ? Math.round(
+          entries.reduce((total, entry) => total + Number(entry.progress ?? 0 || 0), 0) / entries.length
+        )
+      : 0;
+    return {
+      scope: entries.length,
+      completed: completed.length,
+      inProgress: inProgress.length,
+      avgProgress,
+      digitalNotes,
+      audioCount
+    };
+  }, [insightsRange, libraryEntries]);
+  const immersiveHighlight = useMemo(() => {
+    for (const entry of libraryEntries) {
+      const candidate = entry.previewUrl ?? entry.trailerUrl ?? entry.url ?? null;
+      if (!candidate || typeof candidate !== 'string') {
+        continue;
+      }
+      if (!/youtube|youtu\.be|vimeo|loom/.test(candidate.toLowerCase())) {
+        continue;
+      }
+      let embedUrl = candidate;
+      try {
+        if (candidate.includes('youtube.com/watch')) {
+          const parsed = new URL(candidate);
+          const videoId = parsed.searchParams.get('v');
+          if (videoId) {
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+          }
+        } else if (candidate.includes('youtu.be/')) {
+          const id = candidate.split('youtu.be/')[1]?.split(/[?&]/)[0];
+          if (id) {
+            embedUrl = `https://www.youtube.com/embed/${id}`;
+          }
+        } else if (candidate.includes('vimeo.com/')) {
+          const id = candidate.split('vimeo.com/')[1]?.split(/[?&#]/)[0];
+          if (id) {
+            embedUrl = `https://player.vimeo.com/video/${id}`;
+          }
+        } else if (candidate.includes('loom.com/share/')) {
+          const id = candidate.split('loom.com/share/')[1]?.split(/[?&#]/)[0];
+          if (id) {
+            embedUrl = `https://www.loom.com/embed/${id}`;
+          }
+        }
+      } catch (error) {
+        embedUrl = candidate;
+      }
+
+      return { entry, url: candidate, embedUrl };
+    }
+    return null;
+  }, [libraryEntries]);
 
   useEffect(() => {
     if (activeTab !== 'marketplace' && purchaseStatus?.type !== 'success') {
@@ -441,6 +538,68 @@ export default function LearnerEbooks() {
     [deleteLearnerLibraryEntry, setLibraryEntries, token]
   );
 
+  const handleCompleteLibraryEntry = useCallback(
+    async (entry) => {
+      if (!token) {
+        setLibraryStatus({ type: 'error', message: 'Sign in again to update your progress.' });
+        return;
+      }
+      setPendingLibraryId(entry.id);
+      setLibraryStatus({ type: 'pending', message: `Marking ${entry.title} as completed…` });
+      const payload = {
+        progress: 100,
+        lastOpened: new Date().toISOString()
+      };
+      try {
+        await updateLearnerLibraryEntry({ token, ebookId: entry.id, payload });
+        const readableDate = new Date(payload.lastOpened).toLocaleDateString();
+        setLibraryEntries((current) =>
+          current.map((item) =>
+            item.id === entry.id
+              ? {
+                  ...item,
+                  progress: 100,
+                  lastOpened: readableDate,
+                  lastOpenedRaw: payload.lastOpened
+                }
+              : item
+          )
+        );
+        setLibraryStatus({ type: 'success', message: `${entry.title} marked as completed.` });
+      } catch (completeError) {
+        setLibraryStatus({
+          type: 'error',
+          message:
+            completeError instanceof Error
+              ? completeError.message
+              : 'We were unable to update the reading progress.'
+        });
+      } finally {
+        setPendingLibraryId(null);
+      }
+    },
+    [setLibraryEntries, setLibraryStatus, token, updateLearnerLibraryEntry]
+  );
+
+  const closeAudioPreview = useCallback(() => {
+    setAudioPreview(null);
+  }, []);
+
+  const openAudioPreview = useCallback(
+    (entry) => {
+      const candidate =
+        entry.audioPreviewUrl ??
+        entry.audioUrl ??
+        (typeof entry.url === 'string' && /\.(mp3|m4a|wav|aac)$/i.test(entry.url) ? entry.url : null);
+      if (!candidate) {
+        setLibraryStatus({ type: 'error', message: 'This title does not include an audio preview yet.' });
+        return;
+      }
+      setAudioPreview({ title: entry.title, url: candidate, author: entry.author ?? '' });
+    },
+    [setLibraryStatus]
+  );
+
   const openHighlightForm = useCallback((entry) => {
     setHighlightEntryId(entry.id);
     setHighlightForm({
@@ -640,7 +799,54 @@ export default function LearnerEbooks() {
             </button>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-3xl border border-slate-200 bg-white/70 p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reading momentum</p>
+                <h3 className="text-lg font-semibold text-slate-900">Learning cadence snapshot</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Track how many titles are active, wrapped up, and how deep your highlights go this season.
+                </p>
+              </div>
+              <label className="flex flex-col text-xs font-medium text-slate-600 lg:w-48">
+                Reporting window
+                <select
+                  value={insightsRange}
+                  onChange={(event) => setInsightsRange(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="7">Last 7 days</option>
+                  <option value="30">Last 30 days</option>
+                  <option value="90">Last 90 days</option>
+                  <option value="180">Last 6 months</option>
+                </select>
+              </label>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Titles in focus</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{readingInsights.scope}</p>
+                <p className="mt-1 text-xs text-slate-500">Opened within the selected window.</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completed</p>
+                <p className="mt-2 text-2xl font-semibold text-emerald-700">{readingInsights.completed}</p>
+                <p className="mt-1 text-xs text-emerald-700/80">Fully finished and ready for recap.</p>
+              </div>
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary">Average progress</p>
+                <p className="mt-2 text-2xl font-semibold text-primary">{readingInsights.avgProgress}%</p>
+                <p className="mt-1 text-xs text-primary/80">Across all tracked titles in this period.</p>
+              </div>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Highlights captured</p>
+                <p className="mt-2 text-2xl font-semibold text-amber-700">{readingInsights.digitalNotes}</p>
+                <p className="mt-1 text-xs text-amber-700/80">Clipped quotes &amp; annotations ({readingInsights.audioCount} audio titles).</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-4">
             <label className="flex flex-col text-xs font-medium text-slate-600">
               Search library
               <input
@@ -665,6 +871,18 @@ export default function LearnerEbooks() {
                 ))}
               </select>
             </label>
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Sort order
+              <select
+                value={librarySort}
+                onChange={(event) => setLibrarySort(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="recent">Recently opened</option>
+                <option value="title">Title (A-Z)</option>
+                <option value="progress">Progress</option>
+              </select>
+            </label>
             <div className="flex items-end justify-end">
               <button
                 type="button"
@@ -672,6 +890,7 @@ export default function LearnerEbooks() {
                 onClick={() => {
                   setLibraryQuery('');
                   setLibraryFormatFilter('all');
+                  setLibrarySort('recent');
                 }}
               >
                 Reset filters
@@ -725,6 +944,10 @@ export default function LearnerEbooks() {
                     <p className="mt-3 text-xs text-slate-500">
                       {Math.min(100, Number(ebook.progress ?? 0))}% complete
                     </p>
+                    {(ebook.audioPreviewUrl || ebook.audioUrl ||
+                      (typeof ebook.url === 'string' && /\.(mp3|m4a|wav|aac)$/i.test(ebook.url))) && (
+                      <p className="text-xs text-primary">Audio companion available</p>
+                    )}
                     {ebook.url ? (
                       <a
                         href={ebook.url}
@@ -788,6 +1011,21 @@ export default function LearnerEbooks() {
                       </button>
                       <button
                         type="button"
+                        className="dashboard-pill px-3 py-1 text-emerald-600"
+                        onClick={() => handleCompleteLibraryEntry(ebook)}
+                        disabled={pendingLibraryId === ebook.id}
+                      >
+                        {pendingLibraryId === ebook.id ? 'Updating…' : 'Mark completed'}
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1"
+                        onClick={() => openAudioPreview(ebook)}
+                      >
+                        Listen preview
+                      </button>
+                      <button
+                        type="button"
                         className="dashboard-pill bg-rose-50 text-rose-600 hover:bg-rose-100"
                         onClick={() => handleRemoveLibraryEntry(ebook)}
                         disabled={pendingLibraryId === ebook.id}
@@ -819,6 +1057,42 @@ export default function LearnerEbooks() {
               />
             )}
           </div>
+
+          {immersiveHighlight ? (
+            <div className="dashboard-section grid gap-6 lg:grid-cols-2 lg:items-center">
+              <div className="space-y-3">
+                <p className="dashboard-kicker text-primary">Immersive spotlight</p>
+                <h3 className="text-xl font-semibold text-slate-900">{immersiveHighlight.entry.title}</h3>
+                <p className="text-sm text-slate-600">
+                  Step inside {immersiveHighlight.entry.title} with a curated trailer. Share it with your accountability group to
+                  spark discussion before your next reading circle.
+                </p>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span className="rounded-full bg-slate-100 px-3 py-1">{immersiveHighlight.entry.format}</span>
+                  {immersiveHighlight.entry.author ? (
+                    <span className="rounded-full bg-slate-100 px-3 py-1">{immersiveHighlight.entry.author}</span>
+                  ) : null}
+                  <a
+                    href={immersiveHighlight.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="dashboard-pill px-3 py-1"
+                  >
+                    Open in new tab
+                  </a>
+                </div>
+              </div>
+              <div className="aspect-video w-full overflow-hidden rounded-3xl border border-slate-200 shadow-inner">
+                <iframe
+                  title={`Preview for ${immersiveHighlight.entry.title}`}
+                  src={immersiveHighlight.embedUrl}
+                  className="h-full w-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            </div>
+          ) : null}
 
           {recommendations.length > 0 ? (
             <div className="dashboard-card border border-primary/20 bg-gradient-to-r from-primary/5 via-white to-primary/5 px-6 py-6">
@@ -1122,6 +1396,37 @@ export default function LearnerEbooks() {
                 </div>
               )}
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {audioPreview ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="dashboard-kicker text-primary">Audio preview</p>
+                <h2 className="text-xl font-semibold text-slate-900">{audioPreview.title}</h2>
+                {audioPreview.author ? (
+                  <p className="text-sm text-slate-500">Narrated by {audioPreview.author}</p>
+                ) : null}
+              </div>
+              <button type="button" className="dashboard-pill" onClick={closeAudioPreview}>
+                Close
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-slate-600">
+              Press play to sample the audiobook edition and decide if you want to switch formats before your next session.
+            </p>
+            <audio controls className="mt-4 w-full" src={audioPreview.url} preload="metadata">
+              <track kind="captions" />
+              Your browser does not support the audio element.
+            </audio>
+            <div className="mt-4 flex justify-end">
+              <a href={audioPreview.url} target="_blank" rel="noreferrer" className="dashboard-primary-pill px-4 py-2 text-xs">
+                Open full audio
+              </a>
+            </div>
           </div>
         </div>
       ) : null}

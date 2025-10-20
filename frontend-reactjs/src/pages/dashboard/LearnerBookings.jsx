@@ -10,6 +10,15 @@ import {
 } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 
+const prepShareDefaultState = {
+  open: false,
+  booking: null,
+  notes: '',
+  recipients: '',
+  includeResources: true,
+  channel: 'email'
+};
+
 export default function LearnerBookings() {
   const { isLearner, section: data, refresh, loading, error } = useLearnerDashboardSection('tutorBookings');
   const { session } = useAuth();
@@ -33,6 +42,9 @@ export default function LearnerBookings() {
   const [bookingFormStep, setBookingFormStep] = useState(1);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [insightsRange, setInsightsRange] = useState('30');
+  const [prepShareModal, setPrepShareModal] = useState({ ...prepShareDefaultState });
+  const [prepShareErrors, setPrepShareErrors] = useState([]);
   
   useEffect(() => {
     setActiveBookings(Array.isArray(data?.active) ? data.active : []);
@@ -46,6 +58,118 @@ export default function LearnerBookings() {
   }, [error]);
 
   const disableActions = useMemo(() => pendingAction !== null, [pendingAction]);
+  const bookingInsights = useMemo(() => {
+    const now = new Date();
+    const parsedRange = Number.parseInt(insightsRange, 10);
+    const rangeDays = Number.isFinite(parsedRange) ? parsedRange : 30;
+    const rangeCutoff = new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+
+    const allBookings = [...activeBookings, ...historicalBookings];
+    const withinRange = allBookings.filter((booking) => {
+      const candidate = booking.rawDate ?? booking.date ?? null;
+      if (!candidate) {
+        return false;
+      }
+      const parsed = new Date(candidate);
+      return !Number.isNaN(parsed.getTime()) && parsed >= rangeCutoff;
+    });
+
+    const completed = withinRange.filter((booking) =>
+      (booking.status ?? '').toLowerCase().includes('complete')
+    );
+    const cancelled = withinRange.filter((booking) =>
+      (booking.status ?? '').toLowerCase().includes('cancel')
+    );
+    const resourceCount = withinRange.reduce(
+      (total, booking) => total + (Array.isArray(booking.resources) ? booking.resources.length : 0),
+      0
+    );
+    const ratings = historicalBookings
+      .map((booking) => Number.parseFloat(String(booking.rating ?? '')))
+      .filter((rating) => Number.isFinite(rating));
+    const averageRating =
+      ratings.length > 0 ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : null;
+    const upcomingWeek = activeBookings.filter((booking) => {
+      const candidate = booking.rawDate ?? booking.date ?? null;
+      if (!candidate) {
+        return false;
+      }
+      const parsed = new Date(candidate);
+      if (Number.isNaN(parsed.getTime())) {
+        return false;
+      }
+      const diff = parsed.getTime() - now.getTime();
+      return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
+    }).length;
+
+    return {
+      total: withinRange.length,
+      completed: completed.length,
+      cancelled: cancelled.length,
+      resourceCount,
+      satisfaction: averageRating ? Math.round((averageRating / 5) * 100) : null,
+      averageRating,
+      upcomingWeek
+    };
+  }, [activeBookings, historicalBookings, insightsRange]);
+  const nextSession = useMemo(() => {
+    const sortable = activeBookings
+      .map((booking) => {
+        const candidate = booking.rawDate ?? booking.date ?? null;
+        if (!candidate) {
+          return null;
+        }
+        const parsed = new Date(candidate);
+        if (Number.isNaN(parsed.getTime())) {
+          return null;
+        }
+        return { booking, date: parsed };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.date - b.date);
+    return sortable.length ? sortable[0].booking : null;
+  }, [activeBookings]);
+  const heroRecording = useMemo(() => {
+    for (const booking of historicalBookings) {
+      const resources = Array.isArray(booking.resources) ? booking.resources : [];
+      const media = resources.find((resource) =>
+        typeof resource === 'string' && /youtube|youtu\.be|vimeo|loom/.test(resource.toLowerCase())
+      );
+      if (!media) {
+        continue;
+      }
+      let embedUrl = media;
+      try {
+        if (media.includes('youtube.com/watch')) {
+          const parsed = new URL(media);
+          const videoId = parsed.searchParams.get('v');
+          if (videoId) {
+            embedUrl = `https://www.youtube.com/embed/${videoId}`;
+          }
+        } else if (media.includes('youtu.be/')) {
+          const id = media.split('youtu.be/')[1]?.split(/[?&]/)[0];
+          if (id) {
+            embedUrl = `https://www.youtube.com/embed/${id}`;
+          }
+        } else if (media.includes('vimeo.com/')) {
+          const id = media.split('vimeo.com/')[1]?.split(/[?&#]/)[0];
+          if (id) {
+            embedUrl = `https://player.vimeo.com/video/${id}`;
+          }
+        } else if (media.includes('loom.com/share/')) {
+          const id = media.split('loom.com/share/')[1]?.split(/[?&#]/)[0];
+          if (id) {
+            embedUrl = `https://www.loom.com/embed/${id}`;
+          }
+        }
+      } catch (error) {
+        embedUrl = media;
+      }
+
+      return { booking, url: media, embedUrl };
+    }
+    return null;
+  }, [historicalBookings]);
   const statusOptions = useMemo(
     () => [
       { value: 'all', label: 'All statuses' },
@@ -96,6 +220,23 @@ export default function LearnerBookings() {
           ? booking.resources.map((link) => link ?? '')
           : ['']
     });
+    setBookingFormStep(1);
+    setBookingFormVisible(true);
+  }, []);
+
+  const handleDuplicateBooking = useCallback((booking) => {
+    setBookingForm({
+      topic: `${booking.topic ?? 'Mentorship session'} (copy)`,
+      mentorPreference: booking.mentor ?? '',
+      preferredDate: booking.rawDate ?? '',
+      notes: booking.notes ?? '',
+      resourceLinks:
+        Array.isArray(booking.resources) && booking.resources.length
+          ? booking.resources.map((link) => link ?? '')
+          : ['']
+    });
+    setBookingFormMode('create');
+    setBookingFormErrors([]);
     setBookingFormStep(1);
     setBookingFormVisible(true);
   }, []);
@@ -507,6 +648,81 @@ export default function LearnerBookings() {
       </div>
 
       <section className="dashboard-section">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Mentor performance insights</h2>
+            <p className="text-sm text-slate-600">
+              Understand how your mentorship pipeline is performing and where to focus next.
+            </p>
+          </div>
+          <label className="flex flex-col text-xs font-medium text-slate-600 lg:w-40">
+            Reporting window
+            <select
+              value={insightsRange}
+              onChange={(event) => setInsightsRange(event.target.value)}
+              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            >
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="180">Last 6 months</option>
+            </select>
+          </label>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="dashboard-card-muted space-y-2 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Sessions analysed</p>
+            <p className="text-2xl font-semibold text-slate-900">{bookingInsights.total}</p>
+            <p className="text-xs text-slate-500">Across active and historical bookings in the selected window.</p>
+          </div>
+          <div className="dashboard-card-muted space-y-2 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Completed</p>
+            <p className="text-2xl font-semibold text-emerald-600">{bookingInsights.completed}</p>
+            <p className="text-xs text-slate-500">Mentorship sessions delivered with successful outcomes.</p>
+          </div>
+          <div className="dashboard-card-muted space-y-2 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Cancelled</p>
+            <p className="text-2xl font-semibold text-amber-600">{bookingInsights.cancelled}</p>
+            <p className="text-xs text-slate-500">Sessions that were withdrawn before completion.</p>
+          </div>
+          <div className="dashboard-card-muted space-y-2 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">Resource richness</p>
+            <p className="text-2xl font-semibold text-primary">
+              {bookingInsights.resourceCount.toLocaleString()} assets
+            </p>
+            <p className="text-xs text-slate-500">Guides, briefs, and multimedia attached to your sessions.</p>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          <div className="dashboard-card-muted p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Client satisfaction</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">
+              {bookingInsights.satisfaction ? `${bookingInsights.satisfaction}%` : '—'}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">
+              Average rating {bookingInsights.averageRating ? bookingInsights.averageRating.toFixed(1) : 'not yet collected'}
+              .
+            </p>
+          </div>
+          <div className="dashboard-card-muted p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Upcoming week</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900">{bookingInsights.upcomingWeek}</p>
+            <p className="mt-2 text-xs text-slate-500">Bookings scheduled to go live within the next 7 days.</p>
+          </div>
+          <div className="dashboard-card-muted p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next confirmed mentor</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">
+              {nextSession ? nextSession.mentor : 'Awaiting confirmation'}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">Topic · {nextSession ? nextSession.topic : '—'}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Scheduled · {nextSession ? nextSession.date ?? 'Scheduling' : 'TBC'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="dashboard-section">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Upcoming bookings</h2>
@@ -567,7 +783,7 @@ export default function LearnerBookings() {
                   <div>
                     <p className="dashboard-kicker">{item.status}</p>
                     <p className="text-sm font-semibold text-slate-900">{item.topic}</p>
-                  <p className="text-xs text-slate-500">Mentor {item.mentor}</p>
+                    <p className="text-xs text-slate-500">Mentor {item.mentor}</p>
                 </div>
                 <div className="text-right text-xs text-slate-500">
                   <p>{item.date}</p>
@@ -583,8 +799,29 @@ export default function LearnerBookings() {
                 >
                   Reschedule
                 </button>
-                <button type="button" className="dashboard-pill px-3 py-1">
+                <button
+                  type="button"
+                  className="dashboard-pill px-3 py-1"
+                  onClick={() => openPrepShareModal(item)}
+                  disabled={disableActions}
+                >
                   Share prep notes
+                </button>
+                <button
+                  type="button"
+                  className="dashboard-pill px-3 py-1"
+                  onClick={() => handleDuplicateBooking(item)}
+                  disabled={disableActions}
+                >
+                  Duplicate brief
+                </button>
+                <button
+                  type="button"
+                  className="dashboard-pill px-3 py-1 text-emerald-600"
+                  onClick={() => handleCompleteBooking(item)}
+                  disabled={disableActions}
+                >
+                  Mark completed
                 </button>
                 <button
                   type="button"
@@ -635,6 +872,7 @@ export default function LearnerBookings() {
               <th className="pb-3">Topic</th>
               <th className="pb-3">Date</th>
               <th className="pb-3 text-right">Rating</th>
+              <th className="pb-3 text-right">Replay</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
@@ -645,11 +883,25 @@ export default function LearnerBookings() {
                   <td className="py-3 text-slate-600">{item.topic}</td>
                   <td className="py-3 text-slate-600">{item.date}</td>
                   <td className="py-3 text-right text-emerald-500">{item.rating}★</td>
+                  <td className="py-3 text-right">
+                    {item.recordingUrl ? (
+                      <a
+                        href={item.recordingUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="dashboard-pill px-3 py-1 text-xs"
+                      >
+                        Watch replay
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </td>
                 </tr>
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="py-6 text-center text-sm text-slate-500">
+                <td colSpan="5" className="py-6 text-center text-sm text-slate-500">
                   No completed sessions match the current filters yet.
                 </td>
               </tr>
@@ -657,6 +909,44 @@ export default function LearnerBookings() {
           </tbody>
         </table>
       </section>
+
+      {heroRecording ? (
+        <section className="dashboard-section">
+          <div className="grid gap-6 lg:grid-cols-2 lg:items-center">
+            <div className="space-y-3">
+              <p className="dashboard-kicker text-primary">Session replay spotlight</p>
+              <h3 className="text-xl font-semibold text-slate-900">{heroRecording.booking.topic}</h3>
+              <p className="text-sm text-slate-600">
+                Revisit the highlights from your recent session with {heroRecording.booking.mentor}. Share the
+                recording with peers to keep momentum going.
+              </p>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+                <span className="rounded-full bg-slate-100 px-3 py-1">{heroRecording.booking.date}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1">
+                  {heroRecording.booking.rating ? `${heroRecording.booking.rating}★ satisfaction` : 'Awaiting rating'}
+                </span>
+                <a
+                  href={heroRecording.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="dashboard-pill px-3 py-1"
+                >
+                  Open in new tab
+                </a>
+              </div>
+            </div>
+            <div className="aspect-video w-full overflow-hidden rounded-3xl border border-slate-200 shadow-inner">
+              <iframe
+                title={`Session replay for ${heroRecording.booking.topic}`}
+                src={heroRecording.embedUrl}
+                className="h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {statusMessage ? (
         <div
@@ -842,6 +1132,248 @@ export default function LearnerBookings() {
           </div>
         </div>
       ) : null}
+
+      {prepShareModal.open ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="dashboard-kicker text-primary">Share preparation</p>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {prepShareModal.booking?.topic ?? 'Session brief'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Send updated talking points and resources directly to mentors or collaborators.
+                </p>
+              </div>
+              <button type="button" className="dashboard-pill" onClick={closePrepShareModal}>
+                Close
+              </button>
+            </div>
+
+            {prepShareErrors.length ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                <ul className="list-disc space-y-1 pl-5">
+                  {prepShareErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <form className="mt-6 space-y-5" onSubmit={handlePrepShareSubmit}>
+              <label className="block text-sm font-medium text-slate-900">
+                Recipients
+                <input
+                  type="text"
+                  name="recipients"
+                  value={prepShareModal.recipients}
+                  onChange={handlePrepShareChange}
+                  placeholder="mentor@example.com, success@team"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <span className="mt-1 block text-xs text-slate-500">
+                  Separate multiple emails or handles with commas.
+                </span>
+              </label>
+              <label className="block text-sm font-medium text-slate-900">
+                Channel
+                <select
+                  name="channel"
+                  value={prepShareModal.channel}
+                  onChange={handlePrepShareChange}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="email">Email</option>
+                  <option value="slack">Slack</option>
+                  <option value="teams">Microsoft Teams</option>
+                  <option value="in-platform">In-platform message</option>
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-slate-900">
+                Preparation notes
+                <textarea
+                  name="notes"
+                  value={prepShareModal.notes}
+                  onChange={handlePrepShareChange}
+                  rows="4"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  placeholder="Outline priorities, links to decks, or success metrics."
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  name="includeResources"
+                  checked={prepShareModal.includeResources}
+                  onChange={handlePrepShareChange}
+                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+                Attach existing session resources when sharing.
+              </label>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <button type="button" className="dashboard-pill" onClick={closePrepShareModal}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="dashboard-primary-pill"
+                  disabled={disableActions}
+                  aria-busy={disableActions}
+                >
+                  Share briefing
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
+  const closePrepShareModal = useCallback(() => {
+    setPrepShareModal({ ...prepShareDefaultState });
+    setPrepShareErrors([]);
+  }, []);
+
+  const openPrepShareModal = useCallback((booking) => {
+    setPrepShareModal({
+      open: true,
+      booking,
+      notes: booking.notes ?? '',
+      recipients: booking.mentorContact ?? booking.mentor ?? '',
+      includeResources: true,
+      channel: 'email'
+    });
+    setPrepShareErrors([]);
+  }, []);
+
+  const handlePrepShareChange = useCallback((event) => {
+    const { name, type, checked, value } = event.target;
+    setPrepShareModal((current) => ({
+      ...current,
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  }, []);
+
+  const handlePrepShareSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!prepShareModal.booking) {
+        return;
+      }
+
+      const trimmedNotes = prepShareModal.notes?.trim() ?? '';
+      const recipients = (prepShareModal.recipients ?? '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      const errors = [];
+      if (trimmedNotes.length < 10) {
+        errors.push('Provide at least a couple of sentences to brief your mentor.');
+      }
+      if (!recipients.length) {
+        errors.push('Include at least one recipient email or channel handle.');
+      }
+      if (errors.length) {
+        setPrepShareErrors(errors);
+        return;
+      }
+
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to share preparation notes.' });
+        return;
+      }
+
+      setPrepShareErrors([]);
+      setPendingAction(`share-${prepShareModal.booking.id}`);
+      setStatusMessage({
+        type: 'pending',
+        message: `Sharing prep notes for ${prepShareModal.booking.topic}…`
+      });
+      try {
+        await updateTutorBooking({
+          token,
+          bookingId: prepShareModal.booking.id,
+          payload: {
+            notes: trimmedNotes,
+            share: {
+              recipients,
+              channel: prepShareModal.channel,
+              includeResources: prepShareModal.includeResources
+            }
+          }
+        });
+        setActiveBookings((current) =>
+          current.map((booking) =>
+            booking.id === prepShareModal.booking.id
+              ? {
+                  ...booking,
+                  notes: trimmedNotes
+                }
+              : booking
+          )
+        );
+        setStatusMessage({
+          type: 'success',
+          message: `Prep notes shared with ${recipients.length} recipient${
+            recipients.length === 1 ? '' : 's'
+          }.`
+        });
+        closePrepShareModal();
+      } catch (shareError) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            shareError instanceof Error
+              ? shareError.message
+              : 'We were unable to share the preparation notes.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [closePrepShareModal, prepShareModal, setActiveBookings, token, updateTutorBooking]
+  );
+
+  const handleCompleteBooking = useCallback(
+    async (booking) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to complete sessions.' });
+        return;
+      }
+
+      setPendingAction(`complete-${booking.id}`);
+      setStatusMessage({ type: 'pending', message: `Wrapping up ${booking.topic}…` });
+      const firstMedia = (booking.resources ?? []).find((resource) =>
+        typeof resource === 'string' && /youtube|vimeo|loom/.test(resource.toLowerCase())
+      );
+      try {
+        await updateTutorBooking({ token, bookingId: booking.id, payload: { status: 'completed' } });
+        setActiveBookings((current) => current.filter((item) => item.id !== booking.id));
+        setHistoricalBookings((current) => [
+          {
+            ...booking,
+            status: 'Completed',
+            date: booking.date ?? new Date().toLocaleString(),
+            rating: booking.rating ?? '5',
+            recordingUrl: booking.recordingUrl ?? firstMedia ?? null
+          },
+          ...current
+        ]);
+        setStatusMessage({ type: 'success', message: `${booking.topic} has been archived.` });
+      } catch (completeError) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            completeError instanceof Error
+              ? completeError.message
+              : 'We were unable to complete this session.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [setActiveBookings, setHistoricalBookings, token, updateTutorBooking]
+  );
