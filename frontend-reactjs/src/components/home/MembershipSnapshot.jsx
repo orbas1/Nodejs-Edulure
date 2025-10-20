@@ -25,6 +25,8 @@ const PLAN_KEYS = [
   }
 ];
 
+const MAX_FEATURE_ITEMS = 6;
+
 export default function MembershipSnapshot() {
   const { t } = useLanguage();
 
@@ -55,12 +57,22 @@ export default function MembershipSnapshot() {
               'A whimsical path for curious creators.'
             );
             const price = t(`home.membership.plans.${id}.price`, 'Included perks');
-            const features = [0, 1, 2].map((index) =>
-              t(
-                `home.membership.plans.${id}.features.${index}`,
-                'Experiential bullet point'
-              )
-            );
+            const features = [];
+
+            for (let index = 0; index < MAX_FEATURE_ITEMS; index += 1) {
+              const translationKey = `home.membership.plans.${id}.features.${index}`;
+              const feature = t(translationKey);
+              if (feature === translationKey) {
+                break;
+              }
+              features.push(feature);
+            }
+
+            if (features.length === 0) {
+              features.push(
+                t('home.membership.defaults.feature', 'Experiential bullet point')
+              );
+            }
 
             return (
               <article

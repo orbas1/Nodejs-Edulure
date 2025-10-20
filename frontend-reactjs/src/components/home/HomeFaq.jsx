@@ -43,47 +43,51 @@ export default function HomeFaq() {
                 'Here lives a thoughtful answer that helps learners feel confident.'
               );
               const isOpen = openKey === key;
+              const buttonId = `home-faq-trigger-${key}`;
+              const panelId = `home-faq-panel-${key}`;
 
               return (
-                <div key={key} className="relative">
+                <div
+                  key={key}
+                  className={clsx(
+                    'group relative rounded-3xl border border-slate-200 bg-white transition',
+                    'before:absolute before:-bottom-3 before:left-10 before:h-6 before:w-6 before:rotate-45 before:rounded-md before:bg-white before:opacity-0 before:transition-opacity',
+                    'after:absolute after:-bottom-[1.35rem] after:left-10 after:h-8 after:w-8 after:rotate-45 after:rounded-md after:border after:border-slate-200 after:bg-white after:opacity-0 after:transition-opacity',
+                    isOpen &&
+                      'border-primary/60 shadow-[0_18px_40px_-24px_rgba(30,64,175,0.45)] before:opacity-100 after:opacity-100 after:border-primary/60'
+                  )}
+                >
                   <button
                     type="button"
                     onClick={() => toggle(key)}
-                    className={clsx(
-                      'group relative w-full rounded-3xl border border-slate-200 bg-white px-6 py-5 text-left transition',
-                      'before:absolute before:-bottom-3 before:left-10 before:h-6 before:w-6 before:rotate-45 before:rounded-md before:bg-white before:opacity-0 before:transition-opacity',
-                      'after:absolute after:-bottom-[1.35rem] after:left-10 after:h-8 after:w-8 after:rotate-45 after:rounded-md after:border after:border-slate-200 after:bg-white after:opacity-0 after:transition-opacity',
-                      isOpen &&
-                        'border-primary/60 shadow-[0_18px_40px_-24px_rgba(30,64,175,0.45)] before:opacity-100 after:opacity-100'
-                    )}
+                    className="flex w-full items-start justify-between gap-4 rounded-3xl px-6 py-5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                     aria-expanded={isOpen}
+                    aria-controls={panelId}
+                    id={buttonId}
                   >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">{question}</p>
-                        <p
-                          className={clsx(
-                            'mt-3 text-sm text-slate-600 transition-all duration-300 ease-in-out',
-                            isOpen
-                              ? 'max-h-40 opacity-100'
-                              : 'max-h-0 overflow-hidden opacity-0'
-                          )}
-                          aria-hidden={!isOpen}
-                        >
-                          {answer}
-                        </p>
-                      </div>
-                      <span
-                        className={clsx(
-                          'inline-flex h-10 w-10 flex-none items-center justify-center rounded-full border border-slate-200 text-lg transition',
-                          isOpen ? 'rotate-45 border-primary/60 text-primary' : 'group-hover:border-slate-300'
-                        )}
-                        aria-hidden="true"
-                      >
-                        {isOpen ? '−' : '+'}
-                      </span>
-                    </div>
+                    <span className="text-sm font-semibold text-slate-900">{question}</span>
+                    <span
+                      className={clsx(
+                        'inline-flex h-10 w-10 flex-none items-center justify-center rounded-full border border-slate-200 text-lg transition',
+                        isOpen ? 'rotate-45 border-primary/60 text-primary' : 'group-hover:border-slate-300'
+                      )}
+                      aria-hidden="true"
+                    >
+                      {isOpen ? '−' : '+'}
+                    </span>
                   </button>
+                  <div
+                    id={panelId}
+                    role="region"
+                    aria-labelledby={buttonId}
+                    className={clsx(
+                      'px-6 pb-6 text-sm text-slate-600 transition-all duration-300 ease-in-out',
+                      isOpen ? 'max-h-40 opacity-100' : 'max-h-0 overflow-hidden opacity-0'
+                    )}
+                    aria-hidden={!isOpen}
+                  >
+                    <p>{answer}</p>
+                  </div>
                 </div>
               );
             })}

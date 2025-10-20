@@ -69,6 +69,9 @@ const TRANSLATIONS = {
         pretitle: 'Membership snapshot',
         title: 'Pick a playful path into the Edulure universe',
         subtitle: 'Choose the vibe that fits your learning orbit — each plan unlocks new adventures with your crew.',
+        defaults: {
+          feature: 'Experiential bullet point'
+        },
         plans: {
           freeExplorer: {
             title: 'Free Explorer',
