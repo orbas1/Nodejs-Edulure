@@ -7,9 +7,7 @@ import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js'
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
 import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
 import LearnerFinancePurchaseModel from '../models/LearnerFinancePurchaseModel.js';
-import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
 import CommunityModel from '../models/CommunityModel.js';
-import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -3801,9 +3799,11 @@ export default class DashboardService {
       log.warn({ err: error }, 'Failed to load collaborator directory for course workspace');
     }
 
-    let multiRoleLearnerSnapshot;
-    let multiRoleCommunitySnapshot;
+    learnerSnapshot = undefined;
+    communitySnapshot = undefined;
+    communityMemberships = [];
     let communitySummaries = [];
+    let communityMemberships = [];
     const communityEventsByCommunity = new Map();
     const communityRunbooksByCommunity = new Map();
     const communityPaywallTiersByCommunity = new Map();
@@ -3811,7 +3811,7 @@ export default class DashboardService {
     const communityPendingMembersByCommunity = new Map();
     const communityModeratorsByCommunity = new Map();
     const communicationsByCommunity = new Map();
-    let communityModerationCases = [];
+    const communityModerationCases = [];
     let engagementTotals = { current: {}, previous: {} };
 
     try {
@@ -4315,7 +4315,6 @@ export default class DashboardService {
 
     let learnerSnapshot;
     let communitySnapshot;
-    let communityMemberships = [];
 
     try {
       const [

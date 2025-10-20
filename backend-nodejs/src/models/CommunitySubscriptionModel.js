@@ -65,21 +65,45 @@ export default class CommunitySubscriptionModel {
 
   static async updateById(id, updates, connection = db) {
     const payload = {};
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.startedAt !== undefined) payload.started_at = updates.startedAt;
-    if (updates.currentPeriodStart !== undefined) payload.current_period_start = updates.currentPeriodStart;
-    if (updates.currentPeriodEnd !== undefined) payload.current_period_end = updates.currentPeriodEnd;
-    if (updates.cancelAtPeriodEnd !== undefined) payload.cancel_at_period_end = updates.cancelAtPeriodEnd ? 1 : 0;
-    if (updates.canceledAt !== undefined) payload.canceled_at = updates.canceledAt;
-    if (updates.expiresAt !== undefined) payload.expires_at = updates.expiresAt;
-    if (updates.providerStatus !== undefined) payload.provider_status = updates.providerStatus;
-    if (updates.providerSubscriptionId !== undefined)
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.startedAt !== undefined) {
+      payload.started_at = updates.startedAt;
+    }
+    if (updates.currentPeriodStart !== undefined) {
+      payload.current_period_start = updates.currentPeriodStart;
+    }
+    if (updates.currentPeriodEnd !== undefined) {
+      payload.current_period_end = updates.currentPeriodEnd;
+    }
+    if (updates.cancelAtPeriodEnd !== undefined) {
+      payload.cancel_at_period_end = updates.cancelAtPeriodEnd ? 1 : 0;
+    }
+    if (updates.canceledAt !== undefined) {
+      payload.canceled_at = updates.canceledAt;
+    }
+    if (updates.expiresAt !== undefined) {
+      payload.expires_at = updates.expiresAt;
+    }
+    if (updates.providerStatus !== undefined) {
+      payload.provider_status = updates.providerStatus;
+    }
+    if (updates.providerSubscriptionId !== undefined) {
       payload.provider_subscription_id = updates.providerSubscriptionId ?? null;
-    if (updates.providerCustomerId !== undefined) payload.provider_customer_id = updates.providerCustomerId ?? null;
-    if (updates.latestPaymentIntentId !== undefined)
+    }
+    if (updates.providerCustomerId !== undefined) {
+      payload.provider_customer_id = updates.providerCustomerId ?? null;
+    }
+    if (updates.latestPaymentIntentId !== undefined) {
       payload.latest_payment_intent_id = updates.latestPaymentIntentId ?? null;
-    if (updates.affiliateId !== undefined) payload.affiliate_id = updates.affiliateId ?? null;
-    if (updates.metadata !== undefined) payload.metadata = JSON.stringify(updates.metadata ?? {});
+    }
+    if (updates.affiliateId !== undefined) {
+      payload.affiliate_id = updates.affiliateId ?? null;
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = JSON.stringify(updates.metadata ?? {});
+    }
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);

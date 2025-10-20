@@ -54,7 +54,6 @@ function extractCount(row) {
   }
   const value =
     row.count ??
-    row['count'] ??
     row['count(*)'] ??
     row['COUNT(*)'] ??
     row['count(`*`)'] ??
@@ -127,19 +126,45 @@ export default class GovernanceVendorAssessmentModel {
 
   static async updateByPublicId(publicId, updates, connection = db) {
     const payload = {};
-    if (updates.contractId !== undefined) payload.contract_id = updates.contractId;
-    if (updates.vendorName !== undefined) payload.vendor_name = updates.vendorName;
-    if (updates.assessmentType !== undefined) payload.assessment_type = updates.assessmentType;
-    if (updates.riskScore !== undefined) payload.risk_score = Number(updates.riskScore) || 0;
-    if (updates.riskLevel !== undefined) payload.risk_level = updates.riskLevel;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.lastAssessedAt !== undefined) payload.last_assessed_at = updates.lastAssessedAt || null;
-    if (updates.nextReviewAt !== undefined) payload.next_review_at = updates.nextReviewAt || null;
-    if (updates.ownerEmail !== undefined) payload.owner_email = updates.ownerEmail;
-    if (updates.findings !== undefined) payload.findings = serialiseJson(updates.findings, []);
-    if (updates.remediationPlan !== undefined) payload.remediation_plan = serialiseJson(updates.remediationPlan, {});
-    if (updates.evidenceLinks !== undefined) payload.evidence_links = serialiseJson(updates.evidenceLinks, []);
-    if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata, {});
+    if (updates.contractId !== undefined) {
+      payload.contract_id = updates.contractId;
+    }
+    if (updates.vendorName !== undefined) {
+      payload.vendor_name = updates.vendorName;
+    }
+    if (updates.assessmentType !== undefined) {
+      payload.assessment_type = updates.assessmentType;
+    }
+    if (updates.riskScore !== undefined) {
+      payload.risk_score = Number(updates.riskScore) || 0;
+    }
+    if (updates.riskLevel !== undefined) {
+      payload.risk_level = updates.riskLevel;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.lastAssessedAt !== undefined) {
+      payload.last_assessed_at = updates.lastAssessedAt || null;
+    }
+    if (updates.nextReviewAt !== undefined) {
+      payload.next_review_at = updates.nextReviewAt || null;
+    }
+    if (updates.ownerEmail !== undefined) {
+      payload.owner_email = updates.ownerEmail;
+    }
+    if (updates.findings !== undefined) {
+      payload.findings = serialiseJson(updates.findings, []);
+    }
+    if (updates.remediationPlan !== undefined) {
+      payload.remediation_plan = serialiseJson(updates.remediationPlan, {});
+    }
+    if (updates.evidenceLinks !== undefined) {
+      payload.evidence_links = serialiseJson(updates.evidenceLinks, []);
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = serialiseJson(updates.metadata, {});
+    }
 
     if (!Object.keys(payload).length) {
       return this.findByPublicId(publicId, connection);

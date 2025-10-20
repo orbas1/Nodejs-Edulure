@@ -51,7 +51,6 @@ function extractCount(row) {
   }
   const value =
     row.count ??
-    row['count'] ??
     row['count(*)'] ??
     row['COUNT(*)'] ??
     row['count(`*`)'] ??
@@ -118,17 +117,36 @@ export default class GovernanceReviewCycleModel {
 
   static async updateByPublicId(publicId, updates, connection = db) {
     const payload = {};
-    if (updates.cycleName !== undefined) payload.cycle_name = updates.cycleName;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.startDate !== undefined) payload.start_date = updates.startDate;
-    if (updates.endDate !== undefined) payload.end_date = updates.endDate || null;
-    if (updates.nextMilestoneAt !== undefined) payload.next_milestone_at = updates.nextMilestoneAt || null;
-    if (updates.focusAreas !== undefined) payload.focus_areas = serialiseJson(updates.focusAreas, []);
-    if (updates.participants !== undefined) payload.participants = serialiseJson(updates.participants, []);
-    if (updates.actionItems !== undefined) payload.action_items = serialiseJson(updates.actionItems, []);
-    if (updates.outcomeNotes !== undefined) payload.outcome_notes = updates.outcomeNotes ?? null;
-    if (updates.readinessScore !== undefined)
+    if (updates.cycleName !== undefined) {
+      payload.cycle_name = updates.cycleName;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.startDate !== undefined) {
+      payload.start_date = updates.startDate;
+    }
+    if (updates.endDate !== undefined) {
+      payload.end_date = updates.endDate || null;
+    }
+    if (updates.nextMilestoneAt !== undefined) {
+      payload.next_milestone_at = updates.nextMilestoneAt || null;
+    }
+    if (updates.focusAreas !== undefined) {
+      payload.focus_areas = serialiseJson(updates.focusAreas, []);
+    }
+    if (updates.participants !== undefined) {
+      payload.participants = serialiseJson(updates.participants, []);
+    }
+    if (updates.actionItems !== undefined) {
+      payload.action_items = serialiseJson(updates.actionItems, []);
+    }
+    if (updates.outcomeNotes !== undefined) {
+      payload.outcome_notes = updates.outcomeNotes ?? null;
+    }
+    if (updates.readinessScore !== undefined) {
       payload.readiness_score = Number.parseInt(updates.readinessScore, 10) || 0;
+    }
 
     if (!Object.keys(payload).length) {
       return this.findByPublicId(publicId, connection);

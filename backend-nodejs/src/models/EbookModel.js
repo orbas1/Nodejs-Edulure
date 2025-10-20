@@ -367,42 +367,27 @@ export default class EbookModel {
     const categoryFilters = normaliseFilterValues(categories);
     if (categoryFilters.length) {
       query.where((builder) => {
-        categoryFilters.forEach((value, index) => {
-          const clause = 'JSON_CONTAINS(ebooks.categories, ?)';
-          if (index === 0) {
-            builder.whereRaw(clause, [value]);
-          } else {
-            builder.orWhereRaw(clause, [value]);
-          }
-        });
+        for (const category of categories) {
+          builder.orWhereRaw('JSON_CONTAINS(ebooks.categories, ?)', [JSON.stringify(category)]);
+        }
       });
     }
 
     const tagFilters = normaliseFilterValues(tags);
     if (tagFilters.length) {
       query.where((builder) => {
-        tagFilters.forEach((value, index) => {
-          const clause = 'JSON_CONTAINS(ebooks.tags, ?)';
-          if (index === 0) {
-            builder.whereRaw(clause, [value]);
-          } else {
-            builder.orWhereRaw(clause, [value]);
-          }
-        });
+        for (const tag of tags) {
+          builder.orWhereRaw('JSON_CONTAINS(ebooks.tags, ?)', [JSON.stringify(tag)]);
+        }
       });
     }
 
     const languageFilters = normaliseFilterValues(languages);
     if (languageFilters.length) {
       query.where((builder) => {
-        languageFilters.forEach((value, index) => {
-          const clause = 'JSON_CONTAINS(ebooks.languages, ?)';
-          if (index === 0) {
-            builder.whereRaw(clause, [value]);
-          } else {
-            builder.orWhereRaw(clause, [value]);
-          }
-        });
+        for (const language of languages) {
+          builder.orWhereRaw('JSON_CONTAINS(ebooks.languages, ?)', [JSON.stringify(language)]);
+        }
       });
     }
 

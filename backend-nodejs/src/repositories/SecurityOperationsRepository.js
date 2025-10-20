@@ -268,35 +268,78 @@ export default class SecurityOperationsRepository {
     }
 
     const payload = {};
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.severity !== undefined) payload.severity = updates.severity;
-    if (updates.likelihood !== undefined) payload.likelihood = updates.likelihood;
-    if (updates.residualSeverity !== undefined) payload.residual_severity = updates.residualSeverity;
-    if (updates.residualLikelihood !== undefined) payload.residual_likelihood = updates.residualLikelihood;
-    if (updates.inherentRiskScore !== undefined) payload.inherent_risk_score = updates.inherentRiskScore;
-    if (updates.residualRiskScore !== undefined) payload.residual_risk_score = updates.residualRiskScore;
-    if (updates.mitigationPlan !== undefined) payload.mitigation_plan = updates.mitigationPlan;
-    if (updates.residualNotes !== undefined) payload.residual_notes = updates.residualNotes;
-    if (updates.regulatoryDriver !== undefined) payload.regulatory_driver = updates.regulatoryDriver;
-    if (updates.reviewCadenceDays !== undefined) payload.review_cadence_days = updates.reviewCadenceDays;
-    if (updates.identifiedAt !== undefined) payload.identified_at = updates.identifiedAt;
-    if (updates.acceptedAt !== undefined) payload.accepted_at = updates.acceptedAt;
-    if (updates.remediatedAt !== undefined) payload.remediated_at = updates.remediatedAt;
-    if (updates.closedAt !== undefined) payload.closed_at = updates.closedAt;
-    if (updates.lastReviewedAt !== undefined) payload.last_reviewed_at = updates.lastReviewedAt;
-    if (updates.nextReviewAt !== undefined) payload.next_review_at = updates.nextReviewAt;
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.severity !== undefined) {
+      payload.severity = updates.severity;
+    }
+    if (updates.likelihood !== undefined) {
+      payload.likelihood = updates.likelihood;
+    }
+    if (updates.residualSeverity !== undefined) {
+      payload.residual_severity = updates.residualSeverity;
+    }
+    if (updates.residualLikelihood !== undefined) {
+      payload.residual_likelihood = updates.residualLikelihood;
+    }
+    if (updates.inherentRiskScore !== undefined) {
+      payload.inherent_risk_score = updates.inherentRiskScore;
+    }
+    if (updates.residualRiskScore !== undefined) {
+      payload.residual_risk_score = updates.residualRiskScore;
+    }
+    if (updates.mitigationPlan !== undefined) {
+      payload.mitigation_plan = updates.mitigationPlan;
+    }
+    if (updates.residualNotes !== undefined) {
+      payload.residual_notes = updates.residualNotes;
+    }
+    if (updates.regulatoryDriver !== undefined) {
+      payload.regulatory_driver = updates.regulatoryDriver;
+    }
+    if (updates.reviewCadenceDays !== undefined) {
+      payload.review_cadence_days = updates.reviewCadenceDays;
+    }
+    if (updates.identifiedAt !== undefined) {
+      payload.identified_at = updates.identifiedAt;
+    }
+    if (updates.acceptedAt !== undefined) {
+      payload.accepted_at = updates.acceptedAt;
+    }
+    if (updates.remediatedAt !== undefined) {
+      payload.remediated_at = updates.remediatedAt;
+    }
+    if (updates.closedAt !== undefined) {
+      payload.closed_at = updates.closedAt;
+    }
+    if (updates.lastReviewedAt !== undefined) {
+      payload.last_reviewed_at = updates.lastReviewedAt;
+    }
+    if (updates.nextReviewAt !== undefined) {
+      payload.next_review_at = updates.nextReviewAt;
+    }
     if (updates.owner) {
       payload.owner_type = updates.owner.type ?? null;
       payload.owner_id = updates.owner.id ?? null;
       payload.owner_display_name = updates.owner.displayName ?? null;
       payload.owner_email = updates.owner.email ?? null;
     }
-    if (updates.riskOwnerUserId !== undefined) payload.risk_owner_user_id = updates.riskOwnerUserId;
-    if (updates.tags !== undefined) payload.tags = serializeJson(updates.tags, '[]');
-    if (updates.detectionControls !== undefined) payload.detection_controls = serializeJson(updates.detectionControls, '[]');
-    if (updates.mitigationControls !== undefined)
+    if (updates.riskOwnerUserId !== undefined) {
+      payload.risk_owner_user_id = updates.riskOwnerUserId;
+    }
+    if (updates.tags !== undefined) {
+      payload.tags = serializeJson(updates.tags, '[]');
+    }
+    if (updates.detectionControls !== undefined) {
+      payload.detection_controls = serializeJson(updates.detectionControls, '[]');
+    }
+    if (updates.mitigationControls !== undefined) {
       payload.mitigation_controls = serializeJson(updates.mitigationControls, '[]');
-    if (updates.metadata !== undefined) payload.metadata = serializeJson(updates.metadata, '{}');
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = serializeJson(updates.metadata, '{}');
+    }
 
     if (Object.keys(payload).length === 0) {
       return this.getRiskById(riskId);

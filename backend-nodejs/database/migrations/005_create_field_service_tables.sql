@@ -1,12 +1,12 @@
 CREATE TABLE IF NOT EXISTS field_service_providers (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT UNSIGNED NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NULL,
   name VARCHAR(120) NOT NULL,
   email VARCHAR(255) NULL,
   phone VARCHAR(64) NULL,
   status ENUM('active', 'inactive', 'suspended') NOT NULL DEFAULT 'active',
   specialties JSON NULL,
-  rating DECIMAL(3,2) DEFAULT 0,
+  rating DECIMAL(3,2) NOT NULL DEFAULT 0.00,
   last_check_in_at DATETIME NULL,
   location_lat DECIMAL(10,7) NULL,
   location_lng DECIMAL(10,7) NULL,
@@ -18,13 +18,13 @@ CREATE TABLE IF NOT EXISTS field_service_providers (
   INDEX idx_field_service_providers_status (status),
   INDEX idx_field_service_providers_user (user_id),
   CONSTRAINT fk_field_service_providers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS field_service_orders (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  reference VARCHAR(40) NOT NULL UNIQUE,
-  customer_user_id BIGINT UNSIGNED NOT NULL,
-  provider_id BIGINT UNSIGNED NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  reference VARCHAR(40) NOT NULL,
+  customer_user_id INT UNSIGNED NOT NULL,
+  provider_id INT UNSIGNED NULL,
   status VARCHAR(32) NOT NULL,
   priority VARCHAR(24) NOT NULL DEFAULT 'standard',
   service_type VARCHAR(160) NOT NULL,
@@ -46,16 +46,17 @@ CREATE TABLE IF NOT EXISTS field_service_orders (
   metadata JSON NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_field_service_order_reference (reference),
   INDEX idx_field_service_orders_status (status),
   INDEX idx_field_service_orders_customer (customer_user_id),
   INDEX idx_field_service_orders_provider (provider_id),
   CONSTRAINT fk_field_service_orders_customer FOREIGN KEY (customer_user_id) REFERENCES users(id) ON DELETE CASCADE,
   CONSTRAINT fk_field_service_orders_provider FOREIGN KEY (provider_id) REFERENCES field_service_providers(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS field_service_events (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  order_id BIGINT UNSIGNED NOT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id INT UNSIGNED NOT NULL,
   event_type VARCHAR(64) NOT NULL,
   status VARCHAR(32) NULL,
   notes TEXT NULL,
@@ -66,4 +67,4 @@ CREATE TABLE IF NOT EXISTS field_service_events (
   INDEX idx_field_service_events_order (order_id),
   INDEX idx_field_service_events_occurred_at (occurred_at),
   CONSTRAINT fk_field_service_events_order FOREIGN KEY (order_id) REFERENCES field_service_orders(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

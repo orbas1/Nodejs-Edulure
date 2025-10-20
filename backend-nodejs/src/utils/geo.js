@@ -1,4 +1,7 @@
-import centroidsData from '../data/countryCentroids.json' with { type: 'json' };
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const centroidsData = require('../data/countryCentroids.json');
 
 const countryCentroids = new Map(
   Object.entries(centroidsData.countries).map(([code, value]) => [code.toUpperCase(), value])
