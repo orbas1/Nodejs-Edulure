@@ -71,7 +71,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       });
       // refresh feature flags in case role-based experiments toggled after sign-in
       unawaited(ref.read(featureFlagControllerProvider.notifier).refresh(force: true));
-      Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
     } catch (error) {
       if (!mounted) return;
       if (error is DioException) {
