@@ -111,6 +111,28 @@ export default class TutorProfileModel {
     return rows.map((row) => deserialize(row));
   }
 
+  static async listVerified({ search, limit = 12, offset = 0 } = {}, connection = db) {
+    const query = connection(TABLE)
+      .select(BASE_COLUMNS)
+      .where({ is_verified: true })
+      .orderBy('rating_average', 'desc')
+      .orderBy('updated_at', 'desc')
+      .limit(limit)
+      .offset(offset);
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('display_name', `%${search}%`)
+          .orWhereILike('headline', `%${search}%`)
+          .orWhereILike('bio', `%${search}%`);
+      });
+    }
+
+    const rows = await query;
+    return rows.map((row) => deserialize(row));
+  }
+
   static async countAll({ search } = {}, connection = db) {
     const query = connection(TABLE);
     if (search) {
@@ -121,6 +143,22 @@ export default class TutorProfileModel {
           .orWhereILike('bio', `%${search}%`);
       });
     }
+    const result = await query.count({ total: '*' }).first();
+    return Number(result?.total ?? 0);
+  }
+
+  static async countVerified({ search } = {}, connection = db) {
+    const query = connection(TABLE).where({ is_verified: true });
+
+    if (search) {
+      query.andWhere((builder) => {
+        builder
+          .whereILike('display_name', `%${search}%`)
+          .orWhereILike('headline', `%${search}%`)
+          .orWhereILike('bio', `%${search}%`);
+      });
+    }
+
     const result = await query.count({ total: '*' }).first();
     return Number(result?.total ?? 0);
   }

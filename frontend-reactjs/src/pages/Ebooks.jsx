@@ -1,0 +1,802 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ArrowDownTrayIcon,
+  ArrowPathIcon,
+  BookOpenIcon,
+  BookmarkIcon
+} from '@heroicons/react/24/outline';
+
+import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
+import FormStepper from '../components/forms/FormStepper.jsx';
+import adminControlApi from '../api/adminControlApi.js';
+import { listMarketplaceEbooks } from '../api/ebookApi.js';
+import { useAuth } from '../context/AuthContext.jsx';
+import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import { isAbortError } from '../utils/errors.js';
+
+const EXPLORER_CONFIG = {
+  entityType: 'ebooks',
+  title: 'Search the e-book marketplace',
+  description:
+    'Filter playbooks, annotated decks and research libraries. Saved searches and pins keep your enablement team aligned.',
+  placeholder: 'Search e-books by topic, author or keyword…',
+  defaultSort: 'relevance',
+  sortOptions: [
+    { label: 'Relevance', value: 'relevance' },
+    { label: 'Newest', value: 'newest' },
+    { label: 'Top rated', value: 'rating' },
+    { label: 'Shortest read', value: 'readingTime' }
+  ],
+  filterDefinitions: [
+    {
+      key: 'categories',
+      label: 'Categories',
+      type: 'multi',
+      options: [
+        { label: 'Automation', value: 'automation' },
+        { label: 'Enablement', value: 'enablement' },
+        { label: 'Operations', value: 'operations' },
+        { label: 'Leadership', value: 'leadership' }
+      ]
+    },
+    {
+      key: 'languages',
+      label: 'Languages',
+      type: 'multi',
+      options: [
+        { label: 'English', value: 'en' },
+        { label: 'Spanish', value: 'es' },
+        { label: 'French', value: 'fr' }
+      ]
+    },
+    {
+      key: 'readingTimeMinutes',
+      label: 'Reading time (minutes)',
+      type: 'range'
+    }
+  ]
+};
+
+const FORM_STEPS = [
+  {
+    id: 'manifest',
+    title: 'Manifest',
+    description: 'Core identifiers, title, authors'
+  },
+  {
+    id: 'pricing',
+    title: 'Pricing & release',
+    description: 'Currency, status and launch plan'
+  },
+  {
+    id: 'assets',
+    title: 'Assets & metadata',
+    description: 'Cover art, downloads and JSON metadata'
+  }
+];
+
+function createEmptyForm() {
+  return {
+    assetId: '',
+    title: '',
+    subtitle: '',
+    description: '',
+    authors: '',
+    tags: '',
+    categories: '',
+    languages: '',
+    isbn: '',
+    coverImageUrl: '',
+    sampleDownloadUrl: '',
+    audiobookUrl: '',
+    readingTimeMinutes: '',
+    priceCurrency: 'USD',
+    priceAmount: '',
+    status: 'draft',
+    isPublic: false,
+    releaseAt: '',
+    metadata: ''
+  };
+}
+
+function parseListField(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return String(value)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseMetadata(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try {
+    const parsed = JSON.parse(value);
+    return typeof parsed === 'object' && parsed !== null ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function toDateInput(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function EbookCard({ ebook }) {
+  return (
+    <article className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-3">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+            <BookOpenIcon className="h-4 w-4" /> E-book
+          </div>
+          <h3 className="text-2xl font-semibold text-slate-900">{ebook.title}</h3>
+          {ebook.subtitle ? <p className="text-sm font-medium text-slate-500">{ebook.subtitle}</p> : null}
+          {ebook.description ? (
+            <p className="text-sm leading-relaxed text-slate-600">{ebook.description}</p>
+          ) : null}
+          {ebook.categories?.length ? (
+            <div className="flex flex-wrap gap-2">
+              {ebook.categories.map((category) => (
+                <span key={category} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  #{category}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-amber-600">
+              {ebook.readingTimeMinutes ?? '—'} min
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-slate-600">
+              {ebook.languages?.join(', ') ?? 'EN'}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-primary">
+              {ebook.price}
+            </span>
+          </div>
+        </div>
+        {ebook.coverImageUrl ? (
+          <img
+            src={ebook.coverImageUrl}
+            alt={ebook.title}
+            className="h-40 w-32 flex-none rounded-2xl border border-slate-200 object-cover shadow-inner"
+          />
+        ) : null}
+      </div>
+      <div className="flex flex-wrap gap-3">
+        {ebook.sampleDownloadUrl ? (
+          <a
+            href={ebook.sampleDownloadUrl}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+          >
+            <ArrowDownTrayIcon className="h-4 w-4" /> Sample
+          </a>
+        ) : null}
+        <button
+          type="button"
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark"
+        >
+          <BookmarkIcon className="h-4 w-4" /> Add to collection
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function EbookForm({ form, onChange, onSubmit, onCancel, submitting, mode, currentStep, setCurrentStep }) {
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    onChange({
+      ...form,
+      [name]: type === 'checkbox' ? checked : value
+    });
+  };
+
+  const disabled = submitting;
+
+  return (
+    <form className="space-y-6" onSubmit={onSubmit}>
+      <FormStepper steps={FORM_STEPS} currentStep={currentStep} onSelect={setCurrentStep} />
+      {currentStep === 'manifest' ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Asset ID</span>
+            <input
+              type="text"
+              name="assetId"
+              value={form.assetId}
+              onChange={handleChange}
+              placeholder="Upload reference UUID"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              required
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">ISBN</span>
+            <input
+              type="text"
+              name="isbn"
+              value={form.isbn}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="md:col-span-2 space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Title</span>
+            <input
+              type="text"
+              name="title"
+              value={form.title}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              required
+              disabled={disabled}
+            />
+          </label>
+          <label className="md:col-span-2 space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Subtitle</span>
+            <input
+              type="text"
+              name="subtitle"
+              value={form.subtitle}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="md:col-span-2 space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Description</span>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              rows={4}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Authors</span>
+            <input
+              type="text"
+              name="authors"
+              value={form.authors}
+              onChange={handleChange}
+              placeholder="Jane Doe, Lee Wong"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Tags</span>
+            <input
+              type="text"
+              name="tags"
+              value={form.tags}
+              onChange={handleChange}
+              placeholder="Automation, GTM"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Categories</span>
+            <input
+              type="text"
+              name="categories"
+              value={form.categories}
+              onChange={handleChange}
+              placeholder="Enablement, Strategy"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Languages</span>
+            <input
+              type="text"
+              name="languages"
+              value={form.languages}
+              onChange={handleChange}
+              placeholder="en, es"
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      {currentStep === 'pricing' ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Price</span>
+            <input
+              type="number"
+              name="priceAmount"
+              value={form.priceAmount}
+              min="0"
+              step="0.01"
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Currency</span>
+            <input
+              type="text"
+              name="priceCurrency"
+              value={form.priceCurrency}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Reading time (minutes)</span>
+            <input
+              type="number"
+              name="readingTimeMinutes"
+              min="0"
+              value={form.readingTimeMinutes}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Release date</span>
+            <input
+              type="date"
+              name="releaseAt"
+              value={form.releaseAt}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Status</span>
+            <select
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            >
+              <option value="draft">Draft</option>
+              <option value="review">Review</option>
+              <option value="published">Published</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm">
+            <input
+              type="checkbox"
+              name="isPublic"
+              checked={form.isPublic}
+              onChange={handleChange}
+              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+              disabled={disabled}
+            />
+            Publicly listed
+          </label>
+        </div>
+      ) : null}
+
+      {currentStep === 'assets' ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Cover image URL</span>
+            <input
+              type="url"
+              name="coverImageUrl"
+              value={form.coverImageUrl}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Sample download URL</span>
+            <input
+              type="url"
+              name="sampleDownloadUrl"
+              value={form.sampleDownloadUrl}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Audiobook URL</span>
+            <input
+              type="url"
+              name="audiobookUrl"
+              value={form.audiobookUrl}
+              onChange={handleChange}
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+          <label className="md:col-span-2 space-y-2">
+            <span className="text-sm font-semibold text-slate-700">Metadata (JSON)</span>
+            <textarea
+              name="metadata"
+              value={form.metadata}
+              onChange={handleChange}
+              rows={4}
+              placeholder='{"readingGuide": true}'
+              className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              disabled={disabled}
+            />
+          </label>
+        </div>
+      ) : null}
+
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-primary-dark disabled:opacity-50"
+          disabled={disabled}
+        >
+          {mode === 'edit' ? 'Update e-book' : 'Create e-book'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center justify-center rounded-full border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+          disabled={disabled}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+export default function Ebooks() {
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken;
+  const role = String(session?.user?.role ?? '').toLowerCase();
+  const isAdmin = role === 'admin';
+
+  const [marketplace, setMarketplace] = useState([]);
+  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
+  const [liveEbooks, setLiveEbooks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [form, setForm] = useState(() => createEmptyForm());
+  const [mode, setMode] = useState('create');
+  const [editingId, setEditingId] = useState(null);
+  const [currentStep, setCurrentStep] = useState('manifest');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    setMarketplaceLoading(true);
+    listMarketplaceEbooks({ signal: controller.signal })
+      .then((response) => {
+        if (!active) return;
+        const items = Array.isArray(response) ? response : response?.data ?? [];
+        setMarketplace(
+          items.map((item, index) => ({
+            id: item.id ?? item.slug ?? `ebook-${index}`,
+            title: item.title,
+            subtitle: item.subtitle,
+            description: item.description,
+            categories: item.categories ?? [],
+            languages: item.languages ?? [],
+            readingTimeMinutes: item.readingTimeMinutes ?? item.metrics?.readingTime,
+            price: item.price
+              ? new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: item.price.currency ?? 'USD'
+                }).format(Number(item.price.amount ?? item.price.value ?? 0) / 100)
+              : '$0.00',
+            sampleDownloadUrl: item.sampleDownloadUrl ?? item.previewUrl,
+            coverImageUrl: item.coverImageUrl ?? item.coverImage
+          }))
+        );
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err.message ?? 'Unable to load marketplace e-books');
+      })
+      .finally(() => {
+        if (!active) return;
+        setMarketplaceLoading(false);
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, []);
+
+  const loadEbooks = useCallback(
+    async ({ signal } = {}) => {
+      if (!isAdmin || !token || signal?.aborted) {
+        return;
+      }
+
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await adminControlApi.listEbooks({ token, params: { perPage: 50 }, signal });
+        if (signal?.aborted) {
+          return;
+        }
+        setLiveEbooks(response?.data ?? []);
+      } catch (err) {
+        if (isAbortError(err) || signal?.aborted) {
+          return;
+        }
+        setError(err.message ?? 'Unable to load e-books');
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [isAdmin, token]
+  );
+
+  useEffect(() => {
+    if (!isAdmin || !token) {
+      return undefined;
+    }
+    const controller = new AbortController();
+    loadEbooks({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
+  }, [isAdmin, token, loadEbooks]);
+
+  useAutoDismissMessage(successMessage, () => setSuccessMessage(''));
+
+  const resetForm = useCallback(() => {
+    setForm(createEmptyForm());
+    setMode('create');
+    setEditingId(null);
+    setCurrentStep('manifest');
+  }, []);
+
+  const handleEdit = (ebook) => {
+    setMode('edit');
+    setEditingId(ebook.id);
+    setCurrentStep('manifest');
+    setForm({
+      assetId: ebook.assetId ?? '',
+      title: ebook.title ?? '',
+      subtitle: ebook.subtitle ?? '',
+      description: ebook.description ?? '',
+      authors: Array.isArray(ebook.authors) ? ebook.authors.join(', ') : '',
+      tags: Array.isArray(ebook.tags) ? ebook.tags.join(', ') : '',
+      categories: Array.isArray(ebook.categories) ? ebook.categories.join(', ') : '',
+      languages: Array.isArray(ebook.languages) ? ebook.languages.join(', ') : '',
+      isbn: ebook.isbn ?? '',
+      coverImageUrl: ebook.coverImageUrl ?? '',
+      sampleDownloadUrl: ebook.sampleDownloadUrl ?? '',
+      audiobookUrl: ebook.audiobookUrl ?? '',
+      readingTimeMinutes: ebook.readingTimeMinutes ?? '',
+      priceCurrency: ebook.priceCurrency ?? 'USD',
+      priceAmount: ebook.priceAmount ? Number(ebook.priceAmount) / 100 : '',
+      status: ebook.status ?? 'draft',
+      isPublic: Boolean(ebook.isPublic),
+      releaseAt: toDateInput(ebook.releaseAt),
+      metadata: ebook.metadata ? JSON.stringify(ebook.metadata, null, 2) : ''
+    });
+  };
+
+  const handleDelete = async (ebookId) => {
+    if (!isAdmin || !token) return;
+    if (!window.confirm('Delete this e-book?')) return;
+    try {
+      await adminControlApi.deleteEbook({ token, id: ebookId });
+      setSuccessMessage('E-book removed');
+      await loadEbooks();
+      resetForm();
+    } catch (err) {
+      setError(err.message ?? 'Unable to delete e-book');
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (!isAdmin || !token) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      const payload = {
+        assetId: form.assetId.trim(),
+        title: form.title.trim(),
+        subtitle: form.subtitle.trim() || null,
+        description: form.description.trim() || null,
+        authors: parseListField(form.authors),
+        tags: parseListField(form.tags),
+        categories: parseListField(form.categories),
+        languages: parseListField(form.languages),
+        isbn: form.isbn.trim() || null,
+        coverImageUrl: form.coverImageUrl.trim() || null,
+        sampleDownloadUrl: form.sampleDownloadUrl.trim() || null,
+        audiobookUrl: form.audiobookUrl.trim() || null,
+        readingTimeMinutes: form.readingTimeMinutes ? Number(form.readingTimeMinutes) : null,
+        priceCurrency: form.priceCurrency.trim() || 'USD',
+        priceAmount: form.priceAmount !== '' ? Number(form.priceAmount) : 0,
+        status: form.status,
+        isPublic: Boolean(form.isPublic),
+        releaseAt: form.releaseAt ? new Date(form.releaseAt).toISOString() : null,
+        metadata: parseMetadata(form.metadata)
+      };
+
+      if (mode === 'edit' && editingId) {
+        await adminControlApi.updateEbook({ token, id: editingId, payload });
+        setSuccessMessage('E-book updated');
+      } else {
+        await adminControlApi.createEbook({ token, payload });
+        setSuccessMessage('E-book created');
+      }
+      await loadEbooks();
+      resetForm();
+    } catch (err) {
+      setError(err.message ?? 'Unable to save e-book');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const adminPanel = useMemo(() => {
+    if (!isAdmin) {
+      return (
+        <div className="rounded-4xl border border-slate-200 bg-white/80 p-8 text-sm text-slate-600">
+          <p className="text-lg font-semibold text-slate-900">Publisher console locked</p>
+          <p className="mt-2 text-sm text-slate-600">
+            Only administrators can publish or curate marketplace e-books. Request access from an Edulure owner or share this
+            briefing with your compliance lead.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="rounded-4xl border border-slate-200 bg-white/90 p-8 shadow-xl">
+        <div className="flex flex-col gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">Publisher console</p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+              {mode === 'edit' ? 'Update e-book' : 'Create e-book'}
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Launch interactive reading experiences with full CRUD, release guards and metadata controls. Every action is audit
+              ready and syncs to the instructor dashboard instantly.
+            </p>
+            {successMessage ? (
+              <p className="mt-2 rounded-2xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600">
+                {successMessage}
+              </p>
+            ) : null}
+            {error ? (
+              <p className="mt-2 rounded-2xl bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600">{error}</p>
+            ) : null}
+          </div>
+          <EbookForm
+            form={form}
+            onChange={setForm}
+            onSubmit={handleSubmit}
+            onCancel={resetForm}
+            submitting={submitting}
+            mode={mode}
+            currentStep={currentStep}
+            setCurrentStep={setCurrentStep}
+          />
+        </div>
+        <div className="mt-10 space-y-4">
+          <p className="text-sm font-semibold text-slate-700">Published catalogue</p>
+          {loading ? <p className="text-sm text-slate-500">Loading catalogue…</p> : null}
+          {!loading && liveEbooks.length === 0 ? (
+            <p className="text-sm text-slate-500">No e-books published yet.</p>
+          ) : null}
+          <div className="grid gap-3">
+            {liveEbooks.map((ebook) => (
+              <div
+                key={ebook.id}
+                className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-slate-50/70 p-5 text-sm text-slate-600"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{ebook.title}</p>
+                    <p className="text-xs text-slate-500">Status {ebook.status}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleEdit(ebook)}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(ebook.id)}
+                      className="inline-flex items-center justify-center rounded-full border border-rose-200 px-4 py-2 text-xs font-semibold text-rose-600 transition hover:border-rose-400 hover:bg-rose-50"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Price {(ebook.priceAmount ?? 0) / 100} {ebook.priceCurrency} · Public {ebook.isPublic ? 'yes' : 'no'}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }, [
+    isAdmin,
+    mode,
+    form,
+    submitting,
+    currentStep,
+    liveEbooks,
+    loading,
+    handleSubmit,
+    resetForm,
+    successMessage,
+    error
+  ]);
+
+  return (
+    <div className="bg-slate-100 pb-24">
+      <div className="mx-auto flex max-w-6xl flex-col gap-14 px-6 py-16">
+        <header className="space-y-6">
+          <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+            Publishing
+          </span>
+          <h1 className="text-4xl font-semibold text-slate-900">E-book marketplace, ready for production</h1>
+          <p className="max-w-3xl text-sm text-slate-600">
+            Curate, publish and monetise your enablement library. The marketplace below is fully live with CRUD workflows,
+            analytics-ready metadata and saved search experiences.
+          </p>
+        </header>
+
+        <section className="space-y-10">
+          <ExplorerSearchSection {...EXPLORER_CONFIG} />
+        </section>
+
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-semibold text-slate-900">Marketplace highlights</h2>
+            {marketplaceLoading ? (
+              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">Refreshing…</span>
+            ) : null}
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {marketplace.map((ebook) => (
+              <EbookCard key={ebook.id} ebook={ebook} />
+            ))}
+            {!marketplaceLoading && marketplace.length === 0 ? (
+              <p className="text-sm text-slate-500">No marketplace titles available right now. Check back after publishing a release.</p>
+            ) : null}
+            {marketplaceLoading ? <p className="text-sm text-slate-500">Loading marketplace e-books…</p> : null}
+          </div>
+        </section>
+
+        <section>{adminPanel}</section>
+      </div>
+    </div>
+  );
+}

@@ -15,12 +15,68 @@ import CommunityEventModel from '../models/CommunityEventModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentService from './PaymentService.js';
+import UserModel from '../models/UserModel.js';
 
 const ADMIN_ROLES = new Set(['owner', 'admin']);
+
+const DAY_IN_MS = 86_400_000;
 
 function normalizeSlug(value, fallback) {
   const base = value?.trim() || fallback;
   return slugify(base, { lower: true, strict: true });
+}
+
+function buildTierMap(tiers = []) {
+  const map = new Map();
+  tiers.forEach((tier) => {
+    if (tier?.id) {
+      map.set(tier.id, tier);
+    }
+  });
+  return map;
+}
+
+function toUserSummary(user) {
+  if (!user) return null;
+  const name = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+  return {
+    id: user.id,
+    email: user.email,
+    name: name || user.email
+  };
+}
+
+function toTierSummary(tier) {
+  if (!tier) return null;
+  return {
+    id: tier.id,
+    name: tier.name,
+    priceCents: Number(tier.priceCents ?? 0),
+    currency: tier.currency ?? 'USD',
+    interval: tier.billingInterval ?? 'monthly',
+    isActive: Boolean(tier.isActive)
+  };
+}
+
+function hydrateSubscription(subscription, tierMap, userMap) {
+  const tier = toTierSummary(tierMap.get(subscription.tierId));
+  const user = toUserSummary(userMap.get(subscription.userId));
+  return {
+    ...subscription,
+    tier,
+    user,
+    metadata: subscription.metadata ?? {}
+  };
+}
+
+function buildUserMap(users = []) {
+  const map = new Map();
+  users.forEach((user) => {
+    if (user?.id) {
+      map.set(user.id, user);
+    }
+  });
+  return map;
 }
 
 async function resolveCommunity(identifier, connection = db) {
@@ -545,6 +601,184 @@ export default class CommunityMonetizationService {
     });
 
     return updated;
+  }
+
+  static async getRevenueSummary(communityIdentifier, actorId) {
+    const community = await assertCommunity(communityIdentifier);
+    await requireAdmin(community.id, actorId);
+
+    const [tiers, subscriptions] = await Promise.all([
+      CommunityPaywallTierModel.listByCommunity(community.id, { includeInactive: true }),
+      CommunitySubscriptionModel.listByCommunity(community.id)
+    ]);
+
+    const tierMap = buildTierMap(tiers);
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY_IN_MS);
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * DAY_IN_MS);
+
+    let monthlyRecurringCents = 0;
+    let activeSubscriptions = 0;
+    let pausedSubscriptions = 0;
+    let trailingThirtyDayCents = 0;
+    let previousThirtyDayCents = 0;
+    let churnedThirtyDay = 0;
+
+    const tierActiveCounts = new Map();
+
+    subscriptions.forEach((subscription) => {
+      const tier = tierMap.get(subscription.tierId);
+      const price = tier ? Number(tier.priceCents ?? 0) : 0;
+      const status = subscription.status ?? 'inactive';
+      const currentStart = subscription.currentPeriodStart ? new Date(subscription.currentPeriodStart) : null;
+      const canceledAt = subscription.canceledAt ? new Date(subscription.canceledAt) : null;
+
+      const isActive =
+        status === 'active' ||
+        status === 'trialing' ||
+        (status === 'incomplete' && subscription.cancelAtPeriodEnd === false);
+
+      if (isActive || (subscription.cancelAtPeriodEnd && status === 'active')) {
+        activeSubscriptions += 1;
+        monthlyRecurringCents += price;
+        tierActiveCounts.set(
+          subscription.tierId,
+          (tierActiveCounts.get(subscription.tierId) ?? 0) + 1
+        );
+      }
+
+      if (status === 'paused') {
+        pausedSubscriptions += 1;
+      }
+
+      if (currentStart) {
+        if (currentStart >= thirtyDaysAgo) {
+          trailingThirtyDayCents += price;
+        } else if (currentStart >= sixtyDaysAgo) {
+          previousThirtyDayCents += price;
+        }
+      }
+
+      if (canceledAt && canceledAt >= thirtyDaysAgo) {
+        churnedThirtyDay += 1;
+      }
+    });
+
+    const tiersSummary = tiers.map((tier) => ({
+      ...toTierSummary(tier),
+      activeSubscribers: tierActiveCounts.get(tier.id) ?? 0
+    }));
+
+    const churnRate = activeSubscriptions
+      ? Number(((churnedThirtyDay / activeSubscriptions) * 100).toFixed(2))
+      : 0;
+
+    return {
+      totals: {
+        monthlyRecurringCents,
+        activeSubscriptions,
+        pausedSubscriptions,
+        churnRate
+      },
+      trailingThirtyDayCents,
+      previousThirtyDayCents,
+      currency: tiers[0]?.currency ?? 'USD',
+      tiers: tiersSummary
+    };
+  }
+
+  static async listSubscriptionsForCommunity(communityIdentifier, actorId, { status, search } = {}) {
+    const community = await assertCommunity(communityIdentifier);
+    await requireAdmin(community.id, actorId);
+
+    const subscriptions = await CommunitySubscriptionModel.listByCommunity(community.id, { status });
+    const [tiers, users] = await Promise.all([
+      CommunityPaywallTierModel.listByCommunity(community.id, { includeInactive: true }),
+      subscriptions.length ? UserModel.findByIds(subscriptions.map((subscription) => subscription.userId)) : []
+    ]);
+
+    const tierMap = buildTierMap(tiers);
+    const userMap = buildUserMap(users);
+
+    let hydrated = subscriptions.map((subscription) => hydrateSubscription(subscription, tierMap, userMap));
+
+    if (search) {
+      const term = search.toLowerCase();
+      hydrated = hydrated.filter((subscription) => {
+        const userMatch =
+          subscription.user?.email?.toLowerCase().includes(term) ||
+          subscription.user?.name?.toLowerCase().includes(term);
+        const tierMatch = subscription.tier?.name?.toLowerCase().includes(term);
+        return userMatch || tierMatch || String(subscription.publicId ?? '').includes(term);
+      });
+    }
+
+    return hydrated;
+  }
+
+  static async updateSubscription(communityIdentifier, actorId, subscriptionPublicId, updates = {}) {
+    const community = await assertCommunity(communityIdentifier);
+    await requireAdmin(community.id, actorId);
+
+    const subscription = await CommunitySubscriptionModel.findByPublicId(subscriptionPublicId);
+    if (!subscription || subscription.communityId !== community.id) {
+      const error = new Error('Subscription not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const payload = {};
+    if (updates.status) {
+      const nextStatus = updates.status;
+      if (!['active', 'paused', 'canceled'].includes(nextStatus)) {
+        const error = new Error('Unsupported subscription status update');
+        error.status = 422;
+        throw error;
+      }
+      payload.status = nextStatus;
+      if (nextStatus === 'canceled') {
+        payload.canceledAt = new Date().toISOString();
+        payload.cancelAtPeriodEnd = false;
+      }
+      if (nextStatus === 'active') {
+        payload.canceledAt = null;
+        payload.cancelAtPeriodEnd = false;
+      }
+    }
+
+    if (updates.cancelAtPeriodEnd !== undefined) {
+      payload.cancelAtPeriodEnd = Boolean(updates.cancelAtPeriodEnd);
+      if (!payload.cancelAtPeriodEnd && updates.status !== 'canceled') {
+        payload.canceledAt = null;
+      }
+    }
+
+    if (Object.keys(payload).length === 0) {
+      const error = new Error('No updates provided for subscription');
+      error.status = 422;
+      throw error;
+    }
+
+    const updated = await CommunitySubscriptionModel.updateByPublicId(subscriptionPublicId, payload);
+
+    await DomainEventModel.record({
+      entityType: 'community_subscription',
+      entityId: subscriptionPublicId,
+      eventType: 'community.subscription.updated',
+      payload: {
+        communityId: community.id,
+        status: updated.status,
+        cancelAtPeriodEnd: updated.cancelAtPeriodEnd
+      },
+      performedBy: actorId
+    });
+
+    const [tier, user] = await Promise.all([
+      updated.tierId ? CommunityPaywallTierModel.findById(updated.tierId) : Promise.resolve(null),
+      updated.userId ? UserModel.findById(updated.userId) : Promise.resolve(null)
+    ]);
+
+    return hydrateSubscription(updated, buildTierMap(tier ? [tier] : []), buildUserMap(user ? [user] : []));
   }
 
   static async listAffiliates(communityIdentifier, actorId, filters = {}) {

@@ -34,6 +34,9 @@ import 'screens/ebook_library_screen.dart';
 import 'screens/tutor_directory_screen.dart';
 import 'screens/live_sessions_screen.dart';
 import 'screens/course_progress_screen.dart';
+import 'screens/support_screen.dart';
+import 'screens/about_us_screen.dart';
+import 'screens/privacy_policy_screen.dart';
 import 'services/language_service.dart';
 import 'widgets/capability_status_banner.dart';
 
@@ -93,6 +96,9 @@ class EdulureApp extends ConsumerWidget {
           '/ebooks': (_) => const EbookLibraryScreen(),
           '/tutors': (_) => const TutorDirectoryScreen(),
           '/sessions/live': (_) => const LiveSessionsScreen(),
+          '/support': (_) => const SupportScreen(),
+          '/about': (_) => const AboutUsScreen(),
+          '/privacy': (_) => const PrivacyPolicyScreen(),
           '/blog': (_) => const BlogScreen(),
           '/settings': (_) => const SettingsScreen(),
           '/creation/companion': (_) => const MobileCreationCompanionScreen(),

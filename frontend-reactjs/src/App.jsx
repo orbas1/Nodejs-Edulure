@@ -10,12 +10,16 @@ import Explorer from './pages/Explorer.jsx';
 import Analytics from './pages/Analytics.jsx';
 import Admin from './pages/Admin.jsx';
 import ContentLibrary from './pages/ContentLibrary.jsx';
+import LiveClassrooms from './pages/LiveClassrooms.jsx';
+import Ebooks from './pages/Ebooks.jsx';
+import Courses from './pages/Courses.jsx';
 import About from './pages/About.jsx';
 import Privacy from './pages/Privacy.jsx';
 import Terms from './pages/Terms.jsx';
 import Blog from './pages/Blog.jsx';
 import BlogPost from './pages/BlogPost.jsx';
 import Communities from './pages/Communities.jsx';
+import TutorProfile from './pages/TutorProfile.jsx';
 import IntegrationCredentialInvite from './pages/IntegrationCredentialInvite.jsx';
 import ProtectedRoute from './components/routing/ProtectedRoute.jsx';
 import DashboardEntryRedirect from './components/routing/DashboardEntryRedirect.jsx';
@@ -36,6 +40,7 @@ import InstructorCommunityManage from './pages/dashboard/InstructorCommunityMana
 import InstructorCommunityChats from './pages/dashboard/InstructorCommunityChats.jsx';
 import InstructorCommunityWebinars from './pages/dashboard/InstructorCommunityWebinars.jsx';
 import InstructorCommunityPodcasts from './pages/dashboard/InstructorCommunityPodcasts.jsx';
+import InstructorCommunityOperations from './pages/dashboard/InstructorCommunityOperations.jsx';
 import InstructorCourseCreate from './pages/dashboard/InstructorCourseCreate.jsx';
 import InstructorCourseLibrary from './pages/dashboard/InstructorCourseLibrary.jsx';
 import InstructorCourseManage from './pages/dashboard/InstructorCourseManage.jsx';
@@ -132,6 +137,10 @@ function App() {
             </ProtectedRoute>
           )}
         />
+        <Route path="/live-classrooms" element={<LiveClassrooms />} />
+        <Route path="/courses" element={<Courses />} />
+        <Route path="/ebooks" element={<Ebooks />} />
+        <Route path="/tutors" element={<TutorProfile />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/blog/:slug" element={<BlogPost />} />
         <Route path="/about" element={<About />} />
@@ -206,6 +215,14 @@ function App() {
         />
         <Route path="communities/create" element={<InstructorCommunityCreate />} />
         <Route path="communities/manage" element={<InstructorCommunityManage />} />
+        <Route
+          path="communities/operations"
+          element={(
+            <ProtectedRoute allowedRoles={['instructor']}>
+              <InstructorCommunityOperations />
+            </ProtectedRoute>
+          )}
+        />
         <Route path="communities/chats" element={<InstructorCommunityChats />} />
         <Route path="communities/webinars" element={<InstructorCommunityWebinars />} />
         <Route path="communities/podcasts" element={<InstructorCommunityPodcasts />} />

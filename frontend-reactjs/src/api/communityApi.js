@@ -63,6 +63,16 @@ export async function fetchCommunityDetail(communityId, token) {
   return mapResponse(response);
 }
 
+export async function updateCommunity({ communityId, token, payload }) {
+  const response = await httpClient.put(`/communities/${communityId}`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:detail`, 'communities:list']
+    }
+  });
+  return mapResponse(response);
+}
+
 export async function fetchCommunityFeed({
   communityId,
   token,
@@ -150,6 +160,50 @@ export async function deleteCommunityResource({ communityId, resourceId, token }
     token,
     cache: {
       invalidateTags: [`community:${communityId}:resources`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function fetchCommunityMembers({ communityId, token, params = {}, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/members`, {
+    token,
+    signal,
+    params,
+    cache: {
+      ttl: 5000,
+      tags: [`community:${communityId}:members`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function createCommunityMember({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/members`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:members`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunityMember({ communityId, userId, token, payload }) {
+  const response = await httpClient.patch(`/communities/${communityId}/members/${userId}`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:members`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function removeCommunityMember({ communityId, userId, token, payload }) {
+  const response = await httpClient.delete(`/communities/${communityId}/members/${userId}`, {
+    token,
+    body: payload,
+    cache: {
+      invalidateTags: [`community:${communityId}:members`, `community:${communityId}:detail`]
     }
   });
   return mapResponse(response);
@@ -533,6 +587,41 @@ export async function updateCommunityTier({ communityId, tierId, token, payload 
   return mapResponse(response);
 }
 
+export async function fetchCommunityRevenueSummary({ communityId, token, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/monetization/summary`, {
+    token,
+    signal,
+    cache: {
+      ttl: 10_000,
+      tags: [`community:${communityId}:revenue`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function listCommunitySubscriptions({ communityId, token, params = {}, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/subscriptions`, {
+    token,
+    signal,
+    params,
+    cache: {
+      ttl: 5000,
+      tags: [`community:${communityId}:subscriptions`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function updateCommunitySubscription({ communityId, subscriptionId, token, payload }) {
+  const response = await httpClient.patch(`/communities/${communityId}/subscriptions/${subscriptionId}`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:subscriptions`, `community:${communityId}:revenue`]
+    }
+  });
+  return mapResponse(response);
+}
+
 export async function resolveCommunityIncident({ communityId, incidentId, token, payload }) {
   const response = await httpClient.post(
     `/communities/${communityId}/operations/safety/${incidentId}/resolve`,
@@ -541,6 +630,19 @@ export async function resolveCommunityIncident({ communityId, incidentId, token,
       token
     }
   );
+  return mapResponse(response);
+}
+
+export async function fetchCommunityIncidents({ communityId, token, params = {}, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/operations/safety`, {
+    token,
+    signal,
+    params,
+    cache: {
+      ttl: 5000,
+      tags: [`community:${communityId}:incidents`]
+    }
+  });
   return mapResponse(response);
 }
 

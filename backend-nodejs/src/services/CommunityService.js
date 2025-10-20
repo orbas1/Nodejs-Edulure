@@ -12,6 +12,7 @@ import AdsPlacementService from './AdsPlacementService.js';
 const MODERATOR_ROLES = new Set(['owner', 'admin', 'moderator']);
 const RESOURCE_MANAGER_ROLES = new Set(['owner', 'admin', 'moderator']);
 const POST_AUTHOR_ROLES = new Set(['owner', 'admin', 'moderator']);
+const COMMUNITY_MANAGER_ROLES = new Set(['owner', 'admin']);
 
 function isActiveMembership(membership) {
   return membership?.status === 'active';
@@ -39,6 +40,13 @@ function canManageResources(membership, actorRole) {
     return true;
   }
   return isActiveMembership(membership) && RESOURCE_MANAGER_ROLES.has(membership?.role);
+}
+
+function canManageCommunity(membership, actorRole) {
+  if (actorRole === 'admin') {
+    return true;
+  }
+  return isActiveMembership(membership) && COMMUNITY_MANAGER_ROLES.has(membership?.role);
 }
 
 function normalisePlacementIds(value) {
@@ -262,6 +270,68 @@ export default class CommunityService {
     });
   }
 
+  static async updateCommunity(communityIdentifier, actorId, payload = {}, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, actorId);
+    if (!canManageCommunity(membership, options.actorRole)) {
+      const error = new Error('You do not have permission to manage this community');
+      error.status = membership ? 403 : 404;
+      throw error;
+    }
+
+    const updates = {};
+    if (payload.name !== undefined) {
+      updates.name = payload.name;
+    }
+    if (payload.slug !== undefined) {
+      updates.slug = payload.slug ? slugify(payload.slug, { lower: true, strict: true }) : null;
+    }
+    if (payload.description !== undefined) {
+      updates.description = payload.description;
+    }
+    if (payload.coverImageUrl !== undefined) {
+      updates.coverImageUrl = payload.coverImageUrl;
+    }
+    if (payload.visibility !== undefined) {
+      updates.visibility = payload.visibility;
+    }
+
+    if (payload.metadata !== undefined) {
+      const existingMetadata = parseJsonColumn(community.metadata, {});
+      updates.metadata = { ...existingMetadata, ...payload.metadata };
+    }
+
+    const updated = await db.transaction(async (trx) => {
+      const next = await CommunityModel.updateById(community.id, updates, trx);
+      await DomainEventModel.record(
+        {
+          entityType: 'community',
+          entityId: next.id,
+          eventType: 'community.updated',
+          payload: {
+            nameChanged: payload.name !== undefined && payload.name !== community.name,
+            visibility: payload.visibility ?? next.visibility
+          },
+          performedBy: actorId
+        },
+        trx
+      );
+      return next;
+    });
+
+    return this.serializeCommunity({
+      ...updated,
+      memberRole: membership?.role,
+      memberStatus: membership?.status
+    });
+  }
+
   static async createPost(communityIdentifier, userId, payload) {
     const community = await this.resolveCommunity(communityIdentifier);
     if (!community) {
@@ -341,6 +411,88 @@ export default class CommunityService {
     });
 
     return this.serializePost(post, community);
+  }
+
+  static async updatePost(communityIdentifier, postId, userId, payload = {}, options = {}) {
+    const community = await this.resolveCommunity(communityIdentifier);
+    if (!community) {
+      const error = new Error('Community not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const membership = await CommunityMemberModel.findMembership(community.id, userId);
+    if (!membership) {
+      const error = new Error('You need to join this community before managing posts');
+      error.status = 403;
+      throw error;
+    }
+
+    if (!isActiveMembership(membership)) {
+      const error = new Error('Your membership is not active');
+      error.status = 403;
+      throw error;
+    }
+
+    const post = await CommunityPostModel.findById(postId);
+    if (!post || Number(post.communityId) !== Number(community.id)) {
+      const error = new Error('Post not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const canModerate = canModerateMembership(membership, options.actorRole);
+    const isAuthor = Number(post.authorId) === Number(userId);
+    if (!isAuthor && !canModerate) {
+      const error = new Error('You do not have permission to update this post');
+      error.status = 403;
+      throw error;
+    }
+
+    const updates = {};
+    if (payload.title !== undefined) updates.title = payload.title;
+    if (payload.body !== undefined) updates.body = payload.body;
+    if (payload.tags !== undefined) updates.tags = Array.isArray(payload.tags) ? payload.tags : [];
+    if (payload.visibility !== undefined) updates.visibility = payload.visibility;
+    if (payload.status !== undefined) updates.status = payload.status;
+    if (payload.scheduledAt !== undefined) updates.scheduledAt = payload.scheduledAt;
+
+    let nextPublishedAt = payload.publishedAt;
+    if (updates.status === 'published' && !nextPublishedAt) {
+      nextPublishedAt = new Date().toISOString();
+    }
+    if (payload.publishedAt !== undefined || nextPublishedAt) {
+      updates.publishedAt = nextPublishedAt ?? payload.publishedAt;
+    }
+
+    if (payload.metadata !== undefined) {
+      const existingMetadata = parseJsonColumn(post.metadata, {});
+      updates.metadata = { ...existingMetadata, ...payload.metadata };
+    }
+    if (payload.channelId !== undefined) {
+      updates.channelId = payload.channelId;
+    }
+
+    const updated = await db.transaction(async (trx) => {
+      const result = await CommunityPostModel.updateById(post.id, updates, trx);
+      await DomainEventModel.record(
+        {
+          entityType: 'community_post',
+          entityId: post.id,
+          eventType: 'community.post.updated',
+          payload: {
+            communityId: community.id,
+            updatedBy: userId,
+            status: result.status
+          },
+          performedBy: userId
+        },
+        trx
+      );
+      return result;
+    });
+
+    return this.serializePost(updated, community, { membership, actorRole: options.actorRole });
   }
 
   static async createResource(communityIdentifier, userId, payload) {

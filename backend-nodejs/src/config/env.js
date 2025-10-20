@@ -119,6 +119,24 @@ function parseCsv(value) {
     .filter(Boolean);
 }
 
+function parseOriginList(value) {
+  if (!value) {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry) => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return String(value)
+    .split(/[\s,]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 const defaultSchemaGuardTables = [
   'users',
   'communities',
@@ -1106,10 +1124,7 @@ const statementDescriptor =
 const jwtKeyset = normalizeJwtKeyset(raw.JWT_KEYSET, raw.JWT_SECRET, raw.JWT_ACTIVE_KEY_ID);
 const activeJwtKey = jwtKeyset.keys.find((key) => key.kid === jwtKeyset.activeKeyId);
 
-const corsOrigins = (raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL)
-  .split(',')
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const corsOrigins = parseOriginList(raw.CORS_ALLOWED_ORIGINS ?? raw.APP_URL);
 
 const metricsAllowedIps = parseCsv(raw.METRICS_ALLOWED_IPS ?? '');
 const redactedFields = parseCsv(raw.LOG_REDACTED_FIELDS ?? '');

@@ -220,6 +220,27 @@ class _PublicHomeView extends StatelessWidget {
                     onTap: () => Navigator.pushNamed(context, '/courses/progress'),
                   ),
                   ListTile(
+                    leading: const Icon(Icons.support_agent_outlined),
+                    title: const Text('Support desk'),
+                    subtitle: const Text('Manage learner issues and internal notes.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/support'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: const Text('About Edulure'),
+                    subtitle: const Text('Meet the team and learn our mission.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/about'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.privacy_tip_outlined),
+                    title: const Text('Privacy & data'),
+                    subtitle: const Text('Review controls and compliance posture.'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.dashboard_outlined),
                     title: const Text('Course management'),
                     subtitle: const Text('Track cohorts and production tasks.'),

@@ -285,6 +285,14 @@ export const apiRouteMetadata = [
     defaultState: 'enabled'
   },
   {
+    name: 'catalogue',
+    capability: 'public-catalogue',
+    description: 'Public catalogue endpoints for live classrooms, courses, and tutors.',
+    basePath: '/catalogue',
+    flagKey: 'platform.api.v1.catalogue',
+    defaultState: 'enabled'
+  },
+  {
     name: 'blog',
     capability: 'marketing-blog',
     description: 'Blog posts, marketing pages, and public content endpoints.',

@@ -54,7 +54,38 @@ const resolveIncidentSchema = Joi.object({
   followUp: Joi.string().max(500).allow('', null)
 });
 
+const listIncidentsQuerySchema = Joi.object({
+  status: Joi.string().valid('pending', 'in_review', 'escalated', 'suppressed', 'closed', 'resolved').optional(),
+  severity: Joi.string().valid('low', 'medium', 'high', 'critical').optional(),
+  search: Joi.string().max(120).allow('', null),
+  from: Joi.date().iso().optional(),
+  to: Joi.date().iso().optional(),
+  page: Joi.number().integer().min(1).default(1),
+  perPage: Joi.number().integer().min(1).max(100).default(20)
+});
+
 export default class CommunityOperationsController {
+  static async listIncidents(req, res, next) {
+    try {
+      const filters = await listIncidentsQuerySchema.validateAsync(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      const incidents = await CommunityOperationsService.listIncidents(
+        req.params.communityId,
+        req.user.id,
+        filters
+      );
+      return success(res, { data: incidents.items, meta: { pagination: incidents.pagination }, message: 'Safety incidents fetched' });
+    } catch (error) {
+      if (error.isJoi) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+      }
+      return next(error);
+    }
+  }
+
   static async publishRunbook(req, res, next) {
     try {
       const payload = await publishRunbookSchema.validateAsync(req.body, {
