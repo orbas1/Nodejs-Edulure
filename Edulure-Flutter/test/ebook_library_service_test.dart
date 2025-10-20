@@ -14,11 +14,13 @@ void main() {
   late EbookLibraryService service;
   late _FakeDio fakeDio;
   late Future<Directory> Function() libraryBuilder;
+  late _TestClock testClock;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('ebook-library-service-test');
     Hive.init(tempDir.path);
     fakeDio = _FakeDio();
+    testClock = _TestClock(DateTime(2024, 1, 1, 12));
     libraryBuilder = () async {
       final directory = Directory('${tempDir.path}/library');
       if (!await directory.exists()) {
@@ -29,6 +31,7 @@ void main() {
     service = EbookLibraryService(
       httpClient: fakeDio,
       libraryDirectoryBuilder: libraryBuilder,
+      clock: testClock.call,
     );
     await service.ensureReady();
   });
@@ -66,9 +69,11 @@ void main() {
 
   test('ensureDownloaded reuses in-flight download for duplicate requests', () async {
     final controlledDio = _ControlledDio();
+    testClock = _TestClock(DateTime(2024, 1, 1, 12));
     service = EbookLibraryService(
       httpClient: controlledDio,
       libraryDirectoryBuilder: libraryBuilder,
+      clock: testClock.call,
     );
     await service.ensureReady();
 
@@ -108,7 +113,11 @@ void main() {
     expect(fakeDio.downloadCalls, 2);
 
     final filesBox = Hive.box<dynamic>('ebook_library.files');
-    expect(filesBox.get(ebook.id), secondPath);
+    final cached = filesBox.get(ebook.id);
+    expect(cached, isA<Map>());
+    final cachedMap = Map<String, dynamic>.from(cached as Map);
+    expect(cachedMap['path'], secondPath);
+    expect(cachedMap['size'], greaterThan(0));
   });
 
   test('loadReaderPreferences restores persisted settings', () async {
@@ -136,6 +145,7 @@ void main() {
     final failingService = EbookLibraryService(
       httpClient: failingDio,
       libraryDirectoryBuilder: libraryBuilder,
+      clock: testClock.call,
     );
     await failingService.ensureReady();
 
@@ -155,6 +165,97 @@ void main() {
 
     final filesBox = Hive.box<dynamic>('ebook_library.files');
     expect(filesBox.get(ebook.id), isNull);
+  });
+
+  test('ensureDownloaded persists metadata and updates lastAccessed on reuse', () async {
+    final ebook = _buildEbook(
+      id: 'ebook-meta',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-meta.epub',
+    );
+
+    final path = await service.ensureDownloaded(ebook);
+    final filesBox = Hive.box<dynamic>('ebook_library.files');
+    final cached = Map<String, dynamic>.from(filesBox.get(ebook.id) as Map);
+
+    expect(cached['path'], path);
+    expect(cached['size'], greaterThan(0));
+    final firstAccessed = cached['lastAccessed'] as int;
+
+    testClock.advance(const Duration(minutes: 5));
+    final reusedPath = await service.ensureDownloaded(ebook);
+
+    expect(reusedPath, path);
+
+    final updated = Map<String, dynamic>.from(filesBox.get(ebook.id) as Map);
+    expect(updated['lastAccessed'], greaterThan(firstAccessed));
+  });
+
+  test('max cache size evicts least recently used downloads', () async {
+    final limitedService = EbookLibraryService(
+      httpClient: _SizedDio(40),
+      libraryDirectoryBuilder: libraryBuilder,
+      maxCacheSizeBytes: 100,
+      clock: testClock.call,
+    );
+    await limitedService.ensureReady();
+
+    final ebookA = _buildEbook(
+      id: 'ebook-a',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-a.epub',
+    );
+    final ebookB = _buildEbook(
+      id: 'ebook-b',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-b.epub',
+    );
+    final ebookC = _buildEbook(
+      id: 'ebook-c',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-c.epub',
+    );
+
+    final pathA = await limitedService.ensureDownloaded(ebookA);
+    final pathB = await limitedService.ensureDownloaded(ebookB);
+
+    testClock.advance(const Duration(minutes: 1));
+    await limitedService.ensureDownloaded(ebookA);
+
+    testClock.advance(const Duration(minutes: 1));
+    final pathC = await limitedService.ensureDownloaded(ebookC);
+
+    expect(limitedService.isDownloaded(ebookA.id), isTrue);
+    expect(limitedService.isDownloaded(ebookC.id), isTrue);
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(limitedService.isDownloaded(ebookB.id), isFalse);
+    expect(File(pathB).existsSync(), isFalse);
+    expect(File(pathA).existsSync(), isTrue);
+    expect(File(pathC).existsSync(), isTrue);
+
+    final filesBox = Hive.box<dynamic>('ebook_library.files');
+    expect(filesBox.get(ebookB.id), isNull);
+  });
+
+  test('isDownloaded upgrades legacy string cache entries', () async {
+    final filesBox = Hive.box<dynamic>('ebook_library.files');
+    final legacy = _buildEbook(
+      id: 'legacy-ebook',
+      fileUrl: 'https://cdn.edulure.com/assets/library/legacy.epub',
+    );
+    final legacyPath = '${tempDir.path}/library/legacy.epub';
+    final legacyFile = File(legacyPath)..createSync(recursive: true);
+    legacyFile.writeAsStringSync('legacy data');
+
+    await filesBox.put(legacy.id, legacyPath);
+
+    expect(service.isDownloaded(legacy.id), isTrue);
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final upgraded = filesBox.get(legacy.id);
+    expect(upgraded, isA<Map>());
+    final map = Map<String, dynamic>.from(upgraded as Map);
+    expect(map['path'], legacyPath);
+    expect(map['size'], greaterThan(0));
   });
 }
 
@@ -268,5 +369,45 @@ class _FailingDio extends Dio {
       error: 'Simulated offline mode',
       type: DioExceptionType.connectionError,
     );
+  }
+}
+
+class _SizedDio extends Dio {
+  _SizedDio(this.bytes);
+
+  final int bytes;
+  int downloadCalls = 0;
+
+  @override
+  Future<Response<dynamic>> download(
+    String urlPath,
+    dynamic savePath, {
+    ProgressCallback? onReceiveProgress,
+    CancelToken? cancelToken,
+    bool deleteOnError = true,
+    String lengthHeader = Headers.contentLengthHeader,
+    Object? data,
+    Options? options,
+  }) async {
+    downloadCalls++;
+    final file = File(savePath.toString());
+    await file.create(recursive: true);
+    await file.writeAsBytes(List<int>.filled(bytes, downloadCalls));
+    return Response<dynamic>(
+      requestOptions: RequestOptions(path: urlPath),
+      statusCode: 200,
+    );
+  }
+}
+
+class _TestClock {
+  _TestClock(DateTime seed) : _current = seed;
+
+  DateTime _current;
+
+  DateTime call() => _current;
+
+  void advance(Duration delta) {
+    _current = _current.add(delta);
   }
 }
