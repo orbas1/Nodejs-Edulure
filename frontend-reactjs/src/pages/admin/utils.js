@@ -62,3 +62,31 @@ export function getSeverityStyles(severity) {
       return 'bg-slate-100 text-slate-600';
   }
 }
+
+export function cloneDeep(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    return value;
+  }
+}
+
+export function isDeepEqual(a, b) {
+  if (a === b) {
+    return true;
+  }
+
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch (error) {
+    return a === b;
+  }
+}
