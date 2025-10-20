@@ -315,9 +315,9 @@
 
 ## 14. Group 14 (Files 261-280 of 1169)
 
-- `backend-nodejs/src/controllers/CommunityMonetizationController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `backend-nodejs/src/controllers/CommunityOperationsController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `backend-nodejs/src/controllers/CommunityProgrammingController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
+- `backend-nodejs/src/controllers/CommunityMonetizationController.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)
+- `backend-nodejs/src/controllers/CommunityOperationsController.js` (Syntax:95 | Functionality:95 | Real World Ready:95 | Live Data:95 | Error:95 | Logic Flow:95 | Release Readiness:95 | Tests:95 | Overall:95)
+- `backend-nodejs/src/controllers/CommunityProgrammingController.js` (Syntax:95 | Functionality:95 | Real World Ready:95 | Live Data:95 | Error:95 | Logic Flow:95 | Release Readiness:95 | Tests:95 | Overall:95)
 - `backend-nodejs/src/controllers/ComplianceController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/controllers/ContentController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `backend-nodejs/src/controllers/CourseController.js` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
