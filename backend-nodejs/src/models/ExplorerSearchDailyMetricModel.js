@@ -62,6 +62,17 @@ function withTransaction(connection, handler) {
   });
 }
 
+function applyForUpdate(builder) {
+  const client = builder?.client?.config?.client;
+  if (client === 'sqlite3' || client === 'better-sqlite3') {
+    return builder;
+  }
+  if (typeof builder.forUpdate === 'function') {
+    return builder.forUpdate();
+  }
+  return builder;
+}
+
 function normaliseEntityType(entityType) {
   if (typeof entityType !== 'string') {
     throw new TypeError('Explorer search metrics require a valid entity type');
@@ -109,10 +120,8 @@ export default class ExplorerSearchDailyMetricModel {
     const latency = toLatency(latencyMs);
 
     return withTransaction(connection, async (trx) => {
-      const existing = await trx(TABLE)
-        .where({ metric_date: date, entity_type: normalisedEntityType })
-        .forUpdate()
-        .first();
+      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existing = await applyForUpdate(existingQuery).first();
 
       if (existing) {
         const currentSearches = Math.max(0, Number(existing.searches ?? 0));
@@ -165,10 +174,8 @@ export default class ExplorerSearchDailyMetricModel {
     const conversionsDelta = toNonNegativeInteger(conversions);
 
     return withTransaction(connection, async (trx) => {
-      const existing = await trx(TABLE)
-        .where({ metric_date: date, entity_type: normalisedEntityType })
-        .forUpdate()
-        .first();
+      const existingQuery = trx(TABLE).where({ metric_date: date, entity_type: normalisedEntityType });
+      const existing = await applyForUpdate(existingQuery).first();
 
       if (existing) {
         const updatedClicks = Math.max(0, Number(existing.clicks ?? 0)) + clicksDelta;
