@@ -587,6 +587,39 @@ export async function updateCommunityTier({ communityId, tierId, token, payload 
   return mapResponse(response);
 }
 
+export async function listCommunityTiers({ communityId, token, params = {}, signal } = {}) {
+  const response = await httpClient.get(`/communities/${communityId}/paywall/tiers`, {
+    token,
+    signal,
+    params,
+    cache: {
+      ttl: 5000,
+      tags: [`community:${communityId}:paywall`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function createCommunityTier({ communityId, token, payload }) {
+  const response = await httpClient.post(`/communities/${communityId}/paywall/tiers`, payload, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:paywall`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
+export async function deleteCommunityTier({ communityId, tierId, token }) {
+  const response = await httpClient.delete(`/communities/${communityId}/paywall/tiers/${tierId}`, {
+    token,
+    cache: {
+      invalidateTags: [`community:${communityId}:paywall`, `community:${communityId}:detail`]
+    }
+  });
+  return mapResponse(response);
+}
+
 export async function fetchCommunityRevenueSummary({ communityId, token, signal } = {}) {
   const response = await httpClient.get(`/communities/${communityId}/monetization/summary`, {
     token,

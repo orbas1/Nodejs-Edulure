@@ -24,7 +24,11 @@ const emptyChannelForm = {
   referralCode: '',
   trackingUrl: '',
   status: 'draft',
-  commissionRateBps: 250
+  commissionRateBps: 250,
+  audienceFocus: '',
+  contactEmail: '',
+  utmParameters: '',
+  notes: ''
 };
 
 const emptyPayoutForm = {
@@ -109,6 +113,55 @@ function ChannelForm({ form, onChange, onSubmit, onCancel, submitting }) {
             step="10"
             value={form.commissionRateBps}
             onChange={onChange}
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+          Audience focus
+          <input
+            name="audienceFocus"
+            value={form.audienceFocus}
+            onChange={onChange}
+            placeholder="e.g. Early-stage operators"
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+        <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+          Point of contact email
+          <input
+            name="contactEmail"
+            type="email"
+            value={form.contactEmail}
+            onChange={onChange}
+            placeholder="partner@edulure.test"
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="block text-xs font-medium uppercase tracking-wide text-slate-500 md:col-span-2">
+          Campaign notes
+          <textarea
+            name="notes"
+            value={form.notes}
+            onChange={onChange}
+            placeholder="Use one line per observation, launch result, or content collaboration idea."
+            className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            rows={4}
+          />
+          <span className="mt-1 block text-[11px] uppercase tracking-wide text-slate-400">
+            Each line becomes a timeline entry for this partner.
+          </span>
+        </label>
+        <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+          Default UTM parameters
+          <input
+            name="utmParameters"
+            value={form.utmParameters}
+            onChange={onChange}
+            placeholder="utm_source=affiliate&utm_medium=organic"
             className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </label>
@@ -253,7 +306,11 @@ export default function DashboardAffiliate() {
         referralCode: channel.referralCode ?? '',
         trackingUrl: channel.trackingUrl ?? '',
         status: channel.status ?? 'draft',
-        commissionRateBps: channel.commissionRateBps ?? 250
+        commissionRateBps: channel.commissionRateBps ?? 250,
+        audienceFocus: channel.metadata?.audienceFocus ?? '',
+        contactEmail: channel.metadata?.contactEmail ?? '',
+        utmParameters: channel.metadata?.utmParameters ?? '',
+        notes: Array.isArray(channel.notes) ? channel.notes.join('\n') : ''
       });
     } else {
       setChannelForm(emptyChannelForm);
@@ -286,7 +343,18 @@ export default function DashboardAffiliate() {
         referralCode: channelForm.referralCode.trim(),
         trackingUrl: channelForm.trackingUrl?.trim() || undefined,
         status: channelForm.status,
-        commissionRateBps: Number(channelForm.commissionRateBps ?? 0)
+        commissionRateBps: Number(channelForm.commissionRateBps ?? 0),
+        notes: channelForm.notes
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean),
+        metadata: Object.fromEntries(
+          Object.entries({
+            audienceFocus: channelForm.audienceFocus?.trim() || undefined,
+            contactEmail: channelForm.contactEmail?.trim() || undefined,
+            utmParameters: channelForm.utmParameters?.trim() || undefined
+          }).filter(([, value]) => Boolean(value))
+        )
       };
       try {
         if (channelForm.id) {
@@ -386,7 +454,7 @@ export default function DashboardAffiliate() {
     [payoutForm, refresh, resetPayoutForm, token]
   );
 
-  if (role && role !== 'learner') {
+  if (role && !['learner', 'instructor'].includes(role)) {
     return (
       <DashboardStateMessage
         variant="error"
@@ -412,7 +480,9 @@ export default function DashboardAffiliate() {
       <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="dashboard-kicker text-primary">Affiliate workspace</p>
-          <h1 className="dashboard-title">Grow your learner pipeline with trusted partners</h1>
+          <h1 className="dashboard-title">
+            {role === 'instructor' ? 'Scale trusted partner revenue streams' : 'Grow your learner pipeline with trusted partners'}
+          </h1>
           <p className="dashboard-subtitle">
             Capture channel performance, automate payouts, and keep referral partners motivated.
           </p>
@@ -492,20 +562,40 @@ export default function DashboardAffiliate() {
                     'Add a tracking link to monitor conversions.'
                   )}
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 font-medium text-primary">
-                    {channel.status}
-                  </span>
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">
-                    Commission · {(channel.commissionRateBps / 100).toFixed(2)}%
-                  </span>
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">
-                    Outstanding · {channel.outstandingFormatted}
-                  </span>
-                </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
+                <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 font-medium text-primary">
+                  {channel.status}
+                </span>
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">
+                  Commission · {(channel.commissionRateBps / 100).toFixed(2)}%
+                </span>
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">
+                  Outstanding · {channel.outstandingFormatted}
+                </span>
               </div>
-              <div className="flex flex-wrap gap-3">
-                <button type="button" className="dashboard-pill px-4 py-2 text-sm" onClick={() => openChannelForm(channel)}>
+              {channel.metadata?.audienceFocus || channel.metadata?.contactEmail ? (
+                <dl className="mt-3 grid gap-3 text-xs text-slate-500 sm:grid-cols-2">
+                  {channel.metadata?.audienceFocus ? (
+                    <div>
+                      <dt className="font-semibold text-slate-700">Audience focus</dt>
+                      <dd>{channel.metadata.audienceFocus}</dd>
+                    </div>
+                  ) : null}
+                  {channel.metadata?.contactEmail ? (
+                    <div>
+                      <dt className="font-semibold text-slate-700">Partner contact</dt>
+                      <dd>
+                        <a className="text-primary underline" href={`mailto:${channel.metadata.contactEmail}`}>
+                          {channel.metadata.contactEmail}
+                        </a>
+                      </dd>
+                    </div>
+                  ) : null}
+                </dl>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" className="dashboard-pill px-4 py-2 text-sm" onClick={() => openChannelForm(channel)}>
                   Edit
                 </button>
                 <button
@@ -550,6 +640,21 @@ export default function DashboardAffiliate() {
                 </dd>
               </div>
             </dl>
+            {Array.isArray(channel.notes) && channel.notes.length ? (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white/60 p-4">
+                <p className="dashboard-kicker">Activation notes</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">
+                  {channel.notes.map((note, index) => (
+                    <li key={`${channel.id}-note-${index}`}>{note}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+            {channel.metadata?.utmParameters ? (
+              <div className="mt-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-3 text-xs text-slate-500">
+                <span className="font-semibold text-slate-700">UTM parameters:</span> {channel.metadata.utmParameters}
+              </div>
+            ) : null}
           </article>
         ))}
       </section>

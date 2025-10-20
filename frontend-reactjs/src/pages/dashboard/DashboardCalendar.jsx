@@ -38,6 +38,10 @@ const DEFAULT_SEEDED_EVENTS = [
     facilitator: 'Tara Chen',
     capacity: '250 seats',
     resources: 'Pre-read: Trust dashboards primer. Homework: Map your pipeline attrition in Notion.',
+    ctaLabel: 'Access the prep toolkit',
+    ctaUrl: 'https://edulure.test/resources/revenue-architecture-toolkit',
+    mediaUrl: 'https://images.edulure.test/events/revenue-architecture-workshop.jpg',
+    tags: ['cohort', 'revenue', 'trust'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -53,6 +57,10 @@ const DEFAULT_SEEDED_EVENTS = [
     facilitator: 'Leo Okafor',
     capacity: 'Unlimited live viewers',
     resources: 'Promo feed post scheduled. Capture highlight reel for podcasts.',
+    ctaLabel: 'Register your crew',
+    ctaUrl: 'https://edulure.test/live/operator-ama',
+    mediaUrl: 'https://cdn.edulure.test/highlights/operator-ama-teaser.mp4',
+    tags: ['livestream', 'community'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   },
@@ -68,6 +76,10 @@ const DEFAULT_SEEDED_EVENTS = [
     facilitator: 'Mira Shah',
     capacity: 'Editorial team (8)',
     resources: 'Outline, guest bios, and podcast checklist stored in the creation studio.',
+    ctaLabel: 'Listen to trailer',
+    ctaUrl: 'https://edulure.test/podcast/designing-async-accountability',
+    mediaUrl: 'https://images.edulure.test/podcasts/async-accountability-cover.png',
+    tags: ['podcast', 'community-design'],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   }
@@ -115,7 +127,15 @@ function normaliseSeededEvents(events) {
       event.endAt ??
       (event.startAt ? new Date(new Date(event.startAt).getTime() + 60 * 60 * 1000).toISOString() : new Date().toISOString()),
     createdAt: event.createdAt ?? new Date().toISOString(),
-    updatedAt: event.updatedAt ?? new Date().toISOString()
+    updatedAt: event.updatedAt ?? new Date().toISOString(),
+    tags: Array.isArray(event.tags)
+      ? event.tags
+      : typeof event.tags === 'string'
+        ? event.tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter(Boolean)
+        : []
   }));
 }
 
@@ -140,6 +160,51 @@ function computeStatus(event) {
   if (end < now) return 'completed';
   if (start <= now && end >= now) return 'live';
   return 'scheduled';
+}
+
+function resolveEmbedUrl(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtube.com')) {
+      const videoId = parsed.searchParams.get('v');
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+    }
+    if (parsed.hostname.includes('youtu.be')) {
+      const videoId = parsed.pathname.split('/').filter(Boolean)[0];
+      return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+    }
+    if (parsed.hostname.includes('vimeo.com')) {
+      const videoId = parsed.pathname.split('/').filter(Boolean)[0];
+      return videoId ? `https://player.vimeo.com/video/${videoId}` : url;
+    }
+  } catch (_error) {
+    return url;
+  }
+  return url;
+}
+
+function renderMediaPreview(url, title) {
+  if (!url) return null;
+  const lower = url.toLowerCase();
+  if (lower.endsWith('.mp4') || lower.endsWith('.webm') || lower.endsWith('.ogg')) {
+    return (
+      <video controls className="w-full rounded-3xl" src={url} aria-label={`${title} media preview`} />
+    );
+  }
+  if (lower.includes('youtube.com') || lower.includes('youtu.be') || lower.includes('vimeo.com')) {
+    return (
+      <div className="aspect-video w-full overflow-hidden rounded-3xl bg-slate-900">
+        <iframe
+          title={`${title} media embed`}
+          src={resolveEmbedUrl(url)}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="h-full w-full"
+        />
+      </div>
+    );
+  }
+  return <img src={url} alt={`${title} media preview`} className="h-52 w-full rounded-3xl object-cover" />;
 }
 
 function groupEventsByDay(events) {
@@ -316,15 +381,30 @@ export default function DashboardCalendar() {
   const handleSubmit = useCallback(
     (form) => {
       const timestamp = new Date().toISOString();
+      const tags = Array.isArray(form.tags)
+        ? form.tags
+        : typeof form.tags === 'string'
+          ? form.tags
+              .split(',')
+              .map((tag) => tag.trim())
+              .filter(Boolean)
+          : [];
+      const sanitized = {
+        ...form,
+        ctaLabel: form.ctaLabel?.trim() || '',
+        ctaUrl: form.ctaUrl?.trim() || '',
+        mediaUrl: form.mediaUrl?.trim() || '',
+        tags
+      };
       if (dialogMode === 'edit' && form.id) {
         setEvents((prev) =>
           prev.map((event) =>
             event.id === form.id
               ? {
                   ...event,
-                  ...form,
+                  ...sanitized,
                   updatedAt: timestamp,
-                  status: computeStatus(form)
+                  status: computeStatus(sanitized)
                 }
               : event
           )
@@ -333,11 +413,11 @@ export default function DashboardCalendar() {
       } else {
         const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `evt-${Date.now()}`;
         const payload = {
-          ...form,
+          ...sanitized,
           id,
           createdAt: timestamp,
           updatedAt: timestamp,
-          status: computeStatus(form)
+          status: computeStatus(sanitized)
         };
         setEvents((prev) => [...prev, payload]);
         setAnnouncement('New calendar item created and saved locally.');
@@ -400,6 +480,12 @@ export default function DashboardCalendar() {
       if (event.location) {
         lines.push(`LOCATION:${escapeICS(event.location)}`);
       }
+      if (event.ctaUrl) {
+        lines.push(`URL:${escapeICS(event.ctaUrl)}`);
+      }
+      if (Array.isArray(event.tags) && event.tags.length) {
+        lines.push(`CATEGORIES:${escapeICS(event.tags.join(','))}`);
+      }
       lines.push('END:VEVENT');
     });
     lines.push('END:VCALENDAR');
@@ -415,7 +501,11 @@ export default function DashboardCalendar() {
   }, [events]);
 
   const handlePromote = useCallback((event) => {
-    setAnnouncement(`Promotion drafted for “${event.title}”. Push to the community feed once finalised.`);
+    setAnnouncement(
+      `Promotion drafted for “${event.title}”. ${
+        event.ctaLabel ? `Feature the CTA “${event.ctaLabel}”.` : 'Push to the community feed once finalised.'
+      }`
+    );
   }, []);
 
   return (
@@ -596,6 +686,23 @@ export default function DashboardCalendar() {
                           </div>
                           <h3 className="mt-3 text-base font-semibold text-slate-900">{event.title}</h3>
                           <p className="mt-2 text-sm text-slate-600">{event.description}</p>
+                          {event.tags?.length ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {event.tags.map((tag) => (
+                                <span
+                                  key={`${event.id}-${tag}`}
+                                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500"
+                                >
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          ) : null}
+                          {event.mediaUrl ? (
+                            <div className="mt-4 overflow-hidden rounded-3xl border border-slate-200 bg-slate-50">
+                              {renderMediaPreview(event.mediaUrl, event.title)}
+                            </div>
+                          ) : null}
                           <dl className="mt-3 grid gap-3 text-xs text-slate-500 md:grid-cols-2">
                             <div className="flex items-center gap-2">
                               <ClockIcon className="h-4 w-4" aria-hidden="true" />
@@ -639,6 +746,16 @@ export default function DashboardCalendar() {
                               <p className="font-semibold text-slate-700">Resources</p>
                               <p className="mt-1 whitespace-pre-line">{event.resources}</p>
                             </div>
+                          ) : null}
+                          {event.ctaUrl ? (
+                            <a
+                              href={event.ctaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90"
+                            >
+                              {event.ctaLabel || 'Open link'}
+                            </a>
                           ) : null}
                         </div>
                         <div className="flex flex-col gap-2 text-sm text-slate-500">
