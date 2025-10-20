@@ -82,12 +82,13 @@ export default class ExplorerSearchEventModel {
 
   static async topQueries({ since, limit = 5, zeroResultOnly = false }, connection = db) {
     const query = connection('explorer_search_events')
-      .select({
-        query: connection.raw('LOWER(TRIM(query))'),
-        searches: connection.raw('COUNT(*)::bigint')
-      })
+      .select(
+        connection.raw('LOWER(TRIM(query)) AS normalized_query'),
+        connection.raw('COUNT(*) AS searches')
+      )
+      .whereNotNull('query')
       .groupByRaw('LOWER(TRIM(query))')
-      .orderByRaw('COUNT(*) DESC')
+      .orderBy('searches', 'desc')
       .limit(limit);
 
     if (since) {
@@ -99,18 +100,18 @@ export default class ExplorerSearchEventModel {
 
     const rows = await query;
     return rows
-      .filter((row) => row.query)
-      .map((row) => ({ query: row.query, searches: Number(row.searches ?? 0) }));
+      .filter((row) => row.normalized_query)
+      .map((row) => ({ query: row.normalized_query, searches: Number(row.searches ?? 0) }));
   }
 
   static async aggregateRange({ since }, connection = db) {
-    const query = connection('explorer_search_events').select({
-      searches: connection.raw('COUNT(*)::bigint'),
-      zeroResults: connection.raw('SUM(CASE WHEN is_zero_result THEN 1 ELSE 0 END)::bigint'),
-      totalResults: connection.raw('SUM(result_total)::bigint'),
-      averageLatencyMs: connection.raw('AVG(latency_ms)::float'),
-      uniqueUsers: connection.raw('COUNT(DISTINCT user_id)')
-    });
+    const query = connection('explorer_search_events').select(
+      connection.raw('COUNT(*) AS searches'),
+      connection.raw('SUM(CASE WHEN is_zero_result THEN 1 ELSE 0 END) AS zeroResults'),
+      connection.raw('SUM(result_total) AS totalResults'),
+      connection.raw('AVG(latency_ms) AS averageLatencyMs'),
+      connection.raw('COUNT(DISTINCT user_id) AS uniqueUsers')
+    );
     if (since) {
       query.andWhere('created_at', '>=', since);
     }

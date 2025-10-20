@@ -1,26 +1,58 @@
 import db from '../config/database.js';
 
+const TABLE = 'explorer_search_daily_metrics';
+
+function parseMetadata(value) {
+  if (!value) {
+    return {};
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  }
+
+  return typeof value === 'object' && value !== null ? value : {};
+}
+
 function toDomain(row) {
+  if (!row) {
+    return null;
+  }
+
+  const metricDate = row.metric_date ?? row.metricDate;
   return {
     id: row.id,
-    metricDate: row.metric_date instanceof Date ? row.metric_date : new Date(row.metric_date),
-    entityType: row.entity_type,
+    metricDate: metricDate instanceof Date ? metricDate : new Date(metricDate),
+    entityType: row.entity_type ?? row.entityType,
     searches: Number(row.searches ?? 0),
-    zeroResults: Number(row.zero_results ?? 0),
-    displayedResults: Number(row.displayed_results ?? 0),
-    totalResults: Number(row.total_results ?? 0),
+    zeroResults: Number(row.zero_results ?? row.zeroResults ?? 0),
+    displayedResults: Number(row.displayed_results ?? row.displayedResults ?? 0),
+    totalResults: Number(row.total_results ?? row.totalResults ?? 0),
     clicks: Number(row.clicks ?? 0),
     conversions: Number(row.conversions ?? 0),
-    averageLatencyMs: Number(row.average_latency_ms ?? 0),
-    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
-    createdAt: row.created_at ?? null
+    averageLatencyMs: Number(row.average_latency_ms ?? row.averageLatencyMs ?? 0),
+    metadata: parseMetadata(row.metadata),
+    createdAt: row.created_at ? new Date(row.created_at) : row.createdAt ?? null,
+    updatedAt: row.updated_at ? new Date(row.updated_at) : row.updatedAt ?? null
   };
 }
 
 function normaliseDate(value) {
   const date = value ? new Date(value) : new Date();
-  date.setUTCHours(0, 0, 0, 0);
-  return date;
+  const normalised = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  return normalised;
+}
+
+function withTransaction(connection, handler) {
+  if (connection?.isTransaction) {
+    return handler(connection);
+  }
+  return connection.transaction((trx) => handler(trx));
 }
 
 export default class ExplorerSearchDailyMetricModel {
@@ -39,62 +71,113 @@ export default class ExplorerSearchDailyMetricModel {
     const zeroDelta = isZeroResult ? 1 : 0;
     const displayedDelta = Number(displayedHits ?? 0);
     const totalDelta = Number(totalHits ?? 0);
-    const latency = Number(latencyMs ?? 0);
+    const latency = Number.isFinite(Number(latencyMs)) ? Number(latencyMs) : 0;
 
-    const query = `
-      INSERT INTO explorer_search_daily_metrics
-        (metric_date, entity_type, searches, zero_results, displayed_results, total_results, clicks, conversions, average_latency_ms, metadata)
-      VALUES
-        (?, ?, 1, ?, ?, ?, 0, 0, ?, '{}')
-      ON CONFLICT (metric_date, entity_type) DO UPDATE SET
-        searches = explorer_search_daily_metrics.searches + 1,
-        zero_results = explorer_search_daily_metrics.zero_results + ?,
-        displayed_results = explorer_search_daily_metrics.displayed_results + ?,
-        total_results = explorer_search_daily_metrics.total_results + ?,
-        average_latency_ms = CASE
-          WHEN explorer_search_daily_metrics.searches + 1 = 0 THEN 0
-          ELSE ROUND(((explorer_search_daily_metrics.average_latency_ms * explorer_search_daily_metrics.searches) + ?) /
-            (explorer_search_daily_metrics.searches + 1))
-        END
-      RETURNING *
-    `;
+    return withTransaction(connection, async (trx) => {
+      const existing = await trx(TABLE)
+        .where({ metric_date: date, entity_type: entityType })
+        .first();
 
-    const bindings = [
-      date,
-      entityType,
-      zeroDelta,
-      displayedDelta,
-      totalDelta,
-      latency,
-      zeroDelta,
-      displayedDelta,
-      totalDelta,
-      latency
-    ];
+      if (existing) {
+        const currentSearches = Number(existing.searches ?? 0);
+        const searches = currentSearches + 1;
+        const zeroResults = Number(existing.zero_results ?? 0) + zeroDelta;
+        const displayedResults = Number(existing.displayed_results ?? 0) + displayedDelta;
+        const totalResults = Number(existing.total_results ?? 0) + totalDelta;
+        const currentAverage = Number(existing.average_latency_ms ?? 0);
+        const totalLatency = currentAverage * currentSearches + latency;
+        const averageLatencyMs = searches > 0 ? Math.round(totalLatency / searches) : 0;
 
-    const result = await connection.raw(query, bindings);
-    return toDomain(result.rows?.[0] ?? result[0]);
+        await trx(TABLE)
+          .where({ id: existing.id })
+          .update({
+            searches,
+            zero_results: zeroResults,
+            displayed_results: displayedResults,
+            total_results: totalResults,
+            average_latency_ms: averageLatencyMs,
+            updated_at: trx.fn.now()
+          });
+
+        return toDomain({
+          ...existing,
+          searches,
+          zero_results: zeroResults,
+          displayed_results: displayedResults,
+          total_results: totalResults,
+          average_latency_ms: averageLatencyMs
+        });
+      }
+
+      const payload = {
+        metric_date: date,
+        entity_type: entityType,
+        searches: 1,
+        zero_results: zeroDelta,
+        displayed_results: displayedDelta,
+        total_results: totalDelta,
+        clicks: 0,
+        conversions: 0,
+        average_latency_ms: latency,
+        metadata: '{}'
+      };
+
+      const [id] = await trx(TABLE).insert(payload);
+      const row = await trx(TABLE).where({ id }).first();
+      return toDomain(row);
+    });
   }
 
   static async incrementClicks({ metricDate, entityType, clicks = 1, conversions = 0 }, connection = db) {
     const date = normaliseDate(metricDate);
-    const query = `
-      INSERT INTO explorer_search_daily_metrics
-        (metric_date, entity_type, searches, zero_results, displayed_results, total_results, clicks, conversions, average_latency_ms, metadata)
-      VALUES
-        (?, ?, 0, 0, 0, 0, ?, ?, 0, '{}')
-      ON CONFLICT (metric_date, entity_type) DO UPDATE SET
-        clicks = explorer_search_daily_metrics.clicks + ?,
-        conversions = explorer_search_daily_metrics.conversions + ?
-      RETURNING *
-    `;
-    const bindings = [date, entityType, Number(clicks ?? 0), Number(conversions ?? 0), Number(clicks ?? 0), Number(conversions ?? 0)];
-    const result = await connection.raw(query, bindings);
-    return toDomain(result.rows?.[0] ?? result[0]);
+    const clicksDelta = Number(clicks ?? 0);
+    const conversionsDelta = Number(conversions ?? 0);
+
+    return withTransaction(connection, async (trx) => {
+      const existing = await trx(TABLE)
+        .where({ metric_date: date, entity_type: entityType })
+        .first();
+
+      if (existing) {
+        const updatedClicks = Number(existing.clicks ?? 0) + clicksDelta;
+        const updatedConversions = Number(existing.conversions ?? 0) + conversionsDelta;
+
+        await trx(TABLE)
+          .where({ id: existing.id })
+          .update({
+            clicks: updatedClicks,
+            conversions: updatedConversions,
+            updated_at: trx.fn.now()
+          });
+
+        return toDomain({
+          ...existing,
+          clicks: updatedClicks,
+          conversions: updatedConversions
+        });
+      }
+
+      const payload = {
+        metric_date: date,
+        entity_type: entityType,
+        searches: 0,
+        zero_results: 0,
+        displayed_results: 0,
+        total_results: 0,
+        clicks: clicksDelta,
+        conversions: conversionsDelta,
+        average_latency_ms: 0,
+        metadata: '{}'
+      };
+
+      const [id] = await trx(TABLE).insert(payload);
+      const row = await trx(TABLE).where({ id }).first();
+      return toDomain(row);
+    });
   }
 
   static async listBetween({ since, until }, connection = db) {
-    const query = connection('explorer_search_daily_metrics').select('*');
+    const query = connection(TABLE).select('*');
     if (since) {
       query.andWhere('metric_date', '>=', normaliseDate(since));
     }
@@ -107,17 +190,17 @@ export default class ExplorerSearchDailyMetricModel {
   }
 
   static async aggregateRange({ since, until }, connection = db) {
-    const query = connection('explorer_search_daily_metrics')
-      .select({
-        entityType: 'entity_type',
-        searches: connection.raw('SUM(searches)::bigint'),
-        zeroResults: connection.raw('SUM(zero_results)::bigint'),
-        displayedResults: connection.raw('SUM(displayed_results)::bigint'),
-        totalResults: connection.raw('SUM(total_results)::bigint'),
-        clicks: connection.raw('SUM(clicks)::bigint'),
-        conversions: connection.raw('SUM(conversions)::bigint'),
-        averageLatencyMs: connection.raw('AVG(NULLIF(average_latency_ms, 0))::float')
-      })
+    const query = connection(TABLE)
+      .select(
+        'entity_type as entityType',
+        connection.raw('SUM(searches) AS searches'),
+        connection.raw('SUM(zero_results) AS zeroResults'),
+        connection.raw('SUM(displayed_results) AS displayedResults'),
+        connection.raw('SUM(total_results) AS totalResults'),
+        connection.raw('SUM(clicks) AS clicks'),
+        connection.raw('SUM(conversions) AS conversions'),
+        connection.raw('AVG(NULLIF(average_latency_ms, 0)) AS averageLatencyMs')
+      )
       .groupBy('entity_type');
 
     if (since) {

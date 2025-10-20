@@ -96,6 +96,26 @@ function sanitiseSlug(value) {
   return slugify(value, { lower: true, strict: true });
 }
 
+function normaliseFilterValues(values) {
+  if (!values?.length) {
+    return [];
+  }
+
+  return values
+    .map((value) => {
+      if (value === null || value === undefined) {
+        return null;
+      }
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed.length ? trimmed : null;
+      }
+      return value;
+    })
+    .filter((value) => value !== null)
+    .map((value) => JSON.stringify(value));
+}
+
 export default class EbookModel {
   static async listAll({ search, status, limit = 50, offset = 0 } = {}, connection = db) {
     const query = connection(TABLE)
@@ -307,27 +327,45 @@ export default class EbookModel {
       });
     }
 
-    if (categories?.length) {
+    const categoryFilters = normaliseFilterValues(categories);
+    if (categoryFilters.length) {
       query.where((builder) => {
-        for (const category of categories) {
-          builder.orWhereRaw("JSON_CONTAINS(ebooks.categories, '" + JSON.stringify(category) + "')");
-        }
+        categoryFilters.forEach((value, index) => {
+          const clause = 'JSON_CONTAINS(ebooks.categories, ?)';
+          if (index === 0) {
+            builder.whereRaw(clause, [value]);
+          } else {
+            builder.orWhereRaw(clause, [value]);
+          }
+        });
       });
     }
 
-    if (tags?.length) {
+    const tagFilters = normaliseFilterValues(tags);
+    if (tagFilters.length) {
       query.where((builder) => {
-        for (const tag of tags) {
-          builder.orWhereRaw("JSON_CONTAINS(ebooks.tags, '" + JSON.stringify(tag) + "')");
-        }
+        tagFilters.forEach((value, index) => {
+          const clause = 'JSON_CONTAINS(ebooks.tags, ?)';
+          if (index === 0) {
+            builder.whereRaw(clause, [value]);
+          } else {
+            builder.orWhereRaw(clause, [value]);
+          }
+        });
       });
     }
 
-    if (languages?.length) {
+    const languageFilters = normaliseFilterValues(languages);
+    if (languageFilters.length) {
       query.where((builder) => {
-        for (const language of languages) {
-          builder.orWhereRaw("JSON_CONTAINS(ebooks.languages, '" + JSON.stringify(language) + "')");
-        }
+        languageFilters.forEach((value, index) => {
+          const clause = 'JSON_CONTAINS(ebooks.languages, ?)';
+          if (index === 0) {
+            builder.whereRaw(clause, [value]);
+          } else {
+            builder.orWhereRaw(clause, [value]);
+          }
+        });
       });
     }
 
