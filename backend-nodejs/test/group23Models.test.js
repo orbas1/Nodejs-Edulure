@@ -519,6 +519,12 @@ describe('Group 23 model flows', () => {
       currency: 'GBP'
     });
 
+    const due = await MonetizationRevenueScheduleModel.listDueForRecognition(
+      { tenantId: 'tenant-a', asOf: iso('2024-01-20') },
+      connection
+    );
+    expect(due.map((row) => row.id)).toContain(schedule.id);
+
     const recognized = await MonetizationRevenueScheduleModel.markRecognized(schedule.id, { recognizedAt: iso('2024-01-16') }, connection);
     expect(recognized).toMatchObject({ status: 'recognized', recognizedAmountCents: 5000 });
 
@@ -531,6 +537,13 @@ describe('Group 23 model flows', () => {
 
     expect(reduced).toMatchObject({ recognizedAmountCents: 3000, amountCents: 3000 });
     expect(reduced.metadata.adjustments.at(-1)).toMatchObject({ amountCents: 2000, reason: 'partial credit' });
+
+    const byIntent = await MonetizationRevenueScheduleModel.listByPaymentIntent('pi_123', connection);
+    expect(byIntent).toHaveLength(1);
+    expect(byIntent[0]).toMatchObject({ id: schedule.id, amountCents: 3000, recognizedAmountCents: 3000 });
+
+    const deferredBalance = await MonetizationRevenueScheduleModel.sumDeferredBalance({ tenantId: 'tenant-a' }, connection);
+    expect(deferredBalance).toBe(0);
 
     const reconciliation = await MonetizationReconciliationRunModel.create(
       {
@@ -597,9 +610,12 @@ describe('Group 23 model flows', () => {
     );
 
     expect(intent).toMatchObject({ provider: 'stripe', currency: 'GBP', status: 'requires_capture' });
+    expect(intent.providerIntentId).toBe('pi_abc');
+    expect(intent.receiptEmail).toBeNull();
 
     const hashedLookup = await PaymentIntentModel.findByProviderIntentId('pi_abc', connection);
     expect(hashedLookup?.publicId).toEqual(intent.publicId);
+    expect(hashedLookup?.providerIntentId).toBe('pi_abc');
 
     const refreshed = await PaymentIntentModel.updateById(
       intent.id,
@@ -611,6 +627,8 @@ describe('Group 23 model flows', () => {
       connection
     );
     expect(refreshed).toMatchObject({ status: 'succeeded' });
+    expect(refreshed.providerCaptureId).toBe('ca_123');
+    expect(refreshed.receiptEmail).toBe('customer@example.com');
 
     const refund = await PaymentRefundModel.create(
       {
@@ -624,9 +642,11 @@ describe('Group 23 model flows', () => {
     );
 
     expect(refund).toMatchObject({ status: 'pending', amount: 1200 });
+    expect(refund.providerRefundId).toBe('re_987');
 
     const fetched = await PaymentRefundModel.findByProviderRefundId('re_987', connection);
     expect(fetched?.publicId).toEqual(refund.publicId);
+    expect(fetched?.providerRefundId).toBe('re_987');
 
     const processed = await PaymentRefundModel.updateById(
       refund.id,
@@ -634,6 +654,7 @@ describe('Group 23 model flows', () => {
       connection
     );
     expect(processed).toMatchObject({ status: 'succeeded', processedAt: iso('2024-02-01') });
+    expect(processed.failureMessage).toBeNull();
 
     await expect(PaymentLedgerEntryModel.record({ entryType: 'credit' }, connection)).rejects.toThrow(
       /paymentIntentId is required/
@@ -661,6 +682,10 @@ describe('Group 23 model flows', () => {
     const ledgerEntries = await PaymentLedgerEntryModel.listForPayment(intent.publicId, connection);
     expect(ledgerEntries).toHaveLength(1);
     expect(ledgerEntries[0].recordedAt).toBeTruthy();
+    expect(ledgerEntries[0]).toMatchObject({ amount: 3600, entryType: 'captured-revenue' });
+
+    const byUser = await PaymentIntentModel.listByUser(42, { limit: 5 }, connection);
+    expect(byUser[0]).toMatchObject({ provider: 'stripe', providerIntentId: 'pi_abc', receiptEmail: 'customer@example.com' });
   });
 
   it('stores platform settings and synchronises podcast show and episode metadata', async () => {
