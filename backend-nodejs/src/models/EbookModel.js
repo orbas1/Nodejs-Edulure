@@ -93,7 +93,8 @@ function sanitiseSlug(value) {
   if (!value) {
     return null;
   }
-  return slugify(value, { lower: true, strict: true });
+  const slug = slugify(value, { lower: true, strict: true });
+  return slug.length ? slug : null;
 }
 
 function normaliseFilterValues(values) {
@@ -101,7 +102,7 @@ function normaliseFilterValues(values) {
     return [];
   }
 
-  return values
+  const normalised = values
     .map((value) => {
       if (value === null || value === undefined) {
         return null;
@@ -114,6 +115,8 @@ function normaliseFilterValues(values) {
     })
     .filter((value) => value !== null)
     .map((value) => JSON.stringify(value));
+
+  return Array.from(new Set(normalised));
 }
 
 export default class EbookModel {

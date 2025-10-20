@@ -1,6 +1,7 @@
 import db from '../config/database.js';
 
 const TABLE = 'explorer_search_daily_metrics';
+const EMPTY_METADATA = '{}';
 
 function parseMetadata(value) {
   if (!value) {
@@ -43,16 +44,49 @@ function toDomain(row) {
 }
 
 function normaliseDate(value) {
-  const date = value ? new Date(value) : new Date();
-  const normalised = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  return normalised;
+  const candidate = value ? new Date(value) : new Date();
+  if (Number.isNaN(candidate.valueOf())) {
+    throw new TypeError('Invalid metric date provided to ExplorerSearchDailyMetricModel');
+  }
+  return new Date(Date.UTC(candidate.getUTCFullYear(), candidate.getUTCMonth(), candidate.getUTCDate()));
 }
 
 function withTransaction(connection, handler) {
   if (connection?.isTransaction) {
     return handler(connection);
   }
-  return connection.transaction((trx) => handler(trx));
+  return connection.transaction(async (trx) => {
+    trx.isTransaction = true;
+    const result = await handler(trx);
+    return result;
+  });
+}
+
+function normaliseEntityType(entityType) {
+  if (typeof entityType !== 'string') {
+    throw new TypeError('Explorer search metrics require a valid entity type');
+  }
+  const trimmed = entityType.trim();
+  if (!trimmed) {
+    throw new TypeError('Explorer search metrics require a non-empty entity type');
+  }
+  return trimmed;
+}
+
+function toNonNegativeInteger(value) {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number) || number <= 0) {
+    return 0;
+  }
+  return Math.floor(number);
+}
+
+function toLatency(value) {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number) || number <= 0) {
+    return 0;
+  }
+  return Math.round(number);
 }
 
 export default class ExplorerSearchDailyMetricModel {
@@ -68,23 +102,25 @@ export default class ExplorerSearchDailyMetricModel {
     connection = db
   ) {
     const date = normaliseDate(metricDate);
+    const normalisedEntityType = normaliseEntityType(entityType);
     const zeroDelta = isZeroResult ? 1 : 0;
-    const displayedDelta = Number(displayedHits ?? 0);
-    const totalDelta = Number(totalHits ?? 0);
-    const latency = Number.isFinite(Number(latencyMs)) ? Number(latencyMs) : 0;
+    const displayedDelta = toNonNegativeInteger(displayedHits);
+    const totalDelta = toNonNegativeInteger(totalHits);
+    const latency = toLatency(latencyMs);
 
     return withTransaction(connection, async (trx) => {
       const existing = await trx(TABLE)
-        .where({ metric_date: date, entity_type: entityType })
+        .where({ metric_date: date, entity_type: normalisedEntityType })
+        .forUpdate()
         .first();
 
       if (existing) {
-        const currentSearches = Number(existing.searches ?? 0);
+        const currentSearches = Math.max(0, Number(existing.searches ?? 0));
         const searches = currentSearches + 1;
-        const zeroResults = Number(existing.zero_results ?? 0) + zeroDelta;
-        const displayedResults = Number(existing.displayed_results ?? 0) + displayedDelta;
-        const totalResults = Number(existing.total_results ?? 0) + totalDelta;
-        const currentAverage = Number(existing.average_latency_ms ?? 0);
+        const zeroResults = Math.max(0, Number(existing.zero_results ?? 0)) + zeroDelta;
+        const displayedResults = Math.max(0, Number(existing.displayed_results ?? 0)) + displayedDelta;
+        const totalResults = Math.max(0, Number(existing.total_results ?? 0)) + totalDelta;
+        const currentAverage = Math.max(0, Number(existing.average_latency_ms ?? 0));
         const totalLatency = currentAverage * currentSearches + latency;
         const averageLatencyMs = searches > 0 ? Math.round(totalLatency / searches) : 0;
 
@@ -99,19 +135,13 @@ export default class ExplorerSearchDailyMetricModel {
             updated_at: trx.fn.now()
           });
 
-        return toDomain({
-          ...existing,
-          searches,
-          zero_results: zeroResults,
-          displayed_results: displayedResults,
-          total_results: totalResults,
-          average_latency_ms: averageLatencyMs
-        });
+        const row = await trx(TABLE).where({ id: existing.id }).first();
+        return toDomain(row);
       }
 
       const payload = {
         metric_date: date,
-        entity_type: entityType,
+        entity_type: normalisedEntityType,
         searches: 1,
         zero_results: zeroDelta,
         displayed_results: displayedDelta,
@@ -119,7 +149,7 @@ export default class ExplorerSearchDailyMetricModel {
         clicks: 0,
         conversions: 0,
         average_latency_ms: latency,
-        metadata: '{}'
+        metadata: EMPTY_METADATA
       };
 
       const [id] = await trx(TABLE).insert(payload);
@@ -130,17 +160,19 @@ export default class ExplorerSearchDailyMetricModel {
 
   static async incrementClicks({ metricDate, entityType, clicks = 1, conversions = 0 }, connection = db) {
     const date = normaliseDate(metricDate);
-    const clicksDelta = Number(clicks ?? 0);
-    const conversionsDelta = Number(conversions ?? 0);
+    const normalisedEntityType = normaliseEntityType(entityType);
+    const clicksDelta = toNonNegativeInteger(clicks);
+    const conversionsDelta = toNonNegativeInteger(conversions);
 
     return withTransaction(connection, async (trx) => {
       const existing = await trx(TABLE)
-        .where({ metric_date: date, entity_type: entityType })
+        .where({ metric_date: date, entity_type: normalisedEntityType })
+        .forUpdate()
         .first();
 
       if (existing) {
-        const updatedClicks = Number(existing.clicks ?? 0) + clicksDelta;
-        const updatedConversions = Number(existing.conversions ?? 0) + conversionsDelta;
+        const updatedClicks = Math.max(0, Number(existing.clicks ?? 0)) + clicksDelta;
+        const updatedConversions = Math.max(0, Number(existing.conversions ?? 0)) + conversionsDelta;
 
         await trx(TABLE)
           .where({ id: existing.id })
@@ -150,16 +182,13 @@ export default class ExplorerSearchDailyMetricModel {
             updated_at: trx.fn.now()
           });
 
-        return toDomain({
-          ...existing,
-          clicks: updatedClicks,
-          conversions: updatedConversions
-        });
+        const row = await trx(TABLE).where({ id: existing.id }).first();
+        return toDomain(row);
       }
 
       const payload = {
         metric_date: date,
-        entity_type: entityType,
+        entity_type: normalisedEntityType,
         searches: 0,
         zero_results: 0,
         displayed_results: 0,
@@ -167,7 +196,7 @@ export default class ExplorerSearchDailyMetricModel {
         clicks: clicksDelta,
         conversions: conversionsDelta,
         average_latency_ms: 0,
-        metadata: '{}'
+        metadata: EMPTY_METADATA
       };
 
       const [id] = await trx(TABLE).insert(payload);
@@ -199,7 +228,7 @@ export default class ExplorerSearchDailyMetricModel {
         connection.raw('SUM(total_results) AS totalResults'),
         connection.raw('SUM(clicks) AS clicks'),
         connection.raw('SUM(conversions) AS conversions'),
-        connection.raw('AVG(NULLIF(average_latency_ms, 0)) AS averageLatencyMs')
+        connection.raw('SUM(average_latency_ms * searches) AS latencyTotal')
       )
       .groupBy('entity_type');
 
@@ -213,15 +242,17 @@ export default class ExplorerSearchDailyMetricModel {
     const rows = await query;
     const results = new Map();
     for (const row of rows) {
+      const searches = Number(row.searches ?? 0);
+      const latencyTotal = Number(row.latencyTotal ?? 0);
       results.set(row.entityType, {
         entityType: row.entityType,
-        searches: Number(row.searches ?? 0),
+        searches,
         zeroResults: Number(row.zeroResults ?? 0),
         displayedResults: Number(row.displayedResults ?? 0),
         totalResults: Number(row.totalResults ?? 0),
         clicks: Number(row.clicks ?? 0),
         conversions: Number(row.conversions ?? 0),
-        averageLatencyMs: row.averageLatencyMs ? Number(row.averageLatencyMs) : 0
+        averageLatencyMs: searches > 0 ? Math.round(latencyTotal / searches) : 0
       });
     }
     return results;

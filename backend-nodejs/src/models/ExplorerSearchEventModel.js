@@ -7,11 +7,97 @@ function parseJson(value, fallback = {}) {
   if (typeof value === 'object') {
     return value;
   }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' ? parsed : fallback;
+    } catch (_error) {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
+function serialiseJson(value, fallback = {}) {
+  if (value === null || value === undefined) {
+    return JSON.stringify(fallback);
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
   try {
-    return JSON.parse(value);
+    return JSON.stringify(value);
   } catch (_error) {
+    return JSON.stringify(fallback);
+  }
+}
+
+function toNonEmptyString(value, fieldName) {
+  if (typeof value !== 'string') {
+    throw new TypeError(`${fieldName} must be provided as a non-empty string`);
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new TypeError(`${fieldName} must not be empty`);
+  }
+  return trimmed;
+}
+
+function toOptionalString(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    return String(value);
+  }
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+}
+
+function toNonNegativeInteger(value) {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number) || number <= 0) {
+    return 0;
+  }
+  return Math.floor(number);
+}
+
+function toLatency(value) {
+  const number = Number(value ?? 0);
+  if (!Number.isFinite(number) || number <= 0) {
+    return 0;
+  }
+  return Math.round(number);
+}
+
+function normaliseDateBoundary(value, label) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) {
+    throw new TypeError(`Invalid ${label} boundary supplied to ExplorerSearchEventModel`);
+  }
+  return date;
+}
+
+function toOptionalInteger(value, fieldName) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0) {
+    throw new TypeError(`${fieldName} must be a non-negative integer`);
+  }
+  return number;
+}
+
+function normaliseLimit(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0) {
     return fallback;
   }
+  return Math.min(Math.floor(number), 50);
 }
 
 function toDomain(row) {
@@ -38,19 +124,27 @@ function toDomain(row) {
 
 export default class ExplorerSearchEventModel {
   static async create(payload, connection = db) {
+    const eventUuid = toNonEmptyString(payload.eventUuid, 'eventUuid');
+    const sessionId = toNonEmptyString(payload.sessionId, 'sessionId');
+    const query = toOptionalString(payload.query) ?? '';
+    const userId = toOptionalInteger(payload.userId, 'userId');
+    const traceId = toOptionalString(payload.traceId);
+    const resultTotal = toNonNegativeInteger(payload.resultTotal);
+    const latency = toLatency(payload.latencyMs);
+
     const insertPayload = {
-      event_uuid: payload.eventUuid,
-      user_id: payload.userId ?? null,
-      session_id: payload.sessionId,
-      trace_id: payload.traceId ?? null,
-      query: payload.query,
-      result_total: Number(payload.resultTotal ?? 0),
+      event_uuid: eventUuid,
+      user_id: userId,
+      session_id: sessionId,
+      trace_id: traceId,
+      query,
+      result_total: resultTotal,
       is_zero_result: Boolean(payload.isZeroResult),
-      latency_ms: Number(payload.latencyMs ?? 0),
-      filters: JSON.stringify(payload.filters ?? {}),
-      global_filters: JSON.stringify(payload.globalFilters ?? {}),
-      sort_preferences: JSON.stringify(payload.sortPreferences ?? {}),
-      metadata: JSON.stringify(payload.metadata ?? {})
+      latency_ms: latency,
+      filters: serialiseJson(payload.filters ?? {}),
+      global_filters: serialiseJson(payload.globalFilters ?? {}),
+      sort_preferences: serialiseJson(payload.sortPreferences ?? {}),
+      metadata: serialiseJson(payload.metadata ?? {})
     };
 
     const [id] = await connection('explorer_search_events').insert(insertPayload);
@@ -63,17 +157,23 @@ export default class ExplorerSearchEventModel {
   }
 
   static async findByUuid(eventUuid, connection = db) {
-    const row = await connection('explorer_search_events').where({ event_uuid: eventUuid }).first();
+    const uuid = toNonEmptyString(eventUuid, 'eventUuid');
+    const row = await connection('explorer_search_events').where({ event_uuid: uuid }).first();
     return toDomain(row);
   }
 
   static async listBetween({ since, until }, connection = db) {
     const query = connection('explorer_search_events').select('*');
-    if (since) {
-      query.andWhere('created_at', '>=', since);
+    const sinceDate = normaliseDateBoundary(since, 'since');
+    const untilDate = normaliseDateBoundary(until, 'until');
+    if (sinceDate && untilDate && sinceDate > untilDate) {
+      throw new RangeError('since must be before or equal to until when listing explorer search events');
     }
-    if (until) {
-      query.andWhere('created_at', '<=', until);
+    if (sinceDate) {
+      query.andWhere('created_at', '>=', sinceDate);
+    }
+    if (untilDate) {
+      query.andWhere('created_at', '<=', untilDate);
     }
     query.orderBy('created_at', 'desc');
     const rows = await query;
@@ -81,6 +181,7 @@ export default class ExplorerSearchEventModel {
   }
 
   static async topQueries({ since, limit = 5, zeroResultOnly = false }, connection = db) {
+    const safeLimit = normaliseLimit(limit, 5);
     const query = connection('explorer_search_events')
       .select(
         connection.raw('LOWER(TRIM(query)) AS normalized_query'),
@@ -89,10 +190,11 @@ export default class ExplorerSearchEventModel {
       .whereNotNull('query')
       .groupByRaw('LOWER(TRIM(query))')
       .orderBy('searches', 'desc')
-      .limit(limit);
+      .limit(safeLimit);
 
-    if (since) {
-      query.andWhere('created_at', '>=', since);
+    const sinceDate = normaliseDateBoundary(since, 'since');
+    if (sinceDate) {
+      query.andWhere('created_at', '>=', sinceDate);
     }
     if (zeroResultOnly) {
       query.andWhere('is_zero_result', true);
@@ -112,8 +214,9 @@ export default class ExplorerSearchEventModel {
       connection.raw('AVG(latency_ms) AS averageLatencyMs'),
       connection.raw('COUNT(DISTINCT user_id) AS uniqueUsers')
     );
-    if (since) {
-      query.andWhere('created_at', '>=', since);
+    const sinceDate = normaliseDateBoundary(since, 'since');
+    if (sinceDate) {
+      query.andWhere('created_at', '>=', sinceDate);
     }
     const row = await query.first();
     return {
