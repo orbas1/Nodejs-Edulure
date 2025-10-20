@@ -6,6 +6,8 @@ import LearnerSupportRepository from '../repositories/LearnerSupportRepository.j
 import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
+import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
+import LearnerFinanceBudgetModel from '../models/LearnerFinanceBudgetModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -74,6 +76,60 @@ function formatLibraryEntry(entry) {
     metadata: entry.metadata ?? {}
   };
 }
+
+function formatCurrencyValue(amountCents, currency = 'USD') {
+  const cents = Number(amountCents ?? 0);
+  const amount = Math.round(cents) / 100;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency
+    }).format(amount);
+  } catch (_error) {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
+function formatBudget(budget) {
+  if (!budget) return null;
+  return {
+    id: budget.id,
+    name: budget.name,
+    amountCents: Number(budget.amountCents ?? 0),
+    amountFormatted: formatCurrencyValue(budget.amountCents, budget.currency),
+    currency: budget.currency ?? 'USD',
+    period: budget.period ?? 'monthly',
+    alertsEnabled: Boolean(budget.alertsEnabled),
+    alertThresholdPercent: Number(budget.alertThresholdPercent ?? 80),
+    metadata: budget.metadata ?? {},
+    createdAt: budget.createdAt ?? null,
+    updatedAt: budget.updatedAt ?? null
+  };
+}
+
+const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
+  language: 'en',
+  region: 'US',
+  timezone: 'UTC',
+  notificationsEnabled: true,
+  digestEnabled: true,
+  autoPlayMedia: false,
+  highContrast: false,
+  reducedMotion: false,
+  preferences: {
+    interfaceDensity: 'comfortable',
+    analyticsOptIn: true,
+    subtitleLanguage: 'en',
+    audioDescription: false
+  }
+});
+
+const DEFAULT_FINANCE_ALERTS = Object.freeze({
+  sendEmail: true,
+  sendSms: false,
+  escalationEmail: null,
+  notifyThresholdPercent: 80
+});
 
 async function buildFieldServiceAssignment({ userId, order, connection = db }) {
   if (!order) return null;
@@ -209,11 +265,336 @@ export default class LearnerDashboardService {
     });
   }
 
+  static async getSystemPreferences(userId) {
+    const stored = await LearnerSystemPreferenceModel.getForUser(userId);
+    if (!stored) {
+      return { ...DEFAULT_SYSTEM_PREFERENCES };
+    }
+    return {
+      id: stored.id ?? null,
+      language: stored.language ?? DEFAULT_SYSTEM_PREFERENCES.language,
+      region: stored.region ?? DEFAULT_SYSTEM_PREFERENCES.region,
+      timezone: stored.timezone ?? DEFAULT_SYSTEM_PREFERENCES.timezone,
+      notificationsEnabled:
+        stored.notificationsEnabled ?? DEFAULT_SYSTEM_PREFERENCES.notificationsEnabled,
+      digestEnabled: stored.digestEnabled ?? DEFAULT_SYSTEM_PREFERENCES.digestEnabled,
+      autoPlayMedia: stored.autoPlayMedia ?? DEFAULT_SYSTEM_PREFERENCES.autoPlayMedia,
+      highContrast: stored.highContrast ?? DEFAULT_SYSTEM_PREFERENCES.highContrast,
+      reducedMotion: stored.reducedMotion ?? DEFAULT_SYSTEM_PREFERENCES.reducedMotion,
+      preferences: {
+        ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+        ...(stored.preferences ?? {})
+      },
+      createdAt: stored.createdAt ?? null,
+      updatedAt: stored.updatedAt ?? null
+    };
+  }
+
+  static async updateSystemPreferences(userId, payload = {}) {
+    const existingPreference = await LearnerSystemPreferenceModel.getForUser(userId);
+    const base = existingPreference ?? DEFAULT_SYSTEM_PREFERENCES;
+
+    const hasString = (value) => typeof value === 'string' && value.trim().length > 0;
+    const language = hasString(payload.language)
+      ? payload.language.slice(0, 8)
+      : base.language ?? DEFAULT_SYSTEM_PREFERENCES.language;
+    const region = hasString(payload.region)
+      ? payload.region.slice(0, 32)
+      : base.region ?? DEFAULT_SYSTEM_PREFERENCES.region;
+    const timezone = hasString(payload.timezone)
+      ? payload.timezone.slice(0, 64)
+      : base.timezone ?? DEFAULT_SYSTEM_PREFERENCES.timezone;
+
+    const rawPreferences =
+      payload.preferences && typeof payload.preferences === 'object'
+        ? payload.preferences
+        : {};
+    const allowedDensity = new Set(['comfortable', 'compact', 'expanded']);
+    const basePreferences = {
+      ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+      ...(existingPreference?.preferences ?? {})
+    };
+    const interfaceDensity = rawPreferences.interfaceDensity;
+    const normalisedPreferences = {
+      ...basePreferences,
+      ...rawPreferences,
+      interfaceDensity: allowedDensity.has(interfaceDensity)
+        ? interfaceDensity
+        : basePreferences.interfaceDensity,
+      analyticsOptIn:
+        rawPreferences.analyticsOptIn !== undefined
+          ? Boolean(rawPreferences.analyticsOptIn)
+          : basePreferences.analyticsOptIn,
+      subtitleLanguage:
+        typeof rawPreferences.subtitleLanguage === 'string'
+          ? rawPreferences.subtitleLanguage.slice(0, 8)
+          : basePreferences.subtitleLanguage,
+      audioDescription:
+        rawPreferences.audioDescription !== undefined
+          ? Boolean(rawPreferences.audioDescription)
+          : basePreferences.audioDescription
+    };
+
+    const preference = await LearnerSystemPreferenceModel.upsertForUser(userId, {
+      language,
+      region,
+      timezone,
+      notificationsEnabled:
+        payload.notificationsEnabled !== undefined
+          ? Boolean(payload.notificationsEnabled)
+          : base.notificationsEnabled ?? DEFAULT_SYSTEM_PREFERENCES.notificationsEnabled,
+      digestEnabled:
+        payload.digestEnabled !== undefined
+          ? Boolean(payload.digestEnabled)
+          : base.digestEnabled ?? DEFAULT_SYSTEM_PREFERENCES.digestEnabled,
+      autoPlayMedia:
+        payload.autoPlayMedia !== undefined
+          ? Boolean(payload.autoPlayMedia)
+          : base.autoPlayMedia ?? DEFAULT_SYSTEM_PREFERENCES.autoPlayMedia,
+      highContrast:
+        payload.highContrast !== undefined
+          ? Boolean(payload.highContrast)
+          : base.highContrast ?? DEFAULT_SYSTEM_PREFERENCES.highContrast,
+      reducedMotion:
+        payload.reducedMotion !== undefined
+          ? Boolean(payload.reducedMotion)
+          : base.reducedMotion ?? DEFAULT_SYSTEM_PREFERENCES.reducedMotion,
+      preferences: normalisedPreferences
+    });
+
+    const normalised = await this.getSystemPreferences(userId);
+    log.info({ userId, preference: normalised }, 'Learner updated system preferences');
+    return buildAcknowledgement({
+      reference: preference.id,
+      message: 'System preferences updated',
+      meta: { preference: normalised }
+    });
+  }
+
+  static async listFinanceBudgets(userId) {
+    const budgets = await LearnerFinanceBudgetModel.listByUserId(userId);
+    return budgets.map((budget) => formatBudget(budget));
+  }
+
+  static async createFinanceBudget(userId, payload = {}) {
+    if (!payload.name || payload.name.trim().length < 3) {
+      throw new Error('A descriptive name is required for the finance budget');
+    }
+    const amountCentsRaw =
+      payload.amountCents !== undefined
+        ? Number(payload.amountCents)
+        : Number.parseFloat(payload.amount ?? payload.amountDollars ?? 0) * 100;
+    const amountCents = Math.max(0, Math.round(Number.isFinite(amountCentsRaw) ? amountCentsRaw : 0));
+    const period =
+      typeof payload.period === 'string' &&
+      ['monthly', 'quarterly', 'annual', 'one-time'].includes(payload.period)
+        ? payload.period
+        : 'monthly';
+    const alertsEnabled = payload.alertsEnabled !== undefined ? Boolean(payload.alertsEnabled) : true;
+    const threshold = payload.alertThresholdPercent ?? payload.alertThreshold ?? 80;
+    const alertThresholdPercent = Math.min(100, Math.max(1, Number.parseInt(threshold, 10) || 80));
+
+    const budget = await LearnerFinanceBudgetModel.create(
+      {
+        userId,
+        name: payload.name.trim(),
+        amountCents,
+        currency: typeof payload.currency === 'string' ? payload.currency.slice(0, 3).toUpperCase() : 'USD',
+        period,
+        alertsEnabled,
+        alertThresholdPercent,
+        metadata: payload.metadata ?? {}
+      },
+      db
+    );
+
+    log.info({ userId, budgetId: budget.id }, 'Learner created finance budget');
+    return formatBudget(budget);
+  }
+
+  static async updateFinanceBudget(userId, budgetId, payload = {}) {
+    const existing = await LearnerFinanceBudgetModel.findByIdForUser(userId, budgetId);
+    if (!existing) {
+      const error = new Error('Finance budget not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const updates = { ...payload };
+    if (updates.name !== undefined && typeof updates.name === 'string') {
+      updates.name = updates.name.trim();
+    }
+    if (updates.amountCents === undefined && updates.amount !== undefined) {
+      const cents = Number.parseFloat(updates.amount) * 100;
+      updates.amountCents = Math.round(Number.isFinite(cents) ? cents : existing.amountCents);
+    }
+    if (updates.amountCents !== undefined) {
+      updates.amountCents = Math.max(0, Math.round(Number(updates.amountCents) || 0));
+    }
+    if (updates.currency !== undefined && typeof updates.currency === 'string') {
+      updates.currency = updates.currency.slice(0, 3).toUpperCase();
+    }
+    if (updates.period !== undefined) {
+      updates.period = ['monthly', 'quarterly', 'annual', 'one-time'].includes(updates.period)
+        ? updates.period
+        : existing.period;
+    }
+    if (updates.alertThresholdPercent !== undefined) {
+      updates.alertThresholdPercent = Math.min(
+        100,
+        Math.max(1, Number.parseInt(updates.alertThresholdPercent, 10) || existing.alertThresholdPercent)
+      );
+    }
+
+    const updated = await LearnerFinanceBudgetModel.updateByIdForUser(userId, budgetId, updates);
+    log.info({ userId, budgetId }, 'Learner updated finance budget');
+    return formatBudget(updated);
+  }
+
+  static async deleteFinanceBudget(userId, budgetId) {
+    const deleted = await LearnerFinanceBudgetModel.deleteByIdForUser(userId, budgetId);
+    if (!deleted) {
+      const error = new Error('Finance budget not found');
+      error.status = 404;
+      throw error;
+    }
+    log.info({ userId, budgetId }, 'Learner removed finance budget');
+    return buildAcknowledgement({ reference: budgetId, message: 'Finance budget removed' });
+  }
+
+  static async getFinanceSettings(userId) {
+    const [profile, budgets] = await Promise.all([
+      LearnerFinancialProfileModel.findByUserId(userId),
+      LearnerFinanceBudgetModel.listByUserId(userId)
+    ]);
+    const preferences = profile?.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
+    const alerts = {
+      ...DEFAULT_FINANCE_ALERTS,
+      ...(preferences.alerts ?? {})
+    };
+    const financeProfile = {
+      autoPayEnabled: Boolean(profile?.autoPayEnabled),
+      reserveTargetCents: Number(profile?.reserveTargetCents ?? 0),
+      reserveTarget: Math.round(Number(profile?.reserveTargetCents ?? 0) / 100),
+      currency: preferences.currency ?? 'USD',
+      taxId: preferences.taxId ?? null,
+      invoiceDelivery: preferences.invoiceDelivery ?? 'email',
+      payoutSchedule: preferences.payoutSchedule ?? 'monthly',
+      expensePolicyUrl: preferences.expensePolicyUrl ?? null
+    };
+    const documents = Array.isArray(preferences.documents)
+      ? preferences.documents
+      : [];
+    const reimbursements =
+      preferences.reimbursements && typeof preferences.reimbursements === 'object'
+        ? {
+            enabled: Boolean(preferences.reimbursements.enabled),
+            instructions: preferences.reimbursements.instructions ?? null
+          }
+        : { enabled: false, instructions: null };
+
+    return {
+      profile: financeProfile,
+      alerts,
+      budgets: budgets.map((budget) => formatBudget(budget)),
+      documents,
+      reimbursements
+    };
+  }
+
+  static async updateFinanceSettings(userId, payload = {}) {
+    const alertsPayload = payload.alerts && typeof payload.alerts === 'object' ? payload.alerts : {};
+    const documents = Array.isArray(payload.documents) ? payload.documents : undefined;
+    const reimbursementsPayload =
+      payload.reimbursements && typeof payload.reimbursements === 'object' ? payload.reimbursements : {};
+
+    const preferences = {
+      currency: payload.currency ?? payload.profile?.currency ?? 'USD',
+      taxId: payload.taxId ?? payload.profile?.taxId ?? null,
+      invoiceDelivery: payload.invoiceDelivery ?? payload.profile?.invoiceDelivery ?? 'email',
+      payoutSchedule: payload.payoutSchedule ?? payload.profile?.payoutSchedule ?? 'monthly',
+      expensePolicyUrl: payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl ?? null,
+      alerts: {
+        ...DEFAULT_FINANCE_ALERTS,
+        ...alertsPayload,
+        sendEmail:
+          alertsPayload.sendEmail !== undefined ? Boolean(alertsPayload.sendEmail) : DEFAULT_FINANCE_ALERTS.sendEmail,
+        sendSms:
+          alertsPayload.sendSms !== undefined ? Boolean(alertsPayload.sendSms) : DEFAULT_FINANCE_ALERTS.sendSms,
+        escalationEmail:
+          typeof alertsPayload.escalationEmail === 'string'
+            ? alertsPayload.escalationEmail.trim() || null
+            : DEFAULT_FINANCE_ALERTS.escalationEmail,
+        notifyThresholdPercent: Math.min(
+          100,
+          Math.max(1, Number.parseInt(alertsPayload.notifyThresholdPercent ?? DEFAULT_FINANCE_ALERTS.notifyThresholdPercent, 10))
+        )
+      },
+      reimbursements: {
+        enabled:
+          reimbursementsPayload.enabled !== undefined
+            ? Boolean(reimbursementsPayload.enabled)
+            : false,
+        instructions:
+          typeof reimbursementsPayload.instructions === 'string'
+            ? reimbursementsPayload.instructions.trim() || null
+            : null
+      }
+    };
+
+    if (documents !== undefined) {
+      preferences.documents = documents;
+    }
+
+    const acknowledgement = await this.updateFinancialPreferences(userId, {
+      autoPayEnabled:
+        payload.autoPayEnabled !== undefined
+          ? Boolean(payload.autoPayEnabled)
+          : undefined,
+      autoPay: payload.autoPay,
+      reserveTargetCents:
+        payload.reserveTargetCents !== undefined
+          ? Number(payload.reserveTargetCents)
+          : payload.reserveTarget !== undefined
+            ? Math.round(Number(payload.reserveTarget) * 100)
+            : undefined,
+      preferences
+    });
+
+    const financeSettings = await this.getFinanceSettings(userId);
+    acknowledgement.meta = { ...acknowledgement.meta, financeSettings };
+    acknowledgement.message = acknowledgement.message ?? 'Finance settings updated';
+    log.info({ userId, financeSettings }, 'Learner updated finance settings');
+    return acknowledgement;
+  }
+
   static async updateFinancialPreferences(userId, payload = {}) {
+    const existing = await LearnerFinancialProfileModel.findByUserId(userId);
+    const nextAutoPayEnabled =
+      payload.autoPay && payload.autoPay.enabled !== undefined
+        ? Boolean(payload.autoPay.enabled)
+        : payload.autoPayEnabled !== undefined
+          ? Boolean(payload.autoPayEnabled)
+          : Boolean(existing?.autoPayEnabled);
+    let reserveTargetCents;
+    if (payload.reserveTargetCents !== undefined) {
+      reserveTargetCents = Math.max(0, Number(payload.reserveTargetCents));
+    } else if (payload.reserveTarget !== undefined) {
+      reserveTargetCents = Math.max(0, Math.round(Number(payload.reserveTarget) * 100));
+    } else {
+      reserveTargetCents = Number(existing?.reserveTargetCents ?? 0);
+    }
+
+    const mergedPreferences = {
+      ...(existing?.preferences ?? {}),
+      ...(payload.metadata ?? {}),
+      ...(payload.preferences ?? {})
+    };
+
     const profile = await LearnerFinancialProfileModel.upsertForUser(userId, {
-      autoPayEnabled: Boolean(payload.autoPay?.enabled ?? payload.autoPayEnabled ?? false),
-      reserveTargetCents: Math.max(0, Number(payload.reserveTargetCents ?? payload.reserveTarget ?? 0)),
-      preferences: payload.preferences ?? payload.metadata ?? {}
+      autoPayEnabled: nextAutoPayEnabled,
+      reserveTargetCents,
+      preferences: mergedPreferences
     });
     return buildAcknowledgement({
       reference: profile.id,
@@ -641,25 +1022,53 @@ export default class LearnerDashboardService {
       throw error;
     }
 
-    const updated = await LearnerLibraryEntryModel.updateByIdForUser(userId, entryId, {
-      title: payload.title !== undefined ? payload.title.trim() : undefined,
-      format: payload.format !== undefined ? payload.format.trim() : undefined,
-      progress:
-        payload.progress !== undefined
-          ? Math.max(0, Math.min(100, Number(payload.progress)))
-          : undefined,
-      lastOpened: payload.lastOpened !== undefined ? payload.lastOpened : undefined,
-      url: payload.url !== undefined ? payload.url : undefined,
-      summary: payload.summary !== undefined ? payload.summary : undefined,
-      author: payload.author !== undefined ? payload.author : undefined,
-      coverUrl: payload.coverUrl !== undefined ? payload.coverUrl : undefined,
-      tags:
-        payload.tags !== undefined
-          ? Array.isArray(payload.tags)
-            ? payload.tags
-            : [payload.tags].flat().filter(Boolean)
-          : undefined
-    });
+    const updates = {};
+    if (payload.title !== undefined) {
+      updates.title = typeof payload.title === 'string' ? payload.title.trim() : payload.title;
+    }
+    if (payload.format !== undefined) {
+      updates.format = typeof payload.format === 'string' ? payload.format.trim() : payload.format;
+    }
+    if (payload.progress !== undefined) {
+      const numeric = Number(payload.progress);
+      updates.progress = Number.isFinite(numeric)
+        ? Math.max(0, Math.min(100, Math.round(numeric)))
+        : 0;
+    }
+    if (payload.lastOpened !== undefined) {
+      updates.lastOpened = payload.lastOpened;
+    }
+    if (payload.url !== undefined) {
+      updates.url = payload.url;
+    }
+    if (payload.summary !== undefined) {
+      updates.summary = payload.summary;
+    }
+    if (payload.author !== undefined) {
+      updates.author = payload.author;
+    }
+    if (payload.coverUrl !== undefined) {
+      updates.coverUrl = payload.coverUrl;
+    }
+    if (payload.tags !== undefined) {
+      const rawTags = Array.isArray(payload.tags) ? payload.tags : [payload.tags];
+      const normalisedTags = rawTags
+        .flat()
+        .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+        .filter((tag) => tag.length > 0);
+      const deduped = [];
+      const seen = new Set();
+      normalisedTags.forEach((tag) => {
+        const key = tag.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(tag);
+        }
+      });
+      updates.tags = deduped;
+    }
+
+    const updated = await LearnerLibraryEntryModel.updateByIdForUser(userId, entryId, updates);
 
     return formatLibraryEntry(updated);
   }

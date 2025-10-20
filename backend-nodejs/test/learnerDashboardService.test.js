@@ -15,6 +15,21 @@ const mocks = vi.hoisted(() => ({
     updateById: vi.fn(),
     deleteById: vi.fn()
   },
+  financialProfileModel: {
+    findByUserId: vi.fn(),
+    upsertForUser: vi.fn()
+  },
+  financeBudgetModel: {
+    listByUserId: vi.fn(),
+    create: vi.fn(),
+    findByIdForUser: vi.fn(),
+    updateByIdForUser: vi.fn(),
+    deleteByIdForUser: vi.fn()
+  },
+  systemPreferenceModel: {
+    getForUser: vi.fn(),
+    upsertForUser: vi.fn()
+  },
   affiliateChannelModel: {
     listByUserId: vi.fn(),
     create: vi.fn(),
@@ -75,6 +90,18 @@ vi.mock('../src/models/LearnerGrowthExperimentModel.js', () => ({
   default: mocks.growthExperimentModel
 }));
 
+vi.mock('../src/models/LearnerFinancialProfileModel.js', () => ({
+  default: mocks.financialProfileModel
+}));
+
+vi.mock('../src/models/LearnerFinanceBudgetModel.js', () => ({
+  default: mocks.financeBudgetModel
+}));
+
+vi.mock('../src/models/LearnerSystemPreferenceModel.js', () => ({
+  default: mocks.systemPreferenceModel
+}));
+
 vi.mock('../src/models/LearnerAffiliateChannelModel.js', () => ({
   default: mocks.affiliateChannelModel
 }));
@@ -126,6 +153,9 @@ import LearnerDashboardService from '../src/services/LearnerDashboardService.js'
 const {
   growthInitiativeModel,
   growthExperimentModel,
+  financialProfileModel,
+  financeBudgetModel,
+  systemPreferenceModel,
   affiliateChannelModel,
   affiliatePayoutModel,
   adCampaignModel,
@@ -142,6 +172,66 @@ describe('LearnerDashboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     db.transaction.mockImplementation(async (handler) => handler('trx'));
+    financialProfileModel.findByUserId.mockResolvedValue(null);
+    financialProfileModel.upsertForUser.mockResolvedValue({
+      id: 1,
+      autoPayEnabled: false,
+      reserveTargetCents: 0,
+      preferences: {}
+    });
+    financeBudgetModel.listByUserId.mockResolvedValue([]);
+    financeBudgetModel.create.mockResolvedValue({
+      id: 1,
+      userId: 42,
+      name: 'Default budget',
+      amountCents: 0,
+      currency: 'USD',
+      period: 'monthly',
+      alertsEnabled: true,
+      alertThresholdPercent: 80,
+      metadata: {},
+      createdAt: null,
+      updatedAt: null
+    });
+    financeBudgetModel.findByIdForUser.mockResolvedValue({
+      id: 1,
+      userId: 42,
+      name: 'Default budget',
+      amountCents: 0,
+      currency: 'USD',
+      period: 'monthly',
+      alertsEnabled: true,
+      alertThresholdPercent: 80,
+      metadata: {},
+      createdAt: null,
+      updatedAt: null
+    });
+    financeBudgetModel.updateByIdForUser.mockResolvedValue({
+      id: 1,
+      userId: 42,
+      name: 'Updated budget',
+      amountCents: 10000,
+      currency: 'USD',
+      period: 'monthly',
+      alertsEnabled: true,
+      alertThresholdPercent: 75,
+      metadata: {},
+      createdAt: null,
+      updatedAt: null
+    });
+    systemPreferenceModel.getForUser.mockResolvedValue(null);
+    systemPreferenceModel.upsertForUser.mockResolvedValue({
+      id: 2,
+      language: 'en',
+      region: 'US',
+      timezone: 'UTC',
+      notificationsEnabled: true,
+      digestEnabled: true,
+      autoPlayMedia: false,
+      highContrast: false,
+      reducedMotion: false,
+      preferences: {}
+    });
   });
 
   it('rejects duplicate growth initiative slugs', async () => {
@@ -448,5 +538,153 @@ describe('LearnerDashboardService', () => {
       message: 'Field service assignment closed',
       meta: { assignmentId: 'order-3' }
     });
+  });
+
+  it('merges finance settings without disabling existing autopay', async () => {
+    const existingProfile = {
+      id: 9,
+      autoPayEnabled: true,
+      reserveTargetCents: 75000,
+      preferences: { currency: 'USD', alerts: { sendEmail: true } }
+    };
+    financialProfileModel.findByUserId
+      .mockResolvedValueOnce(existingProfile)
+      .mockResolvedValueOnce({
+        ...existingProfile,
+        preferences: { currency: 'USD', alerts: { sendEmail: true, sendSms: true } }
+      });
+    financialProfileModel.upsertForUser.mockResolvedValue({
+      ...existingProfile,
+      preferences: { currency: 'USD', alerts: { sendEmail: true, sendSms: true } }
+    });
+    financeBudgetModel.listByUserId.mockResolvedValue([
+      {
+        id: 5,
+        userId: 42,
+        name: 'Mentorship',
+        amountCents: 120000,
+        currency: 'USD',
+        period: 'monthly',
+        alertsEnabled: true,
+        alertThresholdPercent: 80,
+        metadata: {},
+        createdAt: null,
+        updatedAt: null
+      }
+    ]);
+
+    const acknowledgement = await LearnerDashboardService.updateFinanceSettings(42, {
+      alerts: { sendSms: true }
+    });
+
+    expect(financialProfileModel.upsertForUser).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({
+        autoPayEnabled: true,
+        reserveTargetCents: 75000,
+        preferences: expect.objectContaining({
+          alerts: expect.objectContaining({ sendEmail: true, sendSms: true })
+        })
+      })
+    );
+    expect(acknowledgement.meta.financeSettings.profile.autoPayEnabled).toBe(true);
+    expect(acknowledgement.meta.financeSettings.alerts.sendSms).toBe(true);
+    expect(acknowledgement.meta.financeSettings.budgets).toHaveLength(1);
+  });
+
+  it('creates a finance budget and normalises values', async () => {
+    financeBudgetModel.create.mockResolvedValue({
+      id: 7,
+      userId: 42,
+      name: 'Scholarships',
+      amountCents: 250000,
+      currency: 'USD',
+      period: 'monthly',
+      alertsEnabled: true,
+      alertThresholdPercent: 85,
+      metadata: { category: 'scholarship' },
+      createdAt: null,
+      updatedAt: null
+    });
+
+    const budget = await LearnerDashboardService.createFinanceBudget(42, {
+      name: 'Scholarships',
+      amount: 2500,
+      currency: 'usd',
+      period: 'monthly',
+      alertThresholdPercent: 85,
+      metadata: { category: 'scholarship' }
+    });
+
+    expect(financeBudgetModel.create).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 42, amountCents: 250000, currency: 'USD' }),
+      expect.anything()
+    );
+    expect(budget.amountCents).toBe(250000);
+    expect(budget.amountFormatted).toBeDefined();
+    expect(budget.currency).toBe('USD');
+  });
+
+  it('returns default system preferences when none stored', async () => {
+    systemPreferenceModel.getForUser.mockResolvedValue(null);
+
+    const preferences = await LearnerDashboardService.getSystemPreferences(42);
+
+    expect(preferences.language).toBe('en');
+    expect(preferences.preferences.interfaceDensity).toBe('comfortable');
+    expect(preferences.notificationsEnabled).toBe(true);
+  });
+
+  it('updates system preferences and returns acknowledgement metadata', async () => {
+    systemPreferenceModel.upsertForUser.mockResolvedValue({
+      id: 3,
+      language: 'fr',
+      region: 'FR',
+      timezone: 'Europe/Paris',
+      notificationsEnabled: false,
+      digestEnabled: false,
+      autoPlayMedia: true,
+      highContrast: true,
+      reducedMotion: true,
+      preferences: { interfaceDensity: 'compact', analyticsOptIn: false, subtitleLanguage: 'fr', audioDescription: true }
+    });
+    systemPreferenceModel.getForUser
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 3,
+        language: 'fr',
+        region: 'FR',
+        timezone: 'Europe/Paris',
+        notificationsEnabled: false,
+        digestEnabled: false,
+        autoPlayMedia: true,
+        highContrast: true,
+        reducedMotion: true,
+        preferences: { interfaceDensity: 'compact', analyticsOptIn: false, subtitleLanguage: 'fr', audioDescription: true }
+      });
+
+    const acknowledgement = await LearnerDashboardService.updateSystemPreferences(42, {
+      language: 'fr',
+      region: 'FR',
+      timezone: 'Europe/Paris',
+      notificationsEnabled: false,
+      digestEnabled: false,
+      autoPlayMedia: true,
+      highContrast: true,
+      reducedMotion: true,
+      preferences: {
+        interfaceDensity: 'compact',
+        analyticsOptIn: false,
+        subtitleLanguage: 'fr',
+        audioDescription: true
+      }
+    });
+
+    expect(systemPreferenceModel.upsertForUser).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({ language: 'fr', region: 'FR', timezone: 'Europe/Paris' })
+    );
+    expect(acknowledgement.meta.preference.language).toBe('fr');
+    expect(acknowledgement.meta.preference.preferences.audioDescription).toBe(true);
   });
 });

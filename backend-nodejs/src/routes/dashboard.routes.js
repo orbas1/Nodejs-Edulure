@@ -35,6 +35,21 @@ router.delete(
 );
 router.get('/learner/financial/invoices/:invoiceId/download', auth(), LearnerDashboardController.downloadInvoice);
 router.put('/learner/financial/preferences', auth(), LearnerDashboardController.updateBillingPreferences);
+router.get('/learner/settings/system', auth(), LearnerDashboardController.getSystemPreferences);
+router.put('/learner/settings/system', auth(), LearnerDashboardController.updateSystemPreferences);
+router.get('/learner/settings/finance', auth(), LearnerDashboardController.getFinanceSettings);
+router.put('/learner/settings/finance', auth(), LearnerDashboardController.updateFinanceSettings);
+router.post('/learner/settings/finance/budgets', auth(), LearnerDashboardController.createFinanceBudget);
+router.patch(
+  '/learner/settings/finance/budgets/:budgetId',
+  auth(),
+  LearnerDashboardController.updateFinanceBudget
+);
+router.delete(
+  '/learner/settings/finance/budgets/:budgetId',
+  auth(),
+  LearnerDashboardController.deleteFinanceBudget
+);
 router.post('/learner/growth/initiatives', auth(), LearnerDashboardController.createGrowthInitiative);
 router.patch(
   '/learner/growth/initiatives/:initiativeId',

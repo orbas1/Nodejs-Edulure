@@ -54,6 +54,93 @@ export default class LearnerDashboardController {
     }
   }
 
+  static async getSystemPreferences(req, res, next) {
+    try {
+      const preferences = await LearnerDashboardService.getSystemPreferences(req.user.id);
+      return success(res, {
+        data: preferences,
+        message: 'System preferences retrieved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateSystemPreferences(req, res, next) {
+    try {
+      const acknowledgement = await LearnerDashboardService.updateSystemPreferences(req.user.id, req.body ?? {});
+      return success(res, {
+        data: acknowledgement.meta?.preference ?? acknowledgement,
+        message: acknowledgement.message ?? 'System preferences updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async getFinanceSettings(req, res, next) {
+    try {
+      const settings = await LearnerDashboardService.getFinanceSettings(req.user.id);
+      return success(res, {
+        data: settings,
+        message: 'Finance settings retrieved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateFinanceSettings(req, res, next) {
+    try {
+      const acknowledgement = await LearnerDashboardService.updateFinanceSettings(req.user.id, req.body ?? {});
+      return success(res, {
+        data: acknowledgement.meta?.financeSettings ?? acknowledgement,
+        message: acknowledgement.message ?? 'Finance settings updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createFinanceBudget(req, res, next) {
+    try {
+      const budget = await LearnerDashboardService.createFinanceBudget(req.user.id, req.body ?? {});
+      return success(res, {
+        data: budget,
+        message: 'Finance budget created',
+        status: 201
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateFinanceBudget(req, res, next) {
+    try {
+      const { budgetId } = req.params;
+      const budget = await LearnerDashboardService.updateFinanceBudget(req.user.id, budgetId, req.body ?? {});
+      return success(res, {
+        data: budget,
+        message: 'Finance budget updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteFinanceBudget(req, res, next) {
+    try {
+      const { budgetId } = req.params;
+      const acknowledgement = await LearnerDashboardService.deleteFinanceBudget(req.user.id, budgetId);
+      return success(res, {
+        data: acknowledgement,
+        message: acknowledgement.message ?? 'Finance budget removed'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async createGrowthInitiative(req, res, next) {
     try {
       const initiative = await LearnerDashboardService.createGrowthInitiative(req.user.id, req.body);

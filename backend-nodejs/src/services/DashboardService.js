@@ -5,6 +5,8 @@ import LearnerSupportRepository from '../repositories/LearnerSupportRepository.j
 import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
+import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
+import LearnerFinanceBudgetModel from '../models/LearnerFinanceBudgetModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -82,6 +84,30 @@ const DEFAULT_SUPPORT_CONTACTS = [
     href: 'https://support.edulure.test/call'
   }
 ];
+
+const DEFAULT_SYSTEM_SETTINGS = Object.freeze({
+  language: 'en',
+  region: 'US',
+  timezone: 'UTC',
+  notificationsEnabled: true,
+  digestEnabled: true,
+  autoPlayMedia: false,
+  highContrast: false,
+  reducedMotion: false,
+  preferences: {
+    interfaceDensity: 'comfortable',
+    analyticsOptIn: true,
+    subtitleLanguage: 'en',
+    audioDescription: false
+  }
+});
+
+const DEFAULT_FINANCE_ALERTS = Object.freeze({
+  sendEmail: true,
+  sendSms: false,
+  escalationEmail: null,
+  notifyThresholdPercent: 80
+});
 
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
@@ -349,7 +375,10 @@ export function buildLearnerDashboard({
   messagingSummary = null,
   notifications = [],
   libraryEntries = [],
-  fieldServiceWorkspace = null
+  fieldServiceWorkspace = null,
+  financialProfile = null,
+  financeBudgets = [],
+  systemPreferences = null
 } = {}) {
   const hasSignals =
     enrollments.length ||
@@ -752,10 +781,94 @@ export function buildLearnerDashboard({
         company: contact.company
       }));
 
+      const financePreferencesRaw =
+        financialProfile?.preferences && typeof financialProfile.preferences === 'object'
+          ? financialProfile.preferences
+          : {};
       const financialPreferences = {
-        autoPay: { enabled: Boolean(financialProfileRaw?.autoPayEnabled) },
-        reserveTarget: Math.round((financialProfileRaw?.reserveTargetCents ?? 0) / 100),
-        reserveTargetCents: financialProfileRaw?.reserveTargetCents ?? 0
+        autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
+        reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
+        reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
+        currency: financePreferencesRaw.currency ?? 'USD',
+        invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
+        payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
+        taxId: financePreferencesRaw.taxId ?? null,
+        alerts: {
+          sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
+          sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
+          escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
+          notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
+        },
+        documents: Array.isArray(financePreferencesRaw.documents)
+          ? financePreferencesRaw.documents
+          : [],
+        reimbursements:
+          financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
+            ? {
+                enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
+                instructions: financePreferencesRaw.reimbursements.instructions ?? null
+          }
+            : { enabled: false, instructions: null }
+      };
+
+      const financeBudgetsList = Array.isArray(financeBudgets)
+        ? financeBudgets.map((budget) => ({
+            id: budget.id ?? `budget-${crypto.randomUUID()}`,
+            name: budget.name ?? 'Learning budget',
+            amountCents: Number(budget.amountCents ?? 0),
+            amountFormatted: formatCurrency(budget.amountCents ?? 0, budget.currency ?? 'USD'),
+            currency: budget.currency ?? 'USD',
+            period: budget.period ?? 'monthly',
+            alertsEnabled: Boolean(budget.alertsEnabled ?? true),
+            alertThresholdPercent: Number(budget.alertThresholdPercent ?? 80),
+            metadata: budget.metadata ?? {},
+            createdAt: budget.createdAt ?? null,
+            updatedAt: budget.updatedAt ?? null
+          }))
+        : [];
+
+      const financeSettings = {
+        profile: {
+          currency: financialPreferences.currency,
+          taxId: financialPreferences.taxId,
+          invoiceDelivery: financialPreferences.invoiceDelivery,
+          payoutSchedule: financialPreferences.payoutSchedule,
+          autoPayEnabled: Boolean(financialPreferences.autoPay?.enabled),
+          reserveTarget: financialPreferences.reserveTarget,
+          reserveTargetCents: financialPreferences.reserveTargetCents
+        },
+        alerts: { ...DEFAULT_FINANCE_ALERTS, ...(financialPreferences.alerts ?? {}) },
+        budgets: financeBudgetsList,
+        documents: financialPreferences.documents ?? [],
+        reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
+      };
+
+      const systemSettings = {
+        language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
+        region: systemPreferences?.region ?? DEFAULT_SYSTEM_SETTINGS.region,
+        timezone: systemPreferences?.timezone ?? DEFAULT_SYSTEM_SETTINGS.timezone,
+        notificationsEnabled:
+          systemPreferences?.notificationsEnabled ?? DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
+        digestEnabled: systemPreferences?.digestEnabled ?? DEFAULT_SYSTEM_SETTINGS.digestEnabled,
+        autoPlayMedia: systemPreferences?.autoPlayMedia ?? DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
+        highContrast: systemPreferences?.highContrast ?? DEFAULT_SYSTEM_SETTINGS.highContrast,
+        reducedMotion: systemPreferences?.reducedMotion ?? DEFAULT_SYSTEM_SETTINGS.reducedMotion,
+        preferences: {
+          interfaceDensity:
+            systemPreferences?.preferences?.interfaceDensity ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
+          analyticsOptIn:
+            systemPreferences?.preferences?.analyticsOptIn ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
+          subtitleLanguage:
+            systemPreferences?.preferences?.subtitleLanguage ??
+            systemPreferences?.language ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
+          audioDescription:
+            systemPreferences?.preferences?.audioDescription ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
+        },
+        updatedAt: systemPreferences?.updatedAt ?? null
       };
 
   const notificationsList = [...notifications];
@@ -1677,7 +1790,9 @@ export function buildLearnerDashboard({
     settings: {
       privacy,
       messaging,
-      communities: communitySettings
+      communities: communitySettings,
+      system: systemSettings,
+      finance: financeSettings
     }
   };
 
@@ -3854,7 +3969,9 @@ export default class DashboardService {
       const [
         paymentMethodsRaw,
         billingContactsRaw,
-        financialProfileRaw,
+        financialProfile,
+        financeBudgetsRaw,
+        systemPreferencesRaw,
         growthInitiativesRaw,
         affiliateChannelsRaw,
         adCampaignsRaw,
@@ -3863,6 +3980,8 @@ export default class DashboardService {
         LearnerPaymentMethodModel.listByUserId(user.id),
         LearnerBillingContactModel.listByUserId(user.id),
         LearnerFinancialProfileModel.findByUserId(user.id),
+        LearnerFinanceBudgetModel.listByUserId(user.id),
+        LearnerSystemPreferenceModel.getForUser(user.id),
         LearnerGrowthInitiativeModel.listByUserId(user.id),
         LearnerAffiliateChannelModel.listByUserId(user.id),
         LearnerAdCampaignModel.listByUserId(user.id),
@@ -4009,7 +4128,12 @@ export default class DashboardService {
           followerSummary: learnerFollowerSummary,
           privacySettings,
           messagingSummary: null,
-          notifications: []
+          notifications: [],
+          libraryEntries,
+          fieldServiceWorkspace,
+          financialProfile,
+          financeBudgets: financeBudgetsRaw,
+          systemPreferences: systemPreferencesRaw
         }) ?? undefined;
     } catch (error) {
       log.warn({ err: error }, 'Failed to load learner dashboard data');
@@ -4286,6 +4410,12 @@ export default class DashboardService {
         });
       }
 
+      const [financialProfile, financeBudgetsRaw, systemPreferencesRaw] = await Promise.all([
+        LearnerFinancialProfileModel.findByUserId(user.id),
+        LearnerFinanceBudgetModel.listByUserId(user.id),
+        LearnerSystemPreferenceModel.getForUser(user.id)
+      ]);
+
       learnerSnapshot =
         buildLearnerDashboard({
           user,
@@ -4304,7 +4434,10 @@ export default class DashboardService {
           communities: communityMemberships,
           communityPipelines,
           libraryEntries,
-          fieldServiceWorkspace: learnerFieldServiceWorkspace
+          fieldServiceWorkspace: learnerFieldServiceWorkspace,
+          financialProfile,
+          financeBudgets: financeBudgetsRaw,
+          systemPreferences: systemPreferencesRaw
         }) ?? undefined;
 
       communitySnapshot =

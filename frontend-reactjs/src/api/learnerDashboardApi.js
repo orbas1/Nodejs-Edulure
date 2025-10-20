@@ -196,6 +196,67 @@ export async function deleteBillingContact({ token, contactId, signal } = {}) {
   });
 }
 
+export async function fetchSystemPreferences({ token, signal } = {}) {
+  ensureToken(token);
+  return httpClient.get('/dashboard/learner/settings/system', { token, signal });
+}
+
+export async function updateSystemPreferences({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.put('/dashboard/learner/settings/system', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function fetchFinanceSettings({ token, signal } = {}) {
+  ensureToken(token);
+  return httpClient.get('/dashboard/learner/settings/finance', { token, signal });
+}
+
+export async function updateFinanceSettings({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.put('/dashboard/learner/settings/finance', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function createFinanceBudget({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/settings/finance/budgets', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateFinanceBudget({ token, budgetId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!budgetId) {
+    throw new Error('A finance budget identifier is required to update the record');
+  }
+  return httpClient.patch(`/dashboard/learner/settings/finance/budgets/${budgetId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function deleteFinanceBudget({ token, budgetId, signal } = {}) {
+  ensureToken(token);
+  if (!budgetId) {
+    throw new Error('A finance budget identifier is required to remove the record');
+  }
+  return httpClient.delete(`/dashboard/learner/settings/finance/budgets/${budgetId}`, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export async function joinLiveSession({ token, sessionId, signal } = {}) {
   ensureToken(token);
   if (!sessionId) {
