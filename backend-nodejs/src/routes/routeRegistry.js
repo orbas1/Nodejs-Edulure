@@ -29,9 +29,10 @@ import telemetryRoutes from './telemetry.routes.js';
 import governanceRoutes from './governance.routes.js';
 import releaseRoutes from './release.routes.js';
 import catalogueRoutes from './catalogue.routes.js';
-import { apiRouteMetadata } from './routeMetadata.js';
 import instructorRoutes from './instructor.routes.js';
 import mediaRoutes from './media.routes.js';
+import { apiRouteMetadata } from './routeMetadata.js';
+import { buildRouteRegistry } from './registryValidator.js';
 
 const routerMap = {
   auth: authRoutes,
@@ -69,9 +70,9 @@ const routerMap = {
   media: mediaRoutes
 };
 
-export const apiRouteRegistry = apiRouteMetadata.map((descriptor) => ({
-  ...descriptor,
-  router: routerMap[descriptor.name]
-}));
+export const apiRouteRegistry = buildRouteRegistry({
+  metadata: apiRouteMetadata,
+  routers: routerMap
+});
 
 export default apiRouteRegistry;
