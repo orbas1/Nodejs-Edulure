@@ -96,7 +96,7 @@ function eventTypeMatches(pattern, eventType) {
 
 function matchesAnyPattern(patterns, eventType) {
   if (!Array.isArray(patterns) || patterns.length === 0) {
-    return false;
+    return true;
   }
 
   return patterns.some((pattern) => eventTypeMatches(pattern, eventType));
@@ -120,12 +120,19 @@ export default class IntegrationWebhookSubscriptionModel {
   }
 
   static async findForEvent(eventType, connection = db) {
-    const rows = await connection(this.tableName)
-      .where({ enabled: 1 })
-      .orWhere({ enabled: true });
+    const rows = await connection(this.tableName).select('*');
 
     return rows
       .map((row) => mapRow(row))
+      .filter((subscription) => subscription?.enabled)
+      .filter((subscription) => !subscription.isCircuitOpen)
+      .filter((subscription) => {
+        if (!subscription.circuitBreakerThreshold) {
+          return true;
+        }
+
+        return subscription.consecutiveFailures < subscription.circuitBreakerThreshold;
+      })
       .filter((subscription) => matchesAnyPattern(subscription.eventTypes, eventType));
   }
 
