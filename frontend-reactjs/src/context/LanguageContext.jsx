@@ -64,6 +64,59 @@ const TRANSLATIONS = {
         },
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
+      },
+      ebooks: {
+        tagline: 'Community library',
+        title: 'Turn knowledge into collectible storybooks',
+        subtitle:
+          'Browse playful previews from makers building in public—each zine is remixable and ready to share.',
+        meta: 'Peer-made drops',
+        carouselLabel: 'Swipe through featured community e-books',
+        stickers: {
+          new: 'New!',
+          trending: 'Trending',
+          remixable: 'Remix-ready'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'Product sprints',
+            title: 'Builder’s Notebook',
+            description: 'Rapid rituals and templates for shipping experiments faster.',
+            alt: 'Illustrated cover for Builder’s Notebook showing gradient pages'
+          },
+          communityCookbook: {
+            tag: 'Community rituals',
+            title: 'Community Cookbook',
+            description: 'Icebreakers, retros, and prompts sourced from active cohorts.',
+            alt: 'Cover of Community Cookbook with playful green highlights'
+          },
+          remixAtlas: {
+            tag: 'Remix lab',
+            title: 'Remix Atlas',
+            description: 'Swipe starter frameworks and remix them into your own journeys.',
+            alt: 'Remix Atlas cover featuring arrows bending around a compass'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'Readers',
+            title: 'Pocket-sized insights for every mood',
+            bullets: {
+              discovery: 'Discover bite-sized field guides for every creative phase.',
+              sync: 'Sync progress across devices and pick up where you left off.',
+              community: 'Unlock community annotations and highlight reels.'
+            }
+          },
+          creators: {
+            label: 'Creators',
+            title: 'Delight fans and ship faster',
+            bullets: {
+              publish: 'Drop beautiful digital zines without design tools.',
+              analytics: 'Track reads, saves, and remix requests in real time.',
+              revenue: 'Bundle e-books with live sessions to boost revenue.'
+            }
+          }
+        }
       }
     }
   },
@@ -114,6 +167,59 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Je suis instructeur·rice',
         illustrationAlt: "Collage d'instructeurs et d'apprenants en collaboration"
+      },
+      ebooks: {
+        tagline: 'Bibliothèque communautaire',
+        title: 'Transformez le savoir en livres à collectionner',
+        subtitle:
+          'Parcourez des aperçus ludiques de créateurs qui construisent en public — chaque zine est remixable et prêt à partager.',
+        meta: 'Parutions entre pairs',
+        carouselLabel: 'Faites défiler les e-books phares de la communauté',
+        stickers: {
+          new: 'Nouveau !',
+          trending: 'Tendance',
+          remixable: 'Prêt pour remix'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'Sprints produit',
+            title: 'Carnet du builder',
+            description: 'Rituels et modèles pour expédier des expériences plus vite.',
+            alt: 'Couverture illustrée du Carnet du builder avec des pages en dégradé'
+          },
+          communityCookbook: {
+            tag: 'Rituels de communauté',
+            title: 'Livre de recettes communautaire',
+            description: 'Icebreakers, rétros et invitations issues de cohortes actives.',
+            alt: 'Couverture du Livre de recettes communautaire avec des accents verts ludiques'
+          },
+          remixAtlas: {
+            tag: 'Laboratoire remix',
+            title: 'Atlas du remix',
+            description: 'Capturez des canevas de départ et remixez-les pour vos propres parcours.',
+            alt: 'Couverture de l’Atlas du remix avec des flèches autour d’une boussole'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'Lecteurs',
+            title: 'Des pépites à glisser dans chaque humeur',
+            bullets: {
+              discovery: 'Découvrez des guides de terrain en format capsule pour chaque phase créative.',
+              sync: 'Synchronisez votre progression sur tous vos appareils et reprenez où vous en étiez.',
+              community: 'Débloquez les annotations communautaires et les moments forts.'
+            }
+          },
+          creators: {
+            label: 'Créateurs',
+            title: 'Ravissez votre audience et livrez plus vite',
+            bullets: {
+              publish: 'Publiez de beaux zines numériques sans outils de design.',
+              analytics: 'Suivez lectures, sauvegardes et demandes de remix en temps réel.',
+              revenue: 'Associez e-books et sessions live pour booster vos revenus.'
+            }
+          }
+        }
       }
     }
   },
@@ -164,6 +270,59 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Soy instructor/a',
         illustrationAlt: 'Collage de instructores y estudiantes colaborando'
+      },
+      ebooks: {
+        tagline: 'Biblioteca comunitaria',
+        title: 'Convierte el conocimiento en libros coleccionables',
+        subtitle:
+          'Explora avances juguetones de creadores que construyen en público; cada zine es remixable y listo para compartir.',
+        meta: 'Lanzamientos entre pares',
+        carouselLabel: 'Desliza por los e-books destacados de la comunidad',
+        stickers: {
+          new: '¡Nuevo!',
+          trending: 'Tendencia',
+          remixable: 'Listo para remix'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'Sprints de producto',
+            title: 'Cuaderno del builder',
+            description: 'Rituales y plantillas para lanzar experimentos más rápido.',
+            alt: 'Portada ilustrada del Cuaderno del builder con páginas degradadas'
+          },
+          communityCookbook: {
+            tag: 'Rituales comunitarios',
+            title: 'Recetario comunitario',
+            description: 'Icebreakers, retros y prompts recopilados de cohortes activas.',
+            alt: 'Portada del Recetario comunitario con destellos verdes divertidos'
+          },
+          remixAtlas: {
+            tag: 'Laboratorio remix',
+            title: 'Atlas remix',
+            description: 'Toma marcos iniciales y remíxalos para tus propias travesías.',
+            alt: 'Portada del Atlas remix con flechas rodeando una brújula'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'Lectores',
+            title: 'Ideas de bolsillo para cada estado de ánimo',
+            bullets: {
+              discovery: 'Descubre guías de campo en formato cápsula para cada fase creativa.',
+              sync: 'Sincroniza tu progreso en todos tus dispositivos y retoma donde lo dejaste.',
+              community: 'Desbloquea anotaciones de la comunidad y resúmenes destacados.'
+            }
+          },
+          creators: {
+            label: 'Creadores',
+            title: 'Sorprende a tu comunidad y entrega más rápido',
+            bullets: {
+              publish: 'Publica zines digitales hermosos sin herramientas de diseño.',
+              analytics: 'Sigue lecturas, guardados y solicitudes de remix en tiempo real.',
+              revenue: 'Combina e-books con sesiones en vivo para impulsar los ingresos.'
+            }
+          }
+        }
       }
     }
   },
@@ -214,6 +373,59 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Sou instrutor(a)',
         illustrationAlt: 'Colagem de instrutores e aprendizes colaborando'
+      },
+      ebooks: {
+        tagline: 'Biblioteca da comunidade',
+        title: 'Transforme conhecimento em livros colecionáveis',
+        subtitle:
+          'Explore prévias divertidas de quem constrói em público — cada zine é remixável e pronto para compartilhar.',
+        meta: 'Lançamentos entre pares',
+        carouselLabel: 'Deslize pelos e-books favoritos da comunidade',
+        stickers: {
+          new: 'Novo!',
+          trending: 'Em alta',
+          remixable: 'Pronto para remix'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'Sprints de produto',
+            title: 'Caderno do builder',
+            description: 'Rituais e modelos para lançar experimentos com mais velocidade.',
+            alt: 'Capa ilustrada do Caderno do builder com páginas em degradê'
+          },
+          communityCookbook: {
+            tag: 'Rituais da comunidade',
+            title: 'Livro de receitas da comunidade',
+            description: 'Icebreakers, retros e prompts coletados de cohortes ativas.',
+            alt: 'Capa do Livro de receitas da comunidade com destaques verdes divertidos'
+          },
+          remixAtlas: {
+            tag: 'Laboratório de remix',
+            title: 'Atlas remix',
+            description: 'Pegue frameworks iniciais e remixe para suas próprias jornadas.',
+            alt: 'Capa do Atlas remix com setas em torno de uma bússola'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'Leitores',
+            title: 'Insumos de bolso para cada momento',
+            bullets: {
+              discovery: 'Descubra guias de campo em cápsulas para cada fase criativa.',
+              sync: 'Sincronize o progresso entre dispositivos e retome de onde parou.',
+              community: 'Desbloqueie anotações da comunidade e destaques.'
+            }
+          },
+          creators: {
+            label: 'Criadores',
+            title: 'Encante sua base e entregue mais rápido',
+            bullets: {
+              publish: 'Publique zines digitais lindos sem ferramentas de design.',
+              analytics: 'Acompanhe leituras, salvamentos e pedidos de remix em tempo real.',
+              revenue: 'Combine e-books com sessões ao vivo para impulsionar a receita.'
+            }
+          }
+        }
       }
     }
   },
@@ -264,6 +476,59 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Sono un* istruttore/trice',
         illustrationAlt: 'Collage di istruttori e studenti che collaborano'
+      },
+      ebooks: {
+        tagline: 'Biblioteca della community',
+        title: 'Trasforma il sapere in libri da collezione',
+        subtitle:
+          'Sfoglia anteprime giocose di chi costruisce in pubblico: ogni zine è remixabile e pronta da condividere.',
+        meta: 'Uscite tra pari',
+        carouselLabel: 'Scorri gli e-book di punta della community',
+        stickers: {
+          new: 'Nuovo!',
+          trending: 'Di tendenza',
+          remixable: 'Pronto al remix'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'Sprints di prodotto',
+            title: 'Taccuino del builder',
+            description: 'Rituali e template per spedire esperimenti più in fretta.',
+            alt: 'Copertina illustrata del Taccuino del builder con pagine sfumate'
+          },
+          communityCookbook: {
+            tag: 'Rituali di community',
+            title: 'Ricettario della community',
+            description: 'Icebreaker, retro e prompt raccolti da coorti attive.',
+            alt: 'Copertina del Ricettario della community con accenti verdi giocosi'
+          },
+          remixAtlas: {
+            tag: 'Laboratorio remix',
+            title: 'Atlas remix',
+            description: 'Prendi framework di partenza e remixali per i tuoi percorsi.',
+            alt: 'Copertina dell’Atlas remix con frecce che circondano una bussola'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'Lettori',
+            title: 'Spunti tascabili per ogni stato d’animo',
+            bullets: {
+              discovery: 'Scopri guide da campo in formato mini per ogni fase creativa.',
+              sync: 'Sincronizza i progressi tra dispositivi e riprendi da dove eri rimasto.',
+              community: 'Sblocca annotazioni della community e momenti salienti.'
+            }
+          },
+          creators: {
+            label: 'Creator',
+            title: 'Sorprendi il tuo pubblico e consegna più veloce',
+            bullets: {
+              publish: 'Pubblica zine digitali bellissime senza strumenti di design.',
+              analytics: 'Monitora letture, salvataggi e richieste di remix in tempo reale.',
+              revenue: 'Abbina e-book e sessioni live per incrementare le entrate.'
+            }
+          }
+        }
       }
     }
   },
@@ -314,6 +579,59 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Jestem instruktorem',
         illustrationAlt: 'Kolaż instruktorów i uczniów współpracujących ze sobą'
+      },
+      ebooks: {
+        tagline: 'Biblioteka społeczności',
+        title: 'Zamień wiedzę w kolekcjonerskie książki',
+        subtitle:
+          'Przeglądaj kolorowe zajawki twórców budujących publicznie — każdy zin można remiksować i udostępniać.',
+        meta: 'Premiery od społeczności',
+        carouselLabel: 'Przewijaj wyróżnione e-booki społeczności',
+        stickers: {
+          new: 'Nowość!',
+          trending: 'Na topie',
+          remixable: 'Gotowe do remiksu'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'Sprinty produktowe',
+            title: 'Notatnik buildera',
+            description: 'Rytuały i szablony, dzięki którym szybciej wypuścisz eksperymenty.',
+            alt: 'Ilustrowana okładka Notatnika buildera z gradientowymi stronami'
+          },
+          communityCookbook: {
+            tag: 'Rytuały społeczności',
+            title: 'Książka kucharska społeczności',
+            description: 'Icebreakery, retro i podpowiedzi zebrane od aktywnych kohort.',
+            alt: 'Okładka Książki kucharskiej społeczności z zielonymi akcentami'
+          },
+          remixAtlas: {
+            tag: 'Laboratorium remixu',
+            title: 'Atlas remixu',
+            description: 'Chwytaj ramy startowe i remiksuj je pod własne ścieżki.',
+            alt: 'Okładka Atlasu remixu z strzałkami wokół kompasu'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'Czytelnicy',
+            title: 'Kieszonkowe inspiracje na każdy nastrój',
+            bullets: {
+              discovery: 'Odkrywaj kapsułowe przewodniki terenowe na każdy etap kreatywny.',
+              sync: 'Synchronizuj postępy między urządzeniami i wracaj dokładnie tam, gdzie skończyłeś.',
+              community: 'Odblokuj społecznościowe adnotacje i highlighty.'
+            }
+          },
+          creators: {
+            label: 'Twórcy',
+            title: 'Zachwycaj społeczność i działaj szybciej',
+            bullets: {
+              publish: 'Publikuj piękne cyfrowe ziny bez narzędzi projektowych.',
+              analytics: 'Śledź odczyty, zapisy i prośby o remix w czasie rzeczywistym.',
+              revenue: 'Łącz e-booki z sesjami live, aby zwiększyć przychody.'
+            }
+          }
+        }
       }
     }
   },
@@ -364,6 +682,59 @@ const TRANSLATIONS = {
         },
         instructorPill: 'मैं प्रशिक्षक हूँ',
         illustrationAlt: 'प्रशिक्षकों और शिक्षार्थियों के सहयोग का कोलाज'
+      },
+      ebooks: {
+        tagline: 'समुदाय पुस्तकालय',
+        title: 'ज्ञान को संग्रहणीय पुस्तकों में बदलें',
+        subtitle:
+          'सार्वजनिक रूप से निर्माण करने वाले निर्माताओं की चंचल झलकियाँ देखें — हर ज़ीन रीमिक्स करने और साझा करने के लिए तैयार है।',
+        meta: 'साथियों द्वारा जारी',
+        carouselLabel: 'समुदाय के पसंदीदा ई-बुक्स को स्वाइप करें',
+        stickers: {
+          new: 'नई!',
+          trending: 'ट्रेंडिंग',
+          remixable: 'रीमिक्स के लिए तैयार'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'उत्पाद स्प्रिंट्स',
+            title: 'बिल्डर की नोटबुक',
+            description: 'तेज़ी से प्रयोग शिप करने के लिए रीतियाँ और टेम्पलेट्स।',
+            alt: 'ग्रेडिएंट पन्नों वाली बिल्डर की नोटबुक का चित्रित कवर'
+          },
+          communityCookbook: {
+            tag: 'समुदाय रिवाज़',
+            title: 'कम्युनिटी कुकबुक',
+            description: 'सक्रिय कोहोर्ट्स से जुटाए गए आइसब्रेकर, रेट्रो और प्रॉम्प्ट्स।',
+            alt: 'हरे playful हाईलाइट्स वाली कम्युनिटी कुकबुक का कवर'
+          },
+          remixAtlas: {
+            tag: 'रीमिक्स प्रयोगशाला',
+            title: 'रीमिक्स एटलस',
+            description: 'स्टार्टर फ्रेमवर्क्स उठाएँ और उन्हें अपने सफ़र के लिए रीमिक्स करें।',
+            alt: 'कम्पास के चारों ओर घूमते तीरों वाला रीमिक्स एटलस कवर'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'रीडर्स',
+            title: 'हर मूड के लिए पॉकेट इनसाइट्स',
+            bullets: {
+              discovery: 'हर रचनात्मक चरण के लिए सूक्ष्म फील्ड गाइड खोजें।',
+              sync: 'डिवाइसों के बीच प्रगति को सिंक करें और वहीं से शुरू करें जहाँ छोड़ा था।',
+              community: 'समुदाय की टिप्पणियाँ और हाइलाइट झलकियाँ अनलॉक करें।'
+            }
+          },
+          creators: {
+            label: 'क्रिएटर्स',
+            title: 'प्रशंसकों को खुश करें और तेजी से लॉन्च करें',
+            bullets: {
+              publish: 'डिज़ाइन टूल्स के बिना सुंदर डिजिटल ज़ीन प्रकाशित करें।',
+              analytics: 'रीयल-टाइम में पढ़ाई, सेव और रीमिक्स अनुरोध ट्रैक करें।',
+              revenue: 'ई-बुक्स को लाइव सत्रों के साथ बाँधकर राजस्व बढ़ाएँ।'
+            }
+          }
+        }
       }
     }
   },
@@ -414,6 +785,59 @@ const TRANSLATIONS = {
         },
         instructorPill: 'أنا مدرّس/ة',
         illustrationAlt: 'مجموعة صور لمدربين ومتعلّمين يتعاونون'
+      },
+      ebooks: {
+        tagline: 'مكتبة المجتمع',
+        title: 'حوّل المعرفة إلى كتب قابلة للجمع',
+        subtitle:
+          'تصفّح لمحات مرحة من صانعين يبنون على العلن — كل زين جاهز لإعادة المزج والمشاركة.',
+        meta: 'إصدارات الأقران',
+        carouselLabel: 'اسحب لاستعراض الكتب الإلكترونية المميزة في المجتمع',
+        stickers: {
+          new: 'جديد!',
+          trending: 'رائج',
+          remixable: 'جاهز لإعادة المزج'
+        },
+        cards: {
+          builderNotebook: {
+            tag: 'سباقات المنتج',
+            title: 'دفتر الباني',
+            description: 'طقوس ونماذج لتسريع شحن التجارب.',
+            alt: 'غلاف مصوّر لدفتر الباني مع صفحات متدرجة الألوان'
+          },
+          communityCookbook: {
+            tag: 'طقوس المجتمع',
+            title: 'كتاب وصفات المجتمع',
+            description: 'كاسرات جليد، مراجعات ومحفزات مأخوذة من دفعات نشطة.',
+            alt: 'غلاف كتاب وصفات المجتمع مع لمسات خضراء مرحة'
+          },
+          remixAtlas: {
+            tag: 'مختبر الريمكس',
+            title: 'أطلس الريمكس',
+            description: 'اقتنص أطر البداية وأعد مزجها لمساراتك الخاصة.',
+            alt: 'غلاف أطلس الريمكس مع سهام تدور حول بوصلة'
+          }
+        },
+        panels: {
+          readers: {
+            label: 'للقرّاء',
+            title: 'رؤى صغيرة لكل مزاج',
+            bullets: {
+              discovery: 'اكتشف أدلة ميدانية مختصرة لكل مرحلة إبداعية.',
+              sync: 'زامن تقدمك عبر الأجهزة وواصل من حيث توقفت.',
+              community: 'افتح تعليقات المجتمع واللقطات المميزة.'
+            }
+          },
+          creators: {
+            label: 'للمبدعين',
+            title: 'أبهِر جمهورك وانطلق بسرعة',
+            bullets: {
+              publish: 'أنشر زينات رقمية جميلة من دون أدوات تصميم.',
+              analytics: 'تابع القراءات والحفظ وطلبات الريمكس مباشرة.',
+              revenue: 'ادمج الكتب الإلكترونية مع الجلسات المباشرة لزيادة الإيرادات.'
+            }
+          }
+        }
       }
     }
   },
@@ -463,10 +887,63 @@ const TRANSLATIONS = {
           }
         },
         instructorPill: 'Ich bin Trainer:in',
-        illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
+          illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
+        },
+        ebooks: {
+          tagline: 'Community-Bibliothek',
+          title: 'Verwandle Wissen in sammelbare Storybooks',
+          subtitle:
+            'Stöbere durch verspielte Previews von Maker*innen, die öffentlich bauen – jedes Zine lässt sich remixen und teilen.',
+          meta: 'Drops aus der Community',
+          carouselLabel: 'Streife durch die beliebtesten Community-E-Books',
+          stickers: {
+            new: 'Neu!',
+            trending: 'Im Trend',
+            remixable: 'Remix-ready'
+          },
+          cards: {
+            builderNotebook: {
+              tag: 'Product Sprints',
+              title: 'Builder’s Notebook',
+              description: 'Rituale und Templates, um Experimente schneller zu shippen.',
+              alt: 'Illustrierter Umschlag des Builder’s Notebook mit Farbverlauf'
+            },
+            communityCookbook: {
+              tag: 'Community-Rituale',
+              title: 'Community Cookbook',
+              description: 'Icebreaker, Retros und Prompts aus aktiven Kohorten.',
+              alt: 'Umschlag des Community Cookbook mit verspielten grünen Akzenten'
+            },
+            remixAtlas: {
+              tag: 'Remix-Labor',
+              title: 'Remix Atlas',
+              description: 'Schnapp dir Start-Frameworks und remixe sie für deine eigenen Journeys.',
+              alt: 'Remix-Atlas-Umschlag mit Pfeilen um einen Kompass'
+            }
+          },
+          panels: {
+            readers: {
+              label: 'Für Leser*innen',
+              title: 'Pocket-Insights für jede Stimmung',
+              bullets: {
+                discovery: 'Entdecke kompakte Field Guides für jede kreative Phase.',
+                sync: 'Synchronisiere Fortschritt geräteübergreifend und mach genau dort weiter, wo du aufgehört hast.',
+                community: 'Schalte Community-Notizen und Highlight-Reels frei.'
+              }
+            },
+            creators: {
+              label: 'Für Creator*innen',
+              title: 'Begeistere Fans und liefere schneller',
+              bullets: {
+                publish: 'Veröffentliche schöne digitale Zines ohne Design-Tools.',
+                analytics: 'Verfolge Reads, Saves und Remix-Anfragen in Echtzeit.',
+                revenue: 'Bündle E-Books mit Live-Sessions und steigere den Umsatz.'
+              }
+            }
+          }
+        }
       }
-    }
-  },
+    },
   ru: {
     navigation: {
       login: 'Войти',
@@ -512,11 +989,64 @@ const TRANSLATIONS = {
             cta: 'Читать сейчас'
           }
         },
-        instructorPill: 'Я преподаватель',
-        illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'
+          instructorPill: 'Я преподаватель',
+          illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'
+        },
+        ebooks: {
+          tagline: 'Библиотека сообщества',
+          title: 'Превратите знания в коллекционные цифровые книги',
+          subtitle:
+            'Просматривайте яркие превью от создателей, которые строят на публике — каждый зин можно ремикснуть и поделиться.',
+          meta: 'Релизы от участников',
+          carouselLabel: 'Листайте избранные электронные книги сообщества',
+          stickers: {
+            new: 'Новинка!',
+            trending: 'В тренде',
+            remixable: 'Готово к ремиксу'
+          },
+          cards: {
+            builderNotebook: {
+              tag: 'Продуктовые спринты',
+              title: 'Дневник билдера',
+              description: 'Ритуалы и шаблоны, чтобы быстрее запускать эксперименты.',
+              alt: 'Обложка Дневника билдера с градиентными страницами'
+            },
+            communityCookbook: {
+              tag: 'Ритуалы сообщества',
+              title: 'Комьюнити-книга рецептов',
+              description: 'Айсбрекеры, ретро и подсказки от активных когорт.',
+              alt: 'Обложка Комьюнити-книги рецептов с игривыми зелёными акцентами'
+            },
+            remixAtlas: {
+              tag: 'Лаборатория ремиксов',
+              title: 'Атлас ремиксов',
+              description: 'Берите стартовые фреймворки и адаптируйте их под свои маршруты.',
+              alt: 'Обложка Атласа ремиксов со стрелками вокруг компаса'
+            }
+          },
+          panels: {
+            readers: {
+              label: 'Для читателей',
+              title: 'Карманные инсайты на любой настрой',
+              bullets: {
+                discovery: 'Находите короткие полевые гиды для каждого этапа творчества.',
+                sync: 'Синхронизируйте прогресс между устройствами и продолжайте с нужного места.',
+                community: 'Открывайте доступ к заметкам и хайлайтам сообщества.'
+              }
+            },
+            creators: {
+              label: 'Для создателей',
+              title: 'Удивляйте аудиторию и запускайте быстрее',
+              bullets: {
+                publish: 'Публикуйте красивые цифровые зины без дизайнерских инструментов.',
+                analytics: 'Отслеживайте чтения, сохранения и запросы на ремикс в реальном времени.',
+                revenue: 'Комбинируйте e-book’и с живыми сессиями, чтобы увеличить доход.'
+              }
+            }
+          }
+        }
       }
     }
-  }
 };
 
 const LanguageContext = createContext({
