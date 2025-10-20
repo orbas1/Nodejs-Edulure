@@ -1,145 +1,310 @@
-import { useCallback, useMemo, useState } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
+import { useOutletContext } from "react-router-dom";
 
-import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
-import usePersistentCollection from '../../hooks/usePersistentCollection.js';
+import DashboardActionFeedback from "../../components/dashboard/DashboardActionFeedback.jsx";
+import DashboardStateMessage from "../../components/dashboard/DashboardStateMessage.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
+import {
+  deleteCommunity,
+  fetchCommunities,
+  fetchCommunityDetail,
+  updateCommunity
+} from "../../api/communityApi.js";
 
-const createCommunityDraft = () => ({
-  title: '',
-  members: 0,
-  trend: 'Stable',
-  health: 'Healthy',
-  moderators: 1,
-  approvalsPending: 0,
-  incidentsOpen: 0,
-  escalationsOpen: 0,
-  focus: ''
-});
+function buildFormState(community) {
+  if (!community) {
+    return {
+      name: "",
+      description: "",
+      coverImageUrl: "",
+      visibility: "public",
+      tagsInput: "",
+      tone: "curated",
+      focus: "",
+      onboardingGuideUrl: "",
+      welcomeVideoUrl: "",
+      playbooksInput: "",
+      theme: "",
+      status: community?.status ?? "Active"
+    };
+  }
+
+  const metadata = community.metadata ?? {};
+  const tags = Array.isArray(metadata.tags) ? metadata.tags : [];
+  const playbooks = Array.isArray(metadata.playbooks)
+    ? metadata.playbooks
+    : typeof metadata.playbooks === "string"
+      ? metadata.playbooks
+          .split("\n")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+      : [];
+
+  return {
+    name: community.name ?? "",
+    description: community.description ?? "",
+    coverImageUrl: community.coverImageUrl ?? "",
+    visibility: community.visibility ?? "public",
+    tagsInput: tags.join(", "),
+    tone: metadata.tone ?? "curated",
+    focus: metadata.focus ?? "",
+    onboardingGuideUrl: metadata.onboardingGuideUrl ?? "",
+    welcomeVideoUrl: metadata.welcomeVideoUrl ?? "",
+    playbooksInput: playbooks.join("\n"),
+    theme: metadata.theme ?? "",
+    status: community.metadata?.status ?? "Active"
+  };
+}
+
+function formatDateTime(value) {
+  if (!value) return "Not available";
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(new Date(value));
+  } catch (_error) {
+    return value;
+  }
+}
+
+function classNames(...values) {
+  return values.filter(Boolean).join(" ");
+}
 
 export default function InstructorCommunityManage() {
-  const { dashboard, refresh } = useOutletContext();
-  const seedCommunities = useMemo(
-    () =>
-      (Array.isArray(dashboard?.communities?.manageDeck) ? dashboard.communities.manageDeck : []).map((community) => ({
-        id: community.id ?? `${community.title}-${community.members}`,
-        title: community.title,
-        members: Number(community.members ?? 0),
-        trend: community.trend ?? 'Stable',
-        health: community.health ?? 'Healthy',
-        moderators: Number(community.moderators ?? 1),
-        approvalsPending: Number(community.approvalsPending ?? 0),
-        incidentsOpen: Number(community.incidentsOpen ?? 0),
-        escalationsOpen: Number(community.escalationsOpen ?? 0),
-        focus: community.focus ?? ''
-      })),
-    [dashboard?.communities?.manageDeck]
+  const { refresh } = useOutletContext();
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken;
+
+  const [communities, setCommunities] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [selectedDetail, setSelectedDetail] = useState(null);
+  const [form, setForm] = useState(buildFormState());
+  const [isDirty, setIsDirty] = useState(false);
+  const [loadingList, setLoadingList] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [listError, setListError] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [visibilityFilter, setVisibilityFilter] = useState("all");
+
+  const loadCommunities = useCallback(async () => {
+    if (!token) return;
+    setLoadingList(true);
+    setListError(null);
+    try {
+      const response = await fetchCommunities(token);
+      const data = Array.isArray(response.data) ? response.data : [];
+      setCommunities(data);
+      if (!selectedId && data.length > 0) {
+        setSelectedId(data[0].id);
+      }
+    } catch (error) {
+      setListError(error?.message ?? "Unable to load communities.");
+      setCommunities([]);
+      setSelectedId(null);
+    } finally {
+      setLoadingList(false);
+    }
+  }, [selectedId, token]);
+
+  useEffect(() => {
+    loadCommunities();
+  }, [loadCommunities]);
+
+  const selectedCommunity = useMemo(
+    () => communities.find((community) => community.id === selectedId) ?? null,
+    [communities, selectedId]
   );
 
-  const {
-    items: communities,
-    addItem,
-    updateItem,
-    removeItem,
-    reset: resetCommunities
-  } = usePersistentCollection('edulure.community.operations', () => seedCommunities);
+  useEffect(() => {
+    if (!token || !selectedId) {
+      setSelectedDetail(null);
+      setForm(buildFormState(selectedCommunity));
+      setIsDirty(false);
+      return;
+    }
 
-  const [draft, setDraft] = useState(createCommunityDraft);
-  const [editingId, setEditingId] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+    let cancelled = false;
+    const fetchDetail = async () => {
+      setLoadingDetail(true);
+      try {
+        const response = await fetchCommunityDetail(selectedId, token);
+        if (!cancelled) {
+          setSelectedDetail(response.data ?? null);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setFeedback({ tone: "error", message: error?.message ?? "Unable to load community detail." });
+          setSelectedDetail(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingDetail(false);
+        }
+      }
+    };
 
-  const metrics = useMemo(() => {
-    const totals = communities.reduce(
-      (acc, community) => {
-        acc.members += Number(community.members ?? 0);
-        acc.moderators += Number(community.moderators ?? 0);
-        acc.approvals += Number(community.approvalsPending ?? 0);
-        acc.incidents += Number(community.incidentsOpen ?? 0);
-        return acc;
-      },
-      { members: 0, moderators: 0, approvals: 0, incidents: 0 }
-    );
-    return totals;
-  }, [communities]);
+    fetchDetail();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, token]);
+
+  useEffect(() => {
+    if (!selectedCommunity) {
+      setForm(buildFormState());
+      setIsDirty(false);
+      return;
+    }
+    if (isDirty) {
+      return;
+    }
+    const detail = selectedDetail && selectedDetail.id === selectedCommunity.id ? selectedDetail : null;
+    setForm(buildFormState(detail ?? selectedCommunity));
+  }, [selectedCommunity, selectedDetail, isDirty]);
 
   const filteredCommunities = useMemo(() => {
-    if (!searchTerm) {
-      return communities;
-    }
-    const query = searchTerm.toLowerCase();
-    return communities.filter((community) =>
-      [community.title, community.trend, community.health, community.focus]
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
+    const query = searchTerm.trim().toLowerCase();
+    return communities.filter((community) => {
+      const matchesSearch =
+        !query ||
+        [community.name, community.description, community.metadata?.focus, community.metadata?.tone]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(query);
+      const matchesVisibility =
+        visibilityFilter === "all" || community.visibility === visibilityFilter || community.visibility === visibilityFilter;
+      return matchesSearch && matchesVisibility;
+    });
+  }, [communities, searchTerm, visibilityFilter]);
+
+  const summary = useMemo(() => {
+    return filteredCommunities.reduce(
+      (accumulator, community) => {
+        const stats = community.stats ?? {};
+        accumulator.totalMembers += Number(stats.members ?? 0);
+        accumulator.totalResources += Number(stats.resources ?? 0);
+        accumulator.privateCount += community.visibility === "private" ? 1 : 0;
+        accumulator.publicCount += community.visibility === "public" ? 1 : 0;
+        return accumulator;
+      },
+      { totalMembers: 0, totalResources: 0, privateCount: 0, publicCount: 0 }
     );
-  }, [communities, searchTerm]);
+  }, [filteredCommunities]);
+
+  const handleFieldChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setForm((previous) => ({ ...previous, [name]: value }));
+    setIsDirty(true);
+  }, []);
 
   const handleSubmit = useCallback(
-    (event) => {
+    async (event) => {
       event.preventDefault();
-      const payload = {
-        title: draft.title || 'Untitled community',
-        members: Number.isNaN(Number(draft.members)) ? 0 : Number(draft.members),
-        trend: draft.trend,
-        health: draft.health,
-        moderators: Number.isNaN(Number(draft.moderators)) ? 0 : Number(draft.moderators),
-        approvalsPending: Number.isNaN(Number(draft.approvalsPending)) ? 0 : Number(draft.approvalsPending),
-        incidentsOpen: Number.isNaN(Number(draft.incidentsOpen)) ? 0 : Number(draft.incidentsOpen),
-        escalationsOpen: Number.isNaN(Number(draft.escalationsOpen)) ? 0 : Number(draft.escalationsOpen),
-        focus: draft.focus
-      };
-
-      if (editingId) {
-        updateItem(editingId, payload);
-      } else {
-        addItem(payload);
+      if (!token || !selectedCommunity) {
+        return;
       }
-
-      setDraft(createCommunityDraft());
-      setEditingId(null);
+      setSaving(true);
+      setFeedback(null);
+      try {
+        const tags = form.tagsInput
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+        const playbooks = form.playbooksInput
+          .split("\n")
+          .map((entry) => entry.trim())
+          .filter(Boolean);
+        const payload = {
+          name: form.name,
+          description: form.description || undefined,
+          coverImageUrl: form.coverImageUrl || undefined,
+          visibility: form.visibility,
+          metadata: Object.fromEntries(
+            Object.entries({
+              tone: form.tone,
+              focus: form.focus,
+              onboardingGuideUrl: form.onboardingGuideUrl,
+              welcomeVideoUrl: form.welcomeVideoUrl,
+              theme: form.theme,
+              tags,
+              playbooks
+            }).filter(([, value]) => {
+              if (Array.isArray(value)) {
+                return value.length > 0;
+              }
+              return value !== "" && value !== null && value !== undefined;
+            })
+          )
+        };
+        await updateCommunity({ communityId: selectedCommunity.id, token, payload });
+        setFeedback({ tone: "success", message: "Community updated successfully." });
+        setIsDirty(false);
+        await loadCommunities();
+      } catch (error) {
+        setFeedback({ tone: "error", message: error?.message ?? "Unable to update community." });
+      } finally {
+        setSaving(false);
+      }
     },
-    [addItem, draft, editingId, updateItem]
+    [form, loadCommunities, selectedCommunity, token]
   );
 
-  const handleEdit = useCallback((community) => {
-    setEditingId(community.id);
-    setDraft({
-      title: community.title,
-      members: community.members,
-      trend: community.trend,
-      health: community.health,
-      moderators: community.moderators,
-      approvalsPending: community.approvalsPending,
-      incidentsOpen: community.incidentsOpen,
-      escalationsOpen: community.escalationsOpen,
-      focus: community.focus
-    });
-  }, []);
-
-  const handleCancelEdit = useCallback(() => {
-    setEditingId(null);
-    setDraft(createCommunityDraft());
-  }, []);
-
-  const handleFocusChange = useCallback(
-    (community, focus) => {
-      updateItem(community.id, { focus });
+  const handleArchive = useCallback(
+    async (community) => {
+      if (!token) return;
+      if (!window.confirm(`Archive ${community.name}? Members will lose access.`)) {
+        return;
+      }
+      setDeletingId(community.id);
+      setFeedback(null);
+      try {
+        await deleteCommunity({ communityId: community.id, token });
+        setFeedback({ tone: "success", message: "Community archived successfully." });
+        if (selectedId === community.id) {
+          setSelectedId(null);
+          setSelectedDetail(null);
+        }
+        await loadCommunities();
+      } catch (error) {
+        setFeedback({ tone: "error", message: error?.message ?? "Unable to archive community." });
+      } finally {
+        setDeletingId(null);
+      }
     },
-    [updateItem]
+    [loadCommunities, selectedId, token]
   );
+
+  const communityChannels = useMemo(() => {
+    if (selectedDetail?.channels) {
+      return selectedDetail.channels;
+    }
+    return [];
+  }, [selectedDetail]);
 
   return (
     <div className="space-y-8">
+      <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
+
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Community operations</h1>
+          <h1 className="text-2xl font-semibold text-slate-900">Community operations cockpit</h1>
           <p className="mt-2 text-sm text-slate-600">
-            Monitor growth, health, and resourcing across every live space in your portfolio.
+            Audit every Learnspace you steward, update positioning, and archive communities that have run their course.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button type="button" className="dashboard-pill px-4 py-2" onClick={resetCommunities}>
-            Reset metrics
+          <a href="/dashboard/instructor/community/create" className="dashboard-pill px-4 py-2">
+            Launch new community
+          </a>
+          <button type="button" className="dashboard-pill px-4 py-2" onClick={loadCommunities} disabled={loadingList}>
+            {loadingList ? "Refreshing…" : "Refresh list"}
           </button>
           <button type="button" className="dashboard-primary-pill" onClick={() => refresh?.()}>
             Refresh telemetry
@@ -147,239 +312,337 @@ export default function InstructorCommunityManage() {
         </div>
       </header>
 
-      <section className="grid gap-4 md:grid-cols-4">
-        <div className="dashboard-card-muted p-5">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Total members</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.members}</p>
-          <p className="mt-1 text-xs text-slate-500">Members participating across all communities.</p>
-        </div>
-        <div className="dashboard-card-muted p-5">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Moderators</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.moderators}</p>
-          <p className="mt-1 text-xs text-slate-500">Active stewards keeping rituals on track.</p>
-        </div>
-        <div className="dashboard-card-muted p-5">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Approvals queue</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.approvals}</p>
-          <p className="mt-1 text-xs text-slate-500">Members awaiting onboarding decisions.</p>
-        </div>
-        <div className="dashboard-card-muted p-5">
-          <p className="text-xs uppercase tracking-wide text-slate-500">Open incidents</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{metrics.incidents}</p>
-          <p className="mt-1 text-xs text-slate-500">Issues currently triaged by the operations team.</p>
-        </div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <article className="dashboard-card-muted p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Managed communities</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{filteredCommunities.length}</p>
+          <p className="mt-1 text-xs text-slate-500">{communities.length} total across your workspace.</p>
+        </article>
+        <article className="dashboard-card-muted p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Active members</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{summary.totalMembers}</p>
+          <p className="mt-1 text-xs text-slate-500">Aggregated membership across filtered communities.</p>
+        </article>
+        <article className="dashboard-card-muted p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Content assets</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{summary.totalResources}</p>
+          <p className="mt-1 text-xs text-slate-500">Published resources available to members.</p>
+        </article>
+        <article className="dashboard-card-muted p-5">
+          <p className="text-xs uppercase tracking-wide text-slate-500">Visibility mix</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">
+            {summary.publicCount} public · {summary.privateCount} private
+          </p>
+          <p className="mt-1 text-xs text-slate-500">Balance your open and invite-only experiences.</p>
+        </article>
       </section>
 
-      <section className="dashboard-section space-y-6">
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="dashboard-kicker">Community builder</p>
-            <h2 className="text-lg font-semibold text-slate-900">Add or update a community space</h2>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Search communities"
-              className="dashboard-input h-10"
-            />
-            {editingId ? (
-              <button type="button" className="dashboard-pill px-4 py-2" onClick={handleCancelEdit}>
-                Cancel edit
-              </button>
-            ) : null}
-          </div>
-        </header>
-
-        <form className="grid gap-4 rounded-2xl border border-slate-200 bg-white/60 p-5" onSubmit={handleSubmit}>
-          <label className="grid gap-1 text-sm text-slate-600">
-            Community name
-            <input
-              type="text"
-              required
-              value={draft.title}
-              onChange={(event) => setDraft((previous) => ({ ...previous, title: event.target.value }))}
-              className="dashboard-input"
-            />
-          </label>
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="grid gap-1 text-sm text-slate-600">
-              Members
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1.8fr)]">
+        <section className="dashboard-section space-y-5">
+          <header className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="dashboard-kicker">Your communities</p>
+              <h2 className="text-lg font-semibold text-slate-900">Portfolio overview</h2>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <input
-                type="number"
-                min="0"
-                value={draft.members}
-                onChange={(event) => setDraft((previous) => ({ ...previous, members: event.target.value }))}
-                className="dashboard-input"
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search by name, focus, or tone"
+                className="dashboard-input h-10"
               />
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              Moderators
-              <input
-                type="number"
-                min="0"
-                value={draft.moderators}
-                onChange={(event) => setDraft((previous) => ({ ...previous, moderators: event.target.value }))}
-                className="dashboard-input"
-              />
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              Health
               <select
-                className="dashboard-input"
-                value={draft.health}
-                onChange={(event) => setDraft((previous) => ({ ...previous, health: event.target.value }))}
+                value={visibilityFilter}
+                onChange={(event) => setVisibilityFilter(event.target.value)}
+                className="dashboard-input h-10"
               >
-                <option value="Healthy">Healthy</option>
-                <option value="Stable">Stable</option>
-                <option value="Watch">Watch</option>
-                <option value="At risk">At risk</option>
+                <option value="all">All visibilities</option>
+                <option value="public">Public</option>
+                <option value="private">Private</option>
               </select>
-            </label>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="grid gap-1 text-sm text-slate-600">
-              Trend
-              <select
-                className="dashboard-input"
-                value={draft.trend}
-                onChange={(event) => setDraft((previous) => ({ ...previous, trend: event.target.value }))}
-              >
-                <option value="Growing">Growing</option>
-                <option value="Stable">Stable</option>
-                <option value="Declining">Declining</option>
-              </select>
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              Approvals pending
-              <input
-                type="number"
-                min="0"
-                value={draft.approvalsPending}
-                onChange={(event) => setDraft((previous) => ({ ...previous, approvalsPending: event.target.value }))}
-                className="dashboard-input"
-              />
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              Focus area
-              <input
-                type="text"
-                value={draft.focus}
-                onChange={(event) => setDraft((previous) => ({ ...previous, focus: event.target.value }))}
-                className="dashboard-input"
-              />
-            </label>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="grid gap-1 text-sm text-slate-600">
-              Open incidents
-              <input
-                type="number"
-                min="0"
-                value={draft.incidentsOpen}
-                onChange={(event) => setDraft((previous) => ({ ...previous, incidentsOpen: event.target.value }))}
-                className="dashboard-input"
-              />
-            </label>
-            <label className="grid gap-1 text-sm text-slate-600">
-              Escalations open
-              <input
-                type="number"
-                min="0"
-                value={draft.escalationsOpen}
-                onChange={(event) => setDraft((previous) => ({ ...previous, escalationsOpen: event.target.value }))}
-                className="dashboard-input"
-              />
-            </label>
-          </div>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <button type="submit" className="dashboard-primary-pill px-6 py-2">
-              {editingId ? 'Update community' : 'Add community'}
-            </button>
-          </div>
-        </form>
+            </div>
+          </header>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredCommunities.map((community) => (
-            <article key={community.id} className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm">
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>{community.members} members</span>
-                <span>{community.trend}</span>
-              </div>
-              <h3 className="mt-2 text-lg font-semibold text-slate-900">{community.title}</h3>
-              <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">Health: {community.health}</p>
-              <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="font-semibold text-slate-700">Moderators</p>
-                  <p className="mt-1 text-lg text-slate-900">{community.moderators}</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="font-semibold text-slate-700">Approvals</p>
-                  <p className="mt-1 text-lg text-slate-900">{community.approvalsPending}</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="font-semibold text-slate-700">Incidents</p>
-                  <p className="mt-1 text-lg text-slate-900">{community.incidentsOpen}</p>
-                </div>
-                <div className="rounded-xl bg-slate-50 p-3">
-                  <p className="font-semibold text-slate-700">Escalations</p>
-                  <p className="mt-1 text-lg text-slate-900">{community.escalationsOpen}</p>
-                </div>
-              </div>
-              <label className="mt-4 block text-xs text-slate-500">
-                Quarterly focus
+          {listError ? (
+            <DashboardStateMessage
+              variant="error"
+              title="Unable to load communities"
+              description={listError}
+              actionLabel="Retry"
+              onAction={loadCommunities}
+            />
+          ) : null}
+
+          {loadingList ? (
+            <DashboardStateMessage
+              variant="loading"
+              title="Fetching communities"
+              description="Syncing the latest membership and engagement telemetry."
+            />
+          ) : null}
+
+          {!loadingList && filteredCommunities.length === 0 ? (
+            <DashboardStateMessage
+              title="No communities found"
+              description="Launch a new Learnspace or adjust your filters to continue managing existing spaces."
+              actionLabel="Create community"
+              onAction={() => (window.location.href = "/dashboard/instructor/community/create")}
+            />
+          ) : null}
+
+          <ul className="space-y-3">
+            {filteredCommunities.map((community) => {
+              const stats = community.stats ?? {};
+              const isSelected = community.id === selectedId;
+              return (
+                <li key={community.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(community.id);
+                      setIsDirty(false);
+                    }}
+                    className={classNames(
+                      "w-full rounded-2xl border p-4 text-left transition focus:outline-none focus:ring-2 focus:ring-primary/40",
+                      isSelected
+                        ? "border-primary/60 bg-primary/5 shadow-sm"
+                        : "border-slate-200 bg-white hover:border-primary/30 hover:bg-primary/5"
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-base font-semibold text-slate-900">{community.name}</p>
+                        <p className="mt-1 text-xs text-slate-500">{community.visibility === "private" ? "Private" : "Public"}</p>
+                      </div>
+                      <span className="dashboard-pill px-3 py-1 text-xs font-semibold">
+                        {stats.members ?? 0} members
+                      </span>
+                    </div>
+                    {community.description ? (
+                      <p className="mt-3 line-clamp-2 text-sm text-slate-600">{community.description}</p>
+                    ) : null}
+                    <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-500">
+                      {(community.metadata?.tags ?? []).map((tag) => (
+                        <span key={`${community.id}-${tag}`} className="dashboard-pill px-3 py-1">
+                          #{tag}
+                        </span>
+                      ))}
+                      {community.metadata?.focus ? (
+                        <span className="dashboard-pill px-3 py-1">{community.metadata.focus}</span>
+                      ) : null}
+                      <span className="dashboard-pill px-3 py-1">
+                        Updated {formatDateTime(community.stats?.lastActivityAt ?? community.updatedAt)}
+                      </span>
+                      <button
+                        type="button"
+                        className="dashboard-pill border-transparent bg-rose-50 px-3 py-1 text-rose-600 hover:border-rose-200"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleArchive(community);
+                        }}
+                        disabled={deletingId === community.id}
+                      >
+                        {deletingId === community.id ? "Archiving…" : "Archive"}
+                      </button>
+                    </div>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        <section className="dashboard-section space-y-6">
+          <div className="flex flex-col gap-2">
+            <p className="dashboard-kicker">Community configuration</p>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {selectedCommunity ? `Editing ${selectedCommunity.name}` : "Select a community"}
+            </h2>
+            <p className="text-sm text-slate-600">
+              Update positioning, shareable assets, and visibility controls. Changes sync instantly to the learner portal.
+            </p>
+          </div>
+
+          {!selectedCommunity ? (
+            <DashboardStateMessage
+              title="Choose a community"
+              description="Select a community from the list to view detail, update configuration, and manage channels."
+            />
+          ) : (
+            <form className="grid gap-4" onSubmit={handleSubmit}>
+              <label className="grid gap-1 text-sm text-slate-600">
+                Community name
                 <input
-                  type="text"
-                  value={community.focus}
-                  onChange={(event) => handleFocusChange(community, event.target.value)}
-                  className="dashboard-input mt-1"
-                  placeholder="Launch new onboarding cohort"
+                  required
+                  name="name"
+                  value={form.name}
+                  onChange={handleFieldChange}
+                  className="dashboard-input"
                 />
               </label>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
-                <button type="button" className="dashboard-pill px-3 py-1" onClick={() => handleEdit(community)}>
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  className="dashboard-pill px-3 py-1"
-                  onClick={() => updateItem(community.id, { approvalsPending: Math.max(0, community.approvalsPending - 1) })}
+              <label className="grid gap-1 text-sm text-slate-600">
+                Description
+                <textarea
+                  name="description"
+                  value={form.description}
+                  onChange={handleFieldChange}
+                  className="dashboard-input min-h-[120px]"
+                  placeholder="Describe the intent, rituals, and transformation your community delivers."
+                />
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-1 text-sm text-slate-600">
+                  Cover image URL
+                  <input
+                    name="coverImageUrl"
+                    value={form.coverImageUrl}
+                    onChange={handleFieldChange}
+                    className="dashboard-input"
+                    placeholder="https://cdn.example.com/community-cover.jpg"
+                  />
+                </label>
+                <label className="grid gap-1 text-sm text-slate-600">
+                  Visibility
+                  <select name="visibility" value={form.visibility} onChange={handleFieldChange} className="dashboard-input">
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                  </select>
+                </label>
+              </div>
+              {form.coverImageUrl ? (
+                <figure className="overflow-hidden rounded-2xl border border-slate-200">
+                  <img
+                    src={form.coverImageUrl}
+                    alt="Community cover preview"
+                    className="h-48 w-full object-cover"
+                    onError={(event) => {
+                      event.currentTarget.src =
+                        "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?auto=format&fit=crop&w=800&q=80";
+                    }}
+                  />
+                </figure>
+              ) : null}
+              <label className="grid gap-1 text-sm text-slate-600">
+                Tags
+                <input
+                  name="tagsInput"
+                  value={form.tagsInput}
+                  onChange={handleFieldChange}
+                  className="dashboard-input"
+                  placeholder="community, onboarding, mentorship"
+                />
+              </label>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-1 text-sm text-slate-600">
+                  Tone
+                  <select name="tone" value={form.tone} onChange={handleFieldChange} className="dashboard-input">
+                    <option value="curated">Curated — high touch moderation</option>
+                    <option value="open">Open — community-led discovery</option>
+                    <option value="experimental">Experimental — rapid iteration</option>
+                  </select>
+                </label>
+                <label className="grid gap-1 text-sm text-slate-600">
+                  Focus
+                  <input
+                    name="focus"
+                    value={form.focus}
+                    onChange={handleFieldChange}
+                    className="dashboard-input"
+                    placeholder="Ramp new cohort to launch-ready in 6 weeks"
+                  />
+                </label>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-1 text-sm text-slate-600">
+                  Onboarding guide URL
+                  <input
+                    name="onboardingGuideUrl"
+                    value={form.onboardingGuideUrl}
+                    onChange={handleFieldChange}
+                    className="dashboard-input"
+                    placeholder="https://docs.example.com/onboarding"
+                  />
+                </label>
+                <label className="grid gap-1 text-sm text-slate-600">
+                  Welcome video URL
+                  <input
+                    name="welcomeVideoUrl"
+                    value={form.welcomeVideoUrl}
+                    onChange={handleFieldChange}
+                    className="dashboard-input"
+                    placeholder="https://video.example.com/welcome.mp4"
+                  />
+                </label>
+              </div>
+              {form.welcomeVideoUrl ? (
+                <video
+                  controls
+                  src={form.welcomeVideoUrl}
+                  className="aspect-video w-full rounded-2xl border border-slate-200 object-cover"
+                  preload="metadata"
                 >
-                  Approve member
-                </button>
-                <button
-                  type="button"
-                  className="dashboard-pill px-3 py-1"
-                  onClick={() => updateItem(community.id, { incidentsOpen: Math.max(0, community.incidentsOpen - 1) })}
-                >
-                  Resolve incident
-                </button>
-                <button
-                  type="button"
-                  className="dashboard-pill border-transparent bg-rose-50 px-3 py-1 text-rose-600 hover:border-rose-200"
-                  onClick={() => removeItem(community.id)}
-                >
-                  Archive
+                  <track kind="captions" />
+                </video>
+              ) : null}
+              <label className="grid gap-1 text-sm text-slate-600">
+                Ritual playbooks
+                <textarea
+                  name="playbooksInput"
+                  value={form.playbooksInput}
+                  onChange={handleFieldChange}
+                  className="dashboard-input min-h-[120px]"
+                  placeholder={["Welcome circle", "Weekly co-working", "Demo day retro"].join("
+")}
+                />
+              </label>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <span className="text-xs text-slate-500">
+                  Last activity {formatDateTime(selectedCommunity.stats?.lastActivityAt ?? selectedCommunity.updatedAt)}
+                </span>
+                <button type="submit" className="dashboard-primary-pill px-6 py-2" disabled={saving || !isDirty}>
+                  {saving ? "Saving…" : isDirty ? "Save changes" : "Up to date"}
                 </button>
               </div>
-            </article>
-          ))}
-        </div>
+            </form>
+          )}
 
-        {filteredCommunities.length === 0 ? (
-          <DashboardStateMessage
-            title={communities.length === 0 ? 'Community metrics unavailable' : 'No communities match your filters'}
-            description={
-              communities.length === 0
-                ? 'Add your first community using the builder or refresh once telemetry has synced from source systems.'
-                : 'Clear the search input to continue managing your live communities.'
-            }
-            actionLabel={communities.length === 0 ? 'Add community' : undefined}
-            onAction={communities.length === 0 ? () => setEditingId(null) : undefined}
-          />
-        ) : null}
-      </section>
+          {loadingDetail ? (
+            <DashboardStateMessage
+              variant="loading"
+              title="Loading community detail"
+              description="Fetching channels and membership signals."
+            />
+          ) : null}
+
+          {communityChannels.length > 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+              <p className="dashboard-kicker">Channels</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                {communityChannels.map((channel) => (
+                  <li key={channel.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-2">
+                    <span>
+                      <span className="font-semibold text-slate-800">{channel.name}</span>
+                      <span className="ml-2 text-xs uppercase tracking-wide text-slate-500">{channel.type}</span>
+                    </span>
+                    {channel.isDefault ? (
+                      <span className="text-xs text-primary">Default</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      </div>
     </div>
   );
 }
+
+InstructorCommunityManage.propTypes = {
+  refresh: PropTypes.func
+};
+
+InstructorCommunityManage.defaultProps = {
+  refresh: undefined
+};
