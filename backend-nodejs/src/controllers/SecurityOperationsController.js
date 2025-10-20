@@ -1,5 +1,11 @@
 import securityOperationsService from '../services/SecurityOperationsService.js';
 
+function createHttpError(status, message) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
 function resolveActor(req) {
   if (!req.user) {
     return { id: null, role: 'system', type: 'system' };
@@ -55,6 +61,46 @@ function sanitiseOptionalText(input, { maxLength = 500 } = {}) {
   return text.slice(0, maxLength);
 }
 
+function sanitiseRequiredText(input, fieldName, options) {
+  const value = sanitiseOptionalText(input, options);
+  if (!value) {
+    throw createHttpError(400, `${fieldName} is required`);
+  }
+  return value;
+}
+
+function requirePositiveInteger(value, fieldName) {
+  const numeric = Number.parseInt(value, 10);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw createHttpError(400, `${fieldName} must be a positive integer`);
+  }
+  return numeric;
+}
+
+function parseOptionalDate(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw createHttpError(400, `${fieldName} must be a valid date`);
+    }
+    return value;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw createHttpError(400, `${fieldName} must be a valid date`);
+  }
+  return parsed;
+}
+
+function ensurePlainObject(value, fallback = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return fallback;
+  }
+  return value;
+}
+
 export default class SecurityOperationsController {
   static async listRiskRegister(req, res, next) {
     try {
@@ -83,22 +129,37 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const title = sanitiseRequiredText(req.body?.title, 'title', { maxLength: 300 });
+      const description = sanitiseRequiredText(req.body?.description, 'description', { maxLength: 5000 });
+      const mitigationPlan = sanitiseOptionalText(req.body?.mitigationPlan, { maxLength: 5000 });
+      const residualNotes = sanitiseOptionalText(req.body?.residualNotes, { maxLength: 5000 });
+      const regulatoryDriver = sanitiseOptionalText(req.body?.regulatoryDriver, { maxLength: 500 });
+      const reviewCadence = req.body?.reviewCadenceDays;
+      let reviewCadenceDays;
+      if (reviewCadence !== undefined) {
+        const cadenceNumber = Number(reviewCadence);
+        if (!Number.isFinite(cadenceNumber) || cadenceNumber <= 0) {
+          throw createHttpError(400, 'reviewCadenceDays must be a positive number');
+        }
+        reviewCadenceDays = Math.trunc(cadenceNumber);
+      }
+
       const record = await securityOperationsService.createRiskEntry({
         tenantId,
-        title: req.body?.title,
-        description: req.body?.description,
+        title,
+        description,
         category: req.body?.category,
         severity: req.body?.severity,
         likelihood: req.body?.likelihood,
-        reviewCadenceDays: req.body?.reviewCadenceDays,
-        mitigationPlan: req.body?.mitigationPlan,
-        residualNotes: req.body?.residualNotes,
-        regulatoryDriver: req.body?.regulatoryDriver,
+        reviewCadenceDays,
+        mitigationPlan,
+        residualNotes,
+        regulatoryDriver,
         detectionControls: req.body?.detectionControls,
         mitigationControls: req.body?.mitigationControls,
         tags: req.body?.tags,
         owner: req.body?.owner,
-        metadata: req.body?.metadata,
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -112,16 +173,20 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
-      const { riskId } = req.params;
+      const riskId = requirePositiveInteger(req.params?.riskId, 'riskId');
+      const status = sanitiseRequiredText(req.body?.status, 'status', { maxLength: 100 });
+      const residualNotes = sanitiseOptionalText(req.body?.residualNotes, { maxLength: 5000 });
+      const mitigationPlan = sanitiseOptionalText(req.body?.mitigationPlan, { maxLength: 5000 });
+      const nextReviewAt = parseOptionalDate(req.body?.nextReviewAt, 'nextReviewAt');
       const updated = await securityOperationsService.updateRiskStatus({
-        riskId: Number(riskId),
+        riskId,
         tenantId,
-        status: req.body?.status,
+        status,
         residualSeverity: req.body?.residualSeverity,
         residualLikelihood: req.body?.residualLikelihood,
-        residualNotes: req.body?.residualNotes,
-        mitigationPlan: req.body?.mitigationPlan,
-        nextReviewAt: req.body?.nextReviewAt,
+        residualNotes,
+        mitigationPlan,
+        nextReviewAt,
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -135,13 +200,7 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
-      const { riskId } = req.params;
-      const parsedRiskId = Number.parseInt(riskId, 10);
-      if (!Number.isFinite(parsedRiskId) || parsedRiskId <= 0) {
-        const error = new Error('A valid riskId is required');
-        error.status = 400;
-        throw error;
-      }
+      const parsedRiskId = requirePositiveInteger(req.params?.riskId, 'riskId');
       const reason = sanitiseOptionalText(req.body?.reason ?? req.query?.reason, { maxLength: 500 });
 
       const acknowledgement = await securityOperationsService.deleteRisk({
@@ -165,18 +224,22 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
-      const { riskId } = req.params;
+      const riskId = requirePositiveInteger(req.params?.riskId, 'riskId');
+      const status = sanitiseOptionalText(req.body?.status, { maxLength: 100 });
+      const notes = sanitiseOptionalText(req.body?.notes, { maxLength: 5000 });
+      const nextReviewAt = parseOptionalDate(req.body?.nextReviewAt, 'nextReviewAt');
+      const reviewedAt = parseOptionalDate(req.body?.reviewedAt, 'reviewedAt');
       const payload = await securityOperationsService.recordRiskReview({
-        riskId: Number(riskId),
+        riskId,
         tenantId,
-        status: req.body?.status,
+        status,
         residualSeverity: req.body?.residualSeverity,
         residualLikelihood: req.body?.residualLikelihood,
-        notes: req.body?.notes,
+        notes,
         evidenceReferences: req.body?.evidenceReferences,
         reviewer: req.body?.reviewer,
-        nextReviewAt: req.body?.nextReviewAt,
-        reviewedAt: req.body?.reviewedAt,
+        nextReviewAt,
+        reviewedAt,
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -208,22 +271,30 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const storagePath = sanitiseRequiredText(req.body?.storagePath, 'storagePath', { maxLength: 1024 });
+      const framework = sanitiseOptionalText(req.body?.framework, { maxLength: 200 });
+      const controlReference = sanitiseOptionalText(req.body?.controlReference, { maxLength: 200 });
+      const evidenceType = sanitiseOptionalText(req.body?.evidenceType, { maxLength: 200 });
+      const checksum = sanitiseOptionalText(req.body?.checksum, { maxLength: 512 });
+      const description = sanitiseOptionalText(req.body?.description, { maxLength: 5000 });
+      const capturedAt = parseOptionalDate(req.body?.capturedAt, 'capturedAt');
+      const expiresAt = parseOptionalDate(req.body?.expiresAt, 'expiresAt');
       const evidence = await securityOperationsService.recordAuditEvidence({
         tenantId,
         riskId: req.body?.riskId,
-        framework: req.body?.framework,
-        controlReference: req.body?.controlReference,
-        evidenceType: req.body?.evidenceType,
-        storagePath: req.body?.storagePath,
-        checksum: req.body?.checksum,
+        framework,
+        controlReference,
+        evidenceType,
+        storagePath,
+        checksum,
         sources: req.body?.sources,
-        capturedAt: req.body?.capturedAt,
-        expiresAt: req.body?.expiresAt,
+        capturedAt,
+        expiresAt,
         status: req.body?.status,
         submittedBy: req.body?.submittedBy,
         submittedByEmail: req.body?.submittedByEmail,
-        description: req.body?.description,
-        metadata: req.body?.metadata,
+        description,
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -254,22 +325,27 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const scenarioKey = sanitiseRequiredText(req.body?.scenarioKey, 'scenarioKey', { maxLength: 200 });
+      const scenarioSummary = sanitiseRequiredText(req.body?.scenarioSummary, 'scenarioSummary', { maxLength: 2000 });
+      const exerciseType = sanitiseOptionalText(req.body?.exerciseType, { maxLength: 200 });
+      const outcome = sanitiseOptionalText(req.body?.outcome, { maxLength: 200 });
+      const lessonsLearned = sanitiseOptionalText(req.body?.lessonsLearned, { maxLength: 5000 });
       const record = await securityOperationsService.logContinuityExercise({
         tenantId,
-        scenarioKey: req.body?.scenarioKey,
-        scenarioSummary: req.body?.scenarioSummary,
-        exerciseType: req.body?.exerciseType,
-        startedAt: req.body?.startedAt,
-        completedAt: req.body?.completedAt,
+        scenarioKey,
+        scenarioSummary,
+        exerciseType,
+        startedAt: parseOptionalDate(req.body?.startedAt, 'startedAt'),
+        completedAt: parseOptionalDate(req.body?.completedAt, 'completedAt'),
         rtoTargetMinutes: req.body?.rtoTargetMinutes,
         rpoTargetMinutes: req.body?.rpoTargetMinutes,
         actualRtoMinutes: req.body?.actualRtoMinutes,
         actualRpoMinutes: req.body?.actualRpoMinutes,
-        outcome: req.body?.outcome,
-        lessonsLearned: req.body?.lessonsLearned,
+        outcome,
+        lessonsLearned,
         followUpActions: req.body?.followUpActions,
         owner: req.body?.owner,
-        metadata: req.body?.metadata,
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -301,15 +377,23 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const assessmentType = sanitiseRequiredText(req.body?.assessmentType, 'assessmentType', { maxLength: 200 });
+      const scheduledFor = parseOptionalDate(req.body?.scheduledFor, 'scheduledFor');
+      if (!scheduledFor) {
+        throw createHttpError(400, 'scheduledFor is required');
+      }
+      const status = sanitiseOptionalText(req.body?.status, { maxLength: 200 });
+      const scope = sanitiseOptionalText(req.body?.scope, { maxLength: 5000 });
+      const methodology = sanitiseOptionalText(req.body?.methodology, { maxLength: 5000 });
       const assessment = await securityOperationsService.scheduleAssessment({
         tenantId,
-        assessmentType: req.body?.assessmentType,
-        scheduledFor: req.body?.scheduledFor,
-        status: req.body?.status,
+        assessmentType,
+        scheduledFor,
+        status,
         owner: req.body?.owner,
-        scope: req.body?.scope,
-        methodology: req.body?.methodology,
-        metadata: req.body?.metadata,
+        scope,
+        methodology,
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });

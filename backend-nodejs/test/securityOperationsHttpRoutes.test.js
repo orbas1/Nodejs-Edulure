@@ -83,13 +83,45 @@ describe('Security operations HTTP routes', () => {
 
     const response = await request(app)
       .post('/api/v1/security/risk-register')
-      .send({ title: 'Third-party outage', description: 'Vendor SOC2 revoked.' })
+      .send({
+        title: '  Third-party outage ',
+        description: ' Vendor SOC2 revoked. ',
+        mitigationPlan: '  Documented  ',
+        reviewCadenceDays: 45
+      })
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(201);
     expect(createRiskEntry).toHaveBeenCalledWith(
-      expect.objectContaining({ title: 'Third-party outage', description: 'Vendor SOC2 revoked.' })
+      expect.objectContaining({
+        title: 'Third-party outage',
+        description: 'Vendor SOC2 revoked.',
+        mitigationPlan: 'Documented',
+        reviewCadenceDays: 45
+      })
     );
+  });
+
+  it('rejects create requests without the minimum required attributes', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/risk-register')
+      .send({ description: 'Missing title' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('title is required');
+    expect(createRiskEntry).not.toHaveBeenCalled();
+  });
+
+  it('rejects create requests with invalid review cadence', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/risk-register')
+      .send({ title: 'Risk', description: 'Description', reviewCadenceDays: -2 })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('reviewCadenceDays must be a positive number');
+    expect(createRiskEntry).not.toHaveBeenCalled();
   });
 
   it('updates residual status information', async () => {
@@ -97,13 +129,24 @@ describe('Security operations HTTP routes', () => {
 
     const response = await request(app)
       .patch('/api/v1/security/risk-register/99/status')
-      .send({ status: 'accepted', residualSeverity: 'moderate', residualLikelihood: 'unlikely' })
+      .send({ status: ' accepted ', residualSeverity: 'moderate', residualLikelihood: 'unlikely' })
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
     expect(updateRiskStatus).toHaveBeenCalledWith(
       expect.objectContaining({ riskId: 99, status: 'accepted' })
     );
+  });
+
+  it('rejects status updates when the status value is missing', async () => {
+    const response = await request(app)
+      .patch('/api/v1/security/risk-register/11/status')
+      .send({ residualSeverity: 'moderate' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('status is required');
+    expect(updateRiskStatus).not.toHaveBeenCalled();
   });
 
   it('deletes risks from the register', async () => {
@@ -128,7 +171,7 @@ describe('Security operations HTTP routes', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
-    expect(response.body.error).toBe('A valid riskId is required');
+    expect(response.body.error).toBe('riskId must be a positive integer');
     expect(deleteRisk).not.toHaveBeenCalled();
   });
 
@@ -164,13 +207,34 @@ describe('Security operations HTTP routes', () => {
 
     const response = await request(app)
       .post('/api/v1/security/audit-evidence')
-      .send({ storagePath: 's3://evidence/path.pdf' })
+      .send({
+        storagePath: '  s3://evidence/path.pdf  ',
+        framework: ' SOC2 ',
+        controlReference: ' CC-1 ',
+        capturedAt: '2024-05-01T00:00:00.000Z'
+      })
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(201);
     expect(recordAuditEvidence).toHaveBeenCalledWith(
-      expect.objectContaining({ storagePath: 's3://evidence/path.pdf' })
+      expect.objectContaining({
+        storagePath: 's3://evidence/path.pdf',
+        framework: 'SOC2',
+        controlReference: 'CC-1',
+        capturedAt: expect.any(Date)
+      })
     );
+  });
+
+  it('rejects audit evidence submissions without a storage path', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/audit-evidence')
+      .send({ framework: 'SOC2' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('storagePath is required');
+    expect(recordAuditEvidence).not.toHaveBeenCalled();
   });
 
   it('logs business continuity exercises', async () => {
@@ -179,15 +243,103 @@ describe('Security operations HTTP routes', () => {
     const response = await request(app)
       .post('/api/v1/security/continuity/exercises')
       .send({
-        scenarioKey: 'rds-drill',
-        scenarioSummary: 'RDS failover validation',
+        scenarioKey: ' rds-drill ',
+        scenarioSummary: ' RDS failover validation ',
         exerciseType: 'tabletop'
       })
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(201);
     expect(logContinuityExercise).toHaveBeenCalledWith(
-      expect.objectContaining({ scenarioKey: 'rds-drill' })
+      expect.objectContaining({ scenarioKey: 'rds-drill', scenarioSummary: 'RDS failover validation' })
     );
+  });
+
+  it('requires a positive identifier when recording risk reviews', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/risk-register/not-valid/reviews')
+      .send({ status: 'complete' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('riskId must be a positive integer');
+    expect(recordRiskReview).not.toHaveBeenCalled();
+  });
+
+  it('rejects risk review submissions with invalid date payloads', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/risk-register/12/reviews')
+      .send({ reviewedAt: 'not-a-date' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('reviewedAt must be a valid date');
+    expect(recordRiskReview).not.toHaveBeenCalled();
+  });
+
+  it('rejects audit evidence submissions with invalid timestamps', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/audit-evidence')
+      .send({ storagePath: 's3://bucket', capturedAt: 'invalid-date' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('capturedAt must be a valid date');
+    expect(recordAuditEvidence).not.toHaveBeenCalled();
+  });
+
+  it('rejects schedule assessment requests without required fields', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/assessments')
+      .send({ assessmentType: 'pentest' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('scheduledFor is required');
+    expect(scheduleAssessment).not.toHaveBeenCalled();
+  });
+
+  it('rejects schedule assessment requests with invalid dates', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/assessments')
+      .send({ assessmentType: 'pentest', scheduledFor: 'invalid' })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('scheduledFor must be a valid date');
+    expect(scheduleAssessment).not.toHaveBeenCalled();
+  });
+
+  it('schedules assessments with sanitised payloads', async () => {
+    scheduleAssessment.mockResolvedValue({ assessmentUuid: 'asm-1' });
+
+    const response = await request(app)
+      .post('/api/v1/security/assessments')
+      .send({
+        assessmentType: '  pentest ',
+        scheduledFor: '2025-01-01T00:00:00.000Z',
+        scope: '  External perimeter  '
+      })
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(201);
+    expect(scheduleAssessment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        assessmentType: 'pentest',
+        scheduledFor: expect.any(Date),
+        scope: 'External perimeter'
+      })
+    );
+  });
+
+  it('rejects continuity exercises missing the scenario context', async () => {
+    const response = await request(app)
+      .post('/api/v1/security/continuity/exercises')
+      .send({})
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe('scenarioKey is required');
+    expect(logContinuityExercise).not.toHaveBeenCalled();
   });
 });
