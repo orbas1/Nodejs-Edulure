@@ -7,7 +7,9 @@ const DEFAULT_STATE = {
   lastFailureAt: null,
   lastSuccessAt: null,
   halfOpenSuccesses: 0,
-  halfOpenFailures: 0
+  halfOpenFailures: 0,
+  pausedUntil: null,
+  lastAttemptAt: null
 };
 
 export default class IntegrationCircuitBreaker {
@@ -38,7 +40,12 @@ export default class IntegrationCircuitBreaker {
         const raw = await this.redis.get(this.key);
         if (raw) {
           const parsed = JSON.parse(raw);
-          this.memoryState = { ...DEFAULT_STATE, ...parsed };
+          this.memoryState = {
+            ...DEFAULT_STATE,
+            ...parsed,
+            pausedUntil: parsed.pausedUntil ? new Date(parsed.pausedUntil) : null,
+            lastAttemptAt: parsed.lastAttemptAt ? new Date(parsed.lastAttemptAt) : null
+          };
         }
       } catch (error) {
         this.logger.warn({ err: error }, 'Failed to read circuit breaker state from Redis');
@@ -49,14 +56,24 @@ export default class IntegrationCircuitBreaker {
   }
 
   async persistState(state) {
-    this.memoryState = state;
+    const nextState = {
+      ...DEFAULT_STATE,
+      ...state,
+      pausedUntil: state.pausedUntil instanceof Date ? state.pausedUntil : state.pausedUntil ?? null
+    };
+    this.memoryState = nextState;
     if (!this.redis) {
       return;
     }
 
     try {
       const ttl = Math.max(this.cooldownMs * 2, 10 * 60 * 1000);
-      await this.redis.set(this.key, JSON.stringify(state), 'PX', ttl);
+      const serialisable = {
+        ...nextState,
+        pausedUntil: nextState.pausedUntil ? nextState.pausedUntil.toISOString() : null,
+        lastAttemptAt: nextState.lastAttemptAt ? nextState.lastAttemptAt.toISOString() : null
+      };
+      await this.redis.set(this.key, JSON.stringify(serialisable), 'PX', ttl);
     } catch (error) {
       this.logger.warn({ err: error }, 'Failed to persist circuit breaker state to Redis');
     }
@@ -66,8 +83,20 @@ export default class IntegrationCircuitBreaker {
     const state = await this.loadState();
     const now = Date.now();
 
+    if (state.pausedUntil instanceof Date) {
+      if (now < state.pausedUntil.getTime()) {
+        return {
+          allowed: false,
+          mode: 'paused',
+          resumeAt: state.pausedUntil.toISOString()
+        };
+      }
+      state.pausedUntil = null;
+    }
+
     if (state.mode === 'open') {
-      if (!state.openedAt || now - state.openedAt >= this.cooldownMs) {
+      const openedAt = typeof state.openedAt === 'number' ? state.openedAt : now;
+      if (now - openedAt >= this.cooldownMs) {
         state.mode = 'half-open';
         state.halfOpenSuccesses = 0;
         state.halfOpenFailures = 0;
@@ -75,10 +104,19 @@ export default class IntegrationCircuitBreaker {
         return { allowed: true, mode: 'half-open' };
       }
 
-      return { allowed: false, mode: 'open' };
+      const resumeAt = new Date(openedAt + this.cooldownMs);
+      return {
+        allowed: false,
+        mode: 'open',
+        resumeAt: resumeAt.toISOString()
+      };
     }
 
-    await this.persistState({ ...state, lastAttemptAt: now });
+    const nextState = {
+      ...state,
+      lastAttemptAt: new Date(now)
+    };
+    await this.persistState(nextState);
     return { allowed: true, mode: state.mode ?? 'closed' };
   }
 
@@ -94,10 +132,12 @@ export default class IntegrationCircuitBreaker {
         state.openedAt = null;
         state.halfOpenSuccesses = 0;
         state.halfOpenFailures = 0;
+        state.pausedUntil = null;
       }
     } else {
       state.failureCount = 0;
       state.openedAt = null;
+      state.pausedUntil = null;
     }
 
     await this.persistState(state);
@@ -113,6 +153,7 @@ export default class IntegrationCircuitBreaker {
       state.mode = 'open';
       state.failureCount = this.failureThreshold;
       state.openedAt = now;
+      state.pausedUntil = null;
       await this.persistState(state);
       return;
     }
@@ -121,6 +162,7 @@ export default class IntegrationCircuitBreaker {
     if (state.failureCount >= this.failureThreshold) {
       state.mode = 'open';
       state.openedAt = now;
+      state.pausedUntil = null;
     }
 
     await this.persistState(state);
@@ -138,6 +180,7 @@ export default class IntegrationCircuitBreaker {
     const state = await this.loadState();
     state.mode = 'open';
     state.openedAt = Date.now();
+    state.pausedUntil = new Date(state.openedAt + durationMs);
     await this.persistState(state);
     await delay(durationMs);
   }

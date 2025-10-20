@@ -5,8 +5,31 @@ import { sessionRegistry } from '../services/SessionRegistry.js';
 const rolePriority = {
   user: 1,
   instructor: 2,
-  admin: 3
+  staff: 2,
+  admin: 3,
+  service: 4
 };
+
+function resolveRequiredRoles(input) {
+  if (!input) {
+    return [];
+  }
+  if (Array.isArray(input)) {
+    return input.map((role) => String(role).toLowerCase()).filter(Boolean);
+  }
+  if (typeof input === 'string') {
+    return [input.toLowerCase()];
+  }
+  return [];
+}
+
+function getRolePriority(role) {
+  if (!role) {
+    return 0;
+  }
+  const normalised = String(role).toLowerCase();
+  return rolePriority[normalised] ?? 0;
+}
 
 export default function auth(requiredRole) {
   return async (req, res, next) => {
@@ -27,12 +50,15 @@ export default function auth(requiredRole) {
       }
 
       const session = await sessionRegistry.ensureActive(payload.sid);
-      req.user = { ...payload, id: payload.sub, sessionId: session.id };
-      updateRequestContext({ userId: payload.sub, userRole: payload.role, sessionId: session.id });
-      if (requiredRole) {
-        const userPriority = rolePriority[payload.role] ?? 0;
-        const requiredPriority = rolePriority[requiredRole];
-        if (userPriority < requiredPriority) {
+      const userRole = payload.role ?? payload.roles?.[0] ?? null;
+      req.user = { ...payload, id: payload.sub, role: userRole, sessionId: session.id };
+      updateRequestContext({ userId: payload.sub, userRole, sessionId: session.id });
+
+      const requiredRoles = resolveRequiredRoles(requiredRole);
+      if (requiredRoles.length > 0) {
+        const userPriority = getRolePriority(userRole);
+        const authorised = requiredRoles.some((role) => userPriority >= getRolePriority(role));
+        if (!authorised) {
           return res.status(403).json({ success: false, message: 'Insufficient permissions' });
         }
       }
