@@ -83,7 +83,10 @@ describe('IntegrationKeyInviteController', () => {
       requestId: null,
       ipAddress: null,
       userAgent: null,
-      origin: null
+      origin: null,
+      method: null,
+      path: null,
+      tokenFingerprint: '1251557ad211cc48'
     });
 
     expect(res.set).toHaveBeenCalledWith('Cache-Control', 'no-store, max-age=0, must-revalidate');

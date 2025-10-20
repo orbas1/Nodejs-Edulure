@@ -61,6 +61,10 @@ const databaseMock = {
   transaction: vi.fn(async (handler) => handler(trxMock))
 };
 
+const auditLoggerMock = {
+  record: vi.fn()
+};
+
 const now = new Date('2025-02-26T10:00:00.000Z');
 
 describe('IntegrationApiKeyInviteService', () => {
@@ -71,6 +75,8 @@ describe('IntegrationApiKeyInviteService', () => {
     vi.clearAllMocks();
     inviteModelMock.hashToken.mockImplementation((token) => `hash-${token}`);
     mailServiceMock.sendMail.mockResolvedValue(true);
+    auditLoggerMock.record.mockReset();
+    auditLoggerMock.record.mockResolvedValue();
     randomBytesSpy = vi.spyOn(crypto, 'randomBytes').mockReturnValue(
       Buffer.from('token-abc123token-abc123token-abc123token-abc123', 'utf8')
     );
@@ -81,7 +87,9 @@ describe('IntegrationApiKeyInviteService', () => {
       apiKeyService: apiKeyServiceMock,
       mailService: mailServiceMock,
       database: databaseMock,
-      nowProvider: () => now
+      nowProvider: () => now,
+      auditLogger: auditLoggerMock,
+      auditTenantId: 'integrations'
     });
   });
 
@@ -150,6 +158,19 @@ describe('IntegrationApiKeyInviteService', () => {
       })
     );
     expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
+    expect(auditLoggerMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'integrations.invite.created',
+        entityType: 'integration_api_key_invite',
+        entityId: 'invite-uuid',
+        metadata: expect.objectContaining({
+          provider: 'openai',
+          ownerEmail: 'ops@example.com',
+          rotationIntervalDays: 90,
+          requestedByName: 'Ops Admin'
+        })
+      })
+    );
   });
 
   it('resends an invite and refreshes expiry and token metadata', async () => {
@@ -199,6 +220,16 @@ describe('IntegrationApiKeyInviteService', () => {
       expect.objectContaining({ id: 'invite-uuid', status: 'pending', sendCount: 2 })
     );
     expect(result.claimUrl).toMatch('https://ops.edulure.com/integrations/credential-invite/');
+    expect(auditLoggerMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'integrations.invite.resent',
+        entityId: 'invite-uuid',
+        metadata: expect.objectContaining({
+          sendCount: 2,
+          provider: 'openai'
+        })
+      })
+    );
   });
 
   it('cancels an invite and records audit metadata', async () => {
@@ -230,6 +261,13 @@ describe('IntegrationApiKeyInviteService', () => {
       databaseMock
     );
     expect(result).toEqual(expect.objectContaining({ status: 'cancelled', cancelledBy: 'admin@example.com' }));
+    expect(auditLoggerMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'integrations.invite.cancelled',
+        entityId: 'invite-uuid',
+        metadata: expect.objectContaining({ cancelledBy: 'admin@example.com' })
+      })
+    );
   });
 
   it('submits an invite by creating a new API key when no existing key is linked', async () => {
@@ -259,14 +297,18 @@ describe('IntegrationApiKeyInviteService', () => {
     apiKeyServiceMock.createKey.mockResolvedValue({ id: 5, alias: 'Content Studio Bot', status: 'active' });
     inviteModelMock.updateById.mockResolvedValue({ id: 'invite-uuid', status: 'completed', apiKeyId: 5 });
 
-    const result = await service.submitInvitation('token-xyz', {
-      key: 'sk-live-example-credential-1234567890',
-      rotationIntervalDays: 60,
-      keyExpiresAt: '2025-03-10T10:00:00.000Z',
-      actorEmail: 'ops@example.com',
-      actorName: 'Ops Team',
-      reason: 'Initial provision'
-    });
+    const result = await service.submitInvitation(
+      'token-xyz',
+      {
+        key: 'sk-live-example-credential-1234567890',
+        rotationIntervalDays: 60,
+        keyExpiresAt: '2025-03-10T10:00:00.000Z',
+        actorEmail: 'ops@example.com',
+        actorName: 'Ops Team',
+        reason: 'Initial provision'
+      },
+      { tokenFingerprint: 'abcdef1234567890' }
+    );
 
     expect(databaseMock.transaction).toHaveBeenCalled();
     expect(apiKeyServiceMock.createKey).toHaveBeenCalledWith(
@@ -290,6 +332,17 @@ describe('IntegrationApiKeyInviteService', () => {
     );
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 5, sanitized: true }));
     expect(result.invite).toEqual(expect.objectContaining({ id: 'invite-uuid', status: 'completed' }));
+    expect(auditLoggerMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'integrations.invite.fulfilled',
+        entityId: 'invite-uuid',
+        metadata: expect.objectContaining({
+          apiKeyId: 5,
+          tokenFingerprint: 'abcdef1234567890',
+          provider: 'openai'
+        })
+      })
+    );
   });
 
   it('submits an invite by rotating an existing API key', async () => {
@@ -343,6 +396,12 @@ describe('IntegrationApiKeyInviteService', () => {
       fulfilledAt: now.toISOString()
     });
     expect(result.apiKey).toEqual(expect.objectContaining({ id: 9, sanitized: true }));
+    expect(auditLoggerMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'integrations.invite.fulfilled',
+        metadata: expect.objectContaining({ apiKeyId: 9, provider: 'openai' })
+      })
+    );
   });
 
   it('persists fulfilment context metadata when provided', async () => {
@@ -398,6 +457,15 @@ describe('IntegrationApiKeyInviteService', () => {
       origin: 'https://portal.edulure.com'
     });
     expect(updatePayload.metadata.fulfilledAt).toBe(now.toISOString());
+    expect(auditLoggerMock.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestContext: expect.objectContaining({ requestId: 'req-123', ipAddress: '203.0.113.5' }),
+        metadata: expect.objectContaining({
+          fulfilledReason: 'Initial provision',
+          actorRoles: ['admin', 'integrations']
+        })
+      })
+    );
   });
 
   afterEach(() => {

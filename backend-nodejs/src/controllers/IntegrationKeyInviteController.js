@@ -128,6 +128,12 @@ function extractSubmissionContext(req) {
 
   const userAgent = normaliseHeaderValue(req?.headers?.['user-agent']);
   const origin = normaliseHeaderValue(req?.headers?.origin);
+  const method = typeof req?.method === 'string' ? req.method.trim().toUpperCase() || null : null;
+  const path = typeof req?.originalUrl === 'string' && req.originalUrl.trim()
+    ? req.originalUrl.trim()
+    : typeof req?.url === 'string' && req.url.trim()
+      ? req.url.trim()
+      : null;
 
   const actorId = typeof req?.user?.id === 'string'
     ? req.user.id
@@ -143,7 +149,9 @@ function extractSubmissionContext(req) {
     requestId: requestId ?? null,
     ipAddress: ipAddress ?? null,
     userAgent: userAgent ?? null,
-    origin: origin ?? null
+    origin: origin ?? null,
+    method,
+    path
   };
 }
 
@@ -237,6 +245,7 @@ export async function submitInvitation(req, res, next) {
       stripUnknown: true
     });
 
+    const tokenFingerprint = createTokenFingerprint(token);
     const actorEmailFromContext = typeof req.user?.email === 'string' && isValidEmail(req.user.email)
       ? req.user.email.trim().toLowerCase()
       : null;
@@ -249,10 +258,12 @@ export async function submitInvitation(req, res, next) {
       actorName: actorNameFromPayload ?? actorNameFromContext
     };
 
-    const submissionContext = extractSubmissionContext(req);
+    const submissionContext = {
+      ...extractSubmissionContext(req),
+      tokenFingerprint
+    };
     const result = await inviteService.submitInvitation(token, submission, submissionContext);
 
-    const tokenFingerprint = createTokenFingerprint(token);
     req.log?.info(
       {
         inviteTokenFingerprint: tokenFingerprint,
