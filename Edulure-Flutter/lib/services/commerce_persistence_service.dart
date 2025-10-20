@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive/hive.dart';
 
 import 'commerce_models.dart';
 
@@ -21,12 +21,20 @@ abstract class CommercePersistence {
   Future<void> saveCommunitySubscriptions(CommunitySubscriptionSnapshot snapshot);
 
   Future<void> reset();
+
+  Future<void> close();
 }
 
 class CommercePersistenceService implements CommercePersistence {
-  CommercePersistenceService({String boxName = _defaultBoxName})
-      : _boxName = boxName,
-        _encoder = const CommerceJsonEncoder();
+  CommercePersistenceService({
+    String boxName = _defaultBoxName,
+    HiveInterface? hive,
+    CommerceJsonEncoder encoder = const CommerceJsonEncoder(),
+    HiveCipher? cipher,
+  })  : _boxName = boxName,
+        _encoder = encoder,
+        _hive = hive ?? Hive,
+        _cipher = cipher;
 
   static const _defaultBoxName = 'commerce.state';
   static const _paymentsKey = 'payments';
@@ -36,6 +44,8 @@ class CommercePersistenceService implements CommercePersistence {
 
   final String _boxName;
   final CommerceJsonEncoder _encoder;
+  final HiveInterface _hive;
+  final HiveCipher? _cipher;
   Box<String>? _cachedBox;
 
   Future<Box<String>> _box() async {
@@ -43,7 +53,10 @@ class CommercePersistenceService implements CommercePersistence {
     if (cached != null && cached.isOpen) {
       return cached;
     }
-    final box = await Hive.openBox<String>(_boxName);
+    final box = await _hive.openBox<String>(
+      _boxName,
+      encryptionCipher: _cipher,
+    );
     _cachedBox = box;
     return box;
   }
@@ -94,6 +107,15 @@ class CommercePersistenceService implements CommercePersistence {
     await box.clear();
   }
 
+  @override
+  Future<void> close() async {
+    final cached = _cachedBox;
+    if (cached != null && cached.isOpen) {
+      await cached.close();
+    }
+    _cachedBox = null;
+  }
+
   Future<T?> _read<T>(String key, T Function(String payload) decoder) async {
     try {
       final box = await _box();
@@ -105,6 +127,10 @@ class CommercePersistenceService implements CommercePersistence {
     } catch (error, stackTrace) {
       debugPrint('Failed to read commerce key $key: $error');
       debugPrint('$stackTrace');
+      try {
+        final box = await _box();
+        await box.delete(key);
+      } catch (_) {}
       return null;
     }
   }

@@ -1,4 +1,4 @@
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive/hive.dart';
 
 import 'community_hub_models.dart';
 
@@ -14,6 +14,7 @@ class CommunityHubRepository {
   static const String _scoreboardKey = 'scoreboard';
   static const String _eventsKey = 'events';
   static const String _seededKey = 'seeded';
+  static const int _seedVersion = 2;
 
   final HiveInterface _hive;
 
@@ -26,7 +27,16 @@ class CommunityHubRepository {
 
   Future<void> seedIfNeeded() async {
     final box = await _ensureBox();
-    if (box.get(_seededKey) == true) {
+    final metadata = box.get(_seededKey);
+    int? storedVersion;
+    if (metadata is Map) {
+      storedVersion = metadata['version'] is int
+          ? metadata['version'] as int
+          : int.tryParse(metadata['version']?.toString() ?? '');
+    } else if (metadata == true) {
+      storedVersion = 1;
+    }
+    if (storedVersion != null && storedVersion >= _seedVersion) {
       return;
     }
 
@@ -160,19 +170,29 @@ class CommunityHubRepository {
     await box.put(_podcastsKey, seedPodcasts.map((item) => item.toJson()).toList());
     await box.put(_scoreboardKey, seedScoreboard.map((item) => item.toJson()).toList());
     await box.put(_eventsKey, seedEvents.map((item) => item.toJson()).toList());
-    await box.put(_seededKey, true);
+    await box.put(_seededKey, {
+      'version': _seedVersion,
+      'seededAt': now.toIso8601String(),
+    });
   }
 
   Future<CommunityHubSnapshot> loadSnapshot() async {
     final box = await _ensureBox();
     return CommunityHubSnapshot(
-      feed: _readList(box.get(_feedKey), CommunityFeedPost.fromJson),
-      classrooms: _readList(box.get(_classroomsKey), CommunityClassroom.fromJson),
-      calendarEntries: _readList(box.get(_calendarKey), CommunityCalendarEntry.fromJson),
-      livestreams: _readList(box.get(_livestreamsKey), CommunityLivestream.fromJson),
-      podcasts: _readList(box.get(_podcastsKey), CommunityPodcastEpisode.fromJson),
-      leaderboard: _readList(box.get(_scoreboardKey), CommunityLeaderboardEntry.fromJson),
-      events: _readList(box.get(_eventsKey), CommunityEvent.fromJson),
+      feed: _readList(box.get(_feedKey), CommunityFeedPost.fromJson)
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)),
+      classrooms: _readList(box.get(_classroomsKey), CommunityClassroom.fromJson)
+        ..sort((a, b) => a.startTime.compareTo(b.startTime)),
+      calendarEntries: _readList(box.get(_calendarKey), CommunityCalendarEntry.fromJson)
+        ..sort((a, b) => a.startTime.compareTo(b.startTime)),
+      livestreams: _readList(box.get(_livestreamsKey), CommunityLivestream.fromJson)
+        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt)),
+      podcasts: _readList(box.get(_podcastsKey), CommunityPodcastEpisode.fromJson)
+        ..sort((a, b) => b.publishedAt.compareTo(a.publishedAt)),
+      leaderboard: _readList(box.get(_scoreboardKey), CommunityLeaderboardEntry.fromJson)
+        ..sort((a, b) => a.rank.compareTo(b.rank)),
+      events: _readList(box.get(_eventsKey), CommunityEvent.fromJson)
+        ..sort((a, b) => a.startTime.compareTo(b.startTime)),
     );
   }
 
