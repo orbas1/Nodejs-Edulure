@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -47,76 +47,64 @@ vi.mock('../../../api/adminSettingsApi.js', () => ({
 
 describe('<DashboardSettings /> admin experience', () => {
   beforeEach(() => {
-    useOutletContextMock.mockReturnValue({ role: 'admin', dashboard: {} });
+    useOutletContextMock.mockReturnValue({ role: 'admin' });
 
     fetchAppearanceSettingsMock.mockResolvedValue({
-      brand: {
-        primaryColor: '#2563eb',
-        secondaryColor: '#1e293b',
-        accentColor: '#f97316'
+      branding: {
+        primaryColor: '#2563EB',
+        secondaryColor: '#9333EA',
+        accentColor: '#F59E0B',
+        logoUrl: 'https://cdn.example.com/logo.svg',
+        faviconUrl: ''
       },
-      layout: {
-        homepageHeadline: 'Design the future of learning',
-        homepageSubheadline: 'Deliver transformational learning.',
-        callToActionLabel: 'Launch learner hub',
-        callToActionUrl: '/explorer',
-        announcement: 'Now serving enterprise academies.'
+      theme: {
+        mode: 'light',
+        borderRadius: 'rounded',
+        density: 'comfortable',
+        fontFamily: 'Inter',
+        headingFontFamily: 'Cal Sans'
       },
-      typography: {
-        headingFont: 'Inter',
-        bodyFont: 'General Sans',
-        codeFont: 'Fira Code'
+      hero: {
+        heading: 'Inspire learners at scale',
+        subheading: 'Craft immersive cohort experiences.',
+        primaryCtaLabel: 'Explore programs',
+        primaryCtaUrl: '/explore'
       },
-      assets: []
+      mediaLibrary: []
     });
 
     fetchPreferenceSettingsMock.mockResolvedValue({
-      localization: {
+      localisation: {
         defaultLanguage: 'en',
-        supportedLanguages: ['en']
+        supportedLanguages: ['en'],
+        currency: 'USD',
+        timezone: 'UTC'
       },
-      registrations: {},
-      content: {},
-      communications: {}
+      experience: {
+        enableRecommendations: true,
+        enableSocialSharing: true,
+        enableLiveChatSupport: false,
+        allowGuestCheckout: false,
+        requireEmailVerification: true
+      },
+      communications: {
+        supportEmail: 'support@edulure.io',
+        supportPhone: '',
+        marketingEmail: '',
+        sendWeeklyDigest: true,
+        sendProductUpdates: true
+      }
     });
 
     fetchSystemSettingsMock.mockResolvedValue({
-      environment: {},
-      security: {},
-      storage: {},
-      performance: {}
+      maintenanceMode: { enabled: false, message: '', scheduledWindow: null },
+      operations: { timezone: 'UTC', weeklyBackupDay: 'sunday', autoUpdatesEnabled: true, dataRetentionDays: 365 },
+      security: { enforceMfaForAdmins: true, sessionTimeoutMinutes: 60, allowSessionResume: true },
+      observability: { enableAuditTrail: true, errorReportingEmail: '', notifyOnIntegrationFailure: true }
     });
 
-    fetchIntegrationSettingsMock.mockResolvedValue({
-      webhooks: [
-        {
-          id: 'enrollment-events',
-          name: 'Enrollment stream',
-          url: 'https://hooks.example.com/enrollments',
-          events: ['learner.enrolled'],
-          active: true
-        }
-      ],
-      services: []
-    });
-
-    fetchThirdPartySettingsMock.mockResolvedValue({
-      credentials: [
-        {
-          id: 'openai-prod',
-          provider: 'openai',
-          environment: 'production',
-          alias: 'Instructional design copilot',
-          ownerEmail: 'ai@edulure.com',
-          status: 'active',
-          notes: ''
-        }
-      ],
-      monitoring: {
-        enableHeartbeat: true,
-        alertEmails: ['platform-operations@edulure.com']
-      }
-    });
+    fetchIntegrationSettingsMock.mockResolvedValue({ webhooks: [], services: [] });
+    fetchThirdPartySettingsMock.mockResolvedValue({ credentials: [] });
 
     updateAppearanceSettingsMock.mockResolvedValue({});
     updatePreferenceSettingsMock.mockResolvedValue({});
@@ -129,43 +117,51 @@ describe('<DashboardSettings /> admin experience', () => {
     vi.clearAllMocks();
   });
 
-  it('allows admins to update appearance call-to-action copy', async () => {
-    const user = userEvent.setup({ delay: null });
+  it('allows admins to update primary branding colour', async () => {
+    const user = userEvent.setup();
     render(<DashboardSettings />);
 
-    const headline = await screen.findByText(/visual identity & appearance/i);
-    expect(headline).toBeInTheDocument();
+    const appearanceHeading = await screen.findByRole('heading', { name: /website appearance/i });
+    const appearanceSection = appearanceHeading.closest('section');
+    expect(appearanceSection).toBeInTheDocument();
 
-    const callToActionField = screen.getByLabelText(/call-to-action label/i);
-    await user.clear(callToActionField);
-    await user.type(callToActionField, 'Launch now');
+    const colourField = within(appearanceSection).getByLabelText(/primary colour/i);
+    await user.clear(colourField);
+    await user.type(colourField, '#111111');
 
-    const saveButton = screen.getByRole('button', { name: /save appearance/i });
-    expect(saveButton).toBeEnabled();
-
+    const saveButton = within(appearanceSection).getByRole('button', { name: /save changes/i });
     await user.click(saveButton);
 
     await waitFor(() => {
-      expect(updateAppearanceSettingsMock).toHaveBeenCalledTimes(1);
       expect(updateAppearanceSettingsMock).toHaveBeenCalledWith({
         token: 'token-123',
         payload: expect.objectContaining({
-          layout: expect.objectContaining({ callToActionLabel: 'Launch now' })
+          branding: expect.objectContaining({ primaryColor: '#111111' })
         })
       });
     });
   });
 
-  it('renders integration and third-party empty states gracefully', async () => {
-    fetchIntegrationSettingsMock.mockResolvedValueOnce({ webhooks: [], services: [] });
-    fetchThirdPartySettingsMock.mockResolvedValueOnce(null);
-
+  it('renders integration and credential empty states', async () => {
     render(<DashboardSettings />);
 
-    expect(await screen.findByText(/integration orchestration/i)).toBeInTheDocument();
-    expect(await screen.findByText(/no webhooks configured yet/i)).toBeInTheDocument();
+    const integrationsHeading = await screen.findByRole('heading', { name: /integration settings/i });
+    expect(within(integrationsHeading.closest('section')).getByText(/no webhook subscriptions configured yet/i)).toBeInTheDocument();
 
-    expect(await screen.findByText(/third-party api governance/i)).toBeInTheDocument();
-    expect(await screen.findByText(/no credentials provisioned yet/i)).toBeInTheDocument();
+    const credentialsHeading = await screen.findByRole('heading', { name: /third-party api credentials/i });
+    expect(within(credentialsHeading.closest('section')).getByText(/no credentials captured yet/i)).toBeInTheDocument();
+  });
+
+  it('adds a new credential card when requested', async () => {
+    const user = userEvent.setup();
+    render(<DashboardSettings />);
+
+    const credentialSection = await screen.findByRole('heading', { name: /third-party api credentials/i });
+    const section = credentialSection.closest('section');
+
+    const addButton = within(section).getByRole('button', { name: /add credential/i });
+    await user.click(addButton);
+
+    expect(within(section).getByLabelText(/provider/i)).toBeInTheDocument();
   });
 });

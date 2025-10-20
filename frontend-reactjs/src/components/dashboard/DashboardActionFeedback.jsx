@@ -24,7 +24,7 @@ const toneConfig = {
   }
 };
 
-export default function DashboardActionFeedback({ feedback, onDismiss }) {
+export default function DashboardActionFeedback({ feedback = null, onDismiss }) {
   if (!feedback) {
     return null;
   }
@@ -62,9 +62,4 @@ DashboardActionFeedback.propTypes = {
     detail: PropTypes.string
   }),
   onDismiss: PropTypes.func
-};
-
-DashboardActionFeedback.defaultProps = {
-  feedback: null,
-  onDismiss: undefined
 };

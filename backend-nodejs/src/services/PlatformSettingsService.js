@@ -1,9 +1,101 @@
+import { randomUUID } from 'crypto';
+
 import PlatformSettingModel from '../models/PlatformSettingModel.js';
 import db from '../config/database.js';
 import { env } from '../config/env.js';
 
 const SETTINGS_KEYS = Object.freeze({
-  MONETIZATION: 'monetization'
+  MONETIZATION: 'monetization',
+  APPEARANCE: 'appearance',
+  PREFERENCES: 'preferences',
+  SYSTEM: 'system',
+  INTEGRATIONS: 'integrations',
+  THIRD_PARTY: 'third_party'
+});
+
+const DEFAULT_APPEARANCE = Object.freeze({
+  branding: {
+    primaryColor: '#2563EB',
+    secondaryColor: '#9333EA',
+    accentColor: '#F59E0B',
+    logoUrl: '',
+    faviconUrl: ''
+  },
+  theme: {
+    mode: 'system',
+    borderRadius: 'rounded',
+    density: 'comfortable',
+    fontFamily: 'Inter',
+    headingFontFamily: 'Cal Sans'
+  },
+  hero: {
+    heading: 'Inspire learners at scale',
+    subheading:
+      'Craft immersive cohort experiences, digitise your expertise, and operate a vibrant learning community from a single console.',
+    backgroundImageUrl: '',
+    backgroundVideoUrl: '',
+    primaryCtaLabel: 'Explore programs',
+    primaryCtaUrl: '/explore',
+    secondaryCtaLabel: 'Book a demo',
+    secondaryCtaUrl: '/demo'
+  },
+  mediaLibrary: []
+});
+
+const DEFAULT_PREFERENCES = Object.freeze({
+  localisation: {
+    defaultLanguage: 'en',
+    supportedLanguages: ['en'],
+    currency: 'USD',
+    timezone: 'UTC'
+  },
+  experience: {
+    enableRecommendations: true,
+    enableSocialSharing: true,
+    enableLiveChatSupport: false,
+    allowGuestCheckout: false,
+    requireEmailVerification: true
+  },
+  communications: {
+    supportEmail: 'support@edulure.io',
+    supportPhone: '',
+    marketingEmail: '',
+    sendWeeklyDigest: true,
+    sendProductUpdates: true
+  }
+});
+
+const DEFAULT_SYSTEM = Object.freeze({
+  maintenanceMode: {
+    enabled: false,
+    message: '',
+    scheduledWindow: null
+  },
+  operations: {
+    timezone: 'UTC',
+    weeklyBackupDay: 'sunday',
+    autoUpdatesEnabled: true,
+    dataRetentionDays: 365
+  },
+  security: {
+    enforceMfaForAdmins: true,
+    sessionTimeoutMinutes: 60,
+    allowSessionResume: true
+  },
+  observability: {
+    enableAuditTrail: true,
+    errorReportingEmail: '',
+    notifyOnIntegrationFailure: true
+  }
+});
+
+const DEFAULT_INTEGRATIONS = Object.freeze({
+  webhooks: [],
+  services: []
+});
+
+const DEFAULT_THIRD_PARTY = Object.freeze({
+  credentials: []
 });
 
 const DEFAULT_MONETIZATION = Object.freeze({
@@ -64,6 +156,408 @@ const DEFAULT_MONETIZATION = Object.freeze({
       'Platform commission remains capped at 2.5% for communities and mentoring (5% on digital catalogues and 10% on live donations) with funds routed directly between customers and providers; the platform operates a non-custodial ledger to avoid FCA regulated activity.'
   }
 });
+
+function createStableId(prefix, seed = '') {
+  const trimmed = typeof seed === 'string' ? seed.trim() : '';
+  if (trimmed) {
+    return trimmed.slice(0, 64);
+  }
+  try {
+    return `${prefix}_${randomUUID()}`;
+  } catch (_error) {
+    return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+  }
+}
+
+function normaliseHexColour(value, fallback) {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+  const trimmed = value.trim();
+  if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+  return fallback;
+}
+
+function normaliseUrl(value) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, 2048);
+}
+
+function normaliseText(value, { max = 240, fallback = '', allowEmpty = true } = {}) {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+  const text = String(value).trim();
+  if (!text && !allowEmpty) {
+    return fallback;
+  }
+  return text.slice(0, max);
+}
+
+function dedupeById(entries) {
+  const seen = new Set();
+  return entries.filter((entry) => {
+    if (!entry?.id) {
+      return true;
+    }
+    if (seen.has(entry.id)) {
+      return false;
+    }
+    seen.add(entry.id);
+    return true;
+  });
+}
+
+function normaliseAppearance(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_APPEARANCE);
+
+  if (rawSettings.branding && typeof rawSettings.branding === 'object') {
+    result.branding.primaryColor = normaliseHexColour(
+      rawSettings.branding.primaryColor,
+      result.branding.primaryColor
+    );
+    result.branding.secondaryColor = normaliseHexColour(
+      rawSettings.branding.secondaryColor,
+      result.branding.secondaryColor
+    );
+    result.branding.accentColor = normaliseHexColour(
+      rawSettings.branding.accentColor,
+      result.branding.accentColor
+    );
+    result.branding.logoUrl = normaliseUrl(rawSettings.branding.logoUrl) || result.branding.logoUrl;
+    result.branding.faviconUrl = normaliseUrl(rawSettings.branding.faviconUrl);
+  }
+
+  if (rawSettings.theme && typeof rawSettings.theme === 'object') {
+    const modes = new Set(['light', 'dark', 'system']);
+    const radii = new Set(['sharp', 'rounded', 'pill']);
+    const densities = new Set(['comfortable', 'compact', 'expanded']);
+
+    const requestedMode = String(rawSettings.theme.mode ?? '').toLowerCase();
+    if (modes.has(requestedMode)) {
+      result.theme.mode = requestedMode;
+    }
+    const requestedRadius = String(rawSettings.theme.borderRadius ?? '').toLowerCase();
+    if (radii.has(requestedRadius)) {
+      result.theme.borderRadius = requestedRadius;
+    }
+    const requestedDensity = String(rawSettings.theme.density ?? '').toLowerCase();
+    if (densities.has(requestedDensity)) {
+      result.theme.density = requestedDensity;
+    }
+    result.theme.fontFamily = normaliseText(rawSettings.theme.fontFamily, {
+      max: 120,
+      fallback: result.theme.fontFamily
+    });
+    result.theme.headingFontFamily = normaliseText(rawSettings.theme.headingFontFamily, {
+      max: 120,
+      fallback: result.theme.headingFontFamily
+    });
+  }
+
+  if (rawSettings.hero && typeof rawSettings.hero === 'object') {
+    result.hero.heading = normaliseText(rawSettings.hero.heading, {
+      max: 120,
+      fallback: result.hero.heading,
+      allowEmpty: false
+    });
+    result.hero.subheading = normaliseText(rawSettings.hero.subheading, {
+      max: 240,
+      fallback: result.hero.subheading
+    });
+    result.hero.backgroundImageUrl = normaliseUrl(rawSettings.hero.backgroundImageUrl);
+    result.hero.backgroundVideoUrl = normaliseUrl(rawSettings.hero.backgroundVideoUrl);
+    result.hero.primaryCtaLabel = normaliseText(rawSettings.hero.primaryCtaLabel, { max: 60, fallback: result.hero.primaryCtaLabel });
+    result.hero.primaryCtaUrl = normaliseUrl(rawSettings.hero.primaryCtaUrl) || result.hero.primaryCtaUrl;
+    result.hero.secondaryCtaLabel = normaliseText(rawSettings.hero.secondaryCtaLabel, { max: 60, fallback: result.hero.secondaryCtaLabel });
+    result.hero.secondaryCtaUrl = normaliseUrl(rawSettings.hero.secondaryCtaUrl);
+  }
+
+  if (Array.isArray(rawSettings.mediaLibrary)) {
+    const assets = rawSettings.mediaLibrary
+      .map((asset) => ({
+        id: createStableId('asset', asset?.id),
+        label: normaliseText(asset?.label, { max: 120, fallback: '' }),
+        type: ['image', 'video'].includes(String(asset?.type ?? '').toLowerCase())
+          ? String(asset?.type).toLowerCase()
+          : 'image',
+        url: normaliseUrl(asset?.url),
+        altText: normaliseText(asset?.altText, { max: 160, fallback: '' }),
+        featured: Boolean(asset?.featured)
+      }))
+      .filter((asset) => asset.url);
+
+    result.mediaLibrary = dedupeById(assets).slice(0, 24);
+  }
+
+  return result;
+}
+
+function normalisePreferences(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_PREFERENCES);
+
+  if (rawSettings.localisation && typeof rawSettings.localisation === 'object') {
+    result.localisation.defaultLanguage = normaliseText(rawSettings.localisation.defaultLanguage, {
+      max: 12,
+      fallback: result.localisation.defaultLanguage,
+      allowEmpty: false
+    }).toLowerCase();
+    result.localisation.currency = normaliseText(rawSettings.localisation.currency, {
+      max: 12,
+      fallback: result.localisation.currency,
+      allowEmpty: false
+    }).toUpperCase();
+    result.localisation.timezone = normaliseText(rawSettings.localisation.timezone, {
+      max: 60,
+      fallback: result.localisation.timezone,
+      allowEmpty: false
+    });
+    if (rawSettings.localisation.supportedLanguages !== undefined) {
+      result.localisation.supportedLanguages = normalizeStringArray(
+        rawSettings.localisation.supportedLanguages
+      )
+        .map((language) => language.toLowerCase())
+        .slice(0, 12);
+      if (!result.localisation.supportedLanguages.length) {
+        result.localisation.supportedLanguages = [result.localisation.defaultLanguage];
+      }
+    }
+  }
+
+  if (rawSettings.experience && typeof rawSettings.experience === 'object') {
+    result.experience.enableRecommendations = Boolean(rawSettings.experience.enableRecommendations);
+    result.experience.enableSocialSharing = Boolean(rawSettings.experience.enableSocialSharing);
+    result.experience.enableLiveChatSupport = Boolean(rawSettings.experience.enableLiveChatSupport);
+    result.experience.allowGuestCheckout = Boolean(rawSettings.experience.allowGuestCheckout);
+    result.experience.requireEmailVerification = Boolean(
+      rawSettings.experience.requireEmailVerification ?? result.experience.requireEmailVerification
+    );
+  }
+
+  if (rawSettings.communications && typeof rawSettings.communications === 'object') {
+    result.communications.supportEmail = normaliseText(rawSettings.communications.supportEmail, {
+      max: 180,
+      fallback: result.communications.supportEmail
+    });
+    result.communications.supportPhone = normaliseText(rawSettings.communications.supportPhone, {
+      max: 40,
+      fallback: ''
+    });
+    result.communications.marketingEmail = normaliseText(rawSettings.communications.marketingEmail, {
+      max: 180,
+      fallback: ''
+    });
+    result.communications.sendWeeklyDigest = Boolean(rawSettings.communications.sendWeeklyDigest);
+    result.communications.sendProductUpdates = Boolean(rawSettings.communications.sendProductUpdates);
+  }
+
+  return result;
+}
+
+function normaliseSystem(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_SYSTEM);
+
+  if (rawSettings.maintenanceMode && typeof rawSettings.maintenanceMode === 'object') {
+    result.maintenanceMode.enabled = Boolean(rawSettings.maintenanceMode.enabled);
+    result.maintenanceMode.message = normaliseText(rawSettings.maintenanceMode.message, {
+      max: 360,
+      fallback: ''
+    });
+    if (rawSettings.maintenanceMode.scheduledWindow) {
+      const value = normaliseText(rawSettings.maintenanceMode.scheduledWindow, {
+        max: 120,
+        fallback: null
+      });
+      result.maintenanceMode.scheduledWindow = value || null;
+    }
+  }
+
+  if (rawSettings.operations && typeof rawSettings.operations === 'object') {
+    result.operations.timezone = normaliseText(rawSettings.operations.timezone, {
+      max: 60,
+      fallback: result.operations.timezone,
+      allowEmpty: false
+    });
+    const days = new Set(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
+    const requestedDay = String(rawSettings.operations.weeklyBackupDay ?? '').toLowerCase();
+    if (days.has(requestedDay)) {
+      result.operations.weeklyBackupDay = requestedDay;
+    }
+    result.operations.autoUpdatesEnabled = Boolean(rawSettings.operations.autoUpdatesEnabled);
+    result.operations.dataRetentionDays = clampInt(rawSettings.operations.dataRetentionDays, {
+      min: 30,
+      max: 3650,
+      fallback: result.operations.dataRetentionDays
+    });
+  }
+
+  if (rawSettings.security && typeof rawSettings.security === 'object') {
+    result.security.enforceMfaForAdmins = Boolean(rawSettings.security.enforceMfaForAdmins);
+    result.security.sessionTimeoutMinutes = clampInt(rawSettings.security.sessionTimeoutMinutes, {
+      min: 5,
+      max: 600,
+      fallback: result.security.sessionTimeoutMinutes
+    });
+    result.security.allowSessionResume = Boolean(rawSettings.security.allowSessionResume);
+  }
+
+  if (rawSettings.observability && typeof rawSettings.observability === 'object') {
+    result.observability.enableAuditTrail = Boolean(rawSettings.observability.enableAuditTrail);
+    result.observability.errorReportingEmail = normaliseText(
+      rawSettings.observability.errorReportingEmail,
+      { max: 180, fallback: '' }
+    );
+    result.observability.notifyOnIntegrationFailure = Boolean(
+      rawSettings.observability.notifyOnIntegrationFailure
+    );
+  }
+
+  return result;
+}
+
+function normaliseIntegrations(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_INTEGRATIONS);
+
+  if (Array.isArray(rawSettings.webhooks)) {
+    result.webhooks = dedupeById(
+      rawSettings.webhooks
+        .map((webhook) => ({
+          id: createStableId('webhook', webhook?.id),
+          name: normaliseText(webhook?.name, { max: 120, fallback: 'Webhook destination' }),
+          url: normaliseUrl(webhook?.url),
+          events: normalizeStringArray(webhook?.events).slice(0, 20),
+          secret: normaliseText(webhook?.secret, { max: 120, fallback: '' }),
+          active: Boolean(webhook?.active)
+        }))
+        .filter((entry) => entry.url)
+    ).slice(0, 20);
+  }
+
+  if (Array.isArray(rawSettings.services)) {
+    const allowedStatuses = new Set(['active', 'paused', 'error']);
+    result.services = dedupeById(
+      rawSettings.services
+        .map((service) => ({
+          id: createStableId('service', service?.id),
+          provider: normaliseText(service?.provider, { max: 120, fallback: 'integration' }),
+          status: allowedStatuses.has(String(service?.status ?? '').toLowerCase())
+            ? String(service.status).toLowerCase()
+            : 'active',
+          connectedAccount: normaliseText(service?.connectedAccount, { max: 120, fallback: '' }),
+          notes: normaliseText(service?.notes, { max: 360, fallback: '' })
+        }))
+    ).slice(0, 20);
+  }
+
+  return result;
+}
+
+function normaliseThirdParty(rawSettings = {}) {
+  const result = deepMerge({}, DEFAULT_THIRD_PARTY);
+
+  if (Array.isArray(rawSettings.credentials)) {
+    const allowedStatus = new Set(['active', 'disabled', 'revoked']);
+    result.credentials = dedupeById(
+      rawSettings.credentials
+        .map((credential) => {
+          const resolvedStatus = allowedStatus.has(String(credential?.status ?? '').toLowerCase())
+            ? String(credential.status).toLowerCase()
+            : 'active';
+          const environment = normaliseText(credential?.environment, {
+            max: 60,
+            fallback: 'production',
+            allowEmpty: false
+          }).toLowerCase();
+          return {
+            id: createStableId('credential', credential?.id),
+            provider: normaliseText(credential?.provider, { max: 120, fallback: 'integration' }),
+            environment,
+            alias: normaliseText(credential?.alias, { max: 120, fallback: '' }),
+            ownerEmail: normaliseText(credential?.ownerEmail, { max: 180, fallback: '' }),
+            status: resolvedStatus,
+            maskedKey: normaliseText(credential?.maskedKey, { max: 120, fallback: '' }),
+            createdAt: normaliseText(credential?.createdAt, { max: 40, fallback: '' }),
+            lastRotatedAt: normaliseText(credential?.lastRotatedAt, { max: 40, fallback: '' }),
+            notes: normaliseText(credential?.notes, { max: 360, fallback: '' })
+          };
+        })
+        .filter((credential) => credential.provider)
+    ).slice(0, 30);
+  }
+
+  return result;
+}
+
+function sanitizeAppearancePayload(payload = {}) {
+  const sanitized = {};
+  if (payload.branding !== undefined) {
+    sanitized.branding = normaliseAppearance({ branding: payload.branding }).branding;
+  }
+  if (payload.theme !== undefined) {
+    sanitized.theme = normaliseAppearance({ theme: payload.theme }).theme;
+  }
+  if (payload.hero !== undefined) {
+    sanitized.hero = normaliseAppearance({ hero: payload.hero }).hero;
+  }
+  if (payload.mediaLibrary !== undefined) {
+    sanitized.mediaLibrary = normaliseAppearance({ mediaLibrary: payload.mediaLibrary }).mediaLibrary;
+  }
+  return sanitized;
+}
+
+function sanitizePreferencesPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.localisation !== undefined) {
+    sanitized.localisation = normalisePreferences({ localisation: payload.localisation }).localisation;
+  }
+  if (payload.experience !== undefined) {
+    sanitized.experience = normalisePreferences({ experience: payload.experience }).experience;
+  }
+  if (payload.communications !== undefined) {
+    sanitized.communications = normalisePreferences({ communications: payload.communications }).communications;
+  }
+  return sanitized;
+}
+
+function sanitizeSystemPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.maintenanceMode !== undefined) {
+    sanitized.maintenanceMode = normaliseSystem({ maintenanceMode: payload.maintenanceMode }).maintenanceMode;
+  }
+  if (payload.operations !== undefined) {
+    sanitized.operations = normaliseSystem({ operations: payload.operations }).operations;
+  }
+  if (payload.security !== undefined) {
+    sanitized.security = normaliseSystem({ security: payload.security }).security;
+  }
+  if (payload.observability !== undefined) {
+    sanitized.observability = normaliseSystem({ observability: payload.observability }).observability;
+  }
+  return sanitized;
+}
+
+function sanitizeIntegrationsPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.webhooks !== undefined) {
+    sanitized.webhooks = normaliseIntegrations({ webhooks: payload.webhooks }).webhooks;
+  }
+  if (payload.services !== undefined) {
+    sanitized.services = normaliseIntegrations({ services: payload.services }).services;
+  }
+  return sanitized;
+}
+
+function sanitizeThirdPartyPayload(payload = {}) {
+  const sanitized = {};
+  if (payload.credentials !== undefined) {
+    sanitized.credentials = normaliseThirdParty({ credentials: payload.credentials }).credentials;
+  }
+  return sanitized;
+}
 
 function deepMerge(base, overrides) {
   const result = Array.isArray(base) ? [...base] : { ...base };
@@ -440,27 +934,27 @@ function normaliseMonetization(rawSettings = {}) {
   merged.commissions.enabled = Boolean(merged.commissions.enabled);
   merged.commissions.allowCommunityOverride = Boolean(merged.commissions.allowCommunityOverride);
 
-  const defaultCommission = merged.commissions.default ?? {};
-  defaultCommission.rateBps = clampInt(defaultCommission.rateBps ?? merged.commissions.rateBps, {
+  const commissionDefault = merged.commissions.default ?? {};
+  commissionDefault.rateBps = clampInt(commissionDefault.rateBps ?? merged.commissions.rateBps, {
     min: 0,
     max: 5000,
     fallback: defaults.commissions.default.rateBps
   });
-  defaultCommission.minimumFeeCents = clampInt(
-    defaultCommission.minimumFeeCents ?? merged.commissions.minimumFeeCents,
+  commissionDefault.minimumFeeCents = clampInt(
+    commissionDefault.minimumFeeCents ?? merged.commissions.minimumFeeCents,
     {
       min: 0,
       max: 10_000_000,
       fallback: defaults.commissions.default.minimumFeeCents
     }
   );
-  defaultCommission.affiliateShare = clampRatio(
-    defaultCommission.affiliateShare ?? defaults.commissions.default.affiliateShare,
+  commissionDefault.affiliateShare = clampRatio(
+    commissionDefault.affiliateShare ?? defaults.commissions.default.affiliateShare,
     { fallback: defaults.commissions.default.affiliateShare }
   );
-  merged.commissions.default = defaultCommission;
-  merged.commissions.rateBps = defaultCommission.rateBps;
-  merged.commissions.minimumFeeCents = defaultCommission.minimumFeeCents;
+  merged.commissions.default = commissionDefault;
+  merged.commissions.rateBps = commissionDefault.rateBps;
+  merged.commissions.minimumFeeCents = commissionDefault.minimumFeeCents;
 
   const categoryDefaults = defaults.commissions.categories ?? {};
   const providedCategories = merged.commissions.categories ?? {};
@@ -471,24 +965,24 @@ function normaliseMonetization(rawSettings = {}) {
   const normalisedCategories = {};
   categoryKeys.forEach((key) => {
     const base = providedCategories[key] ?? {};
-    const fallback = categoryDefaults[key] ?? defaultCommission;
+    const fallback = categoryDefaults[key] ?? commissionDefault;
     normalisedCategories[key] = {
-      rateBps: clampInt(base.rateBps ?? fallback.rateBps ?? defaultCommission.rateBps, {
+      rateBps: clampInt(base.rateBps ?? fallback.rateBps ?? commissionDefault.rateBps, {
         min: 0,
         max: 5000,
-        fallback: fallback.rateBps ?? defaultCommission.rateBps
+        fallback: fallback.rateBps ?? commissionDefault.rateBps
       }),
       minimumFeeCents: clampInt(
-        base.minimumFeeCents ?? fallback.minimumFeeCents ?? defaultCommission.minimumFeeCents,
+        base.minimumFeeCents ?? fallback.minimumFeeCents ?? commissionDefault.minimumFeeCents,
         {
           min: 0,
           max: 10_000_000,
-          fallback: fallback.minimumFeeCents ?? defaultCommission.minimumFeeCents
+          fallback: fallback.minimumFeeCents ?? commissionDefault.minimumFeeCents
         }
       ),
       affiliateShare: clampRatio(
-        base.affiliateShare ?? fallback.affiliateShare ?? defaultCommission.affiliateShare,
-        { fallback: fallback.affiliateShare ?? defaultCommission.affiliateShare }
+        base.affiliateShare ?? fallback.affiliateShare ?? commissionDefault.affiliateShare,
+        { fallback: fallback.affiliateShare ?? commissionDefault.affiliateShare }
       )
     };
   });
@@ -532,12 +1026,14 @@ function normaliseMonetization(rawSettings = {}) {
     merged.affiliate.requireTaxInformation ?? affiliateDefaults.requireTaxInformation
   );
 
-  const defaultCommission = merged.affiliate.defaultCommission ?? {};
-  const defaultRecurrence = String(defaultCommission.recurrence ?? affiliateDefaults.defaultCommission.recurrence).toLowerCase();
+  const affiliateDefault = merged.affiliate.defaultCommission ?? {};
+  const defaultRecurrence = String(
+    affiliateDefault.recurrence ?? affiliateDefaults.defaultCommission.recurrence
+  ).toLowerCase();
   const recurrence = ['once', 'finite', 'infinite'].includes(defaultRecurrence)
     ? defaultRecurrence
     : affiliateDefaults.defaultCommission.recurrence;
-  let maxOccurrences = defaultCommission.maxOccurrences;
+  let maxOccurrences = affiliateDefault.maxOccurrences;
   if (recurrence === 'finite') {
     maxOccurrences = clampInt(maxOccurrences, {
       min: 1,
@@ -548,7 +1044,7 @@ function normaliseMonetization(rawSettings = {}) {
     maxOccurrences = null;
   }
   const tiers = normaliseCommissionTiers(
-    defaultCommission.tiers,
+    affiliateDefault.tiers,
     affiliateDefaults.defaultCommission.tiers
   );
   merged.affiliate.defaultCommission = {
@@ -600,6 +1096,86 @@ function normaliseMonetization(rawSettings = {}) {
 }
 
 export default class PlatformSettingsService {
+  static async getAppearanceSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.APPEARANCE, connection);
+    return normaliseAppearance(record?.value ?? {});
+  }
+
+  static async updateAppearanceSettings(payload, connection = db) {
+    const sanitized = sanitizeAppearancePayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getAppearanceSettings(connection);
+    }
+    const current = await this.getAppearanceSettings(connection);
+    const merged = normaliseAppearance(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.APPEARANCE, merged, connection);
+    return merged;
+  }
+
+  static async getPreferenceSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.PREFERENCES, connection);
+    return normalisePreferences(record?.value ?? {});
+  }
+
+  static async updatePreferenceSettings(payload, connection = db) {
+    const sanitized = sanitizePreferencesPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getPreferenceSettings(connection);
+    }
+    const current = await this.getPreferenceSettings(connection);
+    const merged = normalisePreferences(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.PREFERENCES, merged, connection);
+    return merged;
+  }
+
+  static async getSystemSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.SYSTEM, connection);
+    return normaliseSystem(record?.value ?? {});
+  }
+
+  static async updateSystemSettings(payload, connection = db) {
+    const sanitized = sanitizeSystemPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getSystemSettings(connection);
+    }
+    const current = await this.getSystemSettings(connection);
+    const merged = normaliseSystem(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.SYSTEM, merged, connection);
+    return merged;
+  }
+
+  static async getIntegrationSettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.INTEGRATIONS, connection);
+    return normaliseIntegrations(record?.value ?? {});
+  }
+
+  static async updateIntegrationSettings(payload, connection = db) {
+    const sanitized = sanitizeIntegrationsPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getIntegrationSettings(connection);
+    }
+    const current = await this.getIntegrationSettings(connection);
+    const merged = normaliseIntegrations(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.INTEGRATIONS, merged, connection);
+    return merged;
+  }
+
+  static async getThirdPartySettings(connection = db) {
+    const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.THIRD_PARTY, connection);
+    return normaliseThirdParty(record?.value ?? {});
+  }
+
+  static async updateThirdPartySettings(payload, connection = db) {
+    const sanitized = sanitizeThirdPartyPayload(payload);
+    if (!Object.keys(sanitized).length) {
+      return this.getThirdPartySettings(connection);
+    }
+    const current = await this.getThirdPartySettings(connection);
+    const merged = normaliseThirdParty(deepMerge(current, sanitized));
+    await PlatformSettingModel.upsert(SETTINGS_KEYS.THIRD_PARTY, merged, connection);
+    return merged;
+  }
+
   static async getMonetizationSettings(connection = db) {
     const record = await PlatformSettingModel.findByKey(SETTINGS_KEYS.MONETIZATION, connection);
     return normaliseMonetization(record?.value ?? {});
@@ -698,4 +1274,12 @@ export default class PlatformSettingsService {
   }
 }
 
-export { resolveDefaultMonetization, normaliseMonetization };
+export {
+  resolveDefaultMonetization,
+  normaliseMonetization,
+  normaliseAppearance,
+  normalisePreferences,
+  normaliseSystem,
+  normaliseIntegrations,
+  normaliseThirdParty
+};
