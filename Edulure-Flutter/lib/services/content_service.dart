@@ -6,9 +6,10 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'api_config.dart';
+import 'ebook_reader_backend.dart';
 import 'session_manager.dart';
 
-class ContentService {
+class ContentService implements EbookReaderBackend {
   ContentService()
       : _dio = Dio(
           BaseOptions(
@@ -101,6 +102,7 @@ class ContentService {
     return entries;
   }
 
+  @override
   ReaderPreferences loadReaderPreferences() {
     final data = SessionManager.readerSettingsCache.get('preferences');
     if (data is Map) {
@@ -111,6 +113,7 @@ class ContentService {
     return const ReaderPreferences();
   }
 
+  @override
   Future<void> saveReaderPreferences(ReaderPreferences preferences) async {
     await SessionManager.readerSettingsCache.put(
       'preferences',
@@ -118,6 +121,7 @@ class ContentService {
     );
   }
 
+  @override
   Future<void> cacheEbookProgress(String assetId, EbookProgress progress) async {
     await SessionManager.ebookProgressCache.put(
       assetId,
@@ -154,6 +158,7 @@ class ContentService {
     await OpenFilex.open(path);
   }
 
+  @override
   Future<void> updateProgress(String assetId, double progress) async {
     final token = SessionManager.getAccessToken();
     if (token == null) return;

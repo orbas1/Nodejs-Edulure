@@ -5,6 +5,7 @@ import 'package:epub_view/epub_view.dart';
 import 'package:flutter/material.dart';
 
 import '../services/content_service.dart';
+import '../services/ebook_reader_backend.dart';
 
 class EbookReaderScreen extends StatefulWidget {
   const EbookReaderScreen({
@@ -17,7 +18,7 @@ class EbookReaderScreen extends StatefulWidget {
 
   final ContentAsset asset;
   final String filePath;
-  final ContentService service;
+  final EbookReaderBackend service;
   final EbookProgress? initialProgress;
 
   @override

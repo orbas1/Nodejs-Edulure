@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../provider/learning/learning_models.dart';
 import '../provider/learning/learning_store.dart';
+import '../services/content_service.dart' show ContentAsset, EbookProgress;
+import '../services/ebook_library_service.dart';
+import 'ebook_reader_screen.dart';
 
 enum _EbookLibraryAction { refresh, restoreSeed }
 
@@ -15,8 +20,52 @@ class EbookLibraryScreen extends ConsumerStatefulWidget {
 }
 
 class _EbookLibraryScreenState extends ConsumerState<EbookLibraryScreen> {
+  late final EbookLibraryService _libraryService;
+  bool _libraryReady = false;
   String _languageFilter = 'All languages';
   String _searchTerm = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _libraryService = EbookLibraryService();
+    unawaited(_hydrateLibraryState());
+  }
+
+  Future<void> _hydrateLibraryState() async {
+    try {
+      await _libraryService.ensureReady();
+      final notifier = ref.read(ebookStoreProvider.notifier);
+      final ebooks = ref.read(ebookStoreProvider);
+      for (final ebook in ebooks) {
+        final isDownloaded = _libraryService.isDownloaded(ebook.id);
+        if (isDownloaded != ebook.downloaded) {
+          notifier.updateEbook(ebook.copyWith(downloaded: isDownloaded));
+        }
+        if (isDownloaded) {
+          final cached = await _libraryService.loadCachedProgress(ebook.id);
+          if (cached != null) {
+            final normalized = (cached.progressPercent / 100).clamp(0, 1).toDouble();
+            if ((ebook.progress - normalized).abs() > 0.01) {
+              notifier.updateEbook(ebook.copyWith(progress: normalized));
+            }
+          }
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Library offline cache unavailable: $error')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _libraryReady = true;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +129,8 @@ class _EbookLibraryScreenState extends ConsumerState<EbookLibraryScreen> {
       ),
       body: Column(
         children: [
+          if (!_libraryReady)
+            const LinearProgressIndicator(minHeight: 2),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -180,15 +231,106 @@ class _EbookLibraryScreenState extends ConsumerState<EbookLibraryScreen> {
           heightFactor: 0.9,
           child: _EbookDetailSheet(
             ebook: ebook,
+            isLibraryReady: _libraryReady,
             onUpdateProgress: (progress) {
               ref.read(ebookStoreProvider.notifier).updateEbook(
                     ebook.copyWith(progress: progress),
                   );
             },
+            onOpenReader: () => _launchReader(ebook),
+            onToggleOffline: () => _toggleOffline(ebook),
           ),
         );
       },
     );
+  }
+
+  Future<double?> _launchReader(Ebook ebook) async {
+    try {
+      await _libraryService.ensureReady();
+      final path = await _libraryService.ensureDownloaded(ebook);
+      final cached = await _libraryService.loadCachedProgress(ebook.id);
+      final asset = ContentAsset(
+        publicId: ebook.id,
+        originalFilename: '${ebook.title}.epub',
+        type: 'ebook',
+        status: 'ready',
+        updatedAt: DateTime.now().toIso8601String(),
+        metadata: {
+          'ebook': {
+            'chapterCount': ebook.chapters.length,
+          }
+        },
+      );
+      if (!mounted) return null;
+      final result = await Navigator.of(context).push<EbookProgress>(
+        MaterialPageRoute(
+          builder: (_) => EbookReaderScreen(
+            asset: asset,
+            filePath: path,
+            service: _libraryService,
+            initialProgress: cached,
+          ),
+        ),
+      );
+      if (result != null) {
+        await _libraryService.cacheEbookProgress(ebook.id, result);
+        final normalized = (result.progressPercent / 100).clamp(0, 1).toDouble();
+        ref.read(ebookStoreProvider.notifier).updateEbook(
+              ebook.copyWith(
+                progress: normalized,
+                downloaded: true,
+              ),
+            );
+        return normalized;
+      }
+      ref.read(ebookStoreProvider.notifier).updateEbook(
+            ebook.copyWith(downloaded: true),
+          );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unable to open reader: $error')),
+        );
+      }
+    }
+    return null;
+  }
+
+  Future<bool> _toggleOffline(Ebook ebook) async {
+    try {
+      await _libraryService.ensureReady();
+      final alreadyDownloaded = _libraryService.isDownloaded(ebook.id);
+      if (alreadyDownloaded) {
+        await _libraryService.removeDownload(ebook.id);
+        ref.read(ebookStoreProvider.notifier).updateEbook(
+              ebook.copyWith(downloaded: false),
+            );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${ebook.title} removed from offline library')),
+          );
+        }
+        return false;
+      }
+      await _libraryService.ensureDownloaded(ebook);
+      ref.read(ebookStoreProvider.notifier).updateEbook(
+            ebook.copyWith(downloaded: true),
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ebook.title} is ready offline')),
+        );
+      }
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Offline toggle failed: $error')),
+        );
+      }
+      return ebook.downloaded;
+    }
   }
 
   Future<void> _openEbookForm({Ebook? ebook}) async {
@@ -316,6 +458,22 @@ class _EbookCard extends StatelessWidget {
                 ebook.author,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blueGrey),
               ),
+              if (ebook.downloaded) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(Icons.cloud_done_outlined, color: Colors.teal.shade600, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Offline ready',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.teal.shade700, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 8),
               LinearProgressIndicator(
                 value: ebook.progress.clamp(0, 1),
@@ -359,10 +517,16 @@ class _EbookDetailSheet extends StatefulWidget {
   const _EbookDetailSheet({
     required this.ebook,
     required this.onUpdateProgress,
+    this.onOpenReader,
+    this.onToggleOffline,
+    this.isLibraryReady = true,
   });
 
   final Ebook ebook;
   final void Function(double progress) onUpdateProgress;
+  final Future<double?> Function()? onOpenReader;
+  final Future<bool> Function()? onToggleOffline;
+  final bool isLibraryReady;
 
   @override
   State<_EbookDetailSheet> createState() => _EbookDetailSheetState();
@@ -370,11 +534,51 @@ class _EbookDetailSheet extends StatefulWidget {
 
 class _EbookDetailSheetState extends State<_EbookDetailSheet> {
   late double _progress;
+  late bool _downloaded;
+  bool _loadingReader = false;
+  bool _togglingOffline = false;
 
   @override
   void initState() {
     super.initState();
     _progress = widget.ebook.progress;
+    _downloaded = widget.ebook.downloaded;
+  }
+
+  Future<void> _handleOpenReader() async {
+    final open = widget.onOpenReader;
+    if (open == null) {
+      return;
+    }
+    setState(() {
+      _loadingReader = true;
+    });
+    final result = await open();
+    if (!mounted) return;
+    setState(() {
+      _loadingReader = false;
+      if (result != null) {
+        _progress = result;
+        widget.onUpdateProgress(result);
+      }
+      _downloaded = true;
+    });
+  }
+
+  Future<void> _handleToggleOffline() async {
+    final toggle = widget.onToggleOffline;
+    if (toggle == null) {
+      return;
+    }
+    setState(() {
+      _togglingOffline = true;
+    });
+    final result = await toggle();
+    if (!mounted) return;
+    setState(() {
+      _togglingOffline = false;
+      _downloaded = result;
+    });
   }
 
   Future<void> _launchExternal(String url) async {
@@ -413,13 +617,17 @@ class _EbookDetailSheetState extends State<_EbookDetailSheet> {
               icon: const Icon(Icons.graphic_eq_outlined),
             ),
           IconButton(
-            tooltip: 'Open reader',
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Reader launching...')),
-              );
-            },
-            icon: const Icon(Icons.menu_book_outlined),
+            tooltip: widget.isLibraryReady ? 'Open reader' : 'Preparing downloads',
+            onPressed: widget.onOpenReader == null || _loadingReader || !widget.isLibraryReady
+                ? null
+                : _handleOpenReader,
+            icon: _loadingReader
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.menu_book_outlined),
           )
         ],
       ),
@@ -456,13 +664,35 @@ class _EbookDetailSheetState extends State<_EbookDetailSheet> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Icon(Icons.download_done_outlined),
+                        Icon(
+                          _downloaded ? Icons.cloud_done_outlined : Icons.cloud_download_outlined,
+                          color: _downloaded ? Colors.teal : Colors.blueGrey,
+                        ),
                         const SizedBox(width: 8),
-                        Text(widget.ebook.downloaded ? 'Available offline' : 'Stream only'),
+                        Expanded(
+                          child: Text(
+                            _downloaded
+                                ? 'Available offline on this device'
+                                : 'Stream only — download for offline access',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        FilledButton.tonalIcon(
+                          onPressed: widget.onToggleOffline == null || _togglingOffline
+                              ? null
+                              : _handleToggleOffline,
+                          icon: Icon(_downloaded ? Icons.close : Icons.download_outlined),
+                          label: Text(_downloaded ? 'Remove' : 'Download'),
+                        ),
                       ],
                     ),
+                    if (_togglingOffline)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: LinearProgressIndicator(minHeight: 2),
+                      ),
                     const SizedBox(height: 16),
-                    Text('Progress ${( _progress * 100).toStringAsFixed(0)}%'),
+                    Text('Progress ${(_progress * 100).toStringAsFixed(0)}%'),
                     Slider(
                       value: _progress,
                       onChanged: (value) => setState(() => _progress = value),
@@ -495,6 +725,13 @@ class _EbookDetailSheetState extends State<_EbookDetailSheet> {
                             icon: const Icon(Icons.graphic_eq),
                             label: const Text('Audio sample'),
                           ),
+                        FilledButton.icon(
+                          onPressed: widget.onOpenReader == null || _loadingReader
+                              ? null
+                              : _handleOpenReader,
+                          icon: const Icon(Icons.menu_book_outlined),
+                          label: const Text('Open immersive reader'),
+                        ),
                         FilledButton.tonalIcon(
                           onPressed: () => _launchExternal(widget.ebook.fileUrl),
                           icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -523,11 +760,7 @@ class _EbookDetailSheetState extends State<_EbookDetailSheet> {
                 subtitle: Text('${chapter.pageCount} pages'),
                 trailing: IconButton(
                   icon: const Icon(Icons.play_circle_outline),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Opening ${chapter.title}...')),
-                    );
-                  },
+                  onPressed: widget.onOpenReader == null || _loadingReader ? null : _handleOpenReader,
                 ),
               ),
             ),
