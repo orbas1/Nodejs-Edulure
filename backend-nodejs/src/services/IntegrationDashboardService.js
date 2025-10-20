@@ -221,10 +221,15 @@ export default class IntegrationDashboardService {
         const reports = reportsRaw.map(sanitiseReport);
 
         const integrationSnapshot = orchestratorStatus?.[meta.id] ?? {};
-        const [statusRecord, callSummary] = await Promise.all([
-          this.statusService.getStatus(meta.id),
-          this.statusService.summariseCalls(meta.id)
+        const [statusResult, callSummaryResult] = await Promise.allSettled([
+          this.statusService?.getStatus ? this.statusService.getStatus(meta.id) : Promise.resolve(null),
+          this.statusService?.summariseCalls
+            ? this.statusService.summariseCalls(meta.id)
+            : Promise.resolve(null)
         ]);
+
+        const statusRecord = statusResult.status === 'fulfilled' ? statusResult.value : null;
+        const callSummary = callSummaryResult.status === 'fulfilled' ? callSummaryResult.value : null;
 
         const totalRuns = sanitisedRuns.length;
         const successCount = sanitisedRuns.filter((run) => run.status === 'succeeded').length;

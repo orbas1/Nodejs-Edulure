@@ -253,7 +253,7 @@ export default class IntegrationApiKeyService {
       notes: notes ?? null
     };
 
-    const record = await this.model.create(
+    const createArgs = [
       {
         provider: normalisedProvider,
         environment: normalisedEnvironment,
@@ -272,9 +272,14 @@ export default class IntegrationApiKeyService {
         metadata,
         createdBy: createdBy ?? ownerEmail.trim(),
         updatedBy: createdBy ?? ownerEmail.trim()
-      },
-      connection
-    );
+      }
+    ];
+
+    if (connection !== undefined) {
+      createArgs.push(connection);
+    }
+
+    const record = await this.model.create(...createArgs);
 
     return this.sanitize(record);
   }
@@ -331,7 +336,7 @@ export default class IntegrationApiKeyService {
 
     const nextRotationAt = addDays(now, rotationDays);
 
-    const updated = await this.model.updateById(
+    const updateArgs = [
       id,
       {
         lastFour: trimmedKey.slice(-4),
@@ -345,9 +350,14 @@ export default class IntegrationApiKeyService {
         status: 'active',
         metadata: updatedMetadata,
         updatedBy: rotatedBy ?? record.metadata?.lastRotatedBy ?? record.ownerEmail
-      },
-      connection
-    );
+      }
+    ];
+
+    if (connection !== undefined) {
+      updateArgs.push(connection);
+    }
+
+    const updated = await this.model.updateById(...updateArgs);
 
     return this.sanitize(updated);
   }
@@ -369,16 +379,21 @@ export default class IntegrationApiKeyService {
       disabledBy: disabledBy ?? record.metadata?.disabledBy ?? null
     };
 
-    const updated = await this.model.updateById(
+    const disableArgs = [
       id,
       {
         status: 'disabled',
         disabledAt: now,
         metadata: updatedMetadata,
         updatedBy: disabledBy ?? record.metadata?.lastRotatedBy ?? record.ownerEmail
-      },
-      connection
-    );
+      }
+    ];
+
+    if (connection !== undefined) {
+      disableArgs.push(connection);
+    }
+
+    const updated = await this.model.updateById(...disableArgs);
 
     return this.sanitize(updated);
   }
