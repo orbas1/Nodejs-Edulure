@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasCampaigns = await knex.schema.hasTable('ads_campaigns');
   if (!hasCampaigns) {
@@ -28,16 +30,16 @@ export async function up(knex) {
       table.decimal('ctr', 6, 4).notNullable().defaultTo(0);
       table.decimal('cpc_cents', 10, 2).notNullable().defaultTo(0);
       table.decimal('cpa_cents', 10, 2).notNullable().defaultTo(0);
-      table.json('targeting_keywords').notNullable().defaultTo(JSON.stringify([]));
-      table.json('targeting_audiences').notNullable().defaultTo(JSON.stringify([]));
-      table.json('targeting_locations').notNullable().defaultTo(JSON.stringify([]));
-      table.json('targeting_languages').notNullable().defaultTo(JSON.stringify(['en']));
+      table.json('targeting_keywords').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('targeting_audiences').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('targeting_locations').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('targeting_languages').notNullable().defaultTo(jsonDefault(knex, ["en"]));
       table.string('creative_headline', 160).notNullable();
       table.string('creative_description', 500);
       table.string('creative_url', 500);
       table.timestamp('start_at');
       table.timestamp('end_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -65,7 +67,7 @@ export async function up(knex) {
       table.bigInteger('conversions').unsigned().notNullable().defaultTo(0);
       table.integer('spend_cents').unsigned().notNullable().defaultTo(0);
       table.integer('revenue_cents').unsigned().notNullable().defaultTo(0);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.unique(['campaign_id', 'metric_date']);
       table.index(['metric_date']);
     });
