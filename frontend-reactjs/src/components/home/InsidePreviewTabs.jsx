@@ -95,8 +95,10 @@ export default function InsidePreviewTabs() {
     [t]
   );
 
-  const activeTab = tabs.find((tab) => tab.key === activeKey) ?? tabs[0];
   const tabOrder = useMemo(() => tabs.map((tab) => tab.key), [tabs]);
+
+  const getTabId = (key) => `home-preview-tab-${key}`;
+  const getPanelId = (key) => `home-preview-tabpanel-${key}`;
 
   const activateTab = (key) => {
     setActiveKey(key);
@@ -158,11 +160,16 @@ export default function InsidePreviewTabs() {
               </h2>
               <p className="text-base text-slate-600">{subtitle}</p>
             </div>
-            <div className="flex flex-col gap-3" role="tablist" aria-label={tablistLabel}>
+            <div
+              className="flex flex-col gap-3"
+              role="tablist"
+              aria-label={tablistLabel}
+              aria-orientation="vertical"
+            >
               {tabs.map((tab) => {
                 const isActive = tab.key === activeKey;
-                const tabId = `home-preview-tab-${tab.key}`;
-                const panelId = `home-preview-tabpanel-${tab.key}`;
+                const tabId = getTabId(tab.key);
+                const panelId = getPanelId(tab.key);
                 return (
                   <button
                     key={tab.key}
@@ -219,42 +226,53 @@ export default function InsidePreviewTabs() {
               </Link>
             </div>
           </aside>
-          <div
-            className="relative"
-            role="tabpanel"
-            id={`home-preview-tabpanel-${activeTab.key}`}
-            aria-labelledby={`home-preview-tab-${activeTab.key}`}
-            tabIndex={0}
-          >
-            <div className="absolute -left-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
-            <div className="absolute -right-6 top-12 h-56 w-56 rounded-full bg-fuchsia-300/20 blur-[140px]" aria-hidden="true" />
-            <div className="relative overflow-hidden rounded-[2.75rem] border border-slate-200 bg-white shadow-[0_40px_120px_-45px_rgba(15,23,42,0.45)]">
-              <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10" aria-hidden="true" />
-              <img
-                src={activeTab.image}
-                alt={activeTab.imageAlt}
-                className="relative block h-full w-full object-cover"
-                loading="lazy"
-              />
-              <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/20 bg-slate-900/70 p-4 text-white shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] backdrop-blur">
-                <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/70">
-                  {activeTab.label}
-                </p>
-                <p className="mt-2 text-lg font-semibold text-white">{activeTab.caption}</p>
-                <p className="mt-2 text-sm text-white/75">{activeTab.description}</p>
-              </div>
-            </div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              {activeTab.highlights.map((highlight) => (
+          <div className="relative">
+            {tabs.map((tab) => {
+              const isActive = tab.key === activeKey;
+              const tabId = getTabId(tab.key);
+              const panelId = getPanelId(tab.key);
+              return (
                 <div
-                  key={highlight}
-                  className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-card"
+                  key={panelId}
+                  className="relative"
+                  role="tabpanel"
+                  id={panelId}
+                  aria-labelledby={tabId}
+                  tabIndex={isActive ? 0 : -1}
+                  hidden={!isActive}
                 >
-                  <CheckCircleIcon className="mt-1 h-5 w-5 text-primary" aria-hidden="true" />
-                  <p className="text-sm font-medium text-slate-700">{highlight}</p>
+                  <div className="absolute -left-16 -top-16 h-40 w-40 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
+                  <div className="absolute -right-6 top-12 h-56 w-56 rounded-full bg-fuchsia-300/20 blur-[140px]" aria-hidden="true" />
+                  <div className="relative overflow-hidden rounded-[2.75rem] border border-slate-200 bg-white shadow-[0_40px_120px_-45px_rgba(15,23,42,0.45)]">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/10" aria-hidden="true" />
+                    <img
+                      src={tab.image}
+                      alt={tab.imageAlt}
+                      className="relative block h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                    <div className="absolute bottom-6 left-6 right-6 rounded-2xl border border-white/20 bg-slate-900/70 p-4 text-white shadow-[0_20px_40px_-24px_rgba(15,23,42,0.8)] backdrop-blur">
+                      <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary/70">
+                        {tab.label}
+                      </p>
+                      <p className="mt-2 text-lg font-semibold text-white">{tab.caption}</p>
+                      <p className="mt-2 text-sm text-white/75">{tab.description}</p>
+                    </div>
+                  </div>
+                  <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                    {tab.highlights.map((highlight) => (
+                      <div
+                        key={highlight}
+                        className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-card"
+                      >
+                        <CheckCircleIcon className="mt-1 h-5 w-5 text-primary" aria-hidden="true" />
+                        <p className="text-sm font-medium text-slate-700">{highlight}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </HomeSection>
     </section>
