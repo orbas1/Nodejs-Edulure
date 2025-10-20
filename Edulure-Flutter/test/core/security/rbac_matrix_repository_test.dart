@@ -11,15 +11,20 @@ void main() {
   late Directory tempDir;
   late int requestCount;
   late RbacMatrixRepository repository;
+  late bool shouldFail;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('rbac_matrix_repo_test');
     Hive.init(tempDir.path);
     requestCount = 0;
+    shouldFail = false;
     repository = RbacMatrixRepository(
       _FakeDio((options) async {
         requestCount += 1;
         expect(options.path, '/runtime/rbac-matrix');
+        if (shouldFail) {
+          throw DioException(requestOptions: options);
+        }
         return {
           'data': _matrixPayload(),
         };
@@ -44,15 +49,18 @@ void main() {
   test('getMatrix caches result within ttl window', () async {
     final first = await repository.getMatrix();
     expect(first.fromCache, isFalse);
+    expect(first.isStale, isFalse);
     expect(first.matrix.roles, isNotEmpty);
     expect(requestCount, 1);
 
     final second = await repository.getMatrix();
     expect(second.fromCache, isTrue);
+    expect(second.isStale, isFalse);
     expect(requestCount, 1, reason: 'Should reuse cached matrix without new request');
 
     final forced = await repository.getMatrix(force: true);
     expect(forced.fromCache, isFalse);
+    expect(forced.isStale, isFalse);
     expect(requestCount, 2);
   });
 
@@ -103,6 +111,33 @@ void main() {
     );
 
     expect(blocked.allowed, isFalse, reason: 'Manifest should block access when capability disabled');
+  });
+
+  test('returns cached matrix when refresh fails', () async {
+    final first = await repository.getMatrix();
+    expect(first.fromCache, isFalse);
+
+    final box = await Hive.openBox('rbac_matrix_provider_mobile');
+    final staleTimestamp = DateTime.now().toUtc().subtract(const Duration(minutes: 15)).toIso8601String();
+    await box.put('timestamp', staleTimestamp);
+    await box.close();
+
+    shouldFail = true;
+
+    final fallback = await repository.getMatrix(force: true);
+    expect(fallback.fromCache, isTrue);
+    expect(fallback.isStale, isTrue);
+    expect(fallback.matrix.version, first.matrix.version);
+    expect(requestCount, 2);
+  });
+
+  test('throws descriptive exception when no matrix cache exists', () async {
+    shouldFail = true;
+    expect(
+      () => repository.getMatrix(),
+      throwsA(isA<RbacMatrixRepositoryException>()),
+    );
+    expect(requestCount, 1);
   });
 }
 

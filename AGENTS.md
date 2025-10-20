@@ -41,10 +41,10 @@
 
 - `Edulure-Flutter/lib/core/provider_transition/provider_transition_repository.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `Edulure-Flutter/lib/core/runtime/capability_manifest_models.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `Edulure-Flutter/lib/core/runtime/capability_manifest_repository.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
+- `Edulure-Flutter/lib/core/runtime/capability_manifest_notifier.dart` (Syntax:95 | Functionality:95 | Real World Ready:95 | Live Data:95 | Error:95 | Logic Flow:95 | Release Readiness:95 | Tests:95 | Overall:95)
+- `Edulure-Flutter/lib/core/runtime/capability_manifest_repository.dart` (Syntax:95 | Functionality:95 | Real World Ready:95 | Live Data:95 | Error:95 | Logic Flow:95 | Release Readiness:95 | Tests:95 | Overall:95)
 - `Edulure-Flutter/lib/core/security/rbac_matrix_models.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
-- `Edulure-Flutter/lib/core/security/rbac_matrix_repository.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
+- `Edulure-Flutter/lib/core/security/rbac_matrix_repository.dart` (Syntax:95 | Functionality:95 | Real World Ready:95 | Live Data:95 | Error:95 | Logic Flow:95 | Release Readiness:95 | Tests:95 | Overall:95)
 - `Edulure-Flutter/lib/core/security/secure_storage_service.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `Edulure-Flutter/lib/core/security/session_manager_facade.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)
 - `Edulure-Flutter/lib/core/state/provider_logger.dart` (Syntax:0 | Functionality:0 | Real World Ready:0 | Live Data:0 | Error:0 | Logic Flow:0 | Release Readiness:0 | Tests:0 | Overall:0)

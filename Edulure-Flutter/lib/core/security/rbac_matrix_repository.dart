@@ -9,11 +9,42 @@ class RbacMatrixLoadResult {
     required this.matrix,
     required this.fetchedAt,
     required this.fromCache,
+    this.isStale = false,
   });
 
   final RbacMatrix matrix;
   final DateTime fetchedAt;
   final bool fromCache;
+  final bool isStale;
+
+  RbacMatrixLoadResult copyWith({
+    RbacMatrix? matrix,
+    DateTime? fetchedAt,
+    bool? fromCache,
+    bool? isStale,
+  }) {
+    return RbacMatrixLoadResult(
+      matrix: matrix ?? this.matrix,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      fromCache: fromCache ?? this.fromCache,
+      isStale: isStale ?? this.isStale,
+    );
+  }
+}
+
+class RbacMatrixRepositoryException implements Exception {
+  RbacMatrixRepositoryException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() {
+    if (cause == null) {
+      return 'RbacMatrixRepositoryException: $message';
+    }
+    return 'RbacMatrixRepositoryException: $message (cause: $cause)';
+  }
 }
 
 class RbacMatrixRepository {
@@ -63,28 +94,32 @@ class RbacMatrixRepository {
   }
 
   Future<RbacMatrixLoadResult> getMatrix({bool force = false}) async {
-    if (!force) {
-      final cached = await loadCachedMatrix();
-      if (cached != null) {
-        final age = DateTime.now().toUtc().difference(cached.fetchedAt);
-        if (age <= _cacheTtl) {
-          cacheResult(cached);
-          return cached;
-        }
+    final cached = await loadCachedMatrix();
+
+    if (!force && cached != null) {
+      final age = DateTime.now().toUtc().difference(cached.fetchedAt);
+      if (age <= _cacheTtl) {
+        cacheResult(cached);
+        return cached.copyWith(isStale: false);
       }
     }
 
-    final fresh = await _fetchMatrix();
-    await _cacheMatrix(fresh);
-    cacheResult(fresh);
-    return fresh;
+    try {
+      final fresh = await _fetchMatrix();
+      await _cacheMatrix(fresh);
+      cacheResult(fresh);
+      return fresh;
+    } catch (error) {
+      if (cached != null) {
+        cacheResult(cached);
+        return cached.copyWith(isStale: true);
+      }
+      throw RbacMatrixRepositoryException('Unable to fetch RBAC matrix', cause: error);
+    }
   }
 
   Future<RbacMatrixLoadResult> refresh() async {
-    final fresh = await _fetchMatrix();
-    await _cacheMatrix(fresh);
-    cacheResult(fresh);
-    return fresh;
+    return getMatrix(force: true);
   }
 
   Future<RbacMatrixLoadResult> _fetchMatrix() async {

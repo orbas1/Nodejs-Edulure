@@ -8,11 +8,42 @@ class CapabilityManifestLoadResult {
     required this.manifest,
     required this.fetchedAt,
     required this.fromCache,
+    this.isStale = false,
   });
 
   final CapabilityManifest manifest;
   final DateTime fetchedAt;
   final bool fromCache;
+  final bool isStale;
+
+  CapabilityManifestLoadResult copyWith({
+    CapabilityManifest? manifest,
+    DateTime? fetchedAt,
+    bool? fromCache,
+    bool? isStale,
+  }) {
+    return CapabilityManifestLoadResult(
+      manifest: manifest ?? this.manifest,
+      fetchedAt: fetchedAt ?? this.fetchedAt,
+      fromCache: fromCache ?? this.fromCache,
+      isStale: isStale ?? this.isStale,
+    );
+  }
+}
+
+class CapabilityManifestRepositoryException implements Exception {
+  CapabilityManifestRepositoryException(this.message, {this.cause});
+
+  final String message;
+  final Object? cause;
+
+  @override
+  String toString() {
+    if (cause == null) {
+      return 'CapabilityManifestRepositoryException: $message';
+    }
+    return 'CapabilityManifestRepositoryException: $message (cause: $cause)';
+  }
 }
 
 class CapabilityManifestRepository {
@@ -66,25 +97,29 @@ class CapabilityManifestRepository {
   }
 
   Future<CapabilityManifestLoadResult> getManifest({bool force = false}) async {
-    if (!force) {
-      final cached = await loadCachedManifest();
-      if (cached != null) {
-        final age = DateTime.now().toUtc().difference(cached.fetchedAt);
-        if (age <= _cacheTtl) {
-          return cached;
-        }
+    final cached = await loadCachedManifest();
+
+    if (!force && cached != null) {
+      final age = DateTime.now().toUtc().difference(cached.fetchedAt);
+      if (age <= _cacheTtl) {
+        return cached.copyWith(isStale: false);
       }
     }
 
-    final fresh = await _fetchManifest();
-    await _cacheManifest(fresh);
-    return fresh;
+    try {
+      final fresh = await _fetchManifest();
+      await _cacheManifest(fresh);
+      return fresh;
+    } catch (error) {
+      if (cached != null) {
+        return cached.copyWith(isStale: true);
+      }
+      throw CapabilityManifestRepositoryException('Unable to fetch capability manifest', cause: error);
+    }
   }
 
   Future<CapabilityManifestLoadResult> refresh() async {
-    final fresh = await _fetchManifest();
-    await _cacheManifest(fresh);
-    return fresh;
+    return getManifest(force: true);
   }
 
   Future<CapabilityManifestLoadResult> _fetchManifest() async {

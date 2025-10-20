@@ -10,15 +10,20 @@ void main() {
   late Directory tempDir;
   late int requestCount;
   late CapabilityManifestRepository repository;
+  late bool shouldFail;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('capability_manifest_repo_test');
     Hive.init(tempDir.path);
     requestCount = 0;
+    shouldFail = false;
     repository = CapabilityManifestRepository(
       _FakeDio((options) async {
         requestCount += 1;
         expect(options.path, '/runtime/manifest');
+        if (shouldFail) {
+          throw DioException(requestOptions: options);
+        }
         return {
           'data': _manifestPayload(sequence: requestCount),
         };
@@ -42,15 +47,18 @@ void main() {
   test('getManifest caches result within ttl window', () async {
     final first = await repository.getManifest();
     expect(first.fromCache, isFalse);
+    expect(first.isStale, isFalse);
     expect(requestCount, 1);
     expect(first.manifest.capabilities, isNotEmpty);
 
     final second = await repository.getManifest();
     expect(second.fromCache, isTrue);
+    expect(second.isStale, isFalse);
     expect(requestCount, 1, reason: 'Cache should prevent duplicate network calls');
 
     final forced = await repository.getManifest(force: true);
     expect(forced.fromCache, isFalse);
+    expect(forced.isStale, isFalse);
     expect(requestCount, 2);
   });
 
@@ -65,11 +73,42 @@ void main() {
 
     final refreshed = await repository.getManifest();
     expect(refreshed.fromCache, isFalse, reason: 'Expired cache should force network fetch');
+    expect(refreshed.isStale, isFalse);
     expect(requestCount, 2);
 
     final forced = await repository.getManifest(force: true);
     expect(forced.fromCache, isFalse);
+    expect(forced.isStale, isFalse);
     expect(requestCount, 3);
+  });
+
+  test('returns cached manifest when refresh fails', () async {
+    final first = await repository.getManifest();
+    expect(first.fromCache, isFalse);
+
+    // Mark cache as stale to ensure refresh attempts network call.
+    final box = await Hive.openBox('capability_manifest');
+    final staleTimestamp = DateTime.now().toUtc().subtract(const Duration(minutes: 10)).toIso8601String();
+    await box.put('timestamp', staleTimestamp);
+    await box.close();
+
+    shouldFail = true;
+
+    final fallback = await repository.getManifest(force: true);
+    expect(fallback.fromCache, isTrue);
+    expect(fallback.isStale, isTrue);
+    expect(fallback.manifest.summary.capabilities.operational,
+        first.manifest.summary.capabilities.operational);
+    expect(requestCount, 2);
+  });
+
+  test('throws descriptive exception when no cache is available', () async {
+    shouldFail = true;
+    expect(
+      () => repository.getManifest(),
+      throwsA(isA<CapabilityManifestRepositoryException>()),
+    );
+    expect(requestCount, 1);
   });
 }
 
