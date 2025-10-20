@@ -1,19 +1,7 @@
-const DIALECTS = {
-  mysql: new Set(['mysql', 'mysql2']),
-  postgres: new Set(['pg', 'postgres', 'postgresql'])
-};
-
-function getDialect(knex) {
-  return knex?.client?.config?.client ?? 'mysql2';
-}
-
-function isMysql(knex) {
-  return DIALECTS.mysql.has(getDialect(knex));
-}
-
-function isPostgres(knex) {
-  return DIALECTS.postgres.has(getDialect(knex));
-}
+import {
+  isMysql,
+  isPostgres
+} from './_helpers/schema.js';
 
 async function mysqlColumnIncludesEscrow(knex) {
   const [rows] = await knex.raw("SHOW COLUMNS FROM `payment_intents` LIKE 'provider'");
