@@ -9,11 +9,6 @@ const createLogger = () => ({
   child: vi.fn().mockReturnThis()
 });
 
-const flushMicrotasks = async () => {
-  await Promise.resolve();
-  await Promise.resolve();
-};
-
 describe('IntegrationCircuitBreaker', () => {
   let redis;
   let logger;
@@ -74,16 +69,13 @@ describe('IntegrationCircuitBreaker', () => {
       logger
     });
 
-    const pausePromise = breaker.pause(2000);
-    await flushMicrotasks();
-
+    await breaker.pause(2000);
     const duringPause = await breaker.allowRequest();
     expect(duringPause.allowed).toBe(false);
     expect(duringPause.mode).toBe('paused');
     expect(duringPause.resumeAt).toBe('2024-01-01T00:00:02.000Z');
 
     await vi.advanceTimersByTimeAsync(2000);
-    await pausePromise;
 
     const afterPause = await breaker.allowRequest();
     expect(afterPause.allowed).toBe(true);

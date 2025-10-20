@@ -1,5 +1,3 @@
-import { setTimeout as delay } from 'node:timers/promises';
-
 const DEFAULT_STATE = {
   mode: 'closed',
   failureCount: 0,
@@ -206,6 +204,5 @@ export default class IntegrationCircuitBreaker {
     state.openedAt = Date.now();
     state.pausedUntil = new Date(state.openedAt + durationMs);
     await this.persistState(state);
-    await delay(durationMs);
   }
 }

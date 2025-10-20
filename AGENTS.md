@@ -1,5 +1,17 @@
 # Progress Tracker
 
+| Area | Score (0-100) | Notes |
+| --- | --- | --- |
+| Syntax | 0 | Initial baseline; update as work progresses. |
+| Functionality | 0 | Initial baseline; update as work progresses. |
+| Real World Ready | 0 | Initial baseline; update as work progresses. |
+| Live Data | 0 | Initial baseline; update as work progresses. |
+| Error | 0 | Initial baseline; update as work progresses. |
+| Logic Flow | 0 | Initial baseline; update as work progresses. |
+| Release Readiness | 0 | Initial baseline; update as work progresses. |
+| Tests | 0 | Initial baseline; update as work progresses. |
+| Overall Completion Average | 0 | Mean of tracked areas. |
+
 # Task List
 
 ## 1. Group 1 (Files 1-20 of 1169)

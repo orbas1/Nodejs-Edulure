@@ -2,12 +2,23 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import SalesforceClient from '../../src/integrations/SalesforceClient.js';
 
-function createResponse({ status = 200, body, jsonBody, ok } = {}) {
+function createResponse({ status = 200, body, jsonBody, ok, headers = {} } = {}) {
   const payload = body ?? (jsonBody ? JSON.stringify(jsonBody) : '');
+  const headerEntries = headers instanceof Map ? headers : new Map(Object.entries(headers));
   return {
     ok: typeof ok === 'boolean' ? ok : status >= 200 && status < 300,
     status,
-    headers: new Map(),
+    headers: {
+      get: (key) => {
+        const normalised = `${key}`.toLowerCase();
+        for (const [headerKey, value] of headerEntries) {
+          if (`${headerKey}`.toLowerCase() === normalised) {
+            return value;
+          }
+        }
+        return null;
+      }
+    },
     text: async () => payload,
     json: async () => {
       if (jsonBody) {
@@ -18,7 +29,7 @@ function createResponse({ status = 200, body, jsonBody, ok } = {}) {
   };
 }
 
-function createClient({ fetchImpl, auditLogger, logger } = {}) {
+function createClient({ fetchImpl, auditLogger, logger, sleep } = {}) {
   return new SalesforceClient({
     clientId: 'id',
     clientSecret: 'secret',
@@ -26,7 +37,8 @@ function createClient({ fetchImpl, auditLogger, logger } = {}) {
     password: 'pass',
     fetchImpl,
     auditLogger,
-    logger
+    logger,
+    sleep
   });
 }
 
@@ -114,6 +126,40 @@ describe('SalesforceClient', () => {
         statusCode: 401
       })
     );
+  });
+
+  it('uses retry-after headers to determine throttling backoff', async () => {
+    const now = Date.now();
+    const sleep = vi.fn().mockResolvedValue();
+    const auditLogger = vi.fn().mockResolvedValue();
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        createResponse({
+          jsonBody: {
+            access_token: 'token-1',
+            instance_url: 'https://example.salesforce.com',
+            issued_at: `${now}`,
+            expires_in: 3600
+          }
+        })
+      )
+      .mockResolvedValueOnce(
+        createResponse({
+          status: 429,
+          body: JSON.stringify({ error: 'rate limit' }),
+          headers: { 'Retry-After': '2' }
+        })
+      )
+      .mockResolvedValueOnce(createResponse({ jsonBody: { records: [] } }));
+
+    const client = createClient({ fetchImpl, auditLogger, sleep, logger: { warn: vi.fn(), error: vi.fn() } });
+
+    await client.request('query', { query: { q: 'SELECT Id FROM Lead' } });
+
+    expect(sleep).toHaveBeenCalledWith(2000);
+    const degradeAudit = auditLogger.mock.calls.find(([entry]) => entry.outcome === 'degraded');
+    expect(degradeAudit?.[0]?.metadata?.retryAfterMs).toBe(2000);
   });
 
   it('coalesces concurrent authentication requests', async () => {

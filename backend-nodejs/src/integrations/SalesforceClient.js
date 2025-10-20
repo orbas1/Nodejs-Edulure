@@ -24,7 +24,8 @@ export default class SalesforceClient {
     logger,
     fetchImpl,
     auditLogger,
-    refreshSkewMs = 60000
+    refreshSkewMs = 60000,
+    sleep
   } = {}) {
     if (!clientId || !clientSecret || !username || !password) {
       throw new Error('SalesforceClient requires clientId, clientSecret, username, and password.');
@@ -43,6 +44,7 @@ export default class SalesforceClient {
     this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.auditLogger = typeof auditLogger === 'function' ? auditLogger : null;
     this.refreshSkewMs = Number.isFinite(refreshSkewMs) && refreshSkewMs >= 0 ? refreshSkewMs : 60000;
+    this.sleep = typeof sleep === 'function' ? sleep : delay;
 
     this.accessToken = null;
     this.instanceUrl = null;
@@ -201,18 +203,23 @@ export default class SalesforceClient {
         }
 
         if (response.status === 429 || response.status >= 500) {
-          const backoff = Math.min(attempt * 600, 5000);
+          const retryAfterSeconds = Number(response.headers?.get?.('Retry-After') ?? 0);
+          const retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : null;
+          const backoff = retryAfterMs ?? Math.min(attempt * 600, 5000);
           lastError = new Error(`Salesforce request failed with status ${response.status}`);
+          if (retryAfterMs) {
+            lastError.retryAfterMs = retryAfterMs;
+          }
           await this.recordAudit({
             requestMethod: method,
             requestPath: url.pathname,
             statusCode: response.status,
             outcome: response.status === 429 ? 'degraded' : 'failure',
             durationMs,
-            metadata: { ...metadata, backoff }
+            metadata: { ...metadata, backoff, retryAfterMs }
           });
           if (attempt <= this.maxRetries) {
-            await delay(backoff);
+            await this.sleep(backoff);
             continue;
           }
         }
@@ -273,7 +280,7 @@ export default class SalesforceClient {
           throw error;
         }
 
-        await delay(Math.min(attempt * 600, 4000));
+        await this.sleep(Math.min(attempt * 600, 4000));
       }
     }
 
