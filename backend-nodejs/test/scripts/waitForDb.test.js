@@ -3,9 +3,28 @@ import os from 'os';
 import path from 'path';
 import { pathToFileURL } from 'url';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { parseDatabaseUrl, resolveWaitOptions } from '../../scripts/wait-for-db.js';
+const createConnectionMock = vi.hoisted(() => vi.fn());
+const delayMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+
+vi.mock('mysql2/promise', () => ({
+  __esModule: true,
+  default: {
+    createConnection: createConnectionMock
+  }
+}));
+
+vi.mock('node:timers/promises', () => ({
+  setTimeout: delayMock
+}));
+
+const waitForDbModulePromise = import('../../scripts/wait-for-db.js');
+
+let classifyDatabaseError;
+let parseDatabaseUrl;
+let resolveWaitOptions;
+let waitForDatabase;
 
 const ENV_KEYS = [
   'DATABASE_URL',
@@ -21,6 +40,11 @@ const ENV_KEYS = [
 
 const originalEnv = {};
 
+beforeAll(async () => {
+  ({ classifyDatabaseError, parseDatabaseUrl, resolveWaitOptions, waitForDatabase } =
+    await waitForDbModulePromise);
+});
+
 beforeEach(() => {
   for (const key of ENV_KEYS) {
     if (Object.prototype.hasOwnProperty.call(originalEnv, key)) {
@@ -29,6 +53,10 @@ beforeEach(() => {
     originalEnv[key] = process.env[key];
     delete process.env[key];
   }
+
+  createConnectionMock.mockReset();
+  delayMock.mockReset();
+  delayMock.mockImplementation(() => Promise.resolve());
 });
 
 afterEach(() => {
@@ -39,6 +67,7 @@ afterEach(() => {
       process.env[key] = originalEnv[key];
     }
   }
+  vi.clearAllMocks();
 });
 
 describe('parseDatabaseUrl', () => {
@@ -174,5 +203,64 @@ describe('resolveWaitOptions', () => {
 
   it('throws when no database url is available', () => {
     expect(() => resolveWaitOptions()).toThrow('DATABASE_URL must be set');
+  });
+});
+
+describe('classifyDatabaseError', () => {
+  it('identifies fatal authentication failures', () => {
+    const result = classifyDatabaseError({
+      code: 'ER_ACCESS_DENIED_ERROR',
+      message: 'Access denied for user'
+    });
+
+    expect(result).toMatchObject({
+      fatal: true,
+      reason: expect.stringMatching(/Authentication failed/i)
+    });
+  });
+
+  it('provides guidance for transient network issues', () => {
+    const result = classifyDatabaseError({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' });
+
+    expect(result).toMatchObject({
+      fatal: false,
+      reason: expect.stringMatching(/rejected the TCP connection/i),
+      resolution: expect.stringMatching(/Confirm the database container or host/i)
+    });
+  });
+});
+
+describe('waitForDatabase', () => {
+  it('fails fast for fatal authentication errors', async () => {
+    process.env.DATABASE_URL = 'mysql://user:pass@localhost/app';
+
+    createConnectionMock.mockRejectedValue(
+      Object.assign(new Error('Access denied for user'), { code: 'ER_ACCESS_DENIED_ERROR' })
+    );
+
+    await expect(waitForDatabase()).rejects.toMatchObject({
+      message: expect.stringMatching(/Authentication failed/i)
+    });
+    expect(createConnectionMock).toHaveBeenCalledTimes(1);
+    expect(delayMock).not.toHaveBeenCalled();
+  });
+
+  it('retries transient errors until a connection succeeds', async () => {
+    process.env.DATABASE_URL = 'mysql://user:pass@localhost/app';
+
+    const connection = {
+      ping: vi.fn().mockResolvedValue(undefined),
+      end: vi.fn().mockResolvedValue(undefined)
+    };
+
+    createConnectionMock
+      .mockRejectedValueOnce(Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }))
+      .mockResolvedValue(connection);
+
+    const result = await waitForDatabase();
+
+    expect(result.attempts).toBe(2);
+    expect(createConnectionMock).toHaveBeenCalledTimes(2);
+    expect(delayMock).toHaveBeenCalledTimes(1);
   });
 });

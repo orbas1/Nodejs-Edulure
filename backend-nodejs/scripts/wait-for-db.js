@@ -9,6 +9,244 @@ import mysql from 'mysql2/promise';
 const DEFAULT_TIMEOUT_MS = 120000;
 const DEFAULT_INTERVAL_MS = 5000;
 
+const MYSQL_FATAL_ERROR_HINTS = new Map([
+  [
+    'ER_ACCESS_DENIED_ERROR',
+    {
+      reason: 'Authentication failed for the provided database credentials',
+      resolution: 'Verify that the configured username and password are correct and active.'
+    }
+  ],
+  [
+    'ER_DBACCESS_DENIED_ERROR',
+    {
+      reason: 'The database user does not have permission to access the requested schema',
+      resolution: 'Grant the user access to the target schema or choose a schema the user can access.'
+    }
+  ],
+  [
+    'ER_BAD_DB_ERROR',
+    {
+      reason: 'The specified database does not exist',
+      resolution: 'Create the database or update DATABASE_URL to point at an existing schema.'
+    }
+  ],
+  [
+    'ER_ACCESS_DENIED_NO_PASSWORD_ERROR',
+    {
+      reason: 'The database rejected the connection because a password was not provided',
+      resolution: 'Supply the correct password in DATABASE_URL or grant passwordless access explicitly.'
+    }
+  ],
+  [
+    'ER_NOT_SUPPORTED_AUTH_MODE',
+    {
+      reason: 'The database requires an authentication plugin that this client does not support',
+      resolution: 'Enable a compatible authentication plugin (such as mysql_native_password) or upgrade the client.'
+    }
+  ]
+]);
+
+const MYSQL_FATAL_ERRNO_HINTS = new Map([
+  [1045, MYSQL_FATAL_ERROR_HINTS.get('ER_ACCESS_DENIED_ERROR')],
+  [1044, MYSQL_FATAL_ERROR_HINTS.get('ER_DBACCESS_DENIED_ERROR')],
+  [1049, MYSQL_FATAL_ERROR_HINTS.get('ER_BAD_DB_ERROR')],
+  [1251, MYSQL_FATAL_ERROR_HINTS.get('ER_NOT_SUPPORTED_AUTH_MODE')]
+]);
+
+const MYSQL_FATAL_SQLSTATE_HINTS = new Map([
+  ['28000', MYSQL_FATAL_ERROR_HINTS.get('ER_ACCESS_DENIED_ERROR')],
+  ['42000', MYSQL_FATAL_ERROR_HINTS.get('ER_DBACCESS_DENIED_ERROR')]
+]);
+
+const NODE_TLS_FATAL_HINTS = new Map([
+  [
+    'ERR_TLS_CERT_ALTNAME_INVALID',
+    {
+      reason: 'The database TLS certificate does not match the configured hostname',
+      resolution: 'Update the DATABASE_URL host or install a certificate that contains the expected hostnames.'
+    }
+  ],
+  [
+    'DEPTH_ZERO_SELF_SIGNED_CERT',
+    {
+      reason: 'The database TLS certificate chain is self-signed and was rejected',
+      resolution: 'Install a trusted CA certificate or disable strict verification for development environments.'
+    }
+  ],
+  [
+    'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    {
+      reason: 'The database TLS certificate chain could not be verified',
+      resolution: 'Ensure the full CA chain is provided and trusted by the runtime environment.'
+    }
+  ]
+]);
+
+const TRANSIENT_ERROR_HINTS = new Map([
+  [
+    'ECONNREFUSED',
+    {
+      reason: 'The database service rejected the TCP connection',
+      resolution: 'Confirm the database container or host is running and accepting connections.'
+    }
+  ],
+  [
+    'ECONNRESET',
+    {
+      reason: 'The database service reset the network connection during handshake',
+      resolution: 'The database may still be booting; it will be retried automatically.'
+    }
+  ],
+  [
+    'ENOTFOUND',
+    {
+      reason: 'The database host could not be resolved via DNS',
+      resolution: 'Ensure the DATABASE_URL host resolves in this environment.'
+    }
+  ],
+  [
+    'EHOSTUNREACH',
+    {
+      reason: 'The database host is unreachable from this environment',
+      resolution: 'Verify network routing or VPN connectivity to the database host.'
+    }
+  ],
+  [
+    'ETIMEDOUT',
+    {
+      reason: 'The database did not respond before the network timeout elapsed',
+      resolution: 'The database may still be starting up; it will be retried automatically.'
+    }
+  ],
+  [
+    'EAI_AGAIN',
+    {
+      reason: 'The DNS resolver timed out while looking up the database host',
+      resolution: 'DNS should recover automatically; check upstream resolvers if the issue persists.'
+    }
+  ],
+  [
+    'PROTOCOL_CONNECTION_LOST',
+    {
+      reason: 'The database closed the connection unexpectedly during handshake',
+      resolution: 'The database may still be initialising; retrying might succeed once it is ready.'
+    }
+  ]
+]);
+
+const TRANSIENT_SQLSTATE_HINTS = new Map([
+  [
+    '08S01',
+    {
+      reason: 'The connection to the database was lost during handshake',
+      resolution: 'The database may be restarting; the wait script will retry.'
+    }
+  ]
+]);
+
+const TRANSIENT_ERRNO_HINTS = new Map([
+  [
+    1042,
+    {
+      reason: 'The client could not resolve the database hostname',
+      resolution: 'Verify DNS configuration or use a direct IP address in DATABASE_URL.'
+    }
+  ]
+]);
+
+const FATAL_MESSAGE_HINTS = [
+  {
+    test: /access denied/i,
+    ...MYSQL_FATAL_ERROR_HINTS.get('ER_ACCESS_DENIED_ERROR')
+  },
+  {
+    test: /unknown database/i,
+    ...MYSQL_FATAL_ERROR_HINTS.get('ER_BAD_DB_ERROR')
+  },
+  {
+    test: /does not support authentication protocol/i,
+    ...MYSQL_FATAL_ERROR_HINTS.get('ER_NOT_SUPPORTED_AUTH_MODE')
+  },
+  {
+    test: /bad handshake/i,
+    reason: 'The server rejected the TLS or authentication handshake',
+    resolution: 'Check the TLS configuration and authentication plugins exposed by the database server.'
+  }
+];
+
+const TRANSIENT_MESSAGE_HINTS = [
+  {
+    test: /server has gone away/i,
+    reason: 'The database closed the connection before the handshake completed',
+    resolution: 'The database may still be warming up; the wait script will retry.'
+  },
+  {
+    test: /handshake inactivity timeout/i,
+    reason: 'The database did not complete the handshake in time',
+    resolution: 'This is usually transient while the database allocates resources.'
+  }
+];
+
+function lookupHint(value, ...lookups) {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  const normalized = typeof value === 'string' ? value.toUpperCase() : value;
+  for (const lookup of lookups) {
+    if (!lookup) continue;
+    const hint = lookup instanceof Map ? lookup.get(normalized) : undefined;
+    if (hint) {
+      return hint;
+    }
+  }
+
+  return undefined;
+}
+
+export function classifyDatabaseError(error) {
+  if (!error || typeof error !== 'object') {
+    return { fatal: false, reason: undefined, resolution: undefined };
+  }
+
+  const code = typeof error.code === 'string' ? error.code.toUpperCase() : undefined;
+  const errno = typeof error.errno === 'number' ? error.errno : undefined;
+  const sqlState = typeof error.sqlState === 'string' ? error.sqlState.toUpperCase() : undefined;
+  const message = typeof error.message === 'string' ? error.message : '';
+
+  const fatalHint =
+    lookupHint(code, MYSQL_FATAL_ERROR_HINTS, NODE_TLS_FATAL_HINTS) ||
+    lookupHint(errno, MYSQL_FATAL_ERRNO_HINTS) ||
+    lookupHint(sqlState, MYSQL_FATAL_SQLSTATE_HINTS) ||
+    FATAL_MESSAGE_HINTS.find((entry) => entry.test.test(message));
+
+  if (fatalHint || error.fatal === true) {
+    const hint = fatalHint ?? {
+      reason: 'The database server returned a fatal error during connection establishment',
+      resolution: 'Inspect the database logs for details and resolve the misconfiguration before retrying.'
+    };
+
+    return {
+      fatal: true,
+      reason: hint.reason,
+      resolution: hint.resolution
+    };
+  }
+
+  const transientHint =
+    lookupHint(code, TRANSIENT_ERROR_HINTS) ||
+    lookupHint(errno, TRANSIENT_ERRNO_HINTS) ||
+    lookupHint(sqlState, TRANSIENT_SQLSTATE_HINTS) ||
+    TRANSIENT_MESSAGE_HINTS.find((entry) => entry.test.test(message));
+
+  return {
+    fatal: false,
+    reason: transientHint?.reason,
+    resolution: transientHint?.resolution ?? 'The wait script will retry automatically until the timeout elapses.'
+  };
+}
+
 function toPositiveInteger(value, fallback, { minimum } = {}) {
   const min = typeof minimum === 'number' && minimum > 0 ? minimum : 1;
   if (value === undefined || value === null) {
@@ -269,6 +507,23 @@ export async function waitForDatabase(overrides = {}) {
       await connection?.end().catch(() => {});
 
       const elapsedMs = Date.now() - start;
+      const classification = classifyDatabaseError(error);
+
+      if (classification.fatal) {
+        const fatalError = new Error(
+          `${classification.reason} while connecting to ${host}/${database}. ${classification.resolution} Last error: ${error.message}`
+        );
+        fatalError.cause = error;
+        fatalError.details = {
+          host,
+          database,
+          attempts: attempt,
+          elapsedMs,
+          fatal: true
+        };
+        throw fatalError;
+      }
+
       if (elapsedMs + intervalMs > timeoutMs) {
         const timeoutError = new Error(
           `Timed out waiting for database after ${Math.round(timeoutMs / 1000)} seconds`
@@ -278,14 +533,23 @@ export async function waitForDatabase(overrides = {}) {
           host,
           database,
           attempts: attempt,
-          elapsedMs
+          elapsedMs,
+          fatal: false
         };
         throw timeoutError;
       }
 
-      console.warn(
+      const advisoryParts = [
         `Database not ready (attempt ${attempt}) for ${host}/${database}: ${error.message}`
-      );
+      ];
+      if (classification.reason) {
+        advisoryParts.push(`Reason: ${classification.reason}.`);
+      }
+      if (classification.resolution) {
+        advisoryParts.push(classification.resolution);
+      }
+
+      console.warn(advisoryParts.join(' '));
       await delay(intervalMs);
     }
   }
