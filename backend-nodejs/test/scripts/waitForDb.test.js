@@ -1,3 +1,8 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import { pathToFileURL } from 'url';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { parseDatabaseUrl, resolveWaitOptions } from '../../scripts/wait-for-db.js';
@@ -7,7 +12,11 @@ const ENV_KEYS = [
   'DB_WAIT_TIMEOUT_MS',
   'DB_WAIT_INTERVAL_MS',
   'DB_WAIT_USE_SSL',
-  'DB_WAIT_STRICT_SSL'
+  'DB_WAIT_STRICT_SSL',
+  'DB_WAIT_SSL_CA',
+  'DB_WAIT_SSL_CERT',
+  'DB_WAIT_SSL_KEY',
+  'DB_WAIT_SSL_REJECT_UNAUTHORIZED'
 ];
 
 const originalEnv = {};
@@ -75,6 +84,32 @@ describe('parseDatabaseUrl', () => {
     expect(config.ssl.ca).toContain('BEGIN CERT');
   });
 
+  it('loads TLS materials from file paths, URLs, and base64 payloads', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wait-for-db-'));
+    try {
+      const caPath = path.join(tmpDir, 'ca.pem');
+      const certPath = path.join(tmpDir, 'client-cert.pem');
+      const caContent = '-----BEGIN CERTIFICATE-----\nCA\n-----END CERTIFICATE-----';
+      const certContent = '-----BEGIN CERTIFICATE-----\nCLIENT\n-----END CERTIFICATE-----';
+      fs.writeFileSync(caPath, caContent);
+      fs.writeFileSync(certPath, certContent);
+      const keyContent = '-----BEGIN PRIVATE KEY-----\nKEY\n-----END PRIVATE KEY-----';
+      const keyBase64 = Buffer.from(keyContent).toString('base64');
+
+      const config = parseDatabaseUrl(
+        `mysql://user:pass@mysql.example.com/app?ssl=true&ca=${encodeURIComponent(caPath)}` +
+        `&cert=${encodeURIComponent(pathToFileURL(certPath).toString())}&key=${keyBase64}`
+      );
+
+      expect(config.ssl).toBeDefined();
+      expect(config.ssl.ca).toBe(caContent);
+      expect(config.ssl.cert).toBe(certContent);
+      expect(config.ssl.key).toBe(keyContent);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it('forces TLS when the environment flag is set', () => {
     process.env.DB_WAIT_USE_SSL = 'true';
 
@@ -82,6 +117,30 @@ describe('parseDatabaseUrl', () => {
 
     expect(config.ssl).toBeDefined();
     expect(config.ssl.rejectUnauthorized).toBe(true);
+  });
+
+  it('honors TLS environment overrides when query params are absent', () => {
+    process.env.DB_WAIT_USE_SSL = 'true';
+    process.env.DB_WAIT_SSL_CA = Buffer.from('-----BEGIN CERT-----\nENV CA\n-----END CERT-----').toString('base64');
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wait-for-db-env-'));
+    try {
+      const certPath = path.join(tmpDir, 'cert.pem');
+      fs.writeFileSync(certPath, '-----BEGIN CERTIFICATE-----\nENV CERT\n-----END CERTIFICATE-----');
+      process.env.DB_WAIT_SSL_CERT = pathToFileURL(certPath).toString();
+      process.env.DB_WAIT_SSL_KEY = '-----BEGIN PRIVATE KEY-----\nENV KEY\n-----END PRIVATE KEY-----';
+      process.env.DB_WAIT_SSL_REJECT_UNAUTHORIZED = 'false';
+
+      const config = parseDatabaseUrl('mysql://user:pass@mysql.example.com/app');
+
+      expect(config.ssl).toBeDefined();
+      expect(config.ssl.rejectUnauthorized).toBe(false);
+      expect(config.ssl.ca).toContain('ENV CA');
+      expect(config.ssl.cert).toContain('ENV CERT');
+      expect(config.ssl.key).toContain('ENV KEY');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('throws when a non-mysql protocol is provided', () => {

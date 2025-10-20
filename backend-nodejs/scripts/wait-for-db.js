@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -22,7 +23,46 @@ function toPositiveInteger(value, fallback, { minimum } = {}) {
   return parsed;
 }
 
-function decodeMaybeBase64(value) {
+function coalesceNonBlank(...candidates) {
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null) {
+      continue;
+    }
+
+    const value = typeof candidate === 'string' ? candidate.trim() : candidate;
+    if (typeof value === 'string') {
+      if (value !== '') {
+        return value;
+      }
+    } else if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
+function decodeUriComponentSafe(value) {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  try {
+    return decodeURIComponent(value);
+  } catch (_error) {
+    return value;
+  }
+}
+
+function readFileContents(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch (error) {
+    throw new Error(`Failed to read TLS material from ${filePath}: ${error.message}`);
+  }
+}
+
+function decodeMaybeBase64OrFile(value) {
   if (!value) {
     return null;
   }
@@ -32,15 +72,41 @@ function decodeMaybeBase64(value) {
     return null;
   }
 
+  if (trimmed.startsWith('file://')) {
+    let filePath;
+    try {
+      filePath = fileURLToPath(new URL(trimmed));
+    } catch (error) {
+      throw new Error(`Failed to resolve TLS material URL ${trimmed}: ${error.message}`);
+    }
+
+    return readFileContents(filePath);
+  }
+
+  if (trimmed.startsWith('/') || trimmed.startsWith('./') || trimmed.startsWith('../')) {
+    const resolvedPath = path.resolve(process.cwd(), trimmed);
+    if (fs.existsSync(resolvedPath)) {
+      return readFileContents(resolvedPath);
+    }
+  }
+
   if (trimmed.includes('-----BEGIN')) {
     return trimmed;
   }
 
-  try {
-    return Buffer.from(trimmed, 'base64').toString('utf8');
-  } catch (_error) {
-    return trimmed;
+  const looksBase64 = /^[A-Za-z0-9+/]+={0,2}$/.test(trimmed) && trimmed.length % 4 === 0;
+  if (looksBase64) {
+    try {
+      const decoded = Buffer.from(trimmed, 'base64').toString('utf8');
+      if (decoded.trim()) {
+        return decoded;
+      }
+    } catch (_error) {
+      // ignore, fall back to raw string
+    }
   }
+
+  return trimmed;
 }
 
 export function resolveWaitOptions(overrides = {}) {
@@ -102,20 +168,40 @@ export function parseDatabaseUrl(urlString) {
 
   const sslMode = (params.get('sslmode') ?? '').toLowerCase();
   const sslFlag = (params.get('ssl') ?? '').toLowerCase();
-  const rejectUnauthorizedParam = params.get('rejectUnauthorized');
-  const caParam = params.get('ca');
-  const certParam = params.get('cert');
-  const keyParam = params.get('key');
+  const rejectUnauthorizedParam = coalesceNonBlank(
+    params.get('rejectUnauthorized'),
+    params.get('reject_unauthorized'),
+    process.env.DB_WAIT_SSL_REJECT_UNAUTHORIZED
+  );
+
+  const caParam = coalesceNonBlank(
+    params.get('ca'),
+    params.get('sslca'),
+    params.get('ssl-ca'),
+    process.env.DB_WAIT_SSL_CA
+  );
+  const certParam = coalesceNonBlank(
+    params.get('cert'),
+    params.get('sslcert'),
+    params.get('ssl-cert'),
+    process.env.DB_WAIT_SSL_CERT
+  );
+  const keyParam = coalesceNonBlank(
+    params.get('key'),
+    params.get('sslkey'),
+    params.get('ssl-key'),
+    process.env.DB_WAIT_SSL_KEY
+  );
+
+  const ca = caParam ? decodeMaybeBase64OrFile(decodeUriComponentSafe(caParam)) : undefined;
+  const cert = certParam ? decodeMaybeBase64OrFile(decodeUriComponentSafe(certParam)) : undefined;
+  const key = keyParam ? decodeMaybeBase64OrFile(decodeUriComponentSafe(keyParam)) : undefined;
 
   const envForceSsl = process.env.DB_WAIT_USE_SSL === 'true';
   const envDisableSsl = process.env.DB_WAIT_USE_SSL === 'false';
   const strictSsl = process.env.DB_WAIT_STRICT_SSL === 'true';
 
-  const ca = decodeMaybeBase64(caParam);
-  const cert = decodeMaybeBase64(certParam);
-  const key = decodeMaybeBase64(keyParam);
-
-  const shouldEnableSslFromUrl = sslFlag === 'true' || ['require', 'verify-ca', 'verify-full'].includes(sslMode);
+  const shouldEnableSslFromUrl = sslFlag === 'true' || ['require', 'verify-ca', 'verify-full'].includes(sslMode) || !!(ca || cert || key);
   const shouldDisableSslFromUrl = sslFlag === 'false' || sslMode === 'disable';
   const explicitReject = typeof rejectUnauthorizedParam === 'string'
     ? rejectUnauthorizedParam.trim().toLowerCase()
@@ -161,6 +247,8 @@ export function parseDatabaseUrl(urlString) {
 export async function waitForDatabase(overrides = {}) {
   const { url, timeoutMs, intervalMs } = resolveWaitOptions(overrides);
   const connectionConfig = parseDatabaseUrl(url);
+  const connectTimeout = Math.min(Math.max(intervalMs, 1000), 30000);
+  connectionConfig.connectTimeout = connectTimeout;
   const host = connectionConfig.socketPath ? connectionConfig.socketPath : `${connectionConfig.host}:${connectionConfig.port}`;
   const database = connectionConfig.database ?? '<default>';
 
