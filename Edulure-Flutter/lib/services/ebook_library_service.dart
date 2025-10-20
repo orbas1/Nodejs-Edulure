@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -47,6 +48,8 @@ class EbookLibraryService implements EbookReaderBackend {
   Future<void>? _ensureReadyFuture;
   bool _ready = false;
   final Map<String, Future<String>> _inFlightDownloads = <String, Future<String>>{};
+  StreamController<List<DownloadedEbook>>? _downloadsController;
+  StreamSubscription<BoxEvent>? _downloadsSubscription;
 
   Future<void> ensureReady() async {
     if (_ready) {
@@ -68,14 +71,14 @@ class EbookLibraryService implements EbookReaderBackend {
 
   Future<String> ensureDownloaded(Ebook ebook) async {
     await ensureReady();
-    final cachedPath = await _validateCachedDownload(ebook.id);
+    final cachedPath = await _validateCachedDownload(ebook.id, ebook);
     if (cachedPath != null) {
       return cachedPath;
     }
 
     return _inFlightDownloads.putIfAbsent(ebook.id, () async {
       try {
-        final cachedWhileQueued = await _validateCachedDownload(ebook.id);
+        final cachedWhileQueued = await _validateCachedDownload(ebook.id, ebook);
         if (cachedWhileQueued != null) {
           return cachedWhileQueued;
         }
@@ -88,9 +91,10 @@ class EbookLibraryService implements EbookReaderBackend {
 
         try {
           await _client.download(ebook.fileUrl, filePath);
-          final metadata = await _buildCacheEntry(filePath);
+          final metadata = await _buildCacheEntry(ebook, filePath);
           await _filesBox?.put(ebook.id, metadata.toJson());
           await _rebalanceCache(exemptId: ebook.id);
+          _notifyLibraryChanged();
           return metadata.path;
         } on DioException catch (error) {
           await _cleanupFailedDownload(file, ebook.id);
@@ -121,6 +125,7 @@ class EbookLibraryService implements EbookReaderBackend {
       }
     }
     await _filesBox?.delete(ebookId);
+    _notifyLibraryChanged();
   }
 
   bool isDownloaded(String ebookId) {
@@ -141,6 +146,7 @@ class EbookLibraryService implements EbookReaderBackend {
     }
     final touched = cached.touch(_clock());
     unawaited(_filesBox?.put(ebookId, touched.toJson()));
+    _notifyLibraryChanged();
     return true;
   }
 
@@ -169,6 +175,7 @@ class EbookLibraryService implements EbookReaderBackend {
     await _filesBox?.clear();
     await _progressBox?.clear();
     await _preferencesBox?.clear();
+    _notifyLibraryChanged();
   }
 
   @override
@@ -203,6 +210,72 @@ class EbookLibraryService implements EbookReaderBackend {
     await cacheEbookProgress(assetId, next);
   }
 
+  Future<List<DownloadedEbook>> listDownloads() async {
+    await ensureReady();
+    final box = _filesBox;
+    if (box == null || box.isEmpty) {
+      return const <DownloadedEbook>[];
+    }
+    final downloads = <DownloadedEbook>[];
+    for (final entry in box.toMap().entries) {
+      final cached = await _resolveCacheEntry(entry.key.toString());
+      if (cached == null) {
+        continue;
+      }
+      downloads.add(DownloadedEbook.fromCache(entry.key.toString(), cached));
+    }
+    downloads.sort((a, b) => b.lastAccessedAt.compareTo(a.lastAccessedAt));
+    return downloads;
+  }
+
+  Future<DownloadedEbook?> getDownload(String ebookId) async {
+    await ensureReady();
+    final cached = await _resolveCacheEntry(ebookId);
+    if (cached == null) {
+      return null;
+    }
+    return DownloadedEbook.fromCache(ebookId, cached);
+  }
+
+  Stream<List<DownloadedEbook>> watchDownloads() {
+    _downloadsController ??= StreamController<List<DownloadedEbook>>.broadcast(
+      onListen: () {
+        unawaited(() async {
+          await ensureReady();
+          await _startDownloadsWatch();
+          await _emitCurrentDownloads();
+        }());
+      },
+      onCancel: () {
+        final controller = _downloadsController;
+        if (controller == null || controller.hasListener) {
+          return;
+        }
+        unawaited(_teardownDownloadsWatch());
+      },
+    );
+    return _downloadsController!.stream;
+  }
+
+  Future<void> dispose() async {
+    await _teardownDownloadsWatch();
+    final controller = _downloadsController;
+    if (controller != null && !controller.isClosed) {
+      await controller.close();
+    }
+    _downloadsController = null;
+    await _filesBox?.close();
+    await _progressBox?.close();
+    await _preferencesBox?.close();
+    _filesBox = null;
+    _progressBox = null;
+    _preferencesBox = null;
+    _libraryDirectory = null;
+    _ready = false;
+    _ensureReadyFuture = null;
+    _inFlightDownloads.clear();
+  }
+
   Future<Directory> _prepareLibraryDirectory() async {
     return _libraryDirectoryBuilder();
   }
@@ -216,6 +289,44 @@ class EbookLibraryService implements EbookReaderBackend {
     return '${ebook.id}-$sanitized.$extension';
   }
 
+  Future<void> _startDownloadsWatch() async {
+    if (_downloadsSubscription != null) {
+      return;
+    }
+    final box = _filesBox;
+    if (box == null) {
+      return;
+    }
+    _downloadsSubscription = box.watch().listen((_) {
+      _notifyLibraryChanged();
+    });
+  }
+
+  Future<void> _teardownDownloadsWatch() async {
+    await _downloadsSubscription?.cancel();
+    _downloadsSubscription = null;
+  }
+
+  Future<void> _emitCurrentDownloads() async {
+    final controller = _downloadsController;
+    if (controller == null || controller.isClosed) {
+      return;
+    }
+    final snapshot = await listDownloads();
+    if (controller.isClosed) {
+      return;
+    }
+    controller.add(snapshot);
+  }
+
+  void _notifyLibraryChanged() {
+    final controller = _downloadsController;
+    if (controller == null || controller.isClosed) {
+      return;
+    }
+    unawaited(_emitCurrentDownloads());
+  }
+
   Future<void> _initialize() async {
     _filesBox ??= await Hive.openBox<dynamic>(_filesBoxName);
     _progressBox ??= await Hive.openBox<dynamic>(_progressBoxName);
@@ -223,6 +334,7 @@ class EbookLibraryService implements EbookReaderBackend {
     _libraryDirectory ??= await _prepareLibraryDirectory();
     _hydrateSynchronousCaches();
     await _rebalanceCache();
+    _notifyLibraryChanged();
   }
 
   Future<void> _cleanupFailedDownload(File file, String ebookId) async {
@@ -230,6 +342,7 @@ class EbookLibraryService implements EbookReaderBackend {
       await file.delete();
     }
     await _filesBox?.delete(ebookId);
+    _notifyLibraryChanged();
   }
 
   void _hydrateSynchronousCaches() {
@@ -238,14 +351,18 @@ class EbookLibraryService implements EbookReaderBackend {
     _preferencesBox ??= _maybeOpenBox(_preferencesBoxName);
   }
 
-  Future<String?> _validateCachedDownload(String ebookId) async {
+  Future<String?> _validateCachedDownload(String ebookId, [Ebook? ebook]) async {
     final cached = await _resolveCacheEntry(ebookId);
     if (cached == null) {
       return null;
     }
     final touched = cached.touch(_clock());
-    await _filesBox?.put(ebookId, touched.toJson());
-    return touched.path;
+    final enriched = ebook != null
+        ? touched.copyWith(ebookJson: _serializeEbook(ebook))
+        : touched;
+    await _filesBox?.put(ebookId, enriched.toJson());
+    _notifyLibraryChanged();
+    return enriched.path;
   }
 
   Box<dynamic>? _maybeOpenBox(String name) {
@@ -272,14 +389,22 @@ class EbookLibraryService implements EbookReaderBackend {
     return directory;
   }
 
-  Future<_CachedFile> _buildCacheEntry(String path) async {
+  Future<_CachedFile> _buildCacheEntry(Ebook ebook, String path) async {
     final file = File(path);
     final stat = await file.stat();
+    final now = _clock();
     return _CachedFile(
       path: path,
       sizeBytes: stat.size,
-      lastAccessedAt: _clock(),
+      lastAccessedAt: now,
+      downloadedAt: now,
+      ebookJson: _serializeEbook(ebook),
     );
+  }
+
+  Map<String, dynamic> _serializeEbook(Ebook ebook) {
+    final serialized = ebook.copyWith(downloaded: true).toJson();
+    return Map<String, dynamic>.from(serialized);
   }
 
   Future<_CachedFile?> _resolveCacheEntry(String ebookId) async {
@@ -303,6 +428,7 @@ class EbookLibraryService implements EbookReaderBackend {
     final stat = await file.stat();
     final enriched = cached.copyWith(sizeBytes: stat.size);
     await _filesBox?.put(ebookId, enriched.toJson());
+    _notifyLibraryChanged();
     return enriched;
   }
 
@@ -315,6 +441,7 @@ class EbookLibraryService implements EbookReaderBackend {
     final List<_CacheRecord> validEntries = <_CacheRecord>[];
     var totalSize = 0;
     final staleKeys = <dynamic>[];
+    var modified = false;
 
     for (final entry in box.toMap().entries) {
       final cached = _CachedFile.fromHive(entry.value);
@@ -332,6 +459,7 @@ class EbookLibraryService implements EbookReaderBackend {
           : cached.copyWith(sizeBytes: (await file.stat()).size);
       if (!identical(resolved, cached)) {
         await box.put(entry.key, resolved.toJson());
+        modified = true;
       }
       validEntries.add(_CacheRecord(entry.key, resolved));
       totalSize += resolved.sizeBytes;
@@ -339,10 +467,14 @@ class EbookLibraryService implements EbookReaderBackend {
 
     for (final key in staleKeys) {
       await box.delete(key);
+      modified = true;
     }
 
     final limit = _maxCacheSizeBytes;
     if (limit == null || totalSize <= limit) {
+      if (modified) {
+        _notifyLibraryChanged();
+      }
       return;
     }
 
@@ -365,6 +497,11 @@ class EbookLibraryService implements EbookReaderBackend {
       }
       await box.delete(record.key);
       remaining -= record.file.sizeBytes;
+      modified = true;
+    }
+
+    if (modified) {
+      _notifyLibraryChanged();
     }
   }
 }
@@ -376,32 +513,103 @@ class _CacheRecord {
   final _CachedFile file;
 }
 
+class DownloadedEbook {
+  const DownloadedEbook({
+    required this.ebook,
+    required this.path,
+    required this.sizeBytes,
+    required this.downloadedAt,
+    required this.lastAccessedAt,
+  });
+
+  final Ebook ebook;
+  final String path;
+  final int sizeBytes;
+  final DateTime downloadedAt;
+  final DateTime lastAccessedAt;
+
+  DownloadedEbook copyWith({
+    Ebook? ebook,
+    String? path,
+    int? sizeBytes,
+    DateTime? downloadedAt,
+    DateTime? lastAccessedAt,
+  }) {
+    return DownloadedEbook(
+      ebook: ebook ?? this.ebook,
+      path: path ?? this.path,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      downloadedAt: downloadedAt ?? this.downloadedAt,
+      lastAccessedAt: lastAccessedAt ?? this.lastAccessedAt,
+    );
+  }
+
+  static DownloadedEbook fromCache(String id, _CachedFile cached) {
+    final ebookJson = cached.ebookJson;
+    final ebook = ebookJson != null
+        ? Ebook.fromJson(ebookJson)
+        : Ebook(
+            id: id,
+            title: id,
+            author: 'Unknown Author',
+            coverUrl: '',
+            fileUrl: cached.path,
+            description: '',
+            language: 'Unknown',
+            tags: const <String>[],
+            chapters: const <EbookChapter>[],
+            downloaded: true,
+          );
+    final normalized = ebook.copyWith(
+      downloaded: true,
+      fileUrl: ebook.fileUrl.isEmpty ? cached.path : ebook.fileUrl,
+    );
+    return DownloadedEbook(
+      ebook: normalized,
+      path: cached.path,
+      sizeBytes: cached.sizeBytes,
+      downloadedAt: cached.downloadedAt,
+      lastAccessedAt: cached.lastAccessedAt,
+    );
+  }
+}
+
 class _CachedFile {
   const _CachedFile({
     required this.path,
     required this.sizeBytes,
     required this.lastAccessedAt,
+    required this.downloadedAt,
+    this.ebookJson,
   })  : assert(sizeBytes >= 0, 'sizeBytes cannot be negative.');
 
   final String path;
   final int sizeBytes;
   final DateTime lastAccessedAt;
+  final DateTime downloadedAt;
+  final Map<String, dynamic>? ebookJson;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'path': path,
         'size': sizeBytes,
         'lastAccessed': lastAccessedAt.millisecondsSinceEpoch,
+        'downloadedAt': downloadedAt.millisecondsSinceEpoch,
+        if (ebookJson != null) 'ebook': ebookJson,
       };
 
   _CachedFile copyWith({
     String? path,
     int? sizeBytes,
     DateTime? lastAccessedAt,
+    DateTime? downloadedAt,
+    Map<String, dynamic>? ebookJson,
   }) {
     return _CachedFile(
       path: path ?? this.path,
       sizeBytes: sizeBytes ?? this.sizeBytes,
       lastAccessedAt: lastAccessedAt ?? this.lastAccessedAt,
+      downloadedAt: downloadedAt ?? this.downloadedAt,
+      ebookJson: ebookJson ?? this.ebookJson,
     );
   }
 
@@ -411,10 +619,12 @@ class _CachedFile {
 
   static _CachedFile? fromHive(Object? value) {
     if (value is String) {
+      final epoch = DateTime.fromMillisecondsSinceEpoch(0);
       return _CachedFile(
         path: value,
         sizeBytes: 0,
-        lastAccessedAt: DateTime.fromMillisecondsSinceEpoch(0),
+        lastAccessedAt: epoch,
+        downloadedAt: epoch,
       );
     }
     if (value is Map) {
@@ -424,20 +634,27 @@ class _CachedFile {
         return null;
       }
       final dynamic sizeRaw = map['size'];
-      final size = sizeRaw is int
-          ? sizeRaw
-          : int.tryParse(sizeRaw?.toString() ?? '') ?? 0;
+      final size = sizeRaw is int ? sizeRaw : int.tryParse(sizeRaw?.toString() ?? '') ?? 0;
       final dynamic lastRaw = map['lastAccessed'];
       final lastAccessed = lastRaw is int
           ? DateTime.fromMillisecondsSinceEpoch(lastRaw)
           : lastRaw is String
-              ? DateTime.tryParse(lastRaw) ??
-                  DateTime.fromMillisecondsSinceEpoch(0)
+              ? DateTime.tryParse(lastRaw) ?? DateTime.fromMillisecondsSinceEpoch(0)
               : DateTime.fromMillisecondsSinceEpoch(0);
+      final dynamic downloadedRaw = map['downloadedAt'] ?? map['downloaded_at'];
+      final downloadedAt = downloadedRaw is int
+          ? DateTime.fromMillisecondsSinceEpoch(downloadedRaw)
+          : downloadedRaw is String
+              ? DateTime.tryParse(downloadedRaw) ?? lastAccessed
+              : lastAccessed;
+      final ebookRaw = map['ebook'];
+      final ebookJson = ebookRaw is Map ? Map<String, dynamic>.from(ebookRaw as Map) : null;
       return _CachedFile(
         path: path,
         sizeBytes: size,
         lastAccessedAt: lastAccessed,
+        downloadedAt: downloadedAt,
+        ebookJson: ebookJson,
       );
     }
     return null;

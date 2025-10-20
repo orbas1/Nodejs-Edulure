@@ -15,6 +15,7 @@ void main() {
   late _FakeDio fakeDio;
   late Future<Directory> Function() libraryBuilder;
   late _TestClock testClock;
+  late List<EbookLibraryService> disposables;
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('ebook-library-service-test');
@@ -28,15 +29,21 @@ void main() {
       }
       return directory;
     };
+    disposables = <EbookLibraryService>[];
     service = EbookLibraryService(
       httpClient: fakeDio,
       libraryDirectoryBuilder: libraryBuilder,
       clock: testClock.call,
     );
+    disposables.add(service);
     await service.ensureReady();
   });
 
   tearDown(() async {
+    for (final instance in disposables.reversed) {
+      await instance.dispose();
+    }
+    disposables.clear();
     await _disposeBox('ebook_library.files');
     await _disposeBox('ebook_library.progress');
     await _disposeBox('ebook_library.preferences');
@@ -75,6 +82,7 @@ void main() {
       libraryDirectoryBuilder: libraryBuilder,
       clock: testClock.call,
     );
+    disposables.add(service);
     await service.ensureReady();
 
     final ebook = _buildEbook(
@@ -132,6 +140,7 @@ void main() {
       httpClient: fakeDio,
       libraryDirectoryBuilder: libraryBuilder,
     );
+    disposables.add(freshService);
     await freshService.ensureReady();
 
     final restored = freshService.loadReaderPreferences();
@@ -147,6 +156,7 @@ void main() {
       libraryDirectoryBuilder: libraryBuilder,
       clock: testClock.call,
     );
+    disposables.add(failingService);
     await failingService.ensureReady();
 
     final ebook = _buildEbook(
@@ -188,6 +198,7 @@ void main() {
 
     final updated = Map<String, dynamic>.from(filesBox.get(ebook.id) as Map);
     expect(updated['lastAccessed'], greaterThan(firstAccessed));
+    expect(updated['ebook'], isA<Map>());
   });
 
   test('max cache size evicts least recently used downloads', () async {
@@ -197,6 +208,7 @@ void main() {
       maxCacheSizeBytes: 100,
       clock: testClock.call,
     );
+    disposables.add(limitedService);
     await limitedService.ensureReady();
 
     final ebookA = _buildEbook(
@@ -256,6 +268,121 @@ void main() {
     final map = Map<String, dynamic>.from(upgraded as Map);
     expect(map['path'], legacyPath);
     expect(map['size'], greaterThan(0));
+
+    final downloaded = await service.getDownload(legacy.id);
+    expect(downloaded, isNotNull);
+    expect(downloaded!.path, legacyPath);
+    expect(downloaded.ebook.title, legacy.id);
+  });
+
+  test('listDownloads returns enriched metadata sorted by recency', () async {
+    final ebookA = _buildEbook(
+      id: 'ebook-alpha',
+      title: 'Alpha Case Study',
+      author: 'Author A',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-alpha.epub',
+    );
+    final ebookB = _buildEbook(
+      id: 'ebook-beta',
+      title: 'Beta Playbook',
+      author: 'Author B',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-beta.epub',
+    );
+
+    final pathA = await service.ensureDownloaded(ebookA);
+    testClock.advance(const Duration(minutes: 2));
+    await service.ensureDownloaded(ebookB);
+    testClock.advance(const Duration(minutes: 1));
+    await service.ensureDownloaded(ebookA);
+
+    final downloads = await service.listDownloads();
+
+    expect(downloads, hasLength(2));
+    expect(downloads.first.ebook.id, ebookA.id);
+    expect(downloads.first.ebook.title, 'Alpha Case Study');
+    expect(downloads.first.ebook.downloaded, isTrue);
+    expect(downloads.first.path, pathA);
+    expect(downloads.first.sizeBytes, greaterThan(0));
+    expect(downloads.first.lastAccessedAt.isAfter(downloads.first.downloadedAt) ||
+        downloads.first.lastAccessedAt == downloads.first.downloadedAt, isTrue);
+    expect(downloads.last.ebook.id, ebookB.id);
+  });
+
+  test('ensureDownloaded refreshes stored metadata when ebook changes', () async {
+    final ebook = _buildEbook(
+      id: 'ebook-refresh',
+      title: 'First Edition',
+      author: 'Original Author',
+      fileUrl: 'https://cdn.edulure.com/assets/library/ebook-refresh.epub',
+    );
+
+    final path = await service.ensureDownloaded(ebook);
+    expect(fakeDio.downloadCalls, 1);
+
+    final updated = ebook.copyWith(
+      title: 'Updated Edition',
+      author: 'Revised Author',
+    );
+    final refreshedPath = await service.ensureDownloaded(updated);
+
+    expect(fakeDio.downloadCalls, 1);
+    expect(refreshedPath, path);
+
+    final metadata = await service.getDownload(ebook.id);
+    expect(metadata, isNotNull);
+    expect(metadata!.path, path);
+    expect(metadata.ebook.title, 'Updated Edition');
+    expect(metadata.ebook.author, 'Revised Author');
+  });
+
+  test('watchDownloads emits updates for library lifecycle events', () async {
+    final updates = <List<DownloadedEbook>>[];
+    final subscription = service.watchDownloads().listen(updates.add);
+
+    await pumpEventQueue();
+
+    expect(updates, isNotEmpty);
+    expect(updates.last, isEmpty);
+
+    final ebookA = _buildEbook(
+      id: 'watch-1',
+      title: 'Watch One',
+      fileUrl: 'https://cdn.edulure.com/assets/library/watch-1.epub',
+    );
+    final ebookB = _buildEbook(
+      id: 'watch-2',
+      title: 'Watch Two',
+      fileUrl: 'https://cdn.edulure.com/assets/library/watch-2.epub',
+    );
+
+    await service.ensureDownloaded(ebookA);
+    await pumpEventQueue();
+    expect(updates.last.map((download) => download.ebook.id), contains(ebookA.id));
+
+    await service.ensureDownloaded(ebookB);
+    await pumpEventQueue();
+    expect(
+      updates.last.map((download) => download.ebook.id),
+      containsAll(<String>[ebookA.id, ebookB.id]),
+    );
+
+    await service.removeDownload(ebookA.id);
+    await pumpEventQueue();
+    expect(updates.last.map((download) => download.ebook.id), [ebookB.id]);
+
+    await service.clearAll();
+    await pumpEventQueue();
+    expect(updates.last, isEmpty);
+
+    final recorded = updates.length;
+    await subscription.cancel();
+
+    await service.ensureDownloaded(_buildEbook(
+      id: 'watch-3',
+      fileUrl: 'https://cdn.edulure.com/assets/library/watch-3.epub',
+    ));
+    await pumpEventQueue();
+    expect(updates.length, recorded);
   });
 }
 
