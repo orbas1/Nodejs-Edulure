@@ -22,8 +22,10 @@ vi.mock('node:timers/promises', () => ({
 const waitForDbModulePromise = import('../../scripts/wait-for-db.js');
 
 let classifyDatabaseError;
+let parseCliArguments;
 let parseDatabaseUrl;
 let resolveWaitOptions;
+let runCli;
 let waitForDatabase;
 
 const ENV_KEYS = [
@@ -35,14 +37,22 @@ const ENV_KEYS = [
   'DB_WAIT_SSL_CA',
   'DB_WAIT_SSL_CERT',
   'DB_WAIT_SSL_KEY',
-  'DB_WAIT_SSL_REJECT_UNAUTHORIZED'
+  'DB_WAIT_SSL_REJECT_UNAUTHORIZED',
+  'DATABASE_URL_FILE',
+  'DB_WAIT_URL_FILE'
 ];
 
 const originalEnv = {};
 
 beforeAll(async () => {
-  ({ classifyDatabaseError, parseDatabaseUrl, resolveWaitOptions, waitForDatabase } =
-    await waitForDbModulePromise);
+  ({
+    classifyDatabaseError,
+    parseCliArguments,
+    parseDatabaseUrl,
+    resolveWaitOptions,
+    runCli,
+    waitForDatabase
+  } = await waitForDbModulePromise);
 });
 
 beforeEach(() => {
@@ -175,6 +185,25 @@ describe('parseDatabaseUrl', () => {
   it('throws when a non-mysql protocol is provided', () => {
     expect(() => parseDatabaseUrl('postgres://user:pass@localhost/db')).toThrow('mysql or mysql2 protocol');
   });
+
+  it('prioritises TLS override flags over environment configuration', () => {
+    const config = parseDatabaseUrl('mysql://user:pass@mysql.example.com/app', {
+      env: { DB_WAIT_USE_SSL: 'false' },
+      tls: { useSsl: true, rejectUnauthorized: false }
+    });
+
+    expect(config.ssl).toBeDefined();
+    expect(config.ssl.rejectUnauthorized).toBe(false);
+  });
+
+  it('enforces strict SSL when requested regardless of other overrides', () => {
+    const config = parseDatabaseUrl('mysql://user:pass@mysql.example.com/app', {
+      tls: { strictSsl: true, useSsl: false, rejectUnauthorized: false }
+    });
+
+    expect(config.ssl).toBeDefined();
+    expect(config.ssl.rejectUnauthorized).toBe(true);
+  });
 });
 
 describe('resolveWaitOptions', () => {
@@ -203,6 +232,39 @@ describe('resolveWaitOptions', () => {
 
   it('throws when no database url is available', () => {
     expect(() => resolveWaitOptions()).toThrow('DATABASE_URL must be set');
+  });
+
+  it('loads the database url from a file when provided', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wait-url-'));
+    try {
+      const urlFile = path.join(tmpDir, 'db-url.txt');
+      fs.writeFileSync(urlFile, 'mysql://user:pass@localhost/filedb');
+
+      const options = resolveWaitOptions({ urlFile });
+
+      expect(options.url).toBe('mysql://user:pass@localhost/filedb');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('reads database url file paths from the environment', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wait-url-env-'));
+    try {
+      const urlFile = path.join(tmpDir, 'db-url.txt');
+      fs.writeFileSync(urlFile, 'mysql://user:pass@localhost/envdb');
+      process.env.DATABASE_URL_FILE = urlFile;
+
+      const options = resolveWaitOptions();
+
+      expect(options.url).toBe('mysql://user:pass@localhost/envdb');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('throws when the referenced database url file does not exist', () => {
+    expect(() => resolveWaitOptions({ urlFile: '/does/not/exist' })).toThrow('Database URL file not found');
   });
 });
 
@@ -262,5 +324,100 @@ describe('waitForDatabase', () => {
     expect(result.attempts).toBe(2);
     expect(createConnectionMock).toHaveBeenCalledTimes(2);
     expect(delayMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('parseCliArguments', () => {
+  it('parses connection, TLS, and output options correctly', () => {
+    const parsed = parseCliArguments([
+      '--url',
+      'mysql://user:pass@localhost/app',
+      '--timeout',
+      '15000',
+      '--interval=750',
+      '--use-ssl',
+      '--allow-unauthorized',
+      '--ca',
+      '/tmp/ca.pem',
+      '--cert',
+      'file:///tmp/cert.pem',
+      '--key',
+      'KEYDATA',
+      '--json',
+      '--env',
+      'DB_WAIT_STRICT_SSL=true'
+    ]);
+
+    expect(parsed).toMatchObject({
+      url: 'mysql://user:pass@localhost/app',
+      timeoutMs: '15000',
+      intervalMs: '750',
+      output: 'json'
+    });
+    expect(parsed.tlsOverrides).toMatchObject({
+      useSsl: true,
+      rejectUnauthorized: false,
+      ca: '/tmp/ca.pem',
+      cert: 'file:///tmp/cert.pem',
+      key: 'KEYDATA'
+    });
+    expect(parsed.envOverrides).toMatchObject({ DB_WAIT_STRICT_SSL: 'true' });
+    expect(parsed.errors).toHaveLength(0);
+  });
+
+  it('collects unknown options as errors', () => {
+    const parsed = parseCliArguments(['--unknown']);
+
+    expect(parsed.errors).toEqual(['Unknown option: --unknown']);
+  });
+});
+
+describe('runCli', () => {
+  it('writes JSON output when requested and returns success', async () => {
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const waitStub = vi.fn().mockResolvedValue({ attempts: 2, elapsedMs: 1350 });
+
+    const exitCode = await runCli([
+      '--url',
+      'mysql://user:pass@localhost/app',
+      '--json'
+    ], {
+      env: {},
+      stdout,
+      stderr,
+      wait: waitStub
+    });
+
+    expect(exitCode).toBe(0);
+    expect(waitStub).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'mysql://user:pass@localhost/app' }),
+      {}
+    );
+    expect(stdout.write).toHaveBeenCalledWith(expect.stringContaining('"attempts": 2'));
+    expect(stderr.write).not.toHaveBeenCalled();
+  });
+
+  it('returns an error code and logs details when the wait fails', async () => {
+    const stdout = { write: vi.fn() };
+    const stderr = { write: vi.fn() };
+    const waitError = Object.assign(new Error('Connection failed'), {
+      cause: new Error('ECONNREFUSED')
+    });
+    const waitStub = vi.fn().mockRejectedValue(waitError);
+
+    const exitCode = await runCli([
+      '--url',
+      'mysql://user:pass@localhost/app'
+    ], {
+      env: {},
+      stdout,
+      stderr,
+      wait: waitStub
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('Connection failed'));
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining('Last error: ECONNREFUSED'));
   });
 });

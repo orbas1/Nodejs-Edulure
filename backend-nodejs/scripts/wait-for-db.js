@@ -3,11 +3,22 @@ import fs from 'fs';
 import { setTimeout as delay } from 'node:timers/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
 import mysql from 'mysql2/promise';
 
 const DEFAULT_TIMEOUT_MS = 120000;
 const DEFAULT_INTERVAL_MS = 5000;
+
+const require = createRequire(import.meta.url);
+const PACKAGE_VERSION = (() => {
+  try {
+    const pkg = require('../package.json');
+    return pkg?.version ?? '0.0.0';
+  } catch (_error) {
+    return '0.0.0';
+  }
+})();
 
 const MYSQL_FATAL_ERROR_HINTS = new Map([
   [
@@ -348,15 +359,16 @@ function decodeMaybeBase64OrFile(value) {
 }
 
 export function resolveWaitOptions(overrides = {}) {
-  const timeoutSource = overrides.timeoutMs ?? process.env.DB_WAIT_TIMEOUT_MS;
-  const intervalSource = overrides.intervalMs ?? process.env.DB_WAIT_INTERVAL_MS;
+  const env = overrides.env ?? process.env;
+  const timeoutSource = overrides.timeoutMs ?? env?.DB_WAIT_TIMEOUT_MS;
+  const intervalSource = overrides.intervalMs ?? env?.DB_WAIT_INTERVAL_MS;
 
   const timeoutMs = toPositiveInteger(timeoutSource, DEFAULT_TIMEOUT_MS, { minimum: 1000 });
   const intervalMs = toPositiveInteger(intervalSource, DEFAULT_INTERVAL_MS, { minimum: 250 });
 
   const effectiveInterval = Math.min(intervalMs, timeoutMs);
 
-  const url = overrides.url ?? process.env.DATABASE_URL;
+  const url = resolveDatabaseUrl(overrides, env);
   if (!url) {
     throw new Error('DATABASE_URL must be set');
   }
@@ -368,7 +380,7 @@ export function resolveWaitOptions(overrides = {}) {
   };
 }
 
-export function parseDatabaseUrl(urlString) {
+export function parseDatabaseUrl(urlString, { env = process.env, tls: tlsOverrides = {} } = {}) {
   if (!urlString) {
     throw new Error('DATABASE_URL must be set');
   }
@@ -409,35 +421,44 @@ export function parseDatabaseUrl(urlString) {
   const rejectUnauthorizedParam = coalesceNonBlank(
     params.get('rejectUnauthorized'),
     params.get('reject_unauthorized'),
-    process.env.DB_WAIT_SSL_REJECT_UNAUTHORIZED
+    env?.DB_WAIT_SSL_REJECT_UNAUTHORIZED
   );
 
   const caParam = coalesceNonBlank(
     params.get('ca'),
     params.get('sslca'),
     params.get('ssl-ca'),
-    process.env.DB_WAIT_SSL_CA
+    tlsOverrides.ca,
+    env?.DB_WAIT_SSL_CA
   );
   const certParam = coalesceNonBlank(
     params.get('cert'),
     params.get('sslcert'),
     params.get('ssl-cert'),
-    process.env.DB_WAIT_SSL_CERT
+    tlsOverrides.cert,
+    env?.DB_WAIT_SSL_CERT
   );
   const keyParam = coalesceNonBlank(
     params.get('key'),
     params.get('sslkey'),
     params.get('ssl-key'),
-    process.env.DB_WAIT_SSL_KEY
+    tlsOverrides.key,
+    env?.DB_WAIT_SSL_KEY
   );
 
   const ca = caParam ? decodeMaybeBase64OrFile(decodeUriComponentSafe(caParam)) : undefined;
   const cert = certParam ? decodeMaybeBase64OrFile(decodeUriComponentSafe(certParam)) : undefined;
   const key = keyParam ? decodeMaybeBase64OrFile(decodeUriComponentSafe(keyParam)) : undefined;
 
-  const envForceSsl = process.env.DB_WAIT_USE_SSL === 'true';
-  const envDisableSsl = process.env.DB_WAIT_USE_SSL === 'false';
-  const strictSsl = process.env.DB_WAIT_STRICT_SSL === 'true';
+  const overrideUseSsl = typeof tlsOverrides.useSsl === 'boolean' ? tlsOverrides.useSsl : undefined;
+  const overrideStrictSsl = typeof tlsOverrides.strictSsl === 'boolean' ? tlsOverrides.strictSsl : undefined;
+  const overrideRejectUnauthorized =
+    typeof tlsOverrides.rejectUnauthorized === 'boolean' ? tlsOverrides.rejectUnauthorized : undefined;
+
+  const envUseSsl = normalizeBoolean(env?.DB_WAIT_USE_SSL);
+  const envStrictSsl = normalizeBoolean(env?.DB_WAIT_STRICT_SSL);
+
+  const strictSsl = overrideStrictSsl ?? envStrictSsl ?? false;
 
   const shouldEnableSslFromUrl = sslFlag === 'true' || ['require', 'verify-ca', 'verify-full'].includes(sslMode) || !!(ca || cert || key);
   const shouldDisableSslFromUrl = sslFlag === 'false' || sslMode === 'disable';
@@ -447,15 +468,19 @@ export function parseDatabaseUrl(urlString) {
 
   let ssl;
 
-  if (strictSsl || envForceSsl || (!envDisableSsl && (shouldEnableSslFromUrl || ca || cert || key))) {
+  const preferDisableSsl = overrideUseSsl === false || envUseSsl === false;
+  const preferEnableSsl = strictSsl || overrideUseSsl === true || envUseSsl === true;
+
+  if (preferEnableSsl || (!preferDisableSsl && (shouldEnableSslFromUrl || ca || cert || key))) {
     const rejectUnauthorized = strictSsl
       ? true
-      : explicitReject === undefined
-        ? true
-        : explicitReject !== 'false' && explicitReject !== '0';
+      : overrideRejectUnauthorized ??
+        (explicitReject === undefined
+          ? true
+          : explicitReject !== 'false' && explicitReject !== '0');
 
     ssl = { rejectUnauthorized };
-  } else if (shouldDisableSslFromUrl || envDisableSsl) {
+  } else if (shouldDisableSslFromUrl || preferDisableSsl) {
     ssl = undefined;
   }
 
@@ -482,9 +507,11 @@ export function parseDatabaseUrl(urlString) {
   return connectionConfig;
 }
 
-export async function waitForDatabase(overrides = {}) {
-  const { url, timeoutMs, intervalMs } = resolveWaitOptions(overrides);
-  const connectionConfig = parseDatabaseUrl(url);
+export async function waitForDatabase(overrides = {}, env = process.env) {
+  const { tls, env: overrideEnv, ...waitOverrides } = overrides ?? {};
+  const effectiveEnv = overrideEnv ?? env ?? process.env;
+  const { url, timeoutMs, intervalMs } = resolveWaitOptions({ ...waitOverrides, env: effectiveEnv });
+  const connectionConfig = parseDatabaseUrl(url, { env: effectiveEnv, tls });
   const connectTimeout = Math.min(Math.max(intervalMs, 1000), 30000);
   connectionConfig.connectTimeout = connectTimeout;
   const host = connectionConfig.socketPath ? connectionConfig.socketPath : `${connectionConfig.host}:${connectionConfig.port}`;
@@ -560,24 +587,326 @@ export async function waitForDatabase(overrides = {}) {
   throw timeoutError;
 }
 
-async function runCli() {
-  try {
-    const result = await waitForDatabase();
-    console.log(
-      `Database connection established after ${Math.round(result.elapsedMs / 100) / 10}s (attempt ${result.attempts})`
-    );
-  } catch (error) {
-    console.error(error.message);
-    if (error.cause) {
-      console.error(`Last error: ${error.cause.message}`);
+export function parseCliArguments(argv = [], env = process.env) {
+  const args = Array.from(argv);
+  const result = {
+    url: undefined,
+    urlFile: undefined,
+    timeoutMs: undefined,
+    intervalMs: undefined,
+    tlsOverrides: {},
+    output: 'text',
+    showHelp: false,
+    showVersion: false,
+    errors: [],
+    envOverrides: {}
+  };
+
+  function consumeValue(index, currentArg) {
+    const value = args[index + 1];
+    if (value === undefined) {
+      result.errors.push(`Option ${currentArg} requires a value`);
+      return undefined;
     }
-    process.exit(1);
+    args.splice(index + 1, 1);
+    return value;
   }
+
+  for (let i = 0; i < args.length; i += 1) {
+    let arg = args[i];
+
+    if (!arg || typeof arg !== 'string') {
+      continue;
+    }
+
+    if (arg.startsWith('--')) {
+      const [flag, inlineValue] = arg.split('=', 2);
+      let value = inlineValue;
+
+      switch (flag) {
+        case '--help':
+          result.showHelp = true;
+          break;
+        case '--version':
+          result.showVersion = true;
+          break;
+        case '--url':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            result.url = value;
+          }
+          break;
+        case '--url-file':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            result.urlFile = value;
+          }
+          break;
+        case '--timeout':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            result.timeoutMs = value;
+          }
+          break;
+        case '--interval':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            result.intervalMs = value;
+          }
+          break;
+        case '--use-ssl':
+          result.tlsOverrides.useSsl = true;
+          break;
+        case '--no-ssl':
+          result.tlsOverrides.useSsl = false;
+          break;
+        case '--strict-ssl':
+          result.tlsOverrides.strictSsl = true;
+          break;
+        case '--allow-unauthorized':
+          result.tlsOverrides.rejectUnauthorized = false;
+          break;
+        case '--reject-unauthorized':
+          result.tlsOverrides.rejectUnauthorized = true;
+          break;
+        case '--ca':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            result.tlsOverrides.ca = value;
+          }
+          break;
+        case '--cert':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            result.tlsOverrides.cert = value;
+          }
+          break;
+        case '--key':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            result.tlsOverrides.key = value;
+          }
+          break;
+        case '--json':
+          result.output = 'json';
+          break;
+        case '--output':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            const normalized = value.trim().toLowerCase();
+            if (normalized === 'json' || normalized === 'text') {
+              result.output = normalized;
+            } else {
+              result.errors.push(`Unsupported output format: ${value}`);
+            }
+          }
+          break;
+        case '--env':
+          if (value === undefined) {
+            value = consumeValue(i, flag);
+          }
+          if (value !== undefined) {
+            const [envKey, envValue] = value.split('=', 2);
+            if (!envKey) {
+              result.errors.push('Environment overrides require KEY=VALUE syntax');
+            } else {
+              result.envOverrides[envKey] = envValue;
+            }
+          }
+          break;
+        default:
+          result.errors.push(`Unknown option: ${flag}`);
+      }
+      continue;
+    }
+
+    if (arg.startsWith('-') && arg.length > 1) {
+      switch (arg) {
+        case '-h':
+          result.showHelp = true;
+          break;
+        case '-v':
+          result.showVersion = true;
+          break;
+        case '-j':
+          result.output = 'json';
+          break;
+        default:
+          result.errors.push(`Unknown option: ${arg}`);
+      }
+      continue;
+    }
+
+    result.errors.push(`Unexpected argument: ${arg}`);
+  }
+
+  result.envOverrides = { ...result.envOverrides };
+  return result;
+}
+
+export async function runCli(argv = process.argv.slice(2), {
+  env = process.env,
+  stdout = process.stdout,
+  stderr = process.stderr,
+  wait = waitForDatabase
+} = {}) {
+  const parsed = parseCliArguments(argv, env);
+  if (parsed.errors.length > 0) {
+    for (const message of parsed.errors) {
+      stderr.write(`${message}\n`);
+    }
+    if (!parsed.showHelp) {
+      stderr.write('Use --help to see available options.\n');
+    }
+    return 1;
+  }
+
+  if (parsed.showHelp) {
+    stdout.write(`Usage: wait-for-db [options]\n`);
+    stdout.write(`\n`);
+    stdout.write(`Options:\n`);
+    stdout.write(`  --url <connection-string>        Override the database connection string\n`);
+    stdout.write(`  --url-file <path>                Load the database connection string from a file\n`);
+    stdout.write(`  --timeout <ms>                   Override the wait timeout (default ${DEFAULT_TIMEOUT_MS})\n`);
+    stdout.write(`  --interval <ms>                  Override the retry interval (default ${DEFAULT_INTERVAL_MS})\n`);
+    stdout.write(`  --use-ssl / --no-ssl             Force enabling or disabling TLS\n`);
+    stdout.write(`  --strict-ssl                     Enforce certificate validation regardless of other flags\n`);
+    stdout.write(`  --allow-unauthorized             Allow self-signed certificates when TLS is enabled\n`);
+    stdout.write(`  --reject-unauthorized            Require trusted certificates when TLS is enabled\n`);
+    stdout.write(`  --ca --cert --key <value>        Provide TLS materials as file paths, URLs, or base64\n`);
+    stdout.write(`  --json | --output <json|text>    Choose the output format\n`);
+    stdout.write(`  --env KEY=VALUE                  Provide additional environment overrides\n`);
+    stdout.write(`  -h, --help                       Show this help message\n`);
+    stdout.write(`  -v, --version                    Show the script version\n`);
+    return 0;
+  }
+
+  if (parsed.showVersion) {
+    stdout.write(`${PACKAGE_VERSION}\n`);
+    return 0;
+  }
+
+  const effectiveEnv = { ...(env ?? {}), ...parsed.envOverrides };
+
+  try {
+    const result = await wait(
+      {
+        url: parsed.url,
+        urlFile: parsed.urlFile,
+        timeoutMs: parsed.timeoutMs,
+        intervalMs: parsed.intervalMs,
+        tls: parsed.tlsOverrides,
+        env: effectiveEnv
+      },
+      effectiveEnv
+    );
+
+    if (parsed.output === 'json') {
+      stdout.write(
+        `${JSON.stringify({ attempts: result.attempts, elapsedMs: result.elapsedMs }, null, 2)}\n`
+      );
+    } else {
+      stdout.write(
+        `Database connection established after ${Math.round(result.elapsedMs / 100) / 10}s (attempt ${result.attempts})\n`
+      );
+    }
+
+    return 0;
+  } catch (error) {
+    stderr.write(`${error.message}\n`);
+    if (error.cause) {
+      stderr.write(`Last error: ${error.cause.message}\n`);
+    }
+    return 1;
+  }
+}
+
+function resolveDatabaseUrl(overrides, env) {
+  const directUrl = coalesceNonBlank(overrides.url);
+  if (directUrl) {
+    return directUrl;
+  }
+
+  const fileSource = coalesceNonBlank(overrides.urlFile, env?.DB_WAIT_URL_FILE, env?.DATABASE_URL_FILE);
+  if (fileSource) {
+    return readDatabaseUrlFromFile(fileSource);
+  }
+
+  return coalesceNonBlank(env?.DATABASE_URL);
+}
+
+function readDatabaseUrlFromFile(source) {
+  let filePath = source?.trim();
+  if (!filePath) {
+    return undefined;
+  }
+
+  if (filePath.startsWith('file://')) {
+    try {
+      filePath = fileURLToPath(new URL(filePath));
+    } catch (error) {
+      throw new Error(`Failed to resolve database URL file ${source}: ${error.message}`);
+    }
+  } else if (!path.isAbsolute(filePath)) {
+    filePath = path.resolve(process.cwd(), filePath);
+  }
+
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Database URL file not found: ${filePath}`);
+  }
+
+  const contents = fs.readFileSync(filePath, 'utf8').trim();
+  if (!contents) {
+    throw new Error(`Database URL file ${filePath} is empty`);
+  }
+
+  return contents;
+}
+
+function normalizeBoolean(value) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(normalized)) {
+      return true;
+    }
+    if (['0', 'false', 'no', 'off'].includes(normalized)) {
+      return false;
+    }
+  }
+
+  return undefined;
 }
 
 const modulePath = fileURLToPath(import.meta.url);
 const invokedPath = process.argv[1] ? path.resolve(process.argv[1]) : null;
 
 if (invokedPath && modulePath === invokedPath) {
-  runCli();
+  runCli()
+    .then((code) => {
+      process.exit(code);
+    })
+    .catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
 }
