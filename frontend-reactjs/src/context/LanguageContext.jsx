@@ -64,6 +64,50 @@ const TRANSLATIONS = {
         },
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
+      },
+      tutoring: {
+        kicker: 'Tutor arcade',
+        headline: 'Queue up your next breakthrough session',
+        subhead:
+          'Spin up on-demand mentors, drop goals into the queue, and leave every call with a power-up tailored to your momentum.',
+        ctaPrimary: 'Explore the tutor arcade',
+        ctaSecondary: 'Book a lightning session',
+        calendar: {
+          status: 'Live queue',
+          next: 'Next refresh in 00:30',
+          title: 'Arcade queue',
+          slots: {
+            focus: {
+              title: 'Focus sprint · UX critique',
+              meta: '12 min • Rina (Product mentor)'
+            },
+            strategy: {
+              title: 'Strategy boost · Launch runway',
+              meta: '28 min • Malik (Growth coach)'
+            },
+            clarity: {
+              title: 'Clarity check · Data storytelling',
+              meta: '45 min • Zia (Analytics guide)'
+            }
+          },
+          footnote: 'Auto-matching refreshes every 30 seconds to keep energy high.'
+        },
+        learner: {
+          title: 'Learner power-ups',
+          items: {
+            0: 'Drop micro-goals and get laser feedback without waitlists.',
+            1: 'Unlock curated practice quests after every session.',
+            2: 'Sync notes and replays straight into your Edulure workspace.'
+          }
+        },
+        instructor: {
+          title: 'Instructor power-ups',
+          items: {
+            0: 'Fill idle blocks with learners already primed for your craft.',
+            1: 'Launch reusable session templates with one neon tap.',
+            2: 'Earn spotlight boosts when five-star reviews roll in fast.'
+          }
+        }
       }
     }
   },
@@ -114,6 +158,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Je suis instructeur·rice',
         illustrationAlt: "Collage d'instructeurs et d'apprenants en collaboration"
+      },
+      tutoring: {
+        kicker: 'Arcade des tuteurs',
+        headline: 'Alignez votre prochaine session décisive',
+        subhead:
+          'Activez des mentors à la demande, déposez vos objectifs dans la file et repartez de chaque appel avec un bonus calibré sur votre momentum.',
+        ctaPrimary: 'Explorer l’arcade des tuteurs',
+        ctaSecondary: 'Réserver une session éclair',
+        calendar: {
+          status: 'File en direct',
+          next: 'Prochaine mise à jour dans 00:30',
+          title: 'File arcade',
+          slots: {
+            focus: {
+              title: 'Sprint focus · Critique UX',
+              meta: '12 min • Rina (mentor produit)'
+            },
+            strategy: {
+              title: 'Boost stratégie · Piste de lancement',
+              meta: '28 min • Malik (coach croissance)'
+            },
+            clarity: {
+              title: 'Contrôle clarté · Storytelling data',
+              meta: '45 min • Zia (guide analytique)'
+            }
+          },
+          footnote: 'L’auto-appairage se régénère toutes les 30 secondes pour garder le rythme.'
+        },
+        learner: {
+          title: 'Power-ups apprenant·e',
+          items: {
+            0: 'Déposez des micro-objectifs et recevez un feedback laser sans liste d’attente.',
+            1: 'Débloquez des quêtes de pratique personnalisées après chaque session.',
+            2: 'Synchronisez notes et replays directement dans votre espace Edulure.'
+          }
+        },
+        instructor: {
+          title: 'Power-ups instructeur·rice',
+          items: {
+            0: 'Remplissez vos créneaux libres avec des apprenant·e·s aligné·e·s sur votre expertise.',
+            1: 'Déployez des modèles de session réutilisables en un tap néon.',
+            2: 'Gagnez des boosts de visibilité quand les avis cinq étoiles s’enchaînent.'
+          }
+        }
       }
     }
   },
@@ -164,6 +252,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Soy instructor/a',
         illustrationAlt: 'Collage de instructores y estudiantes colaborando'
+      },
+      tutoring: {
+        kicker: 'Arcade de tutores',
+        headline: 'Enfila tu próxima sesión decisiva',
+        subhead:
+          'Activa mentores bajo demanda, deja tus metas en la cola y sal de cada llamada con un power-up hecho a tu medida.',
+        ctaPrimary: 'Explorar el arcade de tutores',
+        ctaSecondary: 'Reservar sesión relámpago',
+        calendar: {
+          status: 'Fila en vivo',
+          next: 'Próxima actualización en 00:30',
+          title: 'Fila arcade',
+          slots: {
+            focus: {
+              title: 'Sprint focus · Crítica UX',
+              meta: '12 min • Rina (mentora de producto)'
+            },
+            strategy: {
+              title: 'Impulso estrategia · Pista de lanzamiento',
+              meta: '28 min • Malik (coach de crecimiento)'
+            },
+            clarity: {
+              title: 'Chequeo claridad · Storytelling de datos',
+              meta: '45 min • Zia (guía analítica)'
+            }
+          },
+          footnote: 'El auto-matching se renueva cada 30 segundos para mantener la energía.'
+        },
+        learner: {
+          title: 'Power-ups de estudiantes',
+          items: {
+            0: 'Deja micro objetivos y recibe feedback láser sin listas de espera.',
+            1: 'Desbloquea misiones de práctica curadas tras cada sesión.',
+            2: 'Sincroniza notas y grabaciones directo en tu espacio Edulure.'
+          }
+        },
+        instructor: {
+          title: 'Power-ups de instructores',
+          items: {
+            0: 'Llena huecos libres con estudiantes alineados a tu expertise.',
+            1: 'Lanza plantillas de sesión reutilizables con un toque neón.',
+            2: 'Gana impulsos de visibilidad cuando llueven reseñas de cinco estrellas.'
+          }
+        }
       }
     }
   },
@@ -214,6 +346,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Sou instrutor(a)',
         illustrationAlt: 'Colagem de instrutores e aprendizes colaborando'
+      },
+      tutoring: {
+        kicker: 'Arcade de tutores',
+        headline: 'Fila sua próxima sessão decisiva',
+        subhead:
+          'Ative mentores sob demanda, solte metas na fila e saia de cada chamada com um power-up feito para o seu ritmo.',
+        ctaPrimary: 'Explorar o arcade de tutores',
+        ctaSecondary: 'Agendar sessão relâmpago',
+        calendar: {
+          status: 'Fila ao vivo',
+          next: 'Próxima atualização em 00:30',
+          title: 'Fila arcade',
+          slots: {
+            focus: {
+              title: 'Sprint de foco · Crítica UX',
+              meta: '12 min • Rina (mentora de produto)'
+            },
+            strategy: {
+              title: 'Impulso de estratégia · Pista de lançamento',
+              meta: '28 min • Malik (coach de crescimento)'
+            },
+            clarity: {
+              title: 'Checagem de clareza · Storytelling de dados',
+              meta: '45 min • Zia (guia analítica)'
+            }
+          },
+          footnote: 'O pareamento automático se renova a cada 30 segundos para manter a energia alta.'
+        },
+        learner: {
+          title: 'Power-ups para aprendizes',
+          items: {
+            0: 'Solte micro metas e receba feedback cirúrgico sem filas de espera.',
+            1: 'Desbloqueie missões de prática curadas após cada sessão.',
+            2: 'Sincronize notas e gravações direto para o seu espaço Edulure.'
+          }
+        },
+        instructor: {
+          title: 'Power-ups para instrutores',
+          items: {
+            0: 'Preencha janelas livres com aprendizes prontos para o seu ofício.',
+            1: 'Dispare modelos reutilizáveis de sessão com um toque neon.',
+            2: 'Ganhe boosts de destaque quando as avaliações cinco estrelas chegarem rápido.'
+          }
+        }
       }
     }
   },
@@ -264,6 +440,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Sono un* istruttore/trice',
         illustrationAlt: 'Collage di istruttori e studenti che collaborano'
+      },
+      tutoring: {
+        kicker: 'Arcade tutor',
+        headline: 'Metti in coda la tua prossima sessione di svolta',
+        subhead:
+          'Attiva mentor on demand, lascia gli obiettivi in coda e chiudi ogni call con un power-up calibrato sul tuo slancio.',
+        ctaPrimary: "Esplora l'arcade dei tutor",
+        ctaSecondary: 'Prenota una sessione lampo',
+        calendar: {
+          status: 'Coda live',
+          next: 'Prossimo refresh in 00:30',
+          title: 'Coda arcade',
+          slots: {
+            focus: {
+              title: 'Sprint focus · Critica UX',
+              meta: '12 min • Rina (mentor di prodotto)'
+            },
+            strategy: {
+              title: 'Boost strategia · Pista di lancio',
+              meta: '28 min • Malik (coach crescita)'
+            },
+            clarity: {
+              title: 'Check chiarezza · Data storytelling',
+              meta: '45 min • Zia (guida analytics)'
+            }
+          },
+          footnote: "Il matching automatico si aggiorna ogni 30 secondi per tenere alta l'energia."
+        },
+        learner: {
+          title: 'Power-up per chi apprende',
+          items: {
+            0: 'Lascia micro-obiettivi e ricevi feedback laser senza liste d’attesa.',
+            1: 'Sblocca missioni di pratica curate dopo ogni sessione.',
+            2: 'Sincronizza note e replay direttamente nel tuo workspace Edulure.'
+          }
+        },
+        instructor: {
+          title: 'Power-up per chi insegna',
+          items: {
+            0: 'Riempi gli slot liberi con learner già allineati al tuo mestiere.',
+            1: 'Lancia template riutilizzabili di sessione con un tap neon.',
+            2: 'Ottieni boost di visibilità quando arrivano recensioni a cinque stelle a ritmo serrato.'
+          }
+        }
       }
     }
   },
@@ -314,6 +534,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Jestem instruktorem',
         illustrationAlt: 'Kolaż instruktorów i uczniów współpracujących ze sobą'
+      },
+      tutoring: {
+        kicker: 'Arcade tutorów',
+        headline: 'Ustaw w kolejce swoją następną przełomową sesję',
+        subhead:
+          'Aktywuj mentorów na żądanie, wrzuć cele do kolejki i zakończ każde połączenie z power-upem dopasowanym do twojego tempa.',
+        ctaPrimary: 'Poznaj arcade tutorów',
+        ctaSecondary: 'Rezerwuj błyskawiczną sesję',
+        calendar: {
+          status: 'Kolejka na żywo',
+          next: 'Następne odświeżenie za 00:30',
+          title: 'Kolejka arcade',
+          slots: {
+            focus: {
+              title: 'Sprint fokus · Krytyka UX',
+              meta: '12 min • Rina (mentorka produktu)'
+            },
+            strategy: {
+              title: 'Zastrzyk strategii · Pas startowy',
+              meta: '28 min • Malik (coach wzrostu)'
+            },
+            clarity: {
+              title: 'Kontrola klarowności · Opowieść o danych',
+              meta: '45 min • Zia (przewodnik analityczny)'
+            }
+          },
+          footnote: 'Automatyczne parowanie odświeża się co 30 sekund, aby utrzymać tempo.'
+        },
+        learner: {
+          title: 'Power-upy dla uczących się',
+          items: {
+            0: 'Wrzucaj mikrocele i otrzymuj laserowy feedback bez kolejek.',
+            1: 'Odblokuj kuratorowane misje treningowe po każdej sesji.',
+            2: 'Synchronizuj notatki i nagrania prosto do swojego workspace Edulure.'
+          }
+        },
+        instructor: {
+          title: 'Power-upy dla instruktorów',
+          items: {
+            0: 'Wypełniaj wolne okna uczniami gotowymi na twoją specjalizację.',
+            1: 'Odpalaj wielorazowe szablony sesji jednym neonowym kliknięciem.',
+            2: 'Zgarniaj boosty widoczności, gdy spływają szybkie pięciogwiazdkowe oceny.'
+          }
+        }
       }
     }
   },
@@ -364,6 +628,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'मैं प्रशिक्षक हूँ',
         illustrationAlt: 'प्रशिक्षकों और शिक्षार्थियों के सहयोग का कोलाज'
+      },
+      tutoring: {
+        kicker: 'ट्यूटर आर्केड',
+        headline: 'अपना अगला ब्रेकथ्रू सत्र कतार में लगाएँ',
+        subhead:
+          'ऑन-डिमांड मेंटर्स को सक्रिय करें, लक्ष्यों को कतार में डालें और हर कॉल से अपने रफ़्तार के मुताबिक़ पावर-अप के साथ निकलें।',
+        ctaPrimary: 'ट्यूटर आर्केड देखें',
+        ctaSecondary: 'झटपट सत्र बुक करें',
+        calendar: {
+          status: 'लाइव कतार',
+          next: 'अगला रिफ्रेश 00:30 में',
+          title: 'आर्केड कतार',
+          slots: {
+            focus: {
+              title: 'फोकस स्प्रिंट · UX समीक्षा',
+              meta: '12 मिन • रीना (प्रोडक्ट मेंटर)'
+            },
+            strategy: {
+              title: 'रणनीति बूस्ट · लॉन्च रनवे',
+              meta: '28 मिन • मलिक (ग्रोथ कोच)'
+            },
+            clarity: {
+              title: 'स्पष्टता जांच · डेटा स्टोरीटेलिंग',
+              meta: '45 मिन • जिया (एनालिटिक्स गाइड)'
+            }
+          },
+          footnote: 'ऊर्जा बनाए रखने के लिए ऑटो-मैचिंग हर 30 सेकंड में ताज़ा होती है।'
+        },
+        learner: {
+          title: 'सीखने वालों के पावर-अप',
+          items: {
+            0: 'माइक्रो लक्ष्य छोड़ें और बिना वेटलिस्ट के लेज़र जैसी प्रतिक्रिया पाएं।',
+            1: 'हर सत्र के बाद क्यूरेटेड प्रैक्टिस क्वेस्ट अनलॉक करें।',
+            2: 'अपने Edulure workspace में नोट्स और रिकॉर्डिंग तुरंत सिंक करें।'
+          }
+        },
+        instructor: {
+          title: 'इंस्ट्रक्टर पावर-अप',
+          items: {
+            0: 'अपने कौशल के अनुरूप तैयार शिक्षार्थियों से खाली स्लॉट भरें।',
+            1: 'एक नीयॉन टैप से पुन: प्रयोज्य सत्र टेम्पलेट लॉन्च करें।',
+            2: 'तेज़ पाँच-सितारा समीक्षाओं पर स्पॉटलाइट बूस्ट कमाएँ।'
+          }
+        }
       }
     }
   },
@@ -414,6 +722,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'أنا مدرّس/ة',
         illustrationAlt: 'مجموعة صور لمدربين ومتعلّمين يتعاونون'
+      },
+      tutoring: {
+        kicker: 'أركيد المدرّسين',
+        headline: 'أدرج جلستك الحاسمة التالية في الطابور',
+        subhead:
+          'فعّل المرشدين عند الطلب، ضع أهدافك في الطابور، واغادر كل اتصال بترقية ملهمة تناسب سرعتك.',
+        ctaPrimary: 'استكشف أركيد المدرّسين',
+        ctaSecondary: 'احجز جلسة خاطفة',
+        calendar: {
+          status: 'طابور مباشر',
+          next: 'التحديث التالي خلال 00:30',
+          title: 'طابور الأركيد',
+          slots: {
+            focus: {
+              title: 'اندفاعة تركيز · مراجعة UX',
+              meta: '12 دقيقة • رينا (مرشدة منتج)'
+            },
+            strategy: {
+              title: 'دفعة استراتيجية · مدرج الإطلاق',
+              meta: '28 دقيقة • مالك (مدرّب نمو)'
+            },
+            clarity: {
+              title: 'فحص وضوح · سرد البيانات',
+              meta: '45 دقيقة • زيا (مرشدة تحليلات)'
+            }
+          },
+          footnote: 'يُعاد ضبط المطابقة التلقائية كل 30 ثانية للحفاظ على الحماس.'
+        },
+        learner: {
+          title: 'ترقيات المتعلمين',
+          items: {
+            0: 'أرسل أهدافًا مصغرة واحصل على تغذية راجعة دقيقة بلا قوائم انتظار.',
+            1: 'افتح مسارات تدريب منتقاة بعد كل جلسة.',
+            2: 'زامن الملاحظات والتسجيلات مباشرة إلى مساحة Edulure الخاصة بك.'
+          }
+        },
+        instructor: {
+          title: 'ترقيات المدرّسين',
+          items: {
+            0: 'املأ الفترات الفارغة بمتعلمين جاهزين لمجالك.',
+            1: 'أطلق قوالب جلسات قابلة لإعادة الاستخدام بلمسة نيون واحدة.',
+            2: 'احصل على دفعات spotlight عند تدفق تقييمات الخمس نجوم بسرعة.'
+          }
+        }
       }
     }
   },
@@ -464,6 +816,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Ich bin Trainer:in',
         illustrationAlt: 'Collage aus Lehrenden und Lernenden, die zusammenarbeiten'
+      },
+      tutoring: {
+        kicker: 'Tutor-Arcade',
+        headline: 'Stell deine nächste Durchbruch-Session in die Queue',
+        subhead:
+          'Aktiviere Mentoren on demand, leg Ziele in die Warteschlange und verlasse jeden Call mit einem Power-up, das deinen Flow stärkt.',
+        ctaPrimary: 'Tutor-Arcade entdecken',
+        ctaSecondary: 'Lightning-Session buchen',
+        calendar: {
+          status: 'Live-Warteschlange',
+          next: 'Nächstes Refresh in 00:30',
+          title: 'Arcade-Queue',
+          slots: {
+            focus: {
+              title: 'Focus-Sprint · UX-Review',
+              meta: '12 Min • Rina (Product-Mentorin)'
+            },
+            strategy: {
+              title: 'Strategie-Boost · Launch-Runway',
+              meta: '28 Min • Malik (Growth-Coach)'
+            },
+            clarity: {
+              title: 'Clarity-Check · Data Storytelling',
+              meta: '45 Min • Zia (Analytics-Guide)'
+            }
+          },
+          footnote: 'Das Auto-Matching aktualisiert sich alle 30 Sekunden für maximale Energie.'
+        },
+        learner: {
+          title: 'Power-ups für Lernende',
+          items: {
+            0: 'Dropp Mikroziele und erhalte Laser-Feedback ohne Warteschlangen.',
+            1: 'Schalte kuratierte Practice-Quests nach jeder Session frei.',
+            2: 'Synchronisiere Notizen und Replays direkt in deinen Edulure-Workspace.'
+          }
+        },
+        instructor: {
+          title: 'Power-ups für Instructor',
+          items: {
+            0: 'Fülle freie Slots mit Lernenden, die zu deinem Skillset passen.',
+            1: 'Starte wiederverwendbare Session-Templates mit einem Neon-Tap.',
+            2: 'Sichere dir Spotlight-Boosts, wenn Fünf-Sterne-Reviews im Takt eintrudeln.'
+          }
+        }
       }
     }
   },
@@ -514,6 +910,50 @@ const TRANSLATIONS = {
         },
         instructorPill: 'Я преподаватель',
         illustrationAlt: 'Коллаж из инструкторов и учащихся, работающих вместе'
+      },
+      tutoring: {
+        kicker: 'Аркада тьюторов',
+        headline: 'Поставьте в очередь следующую прорывную сессию',
+        subhead:
+          'Включайте наставников по требованию, загружайте цели в очередь и завершайте каждый созвон с прокачкой, созданной под ваш темп.',
+        ctaPrimary: 'Исследовать аркаду тьюторов',
+        ctaSecondary: 'Забронировать молниеносную сессию',
+        calendar: {
+          status: 'Живая очередь',
+          next: 'Следующее обновление через 00:30',
+          title: 'Аркадная очередь',
+          slots: {
+            focus: {
+              title: 'Фокус-спринт · UX-разбор',
+              meta: '12 мин • Рина (ментор по продукту)'
+            },
+            strategy: {
+              title: 'Стратегический буст · Взлётная полоса',
+              meta: '28 мин • Малик (коуч по росту)'
+            },
+            clarity: {
+              title: 'Проверка ясности · Data storytelling',
+              meta: '45 мин • Зия (аналитический наставник)'
+            }
+          },
+          footnote: 'Автоподбор обновляется каждые 30 секунд, чтобы держать драйв.'
+        },
+        learner: {
+          title: 'Прокачки для учеников',
+          items: {
+            0: 'Сбрасывайте микроцели и получайте точный фидбек без листов ожидания.',
+            1: 'Открывайте кураторские практические квесты после каждой сессии.',
+            2: 'Синхронизируйте заметки и записи прямо в своё пространство Edulure.'
+          }
+        },
+        instructor: {
+          title: 'Прокачки для инструкторов',
+          items: {
+            0: 'Заполняйте свободные окна учениками, готовыми к вашему мастерству.',
+            1: 'Запускайте повторно используемые шаблоны сессий одним неоновым кликом.',
+            2: 'Получайте бусты видимости, когда стремительно приходят пятёрки.'
+          }
+        }
       }
     }
   }
