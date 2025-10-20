@@ -8,6 +8,8 @@ import LearnerSupportRepository from '../repositories/LearnerSupportRepository.j
 import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
+import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
+import LearnerFinancePurchaseModel from '../models/LearnerFinancePurchaseModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -19,6 +21,9 @@ import FieldServiceOrderModel from '../models/FieldServiceOrderModel.js';
 import FieldServiceEventModel from '../models/FieldServiceEventModel.js';
 import FieldServiceProviderModel from '../models/FieldServiceProviderModel.js';
 import buildFieldServiceWorkspace from './FieldServiceWorkspace.js';
+import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
+import CommunityModel from '../models/CommunityModel.js';
+import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 
 const log = logger.child({ service: 'LearnerDashboardService' });
 
@@ -59,20 +64,130 @@ function normaliseDurationMinutes(value, fallback = 60) {
   return fallback;
 }
 
-function formatBookingAcknowledgement(booking, message, overrides = {}) {
-  return buildAcknowledgement({
-    reference: booking.publicId,
-    message,
-    meta: {
-      status: booking.status,
-      scheduledStart: booking.scheduledStart?.toISOString?.() ?? null,
-      scheduledEnd: booking.scheduledEnd?.toISOString?.() ?? null,
-      durationMinutes: booking.durationMinutes ?? null,
-      tutorId: booking.tutorId,
-      topic: booking.metadata?.topic ?? null,
-      timezone: booking.metadata?.timezone ?? null,
-      ...overrides
+function formatCurrencyValue(amountCents, currency = 'USD') {
+  const cents = Number(amountCents ?? 0);
+  const amount = Math.round(cents) / 100;
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency
+    }).format(amount);
+  } catch (_error) {
+    return `$${amount.toFixed(2)}`;
+  }
+}
+
+function formatDateLabel(value, fallback = 'Not recorded') {
+  if (!value) return fallback;
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return fallback;
     }
+    return new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium' }).format(date);
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+function formatPurchase(purchase) {
+  if (!purchase) return null;
+  return {
+    id: purchase.id,
+    reference: purchase.reference,
+    description: purchase.description,
+    amountCents: Number(purchase.amountCents ?? 0),
+    amountFormatted: formatCurrencyValue(purchase.amountCents, purchase.currency),
+    currency: purchase.currency ?? 'USD',
+    status: purchase.status ?? 'paid',
+    purchasedAt: purchase.purchasedAt ?? null,
+    purchasedAtLabel: formatDateLabel(purchase.purchasedAt, 'Awaiting confirmation'),
+    metadata: purchase.metadata ?? {},
+    createdAt: purchase.createdAt ?? null,
+    updatedAt: purchase.updatedAt ?? null
+  };
+}
+
+function formatSubscription(subscription, communityMap, tierMap) {
+  if (!subscription) return null;
+  const community = communityMap.get(subscription.communityId ?? null);
+  const tier = tierMap.get(subscription.tierId ?? null);
+  const priceCents = tier?.priceCents ?? subscription.metadata?.priceCents;
+  const currency = tier?.currency ?? subscription.metadata?.currency ?? 'USD';
+  const billingInterval = tier?.billingInterval ?? subscription.metadata?.billingInterval ?? 'monthly';
+
+  return {
+    id: subscription.publicId ?? subscription.id,
+    status: subscription.status ?? 'active',
+    provider: subscription.provider ?? 'platform',
+    cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
+    currentPeriodStart: subscription.currentPeriodStart ?? null,
+    currentPeriodEnd: subscription.currentPeriodEnd ?? null,
+    currentPeriodEndLabel: formatDateLabel(subscription.currentPeriodEnd, 'No renewal date'),
+    community: community
+      ? {
+          id: community.id,
+          name: community.name,
+          slug: community.slug,
+          coverImageUrl: community.coverImageUrl ?? null
+        }
+      : null,
+    plan: tier
+      ? {
+          id: tier.id,
+          name: tier.name,
+          billingInterval,
+          priceFormatted: formatCurrencyValue(priceCents, currency)
+        }
+      : {
+          id: null,
+          name: subscription.metadata?.planName ?? 'Subscription',
+          billingInterval,
+          priceFormatted: formatCurrencyValue(priceCents ?? 0, currency)
+        },
+    metadata: subscription.metadata ?? {},
+    createdAt: subscription.createdAt ?? null,
+    updatedAt: subscription.updatedAt ?? null
+  };
+}
+
+const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
+  language: 'en',
+  region: 'US',
+  timezone: 'UTC',
+  notificationsEnabled: true,
+  digestEnabled: true,
+  autoPlayMedia: false,
+  highContrast: false,
+  reducedMotion: false,
+  preferences: {
+    interfaceDensity: 'comfortable',
+    analyticsOptIn: true,
+    subtitleLanguage: 'en',
+    audioDescription: false
+  }
+});
+
+const DEFAULT_FINANCE_ALERTS = Object.freeze({
+  sendEmail: true,
+  sendSms: false,
+  escalationEmail: null,
+  notifyThresholdPercent: 80
+});
+
+async function buildFieldServiceAssignment({ userId, order, connection = db }) {
+  if (!order) return null;
+  const [events, providers] = await Promise.all([
+    FieldServiceEventModel.listByOrderIds([order.id], connection),
+    order.providerId ? FieldServiceProviderModel.listByIds([order.providerId], connection) : []
+  ]);
+
+  const workspace = buildFieldServiceWorkspace({
+    now: new Date(),
+    user: { id: userId },
+    orders: [order],
+    events,
+    providers
   });
 }
 
@@ -192,11 +307,362 @@ export default class LearnerDashboardService {
     });
   }
 
+  static async getSystemPreferences(userId) {
+    const stored = await LearnerSystemPreferenceModel.getForUser(userId);
+    if (!stored) {
+      return { ...DEFAULT_SYSTEM_PREFERENCES };
+    }
+    return {
+      id: stored.id ?? null,
+      language: stored.language ?? DEFAULT_SYSTEM_PREFERENCES.language,
+      region: stored.region ?? DEFAULT_SYSTEM_PREFERENCES.region,
+      timezone: stored.timezone ?? DEFAULT_SYSTEM_PREFERENCES.timezone,
+      notificationsEnabled:
+        stored.notificationsEnabled ?? DEFAULT_SYSTEM_PREFERENCES.notificationsEnabled,
+      digestEnabled: stored.digestEnabled ?? DEFAULT_SYSTEM_PREFERENCES.digestEnabled,
+      autoPlayMedia: stored.autoPlayMedia ?? DEFAULT_SYSTEM_PREFERENCES.autoPlayMedia,
+      highContrast: stored.highContrast ?? DEFAULT_SYSTEM_PREFERENCES.highContrast,
+      reducedMotion: stored.reducedMotion ?? DEFAULT_SYSTEM_PREFERENCES.reducedMotion,
+      preferences: {
+        ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+        ...(stored.preferences ?? {})
+      },
+      createdAt: stored.createdAt ?? null,
+      updatedAt: stored.updatedAt ?? null
+    };
+  }
+
+  static async updateSystemPreferences(userId, payload = {}) {
+    const existingPreference = await LearnerSystemPreferenceModel.getForUser(userId);
+    const base = existingPreference ?? DEFAULT_SYSTEM_PREFERENCES;
+
+    const hasString = (value) => typeof value === 'string' && value.trim().length > 0;
+    const language = hasString(payload.language)
+      ? payload.language.slice(0, 8)
+      : base.language ?? DEFAULT_SYSTEM_PREFERENCES.language;
+    const region = hasString(payload.region)
+      ? payload.region.slice(0, 32)
+      : base.region ?? DEFAULT_SYSTEM_PREFERENCES.region;
+    const timezone = hasString(payload.timezone)
+      ? payload.timezone.slice(0, 64)
+      : base.timezone ?? DEFAULT_SYSTEM_PREFERENCES.timezone;
+
+    const rawPreferences =
+      payload.preferences && typeof payload.preferences === 'object'
+        ? payload.preferences
+        : {};
+    const allowedDensity = new Set(['comfortable', 'compact', 'expanded']);
+    const basePreferences = {
+      ...DEFAULT_SYSTEM_PREFERENCES.preferences,
+      ...(existingPreference?.preferences ?? {})
+    };
+    const interfaceDensity = rawPreferences.interfaceDensity;
+    const normalisedPreferences = {
+      ...basePreferences,
+      ...rawPreferences,
+      interfaceDensity: allowedDensity.has(interfaceDensity)
+        ? interfaceDensity
+        : basePreferences.interfaceDensity,
+      analyticsOptIn:
+        rawPreferences.analyticsOptIn !== undefined
+          ? Boolean(rawPreferences.analyticsOptIn)
+          : basePreferences.analyticsOptIn,
+      subtitleLanguage:
+        typeof rawPreferences.subtitleLanguage === 'string'
+          ? rawPreferences.subtitleLanguage.slice(0, 8)
+          : basePreferences.subtitleLanguage,
+      audioDescription:
+        rawPreferences.audioDescription !== undefined
+          ? Boolean(rawPreferences.audioDescription)
+          : basePreferences.audioDescription
+    };
+
+    const preference = await LearnerSystemPreferenceModel.upsertForUser(userId, {
+      language,
+      region,
+      timezone,
+      notificationsEnabled:
+        payload.notificationsEnabled !== undefined
+          ? Boolean(payload.notificationsEnabled)
+          : base.notificationsEnabled ?? DEFAULT_SYSTEM_PREFERENCES.notificationsEnabled,
+      digestEnabled:
+        payload.digestEnabled !== undefined
+          ? Boolean(payload.digestEnabled)
+          : base.digestEnabled ?? DEFAULT_SYSTEM_PREFERENCES.digestEnabled,
+      autoPlayMedia:
+        payload.autoPlayMedia !== undefined
+          ? Boolean(payload.autoPlayMedia)
+          : base.autoPlayMedia ?? DEFAULT_SYSTEM_PREFERENCES.autoPlayMedia,
+      highContrast:
+        payload.highContrast !== undefined
+          ? Boolean(payload.highContrast)
+          : base.highContrast ?? DEFAULT_SYSTEM_PREFERENCES.highContrast,
+      reducedMotion:
+        payload.reducedMotion !== undefined
+          ? Boolean(payload.reducedMotion)
+          : base.reducedMotion ?? DEFAULT_SYSTEM_PREFERENCES.reducedMotion,
+      preferences: normalisedPreferences
+    });
+
+    const normalised = await this.getSystemPreferences(userId);
+    log.info({ userId, preference: normalised }, 'Learner updated system preferences');
+    return buildAcknowledgement({
+      reference: preference.id,
+      message: 'System preferences updated',
+      meta: { preference: normalised }
+    });
+  }
+
+  static async listFinancePurchases(userId) {
+    const purchases = await LearnerFinancePurchaseModel.listByUserId(userId);
+    return purchases.map((purchase) => formatPurchase(purchase));
+  }
+
+  static async createFinancePurchase(userId, payload = {}) {
+    if (!payload.reference || payload.reference.trim().length < 3) {
+      throw new Error('A reference label is required for the purchase');
+    }
+    if (!payload.description || payload.description.trim().length < 3) {
+      throw new Error('A description is required for the purchase');
+    }
+
+    const amountCentsRaw =
+      payload.amountCents !== undefined
+        ? Number(payload.amountCents)
+        : Number.parseFloat(payload.amount ?? payload.amountDollars ?? 0) * 100;
+    const amountCents = Math.max(0, Math.round(Number.isFinite(amountCentsRaw) ? amountCentsRaw : 0));
+    const allowedStatuses = new Set(['paid', 'pending', 'refunded', 'cancelled']);
+    const status = allowedStatuses.has(payload.status) ? payload.status : 'paid';
+    const purchasedAt = (() => {
+      if (!payload.purchasedAt) return new Date();
+      const parsed = new Date(payload.purchasedAt);
+      return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    })();
+
+    const purchase = await LearnerFinancePurchaseModel.create(
+      {
+        userId,
+        reference: payload.reference.trim().slice(0, 64),
+        description: payload.description.trim().slice(0, 255),
+        amountCents,
+        currency: typeof payload.currency === 'string' ? payload.currency.slice(0, 3).toUpperCase() : 'USD',
+        status,
+        purchasedAt,
+        metadata: payload.metadata ?? {}
+      },
+      db
+    );
+
+    log.info({ userId, purchaseId: purchase.id }, 'Learner recorded finance purchase');
+    return formatPurchase(purchase);
+  }
+
+  static async updateFinancePurchase(userId, purchaseId, payload = {}) {
+    const existing = await LearnerFinancePurchaseModel.findByIdForUser(userId, purchaseId);
+    if (!existing) {
+      const error = new Error('Finance purchase not found');
+      error.status = 404;
+      throw error;
+    }
+
+    const updates = { ...payload };
+    if (updates.reference !== undefined && typeof updates.reference === 'string') {
+      updates.reference = updates.reference.trim().slice(0, 64);
+    }
+    if (updates.description !== undefined && typeof updates.description === 'string') {
+      updates.description = updates.description.trim().slice(0, 255);
+    }
+    if (updates.amountCents === undefined && updates.amount !== undefined) {
+      const cents = Number.parseFloat(updates.amount) * 100;
+      updates.amountCents = Math.round(Number.isFinite(cents) ? cents : existing.amountCents);
+    }
+    if (updates.amountCents !== undefined) {
+      updates.amountCents = Math.max(0, Math.round(Number(updates.amountCents) || 0));
+    }
+    if (updates.currency !== undefined && typeof updates.currency === 'string') {
+      updates.currency = updates.currency.slice(0, 3).toUpperCase();
+    }
+    if (updates.status !== undefined) {
+      const allowedStatuses = new Set(['paid', 'pending', 'refunded', 'cancelled']);
+      updates.status = allowedStatuses.has(updates.status) ? updates.status : existing.status;
+    }
+    if (updates.purchasedAt !== undefined) {
+      const parsed = new Date(updates.purchasedAt);
+      updates.purchasedAt = Number.isNaN(parsed.getTime()) ? existing.purchasedAt : parsed;
+    }
+
+    const updated = await LearnerFinancePurchaseModel.updateByIdForUser(userId, purchaseId, updates);
+    log.info({ userId, purchaseId }, 'Learner updated finance purchase');
+    return formatPurchase(updated);
+  }
+
+  static async deleteFinancePurchase(userId, purchaseId) {
+    const deleted = await LearnerFinancePurchaseModel.deleteByIdForUser(userId, purchaseId);
+    if (!deleted) {
+      const error = new Error('Finance purchase not found');
+      error.status = 404;
+      throw error;
+    }
+    log.info({ userId, purchaseId }, 'Learner removed finance purchase');
+    return buildAcknowledgement({ reference: purchaseId, message: 'Finance purchase removed' });
+  }
+
+  static async getFinanceSettings(userId) {
+    const [profile, purchases, subscriptions] = await Promise.all([
+      LearnerFinancialProfileModel.findByUserId(userId),
+      LearnerFinancePurchaseModel.listByUserId(userId),
+      CommunitySubscriptionModel.listByUser(userId)
+    ]);
+    const preferences = profile?.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
+    const alerts = {
+      ...DEFAULT_FINANCE_ALERTS,
+      ...(preferences.alerts ?? {})
+    };
+    const financeProfile = {
+      autoPayEnabled: Boolean(profile?.autoPayEnabled),
+      reserveTargetCents: Number(profile?.reserveTargetCents ?? 0),
+      reserveTarget: Math.round(Number(profile?.reserveTargetCents ?? 0) / 100),
+      currency: preferences.currency ?? 'USD',
+      taxId: preferences.taxId ?? null,
+      invoiceDelivery: preferences.invoiceDelivery ?? 'email',
+      payoutSchedule: preferences.payoutSchedule ?? 'monthly',
+      expensePolicyUrl: preferences.expensePolicyUrl ?? null
+    };
+    const documents = Array.isArray(preferences.documents)
+      ? preferences.documents
+      : [];
+    const reimbursements =
+      preferences.reimbursements && typeof preferences.reimbursements === 'object'
+        ? {
+            enabled: Boolean(preferences.reimbursements.enabled),
+            instructions: preferences.reimbursements.instructions ?? null
+          }
+        : { enabled: false, instructions: null };
+
+    const communityIds = Array.from(
+      new Set(subscriptions.map((subscription) => subscription.communityId).filter(Boolean))
+    );
+    const tierIds = Array.from(new Set(subscriptions.map((subscription) => subscription.tierId).filter(Boolean)));
+
+    const [communityRecords, tierRecords] = await Promise.all([
+      Promise.all(communityIds.map((communityId) => CommunityModel.findById(communityId))),
+      Promise.all(tierIds.map((tierId) => CommunityPaywallTierModel.findById(tierId)))
+    ]);
+
+    const communityMap = new Map(
+      communityRecords
+        .filter((community) => community)
+        .map((community) => [community.id, community])
+    );
+    const tierMap = new Map(
+      tierRecords
+        .filter((tier) => tier)
+        .map((tier) => [tier.id, tier])
+    );
+
+    return {
+      profile: financeProfile,
+      alerts,
+      purchases: purchases.map((purchase) => formatPurchase(purchase)),
+      subscriptions: subscriptions.map((subscription) => formatSubscription(subscription, communityMap, tierMap)),
+      documents,
+      reimbursements
+    };
+  }
+
+  static async updateFinanceSettings(userId, payload = {}) {
+    const alertsPayload = payload.alerts && typeof payload.alerts === 'object' ? payload.alerts : {};
+    const documents = Array.isArray(payload.documents) ? payload.documents : undefined;
+    const reimbursementsPayload =
+      payload.reimbursements && typeof payload.reimbursements === 'object' ? payload.reimbursements : {};
+
+    const preferences = {
+      currency: payload.currency ?? payload.profile?.currency ?? 'USD',
+      taxId: payload.taxId ?? payload.profile?.taxId ?? null,
+      invoiceDelivery: payload.invoiceDelivery ?? payload.profile?.invoiceDelivery ?? 'email',
+      payoutSchedule: payload.payoutSchedule ?? payload.profile?.payoutSchedule ?? 'monthly',
+      expensePolicyUrl: payload.expensePolicyUrl ?? payload.profile?.expensePolicyUrl ?? null,
+      alerts: {
+        ...DEFAULT_FINANCE_ALERTS,
+        ...alertsPayload,
+        sendEmail:
+          alertsPayload.sendEmail !== undefined ? Boolean(alertsPayload.sendEmail) : DEFAULT_FINANCE_ALERTS.sendEmail,
+        sendSms:
+          alertsPayload.sendSms !== undefined ? Boolean(alertsPayload.sendSms) : DEFAULT_FINANCE_ALERTS.sendSms,
+        escalationEmail:
+          typeof alertsPayload.escalationEmail === 'string'
+            ? alertsPayload.escalationEmail.trim() || null
+            : DEFAULT_FINANCE_ALERTS.escalationEmail,
+        notifyThresholdPercent: Math.min(
+          100,
+          Math.max(1, Number.parseInt(alertsPayload.notifyThresholdPercent ?? DEFAULT_FINANCE_ALERTS.notifyThresholdPercent, 10))
+        )
+      },
+      reimbursements: {
+        enabled:
+          reimbursementsPayload.enabled !== undefined
+            ? Boolean(reimbursementsPayload.enabled)
+            : false,
+        instructions:
+          typeof reimbursementsPayload.instructions === 'string'
+            ? reimbursementsPayload.instructions.trim() || null
+            : null
+      }
+    };
+
+    if (documents !== undefined) {
+      preferences.documents = documents;
+    }
+
+    const acknowledgement = await this.updateFinancialPreferences(userId, {
+      autoPayEnabled:
+        payload.autoPayEnabled !== undefined
+          ? Boolean(payload.autoPayEnabled)
+          : undefined,
+      autoPay: payload.autoPay,
+      reserveTargetCents:
+        payload.reserveTargetCents !== undefined
+          ? Number(payload.reserveTargetCents)
+          : payload.reserveTarget !== undefined
+            ? Math.round(Number(payload.reserveTarget) * 100)
+            : undefined,
+      preferences
+    });
+
+    const financeSettings = await this.getFinanceSettings(userId);
+    acknowledgement.meta = { ...acknowledgement.meta, financeSettings };
+    acknowledgement.message = acknowledgement.message ?? 'Finance settings updated';
+    log.info({ userId, financeSettings }, 'Learner updated finance settings');
+    return acknowledgement;
+  }
+
   static async updateFinancialPreferences(userId, payload = {}) {
+    const existing = await LearnerFinancialProfileModel.findByUserId(userId);
+    const nextAutoPayEnabled =
+      payload.autoPay && payload.autoPay.enabled !== undefined
+        ? Boolean(payload.autoPay.enabled)
+        : payload.autoPayEnabled !== undefined
+          ? Boolean(payload.autoPayEnabled)
+          : Boolean(existing?.autoPayEnabled);
+    let reserveTargetCents;
+    if (payload.reserveTargetCents !== undefined) {
+      reserveTargetCents = Math.max(0, Number(payload.reserveTargetCents));
+    } else if (payload.reserveTarget !== undefined) {
+      reserveTargetCents = Math.max(0, Math.round(Number(payload.reserveTarget) * 100));
+    } else {
+      reserveTargetCents = Number(existing?.reserveTargetCents ?? 0);
+    }
+
+    const mergedPreferences = {
+      ...(existing?.preferences ?? {}),
+      ...(payload.metadata ?? {}),
+      ...(payload.preferences ?? {})
+    };
+
     const profile = await LearnerFinancialProfileModel.upsertForUser(userId, {
-      autoPayEnabled: Boolean(payload.autoPay?.enabled ?? payload.autoPayEnabled ?? false),
-      reserveTargetCents: Math.max(0, Number(payload.reserveTargetCents ?? payload.reserveTarget ?? 0)),
-      preferences: payload.preferences ?? payload.metadata ?? {}
+      autoPayEnabled: nextAutoPayEnabled,
+      reserveTargetCents,
+      preferences: mergedPreferences
     });
     return buildAcknowledgement({
       reference: profile.id,
@@ -677,25 +1143,53 @@ export default class LearnerDashboardService {
       throw error;
     }
 
-    const updated = await LearnerLibraryEntryModel.updateByIdForUser(userId, entryId, {
-      title: payload.title !== undefined ? payload.title.trim() : undefined,
-      format: payload.format !== undefined ? payload.format.trim() : undefined,
-      progress:
-        payload.progress !== undefined
-          ? Math.max(0, Math.min(100, Number(payload.progress)))
-          : undefined,
-      lastOpened: payload.lastOpened !== undefined ? payload.lastOpened : undefined,
-      url: payload.url !== undefined ? payload.url : undefined,
-      summary: payload.summary !== undefined ? payload.summary : undefined,
-      author: payload.author !== undefined ? payload.author : undefined,
-      coverUrl: payload.coverUrl !== undefined ? payload.coverUrl : undefined,
-      tags:
-        payload.tags !== undefined
-          ? Array.isArray(payload.tags)
-            ? payload.tags
-            : [payload.tags].flat().filter(Boolean)
-          : undefined
-    });
+    const updates = {};
+    if (payload.title !== undefined) {
+      updates.title = typeof payload.title === 'string' ? payload.title.trim() : payload.title;
+    }
+    if (payload.format !== undefined) {
+      updates.format = typeof payload.format === 'string' ? payload.format.trim() : payload.format;
+    }
+    if (payload.progress !== undefined) {
+      const numeric = Number(payload.progress);
+      updates.progress = Number.isFinite(numeric)
+        ? Math.max(0, Math.min(100, Math.round(numeric)))
+        : 0;
+    }
+    if (payload.lastOpened !== undefined) {
+      updates.lastOpened = payload.lastOpened;
+    }
+    if (payload.url !== undefined) {
+      updates.url = payload.url;
+    }
+    if (payload.summary !== undefined) {
+      updates.summary = payload.summary;
+    }
+    if (payload.author !== undefined) {
+      updates.author = payload.author;
+    }
+    if (payload.coverUrl !== undefined) {
+      updates.coverUrl = payload.coverUrl;
+    }
+    if (payload.tags !== undefined) {
+      const rawTags = Array.isArray(payload.tags) ? payload.tags : [payload.tags];
+      const normalisedTags = rawTags
+        .flat()
+        .map((tag) => (typeof tag === 'string' ? tag.trim() : ''))
+        .filter((tag) => tag.length > 0);
+      const deduped = [];
+      const seen = new Set();
+      normalisedTags.forEach((tag) => {
+        const key = tag.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          deduped.push(tag);
+        }
+      });
+      updates.tags = deduped;
+    }
+
+    const updated = await LearnerLibraryEntryModel.updateByIdForUser(userId, entryId, updates);
 
     return formatLibraryEntry(updated);
   }

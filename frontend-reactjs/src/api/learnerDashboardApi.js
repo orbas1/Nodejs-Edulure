@@ -209,6 +209,67 @@ export async function deleteBillingContact({ token, contactId, signal } = {}) {
   });
 }
 
+export async function fetchSystemPreferences({ token, signal } = {}) {
+  ensureToken(token);
+  return httpClient.get('/dashboard/learner/settings/system', { token, signal });
+}
+
+export async function updateSystemPreferences({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.put('/dashboard/learner/settings/system', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function fetchFinanceSettings({ token, signal } = {}) {
+  ensureToken(token);
+  return httpClient.get('/dashboard/learner/settings/finance', { token, signal });
+}
+
+export async function updateFinanceSettings({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.put('/dashboard/learner/settings/finance', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function createFinancePurchase({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/settings/finance/purchases', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateFinancePurchase({ token, purchaseId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!purchaseId) {
+    throw new Error('A finance purchase identifier is required to update the record');
+  }
+  return httpClient.patch(`/dashboard/learner/settings/finance/purchases/${purchaseId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function deleteFinancePurchase({ token, purchaseId, signal } = {}) {
+  ensureToken(token);
+  if (!purchaseId) {
+    throw new Error('A finance purchase identifier is required to remove the record');
+  }
+  return httpClient.delete(`/dashboard/learner/settings/finance/purchases/${purchaseId}`, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export async function joinLiveSession({ token, sessionId, signal } = {}) {
   ensureToken(token);
   if (!sessionId) {

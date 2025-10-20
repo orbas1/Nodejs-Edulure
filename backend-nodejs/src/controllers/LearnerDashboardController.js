@@ -54,6 +54,93 @@ export default class LearnerDashboardController {
     }
   }
 
+  static async getSystemPreferences(req, res, next) {
+    try {
+      const preferences = await LearnerDashboardService.getSystemPreferences(req.user.id);
+      return success(res, {
+        data: preferences,
+        message: 'System preferences retrieved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateSystemPreferences(req, res, next) {
+    try {
+      const acknowledgement = await LearnerDashboardService.updateSystemPreferences(req.user.id, req.body ?? {});
+      return success(res, {
+        data: acknowledgement.meta?.preference ?? acknowledgement,
+        message: acknowledgement.message ?? 'System preferences updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async getFinanceSettings(req, res, next) {
+    try {
+      const settings = await LearnerDashboardService.getFinanceSettings(req.user.id);
+      return success(res, {
+        data: settings,
+        message: 'Finance settings retrieved'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateFinanceSettings(req, res, next) {
+    try {
+      const acknowledgement = await LearnerDashboardService.updateFinanceSettings(req.user.id, req.body ?? {});
+      return success(res, {
+        data: acknowledgement.meta?.financeSettings ?? acknowledgement,
+        message: acknowledgement.message ?? 'Finance settings updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async createFinancePurchase(req, res, next) {
+    try {
+      const purchase = await LearnerDashboardService.createFinancePurchase(req.user.id, req.body ?? {});
+      return success(res, {
+        data: purchase,
+        message: 'Purchase recorded',
+        status: 201
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async updateFinancePurchase(req, res, next) {
+    try {
+      const { purchaseId } = req.params;
+      const purchase = await LearnerDashboardService.updateFinancePurchase(req.user.id, purchaseId, req.body ?? {});
+      return success(res, {
+        data: purchase,
+        message: 'Purchase updated'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteFinancePurchase(req, res, next) {
+    try {
+      const { purchaseId } = req.params;
+      const acknowledgement = await LearnerDashboardService.deleteFinancePurchase(req.user.id, purchaseId);
+      return success(res, {
+        data: acknowledgement,
+        message: acknowledgement.message ?? 'Purchase removed'
+      });
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async createGrowthInitiative(req, res, next) {
     try {
       const initiative = await LearnerDashboardService.createGrowthInitiative(req.user.id, req.body);

@@ -74,6 +74,7 @@ import CommunityCommunications from './pages/dashboard/community/CommunityCommun
 import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
 import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
 import LearnerSupport from './pages/dashboard/LearnerSupport.jsx';
+import LearnerSettings from './pages/dashboard/LearnerSettings.jsx';
 
 function App() {
   return (
@@ -172,6 +173,7 @@ function App() {
         <Route path="support" element={<LearnerSupport />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
+        <Route path="settings" element={<LearnerSettings />} />
         <Route path="growth" element={<LearnerGrowth />} />
         <Route path="affiliate" element={<DashboardAffiliate />} />
         <Route path="become-instructor" element={<BecomeInstructor />} />

@@ -5,6 +5,11 @@ import LearnerSupportRepository from '../repositories/LearnerSupportRepository.j
 import LearnerPaymentMethodModel from '../models/LearnerPaymentMethodModel.js';
 import LearnerBillingContactModel from '../models/LearnerBillingContactModel.js';
 import LearnerFinancialProfileModel from '../models/LearnerFinancialProfileModel.js';
+import LearnerSystemPreferenceModel from '../models/LearnerSystemPreferenceModel.js';
+import LearnerFinancePurchaseModel from '../models/LearnerFinancePurchaseModel.js';
+import CommunitySubscriptionModel from '../models/CommunitySubscriptionModel.js';
+import CommunityModel from '../models/CommunityModel.js';
+import CommunityPaywallTierModel from '../models/CommunityPaywallTierModel.js';
 import LearnerGrowthInitiativeModel from '../models/LearnerGrowthInitiativeModel.js';
 import LearnerGrowthExperimentModel from '../models/LearnerGrowthExperimentModel.js';
 import LearnerAffiliateChannelModel from '../models/LearnerAffiliateChannelModel.js';
@@ -82,6 +87,30 @@ const DEFAULT_SUPPORT_CONTACTS = [
     href: 'https://support.edulure.test/call'
   }
 ];
+
+const DEFAULT_SYSTEM_SETTINGS = Object.freeze({
+  language: 'en',
+  region: 'US',
+  timezone: 'UTC',
+  notificationsEnabled: true,
+  digestEnabled: true,
+  autoPlayMedia: false,
+  highContrast: false,
+  reducedMotion: false,
+  preferences: {
+    interfaceDensity: 'comfortable',
+    analyticsOptIn: true,
+    subtitleLanguage: 'en',
+    audioDescription: false
+  }
+});
+
+const DEFAULT_FINANCE_ALERTS = Object.freeze({
+  sendEmail: true,
+  sendSms: false,
+  escalationEmail: null,
+  notifyThresholdPercent: 80
+});
 
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
@@ -349,7 +378,11 @@ export function buildLearnerDashboard({
   messagingSummary = null,
   notifications = [],
   libraryEntries = [],
-  fieldServiceWorkspace = null
+  fieldServiceWorkspace = null,
+  financialProfile = null,
+  financePurchases = [],
+  financeSubscriptions = [],
+  systemPreferences = null
 } = {}) {
   const hasSignals =
     enrollments.length ||
@@ -752,10 +785,120 @@ export function buildLearnerDashboard({
         company: contact.company
       }));
 
+      const financePreferencesRaw =
+        financialProfile?.preferences && typeof financialProfile.preferences === 'object'
+          ? financialProfile.preferences
+          : {};
       const financialPreferences = {
-        autoPay: { enabled: Boolean(financialProfileRaw?.autoPayEnabled) },
-        reserveTarget: Math.round((financialProfileRaw?.reserveTargetCents ?? 0) / 100),
-        reserveTargetCents: financialProfileRaw?.reserveTargetCents ?? 0
+        autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
+        reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
+        reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
+        currency: financePreferencesRaw.currency ?? 'USD',
+        invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
+        payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
+        taxId: financePreferencesRaw.taxId ?? null,
+        alerts: {
+          sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
+          sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
+          escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
+          notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
+        },
+        documents: Array.isArray(financePreferencesRaw.documents)
+          ? financePreferencesRaw.documents
+          : [],
+        reimbursements:
+          financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
+            ? {
+                enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
+                instructions: financePreferencesRaw.reimbursements.instructions ?? null
+          }
+            : { enabled: false, instructions: null }
+      };
+
+  const financePurchasesList = Array.isArray(financePurchases)
+    ? financePurchases.map((purchase) => ({
+        id: purchase.id ?? `purchase-${crypto.randomUUID()}`,
+        reference: purchase.reference ?? 'Purchase',
+        description: purchase.description ?? '',
+        amountCents: Number(purchase.amountCents ?? 0),
+        amountFormatted: formatCurrency(purchase.amountCents ?? 0, purchase.currency ?? 'USD'),
+        currency: purchase.currency ?? 'USD',
+        status: purchase.status ?? 'paid',
+        purchasedAt: purchase.purchasedAt ?? null,
+        purchasedAtLabel:
+          purchase.purchasedAtLabel ??
+          (purchase.purchasedAt
+            ? formatDateTime(purchase.purchasedAt, { dateStyle: 'medium', timeStyle: undefined })
+            : 'Pending confirmation'),
+        metadata: purchase.metadata ?? {},
+        createdAt: purchase.createdAt ?? null,
+        updatedAt: purchase.updatedAt ?? null
+      }))
+    : [];
+
+  const financeSubscriptionsList = Array.isArray(financeSubscriptions)
+    ? financeSubscriptions.map((subscription) => ({
+        id: subscription.id ?? `subscription-${crypto.randomUUID()}`,
+        status: subscription.status ?? 'active',
+        provider: subscription.provider ?? null,
+        cancelAtPeriodEnd: Boolean(subscription.cancelAtPeriodEnd),
+        currentPeriodEnd: subscription.currentPeriodEnd ?? null,
+        currentPeriodEndLabel:
+          subscription.currentPeriodEndLabel ??
+          (subscription.currentPeriodEnd
+            ? formatDateTime(subscription.currentPeriodEnd, { dateStyle: 'medium', timeStyle: undefined })
+            : null),
+        plan: subscription.plan ?? null,
+        community: subscription.community ?? null,
+        metadata: subscription.metadata ?? {},
+        createdAt: subscription.createdAt ?? null,
+        updatedAt: subscription.updatedAt ?? null
+      }))
+    : [];
+
+  const financeSettings = {
+    profile: {
+      currency: financialPreferences.currency,
+      taxId: financialPreferences.taxId,
+      invoiceDelivery: financialPreferences.invoiceDelivery,
+      payoutSchedule: financialPreferences.payoutSchedule,
+      autoPayEnabled: Boolean(financialPreferences.autoPay?.enabled),
+      reserveTarget: financialPreferences.reserveTarget,
+      reserveTargetCents: financialPreferences.reserveTargetCents
+    },
+    alerts: { ...DEFAULT_FINANCE_ALERTS, ...(financialPreferences.alerts ?? {}) },
+    purchases: financePurchasesList,
+    subscriptions: financeSubscriptionsList,
+    documents: financialPreferences.documents ?? [],
+    reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
+  };
+
+      const systemSettings = {
+        language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
+        region: systemPreferences?.region ?? DEFAULT_SYSTEM_SETTINGS.region,
+        timezone: systemPreferences?.timezone ?? DEFAULT_SYSTEM_SETTINGS.timezone,
+        notificationsEnabled:
+          systemPreferences?.notificationsEnabled ?? DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
+        digestEnabled: systemPreferences?.digestEnabled ?? DEFAULT_SYSTEM_SETTINGS.digestEnabled,
+        autoPlayMedia: systemPreferences?.autoPlayMedia ?? DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
+        highContrast: systemPreferences?.highContrast ?? DEFAULT_SYSTEM_SETTINGS.highContrast,
+        reducedMotion: systemPreferences?.reducedMotion ?? DEFAULT_SYSTEM_SETTINGS.reducedMotion,
+        preferences: {
+          interfaceDensity:
+            systemPreferences?.preferences?.interfaceDensity ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
+          analyticsOptIn:
+            systemPreferences?.preferences?.analyticsOptIn ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
+          subtitleLanguage:
+            systemPreferences?.preferences?.subtitleLanguage ??
+            systemPreferences?.language ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
+          audioDescription:
+            systemPreferences?.preferences?.audioDescription ??
+            DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
+        },
+        updatedAt: systemPreferences?.updatedAt ?? null
       };
 
   const notificationsList = [...notifications];
@@ -1677,7 +1820,9 @@ export function buildLearnerDashboard({
     settings: {
       privacy,
       messaging,
-      communities: communitySettings
+      communities: communitySettings,
+      system: systemSettings,
+      finance: financeSettings
     }
   };
 
@@ -3854,7 +3999,9 @@ export default class DashboardService {
       const [
         paymentMethodsRaw,
         billingContactsRaw,
-        financialProfileRaw,
+        financialProfile,
+        financePurchasesRaw,
+        systemPreferencesRaw,
         growthInitiativesRaw,
         affiliateChannelsRaw,
         adCampaignsRaw,
@@ -3863,6 +4010,8 @@ export default class DashboardService {
         LearnerPaymentMethodModel.listByUserId(user.id),
         LearnerBillingContactModel.listByUserId(user.id),
         LearnerFinancialProfileModel.findByUserId(user.id),
+        LearnerFinancePurchaseModel.listByUserId(user.id),
+        LearnerSystemPreferenceModel.getForUser(user.id),
         LearnerGrowthInitiativeModel.listByUserId(user.id),
         LearnerAffiliateChannelModel.listByUserId(user.id),
         LearnerAdCampaignModel.listByUserId(user.id),
@@ -3987,6 +4136,22 @@ export default class DashboardService {
         recommendations: followRecommendations
       };
 
+      const communitySummaryMap = new Map(communitySummaries.map((summary) => [summary.id, summary]));
+      const financeSubscriptionsDetailed = communitySubscriptions.map((subscription) => ({
+        ...subscription,
+        community: communitySummaryMap.get(subscription.communityId ?? null)
+          ? {
+              id: communitySummaryMap.get(subscription.communityId ?? null).id,
+              name: communitySummaryMap.get(subscription.communityId ?? null).name,
+              slug: communitySummaryMap.get(subscription.communityId ?? null).slug,
+              coverImageUrl: communitySummaryMap.get(subscription.communityId ?? null).coverImageUrl ?? null
+            }
+          : null,
+        currentPeriodEndLabel: subscription.currentPeriodEnd
+          ? formatDateTime(subscription.currentPeriodEnd, { dateStyle: 'medium', timeStyle: undefined })
+          : null
+      }));
+
       learnerSnapshot =
         buildLearnerDashboard({
           user,
@@ -4009,7 +4174,13 @@ export default class DashboardService {
           followerSummary: learnerFollowerSummary,
           privacySettings,
           messagingSummary: null,
-          notifications: []
+          notifications: [],
+          libraryEntries,
+          fieldServiceWorkspace,
+          financialProfile,
+          financePurchases: financePurchasesRaw,
+          financeSubscriptions: financeSubscriptionsDetailed,
+          systemPreferences: systemPreferencesRaw
         }) ?? undefined;
     } catch (error) {
       log.warn({ err: error }, 'Failed to load learner dashboard data');
@@ -4286,6 +4457,56 @@ export default class DashboardService {
         });
       }
 
+      const [financialProfile, financePurchasesRaw, financeSubscriptionsRaw, systemPreferencesRaw] = await Promise.all([
+        LearnerFinancialProfileModel.findByUserId(user.id),
+        LearnerFinancePurchaseModel.listByUserId(user.id),
+        CommunitySubscriptionModel.listByUser(user.id),
+        LearnerSystemPreferenceModel.getForUser(user.id)
+      ]);
+
+      const subscriptionCommunityIds = Array.from(
+        new Set(financeSubscriptionsRaw.map((subscription) => subscription.communityId).filter(Boolean))
+      );
+      const subscriptionTierIds = Array.from(
+        new Set(financeSubscriptionsRaw.map((subscription) => subscription.tierId).filter(Boolean))
+      );
+      const [subscriptionCommunities, subscriptionTiers] = await Promise.all([
+        Promise.all(subscriptionCommunityIds.map((communityId) => CommunityModel.findById(communityId))),
+        Promise.all(subscriptionTierIds.map((tierId) => CommunityPaywallTierModel.findById(tierId)))
+      ]);
+      const subscriptionCommunityMap = new Map(
+        subscriptionCommunities.filter(Boolean).map((community) => [community.id, community])
+      );
+      const subscriptionTierMap = new Map(
+        subscriptionTiers.filter(Boolean).map((tier) => [tier.id, tier])
+      );
+      const financeSubscriptionsDetailed = financeSubscriptionsRaw.map((subscription) => {
+        const community = subscriptionCommunityMap.get(subscription.communityId ?? null);
+        const tier = subscriptionTierMap.get(subscription.tierId ?? null);
+        return {
+          ...subscription,
+          community: community
+            ? {
+                id: community.id,
+                name: community.name,
+                slug: community.slug,
+                coverImageUrl: community.coverImageUrl ?? null
+              }
+            : null,
+          plan: tier
+            ? {
+                id: tier.id,
+                name: tier.name,
+                priceFormatted: formatCurrency(tier.priceCents, tier.currency),
+                billingInterval: tier.billingInterval
+              }
+            : subscription.plan ?? null,
+          currentPeriodEndLabel: subscription.currentPeriodEnd
+            ? formatDateTime(subscription.currentPeriodEnd, { dateStyle: 'medium', timeStyle: undefined })
+            : null
+        };
+      });
+
       learnerSnapshot =
         buildLearnerDashboard({
           user,
@@ -4304,7 +4525,11 @@ export default class DashboardService {
           communities: communityMemberships,
           communityPipelines,
           libraryEntries,
-          fieldServiceWorkspace: learnerFieldServiceWorkspace
+          fieldServiceWorkspace: learnerFieldServiceWorkspace,
+          financialProfile,
+          financePurchases: financePurchasesRaw,
+          financeSubscriptions: financeSubscriptionsDetailed,
+          systemPreferences: systemPreferencesRaw
         }) ?? undefined;
 
       communitySnapshot =
