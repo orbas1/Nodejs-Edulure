@@ -2,11 +2,77 @@ import axios from 'axios';
 
 import { responseCache } from './cache.js';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api';
+function sanitizeBaseUrl(value) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.replace(/\/+$/, '');
+}
+
+function isLocalHostname(hostname) {
+  if (!hostname) {
+    return false;
+  }
+
+  const lowered = hostname.toLowerCase();
+  return (
+    lowered === 'localhost' ||
+    lowered === '127.0.0.1' ||
+    lowered === '0.0.0.0' ||
+    lowered === '::1' ||
+    lowered === '[::1]' ||
+    lowered.endsWith('.localhost') ||
+    lowered.endsWith('.local')
+  );
+}
+
+function resolveConfiguredApiBaseUrl() {
+  const explicit =
+    import.meta.env.VITE_API_URL ??
+    import.meta.env.VITE_API_BASE_URL ??
+    import.meta.env.VITE_API_BASEURL ??
+    null;
+
+  return sanitizeBaseUrl(explicit);
+}
+
+function resolveDefaultApiBaseUrl() {
+  const protocolHint = import.meta.env.VITE_API_PROTOCOL;
+  const hostHint = import.meta.env.VITE_API_HOST;
+  const portHint = import.meta.env.VITE_API_PORT;
+
+  const hasWindow = typeof window !== 'undefined' && typeof window.location !== 'undefined';
+  const fallbackProtocol = hasWindow ? window.location.protocol : 'http:';
+  const fallbackHost = hasWindow ? window.location.hostname : 'localhost';
+  const protocol = (protocolHint ?? fallbackProtocol ?? 'http:').replace(/:?[\/]*$/, '');
+  const host = hostHint ?? fallbackHost ?? 'localhost';
+  const rawPort = portHint ?? (isLocalHostname(host) ? '4000' : '');
+
+  const numericPort = Number(rawPort);
+  const shouldIncludePort =
+    rawPort &&
+    (!Number.isFinite(numericPort) ||
+      (protocol === 'http' && numericPort !== 80) ||
+      (protocol === 'https' && numericPort !== 443) ||
+      (protocol !== 'http' && protocol !== 'https'));
+
+  const portSegment = shouldIncludePort ? `:${rawPort}` : '';
+
+  return `${protocol}://${host}${portSegment}/api/v1`;
+}
+
+const API_BASE_URL = sanitizeBaseUrl(resolveConfiguredApiBaseUrl() ?? resolveDefaultApiBaseUrl());
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }

@@ -29,6 +29,30 @@ describe('createCorsOriginValidator', () => {
     expect(policy.isOriginAllowed('https://example.org')).toBe(false);
   });
 
+  it('automatically adds www aliases for apex domains', () => {
+    const policy = createCorsOriginValidator(['https://example.com']);
+
+    expect(policy.isOriginAllowed('https://example.com')).toBe(true);
+    expect(policy.isOriginAllowed('https://www.example.com')).toBe(true);
+    expect(policy.isOriginAllowed('https://blog.example.com')).toBe(false);
+  });
+
+  it('can disable canonical www alias expansion when requested', () => {
+    const policy = createCorsOriginValidator(['https://example.com'], {
+      includeWwwAliases: false
+    });
+
+    expect(policy.isOriginAllowed('https://example.com')).toBe(true);
+    expect(policy.isOriginAllowed('https://www.example.com')).toBe(false);
+  });
+
+  it('normalizes origins defined with www prefixes back to the apex domain', () => {
+    const policy = createCorsOriginValidator(['https://www.example.org']);
+
+    expect(policy.isOriginAllowed('https://www.example.org')).toBe(true);
+    expect(policy.isOriginAllowed('https://example.org')).toBe(true);
+  });
+
   it('treats null origins as configurable entries', () => {
     const policy = createCorsOriginValidator(['null']);
 
@@ -62,6 +86,16 @@ describe('createCorsOriginValidator', () => {
     expect(policy.isOriginAllowed('https://localhost:3000')).toBe(true);
     expect(policy.isOriginAllowed('http://127.0.0.1:3000')).toBe(true);
     expect(policy.isOriginAllowed('http://0.0.0.0:3000')).toBe(true);
+  });
+
+  it('seeds default localhost origins when no local entries are configured', () => {
+    const policy = createCorsOriginValidator(['https://app.example.com'], {
+      allowDevelopmentOrigins: true,
+      developmentPortHints: [5173]
+    });
+
+    expect(policy.isOriginAllowed('http://localhost:5173')).toBe(true);
+    expect(policy.isOriginAllowed('https://127.0.0.1:5173')).toBe(true);
   });
 
   it('can disable development aliases for strict production enforcement', () => {
