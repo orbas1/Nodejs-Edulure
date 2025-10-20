@@ -64,6 +64,34 @@ const TRANSLATIONS = {
         },
         instructorPill: "I'm an instructor",
         illustrationAlt: 'Collage of instructors and learners collaborating'
+      },
+      community: {
+        eyebrow: 'Community spotlight',
+        heading: 'Two tracks. One buzzing campus.',
+        description:
+          'Pick your lane and plug into gatherings designed for momentum, cheer, and meaningful progress.',
+        learners: {
+          label: 'For learners',
+          title: 'Find your flow, one playful sprint at a time.',
+          description:
+            'Join squads who learn out loud, swap experiments, and celebrate the little wins that build big confidence.',
+          benefits: {
+            one: 'Drop into live build labs with peers and mentors who keep things upbeat.',
+            two: 'Collect project-ready templates, playlists, and prompts in one playful vault.',
+            three: 'Score accountability check-ins that feel more like pep talks than homework.'
+          }
+        },
+        instructors: {
+          label: 'For instructors',
+          title: 'Design experiences that feel like festivals, not lectures.',
+          description:
+            'Craft cohorts that pulse with curiosity, remix resources on the fly, and watch your community light up.',
+          benefits: {
+            one: 'Spin up vibrant cohorts with zero-fuss tooling built for experimentation.',
+            two: 'Package curriculum drops, feedback loops, and analytics in one joyful HQ.',
+            three: 'Spotlight wins with playful badges that keep your learners cheering.'
+          }
+        }
       }
     }
   },
