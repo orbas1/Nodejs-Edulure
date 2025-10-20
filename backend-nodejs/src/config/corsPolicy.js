@@ -22,6 +22,8 @@ const DEFAULT_DEVELOPMENT_PORT_HINTS = [
   19006
 ];
 
+const DEFAULT_DEVELOPMENT_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]'];
+
 function formatUrlOrigin(url) {
   const protocol = url.protocol.toLowerCase();
   const hostname = url.hostname.toLowerCase();
@@ -171,6 +173,42 @@ function expandDevelopmentOrigins(exactOrigins, options) {
 
   for (const origin of additionalOrigins) {
     exactOrigins.add(origin);
+  }
+}
+
+function ensureBaselineDevelopmentOrigins(exactOrigins, options) {
+  const {
+    allowDevelopmentOrigins = process.env.NODE_ENV !== 'production',
+    developmentPortHints = DEFAULT_DEVELOPMENT_PORT_HINTS
+  } = options ?? {};
+
+  if (!allowDevelopmentOrigins) {
+    return;
+  }
+
+  const hasLocalOrigin = Array.from(exactOrigins).some((origin) => {
+    const components = parseOriginComponents(origin);
+    return components ? isLocalAddress(components.hostname) : false;
+  });
+
+  if (hasLocalOrigin) {
+    return;
+  }
+
+  const ports = new Set([null]);
+  for (const hint of developmentPortHints) {
+    const numeric = Number(hint);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      ports.add(numeric);
+    }
+  }
+
+  for (const host of DEFAULT_DEVELOPMENT_HOSTS) {
+    for (const scheme of ['http:', 'https:']) {
+      for (const port of ports) {
+        exactOrigins.add(formatOrigin(scheme, host, port));
+      }
+    }
   }
 }
 
@@ -363,7 +401,9 @@ export function createCorsOriginValidator(originsInput, options = {}) {
     }
   }
 
-  expandDevelopmentOrigins(exactOrigins, { allowDevelopmentOrigins, developmentPortHints });
+  const developmentOptions = { allowDevelopmentOrigins, developmentPortHints };
+  expandDevelopmentOrigins(exactOrigins, developmentOptions);
+  ensureBaselineDevelopmentOrigins(exactOrigins, developmentOptions);
 
   if (includeWwwAliases) {
     addCanonicalDomainAliases(exactOrigins);

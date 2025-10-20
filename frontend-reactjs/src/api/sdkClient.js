@@ -11,7 +11,7 @@ let lastConfiguration = {
 function resolveSdkBaseUrl() {
   const base = (API_BASE_URL ?? '').replace(/\/$/, '');
   if (!base) {
-    throw new Error('VITE_API_URL must be defined to configure the API SDK.');
+    throw new Error('VITE_API_URL or VITE_API_BASE_URL must be defined to configure the API SDK.');
   }
   if (base.endsWith('/v1')) {
     return base;

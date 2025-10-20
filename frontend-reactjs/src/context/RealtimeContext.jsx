@@ -17,7 +17,7 @@ function resolveRealtimeUrl() {
     return apiBase.origin;
   } catch (error) {
     console.warn('Unable to resolve realtime URL from API_BASE_URL', error);
-    return 'http://localhost:4000';
+    return 'http://localhost:4100';
   }
 }
 
