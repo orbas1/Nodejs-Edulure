@@ -23,7 +23,9 @@ export default class SalesforceClient {
     externalIdField = 'Edulure_Project_Id__c',
     logger,
     fetchImpl,
-    auditLogger
+    auditLogger,
+    refreshSkewMs = 60000,
+    sleep
   } = {}) {
     if (!clientId || !clientSecret || !username || !password) {
       throw new Error('SalesforceClient requires clientId, clientSecret, username, and password.');
@@ -41,10 +43,13 @@ export default class SalesforceClient {
     this.logger = logger ?? console;
     this.fetchImpl = fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.auditLogger = typeof auditLogger === 'function' ? auditLogger : null;
+    this.refreshSkewMs = Number.isFinite(refreshSkewMs) && refreshSkewMs >= 0 ? refreshSkewMs : 60000;
+    this.sleep = typeof sleep === 'function' ? sleep : delay;
 
     this.accessToken = null;
     this.instanceUrl = null;
     this.tokenExpiresAt = null;
+    this.authPromise = null;
   }
 
   async recordAudit({ requestMethod, requestPath, statusCode, outcome, durationMs, metadata, error }) {
@@ -72,39 +77,73 @@ export default class SalesforceClient {
   }
 
   async authenticate(force = false) {
-    if (!force && this.accessToken && this.tokenExpiresAt && Date.now() < this.tokenExpiresAt - 60000) {
+    const now = Date.now();
+    const hasValidToken =
+      this.accessToken && this.tokenExpiresAt && now < this.tokenExpiresAt - this.refreshSkewMs;
+
+    if (!force && hasValidToken) {
       return { accessToken: this.accessToken, instanceUrl: this.instanceUrl };
     }
 
-    const body = new URLSearchParams({
-      grant_type: 'password',
-      client_id: this.clientId,
-      client_secret: this.clientSecret,
-      username: this.username,
-      password: `${this.password}${this.securityToken}`
-    });
-
-    const response = await this.fetchImpl(`${this.loginUrl}/services/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      const error = new Error(`Salesforce authentication failed with status ${response.status}`);
-      error.details = errorBody;
-      throw error;
+    if (!force && this.authPromise) {
+      return this.authPromise;
     }
 
-    const payload = await response.json();
-    this.accessToken = payload.access_token;
-    this.instanceUrl = payload.instance_url;
-    const issuedAt = Number(payload.issued_at ?? Date.now());
-    this.tokenExpiresAt = issuedAt + Number(payload.expires_in ?? 3600) * 1000;
-    return { accessToken: this.accessToken, instanceUrl: this.instanceUrl };
+    if (force && this.authPromise) {
+      try {
+        await this.authPromise.catch(() => {});
+      } finally {
+        this.authPromise = null;
+      }
+    }
+
+    const performAuthentication = async () => {
+      const body = new URLSearchParams({
+        grant_type: 'password',
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        username: this.username,
+        password: `${this.password}${this.securityToken}`
+      });
+
+      const response = await this.fetchImpl(`${this.loginUrl}/services/oauth2/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        const error = new Error(`Salesforce authentication failed with status ${response.status}`);
+        error.details = errorBody;
+        throw error;
+      }
+
+      const payload = await response.json();
+      this.accessToken = payload.access_token;
+      this.instanceUrl = payload.instance_url;
+      const issuedAt = Number(payload.issued_at ?? Date.now());
+      this.tokenExpiresAt = issuedAt + Number(payload.expires_in ?? 3600) * 1000;
+      return { accessToken: this.accessToken, instanceUrl: this.instanceUrl };
+    };
+
+    this.authPromise = performAuthentication()
+      .then((result) => {
+        return result;
+      })
+      .catch((error) => {
+        this.accessToken = null;
+        this.instanceUrl = null;
+        this.tokenExpiresAt = null;
+        throw error;
+      })
+      .finally(() => {
+        this.authPromise = null;
+      });
+
+    return this.authPromise;
   }
 
   async request(path, { method = 'GET', body, query, headers = {}, retryOnUnauthorized = true } = {}) {
@@ -164,18 +203,23 @@ export default class SalesforceClient {
         }
 
         if (response.status === 429 || response.status >= 500) {
-          const backoff = Math.min(attempt * 600, 5000);
+          const retryAfterSeconds = Number(response.headers?.get?.('Retry-After') ?? 0);
+          const retryAfterMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? retryAfterSeconds * 1000 : null;
+          const backoff = retryAfterMs ?? Math.min(attempt * 600, 5000);
           lastError = new Error(`Salesforce request failed with status ${response.status}`);
+          if (retryAfterMs) {
+            lastError.retryAfterMs = retryAfterMs;
+          }
           await this.recordAudit({
             requestMethod: method,
             requestPath: url.pathname,
             statusCode: response.status,
             outcome: response.status === 429 ? 'degraded' : 'failure',
             durationMs,
-            metadata: { ...metadata, backoff }
+            metadata: { ...metadata, backoff, retryAfterMs }
           });
           if (attempt <= this.maxRetries) {
-            await delay(backoff);
+            await this.sleep(backoff);
             continue;
           }
         }
@@ -236,7 +280,7 @@ export default class SalesforceClient {
           throw error;
         }
 
-        await delay(Math.min(attempt * 600, 4000));
+        await this.sleep(Math.min(attempt * 600, 4000));
       }
     }
 
