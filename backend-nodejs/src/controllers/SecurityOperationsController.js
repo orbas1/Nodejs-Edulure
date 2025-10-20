@@ -37,6 +37,24 @@ function toNumber(value, fallback) {
   return Number.isFinite(numeric) ? numeric : fallback;
 }
 
+function sanitiseOptionalText(input, { maxLength = 500 } = {}) {
+  if (input === undefined || input === null) {
+    return null;
+  }
+
+  const candidate = Array.isArray(input) ? input[0] : input;
+  if (candidate === undefined || candidate === null) {
+    return null;
+  }
+
+  const text = String(candidate).trim();
+  if (!text) {
+    return null;
+  }
+
+  return text.slice(0, maxLength);
+}
+
 export default class SecurityOperationsController {
   static async listRiskRegister(req, res, next) {
     try {
@@ -109,6 +127,36 @@ export default class SecurityOperationsController {
       });
       return res.json({ success: true, data: updated });
     } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async deleteRisk(req, res, next) {
+    try {
+      const tenantId = resolveTenant(req);
+      const actor = resolveActor(req);
+      const { riskId } = req.params;
+      const parsedRiskId = Number.parseInt(riskId, 10);
+      if (!Number.isFinite(parsedRiskId) || parsedRiskId <= 0) {
+        const error = new Error('A valid riskId is required');
+        error.status = 400;
+        throw error;
+      }
+      const reason = sanitiseOptionalText(req.body?.reason ?? req.query?.reason, { maxLength: 500 });
+
+      const acknowledgement = await securityOperationsService.deleteRisk({
+        riskId: parsedRiskId,
+        tenantId,
+        actor,
+        reason,
+        requestContext: resolveRequestContext(req)
+      });
+
+      return res.json({ success: true, data: acknowledgement });
+    } catch (error) {
+      if (error?.message?.toLowerCase().includes('not found')) {
+        error.status = 404;
+      }
       return next(error);
     }
   }
