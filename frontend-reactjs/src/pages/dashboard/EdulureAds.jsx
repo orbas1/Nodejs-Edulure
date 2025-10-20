@@ -921,7 +921,7 @@ export default function EdulureAds() {
     <div className="space-y-8">
       <DashboardActionFeedback feedback={feedback} onDismiss={() => setFeedback(null)} />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="dashboard-kicker text-primary">Growth engine</p>
           <h1 className="dashboard-title">Coordinate Edulure Ads campaigns</h1>
@@ -1611,6 +1611,11 @@ export default function EdulureAds() {
                   </a>
                 </div>
               </div>
+            </article>
+          );
+        })}
+
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-5">
         <section className="dashboard-section lg:col-span-3">
@@ -1690,51 +1695,55 @@ export default function EdulureAds() {
               </div>
             </div>
             <div>
-              <p className="font-semibold text-slate-800">Operational tags</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {tags.map((tag) => (
-                  <span
-                    key={`${tag.category ?? 'tag'}-${tag.label ?? 'label'}`}
-                    className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600"
-                  >
-                    {(tag.category ?? 'Tag').trim()}: {(tag.label ?? 'Unspecified').trim()}
-                  </span>
-                ))}
-                {tags.length === 0 && <span className="text-slate-400">No tags available</span>}
+                <p className="font-semibold text-slate-800">Operational tags</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {tags.map((tag) => (
+                    <span
+                      key={`${tag.category ?? 'tag'}-${tag.label ?? 'label'}`}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1 font-semibold text-slate-600"
+                    >
+                      {(tag.category ?? 'Tag').trim()}: {(tag.label ?? 'Unspecified').trim()}
+                    </span>
+                  ))}
+                  {tags.length === 0 && <span className="text-slate-400">No tags available</span>}
+                </div>
               </div>
+            </div>
+          </section>
+        </div>
 
-      <section className="dashboard-section">
-        <h2 className="text-lg font-semibold text-slate-900">Placement board</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Review channel coverage, scheduling, and optimisation focus across every campaign placement.
-        </p>
-        <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {placements.map((placement) => (
-            <div key={placement.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-900">{placement.name ?? 'Untitled placement'}</h3>
-                <Chip>{placement.status ?? 'Draft'}</Chip>
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {[placement.surface, placement.slot].filter(Boolean).join(' · ') || 'Surface syncing'}
-              </p>
-              <p className="mt-2 text-xs font-semibold text-slate-700">{placement.budgetLabel ?? 'Budget syncing'}</p>
-              <p className="mt-1 text-xs text-slate-500">{placement.optimisation ?? 'Optimisation pending'}</p>
-              <p className="mt-1 text-xs text-slate-500">{placement.scheduleLabel ?? 'Schedule pending'}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {placement.tags.map((tag) => (
-                  <span key={`${placement.id}-${tag}`} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-600">
-                    {tag}
-                  </span>
-                ))}
-                {placement.tags.length === 0 && (
-                  <span className="text-[11px] text-slate-400">No placement tags</span>
-                )}
-              </div>
-            </article>
-          );
-        })}
-      </section>
-    </div>
+        <section className="dashboard-section">
+          <h2 className="text-lg font-semibold text-slate-900">Placement board</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Review channel coverage, scheduling, and optimisation focus across every campaign placement.
+          </p>
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {placements.map((placement) => (
+              <article key={placement.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-900">{placement.name ?? 'Untitled placement'}</h3>
+                  <Chip>{placement.status ?? 'Draft'}</Chip>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {[placement.surface, placement.slot].filter(Boolean).join(' · ') || 'Surface syncing'}
+                </p>
+                <p className="mt-2 text-xs font-semibold text-slate-700">{placement.budgetLabel ?? 'Budget syncing'}</p>
+                <p className="mt-1 text-xs text-slate-500">{placement.optimisation ?? 'Optimisation pending'}</p>
+                <p className="mt-1 text-xs text-slate-500">{placement.scheduleLabel ?? 'Schedule pending'}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {placement.tags.map((tag) => (
+                    <span key={`${placement.id}-${tag}`} className="rounded-full bg-slate-100 px-3 py-1 text-[11px] text-slate-600">
+                      {tag}
+                    </span>
+                  ))}
+                  {placement.tags.length === 0 && (
+                    <span className="text-[11px] text-slate-400">No placement tags</span>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
   );
 }
