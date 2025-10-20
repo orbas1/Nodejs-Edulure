@@ -124,15 +124,28 @@ function collectTagsFromPaths(paths) {
 export function generateServiceSpecs({
   baseSpecPath = path.join(ROOT_DIR, 'src/docs/openapi.json'),
   outputDir,
-  version = 'v1'
+  version = 'v1',
+  services: allowedServices
 } = {}) {
   const specContents = readFileSync(baseSpecPath, 'utf8');
   const baseSpec = JSON.parse(specContents);
 
   const services = [];
+  const normalisedFilters = Array.isArray(allowedServices)
+    ? allowedServices
+        .map((entry) => (typeof entry === 'string' ? entry.toLowerCase().trim() : ''))
+        .filter((entry) => entry.length > 0)
+    : [];
 
   for (const entry of apiRouteMetadata) {
     const serviceName = normaliseServiceName(entry.name);
+    if (
+      normalisedFilters.length > 0 &&
+      !normalisedFilters.includes(serviceName.toLowerCase()) &&
+      !normalisedFilters.includes(entry.name.toLowerCase())
+    ) {
+      continue;
+    }
     const servicePaths = {};
 
     for (const [pathKey, pathValue] of Object.entries(baseSpec.paths ?? {})) {
