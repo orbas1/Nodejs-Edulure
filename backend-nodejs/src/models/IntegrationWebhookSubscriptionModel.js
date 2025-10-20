@@ -126,13 +126,6 @@ export default class IntegrationWebhookSubscriptionModel {
       .map((row) => mapRow(row))
       .filter((subscription) => subscription?.enabled)
       .filter((subscription) => !subscription.isCircuitOpen)
-      .filter((subscription) => {
-        if (!subscription.circuitBreakerThreshold) {
-          return true;
-        }
-
-        return subscription.consecutiveFailures < subscription.circuitBreakerThreshold;
-      })
       .filter((subscription) => matchesAnyPattern(subscription.eventTypes, eventType));
   }
 
