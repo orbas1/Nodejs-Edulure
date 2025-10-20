@@ -4,13 +4,17 @@ import {
   CheckCircleIcon,
   ClockIcon,
   ClipboardDocumentCheckIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  TrashIcon
 } from '@heroicons/react/24/outline';
 import PropTypes from 'prop-types';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import useLearnerStudyPlan from '../../hooks/useLearnerStudyPlan.js';
 
 const toneStyles = {
   positive: {
@@ -48,6 +52,37 @@ const statusPills = {
   'Past due': 'bg-rose-100 text-rose-700',
   Scheduled: 'bg-slate-100 text-slate-600'
 };
+
+function toDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return date;
+}
+
+function toLocalInputValue(value) {
+  const date = toDate(value);
+  if (!date) return '';
+  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
+  const local = new Date(date.getTime() - offsetMs);
+  return local.toISOString().slice(0, 16);
+}
+
+function normaliseMaterials(materials) {
+  if (!materials) return [];
+  if (Array.isArray(materials)) {
+    return materials.filter(Boolean);
+  }
+  if (typeof materials === 'string') {
+    return materials
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
 
 function SummaryCard({ metric }) {
   const tone = toneStyles[metric.tone] ?? toneStyles.neutral;
@@ -209,6 +244,514 @@ CourseSnapshot.propTypes = {
     overdue: PropTypes.number.isRequired,
     averageScore: PropTypes.string
   }).isRequired
+};
+
+function StudyPlanManager({
+  plan,
+  stats,
+  courses,
+  events,
+  onCreate,
+  onUpdate,
+  onRemove,
+  onToggleCompletion,
+  onDuplicate,
+  onReset
+}) {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [feedback, setFeedback] = useState(null);
+  const [formValues, setFormValues] = useState({
+    focus: '',
+    course: '',
+    startAt: '',
+    endAt: '',
+    mode: 'Deep work',
+    durationMinutes: '90',
+    materials: '',
+    submissionUrl: '',
+    notes: '',
+    status: 'scheduled'
+  });
+
+  const courseSuggestions = useMemo(
+    () =>
+      Array.isArray(courses)
+        ? courses
+            .map((course) => course?.title ?? course?.name)
+            .filter((value, index, array) => value && array.indexOf(value) === index)
+        : [],
+    [courses]
+  );
+
+  const courseListId = useMemo(
+    () => `study-plan-courses-${Math.random().toString(36).slice(2, 8)}`,
+    []
+  );
+
+  const sortedPlan = useMemo(() => {
+    return [...plan].sort((a, b) => {
+      const aDate = toDate(a.startAt) ?? toDate(a.endAt);
+      const bDate = toDate(b.startAt) ?? toDate(b.endAt);
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return aDate.getTime() - bDate.getTime();
+    });
+  }, [plan]);
+
+  useEffect(() => {
+    if (!feedback) return undefined;
+    const timeout = window.setTimeout(() => setFeedback(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [feedback]);
+
+  const resetForm = useCallback(() => {
+    setFormValues({
+      focus: '',
+      course: '',
+      startAt: '',
+      endAt: '',
+      mode: 'Deep work',
+      durationMinutes: '90',
+      materials: '',
+      submissionUrl: '',
+      notes: '',
+      status: 'scheduled'
+    });
+    setEditingId(null);
+  }, []);
+
+  const openCreateForm = useCallback(() => {
+    resetForm();
+    setIsFormOpen(true);
+  }, [resetForm]);
+
+  const closeForm = useCallback(() => {
+    setIsFormOpen(false);
+    resetForm();
+  }, [resetForm]);
+
+  const startEdit = useCallback((block) => {
+    setEditingId(block.id);
+    setFormValues({
+      focus: block.focus ?? '',
+      course: block.course ?? '',
+      startAt: toLocalInputValue(block.startAt),
+      endAt: toLocalInputValue(block.endAt),
+      mode: block.mode ?? 'Deep work',
+      durationMinutes: block.durationMinutes ? String(block.durationMinutes) : '',
+      materials: normaliseMaterials(block.materials).join(', '),
+      submissionUrl: block.submissionUrl ?? '',
+      notes: block.notes ?? '',
+      status: block.status ?? 'scheduled'
+    });
+    setIsFormOpen(true);
+  }, []);
+
+  const handleChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setFormValues((current) => ({ ...current, [name]: value }));
+  }, []);
+
+  const handleSubmit = useCallback(
+    (event) => {
+      event.preventDefault();
+      const payload = {
+        focus: formValues.focus.trim() || 'Deep work block',
+        course: formValues.course.trim() || null,
+        startAt: formValues.startAt ? new Date(formValues.startAt).toISOString() : null,
+        endAt: formValues.endAt ? new Date(formValues.endAt).toISOString() : null,
+        mode: formValues.mode,
+        notes: formValues.notes.trim(),
+        submissionUrl: formValues.submissionUrl.trim() || null,
+        status: formValues.status,
+        materials: normaliseMaterials(formValues.materials)
+      };
+      const minutes = Number.parseInt(formValues.durationMinutes, 10);
+      if (Number.isFinite(minutes) && minutes > 0) {
+        payload.durationMinutes = minutes;
+      }
+      if (editingId) {
+        onUpdate?.(editingId, payload);
+        setFeedback('Study block updated.');
+      } else {
+        onCreate?.(payload);
+        setFeedback('Study block added to your plan.');
+      }
+      closeForm();
+    },
+    [closeForm, editingId, formValues, onCreate, onUpdate]
+  );
+
+  const handleRemove = useCallback(
+    (id) => {
+      const target = plan.find((block) => block.id === id);
+      const label = target?.focus ?? 'this study block';
+      const confirmed = window.confirm(`Remove ${label} from your plan?`);
+      if (!confirmed) return;
+      onRemove?.(id);
+      setFeedback('Study block removed.');
+    },
+    [onRemove, plan]
+  );
+
+  const handleDuplicate = useCallback(
+    (id) => {
+      onDuplicate?.(id);
+      setFeedback('Study block duplicated into next week.');
+    },
+    [onDuplicate]
+  );
+
+  const handleToggleStatus = useCallback(
+    (id) => {
+      onToggleCompletion?.(id);
+      setFeedback('Study block status updated.');
+    },
+    [onToggleCompletion]
+  );
+
+  const handleReset = useCallback(() => {
+    const confirmed = window.confirm('Reset your saved study plan on this device?');
+    if (!confirmed) return;
+    onReset?.();
+    setFeedback('Study plan reset to defaults.');
+  }, [onReset]);
+
+  return (
+    <div className="dashboard-card space-y-6 p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <ClockIcon className="h-5 w-5 text-primary" />
+            <h2 className="text-base font-semibold text-slate-900">Study schedule</h2>
+          </div>
+          <p className="mt-1 text-sm text-slate-600">
+            Coordinate revision blocks, prep windows, and mentor reviews without leaving the dashboard.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" className="dashboard-pill" onClick={handleReset}>
+            Reset plan
+          </button>
+          <button
+            type="button"
+            className="dashboard-primary-pill inline-flex items-center gap-2"
+            onClick={openCreateForm}
+          >
+            <PlusIcon className="h-4 w-4" />
+            Add study block
+          </button>
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl bg-primary/5 px-4 py-3 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Scheduled</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{stats.scheduled}</p>
+        </div>
+        <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">Completed</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{stats.completed}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-100 px-4 py-3 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Focus minutes</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{stats.totalMinutes}</p>
+        </div>
+      </div>
+
+      {feedback ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-2xl border border-primary/40 bg-primary/5 px-4 py-3 text-sm text-primary"
+        >
+          {feedback}
+        </p>
+      ) : null}
+
+      {isFormOpen ? (
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Focus area
+              <input
+                type="text"
+                name="focus"
+                value={formValues.focus}
+                onChange={handleChange}
+                required
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Course
+              <input
+                type="text"
+                name="course"
+                list={courseSuggestions.length ? courseListId : undefined}
+                value={formValues.course}
+                onChange={handleChange}
+                placeholder="Optional"
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              {courseSuggestions.length ? (
+                <datalist id={courseListId}>
+                  {courseSuggestions.map((course) => (
+                    <option key={course} value={course} />
+                  ))}
+                </datalist>
+              ) : null}
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Start
+              <input
+                type="datetime-local"
+                name="startAt"
+                value={formValues.startAt}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              End
+              <input
+                type="datetime-local"
+                name="endAt"
+                value={formValues.endAt}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Mode
+              <select
+                name="mode"
+                value={formValues.mode}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="Deep work">Deep work</option>
+                <option value="Review">Review</option>
+                <option value="Mentor session">Mentor session</option>
+                <option value="Workshop">Workshop</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Duration (minutes)
+              <input
+                type="number"
+                min="15"
+                step="15"
+                name="durationMinutes"
+                value={formValues.durationMinutes}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+              Status
+              <select
+                name="status"
+                value={formValues.status}
+                onChange={handleChange}
+                className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="scheduled">Scheduled</option>
+                <option value="completed">Completed</option>
+              </select>
+            </label>
+          </div>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Materials & resources
+            <input
+              type="text"
+              name="materials"
+              value={formValues.materials}
+              onChange={handleChange}
+              placeholder="Comma-separated resources or links"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Submission link
+            <input
+              type="url"
+              name="submissionUrl"
+              value={formValues.submissionUrl}
+              onChange={handleChange}
+              placeholder="Optional"
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Notes for future you
+            <textarea
+              name="notes"
+              value={formValues.notes}
+              onChange={handleChange}
+              rows={3}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </label>
+          <div className="flex items-center justify-end gap-2">
+            <button type="button" className="dashboard-pill" onClick={closeForm}>
+              Cancel
+            </button>
+            <button type="submit" className="dashboard-primary-pill">
+              {editingId ? 'Save changes' : 'Create study block'}
+            </button>
+          </div>
+        </form>
+      ) : null}
+
+      {sortedPlan.length ? (
+        <ul className="space-y-4">
+          {sortedPlan.map((block) => {
+            const completed = block.status === 'completed';
+            const materials = normaliseMaterials(block.materials);
+            return (
+              <li key={block.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-semibold text-slate-900">{block.focus}</p>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                          completed ? 'bg-emerald-100 text-emerald-700' : 'bg-primary/10 text-primary'
+                        }`}
+                      >
+                        {completed ? 'Completed' : 'Scheduled'}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">{block.course ?? 'Independent study'}</p>
+                    <p className="mt-2 text-sm text-slate-600">{block.windowLabel ?? block.dayLabel}</p>
+                    <p className="mt-1 text-xs text-slate-500">Duration {block.durationLabel ?? `${block.durationMinutes}m`}</p>
+                    {materials.length ? (
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-primary">
+                        {materials.map((material) => (
+                          <span
+                            key={`${block.id}-${material}`}
+                            className="rounded-full bg-white px-3 py-1 text-xs font-medium text-primary shadow-sm"
+                          >
+                            {material}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {block.notes ? (
+                      <p className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-xs text-slate-500">{block.notes}</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-col items-end gap-2 text-xs text-slate-500">
+                    {block.submissionUrl ? (
+                      <a
+                        href={block.submissionUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 rounded-full border border-primary/30 px-3 py-1 text-xs font-semibold text-primary transition hover:bg-primary hover:text-white"
+                      >
+                        Open submission
+                        <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+                      </a>
+                    ) : null}
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button type="button" className="dashboard-pill" onClick={() => handleToggleStatus(block.id)}>
+                        {completed ? 'Mark scheduled' : 'Mark completed'}
+                      </button>
+                      <button type="button" className="dashboard-pill" onClick={() => handleDuplicate(block.id)}>
+                        Duplicate
+                      </button>
+                      <button type="button" className="dashboard-pill" onClick={() => startEdit(block)}>
+                        <span className="inline-flex items-center gap-1">
+                          <PencilSquareIcon className="h-3.5 w-3.5" />
+                          Edit
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-pill text-rose-600 hover:border-rose-200 hover:text-rose-700"
+                        onClick={() => handleRemove(block.id)}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          <TrashIcon className="h-3.5 w-3.5" />
+                          Remove
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : (
+        <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+          No study blocks scheduled. Add upcoming assessments to automatically generate preparation windows.
+        </p>
+      )}
+
+      {events?.length ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Linked assessments</p>
+          <ul className="mt-2 space-y-2 text-xs text-slate-600">
+            {events.slice(0, 6).map((event) => (
+              <li key={event.id} className="flex items-center justify-between gap-3">
+                <span className="font-medium text-slate-700">{event.title}</span>
+                <span>{event.date}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+StudyPlanManager.propTypes = {
+  plan: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      focus: PropTypes.string,
+      course: PropTypes.string,
+      startAt: PropTypes.string,
+      endAt: PropTypes.string,
+      durationMinutes: PropTypes.number,
+      materials: PropTypes.oneOfType([PropTypes.array, PropTypes.string]),
+      submissionUrl: PropTypes.string,
+      status: PropTypes.string,
+      notes: PropTypes.string,
+      windowLabel: PropTypes.string,
+      durationLabel: PropTypes.string
+    })
+  ).isRequired,
+  stats: PropTypes.shape({
+    scheduled: PropTypes.number.isRequired,
+    completed: PropTypes.number.isRequired,
+    totalMinutes: PropTypes.number.isRequired
+  }).isRequired,
+  courses: PropTypes.array,
+  events: PropTypes.array,
+  onCreate: PropTypes.func,
+  onUpdate: PropTypes.func,
+  onRemove: PropTypes.func,
+  onToggleCompletion: PropTypes.func,
+  onDuplicate: PropTypes.func,
+  onReset: PropTypes.func
+};
+
+StudyPlanManager.defaultProps = {
+  courses: [],
+  events: [],
+  onCreate: undefined,
+  onUpdate: undefined,
+  onRemove: undefined,
+  onToggleCompletion: undefined,
+  onDuplicate: undefined,
+  onReset: undefined
 };
 
 function AnalyticsCard({ analytics, isLearner }) {
@@ -410,6 +953,17 @@ export default function DashboardAssessments() {
   const events = Array.isArray(schedule.events) ? schedule.events : [];
   const studyPlan = Array.isArray(schedule.studyPlan) ? schedule.studyPlan : [];
 
+  const {
+    plan: learnerStudyPlan,
+    stats: studyStats,
+    createBlock,
+    updateBlock,
+    removeBlock,
+    toggleCompletion,
+    duplicateBlock,
+    reset: resetStudyPlan
+  } = useLearnerStudyPlan(isLearner ? studyPlan : []);
+
   const timelineColumns = isLearner
     ? [
         { key: 'upcoming', title: 'Upcoming focus', empty: 'Nothing scheduled. Enjoy the clear runway.' },
@@ -491,59 +1045,74 @@ export default function DashboardAssessments() {
         </div>
 
         <div className="space-y-6">
-          <div className="dashboard-card space-y-4 p-6">
-            <div className="flex items-center gap-2">
-              <ClockIcon className="h-5 w-5 text-primary" />
-              <h2 className="text-base font-semibold text-slate-900">Schedule</h2>
-            </div>
-            {studyPlan.length ? (
-              <ul className="space-y-3 text-sm text-slate-600">
-                {studyPlan.map((block) => (
-                  <li key={block.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-slate-900">{block.focus}</p>
-                        <p className="text-xs text-slate-500">{block.course}</p>
+          {isLearner ? (
+            <StudyPlanManager
+              plan={learnerStudyPlan}
+              stats={studyStats}
+              courses={courses}
+              events={events}
+              onCreate={createBlock}
+              onUpdate={updateBlock}
+              onRemove={removeBlock}
+              onToggleCompletion={toggleCompletion}
+              onDuplicate={duplicateBlock}
+              onReset={resetStudyPlan}
+            />
+          ) : (
+            <div className="dashboard-card space-y-4 p-6">
+              <div className="flex items-center gap-2">
+                <ClockIcon className="h-5 w-5 text-primary" />
+                <h2 className="text-base font-semibold text-slate-900">Schedule</h2>
+              </div>
+              {studyPlan.length ? (
+                <ul className="space-y-3 text-sm text-slate-600">
+                  {studyPlan.map((block) => (
+                    <li key={block.id} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-slate-900">{block.focus}</p>
+                          <p className="text-xs text-slate-500">{block.course}</p>
+                        </div>
+                        <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{block.window}</span>
                       </div>
-                      <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">{block.window}</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-                      <span>{block.duration}</span>
-                      {block.mode ? <span>{block.mode}</span> : null}
-                      {block.submissionUrl ? (
-                        <a
-                          href={block.submissionUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                        >
-                          Open
-                          <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
-                        </a>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                No study blocks scheduled. Add upcoming assessments to automatically generate preparation windows.
-              </p>
-            )}
-            {events.length ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Events</p>
-                <ul className="mt-2 space-y-2 text-xs text-slate-600">
-                  {events.slice(0, 5).map((event) => (
-                    <li key={event.id} className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-slate-700">{event.title}</span>
-                      <span>{event.date}</span>
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+                        <span>{block.duration}</span>
+                        {block.mode ? <span>{block.mode}</span> : null}
+                        {block.submissionUrl ? (
+                          <a
+                            href={block.submissionUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-primary hover:underline"
+                          >
+                            Open
+                            <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                 </ul>
-              </div>
-            ) : null}
-          </div>
+              ) : (
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                  No study blocks scheduled. Add upcoming assessments to automatically generate preparation windows.
+                </p>
+              )}
+              {events.length ? (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Events</p>
+                  <ul className="mt-2 space-y-2 text-xs text-slate-600">
+                    {events.slice(0, 5).map((event) => (
+                      <li key={event.id} className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-slate-700">{event.title}</span>
+                        <span>{event.date}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <AnalyticsCard analytics={analytics} isLearner={isLearner} />
 

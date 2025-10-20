@@ -18,6 +18,13 @@ import AdminUpcomingLaunchesSection from './admin/sections/AdminUpcomingLaunches
 import AdminActivitySection from './admin/sections/AdminActivitySection.jsx';
 import AdminToolsSection from './admin/sections/AdminToolsSection.jsx';
 import AdminBlogSection from './admin/sections/AdminBlogSection.jsx';
+import AdminCoursesSection from './admin/sections/AdminCoursesSection.jsx';
+import AdminEbooksSection from './admin/sections/AdminEbooksSection.jsx';
+import AdminCalendarSection from './admin/sections/AdminCalendarSection.jsx';
+import AdminBookingsSection from './admin/sections/AdminBookingsSection.jsx';
+import AdminGrowthSection from './admin/sections/AdminGrowthSection.jsx';
+import AdminRevenueManagementSection from './admin/sections/AdminRevenueManagementSection.jsx';
+import AdminAdsManagementSection from './admin/sections/AdminAdsManagementSection.jsx';
 import { formatDateTime, formatNumber, formatRelativeTime } from './admin/utils.js';
 
 const EMPTY_OBJECT = Object.freeze({});
@@ -27,6 +34,13 @@ const SECTION_NAVIGATION = Object.freeze([
   { id: 'overview', label: 'Overview' },
   { id: 'approvals', label: 'Approvals' },
   { id: 'revenue', label: 'Revenue' },
+  { id: 'courses', label: 'Courses' },
+  { id: 'ebooks', label: 'E-books' },
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'bookings', label: 'Bookings' },
+  { id: 'growth', label: 'Growth' },
+  { id: 'revenue-management', label: 'Revenue Ops' },
+  { id: 'ads-management', label: 'Ads' },
   { id: 'monetization', label: 'Monetization' },
   { id: 'communities', label: 'Communities' },
   { id: 'tools', label: 'Tools' },
@@ -502,6 +516,20 @@ export default function Admin() {
               paymentHealthBreakdown={paymentHealthBreakdown}
               onExport={handleRevenueExport}
             />
+
+            <AdminCoursesSection sectionId="courses" token={token} />
+
+            <AdminEbooksSection sectionId="ebooks" token={token} />
+
+            <AdminCalendarSection sectionId="calendar" token={token} />
+
+            <AdminBookingsSection sectionId="bookings" token={token} />
+
+            <AdminGrowthSection sectionId="growth" token={token} />
+
+            <AdminRevenueManagementSection sectionId="revenue-management" token={token} />
+
+            <AdminAdsManagementSection sectionId="ads-management" token={token} />
 
             <AdminMonetizationSettingsSection
               sectionId="monetization"

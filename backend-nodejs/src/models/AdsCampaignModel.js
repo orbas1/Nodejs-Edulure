@@ -155,6 +155,10 @@ export default class AdsCampaignModel {
     return this.findById(id, connection);
   }
 
+  static async deleteById(id, connection = db) {
+    await connection(TABLE).where({ id }).del();
+  }
+
   static async lockByPublicId(publicId, connection = db) {
     const record = await connection(TABLE).where({ public_id: publicId }).forUpdate().first();
     return record ? this.deserialize(record) : null;

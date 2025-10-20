@@ -1,11 +1,15 @@
 import { Router } from 'express';
 
+import AdminAdsController from '../controllers/AdminAdsController.js';
 import AdminBlogController from '../controllers/AdminBlogController.js';
+import AdminBookingController from '../controllers/AdminBookingController.js';
 import AdminControlController from '../controllers/AdminControlController.js';
 import AdminFeatureFlagController from '../controllers/AdminFeatureFlagController.js';
 import AdminIntegrationsController from '../controllers/AdminIntegrationsController.js';
 import AdminSettingsController from '../controllers/AdminSettingsController.js';
 import AdminMonetizationController from '../controllers/AdminMonetizationController.js';
+import AdminGrowthController from '../controllers/AdminGrowthController.js';
+import AdminRevenueManagementController from '../controllers/AdminRevenueManagementController.js';
 import auth from '../middleware/auth.js';
 
 const router = Router();
@@ -129,5 +133,28 @@ router.get('/control/podcasts/:showId/episodes', auth('admin'), AdminControlCont
 router.post('/control/podcasts/:showId/episodes', auth('admin'), AdminControlController.createPodcastEpisode);
 router.put('/control/podcasts/:showId/episodes/:episodeId', auth('admin'), AdminControlController.updatePodcastEpisode);
 router.delete('/control/podcasts/:showId/episodes/:episodeId', auth('admin'), AdminControlController.deletePodcastEpisode);
+
+router.get('/control/bookings', auth('admin'), AdminBookingController.list);
+router.post('/control/bookings', auth('admin'), AdminBookingController.create);
+router.put('/control/bookings/:bookingId', auth('admin'), AdminBookingController.update);
+router.delete('/control/bookings/:bookingId', auth('admin'), AdminBookingController.remove);
+
+router.get('/growth/experiments', auth('admin'), AdminGrowthController.list);
+router.post('/growth/experiments', auth('admin'), AdminGrowthController.create);
+router.put('/growth/experiments/:experimentId', auth('admin'), AdminGrowthController.update);
+router.delete('/growth/experiments/:experimentId', auth('admin'), AdminGrowthController.remove);
+router.get('/growth/metrics', auth('admin'), AdminGrowthController.metrics);
+
+router.get('/revenue/summary', auth('admin'), AdminRevenueManagementController.summary);
+router.get('/revenue/adjustments', auth('admin'), AdminRevenueManagementController.listAdjustments);
+router.post('/revenue/adjustments', auth('admin'), AdminRevenueManagementController.createAdjustment);
+router.put('/revenue/adjustments/:adjustmentId', auth('admin'), AdminRevenueManagementController.updateAdjustment);
+router.delete('/revenue/adjustments/:adjustmentId', auth('admin'), AdminRevenueManagementController.deleteAdjustment);
+
+router.get('/ads/campaigns', auth('admin'), AdminAdsController.listCampaigns);
+router.post('/ads/campaigns', auth('admin'), AdminAdsController.createCampaign);
+router.put('/ads/campaigns/:campaignId', auth('admin'), AdminAdsController.updateCampaign);
+router.delete('/ads/campaigns/:campaignId', auth('admin'), AdminAdsController.deleteCampaign);
+router.get('/ads/summary', auth('admin'), AdminAdsController.summary);
 
 export default router;

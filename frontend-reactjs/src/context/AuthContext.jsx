@@ -5,7 +5,7 @@ import { httpClient } from '../api/httpClient.js';
 
 const TOKEN_STORAGE_KEY = 'edulure.session';
 
-const AuthContext = createContext({
+export const AuthContext = createContext({
   session: null,
   isAuthenticated: false,
   login: async () => {},

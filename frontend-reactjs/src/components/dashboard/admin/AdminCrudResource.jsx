@@ -290,6 +290,20 @@ export default function AdminCrudResource({
 
   const renderField = (field) => {
     const value = formValues[field.name];
+
+    if (typeof field.renderInput === 'function') {
+      return field.renderInput({
+        value,
+        onChange: (nextValue) => handleFieldChange(field.name, nextValue),
+        submitting,
+        disabled,
+        formValues,
+        field,
+        editing,
+        context
+      });
+    }
+
     const commonProps = {
       id: field.name,
       name: field.name,
@@ -303,7 +317,8 @@ export default function AdminCrudResource({
           handleFieldChange(field.name, target.value);
         }
       },
-      className: INPUT_BASE_CLASSES
+      className: INPUT_BASE_CLASSES,
+      ...field.inputProps
     };
 
     switch (field.type) {
@@ -356,6 +371,17 @@ export default function AdminCrudResource({
             {...commonProps}
             value={value}
             placeholder={field.placeholder}
+          />
+        );
+      case 'url':
+        return (
+          <input
+            type="url"
+            {...commonProps}
+            value={value}
+            placeholder={field.placeholder ?? 'https://example.com'}
+            inputMode="url"
+            pattern={field.pattern}
           />
         );
       case 'tags':
@@ -530,16 +556,35 @@ export default function AdminCrudResource({
             </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            {fields.map((field) => (
-              <label key={field.name} className={clsx('flex flex-col gap-2 text-sm text-slate-700', field.fullWidth && 'md:col-span-2')}>
-                <span className="font-semibold text-slate-900">
-                  {field.label}
-                  {field.required ? ' *' : ''}
-                </span>
-                {renderField(field)}
-                {field.helpText ? <span className="text-xs text-slate-500">{field.helpText}</span> : null}
-              </label>
-            ))}
+            {fields.map((field) => {
+              const value = formValues[field.name];
+              const preview = field.renderPreview
+                ? field.renderPreview({
+                    value,
+                    formValues,
+                    field,
+                    editing,
+                    onChange: (nextValue) => handleFieldChange(field.name, nextValue)
+                  })
+                : null;
+
+              return (
+                <label
+                  key={field.name}
+                  className={clsx('flex flex-col gap-2 text-sm text-slate-700', field.fullWidth && 'md:col-span-2')}
+                >
+                  <span className="font-semibold text-slate-900">
+                    {field.label}
+                    {field.required ? ' *' : ''}
+                  </span>
+                  <div className="space-y-2">
+                    {renderField(field)}
+                    {preview}
+                  </div>
+                  {field.helpText ? <span className="text-xs text-slate-500">{field.helpText}</span> : null}
+                </label>
+              );
+            })}
           </div>
           {statusMessage ? (
             <div
@@ -588,7 +633,7 @@ AdminCrudResource.propTypes = {
     PropTypes.shape({
       name: PropTypes.string.isRequired,
       label: PropTypes.string.isRequired,
-      type: PropTypes.oneOf(['text', 'textarea', 'select', 'number', 'datetime', 'checkbox', 'tags', 'json']),
+      type: PropTypes.oneOf(['text', 'textarea', 'select', 'number', 'datetime', 'checkbox', 'tags', 'json', 'url']),
       placeholder: PropTypes.string,
       helpText: PropTypes.string,
       options: PropTypes.array,
@@ -597,7 +642,10 @@ AdminCrudResource.propTypes = {
       fullWidth: PropTypes.bool,
       fromInput: PropTypes.func,
       toInput: PropTypes.func,
-      allowEmpty: PropTypes.bool
+      allowEmpty: PropTypes.bool,
+      renderInput: PropTypes.func,
+      renderPreview: PropTypes.func,
+      inputProps: PropTypes.object
     })
   ).isRequired,
   columns: PropTypes.arrayOf(
