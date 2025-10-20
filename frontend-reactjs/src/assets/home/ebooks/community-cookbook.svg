@@ -1,0 +1,32 @@
+<svg width="360" height="480" viewBox="0 0 360 480" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="360" height="480" rx="36" fill="url(#paint0_linear)"/>
+  <g filter="url(#filter0_di)">
+    <rect x="44" y="72" width="272" height="336" rx="30" fill="white" opacity="0.18"/>
+  </g>
+  <path d="M96 180C96 154.385 116.385 134 142 134H218C243.615 134 264 154.385 264 180V332C264 357.615 243.615 378 218 378H142C116.385 378 96 357.615 96 332V180Z" stroke="white" stroke-width="10" opacity="0.6"/>
+  <path d="M124 208C124 196.954 132.954 188 144 188H216C227.046 188 236 196.954 236 208V248C236 259.046 227.046 268 216 268H144C132.954 268 124 259.046 124 248V208Z" fill="white" opacity="0.85"/>
+  <circle cx="180" cy="300" r="30" fill="#BBF7D0" opacity="0.85"/>
+  <path d="M180 288V312" stroke="#15803D" stroke-width="6" stroke-linecap="round"/>
+  <path d="M168 300H192" stroke="#15803D" stroke-width="6" stroke-linecap="round"/>
+  <path d="M112 156L120 164L136 148" stroke="#10B981" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M248 156L256 164L272 148" stroke="#10B981" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <filter id="filter0_di" x="20" y="48" width="320" height="384" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feGaussianBlur in="BackgroundImageFix" stdDeviation="12"/>
+      <feComposite in2="SourceAlpha" operator="in" result="effect1_backgroundBlur"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset/>
+      <feGaussianBlur stdDeviation="10"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.168627 0 0 0 0 0.764706 0 0 0 0 0.960784 0 0 0 0.3 0"/>
+      <feBlend mode="normal" in2="effect1_backgroundBlur" result="effect2_dropShadow"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect2_dropShadow" result="shape"/>
+    </filter>
+    <linearGradient id="paint0_linear" x1="38" y1="28" x2="326" y2="444" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="0.5" stop-color="#34D399"/>
+      <stop offset="1" stop-color="#FDE68A"/>
+    </linearGradient>
+  </defs>
+</svg>

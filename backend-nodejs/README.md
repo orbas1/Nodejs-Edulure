@@ -196,6 +196,13 @@ enabling commerce in any environment:
 - `PAYMENTS_MAX_COUPON_PERCENTAGE` – hard cap for percentage coupons expressed in % (e.g. `80` = 80%).
 - `PAYMENTS_REPORTING_TIMEZONE` – IANA timezone string used when summarising captured revenue in finance reports.
 
+#### Stripe webhook routing
+
+`src/app.js` captures the raw JSON payload for `/api/v1/payments/webhooks/stripe` so signature verification succeeds. The
+verifier explicitly checks the versioned route prefix produced by `mountVersionedApi`. If the API prefix or version changes,
+update the `VERSIONED_API_BASE_PATH` constant alongside the router configuration; otherwise `req.rawBody` will be undefined and
+Stripe requests will fail signature validation.
+
 ### Messaging & presence environment
 
 Community chat and direct messaging expose tunable pagination and presence windows so operations teams can right-size load and
