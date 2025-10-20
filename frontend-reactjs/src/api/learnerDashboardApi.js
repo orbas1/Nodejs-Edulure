@@ -27,6 +27,30 @@ export async function exportTutorSchedule({ token, signal } = {}) {
   );
 }
 
+export async function updateTutorBooking({ token, bookingId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!bookingId) {
+    throw new Error('A tutor booking identifier is required to update the request');
+  }
+  return httpClient.patch(`/dashboard/learner/tutor-bookings/${bookingId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function cancelTutorBooking({ token, bookingId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!bookingId) {
+    throw new Error('A tutor booking identifier is required to cancel the request');
+  }
+  return httpClient.post(`/dashboard/learner/tutor-bookings/${bookingId}/cancel`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export async function createCourseGoal({ token, courseId, payload, signal } = {}) {
   ensureToken(token);
   if (!courseId) {
@@ -74,6 +98,39 @@ export async function shareEbookHighlight({ token, ebookId, payload, signal } = 
   );
 }
 
+export async function createLearnerLibraryEntry({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/ebooks', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateLearnerLibraryEntry({ token, ebookId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!ebookId) {
+    throw new Error('An e-book identifier is required to update the library entry');
+  }
+  return httpClient.patch(`/dashboard/learner/ebooks/${ebookId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function deleteLearnerLibraryEntry({ token, ebookId, signal } = {}) {
+  ensureToken(token);
+  if (!ebookId) {
+    throw new Error('An e-book identifier is required to remove the library entry');
+  }
+  return httpClient.delete(`/dashboard/learner/ebooks/${ebookId}`, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export async function downloadInvoice({ token, invoiceId, signal } = {}) {
   ensureToken(token);
   if (!invoiceId) {
@@ -88,6 +145,39 @@ export async function downloadInvoice({ token, invoiceId, signal } = {}) {
 export async function updateBillingPreferences({ token, payload, signal } = {}) {
   ensureToken(token);
   return httpClient.put('/dashboard/learner/financial/preferences', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function createPaymentMethod({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/financial/payment-methods', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updatePaymentMethod({ token, methodId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!methodId) {
+    throw new Error('A payment method identifier is required to update the record');
+  }
+  return httpClient.patch(`/dashboard/learner/financial/payment-methods/${methodId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function removePaymentMethod({ token, methodId, signal } = {}) {
+  ensureToken(token);
+  if (!methodId) {
+    throw new Error('A payment method identifier is required to remove the record');
+  }
+  return httpClient.delete(`/dashboard/learner/financial/payment-methods/${methodId}`, {
     token,
     signal,
     invalidateTags: [`dashboard:me:${token}`]
@@ -194,14 +284,59 @@ export async function closeSupportTicket({ token, ticketId, payload, signal } = 
   });
 }
 
+export async function createFieldServiceAssignment({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/field-services/assignments', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateFieldServiceAssignment({ token, assignmentId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!assignmentId) {
+    throw new Error('A field service assignment identifier is required to update');
+  }
+  return httpClient.patch(`/dashboard/learner/field-services/assignments/${assignmentId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function closeFieldServiceAssignment({ token, assignmentId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!assignmentId) {
+    throw new Error('A field service assignment identifier is required to close the job');
+  }
+  return httpClient.post(
+    `/dashboard/learner/field-services/assignments/${assignmentId}/close`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      invalidateTags: [`dashboard:me:${token}`]
+    }
+  );
+}
+
 export const learnerDashboardApi = {
   createTutorBookingRequest,
   exportTutorSchedule,
+  updateTutorBooking,
+  cancelTutorBooking,
   createCourseGoal,
   resumeEbook,
   shareEbookHighlight,
+  createLearnerLibraryEntry,
+  updateLearnerLibraryEntry,
+  deleteLearnerLibraryEntry,
   downloadInvoice,
   updateBillingPreferences,
+  createPaymentMethod,
+  updatePaymentMethod,
+  removePaymentMethod,
   joinLiveSession,
   checkInToLiveSession,
   triggerCommunityAction,
@@ -209,7 +344,10 @@ export const learnerDashboardApi = {
   fetchSupportTickets,
   updateSupportTicket,
   replyToSupportTicket,
-  closeSupportTicket
+  closeSupportTicket,
+  createFieldServiceAssignment,
+  updateFieldServiceAssignment,
+  closeFieldServiceAssignment
 };
 
 export default learnerDashboardApi;

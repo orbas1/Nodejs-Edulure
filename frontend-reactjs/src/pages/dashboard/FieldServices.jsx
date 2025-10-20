@@ -12,10 +12,16 @@ import {
   SignalIcon,
   UserCircleIcon
 } from '@heroicons/react/24/outline';
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import {
+  createFieldServiceAssignment,
+  updateFieldServiceAssignment,
+  closeFieldServiceAssignment
+} from '../../api/learnerDashboardApi.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 const toneClasses = {
   success: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
@@ -74,6 +80,35 @@ function formatDateTime(value) {
 function FieldServices() {
   const { role, dashboard, refresh } = useOutletContext();
   const workspace = dashboard?.fieldServices ?? null;
+  const { session } = useAuth();
+  const token = session?.tokens?.accessToken ?? null;
+
+  const [assignmentsState, setAssignmentsState] = useState([]);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [pendingAction, setPendingAction] = useState(null);
+  const [assignmentFormVisible, setAssignmentFormVisible] = useState(false);
+  const [assignmentFormMode, setAssignmentFormMode] = useState('create');
+  const [editingAssignmentId, setEditingAssignmentId] = useState(null);
+  const [assignmentFormErrors, setAssignmentFormErrors] = useState([]);
+  const [assignmentForm, setAssignmentForm] = useState({
+    serviceType: '',
+    priority: 'Standard',
+    owner: '',
+    location: '',
+    scheduledFor: '',
+    supportChannel: '',
+    briefUrl: '',
+    fieldNotes: '',
+    equipment: '',
+    attachments: [''],
+    debriefHost: '',
+    debriefAt: ''
+  });
+  const [assignmentFormStep, setAssignmentFormStep] = useState(1);
+  const [assignmentSearchTerm, setAssignmentSearchTerm] = useState('');
+  const [assignmentStatusFilter, setAssignmentStatusFilter] = useState('all');
+  const [assignmentPriorityFilter, setAssignmentPriorityFilter] = useState('all');
+  const [operationsRange, setOperationsRange] = useState('30');
 
   const allowedRoles = useMemo(() => new Set(['learner', 'instructor']), []);
   if (!allowedRoles.has(role)) {
@@ -98,13 +133,498 @@ function FieldServices() {
   }
 
   const summaryCards = workspace.summary?.cards ?? [];
-  const assignments = workspace.assignments ?? [];
+  const assignments = assignmentsState;
   const incidents = workspace.incidents ?? [];
   const timeline = workspace.timeline ?? [];
   const providers = workspace.providers ?? [];
   const mapView = workspace.map ?? null;
   const lastUpdatedLabel = formatDateTime(workspace.summary?.updatedAt ?? workspace.lastUpdated);
   const hasAssignments = assignments.length > 0;
+  const disableActions = pendingAction !== null;
+
+  const filteredAssignments = useMemo(() => {
+    const search = assignmentSearchTerm.trim().toLowerCase();
+    const statusFilterValue = assignmentStatusFilter.toLowerCase();
+    const priorityFilterValue = assignmentPriorityFilter.toLowerCase();
+    return assignmentsState.filter((assignment) => {
+      const matchesStatus =
+        statusFilterValue === 'all' || (assignment.status ?? '').toLowerCase() === statusFilterValue;
+      if (!matchesStatus) {
+        return false;
+      }
+      const matchesPriority =
+        priorityFilterValue === 'all' || (assignment.priority ?? '').toLowerCase() === priorityFilterValue;
+      if (!matchesPriority) {
+        return false;
+      }
+      if (!search) {
+        return true;
+      }
+      const haystack = [
+        assignment.serviceType,
+        assignment.owner,
+        assignment.location,
+        assignment.supportChannel,
+        assignment.customer?.name,
+        assignment.provider?.name,
+        assignment.briefUrl,
+        assignment.fieldNotes,
+        ...(Array.isArray(assignment.attachments) ? assignment.attachments : [])
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase());
+      return haystack.some((value) => value.includes(search));
+    });
+  }, [assignmentsState, assignmentPriorityFilter, assignmentSearchTerm, assignmentStatusFilter]);
+  const hasFilteredAssignments = filteredAssignments.length > 0;
+  const operationsInsights = useMemo(() => {
+    const parsedRange = Number.parseInt(operationsRange, 10);
+    const rangeDays = Number.isFinite(parsedRange) ? parsedRange : 30;
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000);
+
+    const inRange = assignmentsState.filter((assignment) => {
+      const candidate = assignment.scheduledAtRaw ?? assignment.scheduledAt ?? assignment.createdAt;
+      if (!candidate) {
+        return false;
+      }
+      const parsed = new Date(candidate);
+      return !Number.isNaN(parsed.getTime()) && parsed >= cutoff;
+    });
+
+    const completed = inRange.filter((assignment) => (assignment.status ?? '').toLowerCase() === 'completed');
+    const active = inRange.filter((assignment) =>
+      ['dispatched', 'en_route', 'on_site', 'investigating'].includes((assignment.status ?? '').toLowerCase())
+    );
+    const highPriority = inRange.filter((assignment) =>
+      ['critical', 'priority', 'urgent'].includes((assignment.priority ?? '').toLowerCase())
+    );
+    const attachments = inRange.reduce(
+      (total, assignment) => total + (Array.isArray(assignment.attachments) ? assignment.attachments.length : 0),
+      0
+    );
+
+    return {
+      total: inRange.length,
+      completionRate: inRange.length ? Math.round((completed.length / inRange.length) * 100) : 0,
+      active: active.length,
+      highPriority: highPriority.length,
+      attachmentAverage: inRange.length ? (attachments / inRange.length).toFixed(1) : '0.0'
+    };
+  }, [assignmentsState, operationsRange]);
+
+  useEffect(() => {
+    setAssignmentsState(Array.isArray(workspace.assignments) ? workspace.assignments : []);
+  }, [workspace.assignments]);
+
+  const resetAssignmentForm = useCallback(() => {
+    setAssignmentForm({
+      serviceType: '',
+      priority: 'Standard',
+      owner: '',
+      location: '',
+      scheduledFor: '',
+      supportChannel: '',
+      briefUrl: '',
+      fieldNotes: '',
+      equipment: '',
+      attachments: [''],
+      debriefHost: '',
+      debriefAt: ''
+    });
+    setAssignmentFormErrors([]);
+    setEditingAssignmentId(null);
+    setAssignmentFormMode('create');
+    setAssignmentFormStep(1);
+  }, []);
+
+  const closeAssignmentForm = useCallback(() => {
+    setAssignmentFormVisible(false);
+    resetAssignmentForm();
+  }, [resetAssignmentForm]);
+
+  const openAssignmentCreateForm = useCallback(() => {
+    resetAssignmentForm();
+    setAssignmentFormMode('create');
+    setAssignmentFormVisible(true);
+  }, [resetAssignmentForm]);
+
+  const openAssignmentEditForm = useCallback((assignment) => {
+    setAssignmentFormMode('edit');
+    setEditingAssignmentId(assignment.id);
+    setAssignmentForm({
+      serviceType: assignment.serviceType ?? '',
+      priority: assignment.priority ?? 'Standard',
+      owner: assignment.owner ?? assignment.dispatchLead ?? '',
+      location: assignment.location ?? assignment.address ?? '',
+      scheduledFor: assignment.scheduledAtRaw ?? assignment.scheduledAt ?? '',
+      supportChannel: assignment.supportChannel ?? assignment.support?.channel ?? '',
+      briefUrl: assignment.briefUrl ?? assignment.briefing ?? assignment.playbook ?? '',
+      fieldNotes: assignment.fieldNotes ?? assignment.notes ?? '',
+      equipment: assignment.equipment ?? assignment.toolkit ?? '',
+      attachments:
+        Array.isArray(assignment.attachments) && assignment.attachments.length
+          ? assignment.attachments.map((item) => item ?? '')
+          : [''],
+      debriefHost: assignment.debriefHost ?? assignment.owner ?? '',
+      debriefAt: assignment.debriefAtRaw ?? assignment.debriefAt ?? ''
+    });
+    setAssignmentFormStep(1);
+    setAssignmentFormVisible(true);
+  }, []);
+
+  const handleAssignmentFormChange = useCallback((event) => {
+    const { name, value } = event.target;
+    setAssignmentForm((current) => ({ ...current, [name]: value }));
+  }, []);
+
+  const handleAssignmentAttachmentChange = useCallback((index, value) => {
+    setAssignmentForm((current) => {
+      const next = Array.isArray(current.attachments) ? [...current.attachments] : [''];
+      next[index] = value;
+      return { ...current, attachments: next };
+    });
+  }, []);
+
+  const handleAddAssignmentAttachment = useCallback(() => {
+    setAssignmentForm((current) => {
+      const next = Array.isArray(current.attachments) ? [...current.attachments] : [];
+      if (next.length >= 5) {
+        return current;
+      }
+      return { ...current, attachments: [...next, ''] };
+    });
+  }, []);
+
+  const handleRemoveAssignmentAttachment = useCallback((index) => {
+    setAssignmentForm((current) => {
+      const next = Array.isArray(current.attachments) ? [...current.attachments] : [''];
+      if (next.length === 1) {
+        next[0] = '';
+        return { ...current, attachments: next };
+      }
+      next.splice(index, 1);
+      return { ...current, attachments: next.length ? next : [''] };
+    });
+  }, []);
+
+  const validateAssignmentForm = useCallback(
+    (scope = 'all') => {
+      const errors = [];
+      const allowStep = (step) => scope === 'all' || scope === step;
+      if (allowStep(1)) {
+        if (!assignmentForm.serviceType || assignmentForm.serviceType.trim().length < 3) {
+          errors.push('Specify the service or incident type.');
+        }
+        if (!assignmentForm.owner || assignmentForm.owner.trim().length < 2) {
+          errors.push('Assign an accountable owner or squad.');
+        }
+        if (!assignmentForm.location || assignmentForm.location.trim().length < 3) {
+          errors.push('Provide the deployment location.');
+        }
+      }
+      if (allowStep(2)) {
+        if (!assignmentForm.scheduledFor) {
+          errors.push('Set the targeted arrival window.');
+        }
+        if (assignmentForm.briefUrl) {
+          try {
+            const parsed = new URL(assignmentForm.briefUrl);
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+              errors.push('Briefing links should start with http or https.');
+            }
+          } catch (error) {
+            errors.push('Provide a valid URL for the briefing link.');
+          }
+        }
+        if (assignmentForm.fieldNotes && assignmentForm.fieldNotes.trim().length < 10) {
+          errors.push('Field notes should capture at least a brief summary.');
+        }
+        const invalidAttachments = (assignmentForm.attachments ?? [])
+          .filter((value) => value && value.trim().length)
+          .filter((value) => {
+            try {
+              const parsed = new URL(value);
+              return !['http:', 'https:'].includes(parsed.protocol);
+            } catch (error) {
+              return true;
+            }
+          });
+        if (invalidAttachments.length) {
+          errors.push('Attachments must be valid links (http or https).');
+        }
+      }
+      if (allowStep(3)) {
+        if (!assignmentForm.debriefHost || assignmentForm.debriefHost.trim().length < 3) {
+          errors.push('Nominate a debrief host for the post-incident review.');
+        }
+        if (!assignmentForm.debriefAt) {
+          errors.push('Schedule a debrief time to maintain accountability.');
+        }
+      }
+      setAssignmentFormErrors(errors);
+      return errors.length === 0;
+    },
+    [assignmentForm]
+  );
+
+  const handleAdvanceAssignmentForm = useCallback(() => {
+    setAssignmentFormErrors([]);
+    if (assignmentFormStep === 1) {
+      if (validateAssignmentForm(1)) {
+        setAssignmentFormStep(2);
+      }
+      return;
+    }
+    if (assignmentFormStep === 2) {
+      if (validateAssignmentForm(2)) {
+        setAssignmentFormStep(3);
+      }
+    }
+  }, [assignmentFormStep, validateAssignmentForm]);
+
+  const handleRewindAssignmentForm = useCallback(() => {
+    setAssignmentFormStep((current) => Math.max(1, current - 1));
+    setAssignmentFormErrors([]);
+  }, []);
+
+  const handleAssignmentFormSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage assignments.' });
+        return;
+      }
+      if (!validateAssignmentForm('all')) {
+        return;
+      }
+
+      const payload = {
+        serviceType: assignmentForm.serviceType.trim(),
+        priority: assignmentForm.priority,
+        owner: assignmentForm.owner.trim(),
+        location: assignmentForm.location.trim(),
+        scheduledFor: assignmentForm.scheduledFor,
+        supportChannel: assignmentForm.supportChannel?.trim() || undefined,
+        briefUrl: assignmentForm.briefUrl?.trim() || undefined
+      };
+
+      if (assignmentForm.fieldNotes) {
+        payload.fieldNotes = assignmentForm.fieldNotes.trim();
+      }
+      if (assignmentForm.equipment) {
+        payload.equipment = assignmentForm.equipment.trim();
+      }
+      const attachments = (assignmentForm.attachments ?? [])
+        .map((value) => value?.trim())
+        .filter((value) => value && value.length > 0);
+      if (attachments.length) {
+        payload.attachments = attachments;
+      }
+      if (assignmentForm.debriefHost) {
+        payload.debriefHost = assignmentForm.debriefHost.trim();
+      }
+      if (assignmentForm.debriefAt) {
+        payload.debriefAt = assignmentForm.debriefAt;
+      }
+
+      if (assignmentFormMode === 'create') {
+        setPendingAction('assignment-create');
+        setStatusMessage({ type: 'pending', message: `Dispatching ${payload.serviceType}…` });
+        try {
+          const response = await createFieldServiceAssignment({ token, payload });
+          const assignment = response?.data ?? {};
+          const newAssignment = {
+            id: assignment.id ?? `assignment-${Date.now()}`,
+            serviceType: assignment.serviceType ?? payload.serviceType,
+            priority: assignment.priority ?? payload.priority,
+            owner: assignment.owner ?? payload.owner,
+            location: assignment.location ?? payload.location,
+            scheduledAt: formatDateTime(assignment.scheduledFor ?? payload.scheduledFor),
+            scheduledAtRaw: assignment.scheduledFor ?? payload.scheduledFor,
+            status: assignment.status ?? 'dispatched',
+            statusLabel: assignment.statusLabel ?? 'Dispatched',
+            supportChannel: assignment.supportChannel ?? payload.supportChannel,
+            briefUrl: assignment.briefUrl ?? payload.briefUrl,
+            fieldNotes: assignment.fieldNotes ?? payload.fieldNotes ?? '',
+            equipment: assignment.equipment ?? payload.equipment ?? '',
+            attachments: assignment.attachments ?? payload.attachments ?? [],
+            debriefHost: assignment.debriefHost ?? payload.debriefHost ?? '',
+            debriefAt: assignment.debriefAt ?? payload.debriefAt ?? '',
+            debriefAtLabel: formatDateTime(assignment.debriefAt ?? payload.debriefAt)
+          };
+          setAssignmentsState((current) => [newAssignment, ...current]);
+          setStatusMessage({ type: 'success', message: `${newAssignment.serviceType} dispatched.` });
+          closeAssignmentForm();
+        } catch (createError) {
+          setStatusMessage({
+            type: 'error',
+            message: createError instanceof Error ? createError.message : 'Unable to dispatch assignment.'
+          });
+        } finally {
+          setPendingAction(null);
+        }
+        return;
+      }
+
+      setPendingAction(`assignment-update-${editingAssignmentId}`);
+      setStatusMessage({ type: 'pending', message: `Updating ${payload.serviceType}…` });
+      try {
+        await updateFieldServiceAssignment({ token, assignmentId: editingAssignmentId, payload });
+        setAssignmentsState((current) =>
+          current.map((assignment) =>
+            assignment.id === editingAssignmentId
+                ? {
+                    ...assignment,
+                    serviceType: payload.serviceType,
+                    priority: payload.priority,
+                    owner: payload.owner,
+                    location: payload.location,
+                    scheduledAt: formatDateTime(payload.scheduledFor),
+                    scheduledAtRaw: payload.scheduledFor,
+                    supportChannel: payload.supportChannel ?? assignment.supportChannel,
+                    briefUrl: payload.briefUrl ?? assignment.briefUrl,
+                    fieldNotes: payload.fieldNotes ?? assignment.fieldNotes,
+                    equipment: payload.equipment ?? assignment.equipment,
+                    attachments: payload.attachments ?? assignment.attachments ?? [],
+                    debriefHost: payload.debriefHost ?? assignment.debriefHost,
+                    debriefAt: payload.debriefAt ?? assignment.debriefAt,
+                    debriefAtLabel: formatDateTime(payload.debriefAt ?? assignment.debriefAt)
+                  }
+                : assignment
+          )
+        );
+        setStatusMessage({ type: 'success', message: `${payload.serviceType} updated.` });
+        closeAssignmentForm();
+      } catch (updateError) {
+        setStatusMessage({
+          type: 'error',
+          message: updateError instanceof Error ? updateError.message : 'Unable to update assignment.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [
+      assignmentForm,
+      assignmentFormMode,
+      closeAssignmentForm,
+      createFieldServiceAssignment,
+      editingAssignmentId,
+      setAssignmentsState,
+      token,
+      updateFieldServiceAssignment,
+      validateAssignmentForm
+    ]
+  );
+
+  const handleAssignmentStatusChange = useCallback(
+    async (assignment, status) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage assignments.' });
+        return;
+      }
+      setPendingAction(`assignment-status-${assignment.id}`);
+      setStatusMessage({ type: 'pending', message: `Updating ${assignment.serviceType} status…` });
+      try {
+        await updateFieldServiceAssignment({ token, assignmentId: assignment.id, payload: { status } });
+        setAssignmentsState((current) =>
+          current.map((item) =>
+            item.id === assignment.id
+              ? {
+                  ...item,
+                  status,
+                  statusLabel:
+                    status === 'completed'
+                      ? 'Completed'
+                      : status === 'on_site'
+                        ? 'On site'
+                        : status === 'en_route'
+                          ? 'En route'
+                          : 'Dispatched'
+                }
+              : item
+          )
+        );
+        setStatusMessage({ type: 'success', message: `${assignment.serviceType} status updated.` });
+      } catch (statusError) {
+        setStatusMessage({
+          type: 'error',
+          message: statusError instanceof Error ? statusError.message : 'Unable to update status.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [setAssignmentsState, token, updateFieldServiceAssignment]
+  );
+
+  const handleResolveAssignment = useCallback(
+    async (assignment) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to manage assignments.' });
+        return;
+      }
+      setPendingAction(`assignment-close-${assignment.id}`);
+      setStatusMessage({ type: 'pending', message: `Closing ${assignment.serviceType}…` });
+      try {
+        await closeFieldServiceAssignment({ token, assignmentId: assignment.id, payload: { resolution: 'Learner closed' } });
+        setAssignmentsState((current) => current.filter((item) => item.id !== assignment.id));
+        setStatusMessage({ type: 'success', message: `${assignment.serviceType} closed.` });
+      } catch (closeError) {
+        setStatusMessage({
+          type: 'error',
+          message: closeError instanceof Error ? closeError.message : 'Unable to close assignment.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [closeFieldServiceAssignment, setAssignmentsState, token]
+  );
+
+  const handleEscalateAssignment = useCallback(
+    async (assignment) => {
+      if (!token) {
+        setStatusMessage({ type: 'error', message: 'Sign in again to escalate assignments.' });
+        return;
+      }
+      setPendingAction(`assignment-escalate-${assignment.id}`);
+      setStatusMessage({ type: 'pending', message: `Escalating ${assignment.serviceType}…` });
+      try {
+        await updateFieldServiceAssignment({
+          token,
+          assignmentId: assignment.id,
+          payload: { status: 'investigating', escalation: true }
+        });
+        setAssignmentsState((current) =>
+          current.map((item) =>
+            item.id === assignment.id
+              ? {
+                  ...item,
+                  status: 'investigating',
+                  statusLabel: 'Investigating',
+                  escalation: {
+                    acknowledged: true,
+                    timestamp: new Date().toISOString()
+                  }
+                }
+              : item
+          )
+        );
+        setStatusMessage({ type: 'success', message: `${assignment.serviceType} escalated to supervisors.` });
+      } catch (escalateError) {
+        setStatusMessage({
+          type: 'error',
+          message:
+            escalateError instanceof Error ? escalateError.message : 'Unable to escalate assignment at this time.'
+        });
+      } finally {
+        setPendingAction(null);
+      }
+    },
+    [setAssignmentsState, token, updateFieldServiceAssignment]
+  );
 
   return (
     <div className="space-y-10">
@@ -119,6 +639,9 @@ function FieldServices() {
         <div className="flex flex-wrap gap-3">
           <button type="button" className="dashboard-primary-pill" onClick={() => refresh?.()}>
             Sync latest telemetry
+          </button>
+          <button type="button" className="dashboard-pill" onClick={openAssignmentCreateForm}>
+            Schedule new dispatch
           </button>
           <button type="button" className="dashboard-pill">
             Export service ledger
@@ -152,6 +675,51 @@ function FieldServices() {
             </div>
           ))}
         </div>
+        <div className="mt-6 rounded-3xl border border-slate-200 bg-white/70 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Operational focus</p>
+              <h3 className="text-lg font-semibold text-slate-900">Dispatch health &amp; readiness</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Review throughput, high-alert work, and documentation coverage for recent deployments.
+              </p>
+            </div>
+            <label className="flex flex-col text-xs font-medium text-slate-600 lg:w-48">
+              Window
+              <select
+                value={operationsRange}
+                onChange={(event) => setOperationsRange(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="7">Last 7 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+            </label>
+          </div>
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Assignments</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{operationsInsights.total}</p>
+              <p className="mt-1 text-xs text-slate-500">Tracked within the selected period.</p>
+            </div>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Completion rate</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-700">{operationsInsights.completionRate}%</p>
+              <p className="mt-1 text-xs text-emerald-700/80">Jobs delivered against SLA commitments.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">High priority</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-700">{operationsInsights.highPriority}</p>
+              <p className="mt-1 text-xs text-amber-700/80">Critical or urgent dispatches requiring focus.</p>
+            </div>
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Docs per job</p>
+              <p className="mt-2 text-2xl font-semibold text-primary">{operationsInsights.attachmentAverage}</p>
+              <p className="mt-1 text-xs text-primary/80">Average supporting assets shared with crews.</p>
+            </div>
+          </div>
+        </div>
       </section>
 
       <div className="grid gap-8 xl:grid-cols-3">
@@ -165,12 +733,55 @@ function FieldServices() {
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <SignalIcon className="h-4 w-4" aria-hidden="true" />
-              <span>{assignments.length} in dashboard scope</span>
+              <span>
+                {filteredAssignments.length} of {assignments.length} in dashboard scope
+              </span>
             </div>
           </div>
-          {hasAssignments ? (
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Search assignments
+              <input
+                type="search"
+                value={assignmentSearchTerm}
+                onChange={(event) => setAssignmentSearchTerm(event.target.value)}
+                placeholder="Search service, owner, or location"
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </label>
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Status
+              <select
+                value={assignmentStatusFilter}
+                onChange={(event) => setAssignmentStatusFilter(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="all">All statuses</option>
+                <option value="dispatched">Dispatched</option>
+                <option value="en_route">En route</option>
+                <option value="on_site">On site</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </label>
+            <label className="flex flex-col text-xs font-medium text-slate-600">
+              Priority
+              <select
+                value={assignmentPriorityFilter}
+                onChange={(event) => setAssignmentPriorityFilter(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="all">All priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="standard">Standard</option>
+                <option value="routine">Routine</option>
+              </select>
+            </label>
+          </div>
+          {hasFilteredAssignments ? (
             <div className="mt-6 space-y-4">
-              {assignments.map((assignment) => (
+              {filteredAssignments.map((assignment) => (
                 <article
                   key={assignment.id}
                   className="dashboard-card-muted relative overflow-hidden p-5 ring-1 ring-inset ring-slate-200 transition hover:-translate-y-0.5 hover:ring-primary/40"
@@ -215,6 +826,12 @@ function FieldServices() {
                           </div>
                         ) : null}
                       </div>
+                      {assignment.fieldNotes ? (
+                        <div className="rounded-2xl border border-slate-200 bg-white/70 p-3 text-xs text-slate-600">
+                          <p className="font-semibold text-slate-700">Field notes</p>
+                          <p className="mt-1 leading-relaxed">{assignment.fieldNotes}</p>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="flex w-full flex-col gap-3 lg:w-64">
                       <div
@@ -250,8 +867,93 @@ function FieldServices() {
                             </p>
                           ) : null}
                         </div>
+                        {assignment.supportChannel ? (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <p className="font-semibold text-slate-600">Support channel</p>
+                            <p className="mt-1 text-slate-900">{assignment.supportChannel}</p>
+                          </div>
+                        ) : null}
+                        {assignment.briefUrl ? (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <p className="font-semibold text-slate-600">Briefing link</p>
+                            <a
+                              href={assignment.briefUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 text-primary hover:underline"
+                            >
+                              View playbook
+                            </a>
+                          </div>
+                        ) : null}
+                        {assignment.debriefAt ? (
+                          <div className="rounded-xl border border-slate-200 bg-white p-3">
+                            <p className="font-semibold text-slate-600">Debrief</p>
+                            <p className="mt-1 text-slate-900">
+                              {assignment.debriefAtLabel ?? formatDateTime(assignment.debriefAt)}
+                            </p>
+                            <p className="mt-1 text-[11px] uppercase tracking-wide text-slate-500">
+                              Host {assignment.debriefHost ?? assignment.owner ?? 'TBC'}
+                            </p>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-slate-600">
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => openAssignmentEditForm(assignment)}
+                    >
+                      Edit briefing
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handleAssignmentStatusChange(assignment, 'en_route')}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-status-${assignment.id}` && assignment.status !== 'en_route'
+                        ? 'Updating…'
+                        : 'Mark en route'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1"
+                      onClick={() => handleAssignmentStatusChange(assignment, 'on_site')}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-status-${assignment.id}` && assignment.status !== 'on_site'
+                        ? 'Updating…'
+                        : 'Mark on site'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      onClick={() => handleAssignmentStatusChange(assignment, 'completed')}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-status-${assignment.id}` && assignment.status !== 'completed'
+                        ? 'Updating…'
+                        : 'Mark completed'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill px-3 py-1 text-amber-600"
+                      onClick={() => handleEscalateAssignment(assignment)}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-escalate-${assignment.id}` ? 'Escalating…' : 'Escalate to supervisor'}
+                    </button>
+                    <button
+                      type="button"
+                      className="dashboard-pill bg-rose-50 text-rose-600 hover:bg-rose-100"
+                      onClick={() => handleResolveAssignment(assignment)}
+                      disabled={disableActions}
+                    >
+                      {pendingAction === `assignment-close-${assignment.id}` ? 'Closing…' : 'Close assignment'}
+                    </button>
                   </div>
                   {assignment.timeline?.length ? (
                     <div className="mt-5 grid gap-3 rounded-2xl border border-dashed border-slate-200 bg-white/60 p-4 text-xs text-slate-600 lg:grid-cols-2">
@@ -269,16 +971,48 @@ function FieldServices() {
                       ))}
                     </div>
                   ) : null}
+                  {Array.isArray(assignment.attachments) && assignment.attachments.length ? (
+                    <div className="mt-5 space-y-2 rounded-2xl border border-slate-200 bg-white/80 p-4 text-xs text-slate-600">
+                      <p className="font-semibold text-slate-700">Attached assets</p>
+                      <ul className="space-y-1">
+                        {assignment.attachments.map((asset, index) => (
+                          <li key={`${assignment.id}-asset-${index}`} className="flex items-center justify-between gap-3">
+                            <span className="truncate">{asset}</span>
+                            <a
+                              href={asset}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="dashboard-pill px-3 py-1"
+                            >
+                              Open
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </div>
           ) : (
             <div className="mt-6">
               <DashboardStateMessage
-                title="No live assignments"
-                description="Assign a provider or sync new jobs from your service hub to populate the operations board."
-                actionLabel="Refresh"
-                onAction={() => refresh?.()}
+                title={assignments.length ? 'No assignments match your filters' : 'No live assignments'}
+                description={
+                  assignments.length
+                    ? 'Adjust your search, status, or priority filters to surface relevant dispatches.'
+                    : 'Assign a provider or sync new jobs from your service hub to populate the operations board.'
+                }
+                actionLabel={assignments.length ? 'Reset filters' : 'Refresh'}
+                onAction={() => {
+                  if (assignments.length) {
+                    setAssignmentSearchTerm('');
+                    setAssignmentStatusFilter('all');
+                    setAssignmentPriorityFilter('all');
+                  } else {
+                    refresh?.();
+                  }
+                }}
               />
             </div>
           )}
@@ -475,6 +1209,307 @@ function FieldServices() {
           )}
         </div>
       </section>
+
+      {statusMessage ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`rounded-3xl border px-5 py-4 text-sm ${
+            statusMessage.type === 'success'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : statusMessage.type === 'error'
+                ? 'border-rose-200 bg-rose-50 text-rose-700'
+                : 'border-primary/20 bg-primary/5 text-primary'
+          }`}
+        >
+          {statusMessage.message}
+        </div>
+      ) : null}
+
+      {assignmentFormVisible ? (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="dashboard-kicker text-primary-dark">
+                  {assignmentFormMode === 'create' ? 'Schedule dispatch' : 'Update dispatch details'}
+                </p>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  {assignmentFormMode === 'create'
+                    ? 'Book a new technician deployment'
+                    : 'Refine the current assignment brief'}
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Capture location, owner, and scheduling data to keep the operations hub in sync.
+                </p>
+              </div>
+              <button type="button" className="dashboard-pill" onClick={closeAssignmentForm}>
+                Close
+              </button>
+            </div>
+
+            {assignmentFormErrors.length ? (
+              <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+                <ul className="list-disc space-y-1 pl-5">
+                  {assignmentFormErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <form className="mt-6 space-y-6" onSubmit={handleAssignmentFormSubmit}>
+              <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className={`flex items-center gap-2 ${assignmentFormStep === 1 ? 'text-primary' : ''}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      assignmentFormStep === 1 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    1
+                  </span>
+                  <span>Briefing details</span>
+                </div>
+                <span className="text-slate-300">—</span>
+                <div className={`flex items-center gap-2 ${assignmentFormStep === 2 ? 'text-primary' : ''}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      assignmentFormStep === 2 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    2
+                  </span>
+                  <span>Deployment logistics</span>
+                </div>
+                <span className="text-slate-300">—</span>
+                <div className={`flex items-center gap-2 ${assignmentFormStep === 3 ? 'text-primary' : ''}`}>
+                  <span
+                    className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                      assignmentFormStep === 3 ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500'
+                    }`}
+                  >
+                    3
+                  </span>
+                  <span>Readiness check</span>
+                </div>
+              </div>
+
+              {assignmentFormStep === 1 ? (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-slate-900">
+                    Service type
+                    <input
+                      type="text"
+                      name="serviceType"
+                      value={assignmentForm.serviceType}
+                      onChange={handleAssignmentFormChange}
+                      required
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Network optimisation audit"
+                    />
+                  </label>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block text-sm font-medium text-slate-900">
+                      Priority
+                      <select
+                        name="priority"
+                        value={assignmentForm.priority}
+                        onChange={handleAssignmentFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      >
+                        <option value="Critical">Critical</option>
+                        <option value="High">High</option>
+                        <option value="Standard">Standard</option>
+                        <option value="Routine">Routine</option>
+                      </select>
+                    </label>
+                    <label className="block text-sm font-medium text-slate-900">
+                      Owner / Squad
+                      <input
+                        type="text"
+                        name="owner"
+                        value={assignmentForm.owner}
+                        onChange={handleAssignmentFormChange}
+                        required
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        placeholder="Ops Team Bravo"
+                      />
+                    </label>
+                  </div>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Service location
+                    <input
+                      type="text"
+                      name="location"
+                      value={assignmentForm.location}
+                      onChange={handleAssignmentFormChange}
+                      required
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Cape Town - Waterfront Campus"
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" className="dashboard-pill" onClick={closeAssignmentForm}>
+                      Cancel
+                    </button>
+                    <button type="button" className="dashboard-primary-pill" onClick={handleAdvanceAssignmentForm}>
+                      Continue to logistics
+                    </button>
+                  </div>
+                </div>
+              ) : assignmentFormStep === 2 ? (
+                <div className="space-y-4">
+                  <label className="block text-sm font-medium text-slate-900">
+                    Scheduled arrival
+                    <input
+                      type="datetime-local"
+                      name="scheduledFor"
+                      value={assignmentForm.scheduledFor}
+                      onChange={handleAssignmentFormChange}
+                      required
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Support channel (optional)
+                    <input
+                      type="text"
+                      name="supportChannel"
+                      value={assignmentForm.supportChannel}
+                      onChange={handleAssignmentFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="#field-support or hotline"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Briefing link (optional)
+                    <input
+                      type="url"
+                      name="briefUrl"
+                      value={assignmentForm.briefUrl}
+                      onChange={handleAssignmentFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="https://"
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Field notes for crew (optional)
+                    <textarea
+                      name="fieldNotes"
+                      value={assignmentForm.fieldNotes}
+                      onChange={handleAssignmentFormChange}
+                      rows="4"
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Outline context, risk reminders, or customer preferences."
+                    />
+                  </label>
+                  <label className="block text-sm font-medium text-slate-900">
+                    Equipment checklist (optional)
+                    <input
+                      type="text"
+                      name="equipment"
+                      value={assignmentForm.equipment}
+                      onChange={handleAssignmentFormChange}
+                      className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      placeholder="Fibre kit, PPE, survey drone"
+                    />
+                  </label>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm text-slate-700">
+                      <span>Attach supporting assets</span>
+                      <button
+                        type="button"
+                        className="dashboard-pill px-3 py-1"
+                        onClick={handleAddAssignmentAttachment}
+                      >
+                        Add attachment
+                      </button>
+                    </div>
+                    {(assignmentForm.attachments ?? []).map((attachment, index) => (
+                      <div key={`attachment-${index}`} className="flex gap-2">
+                        <input
+                          type="url"
+                          value={attachment}
+                          onChange={(event) => handleAssignmentAttachmentChange(index, event.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          placeholder="https://link-to-playbook"
+                        />
+                        <button
+                          type="button"
+                          className="dashboard-pill px-3 py-2"
+                          onClick={() => handleRemoveAssignmentAttachment(index)}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                    <p className="text-xs text-slate-500">
+                      Share diagrams, method statements, or safety documentation to unblock crews.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" className="dashboard-pill" onClick={handleRewindAssignmentForm}>
+                      Back
+                    </button>
+                    <button type="button" className="dashboard-pill" onClick={closeAssignmentForm}>
+                      Cancel
+                    </button>
+                    <button type="button" className="dashboard-primary-pill" onClick={handleAdvanceAssignmentForm}>
+                      Continue to readiness
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block text-sm font-medium text-slate-900">
+                      Debrief host
+                      <input
+                        type="text"
+                        name="debriefHost"
+                        value={assignmentForm.debriefHost}
+                        onChange={handleAssignmentFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        placeholder="Operations lead on duty"
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-900">
+                      Debrief time
+                      <input
+                        type="datetime-local"
+                        name="debriefAt"
+                        value={assignmentForm.debriefAt}
+                        onChange={handleAssignmentFormChange}
+                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      />
+                    </label>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-xs text-slate-600">
+                    <p className="font-semibold text-slate-700">Dispatch summary</p>
+                    <p className="mt-2">
+                      {assignmentForm.attachments?.filter((value) => value && value.trim().length).length ?? 0} digital
+                      assets included · {assignmentForm.equipment ? assignmentForm.equipment.split(',').length : 0} items on
+                      checklist.
+                    </p>
+                    <p className="mt-2">Ensure the readiness box is complete before sending the crew to site.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <button type="button" className="dashboard-pill" onClick={handleRewindAssignmentForm}>
+                      Back
+                    </button>
+                    <button type="button" className="dashboard-pill" onClick={closeAssignmentForm}>
+                      Cancel
+                    </button>
+                    <button type="submit" className="dashboard-primary-pill" disabled={disableActions}>
+                      {assignmentFormMode === 'create' ? 'Dispatch assignment' : 'Save changes'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
