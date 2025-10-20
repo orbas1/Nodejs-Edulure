@@ -78,28 +78,30 @@ export default class InstructorBookingService {
 
   static async listBookings(instructorUserId, { page = 1, perPage = 25, status, search } = {}) {
     const offset = (page - 1) * perPage;
-    const [items, total] = await Promise.all([
+    const [
+      items,
+      total,
+      statsTotal,
+      statsConfirmed,
+      statsRequested,
+      statsCompleted,
+      statsCancelled
+    ] = await Promise.all([
       TutorBookingModel.listForInstructor(instructorUserId, { status, search, limit: perPage, offset }),
-      TutorBookingModel.countForInstructor(instructorUserId, { status, search })
+      TutorBookingModel.countForInstructor(instructorUserId, { status, search }),
+      TutorBookingModel.countForInstructor(instructorUserId, { status: 'all', search: undefined }),
+      TutorBookingModel.countForInstructor(instructorUserId, { status: 'confirmed', search: undefined }),
+      TutorBookingModel.countForInstructor(instructorUserId, { status: 'requested', search: undefined }),
+      TutorBookingModel.countForInstructor(instructorUserId, { status: 'completed', search: undefined }),
+      TutorBookingModel.countForInstructor(instructorUserId, { status: 'cancelled', search: undefined })
     ]);
 
-    const statsSource = await TutorBookingModel.listForInstructor(instructorUserId, { status: 'all', search: undefined });
-    const stats = statsSource.reduce(
-      (acc, booking) => {
-        acc.total += 1;
-        if (booking.status === 'confirmed' || booking.status === 'requested') {
-          acc.upcoming += 1;
-        }
-        if (booking.status === 'completed') {
-          acc.completed += 1;
-        }
-        if (booking.status === 'cancelled') {
-          acc.cancelled += 1;
-        }
-        return acc;
-      },
-      { total: 0, upcoming: 0, completed: 0, cancelled: 0 }
-    );
+    const stats = {
+      total: statsTotal,
+      upcoming: statsConfirmed + statsRequested,
+      completed: statsCompleted,
+      cancelled: statsCancelled
+    };
 
     return {
       items,
@@ -130,6 +132,8 @@ export default class InstructorBookingService {
       );
 
       const durationMinutes = payload.durationMinutes ?? Math.round((scheduledEnd - scheduledStart) / (60 * 1000));
+      const normalisedStatus = humaniseStatus(payload.status ?? 'confirmed');
+
       const bookingPayload = {
         publicId: crypto.randomUUID(),
         tutorId: tutorProfile.id,
@@ -140,9 +144,9 @@ export default class InstructorBookingService {
         hourlyRateAmount: toMinorUnits(payload.hourlyRateAmount),
         hourlyRateCurrency: payload.hourlyRateCurrency ?? tutorProfile.hourlyRateCurrency ?? 'USD',
         meetingUrl: payload.meetingUrl ?? null,
-        status: humaniseStatus(payload.status ?? 'confirmed'),
+        status: normalisedStatus,
         requestedAt: new Date(),
-        confirmedAt: payload.status === 'confirmed' ? new Date() : null,
+        confirmedAt: normalisedStatus === 'confirmed' ? new Date() : null,
         metadata: {
           topic: payload.topic ?? 'Mentorship session',
           notes: payload.notes ?? null,

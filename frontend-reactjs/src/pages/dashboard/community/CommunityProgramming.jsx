@@ -50,6 +50,18 @@ export default function CommunityProgramming({ dashboard, onRefresh }) {
   const [feedback, setFeedback] = useState(null);
   const [isScheduling, setIsScheduling] = useState(false);
 
+  const formatEvent = useCallback(
+    (event) => ({
+      ...event,
+      date: event.date ?? (event.startAt ? new Date(event.startAt).toLocaleString() : undefined),
+      status: event.status ?? "scheduled",
+      facilitator: event.facilitator ?? event.owner ?? "Community team",
+      seats: event.seats ?? (event.attendanceLimit ? `${event.attendanceLimit} seats` : "Open seating"),
+      communityId: event.communityId ?? eventForm.communityId
+    }),
+    [eventForm.communityId]
+  );
+
   useEffect(() => {
     setEvents(initialEvents.map((event) => formatEvent(event)));
   }, [formatEvent, initialEvents]);
@@ -108,15 +120,6 @@ export default function CommunityProgramming({ dashboard, onRefresh }) {
       communityId: previous.communityId || defaultCommunityId
     }));
   }, [defaultCommunityId]);
-
-  const formatEvent = useCallback((event) => ({
-    ...event,
-    date: event.date ?? (event.startAt ? new Date(event.startAt).toLocaleString() : undefined),
-    status: event.status ?? "scheduled",
-    facilitator: event.facilitator ?? event.owner ?? "Community team",
-    seats: event.seats ?? (event.attendanceLimit ? `${event.attendanceLimit} seats` : "Open seating"),
-    communityId: event.communityId ?? eventForm.communityId
-  }), [eventForm.communityId]);
 
   const handleEventFieldChange = useCallback((event) => {
     const { name, value, type, checked } = event.target;
