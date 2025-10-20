@@ -17,6 +17,9 @@ const BASE_COLUMNS = [
   'categories',
   'languages',
   'isbn',
+  'cover_image_url as coverImageUrl',
+  'sample_download_url as sampleDownloadUrl',
+  'audiobook_url as audiobookUrl',
   'reading_time_minutes as readingTimeMinutes',
   'price_currency as priceCurrency',
   'price_amount as priceAmount',
@@ -144,6 +147,9 @@ export default class EbookModel {
       slug: ebook.slug ?? sanitiseSlug(ebook.title),
       subtitle: ebook.subtitle ?? null,
       description: ebook.description ?? null,
+      cover_image_url: ebook.coverImageUrl ?? null,
+      sample_download_url: ebook.sampleDownloadUrl ?? null,
+      audiobook_url: ebook.audiobookUrl ?? null,
       authors: serialiseJson(ebook.authors, []),
       tags: serialiseJson(ebook.tags, []),
       categories: serialiseJson(ebook.categories, []),
@@ -171,6 +177,9 @@ export default class EbookModel {
     if (updates.slug !== undefined) payload.slug = sanitiseSlug(updates.slug);
     if (updates.subtitle !== undefined) payload.subtitle = updates.subtitle ?? null;
     if (updates.description !== undefined) payload.description = updates.description ?? null;
+    if (updates.coverImageUrl !== undefined) payload.cover_image_url = updates.coverImageUrl ?? null;
+    if (updates.sampleDownloadUrl !== undefined) payload.sample_download_url = updates.sampleDownloadUrl ?? null;
+    if (updates.audiobookUrl !== undefined) payload.audiobook_url = updates.audiobookUrl ?? null;
     if (updates.authors !== undefined) payload.authors = serialiseJson(updates.authors, []);
     if (updates.tags !== undefined) payload.tags = serialiseJson(updates.tags, []);
     if (updates.categories !== undefined) payload.categories = serialiseJson(updates.categories, []);

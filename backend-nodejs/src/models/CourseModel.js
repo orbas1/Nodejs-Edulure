@@ -19,6 +19,10 @@ const BASE_COLUMNS = [
   'languages',
   'delivery_format as deliveryFormat',
   'thumbnail_url as thumbnailUrl',
+  'hero_image_url as heroImageUrl',
+  'trailer_url as trailerUrl',
+  'promo_video_url as promoVideoUrl',
+  'syllabus_url as syllabusUrl',
   'price_currency as priceCurrency',
   'price_amount as priceAmount',
   'rating_average as ratingAverage',
@@ -223,6 +227,10 @@ export default class CourseModel {
       languages: serialiseArray(course.languages ?? ['en']),
       delivery_format: course.deliveryFormat ?? 'self_paced',
       thumbnail_url: course.thumbnailUrl ?? null,
+      hero_image_url: course.heroImageUrl ?? null,
+      trailer_url: course.trailerUrl ?? null,
+      promo_video_url: course.promoVideoUrl ?? null,
+      syllabus_url: course.syllabusUrl ?? null,
       price_currency: course.priceCurrency ?? 'USD',
       price_amount: course.priceAmount ?? 0,
       rating_average: course.ratingAverage ?? 0,
@@ -251,6 +259,10 @@ export default class CourseModel {
     if (updates.languages !== undefined) payload.languages = serialiseArray(updates.languages ?? ['en']);
     if (updates.deliveryFormat !== undefined) payload.delivery_format = updates.deliveryFormat ?? 'self_paced';
     if (updates.thumbnailUrl !== undefined) payload.thumbnail_url = updates.thumbnailUrl ?? null;
+    if (updates.heroImageUrl !== undefined) payload.hero_image_url = updates.heroImageUrl ?? null;
+    if (updates.trailerUrl !== undefined) payload.trailer_url = updates.trailerUrl ?? null;
+    if (updates.promoVideoUrl !== undefined) payload.promo_video_url = updates.promoVideoUrl ?? null;
+    if (updates.syllabusUrl !== undefined) payload.syllabus_url = updates.syllabusUrl ?? null;
     if (updates.priceCurrency !== undefined) payload.price_currency = updates.priceCurrency ?? 'USD';
     if (updates.priceAmount !== undefined) payload.price_amount = updates.priceAmount ?? 0;
     if (updates.ratingAverage !== undefined) payload.rating_average = updates.ratingAverage ?? 0;
