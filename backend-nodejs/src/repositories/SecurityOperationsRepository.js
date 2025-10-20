@@ -30,11 +30,15 @@ function serializeJson(value, fallback) {
   }
 
   if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return fallback;
+    }
     try {
-      JSON.parse(value);
-      return value;
+      JSON.parse(trimmed);
+      return trimmed;
     } catch (_error) {
-      return JSON.stringify(value.split(',').map((item) => item.trim()).filter(Boolean));
+      return fallback;
     }
   }
 
@@ -784,3 +788,14 @@ export default class SecurityOperationsRepository {
     return this.connection(table).where({ id: primaryKey }).first();
   }
 }
+
+export const __testables = {
+  parseJson,
+  serializeJson,
+  mapRiskRow,
+  mapReviewRow,
+  mapEvidenceRow,
+  mapContinuityRow,
+  mapAssessmentRow,
+  normaliseSort
+};
