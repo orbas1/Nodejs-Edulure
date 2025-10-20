@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AcademicCapIcon,
@@ -13,6 +13,8 @@ import {
   ChartBarIcon,
   ChatBubbleBottomCenterTextIcon,
   CheckBadgeIcon,
+  ChevronDoubleLeftIcon,
+  ChevronDoubleRightIcon,
   ChevronRightIcon,
   ClipboardDocumentListIcon,
   CommandLineIcon,
@@ -53,6 +55,9 @@ import {
   sendMentorInvite,
   exportPricing
 } from '../api/instructorOrchestrationApi.js';
+
+const MAIN_LOGO_URL = 'https://i.ibb.co/twQyCm1N/Edulure-Logo.png';
+const FAVICON_URL = 'https://i.ibb.co/8v274wR/2.png';
 
 const navigationByRole = {
   learner: (basePath) => [
@@ -311,6 +316,9 @@ export default function DashboardLayout() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [isNavCollapsed, setIsNavCollapsed] = useState(false);
+  const [isAsideCondensed, setIsAsideCondensed] = useState(false);
+  const asideRef = useRef(null);
 
   const handleRoleSelect = useCallback(
     (event) => {
@@ -325,6 +333,29 @@ export default function DashboardLayout() {
   useEffect(() => {
     setMobileNavOpen(false);
   }, [location.pathname, resolvedRole]);
+
+  useEffect(() => {
+    if (!asideRef.current) {
+      setIsAsideCondensed(isNavCollapsed);
+      return undefined;
+    }
+
+    if (typeof ResizeObserver === 'undefined') {
+      setIsAsideCondensed(isNavCollapsed);
+      return undefined;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect?.width ?? 0;
+      setIsAsideCondensed(width < 216);
+    });
+
+    observer.observe(asideRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [isNavCollapsed]);
 
   const filteredResults = useMemo(() => {
     if (!searchQuery) return [];
@@ -480,19 +511,49 @@ export default function DashboardLayout() {
 
   return (
     <div className="dashboard-shell flex">
-      <aside className="dashboard-aside">
-        <div className="flex h-20 items-center border-b border-slate-200 px-6">
-          <Link to="/" className="inline-flex items-center" aria-label="Edulure home">
-            <img src="https://i.ibb.co/twQyCm1N/Edulure-Logo.png" alt="Edulure" className="h-9 w-auto" />
+      <aside
+        ref={asideRef}
+        className={`dashboard-aside${isNavCollapsed ? ' dashboard-aside--collapsed' : ''}`}
+      >
+        <div
+          className={`flex h-20 items-center border-b border-slate-200 ${
+            isAsideCondensed ? 'justify-between px-4' : 'justify-between px-6'
+          }`}
+        >
+          <Link
+            to="/"
+            className={`inline-flex items-center ${isAsideCondensed ? 'gap-0 justify-center' : 'gap-3'}`}
+            aria-label="Edulure home"
+          >
+            <img
+              src={isAsideCondensed ? FAVICON_URL : MAIN_LOGO_URL}
+              alt="Edulure"
+              className={isAsideCondensed ? 'h-10 w-10' : 'h-9 w-auto'}
+            />
+            <span className={isAsideCondensed ? 'sr-only' : 'text-lg font-semibold text-slate-900'}>Edulure</span>
           </Link>
+          <button
+            type="button"
+            className="dashboard-aside-toggle inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            onClick={() => setIsNavCollapsed((value) => !value)}
+            aria-label={isNavCollapsed ? 'Expand dashboard menu' : 'Collapse dashboard menu'}
+          >
+            {isNavCollapsed ? (
+              <ChevronDoubleRightIcon className="h-5 w-5" />
+            ) : (
+              <ChevronDoubleLeftIcon className="h-5 w-5" />
+            )}
+          </button>
         </div>
-        <DashboardNavigation navigation={navigation} />
-        <div className="border-t border-slate-200 p-4">
+        <DashboardNavigation navigation={navigation} isCollapsed={isAsideCondensed} />
+        <div className={`border-t border-slate-200 ${isAsideCondensed ? 'p-3' : 'p-4'}`}>
           <a
             href="/"
-            className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition hover:border-primary/40 hover:text-primary"
+            className={`flex items-center ${
+              isAsideCondensed ? 'justify-center gap-2 rounded-2xl px-3 py-2' : 'justify-between rounded-xl px-4 py-3'
+            } border border-slate-200 text-sm font-semibold text-slate-600 transition hover:border-primary/40 hover:text-primary`}
           >
-            <span>Return to site</span>
+            <span className={isAsideCondensed ? 'sr-only' : ''}>Return to site</span>
             <ArrowLeftOnRectangleIcon className="h-4 w-4" />
           </a>
         </div>

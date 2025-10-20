@@ -28,7 +28,12 @@ a:hover {
   }
 
   .dashboard-aside {
-    @apply hidden w-72 shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur lg:flex lg:flex-col lg:shadow-sm;
+    width: theme('spacing.72');
+    @apply hidden shrink-0 border-r border-slate-200 bg-white/95 backdrop-blur transition-[width] duration-200 ease-in-out lg:flex lg:flex-col lg:shadow-sm;
+  }
+
+  .dashboard-aside--collapsed {
+    width: theme('spacing.24');
   }
 
   .dashboard-card {

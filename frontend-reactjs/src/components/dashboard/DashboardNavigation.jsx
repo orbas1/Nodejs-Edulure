@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { NavLink } from 'react-router-dom';
 import { ChevronDownIcon } from '@heroicons/react/20/solid';
+import { Menu, Transition } from '@headlessui/react';
 
 const itemShape = PropTypes.shape({
   id: PropTypes.string.isRequired,
@@ -84,7 +85,85 @@ DrawerSection.defaultProps = {
   onNavigate: undefined
 };
 
-export default function DashboardNavigation({ navigation, onNavigate }) {
+function CollapsedDrawerSection({ section, onNavigate }) {
+  const Icon = section.icon;
+  return (
+    <Menu as="div" className="relative">
+      <Menu.Button
+        className="group flex h-12 w-full items-center justify-center rounded-2xl bg-slate-100 text-slate-600 transition hover:bg-slate-200"
+        aria-label={section.name}
+        title={section.name}
+      >
+        {Icon ? (
+          <Icon className="h-6 w-6 text-slate-500 group-hover:text-slate-700" aria-hidden="true" />
+        ) : (
+          <span className="text-sm font-semibold">{section.name.charAt(0)}</span>
+        )}
+        <span className="sr-only">{section.name}</span>
+      </Menu.Button>
+      <Transition
+        as={Fragment}
+        enter="transition duration-150 ease-out"
+        enterFrom="transform scale-95 opacity-0"
+        enterTo="transform scale-100 opacity-100"
+        leave="transition duration-100 ease-in"
+        leaveFrom="transform scale-100 opacity-100"
+        leaveTo="transform scale-95 opacity-0"
+      >
+        <Menu.Items className="absolute left-full top-1/2 z-50 w-64 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-3 text-sm shadow-2xl focus:outline-none">
+          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{section.name}</p>
+          <div className="flex flex-col gap-1">
+            {section.children.map((child) => {
+              const ChildIcon = child.icon;
+              return (
+                <Menu.Item key={child.id}>
+                  {({ close }) => (
+                    <NavLink
+                      to={child.to}
+                      end={child.end}
+                      onClick={() => {
+                        if (typeof onNavigate === 'function') {
+                          onNavigate();
+                        }
+                        close();
+                      }}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition ${
+                          isActive
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-slate-600 hover:bg-primary/5 hover:text-primary'
+                        }`
+                      }
+                    >
+                      {ChildIcon ? <ChildIcon className="h-4 w-4 text-slate-400" aria-hidden="true" /> : null}
+                      <span>{child.name}</span>
+                    </NavLink>
+                  )}
+                </Menu.Item>
+              );
+            })}
+          </div>
+        </Menu.Items>
+      </Transition>
+    </Menu>
+  );
+}
+
+CollapsedDrawerSection.propTypes = {
+  section: PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired,
+    icon: PropTypes.elementType,
+    children: PropTypes.arrayOf(itemShape).isRequired
+  }).isRequired,
+  onNavigate: PropTypes.func
+};
+
+CollapsedDrawerSection.defaultProps = {
+  onNavigate: undefined
+};
+
+export default function DashboardNavigation({ navigation, onNavigate, isCollapsed }) {
   const drawerItems = useMemo(() => navigation.filter((item) => item.type === 'section'), [navigation]);
   const linkItems = useMemo(() => navigation.filter((item) => item.type === 'link'), [navigation]);
 
@@ -127,8 +206,12 @@ export default function DashboardNavigation({ navigation, onNavigate }) {
     });
   };
 
+  const containerPadding = isCollapsed ? 'px-2 py-6' : 'px-4 py-6';
+  const linkGap = isCollapsed ? 'gap-0 justify-center' : 'gap-3';
+  const linkPadding = isCollapsed ? 'px-0 py-0 h-12' : 'px-4 py-3';
+
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-6">
+    <div className={`flex flex-1 flex-col gap-3 overflow-y-auto ${containerPadding}`}>
       <div className="space-y-2">
         {linkItems.map((item) => {
           const Icon = item.icon;
@@ -139,18 +222,25 @@ export default function DashboardNavigation({ navigation, onNavigate }) {
               end={item.end}
               onClick={onNavigate}
               className={({ isActive }) =>
-                `group flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                `group flex w-full items-center ${linkGap} rounded-2xl ${linkPadding} text-sm font-semibold transition ${
                   isActive ? 'bg-primary text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`
               }
+              title={isCollapsed ? item.name : undefined}
             >
-              {Icon ? <Icon className={`h-5 w-5 ${item.iconTone ?? 'text-slate-500 group-hover:text-slate-700'}`} /> : null}
-              <span>{item.name}</span>
+              {Icon ? (
+                <Icon
+                  className={`${
+                    isCollapsed ? 'h-6 w-6' : 'h-5 w-5'
+                  } ${item.iconTone ?? 'text-slate-500 group-hover:text-slate-700'}`}
+                />
+              ) : null}
+              <span className={isCollapsed ? 'sr-only' : ''}>{item.name}</span>
             </NavLink>
           );
         })}
       </div>
-      {drawerItems.length > 0 ? (
+      {drawerItems.length > 0 && !isCollapsed ? (
         <div className="flex items-center justify-end px-1">
           <button
             type="button"
@@ -162,15 +252,19 @@ export default function DashboardNavigation({ navigation, onNavigate }) {
         </div>
       ) : null}
       <div className="space-y-4">
-        {drawerItems.map((section) => (
-          <DrawerSection
-            key={section.id}
-            section={section}
-            isOpen={Boolean(openSections[section.id])}
-            onToggle={handleToggle}
-            onNavigate={onNavigate}
-          />
-        ))}
+        {drawerItems.map((section) =>
+          isCollapsed ? (
+            <CollapsedDrawerSection key={section.id} section={section} onNavigate={onNavigate} />
+          ) : (
+            <DrawerSection
+              key={section.id}
+              section={section}
+              isOpen={Boolean(openSections[section.id])}
+              onToggle={handleToggle}
+              onNavigate={onNavigate}
+            />
+          )
+        )}
       </div>
     </div>
   );
@@ -183,9 +277,11 @@ DashboardNavigation.propTypes = {
       id: PropTypes.string.isRequired
     })
   ).isRequired,
-  onNavigate: PropTypes.func
+  onNavigate: PropTypes.func,
+  isCollapsed: PropTypes.bool
 };
 
 DashboardNavigation.defaultProps = {
-  onNavigate: undefined
+  onNavigate: undefined,
+  isCollapsed: false
 };
