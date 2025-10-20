@@ -39,6 +39,7 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 import { MagnifyingGlassIcon } from '@heroicons/react/20/solid';
+import { Tab } from '@headlessui/react';
 
 import { useAuth } from '../context/AuthContext.jsx';
 import { useDashboard } from '../context/DashboardContext.jsx';
@@ -401,6 +402,11 @@ export default function DashboardLayout() {
     return builder ? builder(basePath) : [];
   }, [resolvedRole, basePath]);
 
+  const navigationSections = useMemo(
+    () => navigation.filter((item) => item.type === 'section'),
+    [navigation]
+  );
+
   const instructorOrchestration = useMemo(() => {
     const unauthenticated = () =>
       Promise.reject(new Error('Authentication required to perform this action.'));
@@ -636,43 +642,99 @@ export default function DashboardLayout() {
               </div>
             </div>
             <div className="grid gap-4 lg:grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)] lg:items-start">
-              <div className="relative">
-                <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search across dashboards"
-                  className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 hover:text-primary"
-                    onClick={() => setSearchQuery('')}
-                  >
-                    Clear
-                  </button>
-                )}
-                {filteredResults.length > 0 && (
-                  <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
-                    <ul className="space-y-2">
-                      {filteredResults.map((result) => (
-                        <li key={result.id}>
-                          <NavLink
-                            to={result.url}
-                            className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                            onClick={() => setSearchQuery('')}
+              <div className="space-y-4">
+                <div className="relative">
+                  <MagnifyingGlassIcon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Search across dashboards"
+                    className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-12 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 hover:text-primary"
+                      onClick={() => setSearchQuery('')}
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {filteredResults.length > 0 && (
+                    <div className="absolute left-0 right-0 top-14 z-30 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Search results</p>
+                      <ul className="space-y-2">
+                        {filteredResults.map((result) => (
+                          <li key={result.id}>
+                            <NavLink
+                              to={result.url}
+                              className="flex flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                              onClick={() => setSearchQuery('')}
+                            >
+                              <span className="font-semibold text-slate-800">{result.title}</span>
+                              <span className="text-xs uppercase tracking-wide text-slate-500">{result.type}</span>
+                            </NavLink>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                {navigationSections.length > 0 ? (
+                  <div className="rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick navigation</p>
+                    <Tab.Group>
+                      <Tab.List className="mt-3 flex flex-wrap gap-2">
+                        {navigationSections.map((section) => (
+                          <Tab
+                            key={section.id}
+                            className={({ selected }) =>
+                              `rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+                                selected
+                                  ? 'bg-primary text-white shadow-sm'
+                                  : 'bg-slate-100 text-slate-500 hover:bg-primary/10 hover:text-primary'
+                              }`
+                            }
                           >
-                            <span className="font-semibold text-slate-800">{result.title}</span>
-                            <span className="text-xs uppercase tracking-wide text-slate-500">{result.type}</span>
-                          </NavLink>
-                        </li>
-                      ))}
-                    </ul>
+                            {section.name}
+                          </Tab>
+                        ))}
+                      </Tab.List>
+                      <Tab.Panels className="mt-4 space-y-3">
+                        {navigationSections.map((section) => (
+                          <Tab.Panel key={section.id} className="grid gap-2 md:grid-cols-2">
+                            {section.children.map((child) => {
+                              const Icon = child.icon;
+                              return (
+                                <NavLink
+                                  key={child.id}
+                                  to={child.to}
+                                  end={child.end}
+                                  className={({ isActive }) =>
+                                    `group flex items-start gap-3 rounded-2xl border px-3 py-3 text-sm transition ${
+                                      isActive
+                                        ? 'border-primary bg-primary/10 text-primary'
+                                        : 'border-slate-200 bg-white text-slate-600 hover:border-primary/40 hover:text-primary'
+                                    }`
+                                  }
+                                >
+                                  {Icon ? (
+                                    <Icon className="h-5 w-5 text-slate-400 transition group-hover:text-primary" aria-hidden="true" />
+                                  ) : null}
+                                  <div>
+                                    <p className="font-semibold">{child.name}</p>
+                                    <p className="text-xs text-slate-400">Go to {child.name}</p>
+                                  </div>
+                                </NavLink>
+                              );
+                            })}
+                          </Tab.Panel>
+                        ))}
+                      </Tab.Panels>
+                    </Tab.Group>
                   </div>
-                )}
+                ) : null}
               </div>
               <div className="grid gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
