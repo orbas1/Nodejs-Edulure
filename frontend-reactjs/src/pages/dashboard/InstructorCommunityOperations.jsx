@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   AdjustmentsHorizontalIcon,
@@ -446,75 +446,6 @@ function RevenuePanel({ communityId, token }) {
       }
     },
     [communityId, token, selectedTier, tierEditor, loadRevenue, parseBenefits]
-  );
-
-  const handleToggleTier = useCallback(
-    async (tier) => {
-      if (!communityId || !token) return;
-      setFeedback(null);
-      try {
-        await updateCommunityTier({
-          communityId,
-          tierId: tier.id,
-          token,
-          payload: { isActive: !tier.isActive }
-        });
-        setFeedback({ tone: 'success', message: `${tier.name} ${tier.isActive ? 'disabled' : 'activated'}.` });
-        loadRevenue();
-      } catch (error) {
-        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to update tier status.' });
-      }
-    },
-    [communityId, token, loadRevenue]
-  );
-          token,
-          payload: {
-            name: tierDraft.name,
-            priceCents: Number(tierDraft.priceCents || 0),
-            currency,
-            billingInterval: tierDraft.billingInterval,
-            description: '',
-            benefits: []
-          }
-        });
-        setTierDraft({ name: '', priceCents: 4900, billingInterval: 'monthly' });
-        setFeedback({ tone: 'success', message: 'Tier created successfully.' });
-        loadRevenue();
-      } catch (error) {
-        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to create tier.' });
-      }
-    },
-    [communityId, token, tierDraft, currency, loadRevenue]
-  );
-
-  const handleUpdateTier = useCallback(
-    async (event) => {
-      event.preventDefault();
-      if (!communityId || !token || !selectedTier) return;
-      setFeedback(null);
-      try {
-        await updateCommunityTier({
-          communityId,
-          tierId: selectedTier.id,
-          token,
-          payload: {
-            name: tierEditor.name,
-            description: tierEditor.description,
-            priceCents: Number(tierEditor.priceCents || 0),
-            billingInterval: tierEditor.billingInterval,
-            benefits: tierEditor.benefits
-              .split('\n')
-              .map((benefit) => benefit.trim())
-              .filter(Boolean)
-          }
-        });
-        setFeedback({ tone: 'success', message: 'Tier updated successfully.' });
-        loadRevenue();
-      } catch (error) {
-        setFeedback({ tone: 'error', message: error?.message ?? 'Unable to update tier.' });
-      }
-    },
-    [communityId, token, selectedTier, tierEditor, loadRevenue]
   );
 
   const handleToggleTier = useCallback(
@@ -1541,9 +1472,10 @@ function SafetyPanel({ communityId, token }) {
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 bg-white text-sm">
-              {incidents.map((incident) => (
-                <tr key={incident.id}>
+              <tbody className="divide-y divide-slate-100 bg-white text-sm">
+                {incidents.map((incident) => (
+                  <Fragment key={incident.id}>
+                    <tr>
                   <td className="px-4 py-4">
                     <div className="font-semibold text-slate-900">{incident.title ?? incident.publicId}</div>
                     <div className="text-xs text-slate-500">
@@ -1603,36 +1535,37 @@ function SafetyPanel({ communityId, token }) {
                       </button>
                     </div>
                   </td>
-                </tr>
-                {expandedIncidentId === incident.id && (
-                  <tr>
-                    <td colSpan={5} className="bg-slate-50 px-6 py-4 text-sm text-slate-600">
-                      <div className="flex flex-col gap-3">
-                        <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-                          <span>Reporter: {incident.reporter?.name ?? incident.reporter?.email ?? 'Unknown'}</span>
-                          {incident.updatedAt && <span>Last updated {new Date(incident.updatedAt).toLocaleString()}</span>}
-                          {incident.tags?.length && <span>Tags: {incident.tags.join(', ')}</span>}
-                        </div>
-                        {incident.attachments?.length ? (
-                          <div className="flex flex-wrap gap-3">
-                            {incident.attachments.map((attachment) => (
-                              <a
-                                key={attachment.url}
-                                href={attachment.url}
-                                className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-primary hover:border-primary hover:bg-primary/10"
-                              >
-                                {attachment.label ?? 'Download attachment'}
-                              </a>
-                            ))}
+                    </tr>
+                    {expandedIncidentId === incident.id && (
+                      <tr>
+                        <td colSpan={5} className="bg-slate-50 px-6 py-4 text-sm text-slate-600">
+                          <div className="flex flex-col gap-3">
+                            <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                              <span>Reporter: {incident.reporter?.name ?? incident.reporter?.email ?? 'Unknown'}</span>
+                              {incident.updatedAt && <span>Last updated {new Date(incident.updatedAt).toLocaleString()}</span>}
+                              {incident.tags?.length && <span>Tags: {incident.tags.join(', ')}</span>}
+                            </div>
+                            {incident.attachments?.length ? (
+                              <div className="flex flex-wrap gap-3">
+                                {incident.attachments.map((attachment) => (
+                                  <a
+                                    key={attachment.url}
+                                    href={attachment.url}
+                                    className="inline-flex items-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-primary hover:border-primary hover:bg-primary/10"
+                                  >
+                                    {attachment.label ?? 'Download attachment'}
+                                  </a>
+                                ))}
+                              </div>
+                            ) : (
+                              <p>No attachments linked to this incident.</p>
+                            )}
                           </div>
-                        ) : (
-                          <p>No attachments linked to this incident.</p>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              ))}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
             </tbody>
           </table>
         </div>

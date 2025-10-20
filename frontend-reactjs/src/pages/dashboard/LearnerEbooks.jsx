@@ -240,11 +240,9 @@ export default function LearnerEbooks() {
       0
     );
     const audioCount = entries.filter((entry) => (entry.format ?? '').toLowerCase().includes('audio')).length;
-    const avgProgress = entries.length
-      ? Math.round(
-          entries.reduce((total, entry) => total + Number(entry.progress ?? 0 || 0), 0) / entries.length
-        )
-      : 0;
+      const avgProgress = entries.length
+        ? Math.round(entries.reduce((total, entry) => total + Number(entry.progress ?? 0), 0) / entries.length)
+        : 0;
     return {
       scope: entries.length,
       completed: completed.length,
