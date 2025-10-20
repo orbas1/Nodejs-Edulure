@@ -66,6 +66,7 @@ import CommunitySafety from './pages/dashboard/community/CommunitySafety.jsx';
 import CommunityCommunications from './pages/dashboard/community/CommunityCommunications.jsx';
 import LearnerSocial from './pages/dashboard/LearnerSocial.jsx';
 import LearnerCommunityChats from './pages/dashboard/LearnerCommunityChats.jsx';
+import LearnerSupport from './pages/dashboard/LearnerSupport.jsx';
 
 function App() {
   return (
@@ -157,6 +158,7 @@ function App() {
         <Route path="live-classes" element={<DashboardLiveClassesSwitch />} />
         <Route path="calendar" element={<DashboardCalendar />} />
         <Route path="bookings" element={<DashboardBookingsSwitch />} />
+        <Route path="support" element={<LearnerSupport />} />
         <Route path="ebooks" element={<DashboardEbooksSwitch />} />
         <Route path="financial" element={<LearnerFinancial />} />
         <Route path="affiliate" element={<DashboardAffiliate />} />

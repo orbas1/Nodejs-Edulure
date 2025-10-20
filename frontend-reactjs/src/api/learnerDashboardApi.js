@@ -140,6 +140,51 @@ export async function triggerCommunityAction({ token, communityId, payload, sign
   );
 }
 
+export async function createSupportTicket({ token, payload, signal } = {}) {
+  ensureToken(token);
+  return httpClient.post('/dashboard/learner/support/tickets', payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function updateSupportTicket({ token, ticketId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!ticketId) {
+    throw new Error('A support ticket identifier is required to update');
+  }
+  return httpClient.put(`/dashboard/learner/support/tickets/${ticketId}`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function replyToSupportTicket({ token, ticketId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!ticketId) {
+    throw new Error('A support ticket identifier is required to send a reply');
+  }
+  return httpClient.post(`/dashboard/learner/support/tickets/${ticketId}/messages`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
+export async function closeSupportTicket({ token, ticketId, payload, signal } = {}) {
+  ensureToken(token);
+  if (!ticketId) {
+    throw new Error('A support ticket identifier is required to close the case');
+  }
+  return httpClient.post(`/dashboard/learner/support/tickets/${ticketId}/close`, payload ?? {}, {
+    token,
+    signal,
+    invalidateTags: [`dashboard:me:${token}`]
+  });
+}
+
 export const learnerDashboardApi = {
   createTutorBookingRequest,
   exportTutorSchedule,
@@ -150,7 +195,11 @@ export const learnerDashboardApi = {
   updateBillingPreferences,
   joinLiveSession,
   checkInToLiveSession,
-  triggerCommunityAction
+  triggerCommunityAction,
+  createSupportTicket,
+  updateSupportTicket,
+  replyToSupportTicket,
+  closeSupportTicket
 };
 
 export default learnerDashboardApi;

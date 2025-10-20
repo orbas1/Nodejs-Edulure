@@ -126,8 +126,11 @@ function toICSDate(date) {
 }
 
 function escapeICS(text = '') {
-  return text.replace(/\\/g, '\\').replace(/,/g, '\,').replace(/;/g, '\;').replace(/
-/g, '\n');
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/,/g, '\\,')
+    .replace(/;/g, '\\;')
+    .replace(/\r?\n/g, '\\n');
 }
 
 function computeStatus(event) {
