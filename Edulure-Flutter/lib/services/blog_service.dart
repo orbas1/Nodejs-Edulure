@@ -3,7 +3,73 @@ import 'dart:collection';
 import 'package:dio/dio.dart';
 
 import 'api_config.dart';
-import 'dashboard_service.dart';
+
+class BlogArticle {
+  BlogArticle({
+    required this.slug,
+    required this.title,
+    required this.excerpt,
+    required this.category,
+    required this.readingTimeMinutes,
+    this.publishedAt,
+    this.heroImageUrl,
+    this.isFeatured = false,
+  });
+
+  final String slug;
+  final String title;
+  final String excerpt;
+  final String category;
+  final int readingTimeMinutes;
+  final String? publishedAt;
+  final String? heroImageUrl;
+  final bool isFeatured;
+
+  factory BlogArticle.fromJson(Map<String, dynamic> json) {
+    final categoryJson = json['category'];
+    final heroImage = json['heroImage'];
+    final mediaJson = json['media'];
+
+    String? resolvedHeroImage;
+    if (heroImage is String && heroImage.isNotEmpty) {
+      resolvedHeroImage = heroImage;
+    } else if (mediaJson is List && mediaJson.isNotEmpty) {
+      final first = mediaJson.first;
+      if (first is Map) {
+        final map = Map<String, dynamic>.from(first as Map);
+        resolvedHeroImage = map['mediaUrl']?.toString() ?? map['url']?.toString();
+      }
+    }
+
+    return BlogArticle(
+      slug: json['slug']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Article',
+      excerpt: json['excerpt']?.toString() ?? '',
+      category: categoryJson is Map
+          ? (categoryJson['name']?.toString() ?? 'Insight')
+          : json['category']?.toString() ?? 'Insight',
+      readingTimeMinutes: json['readingTimeMinutes'] is num
+          ? (json['readingTimeMinutes'] as num).round()
+          : int.tryParse('${json['readingTimeMinutes'] ?? 0}') ?? 0,
+      publishedAt: json['publishedAt']?.toString(),
+      heroImageUrl: resolvedHeroImage,
+      isFeatured: json['featured'] == true || json['isFeatured'] == true,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'slug': slug,
+      'title': title,
+      'excerpt': excerpt,
+      'category': category,
+      'readingTimeMinutes': readingTimeMinutes,
+      'publishedAt': publishedAt,
+      'heroImageUrl': heroImageUrl,
+      'isFeatured': isFeatured,
+    };
+  }
+}
 
 class BlogFeedResult {
   BlogFeedResult({

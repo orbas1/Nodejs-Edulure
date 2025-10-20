@@ -141,4 +141,28 @@ void main() {
       );
     });
   });
+
+  test('BlogArticle resolves media fallbacks and formatting', () {
+    final article = BlogArticle.fromJson({
+      'slug': 'insight',
+      'title': 'Insightful article',
+      'excerpt': 'Preview of the latest cohort launch.',
+      'category': {'name': 'Insights'},
+      'readingTimeMinutes': 5,
+      'media': [
+        {
+          'mediaUrl': 'https://cdn.example.com/images/hero.png',
+          'description': 'Hero image',
+        },
+      ],
+      'featured': true,
+      'publishedAt': '2024-05-01',
+    });
+
+    expect(article.slug, 'insight');
+    expect(article.category, 'Insights');
+    expect(article.heroImageUrl, contains('hero.png'));
+    expect(article.isFeatured, isTrue);
+    expect(article.readingTimeMinutes, 5);
+  });
 }
