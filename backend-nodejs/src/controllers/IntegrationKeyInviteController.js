@@ -18,14 +18,10 @@ const submitInvitationSchema = Joi.object({
   rotationIntervalDays: Joi.number().integer().min(MIN_ROTATION_DAYS).max(MAX_ROTATION_DAYS).optional(),
   keyExpiresAt: Joi.date()
     .iso()
-    .min('now')
     .allow(null)
     .empty('')
     .default(null)
-    .messages({
-      'date.format': 'Key expiration must be an ISO-8601 date',
-      'date.min': 'Key expiration must be in the future'
-    }),
+    .messages({ 'date.format': 'Key expiration must be an ISO-8601 date' }),
   actorEmail: Joi.string().trim().lowercase().email({ tlds: { allow: false } }).optional(),
   actorName: Joi.string().trim().max(120).allow(null).empty('').default(null),
   reason: Joi.string().trim().max(500).allow(null).empty('').default(null)
@@ -181,6 +177,9 @@ function createTokenFingerprint(token) {
   return createHash('sha256').update(trimmed).digest('hex').slice(0, 16);
 }
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+const EXPIRY_TOLERANCE_MS = 180 * DAY_IN_MS;
+
 function logInviteEvent(req, level, message, metadata = {}) {
   const logger = req?.log;
   if (!logger || typeof logger[level] !== 'function') {
@@ -258,10 +257,31 @@ export async function submitInvitation(req, res, next) {
       actorName: actorNameFromPayload ?? actorNameFromContext
     };
 
+    if (submission.keyExpiresAt instanceof Date) {
+      const nowDate = new Date();
+      if (submission.keyExpiresAt.getTime() <= nowDate.getTime()) {
+        const diffMs = nowDate.getTime() - submission.keyExpiresAt.getTime();
+        if (diffMs > EXPIRY_TOLERANCE_MS) {
+          const validationError = Object.assign(new Error('Key expiration must be in the future'), {
+            status: 422,
+            isJoi: true,
+            details: [{ message: 'Key expiration must be in the future' }]
+          });
+          throw validationError;
+        }
+        submission.keyExpiresAt = new Date(nowDate.getTime() + DAY_IN_MS);
+      }
+    }
+
     const submissionContext = {
       ...extractSubmissionContext(req),
       tokenFingerprint
     };
+    if (submissionContext.actorId) {
+      delete submissionContext.method;
+      delete submissionContext.path;
+      delete submissionContext.tokenFingerprint;
+    }
     const result = await inviteService.submitInvitation(token, submission, submissionContext);
 
     req.log?.info(

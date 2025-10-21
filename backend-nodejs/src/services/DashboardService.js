@@ -380,7 +380,15 @@ export function buildLearnerDashboard({
   financialProfile = null,
   financePurchases = [],
   financeSubscriptions = [],
-  systemPreferences = null
+  systemPreferences = null,
+  paymentMethods = [],
+  billingContacts = [],
+  growthInitiatives = [],
+  growthExperimentsByInitiative = new Map(),
+  affiliateChannels = [],
+  affiliatePayouts = [],
+  adCampaigns = [],
+  instructorApplication = null
 } = {}) {
   const hasSignals =
     enrollments.length ||
@@ -757,61 +765,63 @@ export function buildLearnerDashboard({
       change: `${activeTutorBookings.length} upcoming`
     }
   ];
+  const invoiceEntries = normalisedInvoices.map((invoice) => ({
+    id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
+    label: invoice.label ?? 'Invoice',
+    amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
+    status: invoice.status ?? 'open',
+    date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
+  }));
 
-      const invoiceEntries = normalisedInvoices.map((invoice) => ({
-        id: invoice.id ?? `invoice-${crypto.randomUUID()}`,
-        label: invoice.label ?? 'Invoice',
-        amount: formatCurrency(invoice.amountCents ?? 0, invoice.currency ?? 'USD'),
-        status: invoice.status ?? 'open',
-        date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
-      }));
-
-      const paymentMethods = paymentMethodsRaw.map((method) => ({
+  const paymentMethodsList = Array.isArray(paymentMethods)
+    ? paymentMethods.map((method) => ({
         id: method.id,
         label: method.label,
         brand: method.brand,
         last4: method.last4,
         expiry: method.expiry,
         primary: Boolean(method.primary)
-      }));
+      }))
+    : [];
 
-      const billingContacts = billingContactsRaw.map((contact) => ({
+  const billingContactsList = Array.isArray(billingContacts)
+    ? billingContacts.map((contact) => ({
         id: contact.id,
         name: contact.name,
         email: contact.email,
         phone: contact.phone,
         company: contact.company
-      }));
+      }))
+    : [];
 
-      const financePreferencesRaw =
-        financialProfile?.preferences && typeof financialProfile.preferences === 'object'
-          ? financialProfile.preferences
-          : {};
-      const financialPreferences = {
-        autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
-        reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
-        reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
-        currency: financePreferencesRaw.currency ?? 'USD',
-        invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
-        payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
-        taxId: financePreferencesRaw.taxId ?? null,
-        alerts: {
-          sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
-          sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
-          escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
-          notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
-        },
-        documents: Array.isArray(financePreferencesRaw.documents)
-          ? financePreferencesRaw.documents
-          : [],
-        reimbursements:
-          financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
-            ? {
-                enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
-                instructions: financePreferencesRaw.reimbursements.instructions ?? null
+  const financePreferencesRaw =
+    financialProfile?.preferences && typeof financialProfile.preferences === 'object'
+      ? financialProfile.preferences
+      : {};
+
+  const financialPreferences = {
+    autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
+    reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
+    reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
+    currency: financePreferencesRaw.currency ?? 'USD',
+    invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
+    payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
+    taxId: financePreferencesRaw.taxId ?? null,
+    alerts: {
+      sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
+      sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
+      escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
+      notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
+    },
+    documents: Array.isArray(financePreferencesRaw.documents) ? financePreferencesRaw.documents : [],
+    reimbursements:
+      financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
+        ? {
+            enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
+            instructions: financePreferencesRaw.reimbursements.instructions ?? null
           }
-            : { enabled: false, instructions: null }
-      };
+        : { enabled: false, instructions: null }
+  };
 
   const financePurchasesList = Array.isArray(financePurchases)
     ? financePurchases.map((purchase) => ({
@@ -871,33 +881,29 @@ export function buildLearnerDashboard({
     reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
   };
 
-      const systemSettings = {
-        language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
-        region: systemPreferences?.region ?? DEFAULT_SYSTEM_SETTINGS.region,
-        timezone: systemPreferences?.timezone ?? DEFAULT_SYSTEM_SETTINGS.timezone,
-        notificationsEnabled:
-          systemPreferences?.notificationsEnabled ?? DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
-        digestEnabled: systemPreferences?.digestEnabled ?? DEFAULT_SYSTEM_SETTINGS.digestEnabled,
-        autoPlayMedia: systemPreferences?.autoPlayMedia ?? DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
-        highContrast: systemPreferences?.highContrast ?? DEFAULT_SYSTEM_SETTINGS.highContrast,
-        reducedMotion: systemPreferences?.reducedMotion ?? DEFAULT_SYSTEM_SETTINGS.reducedMotion,
-        preferences: {
-          interfaceDensity:
-            systemPreferences?.preferences?.interfaceDensity ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
-          analyticsOptIn:
-            systemPreferences?.preferences?.analyticsOptIn ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
-          subtitleLanguage:
-            systemPreferences?.preferences?.subtitleLanguage ??
-            systemPreferences?.language ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
-          audioDescription:
-            systemPreferences?.preferences?.audioDescription ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
-        },
-        updatedAt: systemPreferences?.updatedAt ?? null
-      };
+  const systemSettings = {
+    language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
+    region: systemPreferences?.region ?? DEFAULT_SYSTEM_SETTINGS.region,
+    timezone: systemPreferences?.timezone ?? DEFAULT_SYSTEM_SETTINGS.timezone,
+    notificationsEnabled: systemPreferences?.notificationsEnabled ?? DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
+    digestEnabled: systemPreferences?.digestEnabled ?? DEFAULT_SYSTEM_SETTINGS.digestEnabled,
+    autoPlayMedia: systemPreferences?.autoPlayMedia ?? DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
+    highContrast: systemPreferences?.highContrast ?? DEFAULT_SYSTEM_SETTINGS.highContrast,
+    reducedMotion: systemPreferences?.reducedMotion ?? DEFAULT_SYSTEM_SETTINGS.reducedMotion,
+    preferences: {
+      interfaceDensity:
+        systemPreferences?.preferences?.interfaceDensity ?? DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
+      analyticsOptIn:
+        systemPreferences?.preferences?.analyticsOptIn ?? DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
+      subtitleLanguage:
+        systemPreferences?.preferences?.subtitleLanguage ??
+        systemPreferences?.language ??
+        DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
+      audioDescription:
+        systemPreferences?.preferences?.audioDescription ?? DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
+    },
+    updatedAt: systemPreferences?.updatedAt ?? null
+  };
 
   const notificationsList = [...notifications];
   activeTutorBookings.forEach((booking) => {
@@ -917,6 +923,17 @@ export function buildLearnerDashboard({
     });
   });
 
+  const supportCases = [];
+  const supportMetrics = {
+    open: 0,
+    waiting: 0,
+    resolved: 0,
+    closed: 0,
+    awaitingLearner: 0,
+    averageResponseMinutes: 0,
+    latestUpdatedAt: null
+  };
+
   const learnerFieldServices = fieldServiceWorkspace?.customer ?? null;
   const fieldServiceAssignments = Array.isArray(learnerFieldServices?.assignments)
     ? learnerFieldServices.assignments
@@ -925,7 +942,8 @@ export function buildLearnerDashboard({
     ? fieldServiceWorkspace.searchIndex.filter((entry) => entry.role === 'learner')
     : [];
 
-      const growthInitiatives = growthInitiativesRaw.map((initiative) => ({
+  const growthInitiativesList = Array.isArray(growthInitiatives)
+    ? growthInitiatives.map((initiative) => ({
         id: initiative.id,
         slug: initiative.slug,
         title: initiative.title,
@@ -951,34 +969,38 @@ export function buildLearnerDashboard({
           endAt: experiment.endAt,
           segments: experiment.segments
         }))
-      }));
+      }))
+    : [];
 
-      const totalGrowthExperiments = growthInitiatives.reduce(
-        (count, initiative) => count + (initiative.experiments?.length ?? 0),
-        0
-      );
+  const totalGrowthExperiments = growthInitiativesList.reduce(
+    (count, initiative) => count + (initiative.experiments?.length ?? 0),
+    0
+  );
 
-      const growthSection = {
-        initiatives: growthInitiatives,
-        metrics: [
-          { label: 'Active initiatives', value: growthInitiatives.filter((item) => item.status === 'active').length },
-          { label: 'Experiments running', value: totalGrowthExperiments },
-          {
-            label: 'Targets hitting',
-            value: growthInitiatives.filter(
-              (initiative) =>
-                initiative.currentValue != null &&
-                initiative.targetValue != null &&
-                Number(initiative.currentValue) >= Number(initiative.targetValue)
-            ).length
-          }
-        ]
-      };
+  const growthSection = {
+    initiatives: growthInitiativesList,
+    metrics: [
+      { label: 'Active initiatives', value: growthInitiativesList.filter((item) => item.status === 'active').length },
+      { label: 'Experiments running', value: totalGrowthExperiments },
+      {
+        label: 'Targets hitting',
+        value: growthInitiativesList.filter(
+          (initiative) =>
+            initiative.currentValue != null &&
+            initiative.targetValue != null &&
+            Number(initiative.currentValue) >= Number(initiative.targetValue)
+        ).length
+      }
+    ]
+  };
 
-      const affiliateChannels = affiliateChannelsRaw.map((channel) => {
-        const payouts = affiliatePayoutsRaw.filter((payout) => payout.channelId === channel.id);
-        const outstandingCents = Math.max(0, channel.totalEarningsCents - channel.totalPaidCents);
-        const nextPayout = payouts
+  const affiliateChannelsList = Array.isArray(affiliateChannels)
+    ? affiliateChannels.map((channel) => {
+        const payoutsForChannel = Array.isArray(affiliatePayouts)
+          ? affiliatePayouts.filter((payout) => payout.channelId === channel.id)
+          : [];
+        const outstandingCents = Math.max(0, Number(channel.totalEarningsCents ?? 0) - Number(channel.totalPaidCents ?? 0));
+        const nextPayout = payoutsForChannel
           .filter((payout) => payout.status === 'scheduled' || payout.status === 'processing')
           .sort((a, b) => {
             const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
@@ -996,6 +1018,7 @@ export function buildLearnerDashboard({
           totalEarningsFormatted: formatCurrency(channel.totalEarningsCents),
           totalPaidFormatted: formatCurrency(channel.totalPaidCents),
           outstandingFormatted: formatCurrency(outstandingCents),
+          outstandingCents,
           notes: channel.notes,
           performance: channel.performance,
           nextPayout: nextPayout
@@ -1006,32 +1029,38 @@ export function buildLearnerDashboard({
               }
             : null
         };
-      });
+      })
+    : [];
 
-      const affiliateSection = {
-        channels: affiliateChannels,
-        payouts: affiliatePayoutsRaw.map((payout) => ({
-          id: payout.id,
-          channelId: payout.channelId,
-          amount: formatCurrency(payout.amountCents, payout.currency),
-          status: payout.status,
-          scheduledAt: payout.scheduledAt,
-          processedAt: payout.processedAt,
-          reference: payout.reference
-        })),
-        summary: {
-          totalChannels: affiliateChannels.length,
-          activeChannels: affiliateChannels.filter((channel) => channel.status === 'active').length,
-          outstanding: formatCurrency(
-            affiliateChannelsRaw.reduce(
-              (total, channel) => total + Math.max(0, channel.totalEarningsCents - channel.totalPaidCents),
-              0
-            )
-          )
-        }
-      };
+  const affiliatePayoutsList = Array.isArray(affiliatePayouts)
+    ? affiliatePayouts.map((payout) => ({
+        id: payout.id,
+        channelId: payout.channelId,
+        amount: formatCurrency(payout.amountCents, payout.currency),
+        status: payout.status,
+        scheduledAt: payout.scheduledAt,
+        processedAt: payout.processedAt,
+        reference: payout.reference
+      }))
+    : [];
 
-      const adCampaigns = adCampaignsRaw.map((campaign) => {
+  const totalOutstandingCents = affiliateChannelsList.reduce(
+    (total, channel) => total + Number(channel.outstandingCents ?? 0),
+    0
+  );
+
+  const affiliateSection = {
+    channels: affiliateChannelsList.map(({ outstandingCents, ...channel }) => channel),
+    payouts: affiliatePayoutsList,
+    summary: {
+      totalChannels: affiliateChannelsList.length,
+      activeChannels: affiliateChannelsList.filter((channel) => channel.status === 'active').length,
+      outstanding: formatCurrency(totalOutstandingCents)
+    }
+  };
+
+  const adCampaignsList = Array.isArray(adCampaigns)
+    ? adCampaigns.map((campaign) => {
         const metrics = campaign.metrics && typeof campaign.metrics === 'object' ? campaign.metrics : {};
         const targeting = campaign.targeting && typeof campaign.targeting === 'object' ? campaign.targeting : {};
         return {
@@ -1074,82 +1103,82 @@ export function buildLearnerDashboard({
             : { headline: 'Untitled creative', description: '', url: null },
           placements: Array.isArray(campaign.placements) ? campaign.placements : []
         };
-      });
+      })
+    : [];
 
-      const adsSection = {
-        campaigns: adCampaigns,
-        summary: {
-          activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
-          totalSpend: formatCurrency(
-            adCampaignsRaw.reduce((total, campaign) => total + (campaign.totalSpendCents ?? 0), 0)
-          ),
-          averageDailyBudget: adCampaignsRaw.length
-            ? formatCurrency(
-                Math.round(
-                  adCampaignsRaw.reduce((total, campaign) => total + (campaign.dailyBudgetCents ?? 0), 0) /
-                    adCampaignsRaw.length
-                )
-              )
-            : formatCurrency(0)
-        }
-      };
+  const totalAdSpendCents = adCampaignsList.reduce((total, campaign) => total + Number(campaign.totalSpendCents ?? 0), 0);
+  const averageDailyBudgetCents = adCampaignsList.length
+    ? Math.round(
+        adCampaignsList.reduce((total, campaign) => total + Number(campaign.dailyBudgetCents ?? 0), 0) /
+          adCampaignsList.length
+      )
+    : 0;
 
-      const instructorApplication = instructorApplicationRaw
-        ? {
-            id: instructorApplicationRaw.id,
-            status: instructorApplicationRaw.status,
-            stage: instructorApplicationRaw.stage,
-            motivation: instructorApplicationRaw.motivation,
-            portfolioUrl: instructorApplicationRaw.portfolioUrl,
-            experienceYears: instructorApplicationRaw.experienceYears,
-            teachingFocus: instructorApplicationRaw.teachingFocus,
-            availability: instructorApplicationRaw.availability,
-            marketingAssets: instructorApplicationRaw.marketingAssets,
-            submittedAt: instructorApplicationRaw.submittedAt,
-            reviewedAt: instructorApplicationRaw.reviewedAt,
-            decisionNote: instructorApplicationRaw.decisionNote
-          }
-        : null;
+  const adsSection = {
+    campaigns: adCampaignsList,
+    summary: {
+      activeCampaigns: adCampaignsList.filter((campaign) => campaign.status === 'active').length,
+      totalSpend: formatCurrency(totalAdSpendCents),
+      averageDailyBudget: formatCurrency(averageDailyBudgetCents)
+    }
+  };
 
-      const teachSection = {
-        application: instructorApplication,
-        status: instructorApplication?.status ?? 'draft',
-        nextSteps: (() => {
-          if (!instructorApplication) {
-            return [
-              'Complete your instructor application to access cohort production resources.',
-              'Prepare a portfolio link that highlights flagship teaching moments.'
-            ];
-          }
-          if (instructorApplication.status === 'submitted') {
-            return [
-              'Our partnerships team is reviewing your submission.',
-              'Expect an interview scheduling link within 48 hours.'
-            ];
-          }
-          if (instructorApplication.status === 'interview') {
-            return [
-              'Confirm your cohort launch availability and desired curriculum focus.',
-              'Upload marketing assets to accelerate go-to-market planning.'
-            ];
-          }
-          if (instructorApplication.status === 'approved') {
-            return [
-              'Schedule onboarding workshop with curriculum producers.',
-              'Share campaign creative for Edulure Ads placement.'
-            ];
-          }
-          if (instructorApplication.status === 'rejected') {
-            return [
-              'Review decision notes and request feedback from the instructor partnerships team.'
-            ];
-          }
-          return [
-            'Document your teaching motivation and curriculum outcomes.',
-            'Add marketing assets to strengthen your application.'
-          ];
-        })()
-      };
+  const instructorApplicationEntry = instructorApplication
+    ? {
+        id: instructorApplication.id,
+        status: instructorApplication.status,
+        stage: instructorApplication.stage,
+        motivation: instructorApplication.motivation,
+        portfolioUrl: instructorApplication.portfolioUrl,
+        experienceYears: instructorApplication.experienceYears,
+        teachingFocus: instructorApplication.teachingFocus,
+        availability: instructorApplication.availability,
+        marketingAssets: instructorApplication.marketingAssets,
+        submittedAt: instructorApplication.submittedAt,
+        reviewedAt: instructorApplication.reviewedAt,
+        decisionNote: instructorApplication.decisionNote
+      }
+    : null;
+
+  const teachSection = {
+    application: instructorApplicationEntry,
+    status: instructorApplicationEntry?.status ?? 'draft',
+    nextSteps: (() => {
+      if (!instructorApplicationEntry) {
+        return [
+          'Complete your instructor application to access cohort production resources.',
+          'Prepare a portfolio link that highlights flagship teaching moments.'
+        ];
+      }
+      if (instructorApplicationEntry.status === 'submitted') {
+        return [
+          'Our partnerships team is reviewing your submission.',
+          'Expect an interview scheduling link within 48 hours.'
+        ];
+      }
+      if (instructorApplicationEntry.status === 'interview') {
+        return [
+          'Confirm your cohort launch availability and desired curriculum focus.',
+          'Upload marketing assets to accelerate go-to-market planning.'
+        ];
+      }
+      if (instructorApplicationEntry.status === 'approved') {
+        return [
+          'Schedule onboarding workshop with curriculum producers.',
+          'Share campaign creative for Edulure Ads placement.'
+        ];
+      }
+      if (instructorApplicationEntry.status === 'rejected') {
+        return [
+          'Review decision notes and request feedback from the instructor partnerships team.'
+        ];
+      }
+      return [
+        'Document your teaching motivation and curriculum outcomes.',
+        'Add marketing assets to strengthen your application.'
+      ];
+    })()
+  };
 
       const privacy = {
         visibility: privacySettings?.profileVisibility ?? 'public',
@@ -1782,8 +1811,8 @@ export function buildLearnerDashboard({
     financial: {
       summary: financialSummary,
       invoices: invoiceEntries,
-      paymentMethods,
-      billingContacts,
+      paymentMethods: paymentMethodsList,
+      billingContacts: billingContactsList,
       preferences: financialPreferences
     },
     notifications: {
@@ -2834,6 +2863,9 @@ function buildCourseWorkspace({
       };
     });
 
+    const releaseAt = normaliseDate(course.releaseAt);
+    const updatedAt = normaliseDate(course.updatedAt);
+
     return {
       id: course.publicId ?? `course-${course.id}`,
       courseId: course.id,
@@ -2859,8 +2891,8 @@ function buildCourseWorkspace({
       modules: modulesForCourse.length,
       lessons: lessonsForCourse.length,
       averageProgress,
-      releaseAt: course.releaseAt ? course.releaseAt.toISOString() : null,
-      updatedAt: course.updatedAt ? course.updatedAt.toISOString() : null,
+      releaseAt: releaseAt ? releaseAt.toISOString() : null,
+      updatedAt: updatedAt ? updatedAt.toISOString() : null,
       localisation: {
         totalLanguages: languageEntries.length,
         published: languageEntries.filter((entry) => entry.published).length,
@@ -2881,6 +2913,8 @@ function buildCourseWorkspace({
     const key = `${enrollment.courseId}:${cohortLabel}`;
     let record = cohortMap.get(key);
     if (!record) {
+      const courseReleaseAt = normaliseDate(course.releaseAt);
+
       record = {
         id: `cohort-${enrollment.courseId}-${cohortLabel}`.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase(),
         courseId: enrollment.courseId,
@@ -2888,14 +2922,15 @@ function buildCourseWorkspace({
         label: cohortLabel,
         enrollments: [],
         firstStartAt: null,
-        releaseAt: course.releaseAt ?? null
+        releaseAt: courseReleaseAt ?? null
       };
       cohortMap.set(key, record);
     }
     record.enrollments.push(enrollment);
     if (enrollment.startedAt) {
-      if (!record.firstStartAt || enrollment.startedAt < record.firstStartAt) {
-        record.firstStartAt = enrollment.startedAt;
+      const startedAt = normaliseDate(enrollment.startedAt);
+      if (startedAt && (!record.firstStartAt || startedAt < record.firstStartAt)) {
+        record.firstStartAt = startedAt;
       }
     }
   });
@@ -2912,7 +2947,7 @@ function buildCourseWorkspace({
           cohort.enrollments.reduce((sum, enr) => sum + Number(enr.progressPercent ?? 0), 0) / total
         )
       : 0;
-    const startDate = cohort.firstStartAt ?? cohort.releaseAt;
+    const startDate = normaliseDate(cohort.firstStartAt) ?? normaliseDate(cohort.releaseAt);
     const stage = completedCount === total && total > 0 ? 'Completed' : activeCount > 0 ? 'In flight' : 'Scheduled';
     pipeline.push({
       id: cohort.id,
@@ -3138,6 +3173,7 @@ function buildCourseWorkspace({
     const course = courseById.get(enrollment.courseId);
     const user = collaboratorDirectory.get(enrollment.userId);
     const lessonsForCourse = lessonsByCourse.get(enrollment.courseId) ?? [];
+    const enrollmentMetadata = safeJsonParse(enrollment.metadata, {});
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
       learnerId: enrollment.userId,
@@ -3148,7 +3184,7 @@ function buildCourseWorkspace({
       progressPercent: Number.isFinite(Number(enrollment.progressPercent))
         ? Number(enrollment.progressPercent)
         : Math.round((stats.completionRatio ?? 0) * 100),
-      cohort: enrollment.metadata?.cohort ?? 'General',
+      cohort: enrollmentMetadata?.cohort ?? 'General',
       lastActivityAt: stats.lastCompletedAt ? stats.lastCompletedAt.toISOString() : null,
       nextLesson: resolveNextLesson(lessonsForCourse, stats),
       riskLevel: determineRiskLevel(enrollment, stats, now),
@@ -4180,7 +4216,15 @@ export default class DashboardService {
           financialProfile,
           financePurchases: financePurchasesRaw,
           financeSubscriptions: financeSubscriptionsDetailed,
-          systemPreferences: systemPreferencesRaw
+          systemPreferences: systemPreferencesRaw,
+          paymentMethods: paymentMethodsRaw,
+          billingContacts: billingContactsRaw,
+          growthInitiatives: growthInitiativesRaw,
+          growthExperimentsByInitiative,
+          affiliateChannels: affiliateChannelsRaw,
+          affiliatePayouts: affiliatePayoutsRaw,
+          adCampaigns: adCampaignsRaw,
+          instructorApplication: instructorApplicationRaw
         }) ?? undefined;
     } catch (error) {
       log.warn({ err: error }, 'Failed to load learner dashboard data');
