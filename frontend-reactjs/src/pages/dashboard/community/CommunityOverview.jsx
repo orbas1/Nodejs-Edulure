@@ -3,8 +3,10 @@ import { useMemo } from 'react';
 
 import MetricCard from '../../../components/dashboard/MetricCard.jsx';
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
+import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 export default function CommunityOverview({ dashboard, onRefresh }) {
+  const { allowed, explanation } = useRoleGuard(['community', 'admin']);
   const metrics = useMemo(() => (Array.isArray(dashboard?.metrics) ? dashboard.metrics : []), [dashboard?.metrics]);
   const healthOverview = useMemo(
     () => (Array.isArray(dashboard?.health?.overview) ? dashboard.health.overview : []),
@@ -26,6 +28,16 @@ export default function CommunityOverview({ dashboard, onRefresh }) {
     () => (Array.isArray(dashboard?.communications?.highlights) ? dashboard.communications.highlights : []),
     [dashboard?.communications?.highlights]
   );
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Community privileges required"
+        description={explanation ?? 'Switch to a community workspace to view operations intelligence.'}
+      />
+    );
+  }
 
   if (!dashboard) {
     return (

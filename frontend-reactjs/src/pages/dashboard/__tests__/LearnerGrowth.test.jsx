@@ -102,4 +102,18 @@ describe('<LearnerGrowth />', () => {
       expect(screen.getAllByText(/experiment created/i)).not.toHaveLength(0);
     });
   });
+
+  it('shows an access message when the viewer is not a learner', () => {
+    useLearnerDashboardSectionMock.mockReturnValueOnce({
+      isLearner: false,
+      section: null,
+      loading: false,
+      error: null,
+      refresh: vi.fn()
+    });
+
+    render(<LearnerGrowth />);
+
+    expect(screen.getByText(/Learner Learnspace required/i)).toBeInTheDocument();
+  });
 });

@@ -232,4 +232,18 @@ describe('<LearnerSettings />', () => {
 
     expect(await screen.findByText(/finance settings updated/i)).toBeInTheDocument();
   });
+
+  it('gates access when the viewer is not a learner', () => {
+    useLearnerDashboardSectionMock.mockReturnValueOnce({
+      isLearner: false,
+      section: null,
+      loading: false,
+      error: null,
+      refresh: vi.fn()
+    });
+
+    render(<LearnerSettings />);
+
+    expect(screen.getByText(/Learner Learnspace required/i)).toBeInTheDocument();
+  });
 });
