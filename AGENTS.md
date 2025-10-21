@@ -133,11 +133,11 @@
 120. `backend-nodejs/src/services/UserService.js:408:13` – unused `before`.
 
 #### Group 7 (Items 121-128)
-121. `backend-nodejs/src/utils/geo.js:551:9` – unused `centerLng`.
-122. `backend-nodejs/test/dashboardService.test.js:11:8` – `DashboardService` parse error.
-123. `backend-nodejs/test/dashboardService.test.js:13:67` – `PlatformSettingsService` parse error.
-124. `backend-nodejs/test/group14Controllers.test.js:321:8` – unused `IdentityVerificationController`.
-125. `backend-nodejs/test/openapiBuilder.test.js:2:1` – duplicate `fs` import.
-126. `backend-nodejs/test/platformSettingsAdminSettings.test.js:9:8` – `PlatformSettingsService` parse error.
-127. `backend-nodejs/test/platformSettingsService.test.js:3:67` – `PlatformSettingsService` parse error.
-128. `npm ls` validation – `ipaddr.js@1.9.1` installed but `package.json` requires `^2.2.0`.
+121. ✅ `backend-nodejs/src/utils/geo.js:551:9` – unused `centerLng`.
+122. ✅ `backend-nodejs/test/dashboardService.test.js:11:8` – `DashboardService` parse error.
+123. ✅ `backend-nodejs/test/dashboardService.test.js:13:67` – `PlatformSettingsService` parse error.
+124. ✅ `backend-nodejs/test/group14Controllers.test.js:321:8` – unused `IdentityVerificationController`.
+125. ✅ `backend-nodejs/test/openapiBuilder.test.js:2:1` – duplicate `fs` import.
+126. ✅ `backend-nodejs/test/platformSettingsAdminSettings.test.js:9:8` – `PlatformSettingsService` parse error.
+127. ✅ `backend-nodejs/test/platformSettingsService.test.js:3:67` – `PlatformSettingsService` parse error.
+128. ✅ `npm ls` validation – `ipaddr.js@1.9.1` installed but `package.json` requires `^2.2.0`.
