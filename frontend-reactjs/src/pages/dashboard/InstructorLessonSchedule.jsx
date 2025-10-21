@@ -1,8 +1,9 @@
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
-export default function InstructorLessonSchedule() {
+function InstructorLessonSchedule() {
   const { dashboard, refresh } = useOutletContext();
   const lessons = dashboard?.schedules?.lessons ?? [];
 
@@ -61,3 +62,5 @@ export default function InstructorLessonSchedule() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorLessonSchedule);

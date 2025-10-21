@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useOutletContext } from 'react-router-dom';
+import { resolveInstructorAccess } from './instructor/instructorAccess.js';
 import {
   createCommunity,
   deleteCommunity,
@@ -29,7 +30,11 @@ const initialDraft = {
 export default function InstructorCommunityCreate() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
-  const { dashboard } = useOutletContext();
+  const outletContext = useOutletContext();
+  const role = outletContext?.role ?? null;
+  const { dashboard } = outletContext ?? {};
+  const access = resolveInstructorAccess(role);
+  const hasAccess = access.granted;
 
   const templates = useMemo(
     () => (Array.isArray(dashboard?.communities?.createTemplates) ? dashboard.communities.createTemplates : []),
@@ -44,7 +49,7 @@ export default function InstructorCommunityCreate() {
   const [editingId, setEditingId] = useState(null);
 
   const loadCommunities = useCallback(async () => {
-    if (!token) return;
+    if (!token || !hasAccess) return;
     setLoading(true);
     setError(null);
     try {
@@ -55,7 +60,7 @@ export default function InstructorCommunityCreate() {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [hasAccess, token]);
 
   useEffect(() => {
     loadCommunities();
@@ -112,7 +117,7 @@ export default function InstructorCommunityCreate() {
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
-      if (!token) return;
+      if (!token || !hasAccess) return;
       setLoading(true);
       setFeedback(null);
       try {
@@ -157,8 +162,18 @@ export default function InstructorCommunityCreate() {
         setLoading(false);
       }
     },
-    [draft, editingId, loadCommunities, resetDraft, token]
+    [draft, editingId, hasAccess, loadCommunities, resetDraft, token]
   );
+
+  if (!hasAccess) {
+    return (
+      <DashboardStateMessage
+        variant={access.message.variant}
+        title={access.message.title}
+        description={access.message.description}
+      />
+    );
+  }
 
   const handleEdit = useCallback((community) => {
     setDraft({
