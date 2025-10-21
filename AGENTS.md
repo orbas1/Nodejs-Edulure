@@ -89,26 +89,26 @@
 80. `backend-nodejs/seeds/001_bootstrap.js:3849:21` – undefined `trx`.
 
 #### Group 5 (Items 81-100)
-81. `backend-nodejs/src/controllers/AdminSettingsController.js:3:37` – `PlatformSettingsService` parse error.
-82. `backend-nodejs/src/controllers/AdminSettingsController.js:3:37` – default import parse error.
-83. `backend-nodejs/src/controllers/DashboardController.js:1:30` – `DashboardService` parse error.
-84. `backend-nodejs/src/controllers/DashboardController.js:1:30` – default import parse error.
-85. `backend-nodejs/src/controllers/LearnerDashboardController.js:228:49` – unnecessary escape sequence.
-86. `backend-nodejs/src/controllers/SecurityOperationsController.js:191:7` – undefined `BOOLEAN_TRUE_VALUES`.
-87. `backend-nodejs/src/controllers/SecurityOperationsController.js:194:7` – undefined `BOOLEAN_FALSE_VALUES`.
-88. `backend-nodejs/src/controllers/SecurityOperationsController.js:247:20` – undefined `RISK_SORT_FIELDS`.
-89. `backend-nodejs/src/controllers/TelemetryController.js:1:8` – unused `Joi`.
-90. `backend-nodejs/src/controllers/TelemetryController.js:146:32` – undefined `freshnessQuerySchema`.
-91. `backend-nodejs/src/docs/builders/openapiBuilder.js:153:9` – unused `normalisedFilters`.
-92. `backend-nodejs/src/docs/serviceSpecRegistry.js:8:7` – unused `INDEX_FILE_PATH`.
-93. `backend-nodejs/src/docs/serviceSpecRegistry.js:82:7` – unused `SPEC_INDEX_SCHEMA`.
-94. `backend-nodejs/src/models/CommunityAffiliateModel.js:13:17` – unnecessary escape.
-95. `backend-nodejs/src/models/CommunityAffiliateModel.js:97:10` – unused `buildUpdatePayload`.
-96. `backend-nodejs/src/models/CommunityDonationModel.js:63:17` – unnecessary escape.
-97. `backend-nodejs/src/models/CommunityMemberModel.js:4:3` – unused `normaliseOptionalString`.
-98. `backend-nodejs/src/models/CommunityMemberModel.js:264:22` – unused `error` catch variable.
-99. `backend-nodejs/src/routes/routeMetadata.js:98:69` – unnecessary escape.
-100. `backend-nodejs/src/routes/routeMetadata.js:98:78` – unnecessary escape.
+81. ✅ `backend-nodejs/src/controllers/AdminSettingsController.js:3:37` – `PlatformSettingsService` parse error.
+82. ✅ `backend-nodejs/src/controllers/AdminSettingsController.js:3:37` – default import parse error.
+83. ✅ `backend-nodejs/src/controllers/DashboardController.js:1:30` – `DashboardService` parse error.
+84. ✅ `backend-nodejs/src/controllers/DashboardController.js:1:30` – default import parse error.
+85. ✅ `backend-nodejs/src/controllers/LearnerDashboardController.js:228:49` – unnecessary escape sequence.
+86. ✅ `backend-nodejs/src/controllers/SecurityOperationsController.js:191:7` – undefined `BOOLEAN_TRUE_VALUES`.
+87. ✅ `backend-nodejs/src/controllers/SecurityOperationsController.js:194:7` – undefined `BOOLEAN_FALSE_VALUES`.
+88. ✅ `backend-nodejs/src/controllers/SecurityOperationsController.js:247:20` – undefined `RISK_SORT_FIELDS`.
+89. ✅ `backend-nodejs/src/controllers/TelemetryController.js:1:8` – unused `Joi`.
+90. ✅ `backend-nodejs/src/controllers/TelemetryController.js:146:32` – undefined `freshnessQuerySchema`.
+91. ✅ `backend-nodejs/src/docs/builders/openapiBuilder.js:153:9` – unused `normalisedFilters`.
+92. ✅ `backend-nodejs/src/docs/serviceSpecRegistry.js:8:7` – unused `INDEX_FILE_PATH`.
+93. ✅ `backend-nodejs/src/docs/serviceSpecRegistry.js:82:7` – unused `SPEC_INDEX_SCHEMA`.
+94. ✅ `backend-nodejs/src/models/CommunityAffiliateModel.js:13:17` – unnecessary escape.
+95. ✅ `backend-nodejs/src/models/CommunityAffiliateModel.js:97:10` – unused `buildUpdatePayload`.
+96. ✅ `backend-nodejs/src/models/CommunityDonationModel.js:63:17` – unnecessary escape.
+97. ✅ `backend-nodejs/src/models/CommunityMemberModel.js:4:3` – unused `normaliseOptionalString`.
+98. ✅ `backend-nodejs/src/models/CommunityMemberModel.js:264:22` – unused `error` catch variable.
+99. ✅ `backend-nodejs/src/routes/routeMetadata.js:98:69` – unnecessary escape.
+100. ✅ `backend-nodejs/src/routes/routeMetadata.js:98:78` – unnecessary escape.
 
 #### Group 6 (Items 101-120)
 101. `backend-nodejs/src/routes/routeMetadata.js:98:84` – unnecessary escape.

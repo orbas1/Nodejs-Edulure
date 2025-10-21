@@ -104,21 +104,32 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
 });
 
 function deepMerge(base, patch) {
+  const source = Array.isArray(base) ? [...base] : { ...base };
+
   if (!patch || typeof patch !== 'object') {
-    return { ...base };
+    return source;
   }
 
-  const result = Array.isArray(base) ? [...base] : { ...base };
   for (const [key, value] of Object.entries(patch)) {
-    if (Array.isArray(value)) {
-      result[key] = value.slice(0, 20);
-    } else if (value && typeof value === 'object') {
-      result[key] = deepMerge(base?.[key] ?? {}, value);
-    } else {
-      result[key] = value;
+    if (value === undefined) {
+      continue;
     }
+
+    if (Array.isArray(value)) {
+      source[key] = value.slice(0, 20);
+      continue;
+    }
+
+    if (value && typeof value === 'object') {
+      const baseValue = source[key] && typeof source[key] === 'object' ? source[key] : {};
+      source[key] = deepMerge(baseValue, value);
+      continue;
+    }
+
+    source[key] = value;
   }
-  return result;
+
+  return source;
 }
 
 const DEFAULT_ADMIN_PROFILE = Object.freeze({
@@ -1319,34 +1330,6 @@ function sanitizeFinanceSettingsPayload(payload = {}) {
     sanitized.approvals = normaliseFinanceSettings({ approvals: payload.approvals }).approvals;
   }
   return sanitized;
-}
-
-function deepMerge(base, overrides) {
-  const result = Array.isArray(base) ? [...base] : { ...base };
-  if (!overrides || typeof overrides !== 'object') {
-    return result;
-  }
-
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === undefined) {
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      result[key] = [...value];
-      return;
-    }
-
-    if (value && typeof value === 'object') {
-      const baseValue = result[key] && typeof result[key] === 'object' ? result[key] : {};
-      result[key] = deepMerge(baseValue, value);
-      return;
-    }
-
-    result[key] = value;
-  });
-
-  return result;
 }
 
 function clampInt(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER, fallback = 0 } = {}) {

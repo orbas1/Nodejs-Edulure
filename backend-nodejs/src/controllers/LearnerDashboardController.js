@@ -225,7 +225,7 @@ function formatExpiry(value) {
   if (!trimmed) {
     return '';
   }
-  const match = trimmed.match(/^(0[1-9]|1[0-2])[\/-]?(\d{2}|\d{4})$/);
+  const match = trimmed.match(/^(0[1-9]|1[0-2])[/-]?(\d{2}|\d{4})$/);
   if (!match) {
     return '';
   }

@@ -3,6 +3,17 @@ import createHttpError from 'http-errors';
 
 import securityOperationsService from '../services/SecurityOperationsService.js';
 
+const BOOLEAN_TRUE_VALUES = new Set(['true', '1', 'yes', 'y', 'on']);
+const BOOLEAN_FALSE_VALUES = new Set(['false', '0', 'no', 'n', 'off']);
+const RISK_SORT_FIELDS = new Map([
+  ['residualrisk', 'residualRisk'],
+  ['inherentrisk', 'inherentRisk'],
+  ['updatedat', 'updatedAt'],
+  ['createdat', 'createdAt'],
+  ['nextreviewat', 'nextReviewAt'],
+  ['status', 'status']
+]);
+
 const riskIdParamSchema = Joi.object({
   riskId: Joi.number().integer().positive().required()
 });

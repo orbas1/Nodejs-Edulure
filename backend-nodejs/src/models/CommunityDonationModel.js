@@ -60,7 +60,7 @@ function normaliseReferralCode(code) {
   }
 
   const upper = value.toUpperCase();
-  if (!/^[A-Z0-9\-]{3,60}$/.test(upper)) {
+  if (!/^[A-Z0-9-]{3,60}$/.test(upper)) {
     throw new Error('referralCode must contain 3-60 alphanumeric characters or dashes');
   }
   return upper;

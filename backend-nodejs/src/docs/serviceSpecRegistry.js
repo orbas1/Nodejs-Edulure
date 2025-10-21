@@ -205,15 +205,16 @@ function loadRegistry() {
     return cachedRegistry;
   }
 
-  const indexPath = path.join(GENERATED_ROOT, 'index.json');
-  const indexJson = readJsonFile(indexPath, 'OpenAPI service index');
+  const indexJson = readJsonFile(INDEX_FILE_PATH, 'OpenAPI service index');
+  const parsedIndex = SPEC_INDEX_SCHEMA.safeParse(indexJson);
 
-  if (!Array.isArray(indexJson?.services)) {
-    throw new Error(`OpenAPI index at ${indexPath} must contain a 'services' array.`);
+  if (!parsedIndex.success) {
+    const message = parsedIndex.error.issues.map((issue) => issue.message).join('; ');
+    throw new Error(`OpenAPI index at ${INDEX_FILE_PATH} failed validation: ${message}`);
   }
 
-  const descriptors = indexJson.services.map((descriptor, idx) =>
-    sanitizeDescriptor(descriptor, indexPath, idx)
+  const descriptors = parsedIndex.data.services.map((descriptor, idx) =>
+    sanitizeDescriptor(descriptor, INDEX_FILE_PATH, idx)
   );
 
   const lookup = new Map();
@@ -231,9 +232,9 @@ function loadRegistry() {
   cachedRegistry = {
     descriptors,
     lookup,
-    indexPath,
-    generatedAt: indexJson.generatedAt ?? null,
-    baseSpec: indexJson.baseSpec ?? null
+    indexPath: INDEX_FILE_PATH,
+    generatedAt: parsedIndex.data.generatedAt ?? null,
+    baseSpec: parsedIndex.data.baseSpec ?? null
   };
 
   return cachedRegistry;
