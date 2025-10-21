@@ -388,7 +388,7 @@ export function parseDatabaseUrl(urlString, { env = process.env, tls: tlsOverrid
   let parsed;
   try {
     parsed = new URL(urlString);
-  } catch (error) {
+  } catch {
     throw new Error('DATABASE_URL must be a valid connection string');
   }
 
