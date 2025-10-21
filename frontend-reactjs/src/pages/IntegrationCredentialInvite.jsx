@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { fetchIntegrationInvite, submitIntegrationInvite } from '../api/integrationInviteApi.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 function formatDisplayDate(value) {
   if (!value) return '—';
@@ -26,6 +27,27 @@ export default function IntegrationCredentialInvite() {
   });
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState(null);
+
+  const metaDescription = useMemo(() => {
+    if (!invite) {
+      return 'Securely deliver API credentials requested by the Edulure integrations team. Tokens are vaulted immediately and never displayed.';
+    }
+    return `Submit the ${invite.providerLabel} key for the ${invite.alias} integration. Credentials are encrypted and governed by Edulure security policies.`;
+  }, [invite]);
+
+  usePageMetadata({
+    title: invite?.providerLabel
+      ? `Provide ${invite.providerLabel} credential`
+      : 'Integration credential invitation · Edulure',
+    description: metaDescription,
+    canonicalPath: token ? `/integrations/credential-invite/${token}` : '/integrations/credential-invite',
+    robots: 'noindex, nofollow',
+    analytics: {
+      page_type: 'integration_invite',
+      provider: invite?.provider ?? invite?.providerLabel ?? 'unknown',
+      environment: invite?.environment ?? 'unspecified'
+    }
+  });
 
   useEffect(() => {
     if (!token) {

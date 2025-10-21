@@ -808,6 +808,22 @@ export class SearchIngestionService {
       updatedAt: row.updatedAt
     };
   }
+
+  async getIngestionSummary() {
+    const stats = await this.clusterService.getClusterStatus();
+    const lastRuns = await recordSearchOperation('ingestion.summary', async () =>
+      this.db('search_ingestion_runs')
+        .select(['id', 'index_name as indexName', 'status', 'document_count as documentCount', 'duration_seconds as durationSeconds', 'completed_at as completedAt'])
+        .orderBy('completed_at', 'desc')
+        .limit(10)
+    ).catch(() => []);
+
+    return {
+      cluster: stats,
+      recentRuns: lastRuns,
+      generatedAt: new Date().toISOString()
+    };
+  }
 }
 
 export const searchIngestionService = new SearchIngestionService();

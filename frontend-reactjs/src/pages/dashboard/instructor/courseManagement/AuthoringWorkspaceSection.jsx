@@ -37,6 +37,7 @@ export default function AuthoringWorkspaceSection({ authoring }) {
   const coverage = authoring?.localisationCoverage ?? { totalLanguages: 0, publishedLanguages: 0, missing: [] };
 
   const [selectedDraftId, setSelectedDraftId] = useState(() => getStoredDraftId());
+  const [searchTerm, setSearchTerm] = useState('');
 
   const selectedDraft = useMemo(
     () => drafts.find((draft) => String(draft.id) === String(selectedDraftId)) ?? null,
@@ -61,6 +62,16 @@ export default function AuthoringWorkspaceSection({ authoring }) {
 
   const missingLanguages = Array.isArray(coverage.missing) ? coverage.missing : [];
 
+  const filteredDrafts = useMemo(() => {
+    if (!searchTerm) return drafts;
+    const normalised = searchTerm.toLowerCase();
+    return drafts.filter((draft) =>
+      [draft.title, draft.status, (draft.complianceNotes ?? []).join(' ')].some((value) =>
+        value ? String(value).toLowerCase().includes(normalised) : false
+      )
+    );
+  }, [drafts, searchTerm]);
+
   const hasContent = drafts.length > 0 || activeSessions.length > 0;
   if (!hasContent) {
     return null;
@@ -75,6 +86,16 @@ export default function AuthoringWorkspaceSection({ authoring }) {
             Monitor collaborative production drafts and localisation readiness.
           </p>
         </div>
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          <span>Filter drafts</span>
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search status, owner, compliance"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-600 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </label>
         <div className="dashboard-card-muted px-4 py-3 text-xs text-slate-600">
           <p className="text-sm font-semibold text-slate-900">Localisation coverage</p>
           <div className="mt-2 flex items-center gap-2">
@@ -101,13 +122,13 @@ export default function AuthoringWorkspaceSection({ authoring }) {
         <div className="dashboard-card-muted p-4">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-900">Drafts in progress</h3>
-            <span className="text-xs text-slate-500">{drafts.length} drafts</span>
+            <span className="text-xs text-slate-500">{filteredDrafts.length}/{drafts.length} drafts</span>
           </div>
-          {drafts.length === 0 ? (
+          {filteredDrafts.length === 0 ? (
             <p className="mt-2 text-xs text-slate-500">No draft projects available.</p>
           ) : (
             <ul className="mt-4 space-y-3 text-sm text-slate-600">
-              {drafts.map((draft) => (
+              {filteredDrafts.map((draft) => (
                 <li key={draft.id} className="rounded border border-slate-200 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>

@@ -246,7 +246,6 @@
       },
       "FeatureFlagEvaluation": {
         "type": "object",
-        "description": "Result of evaluating a feature flag for a particular request context.",
         "properties": {
           "key": {
             "type": "string"
@@ -255,122 +254,36 @@
             "type": "boolean"
           },
           "reason": {
-            "type": "string",
-            "description": "Reason describing why the capability is enabled or disabled."
+            "type": "string"
           },
           "variant": {
-            "type": "string",
-            "nullable": true,
-            "description": "Variant key selected for the user when enabled."
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "bucket": {
-            "type": "integer",
-            "format": "int32",
-            "nullable": true,
-            "description": "Deterministic rollout bucket used when evaluating audience splits."
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
           },
           "strategy": {
-            "type": "string",
-            "nullable": true,
-            "description": "Rollout strategy applied during the evaluation."
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "evaluatedAt": {
             "type": "string",
-            "format": "date-time",
-            "description": "Timestamp when the evaluation was performed."
-          },
-          "definition": {
-            "$ref": "#/components/schemas/FeatureFlagDefinition",
-            "nullable": true,
-            "description": "Snapshot of the flag definition used during evaluation when requested."
+            "format": "date-time"
           }
         },
         "required": [
           "key",
           "enabled",
-          "reason",
           "evaluatedAt"
-        ]
-      },
-      "FeatureFlagDefinition": {
-        "type": "object",
-        "description": "Full feature flag definition used to evaluate capability access.",
-        "properties": {
-          "key": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string",
-            "nullable": true
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "environments": {
-            "type": "array",
-            "nullable": true,
-            "description": "Environments where the flag is allowed to run.",
-            "items": {
-              "type": "string"
-            }
-          },
-          "rolloutStrategy": {
-            "type": "string",
-            "nullable": true,
-            "description": "Strategy controlling exposure such as percentage or schedule."
-          },
-          "rolloutPercentage": {
-            "type": "number",
-            "nullable": true,
-            "description": "Percentage of traffic eligible when using percentage-based rollouts."
-          },
-          "killSwitch": {
-            "type": "boolean",
-            "nullable": true,
-            "description": "Indicates whether the kill switch is forcing the flag off."
-          },
-          "variants": {
-            "type": "array",
-            "nullable": true,
-            "description": "Set of variants available for multivariate rollouts.",
-            "items": {
-              "$ref": "#/components/schemas/FeatureFlagVariant"
-            }
-          },
-          "segmentRules": {
-            "type": "object",
-            "nullable": true,
-            "additionalProperties": true,
-            "description": "Segment targeting rules evaluated during rollout."
-          }
-        },
-        "required": [
-          "key"
-        ]
-      },
-      "FeatureFlagVariant": {
-        "type": "object",
-        "description": "Weighted variant definition used when rolling out feature flags.",
-        "properties": {
-          "key": {
-            "type": "string",
-            "description": "Variant key returned to clients when selected."
-          },
-          "weight": {
-            "type": "number",
-            "nullable": true,
-            "description": "Distribution weight applied during percentage or schedule rollouts."
-          },
-          "payload": {
-            "type": "object",
-            "nullable": true,
-            "additionalProperties": true,
-            "description": "Optional JSON payload returned with the variant selection."
-          }
-        },
-        "required": [
-          "key"
         ]
       },
       "CapabilityManifestServiceStatus": {

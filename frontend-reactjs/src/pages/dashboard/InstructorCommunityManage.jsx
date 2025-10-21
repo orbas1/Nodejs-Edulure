@@ -5,6 +5,7 @@ import { useOutletContext } from "react-router-dom";
 import DashboardActionFeedback from "../../components/dashboard/DashboardActionFeedback.jsx";
 import DashboardStateMessage from "../../components/dashboard/DashboardStateMessage.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { resolveInstructorAccess } from "./instructor/instructorAccess.js";
 import {
   deleteCommunity,
   fetchCommunities,
@@ -74,7 +75,11 @@ function classNames(...values) {
 }
 
 export default function InstructorCommunityManage() {
-  const { refresh } = useOutletContext();
+  const outletContext = useOutletContext();
+  const { refresh } = outletContext ?? {};
+  const role = outletContext?.role ?? null;
+  const access = resolveInstructorAccess(role);
+  const hasAccess = access.granted;
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
 
@@ -93,7 +98,7 @@ export default function InstructorCommunityManage() {
   const [visibilityFilter, setVisibilityFilter] = useState("all");
 
   const loadCommunities = useCallback(async () => {
-    if (!token) return;
+    if (!token || !hasAccess) return;
     setLoadingList(true);
     setListError(null);
     try {
@@ -110,7 +115,7 @@ export default function InstructorCommunityManage() {
     } finally {
       setLoadingList(false);
     }
-  }, [selectedId, token]);
+  }, [hasAccess, selectedId, token]);
 
   useEffect(() => {
     loadCommunities();
@@ -122,7 +127,7 @@ export default function InstructorCommunityManage() {
   );
 
   useEffect(() => {
-    if (!token || !selectedId) {
+    if (!token || !selectedId || !hasAccess) {
       setSelectedDetail(null);
       setForm(buildFormState(selectedCommunity));
       setIsDirty(false);
@@ -153,7 +158,7 @@ export default function InstructorCommunityManage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId, token]);
+  }, [hasAccess, selectedCommunity, selectedId, token]);
 
   useEffect(() => {
     if (!selectedCommunity) {
@@ -207,7 +212,7 @@ export default function InstructorCommunityManage() {
   const handleSubmit = useCallback(
     async (event) => {
       event.preventDefault();
-      if (!token || !selectedCommunity) {
+      if (!token || !selectedCommunity || !hasAccess) {
         return;
       }
       setSaving(true);
@@ -253,12 +258,12 @@ export default function InstructorCommunityManage() {
         setSaving(false);
       }
     },
-    [form, loadCommunities, selectedCommunity, token]
+    [form, hasAccess, loadCommunities, selectedCommunity, token]
   );
 
   const handleArchive = useCallback(
     async (community) => {
-      if (!token) return;
+      if (!token || !hasAccess) return;
       if (!window.confirm(`Archive ${community.name}? Members will lose access.`)) {
         return;
       }
@@ -278,8 +283,18 @@ export default function InstructorCommunityManage() {
         setDeletingId(null);
       }
     },
-    [loadCommunities, selectedId, token]
+    [hasAccess, loadCommunities, selectedId, token]
   );
+
+  if (!hasAccess) {
+    return (
+      <DashboardStateMessage
+        variant={access.message.variant}
+        title={access.message.title}
+        description={access.message.description}
+      />
+    );
+  }
 
   const communityChannels = useMemo(() => {
     if (selectedDetail?.channels) {

@@ -5,6 +5,7 @@ import DashboardActionFeedback from '../../components/dashboard/DashboardActionF
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { fetchCommunities } from '../../api/communityApi.js';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 import {
   createCommunityPodcastEpisode,
   deleteCommunityPodcastEpisode,
@@ -63,7 +64,7 @@ function normaliseEpisode(episode) {
   };
 }
 
-export default function InstructorCommunityPodcasts() {
+function InstructorCommunityPodcasts() {
   const { dashboard, refresh } = useOutletContext();
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
@@ -591,3 +592,5 @@ export default function InstructorCommunityPodcasts() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorCommunityPodcasts);

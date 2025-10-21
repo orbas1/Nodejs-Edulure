@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 import PowerpointViewer from '../components/content/PowerpointViewer.jsx';
 import EbookReader from '../components/content/EbookReader.jsx';
 import MaterialMetadataEditor from '../components/content/MaterialMetadataEditor.jsx';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const CACHE_KEY = 'edulure.content.assets';
 
@@ -198,6 +199,31 @@ export default function ContentLibrary() {
     () => assets.find((asset) => asset.publicId === selectedAssetId) ?? null,
     [assets, selectedAssetId]
   );
+
+  const activeAssetName = selectedAsset?.metadata?.custom?.title ?? selectedAsset?.fileName ?? null;
+  const metadataDescription = useMemo(() => {
+    if (selectedAsset) {
+      const assetType = determineAssetType({ type: selectedAsset.mimeType ?? '', name: selectedAsset.fileName ?? '' });
+      const version = selectedAsset.version ? ` (v${selectedAsset.version})` : '';
+      return `Managing ${assetType} asset${version} inside the Edulure content workspace. Update metadata, review analytics, and control distribution settings.`;
+    }
+    return 'Upload, govern, and enrich learning assets across the Edulure content library with secure storage, analytics, and role-aware access controls.';
+  }, [selectedAsset]);
+
+  usePageMetadata({
+    title: activeAssetName ? `${activeAssetName} · Content library` : 'Content library workspace',
+    description: metadataDescription,
+    canonicalPath: selectedAsset ? `/content/assets/${selectedAsset.publicId}` : '/content',
+    image: selectedAsset?.metadata?.custom?.media?.coverImage?.url ?? undefined,
+    robots: 'noindex, nofollow',
+    analytics: {
+      page_type: 'content_library',
+      asset_count: assets.length,
+      viewer_mode: viewer ?? 'summary',
+      is_instructor: isInstructor,
+      has_token: Boolean(token)
+    }
+  });
 
   const fetchAssets = useCallback(async () => {
     if (!token || !isInstructor) {

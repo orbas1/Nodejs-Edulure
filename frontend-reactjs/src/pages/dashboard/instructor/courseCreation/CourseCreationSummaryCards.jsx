@@ -7,13 +7,22 @@ const summaryShape = {
 };
 
 export default function CourseCreationSummaryCards({ cards }) {
-  if (!cards.length) {
+  const safeCards = Array.isArray(cards)
+    ? cards
+        .filter((card) => card && card.label && card.value !== undefined)
+        .map((card) => ({
+          ...card,
+          helper: card.helper ?? ''
+        }))
+    : [];
+
+  if (safeCards.length === 0) {
     return null;
   }
 
   return (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {cards.map((card) => (
+      {safeCards.map((card) => (
         <div key={card.label} className="dashboard-section">
           <p className="dashboard-kicker">{card.label}</p>
           <p className="mt-3 text-2xl font-semibold text-slate-900">{card.value}</p>

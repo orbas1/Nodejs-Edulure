@@ -618,8 +618,13 @@ export default function LearnerGrowth() {
           <p className="mt-2 text-sm text-slate-600">
             Pair your experiments with tracked objectives and automate the analytics feed for the learner success team.
           </p>
-          <button type="button" onClick={() => openInitiativeForm(null)} className="dashboard-primary-pill mt-4">
-            Create initiative
+          <button
+            type="button"
+            onClick={() => openInitiativeForm(null)}
+            className="dashboard-primary-pill mt-4"
+            aria-label="Open new initiative form"
+          >
+            New initiative
           </button>
         </div>
         {statusMessage ? (

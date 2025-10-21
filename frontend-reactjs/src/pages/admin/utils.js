@@ -90,3 +90,60 @@ export function isDeepEqual(a, b) {
     return a === b;
   }
 }
+
+export function ensureArray(value) {
+  if (Array.isArray(value)) {
+    return value.filter((item) => item !== null && item !== undefined);
+  }
+
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  return [value];
+}
+
+export function ensureString(value, fallback = '') {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  const text = String(value).trim();
+  return text.length > 0 ? text : fallback;
+}
+
+export function coerceNumber(
+  value,
+  { min = Number.NEGATIVE_INFINITY, max = Number.POSITIVE_INFINITY, fallback = 0, precision } = {}
+) {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+
+  let result = numeric;
+  if (Number.isFinite(min)) {
+    result = Math.max(result, min);
+  }
+  if (Number.isFinite(max)) {
+    result = Math.min(result, max);
+  }
+
+  if (Number.isInteger(precision) && precision >= 0 && precision <= 10) {
+    const factor = 10 ** precision;
+    result = Math.round(result * factor) / factor;
+  }
+
+  return result;
+}
+
+export function takeItems(value, limit = Number.POSITIVE_INFINITY) {
+  const list = ensureArray(value);
+  if (!Number.isFinite(limit) || limit < 0) {
+    return list;
+  }
+  if (limit === Number.POSITIVE_INFINITY) {
+    return list.slice();
+  }
+  return list.slice(0, limit);
+}

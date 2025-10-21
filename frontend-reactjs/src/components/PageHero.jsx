@@ -2,8 +2,16 @@ import PropTypes from 'prop-types';
 
 const DEFAULT_BADGES = ['Strategists', 'Designers', 'Founders', 'Mentors'];
 
-export default function PageHero({ title, description, subtitle, cta }) {
+export default function PageHero({ title, description, subtitle, cta, badges, image }) {
   const heroDescription = description ?? subtitle;
+  const heroBadges = Array.isArray(badges) && badges.length ? badges : DEFAULT_BADGES;
+  const defaultVisual = {
+    src: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1600&q=80',
+    alt: 'Creators collaborating in an online session',
+    caption: 'Sessions that feel like a shared studio',
+    subcaption: 'Live workshops, async circles, and mentor huddles—captured from the community feed.'
+  };
+  const visual = image ? { ...defaultVisual, ...image } : defaultVisual;
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
@@ -23,7 +31,7 @@ export default function PageHero({ title, description, subtitle, cta }) {
           ) : null}
           {cta ? <div className="mt-8 flex flex-wrap items-center gap-4">{cta}</div> : null}
           <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-white/80">
-            {DEFAULT_BADGES.map((label) => (
+            {heroBadges.map((label) => (
               <span
                 key={label}
                 className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1"
@@ -39,17 +47,15 @@ export default function PageHero({ title, description, subtitle, cta }) {
             <div className="absolute -left-12 -top-12 h-28 w-28 rounded-full bg-primary/40 blur-3xl" />
             <div className="absolute -right-10 bottom-10 h-32 w-32 rounded-full bg-emerald-500/30 blur-3xl" />
             <div className="relative overflow-hidden rounded-4xl border border-white/10 bg-white/10 shadow-[0_45px_90px_-40px_rgba(56,189,248,0.7)] backdrop-blur-xl">
-              <img
-                src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1600&q=80"
-                alt="Creators collaborating in an online session"
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 to-transparent p-6 text-sm text-white/80">
-                <p className="font-semibold text-white">Sessions that feel like a shared studio</p>
-                <p className="mt-1 text-xs text-white/70">
-                  Live workshops, async circles, and mentor huddles—captured from the community feed.
-                </p>
-              </div>
+              <img src={visual.src} alt={visual.alt} className="h-full w-full object-cover" />
+              {(visual.caption || visual.subcaption) && (
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/80 to-transparent p-6 text-sm text-white/80">
+                  {visual.caption && <p className="font-semibold text-white">{visual.caption}</p>}
+                  {visual.subcaption && (
+                    <p className="mt-1 text-xs text-white/70">{visual.subcaption}</p>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -62,11 +68,20 @@ PageHero.propTypes = {
   title: PropTypes.string.isRequired,
   description: PropTypes.string,
   subtitle: PropTypes.string,
-  cta: PropTypes.node
+  cta: PropTypes.node,
+  badges: PropTypes.arrayOf(PropTypes.string),
+  image: PropTypes.shape({
+    src: PropTypes.string.isRequired,
+    alt: PropTypes.string.isRequired,
+    caption: PropTypes.string,
+    subcaption: PropTypes.string
+  })
 };
 
 PageHero.defaultProps = {
   description: undefined,
   subtitle: undefined,
-  cta: null
+  cta: null,
+  badges: undefined,
+  image: undefined
 };

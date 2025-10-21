@@ -114,13 +114,16 @@ function normaliseMessagePermission(value) {
 }
 
 export default function LearnerSafetySection({ privacy, messaging, followers, unreadMessages, className }) {
-  const pendingApprovals = followers?.pending?.length ?? 0;
-  const outgoingRequests = followers?.outgoing?.length ?? 0;
-  const followerCount = followers?.followers ?? 0;
-  const followingCount = followers?.following ?? 0;
+  const pendingApprovals = Array.isArray(followers?.pending) ? followers.pending.length : Number(followers?.pending ?? 0);
+  const outgoingRequests = Array.isArray(followers?.outgoing) ? followers.outgoing.length : Number(followers?.outgoing ?? 0);
+  const followerCount = Number(followers?.followers ?? 0);
+  const followingCount = Number(followers?.following ?? 0);
+  const followApprovalRequired = Boolean(privacy?.followApprovalRequired);
+  const shareActivity = Boolean(privacy?.shareActivity);
+  const notificationsEnabled = Boolean(messaging?.notificationsEnabled);
 
-  const privacyTone = privacy?.followApprovalRequired ? 'good' : 'warn';
-  const messagingTone = unreadMessages > 0 ? 'warn' : messaging?.notificationsEnabled ? 'good' : 'info';
+  const privacyTone = followApprovalRequired ? 'good' : 'warn';
+  const messagingTone = unreadMessages > 0 ? 'warn' : notificationsEnabled ? 'good' : 'info';
   const networkTone = pendingApprovals > 0 ? 'info' : 'good';
 
   const privacyItems = [
@@ -131,13 +134,13 @@ export default function LearnerSafetySection({ privacy, messaging, followers, un
     },
     {
       label: 'Follow approvals',
-      status: privacy?.followApprovalRequired ? 'Required' : 'Auto-approve',
-      tone: privacy?.followApprovalRequired ? 'good' : 'warn'
+      status: followApprovalRequired ? 'Required' : 'Auto-approve',
+      tone: followApprovalRequired ? 'good' : 'warn'
     },
     {
       label: 'Activity broadcast',
-      status: privacy?.shareActivity ? 'Enabled' : 'Muted',
-      tone: privacy?.shareActivity ? 'info' : 'good'
+      status: shareActivity ? 'Enabled' : 'Muted',
+      tone: shareActivity ? 'info' : 'good'
     }
   ];
 
@@ -154,8 +157,8 @@ export default function LearnerSafetySection({ privacy, messaging, followers, un
     },
     {
       label: 'Push notifications',
-      status: messaging?.notificationsEnabled ? 'Enabled' : 'Disabled',
-      tone: messaging?.notificationsEnabled ? 'good' : 'warn'
+      status: notificationsEnabled ? 'Enabled' : 'Disabled',
+      tone: notificationsEnabled ? 'good' : 'warn'
     }
   ];
 

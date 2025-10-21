@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -89,6 +89,22 @@ describe('<DashboardAffiliate />', () => {
       refresh: vi.fn()
     });
     useAuthMock.mockReturnValue({ session: { tokens: { accessToken: 'token-123' } } });
+    if (typeof URL.createObjectURL !== 'function') {
+      Object.defineProperty(URL, 'createObjectURL', {
+        configurable: true,
+        writable: true,
+        value: () => {
+          throw new Error('createObjectURL not implemented');
+        }
+      });
+    }
+    if (typeof URL.revokeObjectURL !== 'function') {
+      Object.defineProperty(URL, 'revokeObjectURL', {
+        configurable: true,
+        writable: true,
+        value: () => {}
+      });
+    }
     createObjectURLSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:download');
     revokeObjectURLSpy = vi.spyOn(URL, 'revokeObjectURL').mockReturnValue(undefined);
   });
@@ -126,10 +142,12 @@ describe('<DashboardAffiliate />', () => {
     render(<DashboardAffiliate />);
 
     await user.selectOptions(screen.getByLabelText(/^channel$/i, { selector: 'select' }), '2');
-    await user.selectOptions(screen.getByLabelText(/^status$/i, { selector: 'select' }), 'scheduled');
+    await user.selectOptions(screen.getByLabelText(/payout status/i, { selector: 'select' }), 'scheduled');
 
-    expect(screen.getByText(/YouTube · YT-PAUSED/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Instagram · IG-ACTIVE/i)).toBeNull();
+    const payoutSection = screen.getByTestId('affiliate-payouts-section');
+
+    expect(within(payoutSection).getByRole('cell', { name: /YouTube · YT-PAUSED/i })).toBeInTheDocument();
+    expect(within(payoutSection).queryByRole('cell', { name: /Instagram · IG-ACTIVE/i })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: /export payouts/i }));
 

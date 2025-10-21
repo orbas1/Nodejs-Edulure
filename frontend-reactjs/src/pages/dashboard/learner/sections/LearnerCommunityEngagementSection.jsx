@@ -7,7 +7,8 @@ const engagementEntryPropType = PropTypes.shape({
 });
 
 function EngagementRow({ name, participation, percentage }) {
-  const width = Math.max(percentage, 6);
+  const safePercentage = Math.max(0, Math.min(percentage, 100));
+  const width = participation > 0 ? Math.max(safePercentage, 6) : 0;
   return (
     <li>
       <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">

@@ -120,11 +120,142 @@ const DEFAULT_FINANCE_ALERTS = Object.freeze({
   notifyThresholdPercent: 80
 });
 
+const MESSAGE_PERMISSION_CANONICAL = new Map([
+  ['everyone', 'everyone'],
+  ['public', 'everyone'],
+  ['all', 'everyone'],
+  ['followers', 'followers'],
+  ['followers_only', 'followers'],
+  ['friends', 'followers'],
+  ['connections', 'followers'],
+  ['no-one', 'none'],
+  ['no_one', 'none'],
+  ['none', 'none'],
+  ['private', 'none']
+]);
+
+const MESSAGE_PERMISSION_DEFAULT = 'followers';
+
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
     operatorDashboardService = new OperatorDashboardService();
   }
   return operatorDashboardService;
+}
+
+function toPositiveInteger(value, { round = true } = {}) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 0;
+  }
+  return round ? Math.round(numeric) : numeric;
+}
+
+function normaliseSupportMetrics(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  const latestUpdatedAtDate = normaliseDate(source.latestUpdatedAt);
+  const averageResponseMinutes = toPositiveInteger(source.averageResponseMinutes);
+  const firstResponseMinutes = toPositiveInteger(
+    source.firstResponseMinutes ?? source.firstResponse ?? averageResponseMinutes
+  );
+
+  return {
+    open: toPositiveInteger(source.open),
+    waiting: toPositiveInteger(source.waiting),
+    resolved: toPositiveInteger(source.resolved),
+    closed: toPositiveInteger(source.closed),
+    awaitingLearner: toPositiveInteger(source.awaitingLearner),
+    averageResponseMinutes,
+    firstResponseMinutes,
+    latestUpdatedAt: latestUpdatedAtDate ? latestUpdatedAtDate.toISOString() : null
+  };
+}
+
+function normaliseSystemPreferences(preferences) {
+  const source = preferences && typeof preferences === 'object' ? preferences : {};
+  const nestedPrefs = source.preferences && typeof source.preferences === 'object' ? source.preferences : {};
+  const updatedAt = normaliseDate(source.updatedAt);
+
+  return {
+    language: typeof source.language === 'string' && source.language ? source.language : DEFAULT_SYSTEM_SETTINGS.language,
+    region: typeof source.region === 'string' && source.region ? source.region : DEFAULT_SYSTEM_SETTINGS.region,
+    timezone:
+      typeof source.timezone === 'string' && source.timezone ? source.timezone : DEFAULT_SYSTEM_SETTINGS.timezone,
+    notificationsEnabled:
+      typeof source.notificationsEnabled === 'boolean'
+        ? source.notificationsEnabled
+        : DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
+    digestEnabled:
+      typeof source.digestEnabled === 'boolean' ? source.digestEnabled : DEFAULT_SYSTEM_SETTINGS.digestEnabled,
+    autoPlayMedia:
+      typeof source.autoPlayMedia === 'boolean' ? source.autoPlayMedia : DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
+    highContrast:
+      typeof source.highContrast === 'boolean' ? source.highContrast : DEFAULT_SYSTEM_SETTINGS.highContrast,
+    reducedMotion:
+      typeof source.reducedMotion === 'boolean' ? source.reducedMotion : DEFAULT_SYSTEM_SETTINGS.reducedMotion,
+    preferences: {
+      interfaceDensity:
+        typeof nestedPrefs.interfaceDensity === 'string' && nestedPrefs.interfaceDensity
+          ? nestedPrefs.interfaceDensity
+          : DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
+      analyticsOptIn:
+        typeof nestedPrefs.analyticsOptIn === 'boolean'
+          ? nestedPrefs.analyticsOptIn
+          : DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
+      subtitleLanguage:
+        typeof nestedPrefs.subtitleLanguage === 'string' && nestedPrefs.subtitleLanguage
+          ? nestedPrefs.subtitleLanguage
+          : typeof source.language === 'string' && source.language
+            ? source.language
+            : DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
+      audioDescription:
+        typeof nestedPrefs.audioDescription === 'boolean'
+          ? nestedPrefs.audioDescription
+          : DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
+    },
+    updatedAt: updatedAt ? updatedAt.toISOString() : null
+  };
+}
+
+function normalisePrivacySettings(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const visibilityRaw = typeof source.profileVisibility === 'string' ? source.profileVisibility.toLowerCase() : '';
+  const visibility = ['public', 'private', 'connections'].includes(visibilityRaw) ? visibilityRaw : 'public';
+
+  const messagePermissionRaw =
+    typeof source.messagePermission === 'string' ? source.messagePermission.toLowerCase() : '';
+  const messagePermission =
+    MESSAGE_PERMISSION_CANONICAL.get(messagePermissionRaw) ?? MESSAGE_PERMISSION_DEFAULT;
+
+  return {
+    visibility,
+    followApprovalRequired: Boolean(source.followApprovalRequired),
+    shareActivity: source.shareActivity !== false,
+    messagePermission
+  };
+}
+
+function normaliseNotifications(notifications) {
+  if (!Array.isArray(notifications)) {
+    return [];
+  }
+
+  return notifications
+    .filter((item) => item && (item.id || item.title))
+    .map((item) => ({
+      id: item.id ?? `notification-${crypto.randomUUID()}`,
+      title: item.title ?? 'Notification',
+      type: item.type ?? 'system',
+      timestamp: (() => {
+        const parsed = normaliseDate(item.timestamp);
+        if (parsed) {
+          return parsed.toISOString();
+        }
+        return item.timestamp ?? null;
+      })(),
+      read: item.read ?? false,
+      cta: item.cta ?? null
+    }));
 }
 
 export function formatCurrency(amountCents, currency = 'USD') {
@@ -376,6 +507,8 @@ export function buildLearnerDashboard({
   ebooks = new Map(),
   invoices = [],
   paymentIntents = [],
+  paymentMethodsRaw = [],
+  billingContactsRaw = [],
   ebookRecommendations = [],
   communityMemberships = [],
   communityEvents = [],
@@ -885,8 +1018,8 @@ export function buildLearnerDashboard({
                 enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
                 instructions: financePreferencesRaw.reimbursements.instructions ?? null
           }
-            : { enabled: false, instructions: null }
-      };
+        : { enabled: false, instructions: null }
+  };
 
   const financePurchasesList = Array.isArray(financePurchases)
     ? financePurchases.map((purchase) => ({
@@ -946,33 +1079,7 @@ export function buildLearnerDashboard({
     reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
   };
 
-      const systemSettings = {
-        language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
-        region: systemPreferences?.region ?? DEFAULT_SYSTEM_SETTINGS.region,
-        timezone: systemPreferences?.timezone ?? DEFAULT_SYSTEM_SETTINGS.timezone,
-        notificationsEnabled:
-          systemPreferences?.notificationsEnabled ?? DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
-        digestEnabled: systemPreferences?.digestEnabled ?? DEFAULT_SYSTEM_SETTINGS.digestEnabled,
-        autoPlayMedia: systemPreferences?.autoPlayMedia ?? DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
-        highContrast: systemPreferences?.highContrast ?? DEFAULT_SYSTEM_SETTINGS.highContrast,
-        reducedMotion: systemPreferences?.reducedMotion ?? DEFAULT_SYSTEM_SETTINGS.reducedMotion,
-        preferences: {
-          interfaceDensity:
-            systemPreferences?.preferences?.interfaceDensity ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
-          analyticsOptIn:
-            systemPreferences?.preferences?.analyticsOptIn ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
-          subtitleLanguage:
-            systemPreferences?.preferences?.subtitleLanguage ??
-            systemPreferences?.language ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
-          audioDescription:
-            systemPreferences?.preferences?.audioDescription ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
-        },
-        updatedAt: systemPreferences?.updatedAt ?? null
-      };
+  const systemSettings = normaliseSystemPreferences(systemPreferences);
 
   const notificationsList = Array.isArray(notifications) ? [...notifications] : [];
   activeTutorBookings.forEach((booking) => {
@@ -1229,16 +1336,88 @@ export function buildLearnerDashboard({
         })()
       };
 
-      const privacy = {
-        visibility: privacySettings?.profileVisibility ?? 'public',
-        followApprovalRequired: Boolean(privacySettings?.followApprovalRequired),
-        shareActivity: privacySettings?.shareActivity ?? true,
-    messagePermission: privacySettings?.messagePermission ?? 'followers'
+  const adsSection = {
+    campaigns: adCampaigns,
+    summary: {
+      activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
+      totalSpend: formatCurrency(
+        adCampaignsList.reduce((total, campaign) => total + Number(campaign.totalSpendCents ?? 0), 0),
+        adsCurrency
+      ),
+      averageDailyBudget: adCampaignsList.length
+        ? formatCurrency(
+            Math.round(
+              adCampaignsList.reduce((total, campaign) => total + Number(campaign.dailyBudgetCents ?? 0), 0) /
+                adCampaignsList.length
+            ),
+            adsCurrency
+          )
+        : formatCurrency(0, adsCurrency)
+    }
   };
 
+  const instructorApplication = instructorApplicationRaw
+    ? {
+        id: instructorApplicationRaw.id,
+        status: instructorApplicationRaw.status,
+        stage: instructorApplicationRaw.stage,
+        motivation: instructorApplicationRaw.motivation,
+        portfolioUrl: instructorApplicationRaw.portfolioUrl,
+        experienceYears: instructorApplicationRaw.experienceYears,
+        teachingFocus: instructorApplicationRaw.teachingFocus,
+        availability: instructorApplicationRaw.availability,
+        marketingAssets: instructorApplicationRaw.marketingAssets,
+        submittedAt: instructorApplicationRaw.submittedAt,
+        reviewedAt: instructorApplicationRaw.reviewedAt,
+        decisionNote: instructorApplicationRaw.decisionNote
+      }
+    : null;
+
+  const teachSection = {
+    application: instructorApplication,
+    status: instructorApplication?.status ?? 'draft',
+    nextSteps: (() => {
+      if (!instructorApplication) {
+        return [
+          'Complete your instructor application to access cohort production resources.',
+          'Prepare a portfolio link that highlights flagship teaching moments.'
+        ];
+      }
+      if (instructorApplication.status === 'submitted') {
+        return [
+          'Our partnerships team is reviewing your submission.',
+          'Expect an interview scheduling link within 48 hours.'
+        ];
+      }
+      if (instructorApplication.status === 'interview') {
+        return [
+          'Confirm your cohort launch availability and desired curriculum focus.',
+          'Upload marketing assets to accelerate go-to-market planning.'
+        ];
+      }
+      if (instructorApplication.status === 'approved') {
+        return [
+          'Schedule onboarding workshop with curriculum producers.',
+          'Share campaign creative for Edulure Ads placement.'
+        ];
+      }
+      if (instructorApplication.status === 'rejected') {
+        return [
+          'Review decision notes and request feedback from the instructor partnerships team.'
+        ];
+      }
+      return [
+        'Document your teaching motivation and curriculum outcomes.',
+        'Add marketing assets to strengthen your application.'
+      ];
+    })()
+  };
+
+  const privacy = normalisePrivacySettings(privacySettings);
+
   const messaging = {
-    unreadThreads: messagingSummary?.unreadThreads ?? 0,
-    notificationsEnabled: messagingSummary?.notificationsEnabled ?? true
+    unreadThreads: toPositiveInteger(messagingSummary?.unreadThreads),
+    notificationsEnabled: messagingSummary?.notificationsEnabled !== false
   };
 
   const communityNameMap = new Map();
@@ -2859,6 +3038,67 @@ function determineRiskLevel(enrollment, stats, now) {
   return 'low';
 }
 
+function normaliseEnrollment(enrollment = {}, collaboratorDirectory = new Map()) {
+  const metadata = safeJsonParse(enrollment.metadata, {});
+  const userObject = typeof enrollment.user === 'object' && enrollment.user ? enrollment.user : null;
+  const learnerMeta =
+    (metadata && (metadata.learner ?? metadata.user ?? metadata.profile ?? {})) || {};
+
+  const derivedUserId =
+    enrollment.userId ??
+    userObject?.id ??
+    learnerMeta?.id ??
+    learnerMeta?.userId ??
+    learnerMeta?.learnerId ??
+    metadata.userId ??
+    metadata.learnerId ??
+    null;
+
+  const directoryUser = derivedUserId ? collaboratorDirectory.get?.(derivedUserId) : null;
+
+  const firstName =
+    enrollment.firstName ??
+    learnerMeta?.firstName ??
+    learnerMeta?.givenName ??
+    metadata.firstName ??
+    metadata.givenName ??
+    userObject?.firstName ??
+    directoryUser?.firstName ??
+    null;
+
+  const lastName =
+    enrollment.lastName ??
+    learnerMeta?.lastName ??
+    learnerMeta?.familyName ??
+    metadata.lastName ??
+    metadata.familyName ??
+    userObject?.lastName ??
+    directoryUser?.lastName ??
+    null;
+
+  const email =
+    enrollment.email ??
+    learnerMeta?.email ??
+    learnerMeta?.emailAddress ??
+    metadata.email ??
+    metadata.contactEmail ??
+    userObject?.email ??
+    directoryUser?.email ??
+    null;
+
+  return {
+    ...enrollment,
+    metadata,
+    userId: derivedUserId ?? enrollment.userId ?? null,
+    resolvedLearner: {
+      id: derivedUserId ?? directoryUser?.id ?? null,
+      firstName,
+      lastName,
+      email
+    }
+  };
+}
+
 function buildCourseWorkspace({
   courses = [],
   modules = [],
@@ -2893,11 +3133,17 @@ function buildCourseWorkspace({
     return workspace;
   }
 
+  const enrollmentRecords = enrollments.map((enrollment) =>
+    normaliseEnrollment(enrollment, collaboratorDirectory)
+  );
+
   const languageLabel = createLanguageDisplay();
   const courseById = new Map();
   courses.forEach((course) => {
     const metadata = safeJsonParse(course.metadata, {});
-    courseById.set(course.id, { ...course, metadata });
+    const releaseAt = normaliseDate(course.releaseAt);
+    const updatedAt = normaliseDate(course.updatedAt);
+    courseById.set(course.id, { ...course, metadata, releaseAt, updatedAt });
   });
 
   const modulesByCourse = new Map();
@@ -2932,9 +3178,9 @@ function buildCourseWorkspace({
   });
 
   const enrollmentsByCourse = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const list = enrollmentsByCourse.get(enrollment.courseId) ?? [];
-    list.push({ ...enrollment, metadata: safeJsonParse(enrollment.metadata, {}) });
+    list.push(enrollment);
     enrollmentsByCourse.set(enrollment.courseId, list);
   });
 
@@ -2969,6 +3215,7 @@ function buildCourseWorkspace({
   });
 
   const catalogue = courses.map((course) => {
+    const courseRecord = courseById.get(course.id) ?? { ...course, metadata: safeJsonParse(course.metadata, {}) };
     const modulesForCourse = modulesByCourse.get(course.id) ?? [];
     const lessonsForCourse = lessonsByCourse.get(course.id) ?? [];
     const courseEnrollments = enrollmentsByCourse.get(course.id) ?? [];
@@ -2981,9 +3228,9 @@ function buildCourseWorkspace({
             totalEnrollments
         )
       : 0;
-    const languages = Array.isArray(course.languages) ? course.languages : [];
-    const publishedLocales = Array.isArray(course.metadata?.publishedLocales)
-      ? course.metadata.publishedLocales
+    const languages = Array.isArray(courseRecord.languages) ? courseRecord.languages : [];
+    const publishedLocales = Array.isArray(courseRecord.metadata?.publishedLocales)
+      ? courseRecord.metadata.publishedLocales
       : [];
 
     const languageEntries = languages.map((code) => {
@@ -3001,24 +3248,24 @@ function buildCourseWorkspace({
     const updatedDate = normaliseDate(course.updatedAt);
 
     return {
-      id: course.publicId ?? `course-${course.id}`,
+      id: courseRecord.publicId ?? `course-${course.id}`,
       courseId: course.id,
-      title: course.title,
-      summary: course.summary,
-      status: course.status,
-      format: course.deliveryFormat ?? course.metadata?.format ?? 'cohort',
+      title: courseRecord.title,
+      summary: courseRecord.summary,
+      status: courseRecord.status,
+      format: courseRecord.deliveryFormat ?? courseRecord.metadata?.format ?? 'cohort',
       languages: languageEntries,
       price: {
-        currency: course.priceCurrency,
-        amountCents: Number(course.priceAmount ?? 0),
-        formatted: formatCurrency(course.priceAmount ?? 0, course.priceCurrency)
+        currency: courseRecord.priceCurrency,
+        amountCents: Number(courseRecord.priceAmount ?? 0),
+        formatted: formatCurrency(courseRecord.priceAmount ?? 0, courseRecord.priceCurrency)
       },
       rating: {
-        average: Number(course.ratingAverage ?? 0),
-        count: Number(course.ratingCount ?? 0)
+        average: Number(courseRecord.ratingAverage ?? 0),
+        count: Number(courseRecord.ratingCount ?? 0)
       },
       learners: {
-        total: Number(course.enrolmentCount ?? totalEnrollments),
+        total: Number(courseRecord.enrolmentCount ?? totalEnrollments),
         active: activeEnrollments.length,
         completed: completedEnrollments.length
       },
@@ -3032,21 +3279,24 @@ function buildCourseWorkspace({
         published: languageEntries.filter((entry) => entry.published).length,
         missing: languageEntries.filter((entry) => !entry.published).map((entry) => entry.code)
       },
-      automation: course.metadata?.dripCampaign ?? null,
-      refresherLessons: Array.isArray(course.metadata?.refresherLessons) ? course.metadata.refresherLessons : []
+      automation: courseRecord.metadata?.dripCampaign ?? null,
+      refresherLessons: Array.isArray(courseRecord.metadata?.refresherLessons)
+        ? courseRecord.metadata.refresherLessons
+        : []
     };
   });
 
   workspace.catalogue = catalogue;
 
   const cohortMap = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const course = courseById.get(enrollment.courseId);
     if (!course) return;
     const cohortLabel = enrollment.metadata?.cohort ?? 'General';
     const key = `${enrollment.courseId}:${cohortLabel}`;
     let record = cohortMap.get(key);
     if (!record) {
+      const releaseAtDate = normaliseDate(course?.releaseAt);
       record = {
         id: `cohort-${enrollment.courseId}-${cohortLabel}`.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase(),
         courseId: enrollment.courseId,
@@ -3300,10 +3550,9 @@ function buildCourseWorkspace({
     }
   };
 
-  const roster = enrollments.map((enrollment) => {
+  const roster = enrollmentRecords.map((enrollment) => {
     const stats = progressByEnrollment.get(enrollment.id) ?? { completionRatio: 0, lastCompletedAt: null };
     const course = courseById.get(enrollment.courseId);
-    const user = collaboratorDirectory.get(enrollment.userId);
     const lessonsForCourse = lessonsByCourse.get(enrollment.courseId) ?? [];
     const enrollmentMetadata =
       typeof enrollment.metadata === 'string'
@@ -3311,8 +3560,8 @@ function buildCourseWorkspace({
         : enrollment.metadata ?? {};
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
-      learnerId: enrollment.userId,
-      name: user ? resolveName(user.firstName, user.lastName, user.email) : `Learner ${enrollment.userId}`,
+      learnerId: identity.id ?? enrollment.userId ?? directoryUser?.id ?? null,
+      name: displayName,
       courseId: enrollment.courseId,
       courseTitle: course?.title ?? 'Course',
       status: enrollment.status,

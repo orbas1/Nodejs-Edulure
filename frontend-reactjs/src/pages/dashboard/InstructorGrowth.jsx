@@ -5,6 +5,7 @@ import DashboardActionFeedback from '../../components/dashboard/DashboardActionF
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { fetchCommunities } from '../../api/communityApi.js';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 import {
   createCommunityGrowthExperiment,
   deleteCommunityGrowthExperiment,
@@ -75,7 +76,7 @@ function formatMetric(value) {
   return Number(value).toFixed(2);
 }
 
-export default function InstructorGrowth() {
+function InstructorGrowth() {
   const { refresh } = useOutletContext();
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
@@ -629,3 +630,5 @@ export default function InstructorGrowth() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorGrowth);

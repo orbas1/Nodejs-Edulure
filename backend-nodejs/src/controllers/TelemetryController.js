@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import Joi from 'joi';
+import { ZodError, z } from 'zod';
 
 import telemetryIngestionService from '../services/TelemetryIngestionService.js';
 import telemetryWarehouseService from '../services/TelemetryWarehouseService.js';
@@ -14,6 +15,26 @@ const consentRequestSchema = z.object({
   metadata: z.record(z.any()).optional(),
   evidence: z.record(z.any()).optional()
 });
+
+function formatValidationIssues(issues) {
+  return issues.map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.join('.') : '',
+    message: issue.message,
+    code: issue.code
+  }));
+}
+
+function parseConsentRequest(payload) {
+  const result = consentRequestSchema.safeParse(payload ?? {});
+  if (!result.success) {
+    const error = new Error('Telemetry consent payload is invalid');
+    error.status = 422;
+    error.code = 'INVALID_TELEMETRY_CONSENT';
+    error.details = formatValidationIssues(result.error.issues);
+    throw error;
+  }
+  return result.data;
+}
 
 function resolveTenantId(req, explicitTenantId) {
   if (explicitTenantId) {
@@ -62,13 +83,17 @@ export default class TelemetryController {
         event: sanitiseEventResponse(result.event)
       });
     } catch (error) {
+      if (error instanceof ZodError) {
+        error.status = 422;
+        error.details = error.errors.map((issue) => issue.message);
+      }
       return next(error);
     }
   }
 
   static async recordConsentDecision(req, res, next) {
     try {
-      const parsed = consentRequestSchema.parse(req.body ?? {});
+      const parsed = parseConsentRequest(req.body ?? {});
       const tenantId = resolveTenantId(req, parsed.tenantId);
       const userId = parsed.userId ?? req.user?.id;
 
@@ -92,14 +117,27 @@ export default class TelemetryController {
 
       return res.status(201).json({ consent: record });
     } catch (error) {
+      if (error instanceof ZodError) {
+        error.status = 422;
+        error.details = error.errors.map((issue) => issue.message);
+      }
       return next(error);
     }
   }
 
   static async listFreshness(req, res, next) {
     try {
-      const limit = Math.max(1, Math.min(200, Number(req.query.limit ?? 50)));
-      const monitors = await TelemetryFreshnessMonitorModel.listSnapshots({ limit });
+      const { value, error } = freshnessQuerySchema.validate(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (error) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+        throw error;
+      }
+
+      const monitors = await TelemetryFreshnessMonitorModel.listSnapshots({ limit: value.limit });
       return res.json({ monitors });
     } catch (error) {
       return next(error);

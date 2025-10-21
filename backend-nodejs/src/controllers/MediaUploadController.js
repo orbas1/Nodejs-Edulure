@@ -16,9 +16,33 @@ const uploadSchema = Joi.object({
   kind: Joi.string()
     .valid(...Object.keys(KIND_CONFIG))
     .default('image'),
-  filename: Joi.string().trim().max(255).required(),
-  mimeType: Joi.string().trim().max(120).required(),
-  size: Joi.number().integer().min(1).required(),
+  filename: Joi.string()
+    .trim()
+    .max(255)
+    .custom((value, helpers) => {
+      if (!value) {
+        return helpers.error('any.required');
+      }
+      if (value.includes('/') || value.includes('\\')) {
+        return helpers.error('string.path');
+      }
+      if (value.includes('..')) {
+        return helpers.error('string.pathTraversal');
+      }
+      return value;
+    }, 'storage key filename sanitiser')
+    .messages({
+      'string.path': 'Filename must not include directory separators',
+      'string.pathTraversal': 'Filename must not include parent directory segments'
+    })
+    .required(),
+  mimeType: Joi.string()
+    .trim()
+    .pattern(/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/i)
+    .max(120)
+    .messages({ 'string.pattern.base': 'mimeType must be a valid media type string (type/subtype)' })
+    .required(),
+  size: Joi.number().integer().min(1).max(524_288_000).required(),
   checksum: Joi.string().hex().length(64).optional(),
   visibility: Joi.string().valid('public', 'workspace', 'private').optional()
 });

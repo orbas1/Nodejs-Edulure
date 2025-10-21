@@ -70,4 +70,42 @@ describe('AuthoringWorkspaceSection', () => {
 
     expect(window.localStorage.getItem(LAST_DRAFT_KEY)).toBeNull();
   });
+
+  it('restores the last opened draft from persisted storage', () => {
+    window.localStorage.setItem(LAST_DRAFT_KEY, 'draft-1');
+
+    const authoring = {
+      drafts: [
+        {
+          id: 'draft-1',
+          title: 'Leadership Lab refresh',
+          status: 'draft',
+          collaborators: [],
+          activeSessions: [],
+          locales: ['en-US'],
+          complianceNotes: [],
+          publishingChannels: [],
+          analyticsTargets: {}
+        }
+      ],
+      activeSessions: [],
+      localisationCoverage: { totalLanguages: 1, publishedLanguages: 1, missing: [] }
+    };
+
+    render(<AuthoringWorkspaceSection authoring={authoring} />);
+
+    expect(screen.getByText('Open in creation studio')).toBeInTheDocument();
+  });
+
+  it('shows empty-state messaging when drafts are unavailable', () => {
+    const authoring = {
+      drafts: [],
+      activeSessions: [],
+      localisationCoverage: { totalLanguages: 0, publishedLanguages: 0, missing: [] }
+    };
+
+    render(<AuthoringWorkspaceSection authoring={authoring} />);
+
+    expect(screen.getByText('No draft projects available.')).toBeInTheDocument();
+  });
 });

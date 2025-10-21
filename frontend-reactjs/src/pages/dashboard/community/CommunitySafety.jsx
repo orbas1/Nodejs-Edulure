@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import DashboardStateMessage from '../../../components/dashboard/DashboardStateMessage.jsx';
 import { resolveCommunityIncident } from '../../../api/communityApi.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import useRoleGuard from '../../../hooks/useRoleGuard.js';
 
 export default function CommunitySafety({ dashboard, onRefresh }) {
+  const { allowed, explanation } = useRoleGuard(['community', 'admin']);
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const initialIncidents = useMemo(
@@ -67,6 +69,16 @@ export default function CommunitySafety({ dashboard, onRefresh }) {
     },
     [backlog, incidents, token]
   );
+
+  if (!allowed) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Community privileges required"
+        description={explanation ?? 'Switch to a community workspace to triage safety incidents.'}
+      />
+    );
+  }
 
   if (!dashboard) {
     return (

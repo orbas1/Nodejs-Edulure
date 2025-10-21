@@ -13,6 +13,7 @@ import RoleManagementPanel from './community/instructorChats/RoleManagementPanel
 import EventPlanner from './community/instructorChats/EventPlanner.jsx';
 import ResourceLibraryPanel from './community/instructorChats/ResourceLibraryPanel.jsx';
 import useCommunityChatWorkspace from './community/instructorChats/useCommunityChatWorkspace.js';
+import { resolveInstructorAccess } from './instructor/instructorAccess.js';
 
 const initialComposerState = {
   messageType: 'text',
@@ -81,6 +82,9 @@ export default function InstructorCommunityChats() {
   const { session, isAuthenticated } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
   const outletContext = useOutletContext();
+  const role = outletContext?.role ?? null;
+  const access = resolveInstructorAccess(role);
+  const hasAccess = access.granted;
 
   const [communitiesState, setCommunitiesState] = useState({ items: [], loading: false, error: null });
   const [selectedCommunityId, setSelectedCommunityId] = useState(null);
@@ -123,10 +127,13 @@ export default function InstructorCommunityChats() {
     workspaceNotice,
     setWorkspaceNotice,
     refreshWorkspace
-  } = useCommunityChatWorkspace({ communityId: selectedCommunityId, token });
+  } = useCommunityChatWorkspace({
+    communityId: hasAccess ? selectedCommunityId : null,
+    token: hasAccess ? token : null
+  });
 
   useEffect(() => {
-    if (!isAuthenticated || !token) {
+    if (!isAuthenticated || !token || !hasAccess) {
       setCommunitiesState({ items: [], loading: false, error: null });
       setSelectedCommunityId(null);
       return undefined;
@@ -155,7 +162,7 @@ export default function InstructorCommunityChats() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, token, communityReloadToken]);
+  }, [hasAccess, isAuthenticated, token, communityReloadToken]);
 
   useEffect(() => {
     setComposerState(initialComposerState);
@@ -446,6 +453,16 @@ export default function InstructorCommunityChats() {
       <DashboardStateMessage
         title="Sign in required"
         description="Sign in to manage community chats and live operations."
+      />
+    );
+  }
+
+  if (!hasAccess) {
+    return (
+      <DashboardStateMessage
+        variant={access.message.variant}
+        title={access.message.title}
+        description={access.message.description}
       />
     );
   }

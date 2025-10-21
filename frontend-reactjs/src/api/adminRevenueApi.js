@@ -1,39 +1,89 @@
 import { httpClient } from './httpClient.js';
+import {
+  assertId,
+  assertToken,
+  createInvalidationConfig,
+  createListCacheConfig,
+  normaliseListResponse
+} from './apiUtils.js';
+
+const REVENUE_CACHE_TAGS = {
+  summary: 'admin:revenue:summary',
+  adjustments: 'admin:revenue:adjustments'
+};
 
 function normaliseList(response) {
-  return {
-    data: response?.data ?? [],
-    meta: response?.meta ?? {},
-    pagination: response?.pagination ?? response?.meta?.pagination ?? null
-  };
+  return normaliseListResponse(response);
+}
+
+function unwrapData(response, fallback = null) {
+  return response?.data ?? response ?? fallback;
 }
 
 export function getRevenueSummary({ token, signal } = {}) {
-  return httpClient.get('/admin/revenue/summary', { token, signal }).then((response) => response?.data ?? {});
+  assertToken(token, 'load revenue summary');
+  return httpClient
+    .get('/admin/revenue/summary', {
+      token,
+      signal,
+      cache: createListCacheConfig(REVENUE_CACHE_TAGS.summary, { ttl: 60_000 })
+    })
+    .then((response) => unwrapData(response, {}));
 }
 
 export function listAdjustments({ token, params, signal } = {}) {
-  return httpClient.get('/admin/revenue/adjustments', { token, params, signal }).then(normaliseList);
+  assertToken(token, 'list revenue adjustments');
+  return httpClient
+    .get('/admin/revenue/adjustments', {
+      token,
+      params,
+      signal,
+      cache: createListCacheConfig(REVENUE_CACHE_TAGS.adjustments)
+    })
+    .then(normaliseList);
 }
 
 export function createAdjustment({ token, payload }) {
-  return httpClient.post('/admin/revenue/adjustments', payload, { token }).then((response) => response?.data ?? null);
+  assertToken(token, 'create a revenue adjustment');
+  return httpClient
+    .post('/admin/revenue/adjustments', payload, {
+      token,
+      cache: createInvalidationConfig([
+        REVENUE_CACHE_TAGS.adjustments,
+        REVENUE_CACHE_TAGS.summary
+      ])
+    })
+    .then((response) => unwrapData(response));
 }
 
 export function updateAdjustment({ token, id, payload }) {
-  if (!id) {
-    throw new Error('Adjustment id is required');
-  }
+  assertToken(token, 'update a revenue adjustment');
+  assertId(id, 'Adjustment id');
   return httpClient
-    .put(`/admin/revenue/adjustments/${id}`, payload, { token })
-    .then((response) => response?.data ?? null);
+    .put(`/admin/revenue/adjustments/${id}`, payload, {
+      token,
+      cache: createInvalidationConfig([
+        REVENUE_CACHE_TAGS.adjustments,
+        REVENUE_CACHE_TAGS.summary,
+        `${REVENUE_CACHE_TAGS.adjustments}:${id}`
+      ])
+    })
+    .then((response) => unwrapData(response));
 }
 
 export function deleteAdjustment({ token, id }) {
-  if (!id) {
-    throw new Error('Adjustment id is required');
-  }
-  return httpClient.delete(`/admin/revenue/adjustments/${id}`, { token }).then((response) => response?.data ?? null);
+  assertToken(token, 'delete a revenue adjustment');
+  assertId(id, 'Adjustment id');
+  return httpClient
+    .delete(`/admin/revenue/adjustments/${id}`, {
+      token,
+      cache: createInvalidationConfig([
+        REVENUE_CACHE_TAGS.adjustments,
+        REVENUE_CACHE_TAGS.summary,
+        `${REVENUE_CACHE_TAGS.adjustments}:${id}`
+      ])
+    })
+    .then((response) => unwrapData(response));
 }
 
 const adminRevenueApi = {
