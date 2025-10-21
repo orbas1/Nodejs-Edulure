@@ -35,9 +35,85 @@ function ensureBufferKey(key) {
   return crypto.createHash(HASH_ALGORITHM).update(trimmed).digest();
 }
 
-function stableStringify(value) {
-  if (value === null || value === undefined) {
+function normalizeStructured(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  if (Buffer.isBuffer(value)) {
+    return value.toString('base64');
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => {
+      const normalisedItem = normalizeStructured(item);
+      return normalisedItem === undefined ? null : normalisedItem;
+    });
+  }
+  if (typeof value === 'object') {
+    return Object.keys(value)
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+      .reduce((acc, key) => {
+        const normalisedValue = normalizeStructured(value[key]);
+        if (normalisedValue !== undefined) {
+          acc[key] = normalisedValue;
+        }
+        return acc;
+      }, {});
+  }
+  return String(value);
+}
+
+function serializeStructured(value) {
+  const normalized = normalizeStructured(value);
+  if (normalized === undefined) {
     return '';
+  }
+  return JSON.stringify(normalized);
+}
+
+function attemptLegacyStructuredParse(serialized) {
+  if (typeof serialized !== 'string' || !serialized.trim()) {
+    return null;
+  }
+
+  const normalised = serialized
+    .replace(/":\s*,/g, '":null,')
+    .replace(/":\s*}/g, '":null}')
+    .replace(/":\s*([A-Za-z@_:\/\-][A-Za-z0-9@._:\/\-]*)(?=[,}\]])/g, '":"$1"');
+
+  try {
+    return JSON.parse(normalised);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function parseStructuredPayload(serialized) {
+  if (!serialized) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(serialized);
+  } catch (_error) {
+    return attemptLegacyStructuredParse(serialized);
+  }
+}
+
+function toHashString(value) {
+  if (value === null || value === undefined) {
+    return null;
   }
   if (typeof value === 'string') {
     return value;
@@ -45,17 +121,13 @@ function stableStringify(value) {
   if (Buffer.isBuffer(value)) {
     return value.toString('base64');
   }
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  if (value instanceof Date) {
+    return value.toISOString();
   }
-  if (typeof value === 'object') {
-    const entries = Object.entries(value)
-      .filter(([, val]) => val !== undefined)
-      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-      .map(([key, val]) => `${JSON.stringify(key)}:${stableStringify(val)}`);
-    return `{${entries.join(',')}}`;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
   }
-  return JSON.stringify(value);
+  return serializeStructured(value);
 }
 
 class DataEncryptionService {
@@ -95,10 +167,11 @@ class DataEncryptionService {
   }
 
   hash(value) {
-    if (value === null || value === undefined) {
+    const normalised = toHashString(value);
+    if (normalised === null) {
       return null;
     }
-    return crypto.createHash(HASH_ALGORITHM).update(stableStringify(value)).digest('hex');
+    return crypto.createHash(HASH_ALGORITHM).update(normalised).digest('hex');
   }
 
   fingerprint(values) {
@@ -144,7 +217,7 @@ class DataEncryptionService {
   }
 
   encryptStructured(payload, { classificationTag, keyId, fingerprintValues } = {}) {
-    const serialized = stableStringify(payload);
+    const serialized = serializeStructured(payload);
     if (!serialized) {
       return {
         ciphertext: null,
@@ -166,12 +239,23 @@ class DataEncryptionService {
   }
 
   decryptStructured(ciphertext, keyId) {
+    if (!ciphertext) {
+      return null;
+    }
+
     try {
       const decrypted = this.decrypt(ciphertext, keyId);
       if (!decrypted) {
         return null;
       }
-      return JSON.parse(decrypted);
+
+      const parsed = parseStructuredPayload(decrypted);
+      if (parsed !== null) {
+        return parsed;
+      }
+
+      logger.error('Failed to parse structured payload after decryption');
+      return null;
     } catch (error) {
       logger.error({ err: error }, 'Failed to decrypt structured payload');
       return null;

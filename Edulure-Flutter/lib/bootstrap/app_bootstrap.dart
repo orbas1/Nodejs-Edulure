@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import '../core/feature_flags/feature_flag_notifier.dart';
+import '../core/runtime/capability_manifest_notifier.dart';
 import '../core/state/provider_logger.dart';
 import '../core/telemetry/telemetry_service.dart';
-import '../core/runtime/capability_manifest_notifier.dart';
 import '../services/language_service.dart';
 import '../services/push_notification_service.dart';
 import '../services/session_manager.dart';
@@ -30,15 +30,44 @@ class AppBootstrap {
 
   Future<void> _initialize() async {
     await Hive.initFlutter();
-    await SessionManager.init();
-    await LanguageService.init();
-    await container.read(telemetryServiceProvider).prepare();
-    await PushNotificationService.instance.initialize();
-    await NotificationPreferenceService.instance
-        .synchronizePendingOperations();
+    final telemetry = container.read(telemetryServiceProvider);
+
+    await _guardedStep(
+      label: 'session.init',
+      run: SessionManager.init,
+      telemetry: telemetry,
+    );
+
+    await _guardedStep(
+      label: 'language.init',
+      run: LanguageService.init,
+      telemetry: telemetry,
+    );
+
+    await _guardedStep(
+      label: 'telemetry.prepare',
+      run: telemetry.prepare,
+      telemetry: telemetry,
+      fatal: false,
+    );
+
+    await _guardedStep(
+      label: 'notifications.init',
+      run: () => PushNotificationService.instance.initialize(),
+      telemetry: telemetry,
+      fatal: false,
+    );
+
+    await _guardedStep(
+      label: 'notifications.synchronizePending',
+      run: () => NotificationPreferenceService.instance.synchronizePendingOperations(),
+      telemetry: telemetry,
+      fatal: false,
+    );
+
     await Future.wait([
-      container.read(featureFlagControllerProvider.notifier).warmUp(),
-      container.read(capabilityManifestControllerProvider.notifier).warmUp(),
+      _warmFeatureFlags(telemetry),
+      _warmCapabilityManifest(telemetry),
     ]);
   }
 
@@ -52,5 +81,57 @@ class AppBootstrap {
         ),
       );
     });
+  }
+
+  Future<void> _guardedStep({
+    required String label,
+    required Future<void> Function() run,
+    required TelemetryService telemetry,
+    bool fatal = true,
+  }) async {
+    final startedAt = DateTime.now();
+    try {
+      await run();
+      telemetry.recordProviderUpdate(
+        providerName: 'bootstrap.$label',
+        value: 'completed in ${DateTime.now().difference(startedAt).inMilliseconds}ms',
+      );
+    } catch (error, stackTrace) {
+      await telemetry.captureException(
+        error,
+        stackTrace: stackTrace,
+        context: {
+          'bootstrapStep': label,
+          'fatal': fatal,
+        },
+      );
+      if (fatal) {
+        rethrow;
+      }
+    }
+  }
+
+  Future<void> _warmFeatureFlags(TelemetryService telemetry) async {
+    try {
+      await container.read(featureFlagControllerProvider.notifier).warmUp();
+    } catch (error, stackTrace) {
+      await telemetry.captureException(
+        error,
+        stackTrace: stackTrace,
+        context: const {'bootstrapStep': 'featureFlags.warmUp'},
+      );
+    }
+  }
+
+  Future<void> _warmCapabilityManifest(TelemetryService telemetry) async {
+    try {
+      await container.read(capabilityManifestControllerProvider.notifier).warmUp();
+    } catch (error, stackTrace) {
+      await telemetry.captureException(
+        error,
+        stackTrace: stackTrace,
+        context: const {'bootstrapStep': 'capabilityManifest.warmUp'},
+      );
+    }
   }
 }

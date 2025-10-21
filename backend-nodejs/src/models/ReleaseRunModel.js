@@ -59,7 +59,6 @@ function extractCount(row) {
 
   const value =
     row.count ??
-    row['count'] ??
     row['count(*)'] ??
     row['COUNT(*)'] ??
     row['count(`*`)'] ??
@@ -138,20 +137,45 @@ export default class ReleaseRunModel {
 
   static async updateByPublicId(publicId, updates, connection = db) {
     const payload = {};
-    if (updates.versionTag !== undefined) payload.version_tag = updates.versionTag;
-    if (updates.environment !== undefined) payload.environment = updates.environment;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.initiatedByEmail !== undefined) payload.initiated_by_email = updates.initiatedByEmail;
-    if (updates.initiatedByName !== undefined) payload.initiated_by_name = updates.initiatedByName ?? null;
-    if (updates.scheduledAt !== undefined) payload.scheduled_at = updates.scheduledAt ?? null;
-    if (updates.startedAt !== undefined) payload.started_at = updates.startedAt ?? null;
-    if (updates.completedAt !== undefined) payload.completed_at = updates.completedAt ?? null;
-    if (updates.changeWindowStart !== undefined) payload.change_window_start = updates.changeWindowStart ?? null;
-    if (updates.changeWindowEnd !== undefined) payload.change_window_end = updates.changeWindowEnd ?? null;
-    if (updates.summaryNotes !== undefined) payload.summary_notes = updates.summaryNotes ?? null;
-    if (updates.checklistSnapshot !== undefined)
+    if (updates.versionTag !== undefined) {
+      payload.version_tag = updates.versionTag;
+    }
+    if (updates.environment !== undefined) {
+      payload.environment = updates.environment;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.initiatedByEmail !== undefined) {
+      payload.initiated_by_email = updates.initiatedByEmail;
+    }
+    if (updates.initiatedByName !== undefined) {
+      payload.initiated_by_name = updates.initiatedByName ?? null;
+    }
+    if (updates.scheduledAt !== undefined) {
+      payload.scheduled_at = updates.scheduledAt ?? null;
+    }
+    if (updates.startedAt !== undefined) {
+      payload.started_at = updates.startedAt ?? null;
+    }
+    if (updates.completedAt !== undefined) {
+      payload.completed_at = updates.completedAt ?? null;
+    }
+    if (updates.changeWindowStart !== undefined) {
+      payload.change_window_start = updates.changeWindowStart ?? null;
+    }
+    if (updates.changeWindowEnd !== undefined) {
+      payload.change_window_end = updates.changeWindowEnd ?? null;
+    }
+    if (updates.summaryNotes !== undefined) {
+      payload.summary_notes = updates.summaryNotes ?? null;
+    }
+    if (updates.checklistSnapshot !== undefined) {
       payload.checklist_snapshot = serialiseJson(updates.checklistSnapshot, []);
-    if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata, {});
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = serialiseJson(updates.metadata, {});
+    }
 
     if (!Object.keys(payload).length) {
       return this.findByPublicId(publicId, connection);

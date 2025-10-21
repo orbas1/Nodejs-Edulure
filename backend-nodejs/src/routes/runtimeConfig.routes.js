@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import RuntimeConfigController from '../controllers/RuntimeConfigController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter({ allowedMethods: ['GET'] });
 
 router.get('/public', RuntimeConfigController.publicSnapshot);
 router.get('/user', auth(), RuntimeConfigController.userSnapshot);

@@ -45,8 +45,24 @@ class TelemetryInterceptor extends Interceptor {
         'path': err.requestOptions.path,
         'method': err.requestOptions.method,
         if (err.response?.statusCode != null) 'statusCode': err.response!.statusCode!,
+        'requiresAuth': err.requestOptions.extra['requiresAuth'] == true,
+        if (err.type != DioExceptionType.unknown) 'type': err.type.name,
+        'headers': _sanitiseHeaders(err.requestOptions.headers),
       },
     ));
     handler.next(err);
+  }
+
+  Map<String, String> _sanitiseHeaders(Map<String, dynamic> headers) {
+    final redacted = <String, String>{};
+    for (final entry in headers.entries) {
+      final key = entry.key.toLowerCase();
+      if (key == 'authorization' || key == 'cookie') {
+        redacted[entry.key] = 'REDACTED';
+        continue;
+      }
+      redacted[entry.key] = entry.value?.toString() ?? '';
+    }
+    return redacted;
   }
 }

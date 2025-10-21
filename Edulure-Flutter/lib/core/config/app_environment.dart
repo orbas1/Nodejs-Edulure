@@ -19,3 +19,20 @@ AppEnvironment parseEnvironment(String value) {
       return AppEnvironment.development;
   }
 }
+
+extension AppEnvironmentX on AppEnvironment {
+  String get displayLabel {
+    switch (this) {
+      case AppEnvironment.development:
+        return 'Development';
+      case AppEnvironment.staging:
+        return 'Staging';
+      case AppEnvironment.production:
+        return 'Production';
+      case AppEnvironment.test:
+        return 'Test';
+    }
+  }
+
+  bool get isLive => this == AppEnvironment.production || this == AppEnvironment.staging;
+}

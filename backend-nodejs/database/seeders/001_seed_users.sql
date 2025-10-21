@@ -1,6 +1,79 @@
-INSERT INTO users (first_name, last_name, email, password_hash, role, age, address)
+INSERT INTO users (
+  first_name,
+  last_name,
+  email,
+  password_hash,
+  role,
+  age,
+  address,
+  two_factor_enabled,
+  two_factor_enrolled_at,
+  two_factor_last_verified_at,
+  email_verified_at,
+  last_login_at,
+  password_changed_at,
+  last_verification_sent_at
+)
 VALUES
-  ('Alex', 'Morgan', 'alex@edulure.com', '$2a$10$D9S1mNqE9iHtlxgKOnY7Ge.2vB1hQn8sahFtF8DWZth/.RXRcvsrq', 'admin', 34, 'London, UK'),
-  ('Jordan', 'Lee', 'jordan@edulure.com', '$2a$10$D9S1mNqE9iHtlxgKOnY7Ge.2vB1hQn8sahFtF8DWZth/.RXRcvsrq', 'instructor', 29, 'Austin, US'),
-  ('Sasha', 'Flores', 'sasha@edulure.com', '$2a$10$D9S1mNqE9iHtlxgKOnY7Ge.2vB1hQn8sahFtF8DWZth/.RXRcvsrq', 'user', 31, 'Toronto, CA')
-ON DUPLICATE KEY UPDATE email = email;
+  (
+    'Alex',
+    'Morgan',
+    'alex@edulure.com',
+    '$2a$10$D9S1mNqE9iHtlxgKOnY7Ge.2vB1hQn8sahFtF8DWZth/.RXRcvsrq',
+    'admin',
+    34,
+    'London, UK',
+    1,
+    NOW(),
+    NOW(),
+    NOW(),
+    NOW(),
+    NOW(),
+    NOW()
+  ),
+  (
+    'Jordan',
+    'Lee',
+    'jordan@edulure.com',
+    '$2a$10$D9S1mNqE9iHtlxgKOnY7Ge.2vB1hQn8sahFtF8DWZth/.RXRcvsrq',
+    'instructor',
+    29,
+    'Austin, US',
+    0,
+    NULL,
+    NULL,
+    NOW(),
+    NOW(),
+    NULL,
+    NOW()
+  ),
+  (
+    'Sasha',
+    'Flores',
+    'sasha@edulure.com',
+    '$2a$10$D9S1mNqE9iHtlxgKOnY7Ge.2vB1hQn8sahFtF8DWZth/.RXRcvsrq',
+    'user',
+    31,
+    'Toronto, CA',
+    0,
+    NULL,
+    NULL,
+    NOW(),
+    NOW(),
+    NULL,
+    NOW()
+  )
+ON DUPLICATE KEY UPDATE
+  first_name = VALUES(first_name),
+  last_name = VALUES(last_name),
+  password_hash = VALUES(password_hash),
+  role = VALUES(role),
+  age = VALUES(age),
+  address = VALUES(address),
+  two_factor_enabled = VALUES(two_factor_enabled),
+  two_factor_enrolled_at = VALUES(two_factor_enrolled_at),
+  two_factor_last_verified_at = VALUES(two_factor_last_verified_at),
+  email_verified_at = VALUES(email_verified_at),
+  last_login_at = VALUES(last_login_at),
+  password_changed_at = VALUES(password_changed_at),
+  last_verification_sent_at = VALUES(last_verification_sent_at);

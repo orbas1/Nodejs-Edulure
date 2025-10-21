@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasCoupons = await knex.schema.hasTable('payment_coupons');
   if (!hasCoupons) {
@@ -22,7 +24,10 @@ export async function up(knex) {
         .defaultTo('draft');
       table.timestamp('valid_from').notNullable();
       table.timestamp('valid_until');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table
+        .json('metadata')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -71,8 +76,14 @@ export async function up(knex) {
       table.bigInteger('amount_tax').unsigned().notNullable().defaultTo(0);
       table.bigInteger('amount_total').unsigned().notNullable();
       table.bigInteger('amount_refunded').unsigned().notNullable().defaultTo(0);
-      table.json('tax_breakdown').notNullable().defaultTo('{}');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table
+        .json('tax_breakdown')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, {}));
+      table
+        .json('metadata')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, {}));
       table
         .integer('coupon_id')
         .unsigned()
@@ -181,7 +192,10 @@ export async function up(knex) {
       table.string('entry_type', 60).notNullable();
       table.bigInteger('amount').notNullable();
       table.string('currency', 3).notNullable();
-      table.json('details').notNullable().defaultTo('{}');
+      table
+        .json('details')
+        .notNullable()
+        .defaultTo(jsonDefault(knex, {}));
       table.timestamp('recorded_at').defaultTo(knex.fn.now());
       table.index(['payment_intent_id', 'entry_type']);
     });

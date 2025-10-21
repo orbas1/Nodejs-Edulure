@@ -13,6 +13,13 @@ import logger from '../src/config/logger.js';
 import { r2Client } from '../src/config/storage.js';
 import { createCorsOriginValidator } from '../src/config/corsPolicy.js';
 
+function assertBucketName(value, label) {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new Error(`[storage] ${label} must be defined before provisioning buckets.`);
+  }
+  return value;
+}
+
 function buildTagSet(tags) {
   return Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
 }
@@ -109,7 +116,7 @@ async function main() {
 
   const buckets = [
     {
-      name: env.storage.publicBucket,
+      name: assertBucketName(env.storage.publicBucket, 'storage.publicBucket'),
       lifecycle: [
         {
           ID: 'public-asset-refresh',
@@ -133,7 +140,7 @@ async function main() {
       }
     },
     {
-      name: env.storage.uploadsBucket,
+      name: assertBucketName(env.storage.uploadsBucket, 'storage.uploadsBucket'),
       lifecycle: [
         {
           ID: 'uploads-expire-seven-days',
@@ -149,7 +156,7 @@ async function main() {
       }
     },
     {
-      name: env.storage.privateBucket,
+      name: assertBucketName(env.storage.privateBucket, 'storage.privateBucket'),
       lifecycle: [
         {
           ID: 'noncurrent-cleanup',
@@ -164,7 +171,7 @@ async function main() {
       }
     },
     {
-      name: env.antivirus.quarantineBucket,
+      name: assertBucketName(env.antivirus.quarantineBucket, 'antivirus.quarantineBucket'),
       lifecycle: [
         {
           ID: 'quarantine-expire',

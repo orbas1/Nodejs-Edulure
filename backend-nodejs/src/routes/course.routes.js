@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import CourseController from '../controllers/CourseController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/:courseId/player', auth(), CourseController.playerSession);
 router.get('/:courseId/live', auth(), CourseController.liveStatus);

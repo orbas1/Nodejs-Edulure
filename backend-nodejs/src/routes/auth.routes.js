@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import AuthController from '../controllers/AuthController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter({ allowedMethods: ['POST'] });
 
 router.post('/register', AuthController.register);
 router.post('/login', AuthController.login);

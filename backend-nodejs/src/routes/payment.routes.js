@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import PaymentController from '../controllers/PaymentController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.post('/', auth(), PaymentController.createIntent);
 router.post('/paypal/:paymentId/capture', auth(), PaymentController.capturePayPal);
