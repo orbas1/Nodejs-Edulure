@@ -53,13 +53,44 @@ SectionHeader.defaultProps = {
 };
 
 export default function CourseLifecyclePlanner({ lifecycles }) {
-  if (!lifecycles.length) {
+  const safeLifecycles = Array.isArray(lifecycles)
+    ? lifecycles.map((course) => ({
+        ...course,
+        modules: Array.isArray(course.modules) ? course.modules : [],
+        reviews: Array.isArray(course.reviews) ? course.reviews : [],
+        refresherLessons: Array.isArray(course.refresherLessons) ? course.refresherLessons : [],
+        recordedVideos: Array.isArray(course.recordedVideos) ? course.recordedVideos : [],
+        catalogue: Array.isArray(course.catalogue) ? course.catalogue : [],
+        drip: {
+          cadence: course.drip?.cadence ?? 'Weekly',
+          anchor: course.drip?.anchor ?? 'cohort-start',
+          timezone: course.drip?.timezone ?? 'UTC',
+          segments: Array.isArray(course.drip?.segments) ? course.drip.segments : [],
+          schedule: Array.isArray(course.drip?.schedule) ? course.drip.schedule : []
+        },
+        mobile: {
+          status: course.mobile?.status ?? 'Pending review',
+          experiences: Array.isArray(course.mobile?.experiences) ? course.mobile.experiences : []
+        }
+      }))
+    : [];
+
+  if (!safeLifecycles.length) {
     return null;
   }
 
+  const handleModuleIntent = (courseId, moduleId) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('edulure:lifecycle-module', {
+        detail: { courseId, moduleId }
+      })
+    );
+  };
+
   return (
     <section className="space-y-10">
-      {lifecycles.map((course) => (
+      {safeLifecycles.map((course) => (
         <article key={course.id} className="dashboard-section space-y-8">
           <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -138,7 +169,19 @@ export default function CourseLifecyclePlanner({ lifecycles }) {
                 />
                 <div className="mt-5 grid gap-4 md:grid-cols-2">
                   {course.modules.map((module) => (
-                    <div key={module.id} className="dashboard-card-muted space-y-3 p-5">
+                    <div
+                      key={module.id}
+                      className="dashboard-card-muted space-y-3 p-5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleModuleIntent(course.id, module.id)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleModuleIntent(course.id, module.id);
+                        }
+                      }}
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">{module.title}</p>

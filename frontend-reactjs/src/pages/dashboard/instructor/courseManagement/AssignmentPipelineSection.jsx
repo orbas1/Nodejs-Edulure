@@ -53,6 +53,25 @@ export default function AssignmentPipelineSection({ assignments }) {
     return null;
   }
 
+  const handleExportCsv = () => {
+    const rows = [...upcoming, ...review, ...automation];
+    if (rows.length === 0 || typeof URL === 'undefined' || typeof document === 'undefined') return;
+    const headers = ['Assignment', 'Course', 'Owner', 'Due'];
+    const lines = rows.map((row) => [row.title, row.courseTitle, row.owner ?? 'Curriculum', row.dueAt ?? row.dueDate ?? '—']);
+    const csv = [headers, ...lines]
+      .map((line) => line.map((value) => (value ? String(value).replaceAll('"', '""') : '')).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'assignment-pipeline.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   const handleOpenAssignment = (assignment) => {
     if (typeof window === 'undefined') return;
     window.dispatchEvent(
@@ -76,6 +95,9 @@ export default function AssignmentPipelineSection({ assignments }) {
             Track grading workload, automation coverage, and upcoming learner commitments.
           </p>
         </div>
+        <button type="button" className="dashboard-pill px-4 py-2 text-xs" onClick={handleExportCsv}>
+          Export queue CSV
+        </button>
         <div className="grid grid-cols-3 gap-3 text-xs text-slate-600 md:text-sm">
           <div className="dashboard-card-muted px-4 py-3 text-center">
             <p className="font-semibold text-slate-900">{summary.total ?? 0}</p>
