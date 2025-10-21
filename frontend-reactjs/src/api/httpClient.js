@@ -140,7 +140,21 @@ const normaliseCacheOptions = (cache) => {
 
 async function request(
   path,
-  { method = 'GET', headers, body, params, token, signal, onUploadProgress, cache, invalidateTags } = {}
+  {
+    method = 'GET',
+    headers,
+    body,
+    data,
+    params,
+    token,
+    signal,
+    onUploadProgress,
+    onDownloadProgress,
+    responseType,
+    cache,
+    invalidateTags,
+    ...axiosOverrides
+  } = {}
 ) {
   const finalHeaders = normaliseHeaders(headers);
   if (token) {
@@ -170,22 +184,27 @@ async function request(
     }
   }
 
+  const finalBody = body !== undefined ? body : data;
+
   const config = {
     url: path,
     method: methodUpper,
     headers: finalHeaders,
-    data: body,
+    data: finalBody,
     params,
     signal,
-    onUploadProgress
+    onUploadProgress,
+    onDownloadProgress,
+    responseType,
+    ...axiosOverrides
   };
 
   const response = await apiClient.request(config);
-  const data = response.data;
+  const responseData = response.data;
 
   if (useCache) {
     const ttl = typeof cacheOptions.ttl === 'number' ? cacheOptions.ttl : undefined;
-    responseCache.set(cacheKey, data, { ttl, tags: cacheOptions.tags });
+    responseCache.set(cacheKey, responseData, { ttl, tags: cacheOptions.tags });
   }
 
   const tagsToInvalidate = cacheOptions.invalidateTags ?? invalidateTags;
@@ -193,7 +212,7 @@ async function request(
     responseCache.invalidateTags(tagsToInvalidate);
   }
 
-  return data;
+  return responseData;
 }
 
 function get(path, options = {}) {

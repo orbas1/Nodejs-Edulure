@@ -1,5 +1,11 @@
 import { httpClient } from './httpClient.js';
 
+function ensureToken(token) {
+  if (!token) {
+    throw new Error('Authentication token is required for moderation requests');
+  }
+}
+
 function mapPaginatedResponse(response = {}) {
   const pagination = response?.meta?.pagination ?? {};
   return {
@@ -14,6 +20,8 @@ function mapPaginatedResponse(response = {}) {
 }
 
 export async function listScamReports({ token, params, signal } = {}) {
+  ensureToken(token);
+
   const response = await httpClient.get('/community-moderation/scam-reports', {
     token,
     params,
@@ -23,6 +31,8 @@ export async function listScamReports({ token, params, signal } = {}) {
 }
 
 export async function updateScamReport({ token, reportId, payload, signal } = {}) {
+  ensureToken(token);
+
   if (!reportId) {
     throw new Error('A scam report identifier is required to update the record');
   }

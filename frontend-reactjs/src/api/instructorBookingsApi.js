@@ -5,6 +5,12 @@ const mapResponse = (response) => ({
   meta: response?.meta ?? null
 });
 
+const ensureBookingId = (bookingId, action) => {
+  if (!bookingId) {
+    throw new Error(`A booking identifier is required to ${action}.`);
+  }
+};
+
 export async function listInstructorBookings({ token, params, signal } = {}) {
   const response = await httpClient.get('/instructor/bookings', {
     token,
@@ -24,6 +30,8 @@ export async function createInstructorBooking({ token, payload }) {
 }
 
 export async function updateInstructorBooking({ token, bookingId, payload }) {
+  ensureBookingId(bookingId, 'update the booking');
+
   const response = await httpClient.patch(`/instructor/bookings/${bookingId}`, payload, {
     token,
     cache: { invalidateTags: ['instructor:bookings'] }
@@ -32,9 +40,11 @@ export async function updateInstructorBooking({ token, bookingId, payload }) {
 }
 
 export async function cancelInstructorBooking({ token, bookingId, payload }) {
+  ensureBookingId(bookingId, 'cancel the booking');
+
   const response = await httpClient.delete(`/instructor/bookings/${bookingId}`, {
     token,
-    data: payload,
+    body: payload ?? {},
     cache: { invalidateTags: ['instructor:bookings'] }
   });
   return mapResponse(response);
