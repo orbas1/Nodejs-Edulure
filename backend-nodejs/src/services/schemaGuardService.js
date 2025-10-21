@@ -15,6 +15,27 @@ const COLUMN_COMPARISON_KEYS = [
   'extra'
 ];
 
+const DEFAULT_INCLUDE_INDEXES = true;
+
+function normaliseTableList(tables) {
+  if (!Array.isArray(tables)) {
+    return null;
+  }
+
+  const normalised = tables
+    .map((table) => (typeof table === 'string' ? table.trim() : table))
+    .filter((table) => typeof table === 'string' && table.length > 0);
+
+  return Array.from(new Set(normalised));
+}
+
+function ensureObject(value, fallback = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return fallback;
+  }
+  return value;
+}
+
 function normalizeColumnRow(row) {
   return {
     name: row.COLUMN_NAME,
@@ -109,7 +130,7 @@ export async function collectSchemaMetadata({
   knex,
   schemaName,
   tables,
-  includeIndexes = true
+  includeIndexes = DEFAULT_INCLUDE_INDEXES
 }) {
   if (!knex) {
     throw new Error('collectSchemaMetadata requires a valid knex instance.');
@@ -121,27 +142,29 @@ export async function collectSchemaMetadata({
     throw new Error('Unable to determine target schema name.');
   }
 
-  let tableList = Array.isArray(tables) && tables.length > 0 ? tables : null;
+  const tableList = normaliseTableList(tables);
 
-  if (!tableList) {
+  let effectiveTables = tableList;
+
+  if (!effectiveTables) {
     const [rows] = await knex.raw(
       `SELECT TABLE_NAME
        FROM INFORMATION_SCHEMA.TABLES
        WHERE TABLE_SCHEMA = ?`,
       [targetSchema]
     );
-    tableList = rows.map((row) => row.TABLE_NAME);
+    effectiveTables = rows.map((row) => row.TABLE_NAME);
   }
 
-  if (!tableList || tableList.length === 0) {
+  if (!effectiveTables || effectiveTables.length === 0) {
     return { database: targetSchema, tables: {} };
   }
 
   const [columnRows] = await knex.raw(
     `SELECT *
      FROM INFORMATION_SCHEMA.COLUMNS
-     WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (${tableList.map(() => '?').join(',')})`,
-    [targetSchema, ...tableList]
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (${effectiveTables.map(() => '?').join(',')})`,
+    [targetSchema, ...effectiveTables]
   );
 
   const tablesWithColumns = groupColumnsByTable(columnRows);
@@ -150,8 +173,8 @@ export async function collectSchemaMetadata({
     const [indexRows] = await knex.raw(
       `SELECT *
        FROM INFORMATION_SCHEMA.STATISTICS
-       WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (${tableList.map(() => '?').join(',')})`,
-      [targetSchema, ...tableList]
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME IN (${effectiveTables.map(() => '?').join(',')})`,
+      [targetSchema, ...effectiveTables]
     );
     const tablesWithIndexes = groupIndexesByTable(indexRows);
 
@@ -335,19 +358,100 @@ export function summariseDiffs(differences) {
     .join('\n');
 }
 
+export function validateBaselineStructure(baseline) {
+  if (!baseline || typeof baseline !== 'object' || Array.isArray(baseline)) {
+    throw new Error('Invalid schema baseline: expected an object payload.');
+  }
+
+  const { database, tables } = baseline;
+
+  if (!database || typeof database !== 'string') {
+    throw new Error('Invalid schema baseline: "database" must be a non-empty string.');
+  }
+
+  const tableDefinitions = ensureObject(tables, null);
+  if (!tableDefinitions) {
+    throw new Error('Invalid schema baseline: "tables" must be an object map.');
+  }
+
+  for (const [tableName, tableDef] of Object.entries(tableDefinitions)) {
+    if (!tableName || typeof tableName !== 'string') {
+      throw new Error('Invalid schema baseline: table names must be strings.');
+    }
+
+    if (!tableDef || typeof tableDef !== 'object' || Array.isArray(tableDef)) {
+      throw new Error(`Invalid schema baseline: table "${tableName}" must be an object definition.`);
+    }
+
+    if (tableDef.columns !== undefined && (!tableDef.columns || typeof tableDef.columns !== 'object')) {
+      throw new Error(`Invalid schema baseline: columns for table "${tableName}" must be an object.`);
+    }
+
+    if (tableDef.indexes !== undefined && !Array.isArray(tableDef.indexes)) {
+      throw new Error(`Invalid schema baseline: indexes for table "${tableName}" must be an array.`);
+    }
+
+    if (Array.isArray(tableDef.indexes)) {
+      tableDef.indexes.forEach((index, idx) => {
+        if (!index || typeof index !== 'object') {
+          throw new Error(`Invalid schema baseline: index #${idx} for table "${tableName}" must be an object.`);
+        }
+        if (!Array.isArray(index.columns)) {
+          throw new Error(`Invalid schema baseline: index "${index.name ?? idx}" for table "${tableName}" must define a columns array.`);
+        }
+      });
+    }
+  }
+
+  return baseline;
+}
+
 export async function loadBaseline(filePath) {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('A schema baseline file path must be provided.');
+  }
+
   const resolvedPath = path.resolve(filePath);
-  const data = await fs.readFile(resolvedPath, 'utf8');
-  return JSON.parse(data);
+  let data;
+
+  try {
+    data = await fs.readFile(resolvedPath, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') {
+      throw new Error(`Schema baseline file not found at ${resolvedPath}`);
+    }
+    throw new Error(`Failed to read schema baseline at ${resolvedPath}: ${error.message}`);
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(data);
+  } catch (error) {
+    throw new Error(`Schema baseline at ${resolvedPath} is not valid JSON: ${error.message}`);
+  }
+
+  return validateBaselineStructure(parsed);
 }
 
 export async function writeBaseline(filePath, schema) {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('A schema baseline file path must be provided.');
+  }
+  if (!schema || typeof schema !== 'object') {
+    throw new Error('A schema definition is required to write a baseline.');
+  }
+
+  const validated = validateBaselineStructure({
+    database: schema.database,
+    tables: ensureObject(schema.tables, {})
+  });
+
   const resolvedPath = path.resolve(filePath);
   await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
   const payload = {
     generatedAt: new Date().toISOString(),
-    database: schema.database,
-    tables: schema.tables
+    database: validated.database,
+    tables: validated.tables
   };
   await fs.writeFile(resolvedPath, JSON.stringify(payload, null, 2));
   logger.info({ baselinePath: resolvedPath }, 'Schema baseline updated');
@@ -357,6 +461,7 @@ export default {
   collectSchemaMetadata,
   diffSchemas,
   summariseDiffs,
+  validateBaselineStructure,
   loadBaseline,
   writeBaseline
 };
