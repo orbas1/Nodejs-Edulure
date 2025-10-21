@@ -152,12 +152,16 @@ export function generateServiceSpecs({
   const services = [];
   const normalisedFilters = Array.isArray(allowedServices)
     ? allowedServices
-        .map((entry) => (typeof entry === 'string' ? entry.toLowerCase().trim() : ''))
+        .map((entry) => (typeof entry === 'string' ? normaliseServiceName(entry) : ''))
         .filter((entry) => entry.length > 0)
     : [];
+  const serviceFilterSet = new Set(normalisedFilters);
 
   for (const entry of apiRouteMetadata) {
     const serviceName = normaliseServiceName(entry.name);
+    if (serviceFilterSet.size > 0 && !serviceFilterSet.has(serviceName)) {
+      continue;
+    }
     const servicePaths = extractServicePaths(baseSpec.paths, entry.basePath);
 
     if (Object.keys(servicePaths).length === 0) {

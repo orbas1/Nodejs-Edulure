@@ -106,10 +106,10 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
 const ARRAY_MERGE_LIMIT = 20;
 
 function deepMerge(base, patch) {
-  const baseClone = Array.isArray(base) ? [...base] : { ...base };
+  const source = Array.isArray(base) ? [...base] : { ...base };
 
   if (!patch || typeof patch !== 'object') {
-    return baseClone;
+    return source;
   }
 
   for (const [key, value] of Object.entries(patch)) {
@@ -118,27 +118,20 @@ function deepMerge(base, patch) {
     }
 
     if (Array.isArray(value)) {
-      const clone = value.slice(0, 20).map((entry) => {
-        if (entry && typeof entry === 'object') {
-          return deepMerge(Array.isArray(entry) ? [] : {}, entry);
-        }
-        return entry;
-      });
-      baseClone[key] = clone;
+      source[key] = value.slice(0, 20);
       continue;
     }
 
     if (value && typeof value === 'object') {
-      const baseValue = baseClone[key];
-      const target = baseValue && typeof baseValue === 'object' ? baseValue : {};
-      baseClone[key] = deepMerge(target, value);
+      const baseValue = source[key] && typeof source[key] === 'object' ? source[key] : {};
+      source[key] = deepMerge(baseValue, value);
       continue;
     }
 
-    baseClone[key] = value;
+    source[key] = value;
   }
 
-  return baseClone;
+  return source;
 }
 
 const DEFAULT_ADMIN_PROFILE = Object.freeze({

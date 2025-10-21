@@ -1329,12 +1329,12 @@ export function buildLearnerDashboard({
           'Review decision notes and request feedback from the instructor partnerships team.'
         ];
       }
-      return [
-        'Document your teaching motivation and curriculum outcomes.',
-        'Add marketing assets to strengthen your application.'
-      ];
-    })()
-  };
+          return [
+            'Document your teaching motivation and curriculum outcomes.',
+            'Add marketing assets to strengthen your application.'
+          ];
+        })()
+      };
 
   const privacy = normalisePrivacySettings(privacySettings);
 
