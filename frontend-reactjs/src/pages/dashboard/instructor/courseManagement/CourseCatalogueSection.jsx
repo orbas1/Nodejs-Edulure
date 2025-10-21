@@ -60,6 +60,7 @@ export default function CourseCatalogueSection({ catalogue }) {
   }
 
   const handleExport = () => {
+    if (typeof document === 'undefined' || typeof URL === 'undefined') return;
     const csv = catalogueToCsv(rows);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
