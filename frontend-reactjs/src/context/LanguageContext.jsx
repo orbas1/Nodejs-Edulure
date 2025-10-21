@@ -570,7 +570,7 @@ const TRANSLATIONS = {
             caption: 'Énergie studio, zéro chaos.',
             description:
               'Organisez jams, AMA et permanences avec une régie qui synchronise chat, notes backstage et enregistrements.',
-            highlightOne: 'Checklist de loge technique',
+            highlightOne: 'Listes de contrôle d’intégration fournisseur',
             highlightTwo: 'Enregistrements automatiques prêts',
             highlightThree: 'Backstage de discussion pour les hôtes',
             imageAlt: 'Aperçu de la régie des événements live Edulure'
@@ -2333,7 +2333,7 @@ const TRANSLATIONS = {
             caption: 'Studio-Energie ohne Chaos.',
             description:
               'Hoste Jams, AMAs und Office Hours mit einer Regie, die Chat, Backstage-Notizen und Aufnahmen synchron hält.',
-            highlightOne: 'Backstage-Checklisten',
+            highlightOne: 'Checklisten für das Provider-Onboarding',
             highlightTwo: 'Automatische Aufzeichnungen bereit',
             highlightThree: 'Backstage-Chat für Hosts',
             imageAlt: 'Vorschau des Edulure-Live-Event-Control-Centers'
