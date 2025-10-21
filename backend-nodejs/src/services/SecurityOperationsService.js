@@ -411,14 +411,21 @@ export class SecurityOperationsService {
   }
 
   async deleteRisk({ riskId, tenantId = 'global', actor, reason, requestContext } = {}) {
-    if (!riskId) {
-      throw new Error('riskId is required to delete a risk');
+    if (!Number.isInteger(riskId) || riskId <= 0) {
+      const validationError = new Error('A positive integer riskId is required to delete a risk');
+      validationError.status = 422;
+      throw validationError;
     }
 
     const risk = await this.repository.getRiskById(riskId);
     if (!risk) {
-      throw new Error(`Risk ${riskId} was not found`);
+      const notFoundError = new Error(`Risk ${riskId} was not found`);
+      notFoundError.status = 404;
+      throw notFoundError;
     }
+
+    const cleanedReason = typeof reason === 'string' ? reason.trim() : null;
+    const reasonForAudit = cleanedReason ? cleanedReason : null;
 
     await this.repository.deleteRisk(riskId);
 
@@ -432,7 +439,7 @@ export class SecurityOperationsService {
         title: risk.title,
         residualRiskScore: risk.residualRiskScore,
         status: risk.status,
-        reason: reason ?? null
+        reason: reasonForAudit
       }
     });
 
@@ -444,11 +451,19 @@ export class SecurityOperationsService {
         riskId: risk.id,
         status: risk.status,
         residualRiskScore: risk.residualRiskScore,
-        reason: reason ?? null
+        reason: reasonForAudit
       }
     });
 
-    return { success: true };
+    return {
+      success: true,
+      deleted: {
+        riskId: risk.id,
+        riskUuid: risk.riskUuid,
+        tenantId: risk.tenantId ?? tenantId ?? 'global',
+        status: risk.status
+      }
+    };
   }
 
   async listAuditEvidence(params = {}) {

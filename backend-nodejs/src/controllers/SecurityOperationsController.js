@@ -1,4 +1,22 @@
+import Joi from 'joi';
+
 import securityOperationsService from '../services/SecurityOperationsService.js';
+
+const riskIdParamSchema = Joi.object({
+  riskId: Joi.number().integer().positive().required()
+});
+
+const deleteRiskSchema = Joi.object({
+  reason: Joi.string().trim().max(240).allow('', null).default(null)
+});
+
+function handleValidationError(error, next) {
+  if (error.isJoi) {
+    error.status = 422;
+    error.details = error.details.map((detail) => detail.message);
+  }
+  return next(error);
+}
 
 function resolveActor(req) {
   if (!req.user) {
@@ -117,20 +135,28 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
-      const { riskId } = req.params;
-      const reason = req.body?.reason ?? req.query?.reason ?? null;
+
+      const [{ riskId }, { reason }] = await Promise.all([
+        riskIdParamSchema.validateAsync(req.params ?? {}, { abortEarly: false, convert: true }),
+        deleteRiskSchema.validateAsync(
+          {
+            reason: req.body?.reason ?? req.query?.reason ?? null
+          },
+          { abortEarly: false, stripUnknown: true }
+        )
+      ]);
 
       const result = await securityOperationsService.deleteRisk({
-        riskId: Number(riskId),
+        riskId,
         tenantId,
-        reason,
+        reason: reason === '' ? null : reason,
         actor,
         requestContext: resolveRequestContext(req)
       });
 
       return res.json({ success: true, data: result });
     } catch (error) {
-      return next(error);
+      return handleValidationError(error, next);
     }
   }
 

@@ -43,6 +43,16 @@ describe('Security operations HTTP routes', () => {
     app = express();
     app.use(express.json());
     app.use('/api/v1/security', securityRouter);
+    app.use((error, _req, res, _next) => {
+      const status = error.status ?? 500;
+      res.status(status).json({
+        success: false,
+        error: {
+          message: error.message,
+          details: error.details ?? null
+        }
+      });
+    });
   });
 
   beforeEach(() => {
@@ -103,15 +113,48 @@ describe('Security operations HTTP routes', () => {
   });
 
   it('deletes risks from the register', async () => {
-    deleteRisk.mockResolvedValue({ success: true });
+    deleteRisk.mockResolvedValue({
+      success: true,
+      deleted: { riskId: 23, riskUuid: 'risk-uuid-23', tenantId: 'global', status: 'identified' }
+    });
 
     const response = await request(app)
       .delete('/api/v1/security/risk-register/23')
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
-    expect(response.body.data).toEqual({ success: true });
-    expect(deleteRisk).toHaveBeenCalledWith(expect.objectContaining({ riskId: 23 }));
+    expect(response.body.data.deleted).toEqual(
+      expect.objectContaining({ riskId: 23, riskUuid: 'risk-uuid-23' })
+    );
+    expect(deleteRisk).toHaveBeenCalledWith(
+      expect.objectContaining({ riskId: 23, reason: null })
+    );
+  });
+
+  it('trims delete reasons from the request payload', async () => {
+    deleteRisk.mockResolvedValue({
+      success: true,
+      deleted: { riskId: 23, riskUuid: 'risk-uuid-23', tenantId: 'global', status: 'identified' }
+    });
+
+    await request(app)
+      .delete('/api/v1/security/risk-register/23')
+      .send({ reason: '   Duplicate entry resolved   ' })
+      .set('Authorization', 'Bearer token');
+
+    expect(deleteRisk).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'Duplicate entry resolved' })
+    );
+  });
+
+  it('rejects invalid risk identifiers with validation feedback', async () => {
+    const response = await request(app)
+      .delete('/api/v1/security/risk-register/not-a-number')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(422);
+    expect(response.body.success).toBe(false);
+    expect(response.body.error.details).toBeTruthy();
   });
 
   it('lists audit evidence with filtering', async () => {
