@@ -17,6 +17,10 @@ const consentRequestSchema = z.object({
   evidence: z.record(z.any()).optional()
 });
 
+const freshnessQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(200).default(50)
+});
+
 function formatValidationIssues(issues) {
   return issues.map((issue) => ({
     path: issue.path.length > 0 ? issue.path.join('.') : '',

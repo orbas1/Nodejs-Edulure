@@ -1,10 +1,5 @@
 import db from '../config/database.js';
-import {
-  ensureIntegerInRange,
-  normaliseOptionalString,
-  readJsonColumn,
-  writeJsonColumn
-} from '../utils/modelUtils.js';
+import { ensureIntegerInRange, readJsonColumn, writeJsonColumn } from '../utils/modelUtils.js';
 
 const TABLE = 'community_members';
 const ROLE_OPTIONS = new Set(['owner', 'admin', 'moderator', 'member']);
@@ -261,7 +256,7 @@ export default class CommunityMemberModel {
             let metadata = {};
             try {
               metadata = row.metadata ? JSON.parse(row.metadata) : {};
-            } catch (error) {
+            } catch {
               metadata = {};
             }
             const metadataValues = Object.values(metadata).map((value) =>

@@ -21,8 +21,8 @@ function normaliseTraceId(candidate) {
     return generateTraceId();
   }
 
-  if (/^[A-Za-z0-9-]{16,128}$/.test(trimmed)) {
-    return trimmed;
+  if (/^[A-Za-z0-9-]{1,128}$/.test(trimmed)) {
+    return trimmed.slice(0, 128);
   }
 
   return generateTraceId();

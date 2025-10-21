@@ -548,7 +548,6 @@ export function buildBounds(markers, options = {}) {
   }
 
   const centerLat = (rawBounds.minLat + rawBounds.maxLat) / 2;
-  const centerLng = (rawBounds.minLng + rawBounds.maxLng) / 2;
 
   const paddingKilometers = Math.max(0, Number(options.paddingKilometers ?? 0));
   const paddingDegrees = Math.max(0, Number(options.paddingDegrees ?? 0));

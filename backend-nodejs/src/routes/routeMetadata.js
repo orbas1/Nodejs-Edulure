@@ -44,12 +44,12 @@ function ensureArray(value, { fallback = [], map = (item) => item } = {}) {
 
 function normaliseBasePath(name, basePath) {
   if (typeof basePath !== 'string') {
-    throw new TypeError(`Route \`${name}\` must declare a basePath string.`);
+    throw new TypeError(`Route `${name}\` must declare a basePath string.`);
   }
 
   const trimmed = basePath.trim();
   if (!trimmed.startsWith('/')) {
-    throw new Error(`Route \`${name}\` base path must start with a forward slash.`);
+    throw new Error(`Route `${name}\` base path must start with a forward slash.`);
   }
 
   if (trimmed === '/') {
@@ -61,7 +61,7 @@ function normaliseBasePath(name, basePath) {
 
 function normaliseString(value, { field, routeName }) {
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(`Route \`${routeName}\` must declare a non-empty ${field}.`);
+    throw new Error(`Route `${routeName}\` must declare a non-empty ${field}.`);
   }
   return value.trim();
 }
@@ -74,7 +74,7 @@ function normaliseDescription(description, name) {
 function normaliseFlagKey(flagKey, name) {
   const trimmed = normaliseString(flagKey, { field: 'flag key', routeName: name });
   if (!/^[-a-z0-9_.]+$/iu.test(trimmed)) {
-    throw new Error(`Route \`${name}\` flag key contains invalid characters.`);
+    throw new Error(`Route `${name}\` flag key contains invalid characters.`);
   }
   return trimmed;
 }
@@ -128,7 +128,7 @@ function buildDisabledMessage(message, fallbackStatus, name) {
 
   const trimmed = String(message).trim();
   if (trimmed.length === 0) {
-    throw new Error(`Route \`${name}\` provided an empty disabledMessage.`);
+    throw new Error(`Route `${name}\` provided an empty disabledMessage.`);
   }
 
   return trimmed;
@@ -137,7 +137,7 @@ function buildDisabledMessage(message, fallbackStatus, name) {
 function normaliseServiceTier(serviceTier, name) {
   const tier = serviceTier === undefined || serviceTier === null ? 'core' : String(serviceTier).trim().toLowerCase();
   if (!SERVICE_TIERS.has(tier)) {
-    throw new Error(`Route \`${name}\` declared an invalid service tier of \`${serviceTier}\`.`);
+    throw new Error(`Route `${name}\` declared an invalid service tier of \`${serviceTier}\`.`);
   }
   return tier;
 }
@@ -206,7 +206,7 @@ function normaliseRbac(rbac, name, audience) {
       : 'role-based';
 
   if (!['role-based', 'public', 'service'].includes(strategy)) {
-    throw new Error(`Route \`${name}\` RBAC strategy \`${strategy}\` is not supported.`);
+    throw new Error(`Route `${name}\` RBAC strategy \`${strategy}\` is not supported.`);
   }
 
   const defaultRole =
@@ -220,7 +220,7 @@ function normaliseRbac(rbac, name, audience) {
   });
 
   if (allowedRoles.length === 0 && strategy !== 'public') {
-    throw new Error(`Route \`${name}\` must declare at least one allowed role.`);
+    throw new Error(`Route `${name}\` must declare at least one allowed role.`);
   }
 
   if (!allowedRoles.includes(defaultRole)) {
@@ -298,7 +298,7 @@ function defineRoute({
   });
 
   if (normalisedOwners.length === 0) {
-    throw new Error(`Route \`${normalisedName}\` must declare at least one owning team.`);
+    throw new Error(`Route `${normalisedName}\` must declare at least one owning team.`);
   }
 
   const normalisedServiceTier = normaliseServiceTier(serviceTier, normalisedName);
