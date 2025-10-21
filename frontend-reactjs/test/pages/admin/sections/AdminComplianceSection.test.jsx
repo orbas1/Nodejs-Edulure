@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { act } from 'react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
@@ -171,6 +171,36 @@ describe('AdminComplianceSection', () => {
     expect(await screen.findByText('Access controls')).toBeInTheDocument();
     expect(screen.getByText('audit_events')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute('href', 'https://example.com/download');
+  });
+
+  it('requires detailed rationale before rejecting a verification case', async () => {
+    const onReview = vi.fn().mockResolvedValue();
+    const { user } = setup({ onReview });
+
+    const rejectButton = screen.getByRole('button', { name: /Reject/i });
+    await user.click(rejectButton);
+
+    expect(onReview).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Provide a clear reason/i)).toBeInTheDocument();
+  });
+
+  it('submits approval decisions with risk overrides applied', async () => {
+    const onReview = vi.fn().mockResolvedValue();
+    const { user } = setup({ onReview });
+
+    const riskInput = screen.getByDisplayValue('15.0');
+    await act(async () => {
+      await user.clear(riskInput);
+      await user.type(riskInput, '45.5');
+    });
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /Approve/i }));
+    });
+
+    await waitFor(() => expect(onReview).toHaveBeenCalledTimes(1));
+    expect(onReview.mock.calls[0][1]).toMatchObject({ status: 'approved', riskScore: 45.5 });
+    expect(await screen.findByText(/Case KYC-1 updated/i)).toBeInTheDocument();
   });
 });
 

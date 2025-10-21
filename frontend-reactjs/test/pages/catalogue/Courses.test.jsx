@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import Courses from '../../../src/pages/Courses.jsx';
@@ -6,6 +7,13 @@ import Courses from '../../../src/pages/Courses.jsx';
 const useAuthMock = vi.fn();
 const listPublicCoursesMock = vi.fn();
 const searchExplorerMock = vi.fn();
+const createPaymentIntentMock = vi.fn();
+const adminControlApiMock = {
+  listCourses: vi.fn(),
+  deleteCourse: vi.fn(),
+  createCourse: vi.fn(),
+  updateCourse: vi.fn()
+};
 
 vi.mock('../../../src/context/AuthContext.jsx', () => ({
   useAuth: () => useAuthMock()
@@ -20,12 +28,11 @@ vi.mock('../../../src/api/explorerApi.js', () => ({
 }));
 
 vi.mock('../../../src/api/adminControlApi.js', () => ({
-  default: {
-    listCourses: vi.fn(),
-    deleteCourse: vi.fn(),
-    createCourse: vi.fn(),
-    updateCourse: vi.fn()
-  }
+  default: adminControlApiMock
+}));
+
+vi.mock('../../../src/api/paymentsApi.js', () => ({
+  createPaymentIntent: (...args) => createPaymentIntentMock(...args)
 }));
 
 vi.mock('../../../src/components/search/ExplorerSearchSection.jsx', () => ({
@@ -50,6 +57,8 @@ describe('Courses page catalogue fallbacks', () => {
     vi.clearAllMocks();
     useAuthMock.mockReturnValue({ session: null, isAuthenticated: false });
     listPublicCoursesMock.mockImplementation(() => Promise.resolve({ data: [] }));
+    createPaymentIntentMock.mockReset();
+    Object.values(adminControlApiMock).forEach((mockFn) => mockFn.mockReset?.());
   });
 
   it('falls back to public course highlights when explorer access is unavailable', async () => {
@@ -100,5 +109,63 @@ describe('Courses page catalogue fallbacks', () => {
     expect(await screen.findByText('Public Product Strategy')).toBeInTheDocument();
     expect(searchExplorerMock).not.toHaveBeenCalled();
     expect(screen.queryByText(/Limited results shown/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces highlight error messaging when the fallback catalogue fails', async () => {
+    listPublicCoursesMock.mockImplementation(({ params }) => {
+      if (params?.limit === 6) {
+        return Promise.reject(new Error('Highlights offline'));
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(<Courses />);
+
+    expect(await screen.findByText('Highlights offline')).toBeInTheDocument();
+  });
+
+  it('creates payment intents from the admin checkout drawer', async () => {
+    useAuthMock.mockReturnValue({
+      session: {
+        tokens: { accessToken: 'token' },
+        user: { role: 'admin', email: 'ops@edulure.com' }
+      },
+      isAuthenticated: true
+    });
+    searchExplorerMock.mockResolvedValue({
+      success: true,
+      data: {
+        results: {
+          courses: {
+            hits: [
+              {
+                id: 'course-1',
+                title: 'Ops Mastery',
+                price: { formatted: '$199' },
+                raw: { level: 'advanced', deliveryFormat: 'cohort', skills: ['ops'] }
+              }
+            ]
+          }
+        }
+      }
+    });
+    listPublicCoursesMock.mockResolvedValue({ data: [] });
+    adminControlApiMock.listCourses.mockResolvedValue({ data: [] });
+    createPaymentIntentMock.mockResolvedValue({ paymentId: 'pi_123', clientSecret: 'secret_456' });
+
+    const user = userEvent.setup();
+    render(<Courses />);
+
+    const purchaseButton = await screen.findByRole('button', { name: /Purchase cohort/i });
+    await user.click(purchaseButton);
+
+    const submitButton = await screen.findByRole('button', { name: /Generate payment intent/i });
+    await user.click(submitButton);
+
+    await waitFor(() => expect(createPaymentIntentMock).toHaveBeenCalledTimes(1));
+    const payload = createPaymentIntentMock.mock.calls[0][0];
+    expect(payload.token).toBe('token');
+    expect(payload.payload.items[0]).toMatchObject({ name: 'Ops Mastery', metadata: { courseId: 'course-1' } });
+    expect(await screen.findByText(/Checkout ready/i)).toBeInTheDocument();
   });
 });

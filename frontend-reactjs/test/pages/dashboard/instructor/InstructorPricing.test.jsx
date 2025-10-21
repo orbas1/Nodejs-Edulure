@@ -50,4 +50,18 @@ describe('InstructorPricing', () => {
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(screen.getByText(/Pricing export scheduled/i)).toBeInTheDocument();
   });
+
+  it('exposes failures when pricing export orchestration is unavailable', async () => {
+    exportPricing.mockRejectedValueOnce(new Error('Export failed'));
+
+    render(<InstructorPricing />);
+
+    const exportButton = screen.getByRole('button', { name: /Export finance report/i });
+    fireEvent.click(exportButton);
+
+    await waitFor(() => expect(exportPricing).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText('Export failed')).toBeInTheDocument();
+    expect(exportButton).not.toBeDisabled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

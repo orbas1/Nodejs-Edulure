@@ -61,4 +61,16 @@ describe('AssignmentPipelineSection', () => {
 
     window.removeEventListener('edulure:assignment-open', listener);
   });
+
+  it('offers empty-state messaging when queues have no entries', () => {
+    const assignments = {
+      summary: { total: 0, dueThisWeek: 0, requiresReview: 0 },
+      queues: { upcoming: [], review: [], automation: [] }
+    };
+
+    render(<AssignmentPipelineSection assignments={assignments} />);
+
+    expect(screen.getByText('No assignments awaiting manual review.')).toBeInTheDocument();
+    expect(screen.getByText('No automation workflows configured yet.')).toBeInTheDocument();
+  });
 });

@@ -71,4 +71,9 @@ describe('LearnerManagementSection', () => {
 
     window.removeEventListener('edulure:learner-intervention', listener);
   });
+
+  it('renders nothing when no learners or alerts exist', () => {
+    const { container } = render(<LearnerManagementSection learners={{ roster: [], riskAlerts: [] }} />);
+    expect(container).toBeEmptyDOMElement();
+  });
 });

@@ -4,13 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CommunitySafety from '../../../../src/pages/dashboard/community/CommunitySafety.jsx';
 
 const resolveIncidentMock = vi.fn();
+const useAuthMock = vi.fn();
 
 vi.mock('../../../../src/api/communityApi.js', () => ({
   resolveCommunityIncident: (...args) => resolveIncidentMock(...args)
 }));
 
 vi.mock('../../../../src/context/AuthContext.jsx', () => ({
-  useAuth: () => ({ session: { tokens: { accessToken: 'token' } } })
+  useAuth: () => useAuthMock()
 }));
 
 describe('CommunitySafety', () => {
@@ -34,6 +35,7 @@ describe('CommunitySafety', () => {
 
   beforeEach(() => {
     resolveIncidentMock.mockReset();
+    useAuthMock.mockReturnValue({ session: { tokens: { accessToken: 'token' } } });
     vi.spyOn(window, 'prompt').mockImplementation(() => '');
   });
 
@@ -57,5 +59,19 @@ describe('CommunitySafety', () => {
       incidentId: 'incident-1'
     });
     expect(screen.queryByText('Escalated harassment report')).not.toBeInTheDocument();
+  });
+
+  it('prevents resolving incidents when unauthenticated', async () => {
+    useAuthMock.mockReturnValue({ session: null });
+    window.prompt.mockReset();
+
+    render(<CommunitySafety dashboard={dashboard} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Resolve/i }));
+
+    await waitFor(() => {
+      expect(resolveIncidentMock).not.toHaveBeenCalled();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('You must be signed in to resolve incidents.');
   });
 });

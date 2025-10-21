@@ -5,6 +5,7 @@ import CommunityOperations from '../../../../src/pages/dashboard/community/Commu
 
 const publishRunbookMock = vi.fn();
 const acknowledgeEscalationMock = vi.fn();
+const useAuthMock = vi.fn();
 
 vi.mock('../../../../src/api/communityApi.js', () => ({
   publishCommunityRunbook: (...args) => publishRunbookMock(...args),
@@ -12,7 +13,7 @@ vi.mock('../../../../src/api/communityApi.js', () => ({
 }));
 
 vi.mock('../../../../src/context/AuthContext.jsx', () => ({
-  useAuth: () => ({ session: { tokens: { accessToken: 'test-token' } } })
+  useAuth: () => useAuthMock()
 }));
 
 describe('CommunityOperations', () => {
@@ -47,6 +48,7 @@ describe('CommunityOperations', () => {
   beforeEach(() => {
     publishRunbookMock.mockReset();
     acknowledgeEscalationMock.mockReset();
+    useAuthMock.mockReturnValue({ session: { tokens: { accessToken: 'test-token' } } });
     vi.spyOn(window, 'prompt').mockImplementation(() => '');
     vi.spyOn(window, 'confirm').mockReturnValue(true);
   });
@@ -103,5 +105,19 @@ describe('CommunityOperations', () => {
     });
 
     expect(screen.getByRole('alert')).toHaveTextContent('Failed to acknowledge escalation');
+  });
+
+  it('prevents runbook publishing without authentication', async () => {
+    useAuthMock.mockReturnValue({ session: null });
+    window.prompt.mockReset();
+
+    render(<CommunityOperations dashboard={dashboard} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Publish runbook/i }));
+
+    await waitFor(() => {
+      expect(publishRunbookMock).not.toHaveBeenCalled();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('You must be signed in to publish runbooks.');
   });
 });

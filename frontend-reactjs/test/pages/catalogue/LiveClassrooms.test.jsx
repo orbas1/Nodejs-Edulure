@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import LiveClassrooms from '../../../src/pages/LiveClassrooms.jsx';
@@ -52,6 +53,8 @@ describe('Live classrooms public catalogue behaviour', () => {
     vi.clearAllMocks();
     useAuthMock.mockReturnValue({ session: null, isAuthenticated: false });
     listPublicLiveClassroomsMock.mockResolvedValue({ data: [] });
+    joinLiveSessionMock.mockReset();
+    checkInToLiveSessionMock.mockReset();
   });
 
   it('loads live classrooms from the public catalogue for non-admin visitors', async () => {
@@ -84,5 +87,58 @@ describe('Live classrooms public catalogue behaviour', () => {
     render(<LiveClassrooms />);
 
     expect(await screen.findByText('Catalogue offline')).toBeInTheDocument();
+  });
+
+  it('requires authentication before joining a session', async () => {
+    listPublicLiveClassroomsMock.mockResolvedValue({
+      data: [
+        {
+          id: 'lc-1',
+          title: 'Ops AMA',
+          status: 'scheduled',
+          startAt: '2024-09-01T10:00:00.000Z',
+          capacity: 30,
+          reservedSeats: 5,
+          isTicketed: false
+        }
+      ]
+    });
+
+    const user = userEvent.setup();
+    render(<LiveClassrooms />);
+
+    await user.click(await screen.findByRole('button', { name: /Join session/i }));
+
+    expect(joinLiveSessionMock).not.toHaveBeenCalled();
+    expect(await screen.findByText('You must be signed in to join a session.')).toBeInTheDocument();
+  });
+
+  it('records check-ins for authenticated operators', async () => {
+    useAuthMock.mockReturnValue({
+      session: { tokens: { accessToken: 'token' } },
+      isAuthenticated: true
+    });
+    listPublicLiveClassroomsMock.mockResolvedValue({
+      data: [
+        {
+          id: 'lc-2',
+          title: 'Launch rehearsal',
+          status: 'live',
+          startAt: '2024-09-01T11:00:00.000Z',
+          capacity: 40,
+          reservedSeats: 12,
+          isTicketed: true
+        }
+      ]
+    });
+    checkInToLiveSessionMock.mockResolvedValue({ success: true });
+
+    const user = userEvent.setup();
+    render(<LiveClassrooms />);
+
+    await user.click(await screen.findByRole('button', { name: /Check in/i }));
+
+    expect(checkInToLiveSessionMock).toHaveBeenCalledWith({ token: 'token', sessionId: 'lc-2' });
+    expect(await screen.findByText('Check-in recorded. Enjoy the classroom!')).toBeInTheDocument();
   });
 });
