@@ -6,6 +6,7 @@ import CreationProjectCollaboratorModel from '../models/CreationProjectCollabora
 import CreationCollaborationSessionModel from '../models/CreationCollaborationSessionModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import AdsCampaignModel from '../models/AdsCampaignModel.js';
+import deepMerge from '../utils/deepMerge.js';
 
 const log = logger.child({ service: 'CreationStudioService' });
 
@@ -187,24 +188,6 @@ function enrichProjectDraft(projectPayload = {}) {
   }
 
   return draft;
-}
-
-function deepMerge(base, override) {
-  if (Array.isArray(base) || Array.isArray(override)) {
-    return override ?? base ?? [];
-  }
-  const result = { ...(base ?? {}) };
-  if (!override || typeof override !== 'object') {
-    return result;
-  }
-  for (const [key, value] of Object.entries(override)) {
-    if (value && typeof value === 'object' && !Array.isArray(value) && typeof result[key] === 'object' && !Array.isArray(result[key])) {
-      result[key] = deepMerge(result[key], value);
-    } else if (value !== undefined) {
-      result[key] = value;
-    }
-  }
-  return result;
 }
 
 async function hydrateProject(project, { includeCollaborators = true, includeSessions = false } = {}) {

@@ -1,5 +1,19 @@
 import { env } from '../config/env.js';
 
+const FALLBACK_SLO_CONFIG = {
+  definitions: [],
+  bucketMinutes: 5,
+  latencySampleSize: 128,
+  defaults: {
+    targetAvailability: 0.999,
+    windowMinutes: 60,
+    warningBurnRate: 2,
+    criticalBurnRate: 4,
+    minRequests: 1,
+    treat4xxAsFailures: false
+  }
+};
+
 function toRegExp(pattern, flags = 'i', context) {
   if (pattern instanceof RegExp) {
     return pattern;
@@ -546,7 +560,7 @@ class SloRegistry {
   }
 }
 
-const sloConfig = env.observability.slo;
+const sloConfig = env?.observability?.slo ?? FALLBACK_SLO_CONFIG;
 
 export const sloRegistry = new SloRegistry({
   bucketSizeMs: sloConfig.bucketMinutes * 60 * 1000,

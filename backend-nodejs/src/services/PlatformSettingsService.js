@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import PlatformSettingModel from '../models/PlatformSettingModel.js';
 import db from '../config/database.js';
 import { env } from '../config/env.js';
+import deepMerge from '../utils/deepMerge.js';
 
 const SETTINGS_KEYS = Object.freeze({
   ADMIN_PROFILE: 'admin_profile',
@@ -103,36 +104,6 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
   credentials: []
 });
 
-const ARRAY_MERGE_LIMIT = 20;
-
-function deepMerge(base, patch) {
-  const source = Array.isArray(base) ? [...base] : { ...base };
-
-  if (!patch || typeof patch !== 'object') {
-    return source;
-  }
-
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) {
-      continue;
-    }
-
-    if (Array.isArray(value)) {
-      source[key] = value.slice(0, 20);
-      continue;
-    }
-
-    if (value && typeof value === 'object') {
-      const baseValue = source[key] && typeof source[key] === 'object' ? source[key] : {};
-      source[key] = deepMerge(baseValue, value);
-      continue;
-    }
-
-    source[key] = value;
-  }
-
-  return source;
-}
 
 const DEFAULT_ADMIN_PROFILE = Object.freeze({
   organisation: {

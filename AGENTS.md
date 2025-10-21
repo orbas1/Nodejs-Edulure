@@ -1,26 +1,26 @@
 ### Backend Failures and Breakages (Grouped by 20)
 
 #### Group 1 (Items 1-20)
-1. `backend-nodejs/test/adminSettingsHttpRoutes.test.js` – vi.mock hoisting error caused by `PlatformSettingsService`.
-2. `backend-nodejs/test/adsHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-3. `backend-nodejs/test/analyticsBiHttpRoutes.test.js` – suite flagged failed without an emitted message.
-4. `backend-nodejs/test/auditEventService.test.js` – IP enrichment assertion mismatch.
-5. `backend-nodejs/test/capabilityManifestService.test.js` – `deepMerge` identifier redeclared.
-6. `backend-nodejs/test/chatHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-7. `backend-nodejs/test/communityAffiliateModel.test.js` – affiliate update expects uppercase code.
-8. `backend-nodejs/test/communityProgrammingController.test.js` – webinar creation payload mismatch.
-9. `backend-nodejs/test/complianceHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-10. `backend-nodejs/test/courseLiveService.test.js` – presence heartbeat timestamp did not change.
-11. `backend-nodejs/test/dashboardHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-12. `backend-nodejs/test/dashboardService.test.js` – `adsSection` identifier redeclared.
-13. `backend-nodejs/test/enablementHttpRoutes.test.js` – suite failed without message.
-14. `backend-nodejs/test/environmentParityService.test.js` – healthy report still marked “drifted”.
-15. `backend-nodejs/test/feedHttpRoutes.test.js` – `deepMerge` identifier redeclared.
-16. `backend-nodejs/test/governanceHttpRoutes.test.js` – suite failed without message.
-17. `backend-nodejs/test/graphqlFeedRoutes.test.js` – `deepMerge` identifier redeclared.
-18. `backend-nodejs/test/group14Controllers.test.js` – undefined observability SLO configuration.
-19. `backend-nodejs/test/integrationApiKeyInviteService.test.js` – database URL expected but missing.
-20. `backend-nodejs/test/integrationOrchestratorService.test.js` – HubSpot sync hits MySQL connection refusals.
+1. ✅ `backend-nodejs/test/adminSettingsHttpRoutes.test.js` – vi.mock hoisting error caused by `PlatformSettingsService`.
+2. ✅ `backend-nodejs/test/adsHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+3. ✅ `backend-nodejs/test/analyticsBiHttpRoutes.test.js` – suite flagged failed without an emitted message.
+4. ✅ `backend-nodejs/test/auditEventService.test.js` – IP enrichment assertion mismatch.
+5. ✅ `backend-nodejs/test/capabilityManifestService.test.js` – `deepMerge` identifier redeclared.
+6. ✅ `backend-nodejs/test/chatHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+7. ✅ `backend-nodejs/test/communityAffiliateModel.test.js` – affiliate update expects uppercase code.
+8. ✅ `backend-nodejs/test/communityProgrammingController.test.js` – webinar creation payload mismatch.
+9. ✅ `backend-nodejs/test/complianceHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+10. ✅ `backend-nodejs/test/courseLiveService.test.js` – presence heartbeat timestamp did not change.
+11. ✅ `backend-nodejs/test/dashboardHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+12. ✅ `backend-nodejs/test/dashboardService.test.js` – `adsSection` identifier redeclared.
+13. ✅ `backend-nodejs/test/enablementHttpRoutes.test.js` – suite failed without message.
+14. ✅ `backend-nodejs/test/environmentParityService.test.js` – healthy report still marked “drifted”.
+15. ✅ `backend-nodejs/test/feedHttpRoutes.test.js` – `deepMerge` identifier redeclared.
+16. ✅ `backend-nodejs/test/governanceHttpRoutes.test.js` – suite failed without message.
+17. ✅ `backend-nodejs/test/graphqlFeedRoutes.test.js` – `deepMerge` identifier redeclared.
+18. ✅ `backend-nodejs/test/group14Controllers.test.js` – undefined observability SLO configuration.
+19. ✅ `backend-nodejs/test/integrationApiKeyInviteService.test.js` – database URL expected but missing.
+20. ✅ `backend-nodejs/test/integrationOrchestratorService.test.js` – HubSpot sync hits MySQL connection refusals.
 
 #### Group 2 (Items 21-40)
 21. ✅ `backend-nodejs/test/learnerDashboardHttpRoutes.test.js` – suite failed without message.
