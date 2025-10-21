@@ -45,5 +45,16 @@ export default function DashboardHome() {
     return <CommunityOverview dashboard={dashboard} onRefresh={refresh} />;
   }
 
-  return <LearnerOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />;
+  if (role === 'learner') {
+    return <LearnerOverview dashboard={dashboard} profile={profile} onRefresh={refresh} />;
+  }
+
+  return (
+    <DashboardStateMessage
+      title="Role not supported"
+      description="This overview is tailored for learner, instructor, community, or admin Learnspaces. Switch roles or refresh to continue."
+      actionLabel="Refresh dashboards"
+      onAction={() => refresh?.()}
+    />
+  );
 }

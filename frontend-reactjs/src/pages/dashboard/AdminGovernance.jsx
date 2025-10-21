@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -9,6 +9,7 @@ import {
 
 import { fetchPolicyTimeline, fetchDsrQueue, updateDsrStatus } from '../../api/complianceApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { formatRelativeTime } from '../admin/utils.js';
 
 function SummaryCard({ title, value, icon: Icon, tone }) {
   const toneClass = useMemo(() => {
@@ -80,47 +81,59 @@ function DsrRequestRow({ request, onStatusChange }) {
 export default function AdminGovernance() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
+  const isAdmin = session?.user?.role === 'admin';
   const [queue, setQueue] = useState({ data: [], total: 0, overdue: 0 });
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    if (!token) return;
-    let isMounted = true;
-    const controller = new AbortController();
-    setLoading(true);
-    Promise.all([
-      fetchDsrQueue({ token, signal: controller.signal }),
-      fetchPolicyTimeline({ token, signal: controller.signal })
-    ])
-      .then(([queuePayload, policyPayload]) => {
-        if (!isMounted) return;
+  const loadGovernanceData = useCallback(
+    async ({ signal, showSpinner = true } = {}) => {
+      if (!token || !isAdmin) return;
+      if (showSpinner) setLoading(true);
+      try {
+        const [queuePayload, policyPayload] = await Promise.all([
+          fetchDsrQueue({ token, signal }),
+          fetchPolicyTimeline({ token, signal })
+        ]);
         setQueue(queuePayload ?? { data: [], total: 0, overdue: 0 });
         setPolicies(policyPayload ?? []);
         setError(null);
-      })
-      .catch((err) => {
-        if (!isMounted && (err?.name === 'AbortError' || err?.message === 'canceled')) {
+        setLastUpdated(new Date());
+      } catch (err) {
+        if (signal?.aborted || err?.name === 'AbortError' || err?.message === 'canceled') {
           return;
         }
         setError(err instanceof Error ? err : new Error('Failed to load governance data'));
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-    return () => {
-      isMounted = false;
-      controller.abort();
-    };
-  }, [token]);
+      } finally {
+        if (showSpinner) setLoading(false);
+      }
+    },
+    [token, isAdmin]
+  );
+
+  useEffect(() => {
+    if (!token || !isAdmin) return;
+    const controller = new AbortController();
+    loadGovernanceData({ signal: controller.signal });
+    return () => controller.abort();
+  }, [token, isAdmin, loadGovernanceData]);
+
+  useEffect(() => {
+    if (!autoRefresh || !token || !isAdmin) return;
+    const interval = setInterval(() => {
+      loadGovernanceData({ showSpinner: false });
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadGovernanceData, token, isAdmin]);
 
   const handleStatusChange = async (requestId, status) => {
-    if (!token) return;
+    if (!token || !isAdmin) return;
     try {
       await updateDsrStatus({ token, requestId, status });
-      const updated = await fetchDsrQueue({ token });
-      setQueue(updated ?? { data: [], total: 0, overdue: 0 });
+      await loadGovernanceData({ showSpinner: false });
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to update DSR status'));
     }
@@ -150,18 +163,56 @@ export default function AdminGovernance() {
     [queue.total, queue.overdue, policies.length]
   );
 
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdated) return null;
+    return formatRelativeTime(lastUpdated) ?? lastUpdated.toLocaleTimeString();
+  }, [lastUpdated]);
+
+  if (!isAdmin) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-rose-700">
+          <p className="text-lg font-semibold">Admin privileges required</p>
+          <p className="mt-2 text-sm">
+            You need an administrator Learnspace to review governance posture and DSR queues.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Governance control centre</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          Track GDPR data subject requests, consent posture, and policy releases from a single workspace.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">Governance control centre</h1>
+          <p className="mt-1 text-sm text-slate-600">
+            Track GDPR data subject requests, consent posture, and policy releases from a single workspace.
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-2 text-xs text-slate-500 md:items-end">
+          {lastUpdatedLabel ? <span>Last refreshed {lastUpdatedLabel}</span> : null}
+          <button
+            type="button"
+            onClick={() => setAutoRefresh((state) => !state)}
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary hover:text-primary"
+            aria-pressed={autoRefresh}
+          >
+            {autoRefresh ? 'Pause auto-refresh' : 'Resume auto-refresh'}
+          </button>
+        </div>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-          {error.message}
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <span>{error.message}</span>
+          <button
+            type="button"
+            onClick={() => loadGovernanceData()}
+            className="rounded-full border border-rose-300 px-3 py-1 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -194,6 +245,13 @@ export default function AdminGovernance() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {loading && queue.data.length === 0 ? (
+                <tr>
+                  <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={6}>
+                    Loading queue…
+                  </td>
+                </tr>
+              ) : null}
               {queue.data.length === 0 && !loading && (
                 <tr>
                   <td className="px-4 py-6 text-center text-sm text-slate-500" colSpan={6}>
@@ -222,6 +280,9 @@ export default function AdminGovernance() {
           </span>
         </div>
         <ol className="mt-4 space-y-4">
+          {loading && policies.length === 0 ? (
+            <li className="text-sm text-slate-500">Loading policy timeline…</li>
+          ) : null}
           {policies.map((policy) => (
             <li key={`${policy.key}-${policy.version}`} className="flex items-start gap-3">
               <div className="mt-1 h-2 w-2 rounded-full bg-slate-400" />

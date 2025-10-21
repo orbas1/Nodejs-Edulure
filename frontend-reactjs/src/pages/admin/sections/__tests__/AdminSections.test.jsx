@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -14,6 +14,9 @@ import AdminRevenueSection from '../AdminRevenueSection.jsx';
 import AdminOperationsSection from '../AdminOperationsSection.jsx';
 import AdminPolicyHubSection from '../AdminPolicyHubSection.jsx';
 import AdminAdsManagementSection from '../AdminAdsManagementSection.jsx';
+import AdminTopCommunitiesSection from '../AdminTopCommunitiesSection.jsx';
+import AdminUpcomingLaunchesSection from '../AdminUpcomingLaunchesSection.jsx';
+import AdminToolsSection from '../AdminToolsSection.jsx';
 import { formatNumber } from '../../utils.js';
 import adminGrowthApi from '../../../../api/adminGrowthApi.js';
 import adminRevenueApi from '../../../../api/adminRevenueApi.js';
@@ -501,5 +504,275 @@ describe('Admin operational sections', () => {
     expect(screen.getByText(/0 hours/)).toBeInTheDocument();
     expect(screen.getByText('Contact owner')).toBeInTheDocument();
     expect(screen.getByText('Awaiting review')).toBeInTheDocument();
+  });
+
+  it('normalises top communities table values and fallbacks', () => {
+    const communities = [
+      { id: 'ops', name: 'Ops Guild', revenue: 125000, currency: 'USD', subscribers: 1234, share: 45.25 },
+      { id: 'growth', name: null, revenue: null, subscribers: null, share: null }
+    ];
+
+    render(<AdminTopCommunitiesSection sectionId="communities" communities={communities} />);
+
+    const opsRow = screen.getByRole('row', { name: /Ops Guild/i });
+    expect(within(opsRow).getByText('$125,000')).toBeInTheDocument();
+    expect(within(opsRow).getByText('1,234')).toBeInTheDocument();
+    expect(within(opsRow).getByText('45.3%')).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Untitled community/i })).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getByText(/total revenue/i)).toBeInTheDocument();
+  });
+
+  it('formats upcoming launches with derived schedule metadata', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-11-01T12:00:00Z'));
+
+    const launches = [
+      {
+        id: 'launch-1',
+        title: 'Instructor Kickoff',
+        community: 'Growth Ops',
+        startAt: '2024-11-03T12:00:00Z'
+      },
+      { id: 'launch-2', title: 'Monetisation Briefing', community: null }
+    ];
+
+    render(<AdminUpcomingLaunchesSection sectionId="launches" launches={launches} />);
+
+    expect(screen.getByText('Instructor Kickoff')).toBeInTheDocument();
+    expect(screen.getByText(/in 48 hours/i)).toBeInTheDocument();
+    expect(screen.getByText('Monetisation Briefing')).toBeInTheDocument();
+    expect(screen.getByText('Date TBC')).toBeInTheDocument();
+    expect(screen.getByText('Schedule pending')).toBeInTheDocument();
+    expect(screen.getByText(/total/i)).toBeInTheDocument();
+
+    vi.useRealTimers();
+  });
+
+  it('groups launches into today, upcoming, and overdue buckets with summary chips', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-11-05T09:00:00Z'));
+
+    const launches = [
+      {
+        id: 'today',
+        title: 'Ops Standup',
+        community: 'Operations Guild',
+        startAt: '2024-11-05T15:00:00Z'
+      },
+      {
+        id: 'future',
+        title: 'Product Enablement',
+        community: 'Product Academy',
+        startAt: '2024-11-08T17:30:00Z'
+      },
+      {
+        id: 'overdue',
+        title: 'Compliance Retrospective',
+        community: 'Compliance Desk',
+        startAt: '2024-11-03T10:00:00Z'
+      },
+      {
+        id: 'unscheduled',
+        title: 'Instructor Recruitment',
+        community: 'Talent Lab'
+      }
+    ];
+
+    render(<AdminUpcomingLaunchesSection sectionId="launches" launches={launches} />);
+
+    const todayGroup = screen.getByText('Launching today').closest('section');
+    expect(todayGroup).not.toBeNull();
+    expect(within(todayGroup).getByText('Ops Standup')).toBeInTheDocument();
+
+    const upcomingGroup = screen.getByText('Upcoming').closest('section');
+    expect(upcomingGroup).not.toBeNull();
+    expect(within(upcomingGroup).getByText('Product Enablement')).toBeInTheDocument();
+    expect(within(upcomingGroup).getByText('Instructor Recruitment')).toBeInTheDocument();
+
+    const overdueGroup = screen.getByText('Requires reschedule').closest('section');
+    expect(overdueGroup).not.toBeNull();
+    expect(within(overdueGroup).getByText('Compliance Retrospective')).toBeInTheDocument();
+
+    const chipFinder = (label) =>
+      screen.getByText((content, element) => element?.tagName === 'SPAN' && content.trim().startsWith(label)).parentElement;
+
+    const totalChip = chipFinder('Total');
+    const todayChip = chipFinder('Today');
+    const upcomingChip = chipFinder('Upcoming');
+    const overdueChip = chipFinder('Overdue');
+
+    expect(totalChip).toHaveTextContent('Total · 4');
+    expect(todayChip).toHaveTextContent('Today · 1');
+    expect(upcomingChip).toHaveTextContent('Upcoming · 2');
+    expect(overdueChip).toHaveTextContent('Overdue · 1');
+
+    vi.useRealTimers();
+  });
+
+  it('renders tooling lifecycle telemetry with resilient fallbacks', () => {
+    const toolsPayload = {
+      summary: {
+        cards: [
+          { id: 'occupancy', label: 'Occupancy', value: null, helper: 'Across active rentals' }
+        ],
+        meta: { occupancy: '74%', pipelineValue: '$12k', lastAudit: '3 days ago' }
+      },
+      listing: [
+        {
+          id: 'tool-1',
+          name: null,
+          status: null,
+          lifecycleStage: null,
+          category: null,
+          owner: null,
+          availableUnits: null,
+          totalCapacity: null,
+          adoptionVelocity: null,
+          demandLevel: null,
+          healthScore: null,
+          rentalContracts: null,
+          value: null,
+          lastAudit: null
+        }
+      ],
+      sales: {
+        metrics: { pipelineValue: '$12k', winRate: '42%' },
+        pipeline: [{ id: 'stage-1', stage: null, deals: null, velocity: null, value: null, conversion: null }],
+        forecast: { committed: '$8k' }
+      },
+      rental: {
+        metrics: {},
+        active: [
+          {
+            id: 'rent-1',
+            tool: null,
+            lessee: null,
+            value: null,
+            utilisation: null,
+            startAt: null,
+            endAt: null,
+            status: null,
+            remaining: null
+          }
+        ],
+        utilisation: { topPerformers: [{ id: 'top-1', tool: null, utilisation: null }] },
+        expiring: [{ id: 'exp-1', tool: null, owner: null, expiresAt: null, remaining: null }]
+      },
+      management: {
+        maintenance: [{ id: 'maint-1', tool: null, owner: null, severity: null, status: null, updated: null }],
+        audits: [{ id: 'audit-1', title: null, owner: null, status: null, dueAt: null }],
+        governance: {}
+      },
+      finalisation: {
+        readinessScore: null,
+        checklist: [{ id: 'check-1', label: null, owner: null, status: null }],
+        communications: [{ id: 'comm-1', channel: null, audience: null, status: null }],
+        pipeline: [{ id: 'pipe-1', tool: null, owner: null, stage: null, eta: null }]
+      }
+    };
+
+    render(<AdminToolsSection sectionId="tools" tools={toolsPayload} />);
+
+    expect(screen.getByText('Untitled tool')).toBeInTheDocument();
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getByText(/No active deals/i)).toBeInTheDocument();
+    expect(screen.getByText(/ETA TBC/i)).toBeInTheDocument();
+  });
+
+  it('supports filtering tooling listings by status, lifecycle stage, and search', async () => {
+    const user = userEvent.setup();
+    const tooling = {
+      summary: { cards: [] },
+      listing: [
+        {
+          id: 'tool-1',
+          name: 'Active Control',
+          status: 'Active',
+          lifecycleStage: 'Scale',
+          category: 'Operations',
+          owner: 'Ops Team',
+          availableUnits: 5,
+          totalCapacity: 10
+        },
+        {
+          id: 'tool-2',
+          name: 'Pilot Flow',
+          status: 'Planned',
+          lifecycleStage: 'Pilot',
+          category: 'Labs',
+          owner: 'Labs Guild',
+          availableUnits: 2,
+          totalCapacity: 5
+        }
+      ]
+    };
+
+    render(<AdminToolsSection sectionId="tools" tools={tooling} />);
+
+    expect(screen.getByText('Active Control')).toBeInTheDocument();
+    expect(screen.getByText('Pilot Flow')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/filter by status/i), 'planned');
+    expect(screen.queryByText('Active Control')).not.toBeInTheDocument();
+    expect(screen.getByText('Pilot Flow')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/filter by status/i), 'all');
+    await user.clear(screen.getByLabelText(/search tooling suites/i));
+    await user.type(screen.getByLabelText(/search tooling suites/i), 'control');
+    expect(screen.getByText('Active Control')).toBeInTheDocument();
+    expect(screen.queryByText('Pilot Flow')).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText(/search tooling suites/i));
+    await user.type(screen.getByLabelText(/search tooling suites/i), 'unknown');
+    expect(screen.getByText(/No tooling suites match/i)).toBeInTheDocument();
+  });
+
+  it('applies combined status and lifecycle filters before searching', async () => {
+    const user = userEvent.setup();
+    const tooling = {
+      summary: { cards: [] },
+      listing: [
+        {
+          id: 'tool-1',
+          name: 'Active Control',
+          status: 'Active',
+          lifecycleStage: 'Scale',
+          category: 'Operations',
+          owner: 'Ops Team',
+          availableUnits: 5,
+          totalCapacity: 10
+        },
+        {
+          id: 'tool-2',
+          name: 'Pilot Flow',
+          status: 'Planned',
+          lifecycleStage: 'Pilot',
+          category: 'Labs',
+          owner: 'Labs Guild',
+          availableUnits: 2,
+          totalCapacity: 5
+        }
+      ]
+    };
+
+    render(<AdminToolsSection sectionId="tools" tools={tooling} />);
+
+    await user.selectOptions(screen.getByLabelText(/filter by status/i), 'active');
+    await user.selectOptions(screen.getByLabelText(/filter by lifecycle stage/i), 'scale');
+
+    expect(screen.getByText('Active Control')).toBeInTheDocument();
+    expect(screen.queryByText('Pilot Flow')).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/filter by status/i), 'all');
+    await user.selectOptions(screen.getByLabelText(/filter by lifecycle stage/i), 'pilot');
+    expect(screen.getByText('Pilot Flow')).toBeInTheDocument();
+    expect(screen.queryByText('Active Control')).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText(/filter by lifecycle stage/i), 'all');
+    await user.clear(screen.getByLabelText(/search tooling suites/i));
+    await user.type(screen.getByLabelText(/search tooling suites/i), 'control');
+    expect(screen.getByText('Active Control')).toBeInTheDocument();
+    expect(screen.queryByText('Pilot Flow')).not.toBeInTheDocument();
   });
 });

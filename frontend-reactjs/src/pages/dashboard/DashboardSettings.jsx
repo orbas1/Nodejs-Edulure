@@ -116,6 +116,122 @@ function cloneState(template) {
   return JSON.parse(JSON.stringify(template));
 }
 
+function stableStringify(value) {
+  if (value === undefined) {
+    return 'undefined';
+  }
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function isDeepEqual(a, b) {
+  return stableStringify(a) === stableStringify(b);
+}
+
+function summariseCollection(label, noun = 'item') {
+  return (before, after) => {
+    const previousCount = Array.isArray(before) ? before.length : 0;
+    const nextCount = Array.isArray(after) ? after.length : 0;
+    if (nextCount === 0) {
+      return `${label} cleared`;
+    }
+    if (nextCount !== previousCount) {
+      return `${label} (${nextCount} ${noun}${nextCount === 1 ? '' : 's'})`;
+    }
+    return `${label} updated`;
+  };
+}
+
+const SECTION_LABELS = Object.freeze({
+  appearance: 'Appearance',
+  preferences: 'Preferences',
+  system: 'System',
+  integrations: 'Integrations',
+  'third-party': 'Third-party credentials'
+});
+
+const SECTION_ANCHORS = Object.freeze({
+  appearance: 'settings-appearance',
+  preferences: 'settings-preferences',
+  system: 'settings-system',
+  integrations: 'settings-integrations',
+  'third-party': 'settings-third-party'
+});
+
+const SECTION_CHANGE_META = Object.freeze({
+  appearance: {
+    branding: { label: 'Brand palette' },
+    theme: { label: 'Theme settings' },
+    hero: { label: 'Hero module messaging' },
+    mediaLibrary: { label: 'Media library assets', summarize: summariseCollection('Media library assets', 'asset') }
+  },
+  preferences: {
+    localisation: { label: 'Localisation defaults' },
+    experience: { label: 'Experience controls' },
+    communications: { label: 'Communication settings' }
+  },
+  system: {
+    maintenanceMode: { label: 'Maintenance mode' },
+    operations: { label: 'Operations policies' },
+    security: { label: 'Security safeguards' },
+    observability: { label: 'Observability alerts' }
+  },
+  integrations: {
+    webhooks: { label: 'Webhook subscriptions', summarize: summariseCollection('Webhook subscriptions', 'subscription') },
+    services: { label: 'Connected services', summarize: summariseCollection('Connected services', 'integration') }
+  },
+  'third-party': {
+    credentials: { label: 'Credential vault entries', summarize: summariseCollection('Credential vault entries', 'credential') }
+  }
+});
+
+function computeChangedSegments(sectionKey, baseline, current) {
+  const meta = SECTION_CHANGE_META[sectionKey];
+  if (!meta) {
+    return isDeepEqual(baseline, current) ? [] : ['Configuration updated'];
+  }
+  const changes = [];
+  Object.entries(meta).forEach(([field, descriptor]) => {
+    const config = typeof descriptor === 'string' ? { label: descriptor } : descriptor;
+    const { label, summarize } = config;
+    const before = baseline?.[field];
+    const after = current?.[field];
+    if (!isDeepEqual(before, after)) {
+      if (typeof summarize === 'function') {
+        changes.push(summarize(before, after) || label);
+      } else {
+        changes.push(label);
+      }
+    }
+  });
+
+  const trackedFields = new Set(Object.keys(meta));
+  const unionFields = new Set([
+    ...Object.keys(baseline ?? {}),
+    ...Object.keys(current ?? {})
+  ]);
+  let additionalChangeDetected = false;
+  unionFields.forEach((field) => {
+    if (!trackedFields.has(field) && !isDeepEqual(baseline?.[field], current?.[field])) {
+      additionalChangeDetected = true;
+    }
+  });
+  if (additionalChangeDetected) {
+    changes.push('Additional configuration updates');
+  }
+
+  return Array.from(new Set(changes));
+}
+
 function generateId(prefix) {
   if (globalThis.crypto?.randomUUID) {
     return `${prefix}-${globalThis.crypto.randomUUID()}`;
@@ -237,10 +353,11 @@ function SectionCard({
   onSubmit,
   saving = false,
   footer = null,
-  actions = null
+  actions = null,
+  id
 }) {
   return (
-    <section className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm">
+    <section id={id} className="flex flex-col gap-5 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-sm">
       <header className="flex items-start gap-3">
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <Icon className="h-6 w-6" aria-hidden="true" />
@@ -276,23 +393,28 @@ SectionCard.propTypes = {
   onSubmit: PropTypes.func.isRequired,
   saving: PropTypes.bool,
   footer: PropTypes.node,
-  actions: PropTypes.node
+  actions: PropTypes.node,
+  id: PropTypes.string
 };
 
 function useSettingsSection({ token, fetcher, updater, fallback, sectionName }) {
   const [data, setData] = useState(() => cloneState(fallback));
+  const [baseline, setBaseline] = useState(() => cloneState(fallback));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
   const refresh = useCallback(async () => {
     if (!token) {
+      setLoading(false);
       return;
     }
     setLoading(true);
     try {
       const response = await fetcher({ token });
-      setData(response ? cloneState(response) : cloneState(fallback));
+      const resolved = response ? cloneState(response) : cloneState(fallback);
+      setData(resolved);
+      setBaseline(cloneState(resolved));
       setFeedback(null);
     } catch (error) {
       console.error(`Failed to load ${sectionName}`, error);
@@ -301,7 +423,9 @@ function useSettingsSection({ token, fetcher, updater, fallback, sectionName }) 
         message: `We could not load ${sectionName}.`,
         detail: error.message
       });
-      setData(cloneState(fallback));
+      const fallbackState = cloneState(fallback);
+      setData(fallbackState);
+      setBaseline(cloneState(fallbackState));
     } finally {
       setLoading(false);
     }
@@ -323,7 +447,9 @@ function useSettingsSection({ token, fetcher, updater, fallback, sectionName }) 
           payload && typeof payload === 'object' && Object.keys(payload).length
             ? payload
             : nextData;
-        setData(cloneState(resolved));
+        const resolvedState = cloneState(resolved);
+        setData(resolvedState);
+        setBaseline(cloneState(resolvedState));
         setFeedback({
           tone: 'success',
           message: `${sectionName} saved`,
@@ -344,15 +470,22 @@ function useSettingsSection({ token, fetcher, updater, fallback, sectionName }) 
     [token, updater, sectionName]
   );
 
+  const reset = useCallback(() => {
+    setData(cloneState(baseline));
+    setFeedback(null);
+  }, [baseline]);
+
   return {
     data,
     setData,
+    baseline,
     loading,
     saving,
     feedback,
     setFeedback,
     refresh,
-    save
+    save,
+    reset
   };
 }
 
@@ -411,6 +544,7 @@ function AppearanceSection({ state, onChange, onSubmit, saving = false, disabled
 
   return (
     <SectionCard
+      id="settings-appearance"
       icon={PaintBrushIcon}
       title="Website appearance"
       description="Control your brand palette, typography, hero module, and media library."
@@ -710,6 +844,7 @@ function PreferencesSection({ state, onChange, onSubmit, saving = false, disable
 
   return (
     <SectionCard
+      id="settings-preferences"
       icon={GlobeAltIcon}
       title="Website preferences"
       description="Fine-tune localisation defaults, user experience levers, and communication policies."
@@ -900,6 +1035,7 @@ function SystemSection({ state, onChange, onSubmit, saving = false, disabled = f
 
   return (
     <SectionCard
+      id="settings-system"
       icon={ServerStackIcon}
       title="System settings"
       description="Orchestrate maintenance windows, retention policies, and operational safeguards."
@@ -1115,6 +1251,7 @@ function IntegrationsSection({ state, onChange, onSubmit, saving = false, disabl
 
   return (
     <SectionCard
+      id="settings-integrations"
       icon={AdjustmentsHorizontalIcon}
       title="Integration settings"
       description="Manage webhook destinations, SaaS connectors, and operational runbooks."
@@ -1320,6 +1457,7 @@ function ThirdPartySection({ state, onChange, onSubmit, saving = false, disabled
 
   return (
     <SectionCard
+      id="settings-third-party"
       icon={KeyIcon}
       title="Third-party API credentials"
       description="Track, rotate, and document external API credentials across environments."
@@ -1507,6 +1645,44 @@ export default function DashboardSettings() {
   );
 
   const isLoadingAny = sections.some((entry) => entry.controller.loading);
+  const isSavingAny = sections.some((entry) => entry.controller.saving);
+
+  const unsavedSections = useMemo(
+    () =>
+      sections
+        .map((entry) => {
+          const changes = computeChangedSegments(
+            entry.key,
+            entry.controller.baseline,
+            entry.controller.data
+          );
+          return {
+            key: entry.key,
+            label: SECTION_LABELS[entry.key] ?? entry.key,
+            anchor: SECTION_ANCHORS[entry.key] ?? '',
+            changes,
+            reset: entry.controller.reset
+          };
+        })
+        .filter((entry) => entry.changes.length > 0),
+    [sections]
+  );
+
+  const totalPendingSegments = useMemo(
+    () => unsavedSections.reduce((sum, entry) => sum + entry.changes.length, 0),
+    [unsavedSections]
+  );
+
+  const discardAll = useCallback(() => {
+    if (isSavingAny) {
+      return;
+    }
+    unsavedSections.forEach((entry) => {
+      if (typeof entry.reset === 'function') {
+        entry.reset();
+      }
+    });
+  }, [unsavedSections, isSavingAny]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -1530,6 +1706,64 @@ export default function DashboardSettings() {
           </button>
         }
       />
+
+      {!isLoadingAny && unsavedSections.length ? (
+        <section className="rounded-3xl border border-amber-200 bg-amber-50/80 p-6 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-amber-600">Unsaved updates</p>
+              <h2 className="text-base font-semibold text-amber-900">
+                {totalPendingSegments === 1
+                  ? '1 configuration update awaiting review'
+                  : `${totalPendingSegments} configuration updates awaiting review`}
+              </h2>
+              <p className="mt-1 text-sm text-amber-700">
+                Save each section to publish your changes or discard items directly from this summary.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="self-start text-xs font-semibold text-amber-700 underline disabled:text-amber-300"
+              onClick={discardAll}
+              disabled={isSavingAny}
+            >
+              Discard all changes
+            </button>
+          </div>
+          <ul className="mt-4 space-y-3">
+            {unsavedSections.map((section) => (
+              <li
+                key={section.key}
+                className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-white/90 p-4 sm:flex-row sm:items-start sm:justify-between"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-amber-900">{section.label}</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-xs text-amber-800">
+                    {section.changes.map((change, index) => (
+                      <li key={`${section.key}-${index}`}>{change}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-start">
+                  {section.anchor ? (
+                    <a className="text-xs font-semibold text-primary underline" href={`#${section.anchor}`}>
+                      Review section
+                    </a>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="text-xs font-semibold text-amber-700 underline disabled:text-amber-300"
+                    onClick={() => section.reset?.()}
+                    disabled={isSavingAny}
+                  >
+                    Discard
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {isLoadingAny ? (
         <div className="flex items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-white/80 p-8 text-sm text-slate-500">

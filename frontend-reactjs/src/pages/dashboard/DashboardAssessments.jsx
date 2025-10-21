@@ -10,7 +10,7 @@ import {
   TrashIcon
 } from '@heroicons/react/24/outline';
 import PropTypes from 'prop-types';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
@@ -284,9 +284,10 @@ function StudyPlanManager({
     [courses]
   );
 
+  const rawCourseListId = useId();
   const courseListId = useMemo(
-    () => `study-plan-courses-${Math.random().toString(36).slice(2, 8)}`,
-    []
+    () => `study-plan-courses-${rawCourseListId.replace(/[^a-zA-Z0-9_-]/g, '')}`,
+    [rawCourseListId]
   );
 
   const sortedPlan = useMemo(() => {

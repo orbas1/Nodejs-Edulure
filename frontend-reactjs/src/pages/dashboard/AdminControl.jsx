@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import clsx from 'clsx';
 
 import adminControlApi from '../../api/adminControlApi.js';
@@ -14,10 +14,33 @@ import {
 export default function AdminControl() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
-  const [activeTab, setActiveTab] = useState('communities');
-
+  const isAdmin = session?.user?.role === 'admin';
   const resourceConfigs = useMemo(() => createAdminControlResourceConfigs(), []);
+  const tabOrder = useMemo(
+    () => ADMIN_CONTROL_TABS.filter((tab) => resourceConfigs[tab.id]),
+    [resourceConfigs]
+  );
+  const [activeTab, setActiveTab] = useState(() => tabOrder[0]?.id ?? ADMIN_CONTROL_TABS[0].id);
 
+  useEffect(() => {
+    if (!tabOrder.some((tab) => tab.id === activeTab)) {
+      setActiveTab(tabOrder[0]?.id ?? ADMIN_CONTROL_TABS[0].id);
+    }
+  }, [tabOrder, activeTab]);
+
+  const handleTabChange = useCallback((tabId) => {
+    setActiveTab(tabId);
+  }, []);
+
+  if (!isAdmin) {
+    return (
+      <DashboardStateMessage
+        variant="error"
+        title="Admin privileges required"
+        description="Switch to an administrator Learnspace or request elevated permissions to manage operational resources."
+      />
+    );
+  }
 
   if (!token) {
     return (
@@ -30,6 +53,15 @@ export default function AdminControl() {
 
   const config = resourceConfigs[activeTab];
 
+  if (!config) {
+    return (
+      <DashboardStateMessage
+        title="Module unavailable"
+        description="The selected operational module is not currently enabled for your account. Choose another tab to continue."
+      />
+    );
+  }
+
   return (
     <div className="space-y-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -40,17 +72,19 @@ export default function AdminControl() {
           </p>
         </div>
         <nav className="flex flex-wrap gap-2">
-          {ADMIN_CONTROL_TABS.map((tab) => (
+          {tabOrder.map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => handleTabChange(tab.id)}
               className={clsx(
                 'rounded-full border px-4 py-2 text-xs font-semibold transition',
                 activeTab === tab.id
                   ? 'border-primary bg-primary text-white shadow'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary'
               )}
+              aria-pressed={activeTab === tab.id}
+              aria-current={activeTab === tab.id ? 'page' : undefined}
             >
               {tab.label}
             </button>
