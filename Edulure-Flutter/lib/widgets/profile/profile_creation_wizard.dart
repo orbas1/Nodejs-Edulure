@@ -57,6 +57,9 @@ class _ProfileCreationWizardState extends State<ProfileCreationWizard> {
     'Learning Facilitation',
     'Product Coaching',
   ];
+  static final RegExp _emailRegExp = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+  static final RegExp _phoneRegExp = RegExp(r'^[+0-9()\s.-]{7,}$');
+  static const int _maxSkills = 20;
 
   final _formKeys = List.generate(3, (_) => GlobalKey<FormState>());
   final _scrollController = ScrollController();
@@ -230,6 +233,74 @@ class _ProfileCreationWizardState extends State<ProfileCreationWizard> {
     );
   }
 
+  String? _validateEmail(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return 'Enter an email address';
+    }
+    if (!_emailRegExp.hasMatch(trimmed)) {
+      return 'Enter a valid email address';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return 'Enter a phone number';
+    }
+    if (!_phoneRegExp.hasMatch(trimmed)) {
+      return 'Enter a valid phone number';
+    }
+    return null;
+  }
+
+  String? _validateRequiredHttpsUrl(String? value, {required String emptyMessage}) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return emptyMessage;
+    }
+    return _validateHttpsLink(trimmed);
+  }
+
+  String? _validateOptionalHttpsUrl(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return _validateHttpsLink(trimmed);
+  }
+
+  String? _validateHttpsLink(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null || !uri.hasScheme || uri.host.isEmpty || uri.scheme != 'https') {
+      return 'Enter a valid https:// link';
+    }
+    if (!_isPublicHost(uri.host)) {
+      return 'Link must target a public host.';
+    }
+    return null;
+  }
+
+  bool _isPublicHost(String host) {
+    final lower = host.toLowerCase();
+    if (lower == 'localhost' || lower == '::1' || lower == '0:0:0:0:0:0:0:1') {
+      return false;
+    }
+    if (lower.endsWith('.local')) {
+      return false;
+    }
+    final privatePrefixes = <String>['10.', '127.', '169.254.', '192.168.', '0.'];
+    if (privatePrefixes.any(lower.startsWith)) {
+      return false;
+    }
+    final match172 = RegExp(r'^172\.(1[6-9]|2[0-9]|3[0-1])\.');
+    if (match172.hasMatch(lower)) {
+      return false;
+    }
+    return true;
+  }
+
   void _goToStep(int step) {
     setState(() => _currentStep = step);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -257,6 +328,8 @@ class _ProfileCreationWizardState extends State<ProfileCreationWizard> {
           emailController: _emailController,
           phoneController: _phoneController,
           locationController: _locationController,
+          emailValidator: _validateEmail,
+          phoneValidator: _validatePhone,
         );
       case 2:
         return _MediaStep(
@@ -271,6 +344,11 @@ class _ProfileCreationWizardState extends State<ProfileCreationWizard> {
           onSkillAdded: _addSkill,
           onSkillRemoved: _removeSkill,
           suggestedSkills: _skillSuggestions,
+          avatarValidator: (value) =>
+              _validateRequiredHttpsUrl(value, emptyMessage: 'Provide an avatar image URL'),
+          bannerValidator: (value) =>
+              _validateRequiredHttpsUrl(value, emptyMessage: 'Provide a banner image URL'),
+          optionalUrlValidator: _validateOptionalHttpsUrl,
         );
       default:
         return _ReviewStep(
@@ -290,18 +368,37 @@ class _ProfileCreationWizardState extends State<ProfileCreationWizard> {
     }
   }
 
-  void _addSkill([String? raw]) {
-    final value = (raw ?? _skillController.text).trim();
-    if (value.isEmpty) {
+  String? _normalizeSkill(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    final collapsed = trimmed.replaceAll(RegExp(r'\s+'), ' ');
+    final parts = collapsed.split(' ');
+    final normalizedParts = parts
+        .map((part) => part.isEmpty ? part : part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .toList();
+    final normalized = normalizedParts.join(' ').trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  void _addSkill(String raw) {
+    final normalized = _normalizeSkill(raw);
+    _skillController.clear();
+    if (normalized == null) {
       return;
     }
-    if (_skills.contains(value)) {
-      _skillController.clear();
+    final exists = _skills.any((skill) => skill.toLowerCase() == normalized.toLowerCase());
+    if (exists) {
+      _showSnackBar('Skill already added.');
+      return;
+    }
+    if (_skills.length >= _maxSkills) {
+      _showSnackBar('You can add up to $_maxSkills skills.');
       return;
     }
     setState(() {
-      _skills = [..._skills, value];
-      _skillController.clear();
+      _skills = [..._skills, normalized];
     });
   }
 
@@ -311,7 +408,68 @@ class _ProfileCreationWizardState extends State<ProfileCreationWizard> {
     });
   }
 
+  void _showSnackBar(String message) {
+    if (!mounted) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String? _validateBeforeSubmit() {
+    if (_nameController.text.trim().isEmpty) {
+      return 'Add your display name before creating your profile.';
+    }
+    if (_headlineController.text.trim().isEmpty) {
+      return 'Add a headline to introduce your work.';
+    }
+    final emailError = _validateEmail(_emailController.text);
+    if (emailError != null) {
+      return emailError;
+    }
+    final phoneError = _validatePhone(_phoneController.text);
+    if (phoneError != null) {
+      return phoneError;
+    }
+    if (_locationController.text.trim().isEmpty) {
+      return 'Share your location or timezone so learners know when you collaborate.';
+    }
+    final avatarError =
+        _validateRequiredHttpsUrl(_avatarController.text, emptyMessage: 'Provide an avatar image URL');
+    if (avatarError != null) {
+      return avatarError;
+    }
+    final bannerError =
+        _validateRequiredHttpsUrl(_bannerController.text, emptyMessage: 'Provide a banner image URL');
+    if (bannerError != null) {
+      return bannerError;
+    }
+    for (final error in [
+      _validateOptionalHttpsUrl(_videoController.text),
+      _validateOptionalHttpsUrl(_calendarController.text),
+      _validateOptionalHttpsUrl(_portfolioController.text),
+    ]) {
+      if (error != null) {
+        return error;
+      }
+    }
+    if (_skills.isEmpty) {
+      return 'Add at least one skill highlight to help learners understand your strengths.';
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
+    if (_saving) {
+      return;
+    }
+    final validationMessage = _validateBeforeSubmit();
+    if (validationMessage != null) {
+      _showSnackBar(validationMessage);
+      return;
+    }
     setState(() => _saving = true);
     final payload = ProfileFormData(
       displayName: _nameController.text.trim(),
@@ -403,11 +561,15 @@ class _ContactStep extends StatelessWidget {
     required this.emailController,
     required this.phoneController,
     required this.locationController,
+    required this.emailValidator,
+    required this.phoneValidator,
   });
 
   final TextEditingController emailController;
   final TextEditingController phoneController;
   final TextEditingController locationController;
+  final FormFieldValidator<String> emailValidator;
+  final FormFieldValidator<String> phoneValidator;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +583,7 @@ class _ContactStep extends StatelessWidget {
           controller: emailController,
           keyboardType: TextInputType.emailAddress,
           decoration: const InputDecoration(labelText: 'Email'),
-          validator: (value) => value == null || value.trim().isEmpty ? 'Enter an email address' : null,
+          validator: emailValidator,
         ),
         const SizedBox(height: 12),
         TextFormField(
@@ -429,14 +591,19 @@ class _ContactStep extends StatelessWidget {
           controller: phoneController,
           keyboardType: TextInputType.phone,
           decoration: const InputDecoration(labelText: 'Phone number'),
-          validator: (value) => value == null || value.trim().isEmpty ? 'Enter a phone number' : null,
+          validator: phoneValidator,
         ),
         const SizedBox(height: 12),
         TextFormField(
           key: const ValueKey('wizard_location'),
           controller: locationController,
-          decoration: const InputDecoration(labelText: 'Location & timezone'),
-          validator: (value) => value == null || value.trim().isEmpty ? 'Add your location' : null,
+          decoration: const InputDecoration(
+            labelText: 'Location & timezone',
+            helperText: 'Share your working hours or base city.',
+          ),
+          validator: (value) => value == null || value.trim().isEmpty
+              ? 'Share your working location or timezone'
+              : null,
         ),
       ],
     );
@@ -456,6 +623,9 @@ class _MediaStep extends StatelessWidget {
     required this.onSkillAdded,
     required this.onSkillRemoved,
     required this.suggestedSkills,
+    required this.avatarValidator,
+    required this.bannerValidator,
+    required this.optionalUrlValidator,
   });
 
   final TextEditingController avatarController;
@@ -469,6 +639,9 @@ class _MediaStep extends StatelessWidget {
   final ValueChanged<String> onSkillAdded;
   final ValueChanged<String> onSkillRemoved;
   final List<String> suggestedSkills;
+  final FormFieldValidator<String> avatarValidator;
+  final FormFieldValidator<String> bannerValidator;
+  final FormFieldValidator<String> optionalUrlValidator;
 
   @override
   Widget build(BuildContext context) {
@@ -481,38 +654,47 @@ class _MediaStep extends StatelessWidget {
         TextFormField(
           key: const ValueKey('wizard_avatar'),
           controller: avatarController,
+          keyboardType: TextInputType.url,
           decoration: const InputDecoration(labelText: 'Avatar image URL'),
-          validator: (value) =>
-              value == null || value.trim().isEmpty ? 'Provide an avatar image URL' : null,
+          validator: avatarValidator,
         ),
         const SizedBox(height: 12),
         TextFormField(
           key: const ValueKey('wizard_banner'),
           controller: bannerController,
+          keyboardType: TextInputType.url,
           decoration: const InputDecoration(labelText: 'Banner image URL'),
-          validator: (value) =>
-              value == null || value.trim().isEmpty ? 'Provide a banner image URL' : null,
+          validator: bannerValidator,
         ),
         const SizedBox(height: 12),
         TextFormField(
+          key: const ValueKey('wizard_video'),
           controller: videoController,
+          keyboardType: TextInputType.url,
           decoration: const InputDecoration(
             labelText: 'Video intro URL',
             helperText: 'Share a welcome video or keynote replay.',
           ),
+          validator: optionalUrlValidator,
         ),
         const SizedBox(height: 12),
         TextFormField(
+          key: const ValueKey('wizard_calendar'),
           controller: calendarController,
+          keyboardType: TextInputType.url,
           decoration: const InputDecoration(
             labelText: 'Booking calendar URL',
             helperText: 'Link to Calendly, Cal.com, or your scheduling hub.',
           ),
+          validator: optionalUrlValidator,
         ),
         const SizedBox(height: 12),
         TextFormField(
+          key: const ValueKey('wizard_portfolio'),
           controller: portfolioController,
+          keyboardType: TextInputType.url,
           decoration: const InputDecoration(labelText: 'Portfolio or website URL'),
+          validator: optionalUrlValidator,
         ),
         const SizedBox(height: 16),
         Text('Skills & focus areas', style: theme.textTheme.titleSmall),
@@ -524,7 +706,10 @@ class _MediaStep extends StatelessWidget {
                 key: const ValueKey('wizard_skill_input'),
                 controller: skillController,
                 focusNode: skillFocusNode,
-                decoration: const InputDecoration(hintText: 'Add a skill'),
+                decoration: const InputDecoration(
+                  hintText: 'Add a skill',
+                  helperText: 'List up to 20 skills to highlight your strengths.',
+                ),
                 onSubmitted: onSkillAdded,
               ),
             ),

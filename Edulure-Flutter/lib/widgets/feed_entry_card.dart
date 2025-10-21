@@ -106,7 +106,7 @@ class FeedEntryCard extends StatelessWidget {
                 if (ad.ctaUrl != null && ad.ctaUrl!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   FilledButton(
-                    onPressed: () => launchUrl(Uri.parse(ad.ctaUrl!), mode: LaunchMode.externalApplication),
+                    onPressed: () => _openExternalUrl(context, ad.ctaUrl!),
                     style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
                     child: const Text('Open campaign'),
                   )
@@ -255,7 +255,7 @@ class FeedEntryCard extends StatelessWidget {
           if (videoUrl != null && videoUrl.isNotEmpty) ...[
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => launchUrl(Uri.parse(videoUrl), mode: LaunchMode.externalApplication),
+              onPressed: () => _openExternalUrl(context, videoUrl),
               icon: const Icon(Icons.play_circle_outline),
               label: const Text('Open linked video'),
             )
@@ -300,6 +300,51 @@ class FeedEntryCard extends StatelessWidget {
       );
     }
     return Wrap(spacing: 8, runSpacing: 8, children: chips);
+  }
+
+  Future<void> _openExternalUrl(BuildContext context, String url) async {
+    final parsed = Uri.tryParse(url.trim());
+    if (parsed == null || !parsed.hasScheme || parsed.host.isEmpty || parsed.scheme != 'https') {
+      _notifyLaunchFailure(context, 'Only public https links can be opened.');
+      return;
+    }
+    if (!_isPublicHost(parsed.host)) {
+      _notifyLaunchFailure(context, 'Links must use a public host.');
+      return;
+    }
+    try {
+      final launched = await launchUrl(parsed, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        _notifyLaunchFailure(context, 'Unable to open the link. Please try again later.');
+      }
+    } catch (_) {
+      _notifyLaunchFailure(context, 'Unable to open the link. Please try again later.');
+    }
+  }
+
+  void _notifyLaunchFailure(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  bool _isPublicHost(String host) {
+    final lower = host.toLowerCase();
+    if (lower == 'localhost' || lower == '::1' || lower == '0:0:0:0:0:0:0:1') {
+      return false;
+    }
+    if (lower.endsWith('.local')) {
+      return false;
+    }
+    const privatePrefixes = <String>['10.', '127.', '169.254.', '192.168.', '0.'];
+    if (privatePrefixes.any(lower.startsWith)) {
+      return false;
+    }
+    final match172 = RegExp(r'^172\.(1[6-9]|2[0-9]|3[0-1])\.');
+    if (match172.hasMatch(lower)) {
+      return false;
+    }
+    return true;
   }
 
   Widget _buildMetadata(BuildContext context, CommunityPost post) {

@@ -15,6 +15,12 @@ class InMemoryLearningPersistence implements LearningPersistence {
     return source == null ? null : List<T>.from(source);
   }
 
+  List<Course>? snapshotCourses() => _clone(_courses);
+  List<Ebook>? snapshotEbooks() => _clone(_ebooks);
+  List<Tutor>? snapshotTutors() => _clone(_tutors);
+  List<LiveSession>? snapshotSessions() => _clone(_sessions);
+  List<ModuleProgressLog>? snapshotLogs() => _clone(_logs);
+
   @override
   Future<List<Course>?> loadCourses() async => _clone(_courses);
 
@@ -66,6 +72,8 @@ class InMemoryLearningPersistence implements LearningPersistence {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('CourseStore', () {
     test('creates courses with multimedia metadata', () {
       final persistence = InMemoryLearningPersistence();
@@ -193,5 +201,47 @@ void main() {
       expect(created.agenda.length, 3);
       expect(created.isRecordingAvailable, isTrue);
     });
+  });
+
+  test('restoreSeedData resets course store to initial seed ordering', () async {
+    final persistence = InMemoryLearningPersistence();
+    final store = CourseStore(persistence: persistence);
+    await store.ready;
+
+    final originalIds = store.state.map((course) => course.id).toList(growable: false);
+
+    final module = CourseModule(
+      id: 'module-growth',
+      title: 'Growth Engines',
+      lessonCount: 5,
+      durationMinutes: 150,
+      description: 'Codify repeatable growth experiments.',
+    );
+
+    final course = store.buildCourseFromForm(
+      title: 'Growth Operating System',
+      category: 'Growth',
+      level: 'Advanced',
+      summary: 'Design sustainable experimentation pipelines.',
+      thumbnailUrl: 'https://example.com/growth.png',
+      price: 299,
+      language: 'English',
+      tags: const ['Growth'],
+      modules: [module],
+      isPublished: true,
+      favorite: false,
+      rating: 4.7,
+      promoVideoUrl: 'https://videos.example.com/growth/intro.mp4',
+      syllabusUrl: 'https://cdn.example.com/growth/syllabus.pdf',
+      learningOutcomes: const ['Automate experiment workflows'],
+    );
+
+    store.createCourse(course);
+    expect(store.state.map((item) => item.id), contains(course.id));
+
+    await store.restoreSeedData();
+
+    expect(store.state.map((item) => item.id), originalIds);
+    expect(persistence.snapshotCourses()!.map((item) => item.id), originalIds);
   });
 }
