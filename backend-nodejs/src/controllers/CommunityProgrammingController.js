@@ -19,7 +19,7 @@ const listQuerySchema = Joi.object({
 const webinarMutationSchema = Joi.object({
   topic: Joi.string().trim().min(3).max(240),
   host: Joi.string().trim().min(2).max(160),
-  startAt: Joi.date().iso(),
+  startAt: Joi.date().iso().raw(),
   status: Joi.string()
     .valid(...webinarStatusEnum)
     .optional(),

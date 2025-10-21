@@ -162,34 +162,7 @@ export default class CommunityAffiliateModel {
   }
 
   static async updateById(id, updates, connection = db) {
-    const payload = {};
-    if (updates.status !== undefined) {
-      payload.status = updates.status;
-    }
-    if (updates.referralCode !== undefined) {
-      payload.referral_code = updates.referralCode;
-    }
-    if (updates.commissionRateBasisPoints !== undefined) {
-      payload.commission_rate_bps = updates.commissionRateBasisPoints;
-    }
-    if (updates.totalEarnedCents !== undefined) {
-      payload.total_earned_cents = updates.totalEarnedCents;
-    }
-    if (updates.totalPaidCents !== undefined) {
-      payload.total_paid_cents = updates.totalPaidCents;
-    }
-    if (updates.metadata !== undefined) {
-      payload.metadata = JSON.stringify(updates.metadata ?? {});
-    }
-    if (updates.approvedAt !== undefined) {
-      payload.approved_at = updates.approvedAt;
-    }
-    if (updates.suspendedAt !== undefined) {
-      payload.suspended_at = updates.suspendedAt;
-    }
-    if (updates.revokedAt !== undefined) {
-      payload.revoked_at = updates.revokedAt;
-    }
+    const payload = buildUpdatePayload(updates ?? {});
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);

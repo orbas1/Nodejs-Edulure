@@ -995,28 +995,28 @@ export function buildLearnerDashboard({
     financialProfile?.preferences && typeof financialProfile.preferences === 'object'
       ? financialProfile.preferences
       : {};
-      const financialPreferences = {
-        autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
-        reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
-        reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
-        currency: financePreferencesRaw.currency ?? 'USD',
-        invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
-        payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
-        taxId: financePreferencesRaw.taxId ?? null,
-        alerts: {
-          sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
-          sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
-          escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
-          notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
-        },
-        documents: Array.isArray(financePreferencesRaw.documents)
-          ? financePreferencesRaw.documents
-          : [],
-        reimbursements:
-          financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
-            ? {
-                enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
-                instructions: financePreferencesRaw.reimbursements.instructions ?? null
+  const financialPreferences = {
+    autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
+    reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
+    reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
+    currency: financePreferencesRaw.currency ?? 'USD',
+    invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
+    payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
+    taxId: financePreferencesRaw.taxId ?? null,
+    alerts: {
+      sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
+      sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
+      escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
+      notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
+    },
+    documents: Array.isArray(financePreferencesRaw.documents)
+      ? financePreferencesRaw.documents
+      : [],
+    reimbursements:
+      financePreferencesRaw.reimbursements && typeof financePreferencesRaw.reimbursements === 'object'
+        ? {
+            enabled: Boolean(financePreferencesRaw.reimbursements.enabled),
+            instructions: financePreferencesRaw.reimbursements.instructions ?? null
           }
         : { enabled: false, instructions: null }
   };
@@ -1261,21 +1261,27 @@ export function buildLearnerDashboard({
     };
   });
 
+  const adsCurrency = adCampaignsList.find((campaign) => campaign.currency)?.currency ??
+    adCampaignsList[0]?.currency ??
+    'USD';
+
   const adsSection = {
     campaigns: adCampaignsDetailed,
     summary: {
       activeCampaigns: adCampaignsDetailed.filter((campaign) => campaign.status === 'active').length,
       totalSpend: formatCurrency(
-        adCampaignsList.reduce((total, campaign) => total + (campaign.totalSpendCents ?? 0), 0)
+        adCampaignsList.reduce((total, campaign) => total + (campaign.totalSpendCents ?? 0), 0),
+        adsCurrency
       ),
       averageDailyBudget: adCampaignsList.length
         ? formatCurrency(
             Math.round(
               adCampaignsList.reduce((total, campaign) => total + (campaign.dailyBudgetCents ?? 0), 0) /
                 adCampaignsList.length
-            )
+            ),
+            adsCurrency
           )
-        : formatCurrency(0)
+        : formatCurrency(0, adsCurrency)
     }
   };
 
@@ -1325,83 +1331,6 @@ export function buildLearnerDashboard({
         ];
       }
       if (instructorApplicationDetails.status === 'rejected') {
-        return [
-          'Review decision notes and request feedback from the instructor partnerships team.'
-        ];
-      }
-          return [
-            'Document your teaching motivation and curriculum outcomes.',
-            'Add marketing assets to strengthen your application.'
-          ];
-        })()
-      };
-
-  const adsSection = {
-    campaigns: adCampaigns,
-    summary: {
-      activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
-      totalSpend: formatCurrency(
-        adCampaignsList.reduce((total, campaign) => total + Number(campaign.totalSpendCents ?? 0), 0),
-        adsCurrency
-      ),
-      averageDailyBudget: adCampaignsList.length
-        ? formatCurrency(
-            Math.round(
-              adCampaignsList.reduce((total, campaign) => total + Number(campaign.dailyBudgetCents ?? 0), 0) /
-                adCampaignsList.length
-            ),
-            adsCurrency
-          )
-        : formatCurrency(0, adsCurrency)
-    }
-  };
-
-  const instructorApplication = instructorApplicationRaw
-    ? {
-        id: instructorApplicationRaw.id,
-        status: instructorApplicationRaw.status,
-        stage: instructorApplicationRaw.stage,
-        motivation: instructorApplicationRaw.motivation,
-        portfolioUrl: instructorApplicationRaw.portfolioUrl,
-        experienceYears: instructorApplicationRaw.experienceYears,
-        teachingFocus: instructorApplicationRaw.teachingFocus,
-        availability: instructorApplicationRaw.availability,
-        marketingAssets: instructorApplicationRaw.marketingAssets,
-        submittedAt: instructorApplicationRaw.submittedAt,
-        reviewedAt: instructorApplicationRaw.reviewedAt,
-        decisionNote: instructorApplicationRaw.decisionNote
-      }
-    : null;
-
-  const teachSection = {
-    application: instructorApplication,
-    status: instructorApplication?.status ?? 'draft',
-    nextSteps: (() => {
-      if (!instructorApplication) {
-        return [
-          'Complete your instructor application to access cohort production resources.',
-          'Prepare a portfolio link that highlights flagship teaching moments.'
-        ];
-      }
-      if (instructorApplication.status === 'submitted') {
-        return [
-          'Our partnerships team is reviewing your submission.',
-          'Expect an interview scheduling link within 48 hours.'
-        ];
-      }
-      if (instructorApplication.status === 'interview') {
-        return [
-          'Confirm your cohort launch availability and desired curriculum focus.',
-          'Upload marketing assets to accelerate go-to-market planning.'
-        ];
-      }
-      if (instructorApplication.status === 'approved') {
-        return [
-          'Schedule onboarding workshop with curriculum producers.',
-          'Share campaign creative for Edulure Ads placement.'
-        ];
-      }
-      if (instructorApplication.status === 'rejected') {
         return [
           'Review decision notes and request feedback from the instructor partnerships team.'
         ];
@@ -2006,7 +1935,24 @@ export function buildLearnerDashboard({
       readiness: readinessList.slice(0, 8)
     }
   };
+  const supportSection = {
+    cases: supportCasesList,
+    knowledgeBase: DEFAULT_SUPPORT_KB,
+    contacts: DEFAULT_SUPPORT_CONTACTS,
+    serviceWindow: '24/7 global support',
+    metrics: {
+      open: supportMetricsSummary.open,
+      waiting: supportMetricsSummary.waiting,
+      resolved: supportMetricsSummary.resolved,
+      closed: supportMetricsSummary.closed,
+      awaitingLearner: supportMetricsSummary.awaitingLearner,
+      averageResponseMinutes: supportMetricsSummary.averageResponseMinutes,
+      latestUpdatedAt: supportMetricsSummary.latestUpdatedAt,
+      firstResponseMinutes: supportMetricsSummary.averageResponseMinutes || 42
+    }
+  };
 
+  const upcomingEntries = upcomingUnique;
 
   const dashboard = {
     metrics,
@@ -2014,7 +1960,7 @@ export function buildLearnerDashboard({
       learningPace,
       communityEngagement
     },
-    upcoming: upcomingUnique,
+    upcoming: upcomingEntries,
     communities: {
       managed: managedCommunities,
       pipelines: pipelineEntries
@@ -2052,22 +1998,7 @@ export function buildLearnerDashboard({
     teach: teachSection,
     assessments: assessmentsSection,
     liveClassrooms: liveDashboard,
-    support: {
-      cases: supportCasesList,
-      knowledgeBase: DEFAULT_SUPPORT_KB,
-      contacts: DEFAULT_SUPPORT_CONTACTS,
-      serviceWindow: '24/7 global support',
-      metrics: {
-        open: supportMetricsSummary.open,
-        waiting: supportMetricsSummary.waiting,
-        resolved: supportMetricsSummary.resolved,
-        closed: supportMetricsSummary.closed,
-        awaitingLearner: supportMetricsSummary.awaitingLearner,
-        averageResponseMinutes: supportMetricsSummary.averageResponseMinutes,
-        latestUpdatedAt: supportMetricsSummary.latestUpdatedAt,
-        firstResponseMinutes: supportMetricsSummary.averageResponseMinutes || 42
-      }
-    },
+    support: supportSection,
     followers: followerSection,
     settings: {
       privacy,
@@ -2189,6 +2120,9 @@ export function buildLearnerDashboard({
   return {
     role: { id: 'learner', label: 'Learner' },
     dashboard,
+    upcoming: upcomingEntries,
+    calendar: calendarEvents,
+    support: supportSection,
     profileStats,
     profileBio,
     profileTitleSegment: 'Learner journey insights',
@@ -2924,8 +2858,10 @@ function normaliseLearnerPayments({ invoices = [], paymentIntents = [], courseMa
       purchaseDate: createdAt ? createdAt.toISOString().slice(0, 10) : null
     });
 
+    const invoiceId =
+      entry.id ?? entry.publicId ?? metadata.invoiceId ?? `invoice-${entry.id ?? crypto.randomUUID()}`;
     normalisedInvoices.push({
-      id: entry.publicId ?? `invoice-${entry.id ?? crypto.randomUUID()}`,
+      id: invoiceId,
       label,
       amountCents,
       currency,
@@ -3558,9 +3494,20 @@ function buildCourseWorkspace({
       typeof enrollment.metadata === 'string'
         ? safeJsonParse(enrollment.metadata, {})
         : enrollment.metadata ?? {};
+    const resolvedLearner = enrollment.resolvedLearner ?? {};
+    const collaboratorMatch =
+      (resolvedLearner.id && collaboratorDirectory.get(resolvedLearner.id)) ??
+      (enrollment.userId && collaboratorDirectory.get(enrollment.userId)) ??
+      null;
+    const learnerId = resolvedLearner.id ?? collaboratorMatch?.id ?? enrollment.userId ?? null;
+    const displayName = resolveName(
+      resolvedLearner.firstName ?? collaboratorMatch?.firstName ?? enrollment.firstName,
+      resolvedLearner.lastName ?? collaboratorMatch?.lastName ?? enrollment.lastName,
+      resolvedLearner.email ?? collaboratorMatch?.email ?? enrollment.email ?? `Learner ${learnerId ?? enrollment.id}`
+    );
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
-      learnerId: identity.id ?? enrollment.userId ?? directoryUser?.id ?? null,
+      learnerId,
       name: displayName,
       courseId: enrollment.courseId,
       courseTitle: course?.title ?? 'Course',

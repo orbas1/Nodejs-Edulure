@@ -10,8 +10,8 @@ const listQuerySchema = Joi.object({
     .allow(null, '')
     .messages({ 'string.pattern.base': 'tenantId may only include letters, numbers, or hyphens' }),
   includeDetails: Joi.boolean()
-    .truthy(['true', '1', 'yes', 'on'])
-    .falsy(['false', '0', 'no', 'off'])
+    .truthy('true', '1', 'yes', 'on')
+    .falsy('false', '0', 'no', 'off')
     .default(false)
 });
 

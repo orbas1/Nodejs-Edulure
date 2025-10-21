@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import PlatformSettingModel from '../models/PlatformSettingModel.js';
 import db from '../config/database.js';
 import { env } from '../config/env.js';
+import deepMerge from '../utils/deepMerge.js';
 
 const SETTINGS_KEYS = Object.freeze({
   ADMIN_PROFILE: 'admin_profile',
@@ -103,23 +104,6 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
   credentials: []
 });
 
-function deepMerge(base, patch) {
-  if (!patch || typeof patch !== 'object') {
-    return { ...base };
-  }
-
-  const result = Array.isArray(base) ? [...base] : { ...base };
-  for (const [key, value] of Object.entries(patch)) {
-    if (Array.isArray(value)) {
-      result[key] = value.slice(0, 20);
-    } else if (value && typeof value === 'object') {
-      result[key] = deepMerge(base?.[key] ?? {}, value);
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
-}
 
 const DEFAULT_ADMIN_PROFILE = Object.freeze({
   organisation: {
@@ -1319,34 +1303,6 @@ function sanitizeFinanceSettingsPayload(payload = {}) {
     sanitized.approvals = normaliseFinanceSettings({ approvals: payload.approvals }).approvals;
   }
   return sanitized;
-}
-
-function deepMerge(base, overrides) {
-  const result = Array.isArray(base) ? [...base] : { ...base };
-  if (!overrides || typeof overrides !== 'object') {
-    return result;
-  }
-
-  Object.entries(overrides).forEach(([key, value]) => {
-    if (value === undefined) {
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      result[key] = [...value];
-      return;
-    }
-
-    if (value && typeof value === 'object') {
-      const baseValue = result[key] && typeof result[key] === 'object' ? result[key] : {};
-      result[key] = deepMerge(baseValue, value);
-      return;
-    }
-
-    result[key] = value;
-  });
-
-  return result;
 }
 
 function clampInt(value, { min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER, fallback = 0 } = {}) {

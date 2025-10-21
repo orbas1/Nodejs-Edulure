@@ -9,8 +9,8 @@ const log = logger.child({ controller: 'ObservabilityController' });
 const INCLUDE_DEFINITION_DEFAULT = true;
 
 const booleanQuery = Joi.boolean()
-  .truthy(['true', '1', 'yes', 'on'])
-  .falsy(['false', '0', 'no', 'off'])
+  .truthy('true', '1', 'yes', 'on')
+  .falsy('false', '0', 'no', 'off')
   .default(INCLUDE_DEFINITION_DEFAULT);
 
 const listQuerySchema = Joi.object({

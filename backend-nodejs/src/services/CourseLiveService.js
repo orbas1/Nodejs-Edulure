@@ -67,7 +67,12 @@ class CourseLiveService {
     if (!session) return this.getPresence(courseId);
     const viewer = session.viewers.get(userId);
     if (viewer) {
-      viewer.lastSeenAt = new Date();
+      const now = new Date();
+      if (viewer.lastSeenAt instanceof Date && now.getTime() <= viewer.lastSeenAt.getTime()) {
+        viewer.lastSeenAt = new Date(viewer.lastSeenAt.getTime() + 1);
+      } else {
+        viewer.lastSeenAt = now;
+      }
     }
     return this.getPresence(courseId);
   }
