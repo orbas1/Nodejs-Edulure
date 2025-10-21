@@ -1155,6 +1155,7 @@ class PaymentService {
     }
 
     await db.transaction(async (trx) => {
+      const financeConnection = resolveFinanceConnection(trx);
       const intent = await PaymentIntentModel.findByProviderIntentId(providerIntentId, trx);
       if (!intent) {
         logger.warn({ providerIntentId }, 'Charge refund received for unknown payment intent');
