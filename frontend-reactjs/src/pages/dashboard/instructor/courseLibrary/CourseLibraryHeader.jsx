@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 
 export default function CourseLibraryHeader({ onUpload }) {
+  const canUpload = typeof onUpload === 'function';
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -9,7 +10,12 @@ export default function CourseLibraryHeader({ onUpload }) {
           Manage evergreen assets, refresh cadences, and distribution channels.
         </p>
       </div>
-      <button type="button" className="dashboard-primary-pill" onClick={onUpload}>
+      <button
+        type="button"
+        className="dashboard-primary-pill disabled:cursor-not-allowed disabled:opacity-60"
+        onClick={onUpload}
+        disabled={!canUpload}
+      >
         Upload new asset
       </button>
     </div>

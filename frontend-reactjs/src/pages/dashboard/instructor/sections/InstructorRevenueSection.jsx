@@ -10,12 +10,13 @@ const PROGRESS_GRADIENTS = [
 function RevenueSliceRow({ slice, index }) {
   const gradient = PROGRESS_GRADIENTS[index % PROGRESS_GRADIENTS.length];
   const safePercent = Number.isFinite(slice.percent) ? Math.max(0, Math.min(100, slice.percent)) : 0;
+  const displayValue = typeof slice.value === 'number' ? slice.value.toLocaleString() : slice.value;
 
   return (
     <li className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm ring-1 ring-inset ring-slate-100">
       <div className="flex items-center justify-between text-sm font-medium text-slate-900">
         <span>{slice.name}</span>
-        <span className="text-slate-500">{slice.value}</span>
+        <span className="text-slate-500">{displayValue}</span>
       </div>
       <div className="mt-2 h-2 rounded-full bg-slate-100">
         <div

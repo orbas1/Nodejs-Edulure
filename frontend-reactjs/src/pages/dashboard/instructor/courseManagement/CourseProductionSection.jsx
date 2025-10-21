@@ -1,15 +1,31 @@
 import PropTypes from 'prop-types';
 
 export default function CourseProductionSection({ production }) {
-  if (!production.length) {
+  const rows = Array.isArray(production)
+    ? production.map((asset) => ({
+        ...asset,
+        owner: asset.owner ?? 'Production'
+      }))
+    : [];
+
+  if (rows.length === 0) {
     return null;
   }
+
+  const handleProductionAction = (asset) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('edulure:production-task', {
+        detail: { taskId: asset.id, owner: asset.owner }
+      })
+    );
+  };
 
   return (
     <section className="dashboard-section">
       <h2 className="text-lg font-semibold text-slate-900">Production sprint</h2>
       <ul className="mt-4 space-y-4">
-        {production.map((asset) => (
+        {rows.map((asset) => (
           <li key={asset.id} className="dashboard-card-muted p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -18,7 +34,11 @@ export default function CourseProductionSection({ production }) {
               </div>
               <div className="text-right text-xs text-slate-600">
                 <p>Owner {asset.owner}</p>
-                <button type="button" className="mt-2 dashboard-pill px-3 py-1 hover:border-primary/50">
+                <button
+                  type="button"
+                  className="mt-2 dashboard-pill px-3 py-1 hover:border-primary/50"
+                  onClick={() => handleProductionAction(asset)}
+                >
                   Open task
                 </button>
               </div>

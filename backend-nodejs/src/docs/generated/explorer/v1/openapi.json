@@ -27,58 +27,6 @@
   ],
   "tags": [],
   "paths": {
-    "/explorer/search": {
-      "post": {
-        "tags": [
-          "Explorer"
-        ],
-        "summary": "Federated explorer search",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ExplorerSearchRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Explorer results returned successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/ExplorerSearchResponse"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/explorer/saved-searches": {
       "get": {
         "tags": [
@@ -313,122 +261,62 @@
           }
         }
       }
+    },
+    "/explorer/search": {
+      "post": {
+        "tags": [
+          "Explorer"
+        ],
+        "summary": "Federated explorer search",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplorerSearchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Explorer results returned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ExplorerSearchResponse"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
-      "SavedExplorerSearchRequest": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "query": {
-            "type": "string"
-          },
-          "entityTypes": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "communities",
-                "courses",
-                "ebooks",
-                "tutors",
-                "profiles",
-                "ads",
-                "events"
-              ]
-            }
-          },
-          "filters": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "globalFilters": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "sort": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "isPinned": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      },
-      "SavedExplorerSearch": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "query": {
-            "type": "string"
-          },
-          "entityTypes": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "communities",
-                "courses",
-                "ebooks",
-                "tutors",
-                "profiles",
-                "ads",
-                "events"
-              ]
-            }
-          },
-          "filters": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "globalFilters": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "sortPreferences": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "isPinned": {
-            "type": "boolean"
-          },
-          "lastUsedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "entityTypes",
-          "filters",
-          "globalFilters",
-          "sortPreferences",
-          "isPinned",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
       "ExplorerSearchResponse": {
         "type": "object",
         "properties": {
@@ -717,23 +605,6 @@
           "raw"
         ]
       },
-      "StandardResponse": {
-        "type": "object",
-        "properties": {
-          "success": {
-            "type": "boolean"
-          },
-          "message": {
-            "type": "string",
-            "nullable": true
-          },
-          "data": {},
-          "meta": {
-            "type": "object",
-            "nullable": true
-          }
-        }
-      },
       "ExplorerSearchRequest": {
         "type": "object",
         "properties": {
@@ -785,6 +656,135 @@
           },
           "savedSearchId": {
             "type": "integer"
+          }
+        }
+      },
+      "SavedExplorerSearchRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "entityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "communities",
+                "courses",
+                "ebooks",
+                "tutors",
+                "profiles",
+                "ads",
+                "events"
+              ]
+            }
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "globalFilters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sort": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "isPinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SavedExplorerSearch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "query": {
+            "type": "string"
+          },
+          "entityTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "communities",
+                "courses",
+                "ebooks",
+                "tutors",
+                "profiles",
+                "ads",
+                "events"
+              ]
+            }
+          },
+          "filters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "globalFilters": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "sortPreferences": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "isPinned": {
+            "type": "boolean"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "entityTypes",
+          "filters",
+          "globalFilters",
+          "sortPreferences",
+          "isPinned",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
           }
         }
       }

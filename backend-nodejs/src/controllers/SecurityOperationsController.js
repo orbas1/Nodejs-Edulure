@@ -32,7 +32,9 @@ function resolveActor(req) {
 }
 
 function resolveTenant(req) {
-  return req.query?.tenantId ?? req.body?.tenantId ?? req.user?.tenantId ?? 'global';
+  const candidate =
+    req.query?.tenantId ?? req.body?.tenantId ?? req.user?.tenantId ?? 'global';
+  return sanitiseOptionalText(candidate, { maxLength: 100 }) ?? 'global';
 }
 
 function resolveRequestContext(req) {
@@ -47,12 +49,171 @@ function resolveRequestContext(req) {
   };
 }
 
-function toNumber(value, fallback) {
-  if (value === undefined || value === null) {
+function sanitiseOptionalText(input, { maxLength = 500 } = {}) {
+  if (input === undefined || input === null) {
+    return null;
+  }
+
+  const candidate = Array.isArray(input) ? input[0] : input;
+  if (candidate === undefined || candidate === null) {
+    return null;
+  }
+
+  const text = String(candidate).trim();
+  if (!text) {
+    return null;
+  }
+
+  return text.slice(0, maxLength);
+}
+
+function sanitiseRequiredText(input, fieldName, options) {
+  const value = sanitiseOptionalText(input, options);
+  if (!value) {
+    throw createHttpError(400, `${fieldName} is required`);
+  }
+  return value;
+}
+
+function requirePositiveInteger(value, fieldName) {
+  const numeric = Number.parseInt(value, 10);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw createHttpError(400, `${fieldName} must be a positive integer`);
+  }
+  return numeric;
+}
+
+function parseOptionalPositiveInteger(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const numeric = Number.parseInt(value, 10);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw createHttpError(400, `${fieldName} must be a positive integer`);
+  }
+  return numeric;
+}
+
+function parseOptionalNonNegativeInteger(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  const numeric = Number.parseInt(value, 10);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    throw createHttpError(400, `${fieldName} must be a non-negative integer`);
+  }
+  return numeric;
+}
+
+function parseLimit(value, fallback = 20, { max = 100 } = {}) {
+  if (value === undefined || value === null || value === '') {
     return fallback;
   }
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
+  const numeric = Number.parseInt(value, 10);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw createHttpError(400, `limit must be a positive integer not exceeding ${max}`);
+  }
+  if (numeric > max) {
+    throw createHttpError(400, `limit must be a positive integer not exceeding ${max}`);
+  }
+  return numeric;
+}
+
+function parseOffset(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+  const numeric = Number.parseInt(value, 10);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    throw createHttpError(400, 'offset must be a non-negative integer');
+  }
+  return numeric;
+}
+
+function parseOptionalBoolean(value, fallback, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  const normalised = String(value).trim().toLowerCase();
+  if (BOOLEAN_TRUE_VALUES.has(normalised)) {
+    return true;
+  }
+  if (BOOLEAN_FALSE_VALUES.has(normalised)) {
+    return false;
+  }
+  throw createHttpError(400, `${fieldName} must be a boolean value`);
+}
+
+function parseOptionalDate(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      throw createHttpError(400, `${fieldName} must be a valid date`);
+    }
+    return value;
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    throw createHttpError(400, `${fieldName} must be a valid date`);
+  }
+  return parsed;
+}
+
+function ensurePlainObject(value, fallback = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return fallback;
+  }
+  return value;
+}
+
+function sanitiseOptionalStringArray(value, { maxItems = 50, maxItemLength = 500 } = {}) {
+  if (!value && value !== 0) {
+    return undefined;
+  }
+
+  const entries = Array.isArray(value) ? value : [value];
+  const sanitised = entries
+    .map((entry) => sanitiseOptionalText(entry, { maxLength: maxItemLength }))
+    .filter(Boolean);
+
+  if (!sanitised.length) {
+    return undefined;
+  }
+
+  return sanitised.slice(0, maxItems);
+}
+
+function resolveSortField(value) {
+  const text = sanitiseOptionalText(value, { maxLength: 50 });
+  if (!text) {
+    return undefined;
+  }
+  const key = text.replace(/[^a-z]/gi, '').toLowerCase();
+  const resolved = RISK_SORT_FIELDS.get(key);
+  if (!resolved) {
+    throw createHttpError(
+      400,
+      'sortBy must be one of residualRisk, inherentRisk, updatedAt, createdAt, nextReviewAt, status'
+    );
+  }
+  return resolved;
+}
+
+function resolveSortDirection(value) {
+  const text = sanitiseOptionalText(value, { maxLength: 4 });
+  if (!text) {
+    return undefined;
+  }
+  const direction = text.toLowerCase();
+  if (direction !== 'asc' && direction !== 'desc') {
+    throw createHttpError(400, 'sortDirection must be either asc or desc');
+  }
+  return direction;
 }
 
 export default class SecurityOperationsController {
@@ -61,17 +222,17 @@ export default class SecurityOperationsController {
       const tenantId = resolveTenant(req);
       const payload = await securityOperationsService.listRiskRegister({
         tenantId,
-        limit: toNumber(req.query?.limit, 20),
-        offset: toNumber(req.query?.offset, 0),
-        status: req.query?.status,
-        category: req.query?.category,
-        ownerId: req.query?.ownerId ? Number(req.query.ownerId) : undefined,
-        tag: req.query?.tag,
-        severity: req.query?.severity,
-        includeClosed: req.query?.includeClosed !== 'false',
-        sortBy: req.query?.sortBy,
-        sortDirection: req.query?.sortDirection,
-        search: req.query?.search
+        limit: parseLimit(req.query?.limit),
+        offset: parseOffset(req.query?.offset),
+        status: sanitiseOptionalText(req.query?.status, { maxLength: 100 }),
+        category: sanitiseOptionalText(req.query?.category, { maxLength: 100 }),
+        ownerId: parseOptionalPositiveInteger(req.query?.ownerId, 'ownerId'),
+        tag: sanitiseOptionalText(req.query?.tag, { maxLength: 100 }),
+        severity: sanitiseOptionalText(req.query?.severity, { maxLength: 100 }),
+        includeClosed: parseOptionalBoolean(req.query?.includeClosed, true, 'includeClosed'),
+        sortBy: resolveSortField(req.query?.sortBy),
+        sortDirection: resolveSortDirection(req.query?.sortDirection),
+        search: sanitiseOptionalText(req.query?.search, { maxLength: 200 })
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
@@ -83,22 +244,43 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const title = sanitiseRequiredText(req.body?.title, 'title', { maxLength: 300 });
+      const description = sanitiseRequiredText(req.body?.description, 'description', { maxLength: 5000 });
+      const mitigationPlan = sanitiseOptionalText(req.body?.mitigationPlan, { maxLength: 5000 });
+      const residualNotes = sanitiseOptionalText(req.body?.residualNotes, { maxLength: 5000 });
+      const regulatoryDriver = sanitiseOptionalText(req.body?.regulatoryDriver, { maxLength: 500 });
+      const reviewCadence = req.body?.reviewCadenceDays;
+      let reviewCadenceDays;
+      if (reviewCadence !== undefined) {
+        const cadenceNumber = Number(reviewCadence);
+        if (!Number.isFinite(cadenceNumber) || cadenceNumber <= 0) {
+          throw createHttpError(400, 'reviewCadenceDays must be a positive number');
+        }
+        reviewCadenceDays = Math.trunc(cadenceNumber);
+      }
+
       const record = await securityOperationsService.createRiskEntry({
         tenantId,
-        title: req.body?.title,
-        description: req.body?.description,
-        category: req.body?.category,
-        severity: req.body?.severity,
-        likelihood: req.body?.likelihood,
-        reviewCadenceDays: req.body?.reviewCadenceDays,
-        mitigationPlan: req.body?.mitigationPlan,
-        residualNotes: req.body?.residualNotes,
-        regulatoryDriver: req.body?.regulatoryDriver,
-        detectionControls: req.body?.detectionControls,
-        mitigationControls: req.body?.mitigationControls,
-        tags: req.body?.tags,
-        owner: req.body?.owner,
-        metadata: req.body?.metadata,
+        title,
+        description,
+        category: sanitiseOptionalText(req.body?.category, { maxLength: 100 }),
+        severity: sanitiseOptionalText(req.body?.severity, { maxLength: 100 }),
+        likelihood: sanitiseOptionalText(req.body?.likelihood, { maxLength: 100 }),
+        reviewCadenceDays,
+        mitigationPlan,
+        residualNotes,
+        regulatoryDriver,
+        detectionControls: sanitiseOptionalStringArray(req.body?.detectionControls, {
+          maxItems: 50,
+          maxItemLength: 200
+        }),
+        mitigationControls: sanitiseOptionalStringArray(req.body?.mitigationControls, {
+          maxItems: 50,
+          maxItemLength: 200
+        }),
+        tags: sanitiseOptionalStringArray(req.body?.tags, { maxItems: 50, maxItemLength: 100 }),
+        owner: ensurePlainObject(req.body?.owner, {}),
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -112,16 +294,20 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
-      const { riskId } = req.params;
+      const riskId = requirePositiveInteger(req.params?.riskId, 'riskId');
+      const status = sanitiseRequiredText(req.body?.status, 'status', { maxLength: 100 });
+      const residualNotes = sanitiseOptionalText(req.body?.residualNotes, { maxLength: 5000 });
+      const mitigationPlan = sanitiseOptionalText(req.body?.mitigationPlan, { maxLength: 5000 });
+      const nextReviewAt = parseOptionalDate(req.body?.nextReviewAt, 'nextReviewAt');
       const updated = await securityOperationsService.updateRiskStatus({
-        riskId: Number(riskId),
+        riskId,
         tenantId,
-        status: req.body?.status,
+        status,
         residualSeverity: req.body?.residualSeverity,
         residualLikelihood: req.body?.residualLikelihood,
-        residualNotes: req.body?.residualNotes,
-        mitigationPlan: req.body?.mitigationPlan,
-        nextReviewAt: req.body?.nextReviewAt,
+        residualNotes,
+        mitigationPlan,
+        nextReviewAt,
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -164,18 +350,25 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
-      const { riskId } = req.params;
+      const riskId = requirePositiveInteger(req.params?.riskId, 'riskId');
+      const status = sanitiseOptionalText(req.body?.status, { maxLength: 100 });
+      const notes = sanitiseOptionalText(req.body?.notes, { maxLength: 5000 });
+      const nextReviewAt = parseOptionalDate(req.body?.nextReviewAt, 'nextReviewAt');
+      const reviewedAt = parseOptionalDate(req.body?.reviewedAt, 'reviewedAt');
       const payload = await securityOperationsService.recordRiskReview({
-        riskId: Number(riskId),
+        riskId,
         tenantId,
-        status: req.body?.status,
+        status,
         residualSeverity: req.body?.residualSeverity,
         residualLikelihood: req.body?.residualLikelihood,
-        notes: req.body?.notes,
-        evidenceReferences: req.body?.evidenceReferences,
-        reviewer: req.body?.reviewer,
-        nextReviewAt: req.body?.nextReviewAt,
-        reviewedAt: req.body?.reviewedAt,
+        notes,
+        evidenceReferences: sanitiseOptionalStringArray(req.body?.evidenceReferences, {
+          maxItems: 50,
+          maxItemLength: 500
+        }),
+        reviewer: ensurePlainObject(req.body?.reviewer, {}),
+        nextReviewAt,
+        reviewedAt,
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -190,12 +383,12 @@ export default class SecurityOperationsController {
       const tenantId = resolveTenant(req);
       const payload = await securityOperationsService.listAuditEvidence({
         tenantId,
-        framework: req.query?.framework,
-        controlReference: req.query?.controlReference,
-        riskId: req.query?.riskId ? Number(req.query.riskId) : undefined,
-        status: req.query?.status,
-        limit: toNumber(req.query?.limit, 20),
-        offset: toNumber(req.query?.offset, 0)
+        framework: sanitiseOptionalText(req.query?.framework, { maxLength: 200 }),
+        controlReference: sanitiseOptionalText(req.query?.controlReference, { maxLength: 200 }),
+        riskId: parseOptionalPositiveInteger(req.query?.riskId, 'riskId'),
+        status: sanitiseOptionalText(req.query?.status, { maxLength: 100 }),
+        limit: parseLimit(req.query?.limit),
+        offset: parseOffset(req.query?.offset)
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
@@ -207,22 +400,30 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const storagePath = sanitiseRequiredText(req.body?.storagePath, 'storagePath', { maxLength: 1024 });
+      const framework = sanitiseOptionalText(req.body?.framework, { maxLength: 200 });
+      const controlReference = sanitiseOptionalText(req.body?.controlReference, { maxLength: 200 });
+      const evidenceType = sanitiseOptionalText(req.body?.evidenceType, { maxLength: 200 });
+      const checksum = sanitiseOptionalText(req.body?.checksum, { maxLength: 512 });
+      const description = sanitiseOptionalText(req.body?.description, { maxLength: 5000 });
+      const capturedAt = parseOptionalDate(req.body?.capturedAt, 'capturedAt');
+      const expiresAt = parseOptionalDate(req.body?.expiresAt, 'expiresAt');
       const evidence = await securityOperationsService.recordAuditEvidence({
         tenantId,
-        riskId: req.body?.riskId,
-        framework: req.body?.framework,
-        controlReference: req.body?.controlReference,
-        evidenceType: req.body?.evidenceType,
-        storagePath: req.body?.storagePath,
-        checksum: req.body?.checksum,
-        sources: req.body?.sources,
-        capturedAt: req.body?.capturedAt,
-        expiresAt: req.body?.expiresAt,
+        riskId: parseOptionalPositiveInteger(req.body?.riskId, 'riskId'),
+        framework,
+        controlReference,
+        evidenceType,
+        storagePath,
+        checksum,
+        sources: sanitiseOptionalStringArray(req.body?.sources, { maxItems: 50, maxItemLength: 200 }),
+        capturedAt,
+        expiresAt,
         status: req.body?.status,
         submittedBy: req.body?.submittedBy,
         submittedByEmail: req.body?.submittedByEmail,
-        description: req.body?.description,
-        metadata: req.body?.metadata,
+        description,
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -237,11 +438,11 @@ export default class SecurityOperationsController {
       const tenantId = resolveTenant(req);
       const payload = await securityOperationsService.listContinuityExercises({
         tenantId,
-        outcome: req.query?.outcome,
-        ownerId: req.query?.ownerId ? Number(req.query.ownerId) : undefined,
-        since: req.query?.since,
-        limit: toNumber(req.query?.limit, 20),
-        offset: toNumber(req.query?.offset, 0)
+        outcome: sanitiseOptionalText(req.query?.outcome, { maxLength: 200 }),
+        ownerId: parseOptionalPositiveInteger(req.query?.ownerId, 'ownerId'),
+        since: parseOptionalDate(req.query?.since, 'since'),
+        limit: parseLimit(req.query?.limit),
+        offset: parseOffset(req.query?.offset)
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
@@ -253,22 +454,30 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const scenarioKey = sanitiseRequiredText(req.body?.scenarioKey, 'scenarioKey', { maxLength: 200 });
+      const scenarioSummary = sanitiseRequiredText(req.body?.scenarioSummary, 'scenarioSummary', { maxLength: 2000 });
+      const exerciseType = sanitiseOptionalText(req.body?.exerciseType, { maxLength: 200 });
+      const outcome = sanitiseOptionalText(req.body?.outcome, { maxLength: 200 });
+      const lessonsLearned = sanitiseOptionalText(req.body?.lessonsLearned, { maxLength: 5000 });
       const record = await securityOperationsService.logContinuityExercise({
         tenantId,
-        scenarioKey: req.body?.scenarioKey,
-        scenarioSummary: req.body?.scenarioSummary,
-        exerciseType: req.body?.exerciseType,
-        startedAt: req.body?.startedAt,
-        completedAt: req.body?.completedAt,
-        rtoTargetMinutes: req.body?.rtoTargetMinutes,
-        rpoTargetMinutes: req.body?.rpoTargetMinutes,
-        actualRtoMinutes: req.body?.actualRtoMinutes,
-        actualRpoMinutes: req.body?.actualRpoMinutes,
-        outcome: req.body?.outcome,
-        lessonsLearned: req.body?.lessonsLearned,
-        followUpActions: req.body?.followUpActions,
-        owner: req.body?.owner,
-        metadata: req.body?.metadata,
+        scenarioKey,
+        scenarioSummary,
+        exerciseType,
+        startedAt: parseOptionalDate(req.body?.startedAt, 'startedAt'),
+        completedAt: parseOptionalDate(req.body?.completedAt, 'completedAt'),
+        rtoTargetMinutes: parseOptionalNonNegativeInteger(req.body?.rtoTargetMinutes, 'rtoTargetMinutes'),
+        rpoTargetMinutes: parseOptionalNonNegativeInteger(req.body?.rpoTargetMinutes, 'rpoTargetMinutes'),
+        actualRtoMinutes: parseOptionalNonNegativeInteger(req.body?.actualRtoMinutes, 'actualRtoMinutes'),
+        actualRpoMinutes: parseOptionalNonNegativeInteger(req.body?.actualRpoMinutes, 'actualRpoMinutes'),
+        outcome,
+        lessonsLearned,
+        followUpActions: sanitiseOptionalStringArray(req.body?.followUpActions, {
+          maxItems: 50,
+          maxItemLength: 500
+        }),
+        owner: ensurePlainObject(req.body?.owner, {}),
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });
@@ -283,12 +492,12 @@ export default class SecurityOperationsController {
       const tenantId = resolveTenant(req);
       const payload = await securityOperationsService.listAssessments({
         tenantId,
-        status: req.query?.status,
-        assessmentType: req.query?.assessmentType,
-        scheduledFrom: req.query?.scheduledFrom,
-        scheduledTo: req.query?.scheduledTo,
-        limit: toNumber(req.query?.limit, 20),
-        offset: toNumber(req.query?.offset, 0)
+        status: sanitiseOptionalText(req.query?.status, { maxLength: 100 }),
+        assessmentType: sanitiseOptionalText(req.query?.assessmentType, { maxLength: 200 }),
+        scheduledFrom: parseOptionalDate(req.query?.scheduledFrom, 'scheduledFrom'),
+        scheduledTo: parseOptionalDate(req.query?.scheduledTo, 'scheduledTo'),
+        limit: parseLimit(req.query?.limit),
+        offset: parseOffset(req.query?.offset)
       });
       return res.json({ success: true, data: payload });
     } catch (error) {
@@ -300,15 +509,23 @@ export default class SecurityOperationsController {
     try {
       const tenantId = resolveTenant(req);
       const actor = resolveActor(req);
+      const assessmentType = sanitiseRequiredText(req.body?.assessmentType, 'assessmentType', { maxLength: 200 });
+      const scheduledFor = parseOptionalDate(req.body?.scheduledFor, 'scheduledFor');
+      if (!scheduledFor) {
+        throw createHttpError(400, 'scheduledFor is required');
+      }
+      const status = sanitiseOptionalText(req.body?.status, { maxLength: 200 });
+      const scope = sanitiseOptionalText(req.body?.scope, { maxLength: 5000 });
+      const methodology = sanitiseOptionalText(req.body?.methodology, { maxLength: 5000 });
       const assessment = await securityOperationsService.scheduleAssessment({
         tenantId,
-        assessmentType: req.body?.assessmentType,
-        scheduledFor: req.body?.scheduledFor,
-        status: req.body?.status,
-        owner: req.body?.owner,
-        scope: req.body?.scope,
-        methodology: req.body?.methodology,
-        metadata: req.body?.metadata,
+        assessmentType,
+        scheduledFor,
+        status,
+        owner: ensurePlainObject(req.body?.owner, {}),
+        scope,
+        methodology,
+        metadata: ensurePlainObject(req.body?.metadata, {}),
         actor,
         requestContext: resolveRequestContext(req)
       });

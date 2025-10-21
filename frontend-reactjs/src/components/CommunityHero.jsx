@@ -1,8 +1,19 @@
 import PropTypes from 'prop-types';
 import { ArrowRightIcon, CheckCircleIcon, UsersIcon } from '@heroicons/react/24/solid';
-import { SparklesIcon, BoltIcon } from '@heroicons/react/24/outline';
+import { SparklesIcon, BoltIcon, CalendarDaysIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
+const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
+
+function isSafeExternalHref(href) {
+  if (!href) return false;
+  try {
+    const parsed = new URL(href, typeof window !== 'undefined' ? window.location.origin : 'https://app.edulure.com');
+    return SAFE_URL_PROTOCOLS.has(parsed.protocol);
+  } catch (error) {
+    return false;
+  }
+}
 
 function CommunityStat({ icon: Icon, label, value }) {
   return (
@@ -31,12 +42,12 @@ export default function CommunityHero({
   onJoin,
   isJoining,
   joinError,
-  canJoin = true,
+  canJoin,
   joinDisabledReason,
   onLeave,
   isLeaving,
   leaveError,
-  canLeave = false
+  canLeave
 }) {
   if (isLoading) {
     return (
@@ -67,6 +78,28 @@ export default function CommunityHero({
   const bannerUrl = community.coverImageUrl;
   const stats = community.stats ?? {};
   const metadata = community.metadata ?? {};
+  const nextEvent = community.nextEvent ?? null;
+  const hubUrl = community.links?.hub ?? `https://app.edulure.com/communities/${community.slug}`;
+  const eventCta = nextEvent?.cta && isSafeExternalHref(nextEvent.cta.href) ? nextEvent.cta : undefined;
+
+  let membershipBanner;
+  const membershipStatus = community.membership?.status;
+  if (membershipStatus === 'pending') {
+    membershipBanner = {
+      tone: 'amber',
+      message: 'Your access request is pending approval. We will notify you once a moderator responds.'
+    };
+  } else if (membershipStatus === 'invited') {
+    membershipBanner = {
+      tone: 'emerald',
+      message: 'You have an invitation waiting — accept to unlock private updates and resources.'
+    };
+  } else if (membershipStatus === 'suspended') {
+    membershipBanner = {
+      tone: 'rose',
+      message: 'Your membership is suspended. Contact support to resolve access or appeal the decision.'
+    };
+  }
 
   const formattedStats = [
     {
@@ -87,6 +120,8 @@ export default function CommunityHero({
   ];
 
   const tagline = metadata.tagline ?? community.description;
+  const eventDate = nextEvent?.scheduledAt ? new Date(nextEvent.scheduledAt) : null;
+  const eventDateLabel = eventDate && !Number.isNaN(eventDate.getTime()) ? eventDate.toLocaleString() : null;
 
   return (
     <section className="relative overflow-hidden rounded-4xl border border-slate-200 bg-slate-950 shadow-xl">
@@ -112,6 +147,22 @@ export default function CommunityHero({
               Your role: {memberRole}
             </span>
           )}
+          {membershipBanner && (
+            <div
+              className={`mt-3 inline-flex items-start gap-3 rounded-2xl border px-4 py-3 text-xs font-semibold ${
+                membershipBanner.tone === 'rose'
+                  ? 'border-rose-200/40 bg-rose-500/10 text-rose-50'
+                  : membershipBanner.tone === 'amber'
+                  ? 'border-amber-200/40 bg-amber-500/10 text-amber-50'
+                  : 'border-emerald-200/40 bg-emerald-500/10 text-emerald-50'
+              }`}
+              role="status"
+              aria-live="polite"
+            >
+              <ExclamationTriangleIcon className="mt-0.5 h-4 w-4" />
+              <span className="text-left font-medium leading-5">{membershipBanner.message}</span>
+            </div>
+          )}
         </div>
         {(joinError || leaveError) && (
           <div className="rounded-2xl border border-red-300 bg-red-500/20 px-4 py-2 text-sm text-red-50" role="alert">
@@ -120,7 +171,7 @@ export default function CommunityHero({
         )}
         <div className="flex flex-wrap items-center gap-4">
           <a
-            href={`https://app.edulure.com/communities/${community.slug}`}
+            href={hubUrl}
             className="inline-flex items-center gap-2 rounded-full bg-white/15 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/25"
           >
             Visit hub
@@ -137,7 +188,9 @@ export default function CommunityHero({
             </button>
           )}
           {!canJoin && !isMember && joinDisabledReason && (
-            <span className="text-xs font-medium text-amber-200">{joinDisabledReason}</span>
+            <span className="text-xs font-medium text-amber-200" role="status">
+              {joinDisabledReason}
+            </span>
           )}
           {isMember && (
             <div className="flex flex-wrap items-center gap-3">
@@ -163,6 +216,29 @@ export default function CommunityHero({
             <CommunityStat key={stat.label} icon={stat.icon} label={stat.label} value={stat.value} />
           ))}
         </div>
+        {nextEvent && (
+          <div className="mt-6 inline-flex items-center gap-3 rounded-3xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white/80" role="status">
+            <CalendarDaysIcon className="h-5 w-5 text-white" />
+            <div>
+              <p className="font-semibold text-white">{nextEvent.title ?? 'Upcoming event'}</p>
+              <p className="text-xs text-white/70">
+                {eventDateLabel ?? 'Schedule to be announced'}
+                {nextEvent.location ? ` • ${nextEvent.location}` : ''}
+              </p>
+            </div>
+            {eventCta && (
+              <a
+                href={eventCta.href}
+                target={eventCta.external ? '_blank' : undefined}
+                rel={eventCta.external ? 'noopener noreferrer' : undefined}
+                className="ml-auto inline-flex items-center gap-2 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white transition hover:bg-white/30"
+              >
+                {eventCta.label}
+                <ArrowRightIcon className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        )}
       </div>
     </section>
   );
@@ -184,7 +260,20 @@ CommunityHero.propTypes = {
       resources: PropTypes.number,
       posts: PropTypes.number
     }),
-    metadata: PropTypes.object
+    metadata: PropTypes.object,
+    nextEvent: PropTypes.shape({
+      title: PropTypes.string,
+      scheduledAt: PropTypes.string,
+      location: PropTypes.string,
+      cta: PropTypes.shape({
+        label: PropTypes.string.isRequired,
+        href: PropTypes.string.isRequired,
+        external: PropTypes.bool
+      })
+    }),
+    links: PropTypes.shape({
+      hub: PropTypes.string
+    })
   }),
   isLoading: PropTypes.bool,
   error: PropTypes.string,
@@ -197,4 +286,19 @@ CommunityHero.propTypes = {
   isLeaving: PropTypes.bool,
   leaveError: PropTypes.string,
   canLeave: PropTypes.bool
+};
+
+CommunityHero.defaultProps = {
+  community: undefined,
+  isLoading: false,
+  error: undefined,
+  onJoin: undefined,
+  isJoining: false,
+  joinError: undefined,
+  canJoin: true,
+  joinDisabledReason: undefined,
+  onLeave: undefined,
+  isLeaving: false,
+  leaveError: undefined,
+  canLeave: false
 };

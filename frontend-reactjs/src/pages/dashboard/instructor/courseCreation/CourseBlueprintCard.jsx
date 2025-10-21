@@ -118,6 +118,22 @@ BlueprintModulesTable.defaultProps = {
 };
 
 export default function CourseBlueprintCard({ blueprint }) {
+  const modules = Array.isArray(blueprint.modules) ? blueprint.modules : [];
+  const outstanding = Array.isArray(blueprint.outstanding) ? blueprint.outstanding : [];
+  const upcoming = Array.isArray(blueprint.upcoming) ? blueprint.upcoming : [];
+
+  const handleBlueprintAction = (action) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('edulure:blueprint-action', {
+        detail: {
+          blueprintId: blueprint.id,
+          action
+        }
+      })
+    );
+  };
+
   return (
     <div className="dashboard-section space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -143,22 +159,22 @@ export default function CourseBlueprintCard({ blueprint }) {
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <BlueprintModulesTable modules={blueprint.modules} />
+          <BlueprintModulesTable modules={modules} />
         </div>
         <div className="lg:col-span-2 space-y-4">
-          <OutstandingTasks tasks={blueprint.outstanding} />
-          <UpcomingMilestones items={blueprint.upcoming} />
+          <OutstandingTasks tasks={outstanding} />
+          <UpcomingMilestones items={upcoming} />
         </div>
       </div>
 
       <div className="flex flex-wrap gap-3 text-xs text-slate-600">
-        <button type="button" className="dashboard-primary-pill">
+        <button type="button" className="dashboard-primary-pill" onClick={() => handleBlueprintAction('open-production')}>
           Open production board
         </button>
-        <button type="button" className="dashboard-pill">
+        <button type="button" className="dashboard-pill" onClick={() => handleBlueprintAction('share-tutors')}>
           Share with tutors
         </button>
-        <button type="button" className="dashboard-pill">
+        <button type="button" className="dashboard-pill" onClick={() => handleBlueprintAction('export-syllabus')}>
           Export syllabus
         </button>
       </div>

@@ -43,7 +43,6 @@ describe('<InstructorTutorSchedule />', () => {
   };
 
   beforeEach(() => {
-    vi.useFakeTimers();
     localStorage.clear();
     useOutletContextMock.mockReturnValue({
       dashboard: baseDashboard,
@@ -52,7 +51,6 @@ describe('<InstructorTutorSchedule />', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -72,12 +70,9 @@ describe('<InstructorTutorSchedule />', () => {
 
     await user.click(within(modal).getByRole('button', { name: /save schedule/i }));
 
-    await waitFor(() => {
-      vi.advanceTimersByTime(300);
-      expect(screen.getByText(/jordan mentor/i)).toBeInTheDocument();
-      expect(screen.getByText(/product guild/i)).toBeInTheDocument();
-      expect(screen.getByText(/6 open slots/i)).toBeInTheDocument();
-    });
+    expect(await screen.findByText(/jordan mentor/i)).toBeInTheDocument();
+    expect(screen.getByText(/product guild/i)).toBeInTheDocument();
+    expect(screen.getByText(/6 open slots/i)).toBeInTheDocument();
   });
 
   it('edits an existing schedule entry inline', async () => {
@@ -91,10 +86,7 @@ describe('<InstructorTutorSchedule />', () => {
     await user.type(learnersField, 'Build guild · cohort b');
     await user.click(within(form).getByRole('button', { name: /save schedule/i }));
 
-    await waitFor(() => {
-      vi.advanceTimersByTime(300);
-      expect(screen.getByText(/cohort b/i)).toBeInTheDocument();
-    });
+    expect(await screen.findByText(/cohort b/i)).toBeInTheDocument();
   });
 
   it('removes an entry and updates the ui immediately', async () => {

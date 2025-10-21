@@ -251,7 +251,8 @@ describe('SecurityOperationsService', () => {
       riskId: 77,
       tenantId: 'tenant-ops',
       actor: { id: 'admin-1', role: 'admin', type: 'user' },
-      requestContext: { requestId: 'req-risk-delete' }
+      requestContext: { requestId: 'req-risk-delete' },
+      reason: 'Consolidated with centralised certificate automation'
     });
 
     expect(repository.deleteRisk).toHaveBeenCalledWith(77);

@@ -19,14 +19,36 @@ LearnerStatCard.propTypes = {
   stat: statPropType.isRequired
 };
 
+function sanitiseImageUrl(url) {
+  if (typeof url !== 'string' || url.trim().length === 0) {
+    return null;
+  }
+  const value = url.trim();
+  if (value.startsWith('data:')) {
+    return value;
+  }
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.edulure.com';
+    const parsed = new URL(value, origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
 function resolveAvatar(profile) {
-  if (profile?.avatar) return profile.avatar;
+  const safeAvatar = sanitiseImageUrl(profile?.avatar);
+  if (safeAvatar) return safeAvatar;
   const seed = encodeURIComponent(profile?.email ?? profile?.name ?? 'learner');
   return `https://avatar.vercel.sh/${seed}.svg?size=96&background=0D1224&color=F8FAFC`;
 }
 
 export default function LearnerProfileSection({ profile, stats, className }) {
   const safeStats = Array.isArray(stats) ? stats.filter((stat) => stat?.label && stat?.value !== undefined) : [];
+  const bio = profile?.bio?.trim?.() ?? '';
 
   return (
     <section
@@ -52,7 +74,9 @@ export default function LearnerProfileSection({ profile, stats, className }) {
           </div>
         </div>
         <p className="text-sm leading-relaxed text-white/80">
-          {profile?.bio ?? 'Welcome to your learning control center. Stay close to your cohorts, metrics, and mentors here.'}
+          {bio.length > 0
+            ? bio
+            : 'Welcome to your learning control center. Stay close to your cohorts, metrics, and mentors here.'}
         </p>
         {safeStats.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-3">

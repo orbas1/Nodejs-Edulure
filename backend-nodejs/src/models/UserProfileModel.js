@@ -94,26 +94,78 @@ export default class UserProfileModel {
     return mapUserProfileRecord(record);
   }
 
-  static async upsert(userId, profile, connection = db) {
-    const payload = {
-      display_name: profile.displayName ?? null,
-      tagline: profile.tagline ?? null,
-      location: profile.location ?? null,
-      avatar_url: profile.avatarUrl ?? null,
-      banner_url: profile.bannerUrl ?? null,
-      bio: profile.bio ?? null,
-      social_links: serialiseJson(profile.socialLinks ?? [], '[]'),
-      metadata: serialiseJson(profile.metadata ?? {}, '{}')
-    };
+  static async findByUserIds(userIds, connection = db) {
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return [];
+    }
 
-    const existing = await connection('user_profiles').where({ user_id: userId }).first();
-    if (existing) {
-      await connection('user_profiles').where({ user_id: userId }).update(payload);
+    const records = await connection('user_profiles').select(BASE_COLUMNS).whereIn('user_id', userIds);
+    return records.map(mapUserProfileRecord);
+  }
+
+  static async upsert(userId, profile, connection = db) {
+    if (!profile || typeof profile !== 'object') {
       return this.findByUserId(userId, connection);
     }
 
-    await connection('user_profiles').insert({ ...payload, user_id: userId });
+    const existing = await connection('user_profiles').where({ user_id: userId }).first();
+
+    const payload = {};
+    if (Object.prototype.hasOwnProperty.call(profile, 'displayName')) {
+      payload.display_name = profile.displayName ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(profile, 'tagline')) {
+      payload.tagline = profile.tagline ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(profile, 'location')) {
+      payload.location = profile.location ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(profile, 'avatarUrl')) {
+      payload.avatar_url = profile.avatarUrl ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(profile, 'bannerUrl')) {
+      payload.banner_url = profile.bannerUrl ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(profile, 'bio')) {
+      payload.bio = profile.bio ?? null;
+    }
+    if (Object.prototype.hasOwnProperty.call(profile, 'socialLinks')) {
+      payload.social_links = serialiseJson(profile.socialLinks ?? [], '[]');
+    }
+    if (Object.prototype.hasOwnProperty.call(profile, 'metadata')) {
+      payload.metadata = serialiseJson(profile.metadata ?? {}, '{}');
+    }
+
+    if (!existing) {
+      const insertDefaults = {
+        display_name: null,
+        tagline: null,
+        location: null,
+        avatar_url: null,
+        banner_url: null,
+        bio: null,
+        social_links: '[]',
+        metadata: '{}'
+      };
+
+      await connection('user_profiles').insert({ user_id: userId, ...insertDefaults, ...payload });
+      return this.findByUserId(userId, connection);
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return mapUserProfileRecord(existing);
+    }
+
+    await connection('user_profiles').where({ user_id: userId }).update(payload);
     return this.findByUserId(userId, connection);
+  }
+
+  static async deleteByUserId(userId, connection = db) {
+    if (!userId) {
+      return 0;
+    }
+
+    return connection('user_profiles').where({ user_id: userId }).del();
   }
 }
 

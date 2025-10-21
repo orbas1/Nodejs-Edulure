@@ -1,3 +1,4 @@
+import express from 'express';
 import request from 'supertest';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,7 +29,10 @@ vi.mock('../src/services/IdentityVerificationService.js', () => ({
 let app;
 
 beforeAll(async () => {
-  ({ default: app } = await import('../src/app.js'));
+  const { default: verificationRouter } = await import('../src/routes/verification.routes.js');
+  app = express();
+  app.use(express.json());
+  app.use('/api/v1/verification', verificationRouter);
 });
 
 beforeEach(() => {

@@ -1,0 +1,464 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – SLO snapshots, telemetry guardrails, and alert governance endpoints for platform operators.",
+    "version": "1.50.0",
+    "description": "SLO snapshots, telemetry guardrails, and alert governance endpoints for platform operators. (Capability: operational-observability)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/observability/slos": {
+      "get": {
+        "summary": "Service level objectives",
+        "description": "Returns the most recent error budget and latency snapshots for registered SLOs.",
+        "tags": [
+          "Observability"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "includeDefinition",
+            "in": "query",
+            "required": false,
+            "description": "When true, include indicator and alert configuration with each snapshot.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current SLO snapshots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservabilitySloListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          }
+        }
+      }
+    },
+    "/observability/slos/{sloId}": {
+      "get": {
+        "summary": "Service level objective detail",
+        "description": "Returns the current snapshot for a specific service level objective.",
+        "tags": [
+          "Observability"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "sloId",
+            "in": "path",
+            "required": true,
+            "description": "Identifier of the service level objective to inspect.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeDefinition",
+            "in": "query",
+            "required": false,
+            "description": "When true, include indicator and alert configuration with the snapshot.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SLO snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ObservabilitySloDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "SLO not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ObservabilitySloDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/ObservabilitySloSnapshot"
+              }
+            }
+          }
+        ]
+      },
+      "ObservabilitySloSnapshot": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "targetAvailability": {
+            "type": "number"
+          },
+          "windowMinutes": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "breaching",
+              "insufficient_data",
+              "no_data"
+            ]
+          },
+          "measuredAvailability": {
+            "type": "number",
+            "nullable": true
+          },
+          "successCount": {
+            "type": "integer"
+          },
+          "errorCount": {
+            "type": "integer"
+          },
+          "totalRequests": {
+            "type": "integer"
+          },
+          "errorBudget": {
+            "type": "number",
+            "nullable": true
+          },
+          "errorBudgetRemaining": {
+            "type": "number",
+            "nullable": true
+          },
+          "burnRate": {
+            "type": "number"
+          },
+          "latency": {
+            "$ref": "#/components/schemas/ObservabilitySloLatencySummary",
+            "nullable": true
+          },
+          "windowStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "windowEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "observedMinutes": {
+            "type": "integer"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservabilitySloAnnotation"
+            },
+            "default": []
+          },
+          "definition": {
+            "$ref": "#/components/schemas/ObservabilitySloDefinition",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "targetAvailability",
+          "windowMinutes",
+          "status",
+          "successCount",
+          "errorCount",
+          "totalRequests",
+          "burnRate",
+          "windowStart",
+          "windowEnd",
+          "observedMinutes",
+          "tags",
+          "annotations"
+        ]
+      },
+      "ObservabilitySloDefinition": {
+        "type": "object",
+        "properties": {
+          "indicator": {
+            "$ref": "#/components/schemas/ObservabilitySloIndicator"
+          },
+          "alerting": {
+            "$ref": "#/components/schemas/ObservabilitySloAlerting"
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "indicator",
+          "alerting",
+          "tags"
+        ]
+      },
+      "ObservabilitySloAlerting": {
+        "type": "object",
+        "properties": {
+          "burnRateWarning": {
+            "type": "number"
+          },
+          "burnRateCritical": {
+            "type": "number"
+          },
+          "minRequests": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "burnRateWarning",
+          "burnRateCritical",
+          "minRequests"
+        ]
+      },
+      "ObservabilitySloIndicator": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "http"
+            ]
+          },
+          "routePattern": {
+            "type": "string"
+          },
+          "routePatternFlags": {
+            "type": "string"
+          },
+          "methodWhitelist": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "excludeRoutePatterns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "treat4xxAsFailures": {
+            "type": "boolean"
+          },
+          "failureStatusCodes": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "default": []
+          },
+          "successStatusCodes": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "type",
+          "routePattern"
+        ]
+      },
+      "ObservabilitySloAnnotation": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "critical"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "code",
+          "message"
+        ]
+      },
+      "ObservabilitySloLatencySummary": {
+        "type": "object",
+        "properties": {
+          "p50Ms": {
+            "type": "number"
+          },
+          "p95Ms": {
+            "type": "number"
+          },
+          "p99Ms": {
+            "type": "number"
+          },
+          "averageMs": {
+            "type": "number"
+          },
+          "maxMs": {
+            "type": "number"
+          },
+          "minMs": {
+            "type": "number"
+          },
+          "sampleSize": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "p50Ms",
+          "p95Ms",
+          "p99Ms",
+          "averageMs",
+          "maxMs",
+          "minMs",
+          "sampleSize"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      },
+      "ObservabilitySloListResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/ObservabilitySloCollection"
+              }
+            }
+          }
+        ]
+      },
+      "ObservabilitySloCollection": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "slo": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ObservabilitySloSnapshot"
+            }
+          }
+        },
+        "required": [
+          "generatedAt",
+          "slo"
+        ]
+      }
+    }
+  }
+}

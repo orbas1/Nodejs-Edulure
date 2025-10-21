@@ -1,0 +1,558 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Knowledge base, training curriculum, and stakeholder communications APIs for operators and go-to-market teams.",
+    "version": "1.50.0",
+    "description": "Knowledge base, training curriculum, and stakeholder communications APIs for operators and go-to-market teams. (Capability: enablement-documentation)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Enablement",
+      "description": "Enablement knowledge base and training APIs."
+    }
+  ],
+  "paths": {
+    "/enablement/articles": {
+      "get": {
+        "summary": "List enablement articles",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "audience",
+            "in": "query",
+            "description": "Filter by audience codes (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "product",
+            "in": "query",
+            "description": "Filter by product identifiers (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tag",
+            "in": "query",
+            "description": "Filter by tag (comma separated or repeated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Full text search across title, summary, and body.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return (1-100).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset into the result set.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enablement articles retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementArticleListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/enablement/articles/{slug}": {
+      "get": {
+        "summary": "Retrieve enablement article",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Article slug identifier."
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format for content.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "markdown",
+                "html"
+              ],
+              "default": "markdown"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enablement article returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementArticleResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          },
+          "404": {
+            "description": "Enablement article not found"
+          }
+        }
+      }
+    },
+    "/enablement/capability-matrix": {
+      "get": {
+        "summary": "Fetch enablement capability matrix",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capability matrix returned.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementCapabilityMatrixResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/enablement/reindex": {
+      "post": {
+        "summary": "Force enablement index refresh",
+        "tags": [
+          "Enablement"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Reindex triggered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnablementReindexResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Enablement APIs disabled for this role"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EnablementReindexResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "articles": {
+                "type": "integer"
+              },
+              "lastUpdatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "articles"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "EnablementCapabilityMatrixResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EnablementCapabilityMatrix"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "EnablementCapabilityMatrix": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "audiences": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "products": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "tags": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "capabilities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "owners": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "totalTimeToCompleteMinutes": {
+            "type": "integer"
+          },
+          "lastUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "total",
+          "audiences",
+          "products",
+          "tags",
+          "capabilities",
+          "owners"
+        ]
+      },
+      "EnablementArticleResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EnablementArticleDetail"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "EnablementArticleDetail": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "enum": [
+              "markdown",
+              "html"
+            ]
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string"
+          },
+          "deliverables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeToCompleteMinutes": {
+            "type": "integer"
+          },
+          "readingTimeMinutes": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wordCount": {
+            "type": "integer"
+          },
+          "contentHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "content",
+          "format",
+          "audience",
+          "products",
+          "tags",
+          "capabilities",
+          "owner"
+        ]
+      },
+      "EnablementArticleListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/EnablementArticleSummary"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "limit",
+              "offset",
+              "items"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "EnablementArticleSummary": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "owner": {
+            "type": "string"
+          },
+          "deliverables": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "timeToCompleteMinutes": {
+            "type": "integer"
+          },
+          "readingTimeMinutes": {
+            "type": "integer"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "wordCount": {
+            "type": "integer"
+          },
+          "contentHash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "audience",
+          "products",
+          "tags",
+          "capabilities",
+          "owner"
+        ]
+      }
+    }
+  }
+}

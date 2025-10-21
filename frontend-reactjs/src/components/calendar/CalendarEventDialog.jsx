@@ -48,6 +48,24 @@ export default function CalendarEventDialog({ isOpen, mode, initialData, onSubmi
     }
   }, [initialData, isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) {
+      return () => {};
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose?.();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   const dialogTitle = useMemo(
     () => (mode === 'edit' ? 'Update scheduled item' : 'Create new scheduled item'),
     [mode]
