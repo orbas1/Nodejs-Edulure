@@ -22,7 +22,8 @@
     "release:readiness": "node ./scripts/release/run-readiness.mjs",
     "audit": "node ./scripts/security/run-npm-audit.mjs",
     "audit:ci": "node ./scripts/security/run-npm-audit.mjs --workspace backend-nodejs && node ./scripts/security/run-npm-audit.mjs --workspace frontend-reactjs && npm --workspace sdk-typescript run audit:dependencies",
-    "license:report": "node ./scripts/security/generate-license-report.mjs"
+    "license:report": "node ./scripts/security/generate-license-report.mjs",
+    "zap:baseline": "node ./scripts/security/verify-security-headers.mjs"
   },
   "config": {
     "minimumNodeVersion": "20.12.2",
