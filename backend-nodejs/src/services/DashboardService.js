@@ -402,13 +402,24 @@ export function buildLearnerDashboard({
   supportCases = [],
   supportMetrics = DEFAULT_SUPPORT_METRICS
 } = {}) {
+  const resolvedCommunityEvents = Array.isArray(communityEvents) ? communityEvents : [];
   const hasSignals =
     enrollments.length ||
     tutorBookings.length ||
     ebookProgress.length ||
     invoices.length ||
     liveClassrooms.length ||
-    communityMemberships.length;
+    communityMemberships.length ||
+    resolvedCommunityEvents.length ||
+    (Array.isArray(notifications) ? notifications.length : 0) ||
+    (Array.isArray(supportCases) ? supportCases.length : 0) ||
+    (Array.isArray(financePurchases) ? financePurchases.length : 0) ||
+    (Array.isArray(financeSubscriptions) ? financeSubscriptions.length : 0) ||
+    (Array.isArray(growthInitiatives) ? growthInitiatives.length : 0) ||
+    (Array.isArray(affiliateChannels) ? affiliateChannels.length : 0) ||
+    (Array.isArray(adCampaigns) ? adCampaigns.length : 0) ||
+    (Array.isArray(paymentMethods) ? paymentMethods.length : 0) ||
+    (Array.isArray(billingContacts) ? billingContacts.length : 0);
 
   if (!hasSignals) {
     return null;
@@ -660,7 +671,7 @@ export function buildLearnerDashboard({
     });
   });
 
-  communityEvents
+  resolvedCommunityEvents
     .map((event) => ({ ...event, startAt: normaliseDate(event.startAt) }))
     .filter((event) => event.startAt && event.startAt >= now)
     .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
@@ -704,7 +715,19 @@ export function buildLearnerDashboard({
       });
     });
 
-  const calendarEvents = learningUpcoming
+  const upcomingUnique = deduplicateByKey(learningUpcoming, (item) =>
+    item.id
+      ? String(item.id)
+      : `${(item.type ?? 'event').toLowerCase()}::${(item.startAt ?? item.date ?? '')}::${
+          item.title ?? ''
+        }`
+  ).sort((a, b) => {
+    const aTime = a.date ? new Date(a.date).getTime() : a.startAt ? new Date(a.startAt).getTime() : Infinity;
+    const bTime = b.date ? new Date(b.date).getTime() : b.startAt ? new Date(b.startAt).getTime() : Infinity;
+    return aTime - bTime;
+  });
+
+  const calendarEvents = upcomingUnique
     .filter((item) => item.startAt)
     .map((item) => ({
       id: `calendar-${item.id}`,
@@ -951,7 +974,7 @@ export function buildLearnerDashboard({
         updatedAt: systemPreferences?.updatedAt ?? null
       };
 
-  const notificationsList = [...notifications];
+  const notificationsList = Array.isArray(notifications) ? [...notifications] : [];
   activeTutorBookings.forEach((booking) => {
     notificationsList.push({
       id: `notification-booking-${booking.id}`,
@@ -1578,7 +1601,7 @@ export function buildLearnerDashboard({
   });
 
   const pipelineEntries = [...communityPipelines];
-  communityEvents
+  resolvedCommunityEvents
     .filter((event) => event.startAt && event.capacity)
     .forEach((event) => {
       const capacity = coercePositiveInteger(event.capacity);
@@ -1812,10 +1835,7 @@ export function buildLearnerDashboard({
       learningPace,
       communityEngagement
     },
-    upcoming: learningUpcoming.sort((a, b) => {
-      if (!a.date || !b.date) return 0;
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    }),
+    upcoming: upcomingUnique,
     communities: {
       managed: managedCommunities,
       pipelines: pipelineEntries
@@ -2408,10 +2428,12 @@ export function buildAffiliateOverview({
   const normalizedSettings = parseMonetizationTier(monetizationSettings.affiliate);
 
   const programs = affiliates.map((affiliate) => {
-    const codes = [affiliate.referralCode].filter(Boolean);
+    const codes = resolveAffiliateReferralCodes(affiliate);
+    const codeSet = new Set(codes);
     const intents = paymentIntents.filter((intent) => {
       const metadata = safeJsonParse(intent.metadata, {});
-      return codes.includes(metadata.referralCode);
+      const intentCodes = resolveReferralCodesFromMetadata(metadata);
+      return intentCodes.some((code) => codeSet.has(code));
     });
 
     const totalVolumeCents = intents.reduce(
@@ -2611,6 +2633,24 @@ function ensureMap(value) {
   return new Map(Object.entries(value));
 }
 
+function deduplicateByKey(list, keyFn) {
+  const seen = new Set();
+  return list.filter((item) => {
+    const computed = keyFn(item);
+    const fallback = JSON.stringify({
+      title: item?.title ?? null,
+      date: item?.date ?? item?.startAt ?? null,
+      type: item?.type ?? null
+    });
+    const key = computed ?? fallback;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function resolveAssignmentDueDate(assignment, course) {
   const releaseAt = course?.releaseAt ? new Date(course.releaseAt) : null;
   if (!releaseAt || Number.isNaN(releaseAt.getTime())) {
@@ -2718,6 +2758,74 @@ function normaliseLearnerPayments({ invoices = [], paymentIntents = [], courseMa
   });
 
   return { orders, invoices: normalisedInvoices };
+}
+
+function normaliseReferralCode(value) {
+  if (!value && value !== 0) return null;
+  const normalised = String(value).trim().toLowerCase();
+  return normalised || null;
+}
+
+function resolveReferralCodesFromMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object') return [];
+  const codes = new Set();
+  const add = (value) => {
+    const normalised = normaliseReferralCode(value);
+    if (normalised) codes.add(normalised);
+  };
+
+  [
+    metadata.referralCode,
+    metadata.referral_code,
+    metadata.affiliateCode,
+    metadata.affiliate_code,
+    metadata.trackingCode,
+    metadata.tracking_code,
+    metadata.tracking?.referralCode,
+    metadata.tracking?.referral_code,
+    metadata.attribution?.referralCode,
+    metadata.attribution?.referral_code,
+    metadata.affiliate?.code,
+    metadata.affiliate?.referralCode
+  ].forEach(add);
+
+  if (Array.isArray(metadata.referralCodes)) {
+    metadata.referralCodes.forEach(add);
+  }
+  if (Array.isArray(metadata.referral_codes)) {
+    metadata.referral_codes.forEach(add);
+  }
+  if (Array.isArray(metadata.codes)) {
+    metadata.codes.forEach(add);
+  }
+  if (Array.isArray(metadata.trackingCodes)) {
+    metadata.trackingCodes.forEach(add);
+  }
+
+  return Array.from(codes);
+}
+
+function resolveAffiliateReferralCodes(affiliate) {
+  if (!affiliate) return [];
+  const metadata = safeJsonParse(affiliate.metadata, {});
+  const codes = new Set();
+  const add = (value) => {
+    const normalised = normaliseReferralCode(value);
+    if (normalised) codes.add(normalised);
+  };
+
+  [affiliate.referralCode, affiliate.code, affiliate.slug].forEach(add);
+
+  if (Array.isArray(affiliate.referralCodes)) {
+    affiliate.referralCodes.forEach(add);
+  }
+  if (Array.isArray(affiliate.codes)) {
+    affiliate.codes.forEach(add);
+  }
+
+  resolveReferralCodesFromMetadata(metadata).forEach(add);
+
+  return Array.from(codes);
 }
 
 function resolveNextLesson(lessons = [], stats = {}) {
