@@ -286,6 +286,10 @@ describe('Admin operational sections', () => {
       expect(adminGrowthApi.getGrowthMetrics).toHaveBeenCalledTimes(1);
     });
 
+    const firstCallArgs = adminGrowthApi.getGrowthMetrics.mock.calls[0][0];
+    expect(firstCallArgs).toEqual(expect.objectContaining({ token: 'test-token' }));
+    expect(firstCallArgs.signal).toBeInstanceOf(AbortSignal);
+
     expect(screen.getByText('Active experiments').parentElement).toHaveTextContent('2');
     expect(screen.getByText('Enrolments (30d)').parentElement).toHaveTextContent('200');
     expect(screen.getByText('Conversion rate').parentElement).toHaveTextContent('45.1%');
@@ -294,6 +298,7 @@ describe('Admin operational sections', () => {
     await waitFor(() => {
       expect(adminGrowthApi.getGrowthMetrics).toHaveBeenCalledTimes(2);
     });
+    expect(adminGrowthApi.getGrowthMetrics.mock.calls[1][0]).toEqual({ token: 'test-token' });
   });
 
   it('displays revenue summary with trend insight and refresh control', async () => {
@@ -304,6 +309,10 @@ describe('Admin operational sections', () => {
       expect(adminRevenueApi.getRevenueSummary).toHaveBeenCalledTimes(1);
     });
 
+    const firstCallArgs = adminRevenueApi.getRevenueSummary.mock.calls[0][0];
+    expect(firstCallArgs).toEqual(expect.objectContaining({ token: 'test-token' }));
+    expect(firstCallArgs.signal).toBeInstanceOf(AbortSignal);
+
     expect(screen.getByText('Captured revenue').parentElement).toHaveTextContent('$1,250.00');
     expect(screen.getByText('Pending settlements').parentElement).toHaveTextContent('$180.00');
     expect(screen.getByText('Recognised').parentElement).toHaveTextContent('$620.00');
@@ -313,6 +322,7 @@ describe('Admin operational sections', () => {
     await waitFor(() => {
       expect(adminRevenueApi.getRevenueSummary).toHaveBeenCalledTimes(2);
     });
+    expect(adminRevenueApi.getRevenueSummary.mock.calls[1][0]).toEqual({ token: 'test-token' });
   });
 
   it('presents advertising portfolio metrics with refresh support', async () => {
@@ -323,6 +333,10 @@ describe('Admin operational sections', () => {
       expect(adminAdsApi.getAdsSummary).toHaveBeenCalledTimes(1);
     });
 
+    const firstCallArgs = adminAdsApi.getAdsSummary.mock.calls[0][0];
+    expect(firstCallArgs).toEqual(expect.objectContaining({ token: 'test-token' }));
+    expect(firstCallArgs.signal).toBeInstanceOf(AbortSignal);
+
     expect(screen.getByText('Active campaigns').parentElement).toHaveTextContent('3');
     expect(screen.getByText('Impressions (30d)').parentElement).toHaveTextContent('12,500');
     expect(screen.getByText('Spend (30d)').parentElement).toHaveTextContent('$6,750.00');
@@ -331,6 +345,58 @@ describe('Admin operational sections', () => {
     await user.click(screen.getByRole('button', { name: /refresh summary/i }));
     await waitFor(() => {
       expect(adminAdsApi.getAdsSummary).toHaveBeenCalledTimes(2);
+    });
+    expect(adminAdsApi.getAdsSummary.mock.calls[1][0]).toEqual({ token: 'test-token' });
+  });
+
+  it('suppresses growth metrics errors when the request aborts', async () => {
+    const abortError = new Error('cancelled');
+    abortError.name = 'AbortError';
+    adminGrowthApi.getGrowthMetrics.mockRejectedValueOnce(abortError);
+
+    render(<AdminGrowthSection token="test-token" />);
+
+    await waitFor(() => {
+      expect(adminGrowthApi.getGrowthMetrics).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/failed to load growth metrics/i)).not.toBeInTheDocument();
+      expect(screen.getByText('Active experiments').parentElement).toHaveTextContent('0');
+    });
+  });
+
+  it('suppresses revenue summary errors when the request aborts', async () => {
+    const abortError = new Error('cancelled');
+    abortError.name = 'AbortError';
+    adminRevenueApi.getRevenueSummary.mockRejectedValueOnce(abortError);
+
+    render(<AdminRevenueManagementSection token="test-token" />);
+
+    await waitFor(() => {
+      expect(adminRevenueApi.getRevenueSummary).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/failed to load revenue summary/i)).not.toBeInTheDocument();
+      expect(screen.getByText('Captured').parentElement).toHaveTextContent('$0.00');
+    });
+  });
+
+  it('suppresses advertising summary errors when the request aborts', async () => {
+    const abortError = new Error('cancelled');
+    abortError.name = 'AbortError';
+    adminAdsApi.getAdsSummary.mockRejectedValueOnce(abortError);
+
+    render(<AdminAdsManagementSection token="test-token" />);
+
+    await waitFor(() => {
+      expect(adminAdsApi.getAdsSummary).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/failed to load ad metrics/i)).not.toBeInTheDocument();
+      expect(screen.getByText('Active campaigns').parentElement).toHaveTextContent('0');
     });
   });
 });
