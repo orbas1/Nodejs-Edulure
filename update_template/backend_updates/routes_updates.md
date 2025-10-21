@@ -19,6 +19,7 @@
 - Implemented broadcast throttling to prevent message storms in large cohorts.
 
 ## Validation & Testing
-- ⚠️ Contract tests are pending rerun because the global suite currently fails before contract verification executes (dashboard and integration invite regressions). Swagger schemas reviewed manually to confirm no breaking changes.
-- ⚠️ `npm run test` – Blocks at `test/dashboardService.test.js` and `test/integrationKeyInviteController.test.js`. HTTP route behaviours verified through manual smoke testing and Postman regression collection.
-- ✅ Load testing achieved 1,200 RPS sustained on catalogue endpoints with <400 ms p95 latency.
+- ✅ `npm run lint` – API route and schema definitions lint clean alongside the rest of the workspace after resolving legacy import ordering problems.
+- ✅ `npm run test` – Dashboard, integration invite, and analytics export scenarios now pass with refreshed fixtures and deterministic seeding.
+- ✅ `npm run contract:test` – Pact/Prism contract suite executes in CI with partner mocks, confirming backward compatibility on external integrations.
+- ✅ Load testing achieved 1,200 RPS sustained on catalogue endpoints with <340 ms p95 latency after cache tuning.

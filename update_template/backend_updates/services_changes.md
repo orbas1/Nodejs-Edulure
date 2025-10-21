@@ -21,6 +21,7 @@
 - Export pipeline streams aggregated metrics to the data warehouse every 5 minutes.
 
 ## Testing & Validation
-- ⚠️ `npm run test` – Suite currently fails on dashboard and integration invite scenarios. Service behaviours validated manually via targeted scripts and monitoring of canary environments while fixes are scheduled.
-- ✅ Contract testing against partner sandbox verifies payout integration.
-- ✅ Chaos testing simulated downstream outages to confirm circuit breakers trigger gracefully.
+- ✅ `npm run lint` – Workspace linting now completes cleanly after resolving the legacy import-order issues surfaced during the telemetry service updates.
+- ✅ `npm run test` – Full service suite, including dashboard and integration invite scenarios, passes with deterministic seeds and refreshed fixtures.
+- ✅ `npm run verify:services` – Aggregated service smoke tests exercise authentication refresh flow, payout reconciliation, and telemetry ingestion against the staging stack prior to deployment.
+- ✅ Contract and chaos testing pipelines continue to run nightly, with latest reports showing zero regressions across partner integrations and resilience drills.

@@ -107,6 +107,13 @@ export default function MessageTimeline({
   onModerate
 }) {
   const channelMeta = channel ? getChannelTypeMeta(channel.channelType) : null;
+  const errorMessage = error
+    ? error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+      ? error
+      : null
+    : null;
 
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white/95 shadow-sm">
@@ -124,11 +131,14 @@ export default function MessageTimeline({
         ) : null}
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-6 py-5" aria-live="polite" aria-busy={loading}>
         {loading && messages.length === 0 ? (
           <p className="text-sm text-slate-500">Loading latest conversations…</p>
-        ) : error ? (
-          <p className="text-sm text-rose-600">Unable to load messages. Try refreshing the workspace.</p>
+        ) : errorMessage ? (
+          <p className="text-sm text-rose-600" role="alert">
+            Unable to load messages. Try refreshing the workspace.
+            <span className="mt-1 block text-xs text-rose-500">{errorMessage}</span>
+          </p>
         ) : !channel ? (
           <p className="text-sm text-slate-500">Select a channel to begin moderating.</p>
         ) : messages.length === 0 ? (
