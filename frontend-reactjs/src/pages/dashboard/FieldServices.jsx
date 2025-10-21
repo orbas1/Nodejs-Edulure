@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import FieldServiceConflictModal from '../../components/dashboard/FieldServiceConflictModal.jsx';
 import {
   createFieldServiceAssignment,
   updateFieldServiceAssignment,
@@ -79,6 +80,49 @@ function formatDateTime(value) {
   }
 }
 
+function hydrateAssignment(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
+  const attachmentsSource = Array.isArray(raw.attachments)
+    ? raw.attachments
+    : Array.isArray(metadata.attachments)
+      ? metadata.attachments
+      : [];
+  const attachments = attachmentsSource
+    .map((item) => {
+      if (item === undefined || item === null) return '';
+      return typeof item === 'string' ? item.trim() : String(item).trim();
+    })
+    .filter((item) => item.length > 0)
+    .filter((item, index, list) => list.indexOf(item) === index);
+
+  const scheduledRaw = raw.scheduledAtRaw ?? raw.scheduledFor ?? null;
+  const debriefAtValue = raw.debriefAt ?? metadata.debriefAt ?? null;
+  const debriefAt = debriefAtValue instanceof Date ? debriefAtValue.toISOString() : debriefAtValue ?? null;
+  const lastUpdate = raw.lastUpdate ?? raw.updatedAt ?? null;
+  const owner = raw.owner ?? metadata.owner ?? null;
+
+  return {
+    ...raw,
+    owner,
+    supportChannel: raw.supportChannel ?? metadata.supportChannel ?? null,
+    briefUrl: raw.briefUrl ?? metadata.briefUrl ?? null,
+    fieldNotes: raw.fieldNotes ?? metadata.fieldNotes ?? null,
+    equipment: raw.equipment ?? metadata.equipment ?? null,
+    attachments,
+    debriefHost: raw.debriefHost ?? metadata.debriefHost ?? owner ?? null,
+    debriefAt,
+    debriefAtLabel: raw.debriefAtLabel ?? (debriefAt ? formatDateTime(debriefAt) : null),
+    scheduledAtRaw: scheduledRaw,
+    scheduledAt: raw.scheduledAt ?? scheduledRaw,
+    lastUpdate,
+    lastUpdateLabel: raw.lastUpdateLabel ?? (lastUpdate ? formatDateTime(lastUpdate) : null)
+  };
+}
+
 function FieldServices() {
   const { role, dashboard, refresh } = useOutletContext();
   const workspace = dashboard?.fieldServices ?? null;
@@ -91,6 +135,7 @@ function FieldServices() {
   const [assignmentFormVisible, setAssignmentFormVisible] = useState(false);
   const [assignmentFormMode, setAssignmentFormMode] = useState('create');
   const [editingAssignmentId, setEditingAssignmentId] = useState(null);
+  const [editingAssignmentSnapshot, setEditingAssignmentSnapshot] = useState(null);
   const [assignmentFormErrors, setAssignmentFormErrors] = useState([]);
   const [assignmentForm, setAssignmentForm] = useState({
     serviceType: '',
@@ -111,6 +156,7 @@ function FieldServices() {
   const [assignmentStatusFilter, setAssignmentStatusFilter] = useState('all');
   const [assignmentPriorityFilter, setAssignmentPriorityFilter] = useState('all');
   const [operationsRange, setOperationsRange] = useState('30');
+  const [conflictDialog, setConflictDialog] = useState(null);
 
   const allowedRoles = useMemo(() => new Set(['learner', 'instructor']), []);
   if (!allowedRoles.has(role)) {
@@ -215,7 +261,10 @@ function FieldServices() {
   }, [assignmentsState, operationsRange]);
 
   useEffect(() => {
-    setAssignmentsState(Array.isArray(workspace.assignments) ? workspace.assignments : []);
+    const assignments = Array.isArray(workspace.assignments)
+      ? workspace.assignments.map((assignment) => hydrateAssignment(assignment)).filter(Boolean)
+      : [];
+    setAssignmentsState(assignments);
   }, [workspace.assignments]);
 
   const resetAssignmentForm = useCallback(() => {
@@ -235,6 +284,7 @@ function FieldServices() {
     });
     setAssignmentFormErrors([]);
     setEditingAssignmentId(null);
+    setEditingAssignmentSnapshot(null);
     setAssignmentFormMode('create');
     setAssignmentFormStep(1);
   }, []);
@@ -253,6 +303,7 @@ function FieldServices() {
   const openAssignmentEditForm = useCallback((assignment) => {
     setAssignmentFormMode('edit');
     setEditingAssignmentId(assignment.id);
+    setEditingAssignmentSnapshot(hydrateAssignment(assignment));
     setAssignmentForm({
       serviceType: assignment.serviceType ?? '',
       priority: assignment.priority ?? 'Standard',
@@ -389,6 +440,39 @@ function FieldServices() {
     setAssignmentFormErrors([]);
   }, []);
 
+  const closeConflictDialog = useCallback(() => setConflictDialog(null), []);
+
+  const openConflictDialog = useCallback(
+    (assignmentId, details = {}, attempted = {}, snapshot = null) => {
+      if (!assignmentId || !details) {
+        return;
+      }
+      const attemptedSource =
+        details.attemptedPayload && typeof details.attemptedPayload === 'object'
+          ? details.attemptedPayload
+          : attempted;
+      const attemptedPayload = { ...attemptedSource };
+      delete attemptedPayload.clientUpdatedAt;
+
+      const serverAssignment = hydrateAssignment(details.serverAssignment ?? null);
+      const suggestedAssignment = hydrateAssignment(details.suggestedAssignment ?? null);
+      const localSnapshot = snapshot ? hydrateAssignment(snapshot) : null;
+
+      setConflictDialog({
+        assignmentId,
+        serverUpdatedAt: details.serverUpdatedAt ?? null,
+        clientUpdatedAt: details.clientUpdatedAt ?? null,
+        serverAssignment,
+        suggestedAssignment,
+        suggestedPayload: details.suggestedPayload ?? null,
+        attemptedPayload,
+        localSnapshot,
+        conflictingFields: Array.isArray(details.conflictingFields) ? details.conflictingFields : []
+      });
+    },
+    []
+  );
+
   const handleAssignmentFormSubmit = useCallback(
     async (event) => {
       event.preventDefault();
@@ -434,28 +518,42 @@ function FieldServices() {
         setStatusMessage({ type: 'pending', message: `Dispatching ${payload.serviceType}…` });
         try {
           const response = await createFieldServiceAssignment({ token, payload });
-          const assignment = response?.data ?? {};
-          const newAssignment = {
-            id: assignment.id ?? `assignment-${Date.now()}`,
-            serviceType: assignment.serviceType ?? payload.serviceType,
-            priority: assignment.priority ?? payload.priority,
-            owner: assignment.owner ?? payload.owner,
-            location: assignment.location ?? payload.location,
-            scheduledAt: formatDateTime(assignment.scheduledFor ?? payload.scheduledFor),
-            scheduledAtRaw: assignment.scheduledFor ?? payload.scheduledFor,
-            status: assignment.status ?? 'dispatched',
-            statusLabel: assignment.statusLabel ?? 'Dispatched',
-            supportChannel: assignment.supportChannel ?? payload.supportChannel,
-            briefUrl: assignment.briefUrl ?? payload.briefUrl,
-            fieldNotes: assignment.fieldNotes ?? payload.fieldNotes ?? '',
-            equipment: assignment.equipment ?? payload.equipment ?? '',
-            attachments: assignment.attachments ?? payload.attachments ?? [],
-            debriefHost: assignment.debriefHost ?? payload.debriefHost ?? '',
-            debriefAt: assignment.debriefAt ?? payload.debriefAt ?? '',
-            debriefAtLabel: formatDateTime(assignment.debriefAt ?? payload.debriefAt)
-          };
-          setAssignmentsState((current) => [newAssignment, ...current]);
-          setStatusMessage({ type: 'success', message: `${newAssignment.serviceType} dispatched.` });
+          const serverAssignment = hydrateAssignment(response?.data ?? null);
+          const fallbackAssignment = hydrateAssignment({
+            id: response?.data?.id ?? `assignment-${Date.now()}`,
+            serviceType: payload.serviceType,
+            priority: payload.priority,
+            owner: payload.owner,
+            location: payload.location,
+            scheduledFor: payload.scheduledFor,
+            status: 'dispatched',
+            statusLabel: 'Dispatched',
+            supportChannel: payload.supportChannel,
+            briefUrl: payload.briefUrl,
+            fieldNotes: payload.fieldNotes ?? '',
+            equipment: payload.equipment ?? '',
+            attachments: payload.attachments ?? [],
+            debriefHost: payload.debriefHost ?? '',
+            debriefAt: payload.debriefAt ?? '',
+            metadata: {
+              owner: payload.owner,
+              fieldNotes: payload.fieldNotes ?? '',
+              attachments: payload.attachments ?? [],
+              supportChannel: payload.supportChannel,
+              briefUrl: payload.briefUrl,
+              equipment: payload.equipment,
+              debriefHost: payload.debriefHost,
+              debriefAt: payload.debriefAt
+            },
+            lastUpdate: new Date().toISOString()
+          });
+          const newAssignment = serverAssignment ?? fallbackAssignment;
+          if (newAssignment) {
+            setAssignmentsState((current) => [newAssignment, ...current]);
+            setStatusMessage({ type: 'success', message: `${newAssignment.serviceType} dispatched.` });
+          } else {
+            setStatusMessage({ type: 'success', message: 'Assignment dispatched.' });
+          }
           closeAssignmentForm();
         } catch (createError) {
           setStatusMessage({
@@ -468,13 +566,35 @@ function FieldServices() {
         return;
       }
 
+      const attemptedPayload = { ...payload };
+      const requestPayload = { ...payload };
+      const clientUpdatedAtToken =
+        editingAssignmentSnapshot?.lastUpdate ?? editingAssignmentSnapshot?.updatedAt ?? null;
+      if (clientUpdatedAtToken) {
+        requestPayload.clientUpdatedAt = clientUpdatedAtToken;
+      }
+
       setPendingAction(`assignment-update-${editingAssignmentId}`);
       setStatusMessage({ type: 'pending', message: `Updating ${payload.serviceType}…` });
       try {
-        await updateFieldServiceAssignment({ token, assignmentId: editingAssignmentId, payload });
-        setAssignmentsState((current) =>
-          current.map((assignment) =>
-            assignment.id === editingAssignmentId
+        const response = await updateFieldServiceAssignment({
+          token,
+          assignmentId: editingAssignmentId,
+          payload: requestPayload
+        });
+        const updatedAssignment = hydrateAssignment(response?.data ?? null);
+        if (updatedAssignment) {
+          setAssignmentsState((current) =>
+            current.map((assignment) =>
+              assignment.id === editingAssignmentId ? updatedAssignment : assignment
+            )
+          );
+          setEditingAssignmentSnapshot(updatedAssignment);
+        } else {
+          const updatedAt = new Date().toISOString();
+          setAssignmentsState((current) =>
+            current.map((assignment) =>
+              assignment.id === editingAssignmentId
                 ? {
                     ...assignment,
                     serviceType: payload.serviceType,
@@ -490,18 +610,29 @@ function FieldServices() {
                     attachments: payload.attachments ?? assignment.attachments ?? [],
                     debriefHost: payload.debriefHost ?? assignment.debriefHost,
                     debriefAt: payload.debriefAt ?? assignment.debriefAt,
-                    debriefAtLabel: formatDateTime(payload.debriefAt ?? assignment.debriefAt)
+                    debriefAtLabel: formatDateTime(payload.debriefAt ?? assignment.debriefAt),
+                    lastUpdate: updatedAt,
+                    lastUpdateLabel: formatDateTime(updatedAt)
                   }
                 : assignment
-          )
-        );
+            )
+          );
+        }
         setStatusMessage({ type: 'success', message: `${payload.serviceType} updated.` });
         closeAssignmentForm();
       } catch (updateError) {
-        setStatusMessage({
-          type: 'error',
-          message: updateError instanceof Error ? updateError.message : 'Unable to update assignment.'
-        });
+        if (updateError?.status === 409 && updateError?.details?.type === 'FIELD_SERVICE_CONFLICT') {
+          openConflictDialog(editingAssignmentId, updateError.details, attemptedPayload, editingAssignmentSnapshot);
+          setStatusMessage({
+            type: 'error',
+            message: 'Changes were rejected because a newer update exists. Review the conflict alert.'
+          });
+        } else {
+          setStatusMessage({
+            type: 'error',
+            message: updateError instanceof Error ? updateError.message : 'Unable to update assignment.'
+          });
+        }
       } finally {
         setPendingAction(null);
       }
@@ -512,6 +643,8 @@ function FieldServices() {
       closeAssignmentForm,
       createFieldServiceAssignment,
       editingAssignmentId,
+      editingAssignmentSnapshot,
+      openConflictDialog,
       setAssignmentsState,
       token,
       updateFieldServiceAssignment,
@@ -525,39 +658,68 @@ function FieldServices() {
         setStatusMessage({ type: 'error', message: 'Sign in again to manage assignments.' });
         return;
       }
+      const attemptedPayload = { status };
+      const requestPayload = { status };
+      const clientUpdatedAtToken = assignment?.lastUpdate ?? assignment?.updatedAt ?? null;
+      if (clientUpdatedAtToken) {
+        requestPayload.clientUpdatedAt = clientUpdatedAtToken;
+      }
       setPendingAction(`assignment-status-${assignment.id}`);
       setStatusMessage({ type: 'pending', message: `Updating ${assignment.serviceType} status…` });
       try {
-        await updateFieldServiceAssignment({ token, assignmentId: assignment.id, payload: { status } });
-        setAssignmentsState((current) =>
-          current.map((item) =>
-            item.id === assignment.id
-              ? {
-                  ...item,
-                  status,
-                  statusLabel:
-                    status === 'completed'
-                      ? 'Completed'
-                      : status === 'on_site'
-                        ? 'On site'
-                        : status === 'en_route'
-                          ? 'En route'
-                          : 'Dispatched'
-                }
-              : item
-          )
-        );
+        const response = await updateFieldServiceAssignment({
+          token,
+          assignmentId: assignment.id,
+          payload: requestPayload
+        });
+        const updatedAssignment = hydrateAssignment(response?.data ?? null);
+        if (updatedAssignment) {
+          setAssignmentsState((current) =>
+            current.map((item) => (item.id === assignment.id ? updatedAssignment : item))
+          );
+        } else {
+          const statusLabel =
+            status === 'completed'
+              ? 'Completed'
+              : status === 'on_site'
+                ? 'On site'
+                : status === 'en_route'
+                  ? 'En route'
+                  : 'Dispatched';
+          const updatedAt = new Date().toISOString();
+          setAssignmentsState((current) =>
+            current.map((item) =>
+              item.id === assignment.id
+                ? {
+                    ...item,
+                    status,
+                    statusLabel,
+                    lastUpdate: updatedAt,
+                    lastUpdateLabel: formatDateTime(updatedAt)
+                  }
+                : item
+            )
+          );
+        }
         setStatusMessage({ type: 'success', message: `${assignment.serviceType} status updated.` });
       } catch (statusError) {
-        setStatusMessage({
-          type: 'error',
-          message: statusError instanceof Error ? statusError.message : 'Unable to update status.'
-        });
+        if (statusError?.status === 409 && statusError?.details?.type === 'FIELD_SERVICE_CONFLICT') {
+          openConflictDialog(assignment.id, statusError.details, attemptedPayload, assignment);
+          setStatusMessage({
+            type: 'error',
+            message: 'Status change conflicted with a newer update. Review the conflict alert.'
+          });
+        } else {
+          setStatusMessage({
+            type: 'error',
+            message: statusError instanceof Error ? statusError.message : 'Unable to update status.'
+          });
+        }
       } finally {
         setPendingAction(null);
       }
     },
-    [setAssignmentsState, token, updateFieldServiceAssignment]
+    [openConflictDialog, setAssignmentsState, token, updateFieldServiceAssignment]
   );
 
   const handleResolveAssignment = useCallback(
@@ -590,42 +752,138 @@ function FieldServices() {
         setStatusMessage({ type: 'error', message: 'Sign in again to escalate assignments.' });
         return;
       }
+      const attemptedPayload = { status: 'investigating', escalation: true };
+      const requestPayload = { ...attemptedPayload };
+      const clientUpdatedAtToken = assignment?.lastUpdate ?? assignment?.updatedAt ?? null;
+      if (clientUpdatedAtToken) {
+        requestPayload.clientUpdatedAt = clientUpdatedAtToken;
+      }
       setPendingAction(`assignment-escalate-${assignment.id}`);
       setStatusMessage({ type: 'pending', message: `Escalating ${assignment.serviceType}…` });
       try {
-        await updateFieldServiceAssignment({
+        const response = await updateFieldServiceAssignment({
           token,
           assignmentId: assignment.id,
-          payload: { status: 'investigating', escalation: true }
+          payload: requestPayload
         });
-        setAssignmentsState((current) =>
-          current.map((item) =>
-            item.id === assignment.id
-              ? {
-                  ...item,
-                  status: 'investigating',
-                  statusLabel: 'Investigating',
-                  escalation: {
-                    acknowledged: true,
-                    timestamp: new Date().toISOString()
+        const updatedAssignment = hydrateAssignment(response?.data ?? null);
+        if (updatedAssignment) {
+          setAssignmentsState((current) =>
+            current.map((item) => (item.id === assignment.id ? updatedAssignment : item))
+          );
+        } else {
+          const timestamp = new Date().toISOString();
+          setAssignmentsState((current) =>
+            current.map((item) =>
+              item.id === assignment.id
+                ? {
+                    ...item,
+                    status: 'investigating',
+                    statusLabel: 'Investigating',
+                    escalation: {
+                      acknowledged: true,
+                      timestamp
+                    },
+                    lastUpdate: timestamp,
+                    lastUpdateLabel: formatDateTime(timestamp)
                   }
-                }
-              : item
-          )
-        );
+                : item
+            )
+          );
+        }
         setStatusMessage({ type: 'success', message: `${assignment.serviceType} escalated to supervisors.` });
       } catch (escalateError) {
-        setStatusMessage({
-          type: 'error',
-          message:
-            escalateError instanceof Error ? escalateError.message : 'Unable to escalate assignment at this time.'
-        });
+        if (escalateError?.status === 409 && escalateError?.details?.type === 'FIELD_SERVICE_CONFLICT') {
+          openConflictDialog(assignment.id, escalateError.details, attemptedPayload, assignment);
+          setStatusMessage({
+            type: 'error',
+            message: 'Escalation conflicted with a newer update. Review the conflict alert.'
+          });
+        } else {
+          setStatusMessage({
+            type: 'error',
+            message:
+              escalateError instanceof Error ? escalateError.message : 'Unable to escalate assignment at this time.'
+          });
+        }
       } finally {
         setPendingAction(null);
       }
     },
-    [setAssignmentsState, token, updateFieldServiceAssignment]
+    [openConflictDialog, setAssignmentsState, token, updateFieldServiceAssignment]
   );
+
+  const handleConflictReload = useCallback(() => {
+    if (!conflictDialog?.assignmentId) {
+      setConflictDialog(null);
+      return;
+    }
+    const refreshed = hydrateAssignment(conflictDialog.serverAssignment ?? null);
+    if (refreshed) {
+      setAssignmentsState((current) =>
+        current.map((item) => (item.id === conflictDialog.assignmentId ? refreshed : item))
+      );
+      if (editingAssignmentId === conflictDialog.assignmentId) {
+        setEditingAssignmentSnapshot(refreshed);
+      }
+      setStatusMessage({
+        type: 'info',
+        message: 'Reloaded the assignment with the latest server changes.'
+      });
+    }
+    setConflictDialog(null);
+  }, [conflictDialog, editingAssignmentId, setAssignmentsState, setEditingAssignmentSnapshot]);
+
+  const handleConflictApplySuggestion = useCallback(async () => {
+    if (!conflictDialog?.assignmentId || !conflictDialog?.suggestedPayload) {
+      setConflictDialog(null);
+      return;
+    }
+    if (!token) {
+      setStatusMessage({ type: 'error', message: 'Sign in again to resolve conflicts.' });
+      return;
+    }
+    setPendingAction(`assignment-conflict-${conflictDialog.assignmentId}`);
+    try {
+      const payload = { ...conflictDialog.suggestedPayload };
+      if (conflictDialog.serverUpdatedAt) {
+        payload.clientUpdatedAt = conflictDialog.serverUpdatedAt;
+      }
+      const response = await updateFieldServiceAssignment({
+        token,
+        assignmentId: conflictDialog.assignmentId,
+        payload
+      });
+      const updatedAssignment = hydrateAssignment(response?.data ?? null);
+      if (updatedAssignment) {
+        setAssignmentsState((current) =>
+          current.map((item) => (item.id === conflictDialog.assignmentId ? updatedAssignment : item))
+        );
+        if (editingAssignmentId === conflictDialog.assignmentId) {
+          setEditingAssignmentSnapshot(updatedAssignment);
+        }
+      }
+      setStatusMessage({
+        type: 'success',
+        message: 'Assignment merged with the latest server changes.'
+      });
+      setConflictDialog(null);
+    } catch (error) {
+      setStatusMessage({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Unable to apply merge suggestion.'
+      });
+    } finally {
+      setPendingAction(null);
+    }
+  }, [
+    conflictDialog,
+    editingAssignmentId,
+    setEditingAssignmentSnapshot,
+    setAssignmentsState,
+    token,
+    updateFieldServiceAssignment
+  ]);
 
   return (
     <div className="space-y-10">
@@ -1511,6 +1769,12 @@ function FieldServices() {
           </div>
         </div>
       ) : null}
+      <FieldServiceConflictModal
+        conflict={conflictDialog}
+        onClose={closeConflictDialog}
+        onReloadServer={handleConflictReload}
+        onApplySuggestion={handleConflictApplySuggestion}
+      />
     </div>
   );
 }
