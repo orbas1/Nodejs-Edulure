@@ -1,13 +1,42 @@
 import db from '../config/database.js';
+import {
+  ensureIntegerInRange,
+  readJsonColumn,
+  writeJsonColumn
+} from '../utils/modelUtils.js';
 
-function parseJson(value, fallback) {
-  if (!value) return fallback;
-  if (typeof value === 'object') return value;
-  try {
-    return JSON.parse(value);
-  } catch (_error) {
-    return fallback;
+const TABLE = 'community_event_participants';
+const STATUS_OPTIONS = new Set(['going', 'interested', 'waitlisted', 'declined', 'checked_in']);
+
+function normalisePrimaryId(value, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    throw new Error(`${fieldName} is required`);
   }
+
+  return ensureIntegerInRange(value, { fieldName, min: 1 });
+}
+
+function normaliseStatus(status) {
+  if (status === undefined || status === null || status === '') {
+    return 'interested';
+  }
+
+  const candidate = String(status).trim().toLowerCase();
+  if (!STATUS_OPTIONS.has(candidate)) {
+    throw new Error(`Unsupported participant status '${status}'`);
+  }
+  return candidate;
+}
+
+function normaliseTimestamp(value, { fieldName, defaultValue } = {}) {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue ?? null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`${fieldName} must be a valid datetime`);
+  }
+  return date;
 }
 
 function mapRow(row) {
@@ -17,36 +46,52 @@ function mapRow(row) {
     eventId: row.event_id,
     userId: row.user_id,
     status: row.status,
-    rsvpAt: row.rsvp_at,
+    rsvpAt: row.rsvp_at ?? null,
     checkInAt: row.check_in_at ?? null,
     reminderScheduledAt: row.reminder_scheduled_at ?? null,
-    metadata: parseJson(row.metadata, {})
+    metadata: readJsonColumn(row.metadata, {})
+  };
+}
+
+function buildPayload(participant, connection) {
+  if (!participant) {
+    throw new Error('Participant payload is required');
+  }
+
+  return {
+    event_id: normalisePrimaryId(participant.eventId, 'eventId'),
+    user_id: normalisePrimaryId(participant.userId, 'userId'),
+    status: normaliseStatus(participant.status),
+    rsvp_at: normaliseTimestamp(participant.rsvpAt, {
+      fieldName: 'rsvpAt',
+      defaultValue: connection.fn.now()
+    }),
+    check_in_at: normaliseTimestamp(participant.checkInAt, { fieldName: 'checkInAt' }),
+    reminder_scheduled_at: normaliseTimestamp(participant.reminderScheduledAt, {
+      fieldName: 'reminderScheduledAt'
+    }),
+    metadata: writeJsonColumn(participant.metadata, {})
   };
 }
 
 export default class CommunityEventParticipantModel {
   static table(connection = db) {
-    return connection('community_event_participants');
+    return connection(TABLE);
   }
 
   static async upsert(participant, connection = db) {
-    const payload = {
-      event_id: participant.eventId,
-      user_id: participant.userId,
-      status: participant.status ?? 'interested',
-      rsvp_at: participant.rsvpAt ?? connection.fn.now(),
-      check_in_at: participant.checkInAt ?? null,
-      reminder_scheduled_at: participant.reminderScheduledAt ?? null,
-      metadata: JSON.stringify(participant.metadata ?? {})
+    const payload = buildPayload(participant, connection);
+
+    const selector = {
+      event_id: payload.event_id,
+      user_id: payload.user_id
     };
 
-    const existing = await this.table(connection)
-      .where({ event_id: participant.eventId, user_id: participant.userId })
-      .first();
+    const existing = await this.table(connection).where(selector).first();
 
     if (existing) {
       await this.table(connection)
-        .where({ event_id: participant.eventId, user_id: participant.userId })
+        .where(selector)
         .update({
           ...payload,
           updated_at: connection.fn.now()
@@ -55,22 +100,26 @@ export default class CommunityEventParticipantModel {
       await this.table(connection).insert(payload);
     }
 
-    const row = await this.table(connection)
-      .where({ event_id: participant.eventId, user_id: participant.userId })
-      .first();
+    const row = await this.table(connection).where(selector).first();
     return mapRow(row);
   }
 
   static async find(eventId, userId, connection = db) {
     const row = await this.table(connection)
-      .where({ event_id: eventId, user_id: userId })
+      .where({
+        event_id: normalisePrimaryId(eventId, 'eventId'),
+        user_id: normalisePrimaryId(userId, 'userId')
+      })
       .first();
     return mapRow(row);
   }
 
   static async countByStatus(eventId, status, connection = db) {
     const row = await this.table(connection)
-      .where({ event_id: eventId, status })
+      .where({
+        event_id: normalisePrimaryId(eventId, 'eventId'),
+        status: normaliseStatus(status)
+      })
       .count({ count: '*' })
       .first();
     return Number(row?.count ?? 0);
@@ -78,7 +127,7 @@ export default class CommunityEventParticipantModel {
 
   static async listForEvent(eventId, connection = db) {
     const rows = await this.table(connection)
-      .where({ event_id: eventId })
+      .where({ event_id: normalisePrimaryId(eventId, 'eventId') })
       .orderBy('rsvp_at', 'asc');
     return rows.map((row) => mapRow(row));
   }

@@ -34,7 +34,7 @@ class _PublicHomeView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<String>(
       valueListenable: LanguageService.listenable(),
-      builder: (context, code, _) {
+      builder: (context, _, __) {
         final t = LanguageService.translate;
         String translateWithFallback(String key, String fallback) {
           final resolved = t(key);
@@ -74,12 +74,12 @@ class _PublicHomeView extends StatelessWidget {
               ),
               TextButton(
                 onPressed: () => Navigator.pushNamed(context, '/login'),
-                child: Text(t('navigation.login')),
+                child: Text(navLogin),
               ),
               const SizedBox(width: 8),
               FilledButton(
                 onPressed: () => Navigator.pushNamed(context, '/register'),
-                child: Text(t('navigation.register')),
+                child: Text(navRegister),
               ),
               const SizedBox(width: 16),
             ],

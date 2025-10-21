@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS learner_support_cases (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  user_id BIGINT UNSIGNED NOT NULL,
-  reference VARCHAR(40) NOT NULL UNIQUE,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  reference VARCHAR(40) NOT NULL,
   subject VARCHAR(255) NOT NULL,
   category VARCHAR(120) NOT NULL DEFAULT 'General',
   priority ENUM('urgent', 'high', 'normal', 'low') NOT NULL DEFAULT 'normal',
@@ -13,14 +13,15 @@ CREATE TABLE IF NOT EXISTS learner_support_cases (
   metadata JSON NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_support_case_reference (reference),
   INDEX idx_support_cases_user (user_id),
   INDEX idx_support_cases_status (status),
   CONSTRAINT fk_support_cases_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS learner_support_messages (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  case_id BIGINT UNSIGNED NOT NULL,
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  case_id INT UNSIGNED NOT NULL,
   author ENUM('learner', 'support', 'system') NOT NULL DEFAULT 'support',
   body TEXT NOT NULL,
   attachments JSON NULL,
@@ -28,4 +29,4 @@ CREATE TABLE IF NOT EXISTS learner_support_messages (
   INDEX idx_support_messages_case (case_id),
   INDEX idx_support_messages_created_at (created_at),
   CONSTRAINT fk_support_messages_case FOREIGN KEY (case_id) REFERENCES learner_support_cases(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

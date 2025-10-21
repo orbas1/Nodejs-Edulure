@@ -1,5 +1,8 @@
+#!/usr/bin/env node
+
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { parseArgs } from 'node:util';
 import dotenv from 'dotenv';
 
 import db from '../src/config/database.js';
@@ -16,28 +19,42 @@ dotenv.config({ path: path.resolve(projectRoot, '.env') });
 const HELP_MESSAGE = `Usage: node scripts/manage-feature-flags.js <command> [options]
 
 Commands:
-  sync [--dry-run] [--actor=<email>]   Synchronise database definitions with the manifest.
-  snapshot [--tenant=<id>] [--environment=<env>] [--include-inactive=<bool>]   Print tenant snapshot as JSON.
+  sync [--dry-run] [--actor=<email>]                           Synchronise database definitions with the manifest.
+  snapshot [--tenant=<id>] [--environment=<env>] [--include-inactive]   Print tenant snapshot as JSON.
   override --flag=<key> --tenant=<id> --state=<state> [--environment=<env>] [--variant=<key>] [--notes="..."]   Apply a tenant override.
-  remove --flag=<key> --tenant=<id> [--environment=<env>]   Remove a tenant override.
-  help                                 Show this message.
+  remove --flag=<key> --tenant=<id> [--environment=<env>]      Remove a tenant override.
+  help                                                         Show this message.
 `;
 
-function parseArgs(argv) {
-  const [, , command = 'help', ...rest] = argv;
-  const options = {};
-
-  for (const entry of rest) {
-    if (!entry.startsWith('--')) {
-      continue;
+function parseCli(argv) {
+  const { values, positionals } = parseArgs({
+    args: argv.slice(2),
+    allowPositionals: true,
+    options: {
+      actor: { type: 'string' },
+      'dry-run': { type: 'boolean' },
+      tenant: { type: 'string' },
+      environment: { type: 'string' },
+      'include-inactive': { type: 'boolean' },
+      flag: { type: 'string' },
+      state: { type: 'string' },
+      variant: { type: 'string' },
+      notes: { type: 'string' }
     }
+  });
 
-    const [key, rawValue] = entry.slice(2).split('=');
-    const value = rawValue ?? 'true';
-    options[key] = value;
+  const [command = 'help'] = positionals;
+  return { command, options: values };
+}
+
+function assertEmail(value, label) {
+  if (!value) {
+    return;
   }
-
-  return { command, options };
+  const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!pattern.test(value)) {
+    throw new Error(`${label} must be a valid email address.`);
+  }
 }
 
 function printResult(result) {
@@ -56,7 +73,8 @@ async function shutdown() {
 
 async function handleSync(options) {
   const actor = options.actor ?? env.featureFlags.bootstrapActor;
-  const dryRun = options['dry-run'] === 'true';
+  assertEmail(actor, 'actor');
+  const dryRun = Boolean(options['dry-run']);
   const summary = await featureFlagGovernanceService.syncDefinitions({ actor, dryRun });
   logger.info({ summary }, dryRun ? 'Feature flag manifest dry-run' : 'Feature flag manifest synchronised');
   printResult(summary);
@@ -65,7 +83,7 @@ async function handleSync(options) {
 async function handleSnapshot(options) {
   const tenantId = options.tenant ?? null;
   const environment = options.environment ?? env.featureFlags.defaultEnvironment;
-  const includeInactive = options['include-inactive'] !== 'false';
+  const includeInactive = options['include-inactive'] !== false;
   const snapshot = await featureFlagGovernanceService.generateTenantSnapshot({
     tenantId,
     environment,
@@ -87,6 +105,7 @@ async function handleOverride(options) {
   const variantKey = options.variant ?? null;
   const notes = options.notes ?? null;
   const actor = options.actor ?? env.featureFlags.bootstrapActor;
+  assertEmail(actor, 'actor');
 
   const result = await featureFlagGovernanceService.applyTenantOverride({
     flagKey,
@@ -112,6 +131,7 @@ async function handleRemove(options) {
 
   const environment = options.environment ?? env.featureFlags.defaultEnvironment;
   const actor = options.actor ?? env.featureFlags.bootstrapActor;
+  assertEmail(actor, 'actor');
 
   const result = await featureFlagGovernanceService.removeTenantOverride({
     flagKey,
@@ -125,7 +145,7 @@ async function handleRemove(options) {
 }
 
 async function main() {
-  const { command, options } = parseArgs(process.argv);
+  const { command, options } = parseCli(process.argv);
 
   if (command === 'help' || command === '--help' || command === '-h') {
     console.log(HELP_MESSAGE);

@@ -31,9 +31,67 @@ function serialiseJson(value, fallback = null) {
   }
 }
 
+function parseJsonColumn(value, fallback) {
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+
+  if (Array.isArray(fallback) && Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(fallback) && !Array.isArray(parsed)) {
+      return fallback;
+    }
+    if (!Array.isArray(fallback) && typeof fallback === 'object' && (parsed === null || typeof parsed !== 'object')) {
+      return fallback;
+    }
+    return parsed;
+  } catch (_error) {
+    return fallback;
+  }
+}
+
+export function mapUserProfileRecord(record) {
+  if (!record) {
+    return null;
+  }
+
+  return {
+    id: record.id,
+    userId: record.userId ?? record.user_id,
+    displayName: record.displayName ?? record.display_name ?? null,
+    tagline: record.tagline ?? null,
+    location: record.location ?? null,
+    avatarUrl: record.avatarUrl ?? record.avatar_url ?? null,
+    bannerUrl: record.bannerUrl ?? record.banner_url ?? null,
+    bio: record.bio ?? null,
+    socialLinks: parseJsonColumn(record.socialLinks ?? record.social_links, []),
+    metadata: parseJsonColumn(record.metadata, {}),
+    createdAt: record.createdAt ?? record.created_at ?? null,
+    updatedAt: record.updatedAt ?? record.updated_at ?? null
+  };
+}
+
 export default class UserProfileModel {
   static async findByUserId(userId, connection = db) {
-    return connection('user_profiles').select(BASE_COLUMNS).where({ user_id: userId }).first();
+    const record = await connection('user_profiles').select(BASE_COLUMNS).where({ user_id: userId }).first();
+    return mapUserProfileRecord(record);
   }
 
   static async upsert(userId, profile, connection = db) {
@@ -58,3 +116,8 @@ export default class UserProfileModel {
     return this.findByUserId(userId, connection);
   }
 }
+
+export const __testables = {
+  parseJsonColumn,
+  mapUserProfileRecord
+};

@@ -1,11 +1,16 @@
+import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'community_hub_models.dart';
 
 class CommunityHubRepository {
-  CommunityHubRepository({HiveInterface? hive}) : _hive = hive ?? Hive;
+  CommunityHubRepository({
+    HiveInterface? hive,
+    String boxName = _defaultBoxName,
+  })  : _hive = hive ?? Hive,
+        _boxName = boxName;
 
-  static const String _boxName = 'community_hub';
+  static const String _defaultBoxName = 'community_hub';
   static const String _feedKey = 'feed_posts';
   static const String _classroomsKey = 'classrooms';
   static const String _calendarKey = 'calendar_entries';
@@ -16,6 +21,7 @@ class CommunityHubRepository {
   static const String _seededKey = 'seeded';
 
   final HiveInterface _hive;
+  final String _boxName;
 
   Future<Box<dynamic>> _ensureBox() async {
     if (!_hive.isBoxOpen(_boxName)) {

@@ -55,7 +55,6 @@ function extractCount(row) {
   }
   const value =
     row.count ??
-    row['count'] ??
     row['count(*)'] ??
     row['COUNT(*)'] ??
     row['count(`*`)'] ??
@@ -132,24 +131,48 @@ export default class GovernanceContractModel {
 
   static async updateByPublicId(publicId, updates, connection = db) {
     const payload = {};
-    if (updates.vendorName !== undefined) payload.vendor_name = updates.vendorName;
-    if (updates.contractType !== undefined) payload.contract_type = updates.contractType;
-    if (updates.status !== undefined) payload.status = updates.status;
-    if (updates.ownerEmail !== undefined) payload.owner_email = updates.ownerEmail;
-    if (updates.riskTier !== undefined) payload.risk_tier = updates.riskTier;
-    if (updates.contractValueCents !== undefined)
+    if (updates.vendorName !== undefined) {
+      payload.vendor_name = updates.vendorName;
+    }
+    if (updates.contractType !== undefined) {
+      payload.contract_type = updates.contractType;
+    }
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+    }
+    if (updates.ownerEmail !== undefined) {
+      payload.owner_email = updates.ownerEmail;
+    }
+    if (updates.riskTier !== undefined) {
+      payload.risk_tier = updates.riskTier;
+    }
+    if (updates.contractValueCents !== undefined) {
       payload.contract_value_cents = Number.parseInt(updates.contractValueCents, 10) || 0;
-    if (updates.currency !== undefined) payload.currency = updates.currency;
-    if (updates.effectiveDate !== undefined) payload.effective_date = updates.effectiveDate;
-    if (updates.renewalDate !== undefined) payload.renewal_date = updates.renewalDate || null;
-    if (updates.terminationNoticeDate !== undefined)
+    }
+    if (updates.currency !== undefined) {
+      payload.currency = updates.currency;
+    }
+    if (updates.effectiveDate !== undefined) {
+      payload.effective_date = updates.effectiveDate;
+    }
+    if (updates.renewalDate !== undefined) {
+      payload.renewal_date = updates.renewalDate || null;
+    }
+    if (updates.terminationNoticeDate !== undefined) {
       payload.termination_notice_date = updates.terminationNoticeDate || null;
-    if (updates.obligations !== undefined) payload.obligations = serialiseJson(updates.obligations, []);
-    if (updates.metadata !== undefined) payload.metadata = serialiseJson(updates.metadata, {});
-    if (updates.lastRenewalEvaluatedAt !== undefined)
+    }
+    if (updates.obligations !== undefined) {
+      payload.obligations = serialiseJson(updates.obligations, []);
+    }
+    if (updates.metadata !== undefined) {
+      payload.metadata = serialiseJson(updates.metadata, {});
+    }
+    if (updates.lastRenewalEvaluatedAt !== undefined) {
       payload.last_renewal_evaluated_at = updates.lastRenewalEvaluatedAt || null;
-    if (updates.nextGovernanceCheckAt !== undefined)
+    }
+    if (updates.nextGovernanceCheckAt !== undefined) {
       payload.next_governance_check_at = updates.nextGovernanceCheckAt || null;
+    }
 
     if (!Object.keys(payload).length) {
       return this.findByPublicId(publicId, connection);

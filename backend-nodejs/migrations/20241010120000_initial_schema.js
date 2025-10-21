@@ -1,19 +1,59 @@
+const DEFAULT_CHARSET = 'utf8mb4';
+const DEFAULT_COLLATION = 'utf8mb4_unicode_ci';
+
+const applyTableDefaults = (table) => {
+  if (typeof table.engine === 'function') {
+    table.engine('InnoDB');
+  }
+
+  if (typeof table.charset === 'function') {
+    table.charset(DEFAULT_CHARSET);
+  }
+
+  if (typeof table.collate === 'function') {
+    table.collate(DEFAULT_COLLATION);
+  }
+};
+
+const ensureJsonColumn = (table, columnName, { nullable = false } = {}) => {
+  const column = table.json(columnName);
+  if (!nullable) {
+    column.notNullable();
+  }
+
+  column.defaultTo('{}');
+  return column;
+};
+
+const ensureJsonArrayColumn = (table, columnName, { nullable = false } = {}) => {
+  const column = table.json(columnName);
+  if (!nullable) {
+    column.notNullable();
+  }
+
+  column.defaultTo('[]');
+  return column;
+};
+
 export async function up(knex) {
   const hasUsers = await knex.schema.hasTable('users');
   if (!hasUsers) {
     await knex.schema.createTable('users', (table) => {
       table.increments('id').primary();
       table.string('first_name', 120).notNullable();
-      table.string('last_name', 120).nullable();
-      table.string('email', 255).notNullable().unique();
+      table.string('last_name', 120);
+      table.string('email', 255).notNullable().unique('users_email_unique');
       table.string('password_hash', 255).notNullable();
       table.enum('role', ['user', 'instructor', 'admin']).notNullable().defaultTo('user');
       table.integer('age').unsigned();
       table.string('address', 255);
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.index(['role'], 'idx_users_role');
+      applyTableDefaults(table);
     });
   }
 
@@ -33,14 +73,17 @@ export async function up(knex) {
       table.text('description');
       table.string('cover_image_url', 500);
       table.enum('visibility', ['public', 'private']).notNullable().defaultTo('public');
-      table.json('metadata').notNullable().defaultTo(JSON.stringify({}));
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      ensureJsonColumn(table, 'metadata');
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.timestamp('deleted_at').nullable();
-      table.index(['owner_id']);
-      table.index(['slug']);
+      table.index(['owner_id'], 'idx_communities_owner');
+      table.index(['slug'], 'idx_communities_slug');
+      table.index(['deleted_at'], 'idx_communities_deleted_at');
+      applyTableDefaults(table);
     });
   }
 
@@ -64,11 +107,17 @@ export async function up(knex) {
         .onDelete('CASCADE');
       table.enum('role', ['owner', 'admin', 'moderator', 'member']).notNullable().defaultTo('member');
       table.enum('status', ['active', 'pending', 'banned']).notNullable().defaultTo('active');
-      table.timestamp('joined_at').defaultTo(knex.fn.now());
-      table.timestamp('updated_at').defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+      table.timestamp('joined_at').notNullable().defaultTo(knex.fn.now());
+      table
+        .timestamp('updated_at')
+        .notNullable()
+        .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
       table.timestamp('left_at');
-      table.unique(['community_id', 'user_id']);
-      table.index(['user_id', 'status']);
+      table.unique(['community_id', 'user_id'], 'community_members_unique_user');
+      table.index(['user_id', 'status'], 'idx_community_members_user_status');
+      table.index(['community_id', 'role'], 'idx_community_members_role');
+      table.index(['left_at'], 'idx_community_members_left_at');
+      applyTableDefaults(table);
     });
   }
 
@@ -79,16 +128,18 @@ export async function up(knex) {
       table.string('entity_type', 100).notNullable();
       table.string('entity_id', 100).notNullable();
       table.string('event_type', 100).notNullable();
-      table.json('payload');
+      ensureJsonColumn(table, 'payload', { nullable: true });
       table
         .integer('performed_by')
         .unsigned()
         .references('id')
         .inTable('users')
         .onDelete('SET NULL');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table.index(['entity_type', 'entity_id']);
-      table.index(['event_type']);
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+      table.index(['entity_type', 'entity_id'], 'idx_domain_events_entity');
+      table.index(['event_type'], 'idx_domain_events_event_type');
+      table.index(['created_at'], 'idx_domain_events_created_at');
+      applyTableDefaults(table);
     });
   }
 
@@ -109,20 +160,23 @@ export async function up(knex) {
         .enu('status', ['active', 'inactive', 'suspended'])
         .notNullable()
         .defaultTo('active');
-      table.json('specialties');
-      table.decimal('rating', 3, 2).defaultTo(0);
+      ensureJsonArrayColumn(table, 'specialties', { nullable: true });
+      table.decimal('rating', 3, 2).notNullable().defaultTo(0);
       table.timestamp('last_check_in_at');
       table.decimal('location_lat', 10, 7);
       table.decimal('location_lng', 10, 7);
       table.string('location_label', 255);
       table.timestamp('location_updated_at');
-      table.json('metadata');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      ensureJsonColumn(table, 'metadata');
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
-      table.index(['status']);
-      table.index(['user_id']);
+      table.index(['status'], 'idx_field_service_providers_status');
+      table.index(['user_id'], 'idx_field_service_providers_user');
+      table.index(['location_updated_at'], 'idx_field_service_providers_location_updated');
+      applyTableDefaults(table);
     });
   }
 
@@ -162,14 +216,17 @@ export async function up(knex) {
       table.string('region', 120);
       table.string('postal_code', 24);
       table.string('country', 2).notNullable().defaultTo('GB');
-      table.json('metadata');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      ensureJsonColumn(table, 'metadata');
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
+        .notNullable()
         .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
-      table.index(['status']);
-      table.index(['customer_user_id']);
-      table.index(['provider_id']);
+      table.index(['status'], 'idx_field_service_orders_status');
+      table.index(['customer_user_id'], 'idx_field_service_orders_customer');
+      table.index(['provider_id'], 'idx_field_service_orders_provider');
+      table.index(['scheduled_for'], 'idx_field_service_orders_scheduled');
+      applyTableDefaults(table);
     });
   }
 
@@ -189,10 +246,11 @@ export async function up(knex) {
       table.text('notes');
       table.string('author', 160);
       table.timestamp('occurred_at').notNullable();
-      table.json('metadata');
-      table.timestamp('created_at').defaultTo(knex.fn.now());
-      table.index(['order_id']);
-      table.index(['occurred_at']);
+      ensureJsonColumn(table, 'metadata', { nullable: true });
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
+      table.index(['order_id'], 'idx_field_service_events_order');
+      table.index(['occurred_at'], 'idx_field_service_events_occurred_at');
+      applyTableDefaults(table);
     });
   }
 
@@ -211,11 +269,13 @@ export async function up(knex) {
       table.string('user_agent', 500);
       table.string('ip_address', 45);
       table.timestamp('expires_at').notNullable();
-      table.timestamp('created_at').defaultTo(knex.fn.now());
+      table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
       table.timestamp('revoked_at');
       table.string('revoked_reason', 255);
       table.unique(['user_id', 'refresh_token_hash']);
-      table.index(['user_id', 'expires_at']);
+      table.index(['user_id', 'expires_at'], 'idx_user_sessions_expiration');
+      table.index(['revoked_at'], 'idx_user_sessions_revoked');
+      applyTableDefaults(table);
     });
   }
 }

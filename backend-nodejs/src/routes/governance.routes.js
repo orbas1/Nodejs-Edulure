@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import GovernanceController from '../controllers/GovernanceController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.get('/overview', auth('admin'), GovernanceController.getOverview);
 router.get('/contracts', auth('admin'), GovernanceController.listContracts);

@@ -347,22 +347,164 @@ class ProviderTransitionAnnouncementsState {
     required this.announcements,
     required this.fetchedAt,
     this.offlineFallback = false,
+    this.permissions = const ProviderTransitionPermissions.restricted(),
   });
 
   final List<ProviderTransitionAnnouncementBundle> announcements;
   final DateTime fetchedAt;
   final bool offlineFallback;
+  final ProviderTransitionPermissions permissions;
 
   ProviderTransitionAnnouncementsState copyWith({
     List<ProviderTransitionAnnouncementBundle>? announcements,
     DateTime? fetchedAt,
     bool? offlineFallback,
+    ProviderTransitionPermissions? permissions,
   }) {
     return ProviderTransitionAnnouncementsState(
       announcements: announcements ?? this.announcements,
       fetchedAt: fetchedAt ?? this.fetchedAt,
       offlineFallback: offlineFallback ?? this.offlineFallback,
+      permissions: permissions ?? this.permissions,
     );
+  }
+}
+
+enum ProviderTransitionAction { acknowledge, recordStatus }
+
+class ProviderTransitionPermissions {
+  const ProviderTransitionPermissions({
+    required this.canAcknowledge,
+    required this.canRecordStatus,
+    this.acknowledgeDeniedReason,
+    this.recordStatusDeniedReason,
+  });
+
+  const ProviderTransitionPermissions.fullAccess()
+      : canAcknowledge = true,
+        canRecordStatus = true,
+        acknowledgeDeniedReason = null,
+        recordStatusDeniedReason = null;
+
+  const ProviderTransitionPermissions.restricted({
+    String? acknowledgeReason,
+    String? recordStatusReason,
+  })  : canAcknowledge = false,
+        canRecordStatus = false,
+        acknowledgeDeniedReason = acknowledgeReason,
+        recordStatusDeniedReason = recordStatusReason;
+
+  final bool canAcknowledge;
+  final bool canRecordStatus;
+  final String? acknowledgeDeniedReason;
+  final String? recordStatusDeniedReason;
+
+  bool allows(ProviderTransitionAction action) {
+    switch (action) {
+      case ProviderTransitionAction.acknowledge:
+        return canAcknowledge;
+      case ProviderTransitionAction.recordStatus:
+        return canRecordStatus;
+    }
+  }
+
+  String? denialReasonFor(ProviderTransitionAction action) {
+    switch (action) {
+      case ProviderTransitionAction.acknowledge:
+        return acknowledgeDeniedReason;
+      case ProviderTransitionAction.recordStatus:
+        return recordStatusDeniedReason;
+    }
+  }
+
+  ProviderTransitionPermissions restrictForOffline() {
+    if (!canAcknowledge && !canRecordStatus) {
+      return this;
+    }
+    const message = 'Offline snapshot – actions temporarily unavailable';
+    return ProviderTransitionPermissions(
+      canAcknowledge: false,
+      canRecordStatus: false,
+      acknowledgeDeniedReason: message,
+      recordStatusDeniedReason: message,
+    );
+  }
+
+  ProviderTransitionPermissions copyWith({
+    bool? canAcknowledge,
+    bool? canRecordStatus,
+    String? acknowledgeDeniedReason,
+    String? recordStatusDeniedReason,
+  }) {
+    return ProviderTransitionPermissions(
+      canAcknowledge: canAcknowledge ?? this.canAcknowledge,
+      canRecordStatus: canRecordStatus ?? this.canRecordStatus,
+      acknowledgeDeniedReason: acknowledgeDeniedReason ?? this.acknowledgeDeniedReason,
+      recordStatusDeniedReason: recordStatusDeniedReason ?? this.recordStatusDeniedReason,
+    );
+  }
+
+  factory ProviderTransitionPermissions.fromSession({
+    Map<String, dynamic>? session,
+    String? activeRole,
+  }) {
+    final roles = <String>{};
+    if (activeRole != null && activeRole.isNotEmpty) {
+      roles.add(activeRole.toLowerCase());
+    }
+    final user = session?['user'];
+    if (user is Map) {
+      final primaryRole = user['role'];
+      if (primaryRole is String && primaryRole.isNotEmpty) {
+        roles.add(primaryRole.toLowerCase());
+      }
+      final declaredRoles = user['roles'];
+      if (declaredRoles is Iterable) {
+        for (final role in declaredRoles) {
+          if (role is String && role.isNotEmpty) {
+            roles.add(role.toLowerCase());
+          }
+        }
+      }
+    }
+
+    if (roles.isEmpty) {
+      return const ProviderTransitionPermissions.restricted(
+        acknowledgeReason: 'Provider role required',
+        recordStatusReason: 'Provider role required',
+      );
+    }
+
+    const acknowledgeRoles = {'admin', 'provider', 'operations', 'community'};
+    const statusRoles = {'admin', 'provider'};
+
+    final canAck = roles.any(acknowledgeRoles.contains);
+    final canStatus = roles.any(statusRoles.contains);
+
+    return ProviderTransitionPermissions(
+      canAcknowledge: canAck,
+      canRecordStatus: canStatus,
+      acknowledgeDeniedReason:
+          canAck ? null : 'Only administrator or provider operators may acknowledge transitions.',
+      recordStatusDeniedReason:
+          canStatus ? null : 'Status updates require administrator or provider operator access.',
+    );
+  }
+}
+
+class ProviderTransitionAccessDeniedException implements Exception {
+  ProviderTransitionAccessDeniedException(this.action, {this.reason});
+
+  final ProviderTransitionAction action;
+  final String? reason;
+
+  @override
+  String toString() {
+    final base = 'Access denied for provider transition ${action.name}';
+    if (reason == null) {
+      return base;
+    }
+    return '$base: $reason';
   }
 }
 

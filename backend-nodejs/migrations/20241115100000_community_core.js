@@ -1,3 +1,5 @@
+import { jsonDefault } from './_utils.js';
+
 export async function up(knex) {
   const hasChannels = await knex.schema.hasTable('community_channels');
   if (!hasChannels) {
@@ -18,7 +20,7 @@ export async function up(knex) {
         .defaultTo('general');
       table.text('description');
       table.boolean('is_default').notNullable().defaultTo(false);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -58,7 +60,7 @@ export async function up(knex) {
         .defaultTo('update');
       table.string('title', 200);
       table.text('body').notNullable();
-      table.json('tags').notNullable().defaultTo('[]');
+      table.json('tags').notNullable().defaultTo(jsonDefault(knex, []));
       table
         .enum('visibility', ['public', 'members', 'admins'])
         .notNullable()
@@ -70,8 +72,8 @@ export async function up(knex) {
       table.timestamp('scheduled_at');
       table.timestamp('published_at');
       table.integer('comment_count').unsigned().notNullable().defaultTo(0);
-      table.json('reaction_summary').notNullable().defaultTo('{}');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('reaction_summary').notNullable().defaultTo(jsonDefault(knex, {}));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -115,8 +117,8 @@ export async function up(knex) {
         .onDelete('SET NULL');
       table.string('link_url', 500);
       table.string('classroom_reference', 120);
-      table.json('tags').notNullable().defaultTo('[]');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('tags').notNullable().defaultTo(jsonDefault(knex, []));
+      table.json('metadata').notNullable().defaultTo(jsonDefault(knex, {}));
       table
         .enum('visibility', ['members', 'admins'])
         .notNullable()

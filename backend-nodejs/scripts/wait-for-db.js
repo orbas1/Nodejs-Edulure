@@ -7,25 +7,29 @@ if (!url) {
   process.exit(2);
 }
 
-const client = new pg.Client({ connectionString: url });
-const start = Date.now();
-const timeoutMs = parseInt(process.env.DB_WAIT_TIMEOUT_MS ?? '120000', 10);
+const timeoutMs = Number.parseInt(process.env.DB_WAIT_TIMEOUT_MS ?? '120000', 10);
+const retryDelayMs = Number.parseInt(process.env.DB_WAIT_RETRY_MS ?? '5000', 10);
+
+function createClient() {
+  return new pg.Client({ connectionString: url });
+}
 
 async function wait() {
-  while (Date.now() - start < timeoutMs) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const client = createClient();
     try {
       await client.connect();
       await client.query('select 1');
-      await client.end();
       console.log('Database connection established');
       return;
     } catch (error) {
       console.warn('Database not ready yet:', error.message);
-      await new Promise((resolve) => setTimeout(resolve, 5000));
+      await new Promise((resolve) => {
+        setTimeout(resolve, retryDelayMs);
+      });
     } finally {
-      if (client._connected) {
-        await client.end().catch(() => {});
-      }
+      await client.end().catch(() => {});
     }
   }
   console.error(`Timed out waiting for database after ${timeoutMs / 1000}s`);

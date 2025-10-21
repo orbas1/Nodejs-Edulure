@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import CommunityModerationController from '../controllers/CommunityModerationController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.post(
   '/communities/:communityId/cases',

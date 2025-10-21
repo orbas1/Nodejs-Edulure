@@ -1,9 +1,8 @@
-import { Router } from 'express';
-
 import ContentController from '../controllers/ContentController.js';
 import auth from '../middleware/auth.js';
+import { createApiRouter } from './routerFactory.js';
 
-const router = Router();
+const router = createApiRouter();
 
 router.post('/assets/upload-session', auth('instructor'), ContentController.createUploadSession);
 router.post('/assets/:assetId/ingest', auth('instructor'), ContentController.confirmUpload);

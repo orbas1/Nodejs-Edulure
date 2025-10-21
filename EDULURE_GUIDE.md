@@ -45,6 +45,7 @@ This guide documents the day-to-day workflows, operational expectations, and arc
 
 3. **Flutter SDK**
    - Install Flutter 3.x and configure device simulators/emulators. Confirm setup with `flutter doctor` before working inside `Edulure-Flutter/`.
+   - Mobile builds rely on the following `--dart-define` keys: `APP_ENV`, `API_BASE_URL`, `HTTP_CLIENT_TIMEOUT_MS`, `ENABLE_NETWORK_LOGGING`, `SENTRY_DSN`, and `SENTRY_TRACES_SAMPLE_RATE`. Production builds must point to an HTTPS API endpoint.
 
 4. **Terraform**
    - Install Terraform 1.5+ if you are responsible for infrastructure changes. Terraform operations run from `infrastructure/terraform/envs/<environment>`.
@@ -236,6 +237,8 @@ Key areas of the React application include:
 - Routes mirror the web experience (`/`, `/login`, `/register`, `/feed`, `/profile`). Navigation is orchestrated in `lib/router.dart`.
 - The Inter font is applied through `google_fonts`. UI adheres to Material 3 components defined in `lib/theme.dart`.
 - Push notifications use Firebase Cloud Messaging via `firebase_messaging` and foreground handling via `flutter_local_notifications`. Provide platform-specific config files before running on device.
+- Provider transition hub actions (acknowledgements and status updates) now respect the active session role. Administrators and provider operators can submit updates; other roles receive inline messaging when permissions are insufficient. Offline cached snapshots automatically disable write actions until connectivity is restored.
+- The shared `AppConfig` enforces secure base URLs in production and allows per-environment client timeouts via `HTTP_CLIENT_TIMEOUT_MS`.
 - Tests under `test/` cover widget rendering and routing. Run with `flutter test`.
 
 ### Functional map

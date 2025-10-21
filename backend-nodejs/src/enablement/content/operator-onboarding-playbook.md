@@ -7,7 +7,7 @@
   "products": ["operator-console", "governance-hub"],
   "tags": ["onboarding", "training", "operations"],
   "capabilities": ["Task 2", "Task 5"],
-  "lastUpdated": "2025-03-06",
+  "lastUpdated": "2025-10-20",
   "owner": "Customer Enablement",
   "timeToCompleteMinutes": 90,
   "deliverables": [
@@ -50,3 +50,8 @@ The operator onboarding playbook accelerates the time it takes for a new regiona
 
 ## Maintenance ownership
 The Customer Enablement team owns updates, with quarterly reviews involving representatives from infrastructure, analytics, and finance. When new backend capabilities ship (for example, updated reconciliation logic or telemetry consent requirements), the owner must update this playbook within five business days. The enablement content API exposes change timestamps so downstream portals and LMS integrations automatically surface the latest revision.
+
+## API documentation sync
+- Operators must bookmark the service registry index at `https://docs.edulure.com/apis/index.json` before day one. During onboarding, facilitators verify the published checksum values for `/payments` and `/runtime-config` specs to confirm everyone is using the latest contracts.
+- The security section now mandates bearer tokens for all operator APIs; review the documentation snippets during the access provisioning module and rehearse token refresh workflows with the support engineering liaison.
+- Capture any discrepancies between the docs and in-product experiences in the enablement backlog immediately. Include the affected spec URL and checksum so engineering can triage without ambiguity.

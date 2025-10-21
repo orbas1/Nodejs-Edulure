@@ -1,6 +1,7 @@
 const FOLLOW_STATUSES = ['pending', 'accepted', 'declined'];
 const PROFILE_VISIBILITY = ['public', 'followers', 'private'];
 const MESSAGE_PERMISSIONS = ['anyone', 'followers', 'none'];
+const JSON_EMPTY_OBJECT = JSON.stringify({});
 
 export async function up(knex) {
   const hasPrivacySettings = await knex.schema.hasTable('user_privacy_settings');
@@ -18,7 +19,7 @@ export async function up(knex) {
       table.boolean('follow_approval_required').notNullable().defaultTo(false);
       table.enum('message_permission', MESSAGE_PERMISSIONS).notNullable().defaultTo('followers');
       table.boolean('share_activity').notNullable().defaultTo(true);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -49,7 +50,7 @@ export async function up(knex) {
       table.string('source', 80);
       table.string('reason', 240);
       table.timestamp('accepted_at');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -80,7 +81,7 @@ export async function up(knex) {
         .onDelete('CASCADE');
       table.timestamp('muted_until');
       table.string('reason', 240);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table
         .timestamp('updated_at')
@@ -109,7 +110,7 @@ export async function up(knex) {
         .inTable('users')
         .onDelete('CASCADE');
       table.string('reason', 240);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('blocked_at').defaultTo(knex.fn.now());
       table.timestamp('expires_at');
       table.unique(['user_id', 'blocked_user_id']);
@@ -139,7 +140,7 @@ export async function up(knex) {
       table.decimal('score', 5, 2).notNullable().defaultTo(0);
       table.integer('mutual_followers_count').unsigned().notNullable().defaultTo(0);
       table.string('reason_code', 80).notNullable().defaultTo('mutual_followers');
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('generated_at').defaultTo(knex.fn.now());
       table.timestamp('consumed_at');
       table.timestamp('created_at').defaultTo(knex.fn.now());
@@ -173,7 +174,7 @@ export async function up(knex) {
       table.string('action', 120).notNullable();
       table.string('source', 120);
       table.string('ip_address', 120);
-      table.json('metadata').notNullable().defaultTo('{}');
+      table.json('metadata').notNullable().defaultTo(JSON_EMPTY_OBJECT);
       table.timestamp('created_at').defaultTo(knex.fn.now());
       table.index(['user_id', 'action']);
       table.index(['target_user_id']);

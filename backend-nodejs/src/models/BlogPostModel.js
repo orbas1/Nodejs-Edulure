@@ -1,6 +1,7 @@
 import slugify from 'slugify';
 
 import db from '../config/database.js';
+import { safeJsonParse, safeJsonStringify } from '../utils/modelUtils.js';
 import BlogMediaModel from './BlogMediaModel.js';
 
 const TABLE = 'blog_posts';
@@ -30,9 +31,7 @@ const BASE_COLUMNS = [
 ];
 
 function serialiseMetadata(metadata) {
-  if (!metadata) return JSON.stringify({});
-  if (typeof metadata === 'string') return metadata;
-  return JSON.stringify(metadata);
+  return safeJsonStringify(metadata);
 }
 
 function toSlug(value) {
@@ -170,7 +169,7 @@ export default class BlogPostModel {
       status: row.status,
       publishedAt: row.publishedAt,
       scheduledFor: row.scheduledFor,
-      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata || '{}') : row.metadata,
+      metadata: safeJsonParse(row.metadata, {}),
       isFeatured: Boolean(row.isFeatured),
       readingTimeMinutes: row.readingTimeMinutes,
       viewCount: Number(row.viewCount ?? 0),
