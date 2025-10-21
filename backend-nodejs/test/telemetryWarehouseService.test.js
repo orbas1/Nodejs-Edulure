@@ -165,4 +165,56 @@ describe('TelemetryWarehouseService', () => {
       expect.objectContaining({ status: 'success', output: expect.objectContaining({ batchId: 55 }) })
     );
   });
+
+  it('marks batches and events failed when the upload throws', async () => {
+    const event = {
+      id: 2,
+      eventUuid: 'uuid-2',
+      eventName: 'app.crash',
+      eventVersion: '1',
+      eventSource: 'web',
+      schemaVersion: 'v1',
+      occurredAt: new Date('2025-03-04T10:00:00Z'),
+      receivedAt: new Date('2025-03-04T10:00:01Z'),
+      tenantId: 'global',
+      userId: 11,
+      sessionId: 'session-2',
+      deviceId: 'android',
+      correlationId: 'corr-2',
+      consentScope: 'product.analytics',
+      consentStatus: 'granted',
+      payload: { platform: 'android' },
+      context: {},
+      metadata: {},
+      tags: [],
+      ingestionStatus: 'pending'
+    };
+
+    eventModel.listPendingForExport.mockResolvedValue([event]);
+    batchModel.create.mockResolvedValue({ id: 88, batchUuid: 'batch-err', status: 'exporting' });
+    storage.uploadBuffer.mockRejectedValue(new Error('upload failed'));
+
+    service = new TelemetryWarehouseService({
+      eventModel,
+      batchModel,
+      freshnessModel,
+      lineageModel,
+      storage,
+      loggerInstance: loggerStub,
+      config: {
+        export: { enabled: true, destination: 's3', bucket: 'private', prefix: 'warehouse/telemetry', batchSize: 10 },
+        freshness: { warehouseThresholdMinutes: 30 },
+        lineage: { tool: 'dbt', autoRecord: true }
+      }
+    });
+
+    await expect(service.exportPendingEvents()).rejects.toThrow('upload failed');
+
+    expect(batchModel.markFailed).toHaveBeenCalledWith(88, expect.any(Error));
+    expect(eventModel.markExportFailed).toHaveBeenCalledWith([2], expect.any(Error));
+    expect(metrics.recordTelemetryExport).toHaveBeenCalledWith(
+      expect.objectContaining({ result: 'failed', eventCount: 1 })
+    );
+    expect(metrics.recordTelemetryFreshness).not.toHaveBeenCalled();
+  });
 });
