@@ -51,7 +51,7 @@ function sanitizeBaseUrl(value) {
     return null;
   }
 
-  return trimmed.replace(/\/+$/, '');
+  return trimmed.replace(/[:/\\]+$/, '');
 }
 
 function isLocalHostname(hostname) {
@@ -89,7 +89,7 @@ function resolveDefaultApiBaseUrl() {
   const hasWindow = typeof window !== 'undefined' && typeof window.location !== 'undefined';
   const fallbackProtocol = hasWindow ? window.location.protocol : 'http:';
   const fallbackHost = hasWindow ? window.location.hostname : 'localhost';
-  const protocol = (protocolHint ?? fallbackProtocol ?? 'http:').replace(/:?[\/]*$/, '');
+  const protocol = (protocolHint ?? fallbackProtocol ?? 'http:').replace(/[:/\\]+$/, '');
   const host = hostHint ?? fallbackHost ?? 'localhost';
   const rawPort = portHint ?? (isLocalHostname(host) ? '4000' : '');
 

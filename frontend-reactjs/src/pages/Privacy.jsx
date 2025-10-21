@@ -2,7 +2,13 @@ import PageHero from '../components/PageHero.jsx';
 import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const lastUpdated = '24 November 2024';
+const lastUpdatedDate = '2024-11-24';
 const policyOwner = 'Blackwellen Ltd Data Protection Office';
+const companyProfile = {
+  name: 'Blackwellen Ltd',
+  tradingName: 'Edulure',
+  jurisdiction: 'United Kingdom'
+};
 
 const privacyPolicy = [
   {

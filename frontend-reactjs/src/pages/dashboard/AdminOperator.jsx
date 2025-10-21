@@ -139,13 +139,12 @@ function EmptyState({ title, message }) {
 export default function AdminOperator() {
   const { session } = useAuth();
   const resolvedRole = typeof session?.user?.role === 'string' && session.user.role.length > 0;
-  const isAdmin = String(session?.user?.role ?? '').toLowerCase() === 'admin';
+  const isAdmin = resolvedRole && session.user.role.toLowerCase() === 'admin';
   const { dashboards, loading, error } = useDashboard();
   const { alerts, loading: healthLoading } = useServiceHealth();
   const operatorDashboard = dashboards?.admin?.operator;
   const numberFormatter = useMemo(() => new Intl.NumberFormat('en-US'), []);
   const token = session?.tokens?.accessToken ?? null;
-  const isAdmin = session?.user?.role === 'admin';
 
   const [riskRecords, setRiskRecords] = useState([]);
   const [riskSummary, setRiskSummary] = useState(() => normalizeRiskSummary());

@@ -160,6 +160,15 @@ export default function BlogPost() {
   const canonicalPath = post?.slug ? `/blog/${post.slug}` : '/blog';
   const robots = post?.status === 'draft' || post?.visibility === 'private' ? 'noindex, nofollow' : 'index, follow';
 
+  const tags = useMemo(() => (Array.isArray(post?.tags) ? post.tags : []), [post?.tags]);
+  const wordCount = useMemo(() => {
+    if (!post?.content) {
+      return null;
+    }
+    const words = post.content.trim().split(/\s+/).filter(Boolean);
+    return words.length || null;
+  }, [post?.content]);
+
   const canonicalUrlForStructured = useMemo(() => {
     if (post?.permalink) {
       return post.permalink;
@@ -284,15 +293,6 @@ export default function BlogPost() {
       </main>
     );
   }
-
-  const tags = Array.isArray(post.tags) ? post.tags : [];
-  const wordCount = useMemo(() => {
-    if (!post?.content) {
-      return null;
-    }
-    const words = post.content.trim().split(/\s+/).filter(Boolean);
-    return words.length || null;
-  }, [post?.content]);
 
   return (
     <main className="bg-gradient-to-b from-slate-50 via-white to-white">
