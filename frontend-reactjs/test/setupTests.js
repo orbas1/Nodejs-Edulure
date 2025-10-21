@@ -3,4 +3,27 @@
 // deprecation notices from dependencies such as jest-axe.
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+if (typeof window !== 'undefined') {
+  if (!('matchMedia' in window)) {
+    window.matchMedia = (query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false
+    });
+  }
+
+  if (!('ResizeObserver' in window)) {
+    window.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    };
+  }
+}
+
 import '@testing-library/jest-dom/vitest';

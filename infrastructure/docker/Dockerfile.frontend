@@ -3,17 +3,23 @@ ARG NODE_VERSION=20.11.1
 
 FROM node:${NODE_VERSION}-bookworm AS builder
 WORKDIR /app
+ENV NODE_ENV=production
 
 COPY sdk-typescript ./sdk-typescript
 RUN npm ci --prefix ./sdk-typescript \
- && npm run build --prefix ./sdk-typescript
+ && npm run build --prefix ./sdk-typescript \
+ && rm -rf ./sdk-typescript/node_modules \
+ && npm cache clean --force
 
 COPY frontend-reactjs ./frontend
-RUN npm ci --prefix ./frontend
-WORKDIR /app/frontend
-RUN npm run build
+RUN npm ci --prefix ./frontend \
+ && npm run build --prefix ./frontend \
+ && npm cache clean --force
 
 FROM nginx:1.27-bookworm AS runtime
+LABEL org.opencontainers.image.source="https://github.com/edulure/platform" \
+      org.opencontainers.image.description="Edulure web application"
+ENV NGINX_ENVSUBST_OUTPUT_DIR="/etc/nginx/templates"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl \
  && rm -rf /var/lib/apt/lists/* \
@@ -21,4 +27,4 @@ RUN apt-get update \
 COPY infrastructure/docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://localhost/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -f http://127.0.0.1/healthz || exit 1

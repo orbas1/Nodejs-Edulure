@@ -51,6 +51,30 @@ variable "create_nat_gateway" {
   default     = true
 }
 
+variable "enable_vpc_flow_logs" {
+  type        = bool
+  description = "Enable VPC flow logs for observability."
+  default     = true
+}
+
+variable "vpc_flow_logs_retention_days" {
+  type        = number
+  description = "Retention period for VPC flow logs."
+  default     = 7
+}
+
+variable "vpc_flow_logs_traffic_type" {
+  type        = string
+  description = "Traffic type captured by flow logs."
+  default     = "ALL"
+}
+
+variable "vpc_flow_logs_kms_key_arn" {
+  type        = string
+  description = "Optional KMS key for encrypting flow log groups."
+  default     = null
+}
+
 variable "container_image" {
   type        = string
   description = "Docker image for the backend API."
@@ -137,6 +161,48 @@ variable "enable_alb_deletion_protection" {
   default     = false
 }
 
+variable "load_balancer_idle_timeout" {
+  type        = number
+  description = "Idle timeout for the ALB in seconds."
+  default     = 60
+}
+
+variable "enable_alb_access_logs" {
+  type        = bool
+  description = "Emit ALB access logs to S3."
+  default     = false
+}
+
+variable "alb_access_logs_bucket" {
+  type        = string
+  description = "S3 bucket for ALB access logs."
+  default     = null
+}
+
+variable "alb_access_logs_prefix" {
+  type        = string
+  description = "S3 prefix for ALB access logs."
+  default     = null
+}
+
+variable "waf_web_acl_arn" {
+  type        = string
+  description = "Optional WAF Web ACL ARN."
+  default     = null
+}
+
+variable "enable_deployment_circuit_breaker" {
+  type        = bool
+  description = "Toggle ECS deployment circuit breaker."
+  default     = true
+}
+
+variable "rollback_on_failure" {
+  type        = bool
+  description = "Rollback failed ECS deployments automatically."
+  default     = true
+}
+
 variable "assign_public_ip" {
   type        = bool
   description = "Assign public IPs to ECS tasks (set true only when NAT is disabled)."
@@ -211,6 +277,86 @@ variable "database_apply_immediately" {
 variable "database_skip_final_snapshot" {
   type        = bool
   description = "Skip final snapshot on destroy."
+  default     = true
+}
+
+variable "database_kms_key_id" {
+  type        = string
+  description = "Customer managed KMS key for database encryption."
+  default     = null
+}
+
+variable "database_deletion_protection" {
+  type        = bool
+  description = "Prevent destruction of the database instance."
+  default     = false
+}
+
+variable "database_storage_type" {
+  type        = string
+  description = "Storage type for Postgres."
+  default     = "gp3"
+}
+
+variable "database_performance_insights_retention" {
+  type        = number
+  description = "Performance Insights retention in days."
+  default     = 7
+}
+
+variable "database_monitoring_interval" {
+  type        = number
+  description = "Enhanced monitoring interval in seconds (0 disables)."
+  default     = 60
+}
+
+variable "database_parameters" {
+  type = list(object({
+    name         = string
+    value        = string
+    apply_method = string
+  }))
+  description = "Additional Postgres parameter overrides."
+  default = [
+    {
+      name         = "log_min_duration_statement"
+      value        = "1000"
+      apply_method = "pending-reboot"
+    },
+    {
+      name         = "shared_preload_libraries"
+      value        = "pg_stat_statements"
+      apply_method = "pending-reboot"
+    },
+    {
+      name         = "pg_stat_statements.max"
+      value        = "10000"
+      apply_method = "pending-reboot"
+    }
+  ]
+}
+
+variable "database_backup_window" {
+  type        = string
+  description = "Preferred backup window for Postgres."
+  default     = null
+}
+
+variable "database_maintenance_window" {
+  type        = string
+  description = "Preferred maintenance window for Postgres."
+  default     = null
+}
+
+variable "database_cloudwatch_logs_exports" {
+  type        = list(string)
+  description = "RDS logs exported to CloudWatch Logs."
+  default     = ["postgresql", "upgrade"]
+}
+
+variable "database_auto_minor_version_upgrade" {
+  type        = bool
+  description = "Apply Postgres minor upgrades automatically."
   default     = true
 }
 

@@ -142,7 +142,16 @@ resource "aws_lb" "this" {
   load_balancer_type = "application"
   security_groups    = [var.load_balancer_security_group_id]
   subnets            = var.public_subnet_ids
+  idle_timeout       = var.load_balancer_idle_timeout
   enable_deletion_protection = var.enable_alb_deletion_protection
+  dynamic "access_logs" {
+    for_each = var.enable_alb_access_logs ? [1] : []
+    content {
+      bucket  = var.alb_access_logs_bucket
+      prefix  = coalesce(var.alb_access_logs_prefix, "${var.project}/${var.environment}")
+      enabled = true
+    }
+  }
   tags = merge(
     {
       Environment = var.environment
@@ -212,6 +221,12 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+resource "aws_wafv2_web_acl_association" "this" {
+  count        = var.waf_web_acl_arn != null && trimspace(var.waf_web_acl_arn) != "" ? 1 : 0
+  resource_arn = aws_lb.this.arn
+  web_acl_arn  = var.waf_web_acl_arn
+}
+
 resource "aws_ecs_task_definition" "this" {
   family                   = local.service_name
   network_mode             = "awsvpc"
@@ -268,6 +283,7 @@ resource "aws_ecs_service" "this" {
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
   enable_execute_command = true
+  propagate_tags        = "TASK_DEFINITION"
 
   network_configuration {
     security_groups  = [aws_security_group.service.id]
@@ -287,6 +303,14 @@ resource "aws_ecs_service" "this" {
 
   deployment_minimum_healthy_percent = 50
   deployment_maximum_percent         = 200
+
+  dynamic "deployment_circuit_breaker" {
+    for_each = var.enable_deployment_circuit_breaker ? [1] : []
+    content {
+      enable   = true
+      rollback = var.rollback_on_failure
+    }
+  }
 
   tags = var.tags
 }
@@ -347,4 +371,8 @@ output "load_balancer_dns" {
 
 output "security_group_id" {
   value = aws_security_group.service.id
+}
+
+output "load_balancer_arn" {
+  value = aws_lb.this.arn
 }
