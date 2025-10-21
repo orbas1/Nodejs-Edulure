@@ -114,6 +114,26 @@ describe('Telemetry HTTP routes', () => {
     expect(response.body.duplicate).toBe(true);
   });
 
+  it('returns 422 when telemetry payload validation fails', async () => {
+    const validationError = new Error('Telemetry event payload is invalid');
+    validationError.status = 422;
+    validationError.code = 'INVALID_TELEMETRY_EVENT';
+    validationError.details = [{ path: 'eventName', message: 'Required', code: 'too_small' }];
+    ingestionMock.ingestEvent.mockRejectedValue(validationError);
+
+    const response = await request(app)
+      .post('/api/v1/telemetry/events')
+      .set('Authorization', 'Bearer token')
+      .send({ eventSource: 'web' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.success).toBe(false);
+    expect(response.body.code).toBe('INVALID_TELEMETRY_EVENT');
+    expect(response.body.details).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'eventName' })])
+    );
+  });
+
   it('records consent decisions while applying tenant scoping', async () => {
     ingestionMock.registerConsentDecision.mockResolvedValue({
       id: 500,
@@ -134,6 +154,21 @@ describe('Telemetry HTTP routes', () => {
     expect(ingestionMock.registerConsentDecision).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: 'tenant-1', userId: 99 })
     );
+  });
+
+  it('validates consent payloads before recording decisions', async () => {
+    const response = await request(app)
+      .post('/api/v1/telemetry/consents')
+      .set('Authorization', 'Bearer token')
+      .send({ status: 'revoked' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.success).toBe(false);
+    expect(response.body.code).toBe('INVALID_TELEMETRY_CONSENT');
+    expect(response.body.details).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: 'consentScope' })])
+    );
+    expect(ingestionMock.registerConsentDecision).not.toHaveBeenCalled();
   });
 
   it('lists telemetry freshness monitors for operators', async () => {
