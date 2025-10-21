@@ -9,6 +9,37 @@ const log = logger.child({ service: 'AdsService' });
 const PROHIBITED_KEYWORDS = ['clickbait', 'scam', 'spam', 'crypto giveaway'];
 const MIN_HEADLINE_LENGTH = 12;
 const MAX_HEADLINE_LENGTH = 160;
+const ALLOWED_CAMPAIGN_ROLES = new Set(['admin', 'staff', 'instructor', 'service']);
+const ADMIN_LEVEL_ROLES = new Set(['admin', 'staff', 'service']);
+
+function normaliseRole(role) {
+  return typeof role === 'string' ? role.toLowerCase() : null;
+}
+
+function resolveActorId(actor) {
+  if (!actor || typeof actor !== 'object') {
+    return null;
+  }
+  return actor.id ?? actor.userId ?? actor.sub ?? null;
+}
+
+function assertActorCanManageCampaigns(actor) {
+  const actorId = resolveActorId(actor);
+  if (!actorId) {
+    const error = new Error('Actor identity required');
+    error.status = 401;
+    throw error;
+  }
+
+  const role = normaliseRole(actor?.role);
+  if (!role || !ALLOWED_CAMPAIGN_ROLES.has(role)) {
+    const error = new Error('You do not have permission to manage campaigns');
+    error.status = 403;
+    throw error;
+  }
+
+  return { id: actorId, role };
+}
 
 function rate(value, total) {
   if (!total || total <= 0) {
@@ -79,6 +110,7 @@ function containsProhibitedKeyword(text) {
 
 export default class AdsService {
   static async listCampaigns({ actor, filters = {}, pagination = {} } = {}) {
+    const { id: actorId, role: actorRole } = assertActorCanManageCampaigns(actor);
     const page = Math.max(1, Number(pagination.page ?? 1));
     const limit = Math.min(50, Math.max(1, Number(pagination.limit ?? 20)));
     const offset = (page - 1) * limit;
@@ -91,8 +123,8 @@ export default class AdsService {
       orderBy: 'updated_at'
     };
 
-    if (actor.role !== 'admin') {
-      queryFilters.createdBy = actor.id;
+    if (!ADMIN_LEVEL_ROLES.has(actorRole)) {
+      queryFilters.createdBy = actorId;
     }
 
     const [campaigns, total] = await Promise.all([
@@ -114,13 +146,14 @@ export default class AdsService {
   }
 
   static async getCampaign(publicId, actor) {
+    const { id: actorId, role: actorRole } = assertActorCanManageCampaigns(actor);
     const campaign = await AdsCampaignModel.findByPublicId(publicId);
     if (!campaign) {
       const error = new Error('Campaign not found');
       error.status = 404;
       throw error;
     }
-    if (actor.role !== 'admin' && campaign.createdBy !== actor.id) {
+    if (!ADMIN_LEVEL_ROLES.has(actorRole) && campaign.createdBy !== actorId) {
       const error = new Error('You do not have permission to manage this campaign');
       error.status = 403;
       throw error;
@@ -131,6 +164,7 @@ export default class AdsService {
   }
 
   static async createCampaign(actor, payload) {
+    const { id: actorId } = assertActorCanManageCampaigns(actor);
     const startAt = payload.startAt ? new Date(payload.startAt) : null;
     const endAt = payload.endAt ? new Date(payload.endAt) : null;
     if (startAt && endAt && endAt < startAt) {
@@ -142,7 +176,7 @@ export default class AdsService {
     const campaign = await db.transaction(async (trx) => {
       const created = await AdsCampaignModel.create(
         {
-          createdBy: actor.id,
+          createdBy: actorId,
           name: payload.name,
           objective: payload.objective,
           status: payload.status ?? 'draft',
@@ -172,11 +206,11 @@ export default class AdsService {
           entityId: String(created.id),
           eventType: 'ads.campaign.created',
           payload: {
-            createdBy: actor.id,
+            createdBy: actorId,
             objective: payload.objective,
             status: created.status
           },
-          performedBy: actor.id
+          performedBy: actorId
         },
         trx
       );
@@ -189,13 +223,14 @@ export default class AdsService {
   }
 
   static async updateCampaign(publicId, actor, payload) {
+    const { id: actorId, role: actorRole } = assertActorCanManageCampaigns(actor);
     const campaign = await AdsCampaignModel.findByPublicId(publicId);
     if (!campaign) {
       const error = new Error('Campaign not found');
       error.status = 404;
       throw error;
     }
-    if (actor.role !== 'admin' && campaign.createdBy !== actor.id) {
+    if (!ADMIN_LEVEL_ROLES.has(actorRole) && campaign.createdBy !== actorId) {
       const error = new Error('You do not have permission to manage this campaign');
       error.status = 403;
       throw error;
@@ -243,7 +278,7 @@ export default class AdsService {
       payload: {
         fields: Object.keys(updates)
       },
-      performedBy: actor.id
+      performedBy: actorId
     });
 
     const [hydrated] = await this.hydrateCampaignCollection([updated]);
@@ -251,13 +286,14 @@ export default class AdsService {
   }
 
   static async pauseCampaign(publicId, actor, reason = 'manual_pause') {
+    const { id: actorId, role: actorRole } = assertActorCanManageCampaigns(actor);
     const campaign = await AdsCampaignModel.findByPublicId(publicId);
     if (!campaign) {
       const error = new Error('Campaign not found');
       error.status = 404;
       throw error;
     }
-    if (actor.role !== 'admin' && campaign.createdBy !== actor.id) {
+    if (!ADMIN_LEVEL_ROLES.has(actorRole) && campaign.createdBy !== actorId) {
       const error = new Error('You do not have permission to manage this campaign');
       error.status = 403;
       throw error;
@@ -276,20 +312,21 @@ export default class AdsService {
       entityId: String(updated.id),
       eventType: 'ads.campaign.paused',
       payload: { reason },
-      performedBy: actor.id
+      performedBy: actorId
     });
 
-    return this.getCampaign(publicId, actor);
+    return this.getCampaign(publicId, { id: actorId, role: actorRole });
   }
 
   static async resumeCampaign(publicId, actor) {
+    const { id: actorId, role: actorRole } = assertActorCanManageCampaigns(actor);
     const campaign = await AdsCampaignModel.findByPublicId(publicId);
     if (!campaign) {
       const error = new Error('Campaign not found');
       error.status = 404;
       throw error;
     }
-    if (actor.role !== 'admin' && campaign.createdBy !== actor.id) {
+    if (!ADMIN_LEVEL_ROLES.has(actorRole) && campaign.createdBy !== actorId) {
       const error = new Error('You do not have permission to manage this campaign');
       error.status = 403;
       throw error;
@@ -312,20 +349,21 @@ export default class AdsService {
       entityId: String(updated.id),
       eventType: 'ads.campaign.resumed',
       payload: {},
-      performedBy: actor.id
+      performedBy: actorId
     });
 
-    return this.getCampaign(publicId, actor);
+    return this.getCampaign(publicId, { id: actorId, role: actorRole });
   }
 
   static async recordDailyMetrics(publicId, actor, payload) {
+    const { id: actorId, role: actorRole } = assertActorCanManageCampaigns(actor);
     const campaign = await AdsCampaignModel.findByPublicId(publicId);
     if (!campaign) {
       const error = new Error('Campaign not found');
       error.status = 404;
       throw error;
     }
-    if (actor.role !== 'admin' && campaign.createdBy !== actor.id) {
+    if (!ADMIN_LEVEL_ROLES.has(actorRole) && campaign.createdBy !== actorId) {
       const error = new Error('You do not have permission to manage this campaign');
       error.status = 403;
       throw error;
@@ -360,20 +398,21 @@ export default class AdsService {
         conversions: payload.conversions,
         spendCents: payload.spendCents
       },
-      performedBy: actor.id
+      performedBy: actorId
     });
 
     return hydrated;
   }
 
   static async getInsights(publicId, actor, { windowDays = 14 } = {}) {
+    const { id: actorId, role: actorRole } = assertActorCanManageCampaigns(actor);
     const campaign = await AdsCampaignModel.findByPublicId(publicId);
     if (!campaign) {
       const error = new Error('Campaign not found');
       error.status = 404;
       throw error;
     }
-    if (actor.role !== 'admin' && campaign.createdBy !== actor.id) {
+    if (!ADMIN_LEVEL_ROLES.has(actorRole) && campaign.createdBy !== actorId) {
       const error = new Error('You do not have permission to manage this campaign');
       error.status = 403;
       throw error;
@@ -428,19 +467,28 @@ export default class AdsService {
   }
 
   static async hydrateCampaignCollection(campaigns) {
-    if (!campaigns.length) {
+    if (!Array.isArray(campaigns) || campaigns.length === 0) {
       return [];
     }
 
     const ids = campaigns.map((campaign) => campaign.id);
     const lifetimeMap = await AdsCampaignMetricModel.summariseByCampaignIds(ids);
 
+    const trailingPairs = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const summary = await AdsCampaignMetricModel.summariseWindow(campaign.id, { windowDays: 7 });
+        return [campaign.id, summary ?? defaultSummary()];
+      })
+    );
+
+    const trailingMap = new Map(trailingPairs);
+
+    await Promise.all(campaigns.map((campaign) => this.applyLifecycleTransitions(campaign)));
+
     const results = [];
     for (const campaign of campaigns) {
       const lifetime = lifetimeMap.get(campaign.id) ?? defaultSummary();
-      const trailing = await AdsCampaignMetricModel.summariseWindow(campaign.id, { windowDays: 7 });
-
-      await this.applyLifecycleTransitions(campaign);
+      const trailing = trailingMap.get(campaign.id) ?? defaultSummary();
 
       const derived = this.computeDerivedMetrics(campaign, lifetime, trailing);
       const compliance = this.evaluateCompliance(campaign, derived);
