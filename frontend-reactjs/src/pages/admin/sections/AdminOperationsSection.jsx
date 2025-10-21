@@ -1,16 +1,28 @@
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
 
+import { ensureArray, ensureString } from '../utils.js';
+
+function normaliseEntries(entries) {
+  return ensureArray(entries).map((entry, index) => ({
+    label: ensureString(entry?.label, `Entry ${index + 1}`),
+    value: ensureString(entry?.value, '—')
+  }));
+}
+
 function StatList({ title, emptyLabel, entries }) {
+  const resolvedEntries = useMemo(() => normaliseEntries(entries), [entries]);
+
   return (
     <div className="dashboard-section">
       <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
       <ul className="mt-4 space-y-3 text-sm text-slate-600">
-        {entries.length === 0 ? (
+        {resolvedEntries.length === 0 ? (
           <li className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">
             {emptyLabel}
           </li>
         ) : (
-          entries.map((entry) => (
+          resolvedEntries.map((entry) => (
             <li key={entry.label} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3">
               <span>{entry.label}</span>
               <span className="font-semibold text-slate-900">{entry.value}</span>

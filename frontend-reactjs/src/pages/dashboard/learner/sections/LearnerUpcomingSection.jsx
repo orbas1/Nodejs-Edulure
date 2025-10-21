@@ -7,7 +7,8 @@ const upcomingItemPropType = PropTypes.shape({
   date: PropTypes.string.isRequired,
   title: PropTypes.string.isRequired,
   host: PropTypes.string.isRequired,
-  action: PropTypes.string.isRequired
+  action: PropTypes.string.isRequired,
+  href: PropTypes.string
 });
 
 function UpcomingCard({ event }) {
@@ -19,12 +20,24 @@ function UpcomingCard({ event }) {
       </div>
       <p className="mt-3 text-sm font-semibold text-slate-900">{event.title}</p>
       <p className="text-xs text-slate-500">Hosted by {event.host}</p>
-      <button
-        type="button"
-        className="mt-4 inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark"
-      >
-        {event.action}
-      </button>
+      {event.href ? (
+        <a
+          href={event.href}
+          target={event.href.startsWith('mailto:') ? '_self' : '_blank'}
+          rel="noreferrer noopener"
+          className="mt-4 inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark"
+        >
+          {event.action}
+        </a>
+      ) : (
+        <button
+          type="button"
+          className="mt-4 inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm opacity-60"
+          disabled
+        >
+          {event.action}
+        </button>
+      )}
     </li>
   );
 }

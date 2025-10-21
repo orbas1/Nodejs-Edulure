@@ -18,7 +18,8 @@ function formatMinutes(minutes) {
 }
 
 function BarTrack({ value, label, percentage }) {
-  const width = Math.max(percentage, 4);
+  const safePercentage = Math.max(0, Math.min(percentage, 100));
+  const width = percentage > 0 ? Math.max(safePercentage, 4) : 0;
   return (
     <div>
       <div className="flex items-center justify-between text-xs font-semibold text-slate-500">

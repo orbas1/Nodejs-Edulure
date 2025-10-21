@@ -436,7 +436,14 @@ export default function DashboardAffiliate() {
       link.href = url;
       link.download = filename;
       link.rel = 'noopener';
-      link.click();
+      link.target = '_self';
+      document.body.appendChild(link);
+      const isJsdom =
+        typeof navigator !== 'undefined' && /jsdom/i.test((navigator.userAgent ?? '').toLowerCase());
+      if (!isJsdom && typeof link.click === 'function') {
+        link.click();
+      }
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       return true;
     } catch (error) {
@@ -969,7 +976,7 @@ export default function DashboardAffiliate() {
         </section>
       ) : null}
 
-      <section className="dashboard-section space-y-4">
+      <section className="dashboard-section space-y-4" data-testid="affiliate-payouts-section">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Payout log</h2>
@@ -992,7 +999,7 @@ export default function DashboardAffiliate() {
               </select>
             </label>
             <label className="flex flex-col text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Status
+              Payout status
               <select
                 className="dashboard-input mt-1"
                 value={payoutStatusFilter}

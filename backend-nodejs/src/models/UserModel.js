@@ -19,11 +19,11 @@ const BASE_COLUMNS = [
 
 export default class UserModel {
   static async findByEmail(email, connection = db) {
-    return connection('users').where({ email }).first();
+    return connection('users').where({ email }).whereNull('deleted_at').first();
   }
 
   static async forUpdateByEmail(email, connection = db) {
-    return connection('users').where({ email }).forUpdate().first();
+    return connection('users').where({ email }).whereNull('deleted_at').forUpdate().first();
   }
 
   static async create(user, connection = db) {
@@ -48,12 +48,12 @@ export default class UserModel {
   }
 
   static async findById(id, connection = db) {
-    return connection('users').select(BASE_COLUMNS).where({ id }).first();
+    return connection('users').select(BASE_COLUMNS).where({ id }).whereNull('deleted_at').first();
   }
 
   static async findByIds(ids, connection = db) {
     if (!ids?.length) return [];
-    return connection('users').select(BASE_COLUMNS).whereIn('id', ids);
+    return connection('users').select(BASE_COLUMNS).whereIn('id', ids).whereNull('deleted_at');
   }
 
   static async updateById(id, updates, connection = db) {
@@ -79,21 +79,41 @@ export default class UserModel {
           ? JSON.stringify(updates.address)
           : updates.address ?? null;
     }
+    if (updates.passwordHash !== undefined) {
+      payload.password_hash = updates.passwordHash ?? null;
+    }
+    if (updates.twoFactorEnabled !== undefined) {
+      payload.two_factor_enabled = updates.twoFactorEnabled ? 1 : 0;
+    }
+    if (updates.twoFactorSecret !== undefined) {
+      payload.two_factor_secret = updates.twoFactorSecret ?? null;
+    }
+    if (updates.twoFactorEnrolledAt !== undefined) {
+      payload.two_factor_enrolled_at = updates.twoFactorEnrolledAt ?? null;
+    }
+    if (updates.twoFactorLastVerifiedAt !== undefined) {
+      payload.two_factor_last_verified_at = updates.twoFactorLastVerifiedAt ?? null;
+    }
 
     if (Object.keys(payload).length === 0) {
       return this.findById(id, connection);
     }
 
-    await connection('users').where({ id }).update(payload);
+    await connection('users').where({ id }).whereNull('deleted_at').update(payload);
     return this.findById(id, connection);
   }
 
   static async list({ limit = 20, offset = 0 } = {}, connection = db) {
     return connection('users')
       .select(BASE_COLUMNS)
+      .whereNull('deleted_at')
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
+  }
+
+  static async deleteById(id, connection = db) {
+    return connection('users').where({ id }).whereNull('deleted_at').update({ deleted_at: connection.fn.now() });
   }
 
   static async recordLoginFailure(user, options, connection = db) {

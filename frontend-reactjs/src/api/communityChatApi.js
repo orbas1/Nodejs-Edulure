@@ -1,4 +1,10 @@
 import { httpClient } from './httpClient.js';
+import {
+  assertId,
+  assertToken,
+  createInvalidationConfig,
+  createListCacheConfig
+} from './apiUtils.js';
 
 const mapResponse = (response) => ({
   data: response?.data ?? null,
@@ -7,13 +13,12 @@ const mapResponse = (response) => ({
 });
 
 export async function listCommunityChannels({ communityId, token, signal }) {
+  assertToken(token, 'list community chat channels');
+  assertId(communityId, 'Community id');
   const response = await httpClient.get(`/communities/${communityId}/chat/channels`, {
     token,
     signal,
-    cache: {
-      ttl: 1000 * 30,
-      tags: [`community:${communityId}:chat:channels`]
-    }
+    cache: createListCacheConfig(`community:${communityId}:chat:channels`, { ttl: 1000 * 30 })
   });
   return mapResponse(response);
 }
@@ -28,6 +33,9 @@ export async function listCommunityMessages({
   after,
   includeHidden = false
 }) {
+  assertToken(token, 'list community chat messages');
+  assertId(communityId, 'Community id');
+  assertId(channelId, 'Channel id');
   const response = await httpClient.get(`/communities/${communityId}/chat/channels/${channelId}/messages`, {
     token,
     signal,
@@ -36,27 +44,36 @@ export async function listCommunityMessages({
       before: before ? new Date(before).toISOString() : undefined,
       after: after ? new Date(after).toISOString() : undefined,
       includeHidden
-    }
+    },
+    cache: createListCacheConfig(`community:${communityId}:chat:messages:${channelId}`, { ttl: 5_000 })
   });
   return mapResponse(response);
 }
 
 export async function postCommunityMessage({ communityId, channelId, token, payload }) {
+  assertToken(token, 'post community chat messages');
+  assertId(communityId, 'Community id');
+  assertId(channelId, 'Channel id');
   const response = await httpClient.post(`/communities/${communityId}/chat/channels/${channelId}/messages`, payload, {
     token,
-    cache: {
-      invalidateTags: [`community:${communityId}:chat:channels`, `community:${communityId}:chat:messages:${channelId}`]
-    }
+    cache: createInvalidationConfig([
+      `community:${communityId}:chat:channels`,
+      `community:${communityId}:chat:messages:${channelId}`
+    ])
   });
   return mapResponse(response);
 }
 
 export async function markCommunityChannelRead({ communityId, channelId, token, payload }) {
+  assertToken(token, 'mark community channels as read');
+  assertId(communityId, 'Community id');
+  assertId(channelId, 'Channel id');
   const response = await httpClient.post(`/communities/${communityId}/chat/channels/${channelId}/read`, payload ?? {}, {
     token,
-    cache: {
-      invalidateTags: [`community:${communityId}:chat:channels`, `community:${communityId}:chat:messages:${channelId}`]
-    }
+    cache: createInvalidationConfig([
+      `community:${communityId}:chat:channels`,
+      `community:${communityId}:chat:messages:${channelId}`
+    ])
   });
   return mapResponse(response);
 }
@@ -68,14 +85,16 @@ export async function addCommunityMessageReaction({
   token,
   emoji
 }) {
+  assertToken(token, 'react to community messages');
+  assertId(communityId, 'Community id');
+  assertId(channelId, 'Channel id');
+  assertId(messageId, 'Message id');
   const response = await httpClient.post(
     `/communities/${communityId}/chat/channels/${channelId}/messages/${messageId}/reactions`,
     { emoji },
     {
       token,
-      cache: {
-        invalidateTags: [`community:${communityId}:chat:messages:${channelId}`]
-      }
+      cache: createInvalidationConfig(`community:${communityId}:chat:messages:${channelId}`)
     }
   );
   return mapResponse(response);
@@ -88,14 +107,16 @@ export async function removeCommunityMessageReaction({
   token,
   emoji
 }) {
+  assertToken(token, 'remove community message reactions');
+  assertId(communityId, 'Community id');
+  assertId(channelId, 'Channel id');
+  assertId(messageId, 'Message id');
   const response = await httpClient.delete(
     `/communities/${communityId}/chat/channels/${channelId}/messages/${messageId}/reactions`,
     {
       token,
       body: { emoji },
-      cache: {
-        invalidateTags: [`community:${communityId}:chat:messages:${channelId}`]
-      }
+      cache: createInvalidationConfig(`community:${communityId}:chat:messages:${channelId}`)
     }
   );
   return mapResponse(response);
@@ -108,37 +129,38 @@ export async function moderateCommunityMessage({
   token,
   payload
 }) {
+  assertToken(token, 'moderate community chat messages');
+  assertId(communityId, 'Community id');
+  assertId(channelId, 'Channel id');
+  assertId(messageId, 'Message id');
   const response = await httpClient.post(
     `/communities/${communityId}/chat/channels/${channelId}/messages/${messageId}/moderate`,
     payload,
     {
       token,
-      cache: {
-        invalidateTags: [`community:${communityId}:chat:messages:${channelId}`]
-      }
+      cache: createInvalidationConfig(`community:${communityId}:chat:messages:${channelId}`)
     }
   );
   return mapResponse(response);
 }
 
 export async function listCommunityPresence({ communityId, token, signal }) {
+  assertToken(token, 'list community presence');
+  assertId(communityId, 'Community id');
   const response = await httpClient.get(`/communities/${communityId}/chat/presence`, {
     token,
     signal,
-    cache: {
-      ttl: 1000 * 15,
-      tags: [`community:${communityId}:chat:presence`]
-    }
+    cache: createListCacheConfig(`community:${communityId}:chat:presence`, { ttl: 1000 * 15 })
   });
   return mapResponse(response);
 }
 
 export async function updateCommunityPresence({ communityId, token, payload }) {
+  assertToken(token, 'update community presence');
+  assertId(communityId, 'Community id');
   const response = await httpClient.post(`/communities/${communityId}/chat/presence`, payload, {
     token,
-    cache: {
-      invalidateTags: [`community:${communityId}:chat:presence`]
-    }
+    cache: createInvalidationConfig(`community:${communityId}:chat:presence`)
   });
   return mapResponse(response);
 }

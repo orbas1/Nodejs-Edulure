@@ -110,6 +110,8 @@ SummaryCard.defaultProps = {
   helper: undefined
 };
 
+const isAbortError = (error) => error?.name === 'AbortError' || error?.code === 'ERR_CANCELED';
+
 function normaliseAmount(value) {
   if (value === null || value === undefined) return 0;
   const numeric = Number(value);
@@ -121,25 +123,47 @@ export default function AdminRevenueManagementSection({ sectionId, token }) {
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
 
-  const fetchSummary = useCallback(async () => {
-    if (!token) {
-      setSummary(null);
-      return;
-    }
-    setLoadingSummary(true);
-    setSummaryError(null);
-    try {
-      const payload = await adminRevenueApi.getRevenueSummary({ token });
-      setSummary(payload ?? {});
-    } catch (error) {
-      setSummaryError(error instanceof Error ? error : new Error('Failed to load revenue summary'));
-    } finally {
-      setLoadingSummary(false);
-    }
-  }, [token]);
+  const fetchSummary = useCallback(
+    async ({ signal, showLoading = true } = {}) => {
+      if (!token) {
+        setSummary(null);
+        setSummaryError(null);
+        setLoadingSummary(false);
+        return;
+      }
+
+      if (showLoading) {
+        setLoadingSummary(true);
+      }
+      setSummaryError(null);
+
+      try {
+        const request = signal ? { token, signal } : { token };
+        const payload = await adminRevenueApi.getRevenueSummary(request);
+        if (signal?.aborted) {
+          return;
+        }
+        setSummary(payload ?? {});
+      } catch (error) {
+        if (signal?.aborted || isAbortError(error)) {
+          return;
+        }
+        setSummaryError(error instanceof Error ? error : new Error('Failed to load revenue summary'));
+      } finally {
+        if (!signal?.aborted) {
+          setLoadingSummary(false);
+        }
+      }
+    },
+    [token]
+  );
 
   useEffect(() => {
-    fetchSummary();
+    const controller = new AbortController();
+    fetchSummary({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
   }, [fetchSummary]);
 
   const summaryCards = useMemo(() => {

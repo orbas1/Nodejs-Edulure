@@ -1,3 +1,4 @@
+import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 
 import { useLanguage } from '../context/LanguageContext.jsx';
@@ -14,7 +15,8 @@ const FEATURE_CONFIG = [
       {
         key: 'cohort',
         fallback: 'New Cohort',
-        to: '/dashboard/instructor/courses/create'
+        to: '/dashboard/instructor/courses/create',
+        badge: 'Launch ready'
       },
       {
         key: 'library',
@@ -38,7 +40,8 @@ const FEATURE_CONFIG = [
       {
         key: 'rooms',
         fallback: 'Live Rooms',
-        to: '/dashboard/instructor/live-classes'
+        to: '/dashboard/instructor/live-classes',
+        badge: 'Beta'
       },
       {
         key: 'calendar',
@@ -62,7 +65,8 @@ const FEATURE_CONFIG = [
       {
         key: 'pricing',
         fallback: 'Pricing',
-        to: '/dashboard/instructor/pricing'
+        to: '/dashboard/instructor/pricing',
+        badge: 'Insights'
       },
       {
         key: 'affiliate',
@@ -78,7 +82,7 @@ const FEATURE_CONFIG = [
   }
 ];
 
-export default function FeatureGrid() {
+export default function FeatureGrid({ onActionClick }) {
   const { t } = useLanguage();
 
   const eyebrow = t('home.featureGrid.eyebrow', 'Workflow shortcuts');
@@ -102,6 +106,10 @@ export default function FeatureGrid() {
       label: t(
         `home.featureGrid.categories.${feature.key}.actions.${action.key}`,
         action.fallback
+      ),
+      description: t(
+        `home.featureGrid.categories.${feature.key}.descriptions.${action.key}`,
+        ''
       )
     }))
   }));
@@ -128,9 +136,22 @@ export default function FeatureGrid() {
                   <Link
                     key={action.key}
                     to={action.to}
-                    className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                    className="group inline-flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-4 py-2 text-left text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+                    onClick={() => onActionClick?.(action)}
                   >
-                    {action.label}
+                    <span>
+                      {action.label}
+                      {action.description && (
+                        <span className="block text-xs font-medium text-slate-400 group-hover:text-primary/80">
+                          {action.description}
+                        </span>
+                      )}
+                    </span>
+                    {action.badge && (
+                      <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                        {action.badge}
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>
@@ -141,3 +162,11 @@ export default function FeatureGrid() {
     </section>
   );
 }
+
+FeatureGrid.propTypes = {
+  onActionClick: PropTypes.func
+};
+
+FeatureGrid.defaultProps = {
+  onActionClick: undefined
+};

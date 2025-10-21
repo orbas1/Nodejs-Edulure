@@ -99,4 +99,13 @@ describe('Provider transition HTTP routes', () => {
       { tenantScope: 'global' }
     );
   });
+
+  it('guards against invalid announcement identifiers', async () => {
+    const response = await request(app)
+      .post('/api/v1/provider-transition/announcements/invalid slug/status-updates')
+      .send({ statusCode: 'testing' });
+
+    expect(response.status).toBe(422);
+    expect(serviceMock.recordStatusUpdate).not.toHaveBeenCalled();
+  });
 });

@@ -1,4 +1,14 @@
-<svg width="560" height="360" viewBox="0 0 560 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg
+  width="560"
+  height="360"
+  viewBox="0 0 560 360"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby="libraryPreviewTitle libraryPreviewDescription"
+>
+  <title id="libraryPreviewTitle">Resource library preview</title>
+  <desc id="libraryPreviewDescription">Grid tile showcasing a featured resource tile and metadata from the Edulure content library.</desc>
   <defs>
     <linearGradient id="libraryGlow" x1="120" y1="40" x2="460" y2="320" gradientUnits="userSpaceOnUse">
       <stop stop-color="#38bdf8" />

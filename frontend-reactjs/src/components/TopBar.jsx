@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { useState } from 'react';
 import { BellIcon, ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline';
 import CommunitySwitcher from './CommunitySwitcher.jsx';
 import SearchBar from './SearchBar.jsx';
@@ -13,18 +14,44 @@ export default function TopBar({
   searchValue,
   onSearchChange,
   onSearchSubmit,
-  isSearching = false
+  isSearching = false,
+  messageCount = 0,
+  notificationCount = 0,
+  onOpenMessages,
+  onOpenNotifications,
+  profileImageUrl = 'https://i.pravatar.cc/100?img=15',
+  profileAlt = 'Your profile'
 }) {
+  const [localSearchValue, setLocalSearchValue] = useState('');
+  const resolvedSearchValue = searchValue ?? localSearchValue;
+
   const handleSearchChange = (value, event) => {
     if (typeof onSearchChange === 'function') {
       onSearchChange(value, event);
+    }
+    if (searchValue === undefined) {
+      setLocalSearchValue(value);
     }
   };
 
   const handleSearchSubmit = (event) => {
     if (typeof onSearchSubmit === 'function') {
-      const inputValue = event?.target?.search?.value ?? '';
-      onSearchSubmit(inputValue);
+      const formValue = event?.target?.search?.value;
+      const rawValue = searchValue ?? localSearchValue ?? formValue ?? '';
+      const trimmedValue = (formValue ?? rawValue ?? '').trim();
+      onSearchSubmit(trimmedValue);
+    }
+  };
+
+  const handleOpenMessages = () => {
+    if (typeof onOpenMessages === 'function') {
+      onOpenMessages();
+    }
+  };
+
+  const handleOpenNotifications = () => {
+    if (typeof onOpenNotifications === 'function') {
+      onOpenNotifications();
     }
   };
 
@@ -46,7 +73,7 @@ export default function TopBar({
       </div>
       <div className="w-full sm:flex-1">
         <SearchBar
-          value={searchValue}
+          value={resolvedSearchValue}
           onChange={handleSearchChange}
           onSubmit={handleSearchSubmit}
           loading={isSearching}
@@ -59,25 +86,33 @@ export default function TopBar({
           type="button"
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary"
           aria-label="Open community messages"
+          title="Open community messages"
+          onClick={handleOpenMessages}
         >
           <ChatBubbleLeftEllipsisIcon className="h-5 w-5" />
-          <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-white">
-            3
-          </span>
+          {messageCount > 0 ? (
+            <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-white">
+              {messageCount > 99 ? '99+' : messageCount}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"
           className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-primary hover:text-primary"
           aria-label="Open community notifications"
+          title="Open community notifications"
+          onClick={handleOpenNotifications}
         >
           <BellIcon className="h-5 w-5" />
-          <span className="absolute -right-1 -top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-white">
-            7
-          </span>
+          {notificationCount > 0 ? (
+            <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold leading-none text-white">
+              {notificationCount > 99 ? '99+' : notificationCount}
+            </span>
+          ) : null}
         </button>
         <img
-          src="https://i.pravatar.cc/100?img=15"
-          alt="Your profile"
+          src={profileImageUrl}
+          alt={profileAlt}
           className="h-10 w-10 rounded-full border border-white shadow-md"
         />
       </div>
@@ -104,5 +139,11 @@ TopBar.propTypes = {
   searchValue: PropTypes.string,
   onSearchChange: PropTypes.func,
   onSearchSubmit: PropTypes.func,
-  isSearching: PropTypes.bool
+  isSearching: PropTypes.bool,
+  messageCount: PropTypes.number,
+  notificationCount: PropTypes.number,
+  onOpenMessages: PropTypes.func,
+  onOpenNotifications: PropTypes.func,
+  profileImageUrl: PropTypes.string,
+  profileAlt: PropTypes.string
 };

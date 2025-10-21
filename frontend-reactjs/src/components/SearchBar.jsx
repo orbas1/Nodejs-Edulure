@@ -8,13 +8,17 @@ export default function SearchBar({
   onSubmit,
   placeholder = 'Search across courses, communities, lessons...',
   loading = false,
-  ariaLabel = 'Search the catalogue'
+  ariaLabel = 'Search the catalogue',
+  allowClear = false,
+  onClear
 }) {
   const handleSubmit = (event) => {
-    if (typeof onSubmit === 'function') {
-      event.preventDefault();
-      onSubmit(event);
-    }
+    if (typeof onSubmit !== 'function') return;
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const submittedValue = formData.get('search');
+    onSubmit(typeof submittedValue === 'string' ? submittedValue : '', event);
   };
 
   const inputProps = {
@@ -47,6 +51,18 @@ export default function SearchBar({
           aria-hidden="true"
         />
       )}
+      {allowClear && (value?.length || defaultValue?.length) && (
+        <button
+          type="button"
+          onClick={() => {
+            onChange?.('', null);
+            onClear?.();
+          }}
+          className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500 transition hover:bg-slate-200"
+        >
+          Clear
+        </button>
+      )}
     </>
   );
 
@@ -68,5 +84,19 @@ SearchBar.propTypes = {
   onSubmit: PropTypes.func,
   placeholder: PropTypes.string,
   loading: PropTypes.bool,
-  ariaLabel: PropTypes.string
+  ariaLabel: PropTypes.string,
+  allowClear: PropTypes.bool,
+  onClear: PropTypes.func
+};
+
+SearchBar.defaultProps = {
+  value: undefined,
+  defaultValue: undefined,
+  onChange: undefined,
+  onSubmit: undefined,
+  placeholder: 'Search across courses, communities, lessons...',
+  loading: false,
+  ariaLabel: 'Search the catalogue',
+  allowClear: false,
+  onClear: undefined
 };

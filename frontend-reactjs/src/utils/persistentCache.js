@@ -1,4 +1,4 @@
-import { del, get, set } from 'idb-keyval';
+import { del, get, keys, set } from 'idb-keyval';
 
 const noopLogger = {
   error: () => {}
@@ -70,10 +70,31 @@ export function createPersistentCache(namespace, { ttlMs, logger = noopLogger } 
     }
   }
 
+  async function prune() {
+    try {
+      const allKeys = await keys();
+      const namespacePrefix = `${namespace}:`;
+      const candidates = allKeys.filter(
+        (key) => typeof key === 'string' && key.startsWith(namespacePrefix)
+      );
+      await Promise.all(
+        candidates.map(async (key) => {
+          const entry = await get(key);
+          if (entry?.expiresAt && entry.expiresAt < Date.now()) {
+            await del(key);
+          }
+        })
+      );
+    } catch (error) {
+      logger.error?.(`Failed to prune cache entries for ${namespace}`, error);
+    }
+  }
+
   return {
     read,
     write,
-    clear
+    clear,
+    prune
   };
 }
 
