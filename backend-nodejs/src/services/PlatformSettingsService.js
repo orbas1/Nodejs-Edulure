@@ -103,6 +103,8 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
   credentials: []
 });
 
+const ARRAY_MERGE_LIMIT = 20;
+
 function deepMerge(base, patch) {
   const baseClone = Array.isArray(base) ? [...base] : { ...base };
 
