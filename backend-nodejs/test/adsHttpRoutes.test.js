@@ -80,7 +80,7 @@ describe('Ads HTTP routes', () => {
 
   it('rejects metrics payloads with validation errors', async () => {
     const response = await request(app)
-      .post(`/api/ads/campaigns/${baseCampaignId()}/metrics`)
+      .post(`/api/v1/ads/campaigns/${baseCampaignId()}/metrics`)
       .set('Authorization', 'Bearer token')
       .send({ impressions: -1 });
 
@@ -96,7 +96,7 @@ describe('Ads HTTP routes', () => {
     });
 
     const response = await request(app)
-      .get(`/api/ads/campaigns/${baseCampaignId()}/insights?windowDays=21`)
+      .get(`/api/v1/ads/campaigns/${baseCampaignId()}/insights?windowDays=21`)
       .set('Authorization', 'Bearer token');
 
     expect(response.status).toBe(200);
