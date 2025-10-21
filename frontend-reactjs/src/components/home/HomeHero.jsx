@@ -39,7 +39,7 @@ export default function HomeHero() {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               {t('home.hero.status', 'Built for cohort-based learning')}
             </span>
-            <LanguageSelector size="small" variant="dark" align="end" className="ml-auto" />
+            <LanguageSelector size="compact" variant="dark" align="end" className="ml-auto" />
           </div>
           <div>
             <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">{headline}</h1>
