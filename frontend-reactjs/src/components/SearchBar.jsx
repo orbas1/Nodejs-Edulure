@@ -11,10 +11,12 @@ export default function SearchBar({
   ariaLabel = 'Search the catalogue'
 }) {
   const handleSubmit = (event) => {
-    if (typeof onSubmit === 'function') {
-      event.preventDefault();
-      onSubmit(event);
-    }
+    if (typeof onSubmit !== 'function') return;
+    event.preventDefault();
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const submittedValue = formData.get('search');
+    onSubmit(typeof submittedValue === 'string' ? submittedValue : '', event);
   };
 
   const inputProps = {
