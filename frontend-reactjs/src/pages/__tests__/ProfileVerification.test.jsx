@@ -102,6 +102,8 @@ describe('<Profile /> verification workflow', () => {
 
     render(<Profile />);
 
+    expect(document.title).toContain('Alex Morgan');
+
     const frontInput = await screen.findByLabelText('Front of ID');
     await userEvent.upload(frontInput, new File(['content'], 'front.png', { type: 'image/png' }));
 
@@ -156,6 +158,8 @@ describe('<Profile /> verification workflow', () => {
     submitVerificationPackageMock.mockResolvedValue({});
 
     render(<Profile />);
+
+    expect(document.title).toContain('Alex Morgan');
 
     const submitButton = await screen.findByRole('button', { name: 'Submit for review' });
     expect(submitButton).toBeEnabled();

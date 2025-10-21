@@ -36,6 +36,14 @@ const EVENT_SCHEMA = z.object({
   tags: z.array(z.string().trim()).default([])
 });
 
+function formatValidationIssues(issues) {
+  return issues.map((issue) => ({
+    path: issue.path.length > 0 ? issue.path.join('.') : '',
+    message: issue.message,
+    code: issue.code
+  }));
+}
+
 function hashValue(value) {
   if (!value) {
     return null;
@@ -104,7 +112,16 @@ export class TelemetryIngestionService {
       throw error;
     }
 
-    const parsed = EVENT_SCHEMA.parse(rawPayload ?? {});
+    const validation = EVENT_SCHEMA.safeParse(rawPayload ?? {});
+    if (!validation.success) {
+      const error = new Error('Telemetry event payload is invalid');
+      error.status = 422;
+      error.code = 'INVALID_TELEMETRY_EVENT';
+      error.details = formatValidationIssues(validation.error.issues);
+      throw error;
+    }
+
+    const parsed = validation.data;
     const tenantId = parsed.tenantId ?? 'global';
     const correlationId = parsed.correlationId ?? crypto.randomUUID().replace(/-/g, '').slice(0, 32);
     const consentScope = normaliseScope(parsed.consentScope, this.config.defaultScope);
@@ -166,7 +183,7 @@ export class TelemetryIngestionService {
       correlationId,
       consentScope,
       consentStatus,
-      ingestionStatus: duplicate ? 'duplicate' : ingestionStatus,
+      ingestionStatus,
       payload: parsed.payload,
       context,
       metadata,
@@ -175,6 +192,7 @@ export class TelemetryIngestionService {
     });
 
     const resolvedStatus = duplicate ? 'duplicate' : event.ingestionStatus;
+    const eventRecord = duplicate ? { ...event, ingestionStatus: 'duplicate' } : event;
 
     recordTelemetryIngestion({
       scope: consentScope,
@@ -186,8 +204,8 @@ export class TelemetryIngestionService {
       lastEventAt: occurredAt,
       thresholdMinutes: this.config.freshnessThresholdMinutes,
       metadata: {
-        eventId: event.id,
-        eventName: event.eventName,
+        eventId: eventRecord.id,
+        eventName: eventRecord.eventName,
         ingestionStatus: resolvedStatus
       }
     });
@@ -200,10 +218,10 @@ export class TelemetryIngestionService {
     });
 
     return {
-      event,
+      event: eventRecord,
       duplicate,
       consent: consentRecord,
-      suppressed: event.ingestionStatus === 'suppressed'
+      suppressed: resolvedStatus === 'suppressed'
     };
   }
 }

@@ -15,6 +15,7 @@ import { createEbookPurchaseIntent, listMarketplaceEbooks } from '../api/ebookAp
 import { requestMediaUpload } from '../api/mediaApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 import { computeFileChecksum } from '../utils/uploads.js';
 
@@ -777,6 +778,51 @@ export default function Ebooks() {
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
   const [uploadState, setUploadState] = useState({});
+
+  const featuredEbook = useMemo(() => marketplace[0] ?? liveEbooks[0] ?? null, [marketplace, liveEbooks]);
+  const ebookKeywords = useMemo(() => {
+    if (!featuredEbook) {
+      return [];
+    }
+    const keywords = new Set();
+    (featuredEbook.categories ?? []).forEach((category) => {
+      if (typeof category === 'string') {
+        keywords.add(category);
+      } else if (typeof category?.name === 'string') {
+        keywords.add(category.name);
+      }
+    });
+    if (typeof featuredEbook.author === 'string') {
+      keywords.add(featuredEbook.author);
+    }
+    if (featuredEbook.readingTimeMinutes) {
+      keywords.add(`${featuredEbook.readingTimeMinutes} minute read`);
+    }
+    return Array.from(keywords);
+  }, [featuredEbook]);
+
+  const ebooksMetaDescription = useMemo(() => {
+    if (featuredEbook?.description) {
+      return featuredEbook.description;
+    }
+    if (featuredEbook?.title) {
+      return `Preview ${featuredEbook.title} and browse premium Edulure e-books packed with operator playbooks, templates, and actionable frameworks.`;
+    }
+    return 'Unlock Edulure e-books and playbooks covering growth, community, enablement, and monetisation. Filter by reading time, category, and instructor expertise.';
+  }, [featuredEbook]);
+
+  usePageMetadata({
+    title: featuredEbook?.title ? `${featuredEbook.title} · Edulure e-books` : 'Edulure e-books and playbooks',
+    description: ebooksMetaDescription,
+    canonicalPath: featuredEbook?.slug ? `/ebooks/${featuredEbook.slug}` : '/ebooks',
+    image: featuredEbook?.coverImageUrl ?? undefined,
+    keywords: ebookKeywords,
+    analytics: {
+      page_type: 'ebooks',
+      marketplace_count: marketplace.length,
+      live_count: liveEbooks.length
+    }
+  });
 
   const updateUploadState = useCallback((field, patch) => {
     setUploadState((current) => ({

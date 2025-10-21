@@ -180,6 +180,43 @@ function serialiseCallSummary(summary) {
   };
 }
 
+function calculateCallHealthStats(callSummary) {
+  const total = Number(callSummary?.total ?? 0);
+  if (!total) {
+    return { successRate: null, errorRate: null, degradedRate: null };
+  }
+
+  const success = Number(callSummary?.success ?? 0);
+  const degraded = Number(callSummary?.degraded ?? 0);
+  const failure = Number(callSummary?.failure ?? 0);
+
+  return {
+    successRate: Math.max(0, Math.min(100, Math.round((success / total) * 100))),
+    degradedRate: Math.max(0, Math.min(100, Math.round((degraded / total) * 100))),
+    errorRate: Math.max(0, Math.min(100, Math.round((failure / total) * 100)))
+  };
+}
+
+function buildSloSummary(summary, healthStats) {
+  if (!summary) {
+    return null;
+  }
+
+  const sloTarget = 98;
+  const successRate = summary.successRate ?? healthStats.successRate ?? null;
+  if (successRate === null) {
+    return null;
+  }
+
+  const variance = Number.isFinite(successRate) ? Number((successRate - sloTarget).toFixed(2)) : null;
+  return {
+    sloTarget,
+    successRate,
+    variance,
+    breaching: variance !== null && variance < -0.5
+  };
+}
+
 export default class IntegrationDashboardService {
   constructor({
     orchestratorService = integrationOrchestratorService,
@@ -268,6 +305,10 @@ export default class IntegrationDashboardService {
 
         const health = deriveHealth(summary, enabledSnapshot);
 
+        const callSummarySanitised = serialiseCallSummary(callSummary ?? integrationSnapshot.callSummary ?? null);
+        const callHealth = calculateCallHealthStats(callSummarySanitised);
+        const slo = buildSloSummary(summary, callHealth);
+
         return {
           ...meta,
           enabled: enabledSnapshot,
@@ -279,7 +320,9 @@ export default class IntegrationDashboardService {
           reconciliation,
           status: integrationSnapshot,
           statusDetails: serialiseStatus(statusRecord) ?? serialiseStatus(integrationSnapshot.status ?? null),
-          callSummary: serialiseCallSummary(callSummary ?? integrationSnapshot.callSummary ?? null)
+          callSummary: callSummarySanitised,
+          callHealth,
+          slo
         };
       })
     );
@@ -356,6 +399,47 @@ export default class IntegrationDashboardService {
       correlationId: result.run.correlationId,
       status: result.run.status ?? 'pending',
       triggeredBy: result.run.triggeredBy ?? 'manual-dashboard'
+    };
+  }
+
+  async healthOverview() {
+    const snapshot = await this.buildSnapshot({ runLimit: 5, failureLimit: 20, reportLimit: 3 });
+    const totals = snapshot.integrations.reduce(
+      (acc, integration) => {
+        const { callHealth, summary } = integration;
+        const successRate = summary.successRate ?? callHealth.successRate ?? null;
+        if (successRate !== null) {
+          acc.successRates.push(successRate);
+        }
+
+        if (callHealth.errorRate !== null) {
+          acc.errorRates.push(callHealth.errorRate);
+        }
+
+        if (integration.health === 'critical') {
+          acc.critical.push(integration.id);
+        } else if (integration.health === 'warning') {
+          acc.warning.push(integration.id);
+        }
+
+        return acc;
+      },
+      { successRates: [], errorRates: [], critical: [], warning: [] }
+    );
+
+    const average = (values) => {
+      if (!values.length) return null;
+      const sum = values.reduce((acc, value) => acc + value, 0);
+      return Number((sum / values.length).toFixed(2));
+    };
+
+    return {
+      generatedAt: snapshot.generatedAt,
+      averageSuccessRate: average(totals.successRates),
+      averageErrorRate: average(totals.errorRates),
+      criticalIntegrations: totals.critical,
+      warningIntegrations: totals.warning,
+      totalIntegrations: snapshot.integrations.length
     };
   }
 }

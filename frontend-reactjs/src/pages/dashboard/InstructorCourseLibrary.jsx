@@ -4,8 +4,9 @@ import { useOutletContext } from 'react-router-dom';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import CourseLibraryHeader from './instructor/courseLibrary/CourseLibraryHeader.jsx';
 import CourseLibraryTable from './instructor/courseLibrary/CourseLibraryTable.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
-export default function InstructorCourseLibrary({ onUploadAsset }) {
+function InstructorCourseLibrary({ onUploadAsset }) {
   const { dashboard, refresh } = useOutletContext();
   const library = dashboard?.courses?.library ?? [];
 
@@ -35,3 +36,5 @@ InstructorCourseLibrary.propTypes = {
 InstructorCourseLibrary.defaultProps = {
   onUploadAsset: undefined
 };
+
+export default withInstructorDashboardAccess(InstructorCourseLibrary);

@@ -42,6 +42,7 @@ async function resolveUserFromToken(token) {
 class RealtimeService {
   constructor() {
     this.io = null;
+    this.activeConnections = new Map();
   }
 
   async start(httpServer) {
@@ -92,6 +93,9 @@ class RealtimeService {
       log.info({ userId: user.id }, 'socket connected');
       socket.join(`user:${user.id}`);
       socket.emit('realtime.ready', { user });
+      const userConnections = this.activeConnections.get(user.id) ?? new Set();
+      userConnections.add(socket.id);
+      this.activeConnections.set(user.id, userConnections);
 
       socket.on('inbox.join', async (payload) => {
         const threadId = Number(payload?.threadId);
@@ -158,6 +162,13 @@ class RealtimeService {
 
       socket.on('disconnect', () => {
         log.info({ userId: user.id }, 'socket disconnected');
+        const connections = this.activeConnections.get(user.id);
+        if (connections) {
+          connections.delete(socket.id);
+          if (!connections.size) {
+            this.activeConnections.delete(user.id);
+          }
+        }
         socket.data.joinedCourses?.forEach((courseId) => {
           const presence = courseLiveService.leaveCourse(courseId, user.id);
           this.io.to(`course:${courseId}`).emit('course.presence', {
@@ -222,6 +233,19 @@ class RealtimeService {
       courseId,
       presence
     });
+  }
+
+  getConnectionSummary() {
+    const totalConnections = Array.from(this.activeConnections.values()).reduce(
+      (total, connections) => total + connections.size,
+      0
+    );
+
+    return {
+      connectedUsers: this.activeConnections.size,
+      totalConnections,
+      generatedAt: new Date().toISOString()
+    };
   }
 
   broadcastCourseMessage(courseId, message) {

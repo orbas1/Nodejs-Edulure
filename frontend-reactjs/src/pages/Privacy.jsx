@@ -1,4 +1,5 @@
 import PageHero from '../components/PageHero.jsx';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const lastUpdated = '24 November 2024';
 const policyOwner = 'Blackwellen Ltd Data Protection Office';
@@ -221,6 +222,27 @@ const reviewSummary = [
 ];
 
 export default function Privacy() {
+  usePageMetadata({
+    title: 'Privacy Notice · Edulure',
+    description: `${companyProfile.name} explains how learner, instructor, and community data is collected, used, and protected across the Edulure platform.`,
+    canonicalPath: '/privacy',
+    structuredData: {
+      '@context': 'https://schema.org',
+      '@type': 'PrivacyPolicy',
+      name: 'Edulure Privacy Notice',
+      creator: {
+        '@type': 'Organization',
+        name: companyProfile.name,
+        url: 'https://www.edulure.com'
+      },
+      dateModified: lastUpdatedDate,
+      jurisdiction: companyProfile.jurisdiction
+    },
+    analytics: {
+      page_type: 'privacy_notice'
+    }
+  });
+
   return (
     <div className="bg-white text-slate-700">
       <PageHero

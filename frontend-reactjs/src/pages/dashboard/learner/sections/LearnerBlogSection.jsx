@@ -5,6 +5,17 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
 }
 
+function normaliseSlug(slug) {
+  if (typeof slug !== 'string') {
+    return '';
+  }
+  const trimmed = slug.trim().replace(/^\/+/, '').replace(/\/+$/, '');
+  if (trimmed.length === 0) {
+    return '';
+  }
+  return trimmed;
+}
+
 export default function LearnerBlogSection({ posts, featured, className }) {
   if (!Array.isArray(posts) || posts.length === 0) {
     return (
@@ -29,7 +40,11 @@ export default function LearnerBlogSection({ posts, featured, className }) {
   }
 
   const spotlight = featured ?? posts[0];
-  const supporting = posts.filter((post) => post.slug !== spotlight.slug).slice(0, 3);
+  const spotlightSlug = normaliseSlug(spotlight?.slug);
+  const supporting = posts
+    .filter((post) => normaliseSlug(post.slug) !== spotlightSlug)
+    .slice(0, 3);
+  const spotlightLink = spotlightSlug ? `/blog/${spotlightSlug}` : '/blog';
 
   return (
     <section
@@ -64,7 +79,7 @@ export default function LearnerBlogSection({ posts, featured, className }) {
               {spotlight.publishedAt ? new Date(spotlight.publishedAt).toLocaleDateString() : 'Drafted'}
             </span>
             <Link
-              to={`/blog/${spotlight.slug}`}
+              to={spotlightLink}
               className="rounded-full bg-primary px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-card transition hover:bg-primary-dark"
             >
               Read article
@@ -73,10 +88,12 @@ export default function LearnerBlogSection({ posts, featured, className }) {
         </div>
         <div className="grid gap-2 text-xs text-slate-500">
           <p className="text-sm font-semibold text-slate-700">Recently published</p>
-          {supporting.map((post) => (
-            <Link
-              key={post.slug}
-              to={`/blog/${post.slug}`}
+          {supporting.map((post) => {
+            const safeSlug = normaliseSlug(post.slug);
+            return (
+              <Link
+              key={safeSlug || post.slug || post.title}
+              to={safeSlug ? `/blog/${safeSlug}` : '/blog'}
               className="rounded-2xl border border-slate-200 bg-white/60 px-4 py-3 text-left transition hover:border-primary/40 hover:text-primary"
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">
@@ -85,7 +102,8 @@ export default function LearnerBlogSection({ posts, featured, className }) {
               <p className="mt-1 text-sm font-semibold text-slate-900">{post.title}</p>
               <p className="mt-1 line-clamp-2 text-xs text-slate-500">{post.excerpt ?? 'Read more'}</p>
             </Link>
-          ))}
+            );
+          })}
         </div>
       </article>
     </section>

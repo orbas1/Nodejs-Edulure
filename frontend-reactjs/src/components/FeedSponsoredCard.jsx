@@ -1,5 +1,7 @@
 import PropTypes from 'prop-types';
 
+const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
+
 function formatUrl(url) {
   if (!url) return 'landing page';
   try {
@@ -10,10 +12,31 @@ function formatUrl(url) {
   }
 }
 
-export default function FeedSponsoredCard({ ad, canManage = false, onDismiss, isProcessing = false }) {
+function getSafeUrl(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (!SAFE_URL_PROTOCOLS.has(parsed.protocol)) {
+      return null;
+    }
+    return parsed.toString();
+  } catch (error) {
+    return null;
+  }
+}
+
+export default function FeedSponsoredCard({
+  ad,
+  canManage = false,
+  onDismiss,
+  isProcessing = false,
+  onVisit
+}) {
   const advertiser = ad.advertiser ?? 'Edulure Partner';
   const description = ad.description || 'Discover how operators are scaling with Edulure Ads.';
-  const targetLabel = formatUrl(ad.ctaUrl);
+  const safeCtaUrl = getSafeUrl(ad.ctaUrl);
+  const targetLabel = formatUrl(safeCtaUrl);
+  const metrics = ad.metrics ?? {};
 
   return (
     <article className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-6 shadow-sm">
@@ -33,12 +56,13 @@ export default function FeedSponsoredCard({ ad, canManage = false, onDismiss, is
       </div>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-slate-400">{ad.disclosure ?? 'Edulure Ads'}</p>
-        {ad.ctaUrl && (
+        {safeCtaUrl && (
           <a
-            href={ad.ctaUrl}
+            href={safeCtaUrl}
             className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-amber-600"
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => onVisit?.(ad)}
           >
             Visit {targetLabel}
           </a>
@@ -54,6 +78,22 @@ export default function FeedSponsoredCard({ ad, canManage = false, onDismiss, is
           </button>
         )}
       </div>
+      {(metrics.clicks || metrics.conversions) && (
+        <dl className="mt-4 flex flex-wrap gap-4 text-xs text-amber-700">
+          {metrics.clicks && (
+            <div className="flex items-center gap-1">
+              <span className="font-semibold">{metrics.clicks}</span>
+              <span>clicks</span>
+            </div>
+          )}
+          {metrics.conversions && (
+            <div className="flex items-center gap-1">
+              <span className="font-semibold">{metrics.conversions}</span>
+              <span>conversions</span>
+            </div>
+          )}
+        </dl>
+      )}
     </article>
   );
 }
@@ -67,10 +107,22 @@ FeedSponsoredCard.propTypes = {
     objective: PropTypes.string,
     ctaUrl: PropTypes.string,
     disclosure: PropTypes.string,
-    position: PropTypes.number
+    position: PropTypes.number,
+    metrics: PropTypes.shape({
+      clicks: PropTypes.number,
+      conversions: PropTypes.number
+    })
   }).isRequired,
   canManage: PropTypes.bool,
   onDismiss: PropTypes.func,
-  isProcessing: PropTypes.bool
+  isProcessing: PropTypes.bool,
+  onVisit: PropTypes.func
+};
+
+FeedSponsoredCard.defaultProps = {
+  canManage: false,
+  onDismiss: undefined,
+  isProcessing: false,
+  onVisit: undefined
 };
 

@@ -1,4 +1,14 @@
-<svg width="560" height="360" viewBox="0 0 560 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg
+  width="560"
+  height="360"
+  viewBox="0 0 560 360"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby="liveEventsPreviewTitle liveEventsPreviewDescription"
+>
+  <title id="liveEventsPreviewTitle">Live events stage preview</title>
+  <desc id="liveEventsPreviewDescription">Stage layout with spotlight buttons representing Edulure live events and broadcasts.</desc>
   <defs>
     <linearGradient id="eventsGlow" x1="120" y1="40" x2="460" y2="320" gradientUnits="userSpaceOnUse">
       <stop stop-color="#f97316" />

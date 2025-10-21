@@ -624,6 +624,29 @@ export class SearchClusterService {
     return match?.client ?? createMeilisearchClient(host, env.search.adminApiKey);
   }
 
+  getClusterStatus() {
+    const nodes = [...this.adminNodes, ...this.replicaNodes, ...this.readNodes];
+    const summary = nodes.reduce(
+      (acc, node) => {
+        if (node.health.status === 'healthy') {
+          acc.healthy += 1;
+        } else if (node.health.status === 'degraded') {
+          acc.degraded += 1;
+        } else {
+          acc.unreachable += 1;
+        }
+        return acc;
+      },
+      { healthy: 0, degraded: 0, unreachable: 0 }
+    );
+
+    return {
+      nodes: nodes.map((node) => ({ host: node.host, status: node.health.status, latencyMs: node.health.latencyMs })),
+      summary,
+      generatedAt: new Date().toISOString()
+    };
+  }
+
   async createSnapshot() {
     return this.withAdminClient('create-snapshot', async (client) => {
       const task = await recordSearchOperation('create_snapshot', () => client.createSnapshot());

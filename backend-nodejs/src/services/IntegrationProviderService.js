@@ -17,6 +17,7 @@ import TwilioMessagingClient from '../integrations/TwilioMessagingClient.js';
 import IntegrationWebhookReceiptService from './IntegrationWebhookReceiptService.js';
 
 const STRIPE_API_VERSION = '2024-06-20';
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 class IntegrationProviderService {
   static redisClient = env.redis.enabled ? getRedisClient() : null;
@@ -28,6 +29,43 @@ class IntegrationProviderService {
   static cloudConvertClient;
 
   static twilioClient;
+
+  static cacheTimestamps = new Map();
+
+  static isCacheFresh(key) {
+    const timestamp = this.cacheTimestamps.get(key);
+    if (!timestamp) {
+      return false;
+    }
+
+    return Date.now() - timestamp < CACHE_TTL_MS;
+  }
+
+  static updateCacheTimestamp(key) {
+    this.cacheTimestamps.set(key, Date.now());
+  }
+
+  static resetCache(key) {
+    if (key) {
+      this.cacheTimestamps.delete(key);
+      if (key === 'stripe') {
+        this.stripeGateway = null;
+      } else if (key === 'paypal') {
+        this.paypalGateway = null;
+      } else if (key === 'cloudconvert') {
+        this.cloudConvertClient = null;
+      } else if (key === 'twilio') {
+        this.twilioClient = null;
+      }
+      return;
+    }
+
+    this.cacheTimestamps.clear();
+    this.stripeGateway = null;
+    this.paypalGateway = null;
+    this.cloudConvertClient = null;
+    this.twilioClient = null;
+  }
 
   static buildCircuitBreaker(name, { failureThreshold, cooldownSeconds }) {
     const keyPrefix = env.redis.lockPrefix ?? 'edulure:locks';
@@ -41,7 +79,7 @@ class IntegrationProviderService {
   }
 
   static getStripeGateway() {
-    if (this.stripeGateway) {
+    if (this.stripeGateway && this.isCacheFresh('stripe')) {
       return this.stripeGateway;
     }
 
@@ -71,11 +109,13 @@ class IntegrationProviderService {
       receiptService: IntegrationWebhookReceiptService
     });
 
+    this.updateCacheTimestamp('stripe');
+
     return this.stripeGateway;
   }
 
   static getPayPalGateway() {
-    if (this.paypalGateway) {
+    if (this.paypalGateway && this.isCacheFresh('paypal')) {
       return this.paypalGateway;
     }
 
@@ -103,11 +143,13 @@ class IntegrationProviderService {
       logger: logger.child({ module: 'paypal-gateway' })
     });
 
+    this.updateCacheTimestamp('paypal');
+
     return this.paypalGateway;
   }
 
   static getCloudConvertClient() {
-    if (this.cloudConvertClient) {
+    if (this.cloudConvertClient && this.isCacheFresh('cloudconvert')) {
       return this.cloudConvertClient;
     }
 
@@ -130,11 +172,13 @@ class IntegrationProviderService {
       logger: logger.child({ module: 'cloudconvert-client' })
     });
 
+    this.updateCacheTimestamp('cloudconvert');
+
     return this.cloudConvertClient;
   }
 
   static getTwilioClient() {
-    if (this.twilioClient) {
+    if (this.twilioClient && this.isCacheFresh('twilio')) {
       return this.twilioClient;
     }
 
@@ -158,7 +202,18 @@ class IntegrationProviderService {
       logger: logger.child({ module: 'twilio-client' })
     });
 
+    this.updateCacheTimestamp('twilio');
+
     return this.twilioClient;
+  }
+
+  static describeProviders() {
+    return {
+      stripe: Boolean(this.stripeGateway),
+      paypal: Boolean(this.paypalGateway),
+      cloudConvert: Boolean(this.cloudConvertClient),
+      twilio: Boolean(this.twilioClient)
+    };
   }
 }
 

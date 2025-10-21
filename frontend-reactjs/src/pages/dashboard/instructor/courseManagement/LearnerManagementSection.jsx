@@ -25,7 +25,12 @@ function resolveRiskClass(riskLevel) {
 
 export default function LearnerManagementSection({ learners }) {
   const roster = Array.isArray(learners?.roster) ? learners.roster : [];
-  const riskAlerts = Array.isArray(learners?.riskAlerts) ? learners.riskAlerts : [];
+  const riskAlerts = Array.isArray(learners?.riskAlerts)
+    ? learners.riskAlerts.map((alert) => ({
+        ...alert,
+        riskLevel: alert.riskLevel ?? 'low'
+      }))
+    : [];
 
   const rosterWithSort = useMemo(
     () =>
@@ -79,6 +84,30 @@ export default function LearnerManagementSection({ learners }) {
     );
   };
 
+  const handleExportRoster = () => {
+    if (typeof document === 'undefined' || typeof URL === 'undefined') return;
+    const headers = ['Learner', 'Course', 'Progress', 'Cohort', 'Risk'];
+    const lines = rosterWithSort.map((entry) => [
+      entry.name,
+      entry.courseTitle,
+      `${entry.progressPercent ?? 0}%`,
+      entry.cohort,
+      formatRiskLabel(entry.riskLevel)
+    ]);
+    const csv = [headers, ...lines]
+      .map((line) => line.map((value) => String(value ?? '').replaceAll('"', '""')).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'learner-roster.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section className="dashboard-section">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -88,6 +117,9 @@ export default function LearnerManagementSection({ learners }) {
             Prioritise interventions and monitor progression across every cohort.
           </p>
         </div>
+        <button type="button" className="dashboard-pill px-4 py-2 text-xs" onClick={handleExportRoster}>
+          Export roster CSV
+        </button>
         <div className="grid grid-cols-2 gap-3 text-xs text-slate-600 md:grid-cols-4 md:text-sm">
           <div className="dashboard-card-muted px-4 py-3 text-center">
             <p className="text-lg font-semibold text-slate-900">{metrics.totalLearners}</p>

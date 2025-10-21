@@ -59,6 +59,7 @@ describe('<IntegrationCredentialInvite />', () => {
     expect(screen.getByText('How this works')).toBeInTheDocument();
     expect(screen.getByDisplayValue('ops@example.com')).toBeInTheDocument();
     expect(screen.getByDisplayValue('90')).toBeInTheDocument();
+    expect(document.title).toContain('Provide OpenAI credential');
   });
 
   it('surfaces an error when the invitation cannot be retrieved', async () => {

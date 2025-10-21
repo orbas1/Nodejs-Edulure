@@ -8,6 +8,7 @@ import CreationStudioSummary from './instructor/creationStudio/CreationStudioSum
 import CreationProjectList from './instructor/creationStudio/CreationProjectList.jsx';
 import CreationWizardStepper from './instructor/creationStudio/CreationWizardStepper.jsx';
 import CreationAssetLibrary from './instructor/creationStudio/CreationAssetLibrary.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 import CreationCollaboratorsPanel from './instructor/creationStudio/CreationCollaboratorsPanel.jsx';
 import CreationAnalyticsDashboard from './instructor/creationStudio/CreationAnalyticsDashboard.jsx';
 import {
@@ -18,7 +19,7 @@ import {
 
 const INITIAL_FILTERS = { search: '', type: 'all' };
 
-export default function InstructorCreationStudio() {
+function InstructorCreationStudio() {
   const { session } = useAuth();
   const { role, refresh } = useOutletContext();
   const token = session?.tokens?.accessToken ?? null;
@@ -371,3 +372,5 @@ export default function InstructorCreationStudio() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorCreationStudio);

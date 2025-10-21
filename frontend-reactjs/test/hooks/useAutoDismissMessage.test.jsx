@@ -30,6 +30,7 @@ describe('useAutoDismissMessage', () => {
   afterEach(() => {
     vi.runOnlyPendingTimers();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('clears the message after the timeout elapses', () => {
@@ -78,5 +79,31 @@ describe('useAutoDismissMessage', () => {
     }
 
     expect(() => render(<NoopHandler />)).not.toThrow();
+  });
+
+  it('falls back to a default timeout when the provided value is invalid', () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+    render(<TestHarness initialMessage="Hello" timeout={-1} />);
+
+    expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 6000);
+  });
+
+  it('clears timers on unmount to prevent leaks', () => {
+    const clearTimeoutSpy = vi.spyOn(window, 'clearTimeout');
+    const { unmount } = render(<TestHarness initialMessage="Hello" timeout={1200} />);
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    unmount();
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+  });
+
+  it('avoids scheduling work when there is no message to display', () => {
+    const setTimeoutSpy = vi.spyOn(window, 'setTimeout');
+    render(<TestHarness initialMessage="" timeout={500} />);
+
+    expect(setTimeoutSpy).not.toHaveBeenCalled();
   });
 });

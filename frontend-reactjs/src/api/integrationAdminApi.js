@@ -26,7 +26,9 @@ export async function triggerIntegrationRun({ token, integration, windowStartAt,
   if (windowStartAt) payload.windowStartAt = windowStartAt;
   if (windowEndAt) payload.windowEndAt = windowEndAt;
 
-  return httpClient.post(`/admin/integrations/${integration}/runs`, payload, {
+  const safeIntegration = encodeURIComponent(integration);
+
+  return httpClient.post(`/admin/integrations/${safeIntegration}/runs`, payload, {
     token,
     cache: false,
     invalidateTags: [`integration-dashboard-${integration}`]
@@ -105,7 +107,9 @@ export async function rotateIntegrationApiKey({
 
   const payload = { key, rotationIntervalDays, expiresAt, reason, notes };
 
-  const response = await httpClient.post(`/admin/integrations/api-keys/${id}/rotate`, payload, {
+  const safeId = encodeURIComponent(id);
+
+  const response = await httpClient.post(`/admin/integrations/api-keys/${safeId}/rotate`, payload, {
     token,
     cache: false,
     invalidateTags: ['integration-api-keys']
@@ -122,7 +126,9 @@ export async function disableIntegrationApiKey({ token, id, reason } = {}) {
     throw new Error('API key identifier is required');
   }
 
-  const response = await httpClient.post(`/admin/integrations/api-keys/${id}/disable`, { reason }, {
+  const safeId = encodeURIComponent(id);
+
+  const response = await httpClient.post(`/admin/integrations/api-keys/${safeId}/disable`, { reason }, {
     token,
     cache: false,
     invalidateTags: ['integration-api-keys']
@@ -202,8 +208,10 @@ export async function resendIntegrationApiKeyInvitation({ token, id, requestedBy
     throw new Error('Invitation identifier is required');
   }
 
+  const safeId = encodeURIComponent(id);
+
   const response = await httpClient.post(
-    `/admin/integrations/api-keys/invitations/${id}/resend`,
+    `/admin/integrations/api-keys/invitations/${safeId}/resend`,
     { requestedByName },
     {
       token,
@@ -226,8 +234,10 @@ export async function cancelIntegrationApiKeyInvitation({ token, id } = {}) {
     throw new Error('Invitation identifier is required');
   }
 
+  const safeId = encodeURIComponent(id);
+
   const response = await httpClient.post(
-    `/admin/integrations/api-keys/invitations/${id}/cancel`,
+    `/admin/integrations/api-keys/invitations/${safeId}/cancel`,
     {},
     {
       token,
@@ -237,6 +247,81 @@ export async function cancelIntegrationApiKeyInvitation({ token, id } = {}) {
   );
 
   return response?.data ?? response;
+}
+
+export async function updateIntegrationSettings({ token, integration, payload, signal } = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to update integration settings');
+  }
+  if (!integration) {
+    throw new Error('An integration identifier is required to update settings');
+  }
+
+  const safeIntegration = encodeURIComponent(integration);
+
+  const response = await httpClient.put(
+    `/admin/integrations/${safeIntegration}/settings`,
+    payload ?? {},
+    {
+      token,
+      signal,
+      cache: false,
+      invalidateTags: [`integration-settings-${integration}`]
+    }
+  );
+
+  return response?.data ?? response;
+}
+
+export async function fetchIntegrationHealth({ token, integration, signal } = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to fetch integration health');
+  }
+  if (!integration) {
+    throw new Error('An integration identifier is required to fetch health information');
+  }
+
+  const safeIntegration = encodeURIComponent(integration);
+
+  const response = await httpClient.get(`/admin/integrations/${safeIntegration}/health`, {
+    token,
+    signal,
+    cache: { enabled: false }
+  });
+
+  return response?.data ?? response;
+}
+
+export async function downloadIntegrationReport({
+  token,
+  integration,
+  format = 'json',
+  signal,
+  params = {}
+} = {}) {
+  if (!token) {
+    throw new Error('Authentication token is required to download integration reports');
+  }
+  if (!integration) {
+    throw new Error('An integration identifier is required to download reports');
+  }
+
+  const safeIntegration = encodeURIComponent(integration);
+  const requestParams = { ...params };
+  if (format) {
+    requestParams.format = format;
+  }
+
+  const binaryFormats = new Set(['csv', 'xlsx', 'zip', 'pdf']);
+  const responseType = binaryFormats.has(String(format).toLowerCase()) ? 'blob' : 'json';
+
+  return httpClient.get(`/admin/integrations/${safeIntegration}/report`, {
+    token,
+    signal,
+    params: requestParams,
+    responseType,
+    cache: { enabled: false }
+  });
 }
 
 export const integrationAdminApi = {
@@ -249,7 +334,10 @@ export const integrationAdminApi = {
   listIntegrationApiKeyInvitations,
   createIntegrationApiKeyInvitation,
   resendIntegrationApiKeyInvitation,
-  cancelIntegrationApiKeyInvitation
+  cancelIntegrationApiKeyInvitation,
+  updateIntegrationSettings,
+  fetchIntegrationHealth,
+  downloadIntegrationReport
 };
 
 export default integrationAdminApi;

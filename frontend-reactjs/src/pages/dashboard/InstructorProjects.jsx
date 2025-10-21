@@ -10,6 +10,7 @@ import {
 import { useOutletContext } from 'react-router-dom';
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import withInstructorDashboardAccess from './instructor/withInstructorDashboardAccess.jsx';
 
 const summaryToneStyles = {
   primary: 'border-primary/40 bg-primary/5 text-primary',
@@ -76,7 +77,7 @@ function EmptyState({ title, description }) {
   );
 }
 
-export default function InstructorProjects() {
+function InstructorProjects() {
   const { role, dashboard, refresh } = useOutletContext();
   const projects = dashboard?.projects ?? null;
 
@@ -648,3 +649,5 @@ export default function InstructorProjects() {
     </div>
   );
 }
+
+export default withInstructorDashboardAccess(InstructorProjects);

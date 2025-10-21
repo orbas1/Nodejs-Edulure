@@ -25,6 +25,7 @@ import {
 } from '../api/socialGraphApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useConsentRecords from '../hooks/useConsentRecords.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 import ProfileIdentityEditor from '../components/profile/ProfileIdentityEditor.jsx';
 import {
   mapFollowerItem,
@@ -493,6 +494,76 @@ export default function Profile() {
     () => consents.filter((consent) => consent.status === 'granted' && consent.active),
     [consents]
   );
+
+  const profileDisplayName = profile?.name ?? defaultProfile.name;
+  const profileKeywords = useMemo(() => {
+    const keywords = new Set();
+    (profile?.expertise ?? []).forEach((item) => {
+      if (typeof item === 'string') {
+        keywords.add(item);
+      }
+    });
+    (profile?.trustBadges ?? []).forEach((badge) => {
+      if (typeof badge === 'string') {
+        keywords.add(badge);
+      }
+    });
+    return Array.from(keywords);
+  }, [profile?.expertise, profile?.trustBadges]);
+
+  const profileMetaDescription = useMemo(() => {
+    if (profile?.tagline) {
+      return profile.tagline;
+    }
+    if (profile?.bio) {
+      const condensed = profile.bio.replace(/\s+/g, ' ').trim();
+      return condensed.length > 200 ? `${condensed.slice(0, 197)}…` : condensed;
+    }
+    return 'Explore an Edulure operator profile including expertise, trust scores, community roles, and monetisation highlights.';
+  }, [profile?.tagline, profile?.bio]);
+
+  const canonicalProfilePath = useMemo(() => {
+    if (profile?.handle) {
+      return `/profiles/${profile.handle.replace(/^@/, '')}`;
+    }
+    return '/profile';
+  }, [profile?.handle]);
+
+  const structuredProfileData = useMemo(() => {
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Person',
+      name: profileDisplayName,
+      description: profileMetaDescription,
+      jobTitle: profile?.tagline ?? undefined,
+      image: profile?.avatar ?? undefined,
+      address: profile?.location
+        ? {
+            '@type': 'PostalAddress',
+            addressLocality: profile.location
+          }
+        : undefined,
+      sameAs: Array.isArray(profile?.social)
+        ? profile.social
+            .map((link) => link?.url)
+            .filter((url) => typeof url === 'string' && url.startsWith('http'))
+        : undefined
+    };
+  }, [profileDisplayName, profileMetaDescription, profile?.avatar, profile?.location, profile?.social]);
+
+  usePageMetadata({
+    title: `${profileDisplayName} · Edulure profile`,
+    description: profileMetaDescription,
+    canonicalPath: canonicalProfilePath,
+    image: profile?.avatar ?? undefined,
+    keywords: profileKeywords,
+    structuredData: structuredProfileData,
+    analytics: {
+      page_type: 'profile',
+      user_id: userId ?? null,
+      follower_total: followersMeta.total ?? null
+    }
+  });
 
   const resetProfileMessages = useCallback(() => {
     setProfileSaveError(null);

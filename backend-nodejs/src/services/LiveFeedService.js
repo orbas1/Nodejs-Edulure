@@ -70,6 +70,15 @@ function topTagsFromPosts(posts, limit = 5) {
     .slice(0, limit);
 }
 
+function deriveEngagementMomentum({ posts, comments, reactions, uniqueCommunities }) {
+  const postScore = Math.min(posts.length * 2, 40);
+  const commentScore = Math.min(comments * 0.5, 30);
+  const reactionScore = Math.min(reactions * 0.25, 20);
+  const communityScore = Math.min(uniqueCommunities * 5, 10);
+  const total = postScore + commentScore + reactionScore + communityScore;
+  return Math.max(0, Math.min(100, Math.round(total)));
+}
+
 export default class LiveFeedService {
   static async getFeed({
     actor,
@@ -328,6 +337,13 @@ export default class LiveFeedService {
       }
     }
 
+    const momentum = deriveEngagementMomentum({
+      posts,
+      comments,
+      reactions,
+      uniqueCommunities
+    });
+
     return {
       generatedAt: new Date().toISOString(),
       range: {
@@ -341,9 +357,19 @@ export default class LiveFeedService {
         reactions,
         uniqueCommunities: uniqueCommunities.size,
         trendingTags,
-        latestActivityAt: latestActivity ? latestActivity.toISOString() : null
+        latestActivityAt: latestActivity ? latestActivity.toISOString() : null,
+        momentumScore: momentum
       },
       ads: adsSummary
+    };
+  }
+
+  static async getMomentumScore(args = {}) {
+    const analytics = await this.computeAnalytics(args);
+    return {
+      momentumScore: analytics.engagement.momentumScore,
+      generatedAt: analytics.generatedAt,
+      range: analytics.range
     };
   }
 }

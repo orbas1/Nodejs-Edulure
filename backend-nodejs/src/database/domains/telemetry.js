@@ -14,6 +14,25 @@ export const BATCH_STATUSES = ['pending', 'exporting', 'exported', 'failed'];
 export const FRESHNESS_STATUSES = ['healthy', 'warning', 'critical'];
 export const LINEAGE_STATUSES = ['running', 'success', 'failed'];
 
+function resolveDialect(knex) {
+  const client = knex?.client?.config?.client ?? knex?.client?.driverName ?? '';
+  return String(client).toLowerCase();
+}
+
+function timestampWithAutoUpdate(knex, table, column = 'updated_at') {
+  const dialect = resolveDialect(knex);
+
+  if (dialect.includes('mysql')) {
+    table
+      .timestamp(column)
+      .notNullable()
+      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+    return;
+  }
+
+  table.timestamp(column).notNullable().defaultTo(knex.fn.now());
+}
+
 function jsonDefault() {
   return JSON.stringify({});
 }
@@ -50,10 +69,7 @@ function createConsentLedgerTable(table, knex) {
   table.json('evidence').notNullable().defaultTo(jsonDefault());
   table.json('metadata').notNullable().defaultTo(jsonDefault());
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-  table
-    .timestamp('updated_at')
-    .notNullable()
-    .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+  timestampWithAutoUpdate(knex, table);
 
   table.unique(
     ['tenant_id', 'user_id', 'consent_scope', 'consent_version'],
@@ -86,10 +102,7 @@ function createEventBatchesTable(table, knex) {
   table.text('error_message');
   table.json('metadata').notNullable().defaultTo(jsonDefault());
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-  table
-    .timestamp('updated_at')
-    .notNullable()
-    .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+  timestampWithAutoUpdate(knex, table);
 
   table.index(['status', 'started_at'], 'telemetry_batches_status_idx');
 }
@@ -146,10 +159,7 @@ function createEventsTable(table, knex) {
   table.json('metadata').notNullable().defaultTo(jsonDefault());
   table.json('tags').notNullable().defaultTo(arrayDefault());
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-  table
-    .timestamp('updated_at')
-    .notNullable()
-    .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+  timestampWithAutoUpdate(knex, table);
 
   table.unique(['dedupe_hash'], 'telemetry_events_dedupe_unique');
   table.index(['tenant_id', 'event_name', 'occurred_at'], 'telemetry_events_name_time_idx');
@@ -172,10 +182,7 @@ function createFreshnessMonitorsTable(table, knex) {
   table.integer('lag_seconds').unsigned().notNullable().defaultTo(0);
   table.json('metadata').notNullable().defaultTo(jsonDefault());
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-  table
-    .timestamp('updated_at')
-    .notNullable()
-    .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+  timestampWithAutoUpdate(knex, table);
 }
 
 function createLineageRunsTable(table, knex) {
@@ -201,10 +208,7 @@ function createLineageRunsTable(table, knex) {
   table.text('error_message');
   table.json('metadata').notNullable().defaultTo(jsonDefault());
   table.timestamp('created_at').notNullable().defaultTo(knex.fn.now());
-  table
-    .timestamp('updated_at')
-    .notNullable()
-    .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
+  timestampWithAutoUpdate(knex, table);
 
   table.index(['model_name', 'status', 'started_at'], 'telemetry_lineage_model_status_idx');
 }

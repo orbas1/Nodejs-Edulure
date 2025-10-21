@@ -4,13 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import CommunityMonetisation from '../../../../src/pages/dashboard/community/CommunityMonetisation.jsx';
 
 const updateTierMock = vi.fn();
+const useAuthMock = vi.fn();
 
 vi.mock('../../../../src/api/communityApi.js', () => ({
   updateCommunityTier: (...args) => updateTierMock(...args)
 }));
 
 vi.mock('../../../../src/context/AuthContext.jsx', () => ({
-  useAuth: () => ({ session: { tokens: { accessToken: 'token' } } })
+  useAuth: () => useAuthMock()
 }));
 
 describe('CommunityMonetisation', () => {
@@ -35,6 +36,7 @@ describe('CommunityMonetisation', () => {
 
   beforeEach(() => {
     updateTierMock.mockReset();
+    useAuthMock.mockReturnValue({ session: { tokens: { accessToken: 'token' } } });
   });
 
   afterEach(() => {
@@ -69,5 +71,32 @@ describe('CommunityMonetisation', () => {
       payload: { isActive: false }
     });
     expect(screen.getByText(/Inactive/)).toBeInTheDocument();
+  });
+
+  it('blocks tier toggles when no session token is available', async () => {
+    useAuthMock.mockReturnValue({ session: null });
+
+    render(<CommunityMonetisation dashboard={dashboard} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Pause tier/i }));
+
+    await waitFor(() => {
+      expect(updateTierMock).not.toHaveBeenCalled();
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('You must be signed in to manage tiers.');
+  });
+
+  it('recovers gracefully when the update operation fails', async () => {
+    updateTierMock.mockRejectedValue(new Error('Failed to persist change'));
+
+    render(<CommunityMonetisation dashboard={dashboard} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Pause tier/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Failed to persist change');
+    });
+
+    expect(screen.getByRole('button', { name: /Pause tier/i })).toBeInTheDocument();
   });
 });
