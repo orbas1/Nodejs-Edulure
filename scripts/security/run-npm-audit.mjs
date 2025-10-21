@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'process';
 
@@ -14,18 +16,43 @@ const ALLOWLIST = [
   }
 ];
 
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url));
+const REPORTS_DIR = path.resolve(repoRoot, 'reports', 'security');
+
 function parseArgs() {
   const args = process.argv.slice(2);
-  const parsed = { workspace: null };
-  for (let i = 0; i < args.length; i += 1) {
-    const arg = args[i];
-    if (arg === '--workspace' || arg === '-w') {
-      parsed.workspace = args[i + 1] ?? null;
-      i += 1;
+  const parsed = {
+    workspace: null,
+    severity: 'moderate'
+  };
+
+  for (let index = 0; index < args.length; index += 1) {
+    const token = args[index];
+    if ((token === '--workspace' || token === '-w') && args[index + 1]) {
+      parsed.workspace = args[index + 1];
+      index += 1;
+    } else if ((token === '--severity' || token === '-s') && args[index + 1]) {
+      parsed.severity = args[index + 1].toLowerCase();
+      index += 1;
     }
   }
+
   return parsed;
 }
+
+function validateSeverity(severity) {
+  const allowed = ['low', 'moderate', 'high', 'critical'];
+  if (!allowed.includes(severity)) {
+    throw new Error(`Unsupported severity threshold '${severity}'. Choose one of: ${allowed.join(', ')}`);
+  }
+  return severity;
+}
+
+const cliOptions = (() => {
+  const parsed = parseArgs();
+  parsed.severity = validateSeverity(parsed.severity);
+  return parsed;
+})();
 
 function runAudit({ cwd }) {
   const npmCli = process.env.npm_execpath;
@@ -33,7 +60,7 @@ function runAudit({ cwd }) {
     throw new Error('npm_execpath is not defined. Run this script via an npm script context.');
   }
   const command = process.env.npm_node_execpath || process.execPath;
-  const args = [npmCli, 'audit', '--json', '--audit-level=moderate'];
+  const args = [npmCli, 'audit', '--json', `--audit-level=${cliOptions.severity}`];
 
   return new Promise((resolve, reject) => {
     execFile(command, args, { cwd, maxBuffer: 1024 * 1024 * 10 }, (error, stdout, stderr) => {
@@ -66,7 +93,11 @@ function isAllowlisted({ advisoryId, workspace }) {
     return null;
   }
 
-  if (match.expiresOn && new Date(match.expiresOn) < new Date()) {
+  if (!match.expiresOn) {
+    return { ...match, expired: true, reason: 'missing_expiry' };
+  }
+
+  if (new Date(match.expiresOn) < new Date()) {
     return { ...match, expired: true };
   }
 
@@ -102,8 +133,34 @@ function extractFindings({ report }) {
   return findings;
 }
 
+async function ensureReportsDir() {
+  await fs.mkdir(REPORTS_DIR, { recursive: true });
+}
+
+async function persistReport({ workspace, severity, findings, accepted, unapproved, report }) {
+  await ensureReportsDir();
+  const reportName = `${workspace || 'root'}-npm-audit.json`;
+  const payload = {
+    generatedAt: new Date().toISOString(),
+    workspace: workspace ?? 'root',
+    severityThreshold: severity,
+    summary: {
+      findings: findings.length,
+      allowlisted: accepted.length,
+      unapproved: unapproved.length
+    },
+    report,
+    findings,
+    accepted,
+    unapproved
+  };
+  const outputPath = path.join(REPORTS_DIR, reportName);
+  await fs.writeFile(outputPath, JSON.stringify(payload, null, 2));
+  return outputPath;
+}
+
 async function main() {
-  const { workspace } = parseArgs();
+  const { workspace, severity } = cliOptions;
   const cwdUrl = workspace ? new URL(`../../${workspace}/`, import.meta.url) : new URL('../../', import.meta.url);
   const resolvedCwd = fileURLToPath(cwdUrl);
 
@@ -112,6 +169,8 @@ async function main() {
 
   if (!findings.length) {
     console.log('npm audit: no actionable vulnerabilities detected');
+    const reportPath = await persistReport({ workspace, severity, findings: [], accepted: [], unapproved: [], report });
+    console.log(`Audit report saved to ${path.relative(process.cwd(), reportPath)}`);
     return;
   }
 
@@ -126,12 +185,15 @@ async function main() {
     }
 
     if (allowlistEntry.expired) {
-      unapproved.push({ ...finding, allowlistExpired: true });
+      unapproved.push({ ...finding, allowlistExpired: true, allowlistEntry });
       continue;
     }
 
     accepted.push({ ...finding, allowlistEntry });
   }
+
+  const reportPath = await persistReport({ workspace, severity, findings, accepted, unapproved, report });
+  console.log(`Audit report saved to ${path.relative(process.cwd(), reportPath)}`);
 
   if (accepted.length) {
     console.log('⚠️  Allowlisted vulnerabilities detected:');
@@ -145,7 +207,10 @@ async function main() {
   if (unapproved.length) {
     console.error('\n❌ Unapproved vulnerabilities detected:');
     for (const finding of unapproved) {
-      const note = finding.allowlistExpired ? ' (allowlist expired)' : '';
+      let note = '';
+      if (finding.allowlistExpired) {
+        note = finding.allowlistEntry?.reason === 'missing_expiry' ? ' (allowlist missing expiry)' : ' (allowlist expired)';
+      }
       console.error(` - [${finding.advisoryId}] ${finding.title}${note}`);
       if (finding.url) {
         console.error(`   ${finding.url}`);

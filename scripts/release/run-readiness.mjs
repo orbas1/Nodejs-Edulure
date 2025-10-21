@@ -8,24 +8,42 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
 
-function runCheck({ id, title, command, cwd = repoRoot, category }) {
+const defaultTimeoutMs = Number.parseInt(process.env.READINESS_CHECK_TIMEOUT_MS ?? '', 10);
+
+function runCheck({ id, title, command, cwd = repoRoot, category, timeoutMs, metadata = {} }) {
+  if (!Array.isArray(command) || command.length === 0) {
+    throw new Error(`Invalid readiness command definition for ${id}`);
+  }
+
   const startedAt = Date.now();
   const [cmd, ...args] = command;
   const child = spawnSync(cmd, args, {
     cwd,
     env: { ...process.env, FORCE_COLOR: '1' },
-    stdio: 'inherit'
+    stdio: 'inherit',
+    timeout: timeoutMs ?? (Number.isFinite(defaultTimeoutMs) ? defaultTimeoutMs : undefined)
   });
 
   const durationMs = Date.now() - startedAt;
+  const exitCode = typeof child.status === 'number' ? child.status : child.error ? 1 : child.signal ? 1 : 0;
+  const combinedMetadata = { ...metadata };
+
+  if (child.signal) {
+    combinedMetadata.signal = child.signal;
+  }
+  if (child.error) {
+    combinedMetadata.spawnError = child.error.message;
+  }
+
   return {
     id,
     title,
     category,
     command: [cmd, ...args].join(' '),
-    exitCode: child.status ?? child.signal ?? 0,
-    status: child.status === 0 ? 'passed' : 'failed',
-    durationMs
+    exitCode,
+    status: exitCode === 0 ? 'passed' : 'failed',
+    durationMs,
+    metadata: Object.keys(combinedMetadata).length ? combinedMetadata : undefined
   };
 }
 
@@ -99,7 +117,22 @@ let allPassed = true;
 
 for (const check of checks) {
   console.log(`\n▶️  Running ${check.title} (${check.id})`);
-  const result = runCheck(check);
+  let result;
+  try {
+    result = runCheck(check);
+  } catch (error) {
+    result = {
+      id: check.id,
+      title: check.title,
+      category: check.category,
+      command: Array.isArray(check.command) ? check.command.join(' ') : String(check.command),
+      exitCode: 1,
+      status: 'failed',
+      durationMs: 0,
+      metadata: { error: error.message }
+    };
+    console.error(`❌  ${check.title} misconfigured:`, error.message);
+  }
   results.push(result);
   if (result.status !== 'passed') {
     allPassed = false;
@@ -157,12 +190,19 @@ writeFileSync(reportPath, JSON.stringify(summary, null, 2));
 console.log('\n📋 Release readiness summary saved to', path.relative(repoRoot, reportPath));
 for (const check of results) {
   const statusEmoji = check.status === 'passed' ? '✅' : '❌';
-  console.log(`${statusEmoji} [${check.category}] ${check.title} (${check.command})`);
+  const durationLabel = `${(check.durationMs / 1000).toFixed(1)}s`;
+  console.log(`${statusEmoji} [${check.category}] ${check.title} (${check.command}) — ${durationLabel}`);
   if (check.metadata?.pendingItems?.length) {
     console.log(`   Pending checklist items: ${check.metadata.pendingItems.join(', ')}`);
   }
   if (check.metadata?.error) {
     console.log(`   Error: ${check.metadata.error}`);
+  }
+  if (check.metadata?.spawnError) {
+    console.log(`   Spawn error: ${check.metadata.spawnError}`);
+  }
+  if (check.metadata?.signal) {
+    console.log(`   Terminated by signal: ${check.metadata.signal}`);
   }
 }
 

@@ -5,6 +5,30 @@ import { fileURLToPath } from 'url';
 import process from 'process';
 import { createRequire } from 'module';
 
+const args = process.argv.slice(2);
+
+function parseArgs(rawArgs) {
+  const parsed = {
+    workspace: null,
+    format: 'json'
+  };
+
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const token = rawArgs[index];
+    if ((token === '--workspace' || token === '-w') && rawArgs[index + 1]) {
+      parsed.workspace = rawArgs[index + 1];
+      index += 1;
+    } else if (token === '--format' && rawArgs[index + 1]) {
+      parsed.format = rawArgs[index + 1].toLowerCase();
+      index += 1;
+    }
+  }
+
+  return parsed;
+}
+
+const cliOptions = parseArgs(args);
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..', '..');
@@ -24,7 +48,13 @@ const bannedLicenseMatchers = [
 ];
 
 const require = createRequire(import.meta.url);
-const checker = require('license-checker');
+let checker;
+try {
+  checker = require('license-checker');
+} catch (error) {
+  console.error('The license-checker dependency is required. Run `npm install` from the repo root.');
+  throw error;
+}
 
 async function ensureDirectory(dirPath) {
   await fs.mkdir(dirPath, { recursive: true });
@@ -66,14 +96,38 @@ function createLicenseReport(startPath) {
 }
 
 async function writeReport(workspaceName, data) {
-  const outputPath = path.join(reportsDir, `${workspaceName}-licenses.json`);
-  const payload = {
-    generatedAt: new Date().toISOString(),
-    workspace: workspaceName,
-    packages: data
-  };
-  await fs.writeFile(outputPath, JSON.stringify(payload, null, 2));
+  const outputPath = path.join(reportsDir, `${workspaceName}-licenses.${cliOptions.format === 'ndjson' ? 'ndjson' : 'json'}`);
+  await fs.writeFile(outputPath, serialiseReportPayload(data));
   return outputPath;
+}
+
+function selectWorkspaces() {
+  if (!cliOptions.workspace) {
+    return workspaces;
+  }
+
+  const match = workspaces.find((entry) => entry.name === cliOptions.workspace);
+  if (!match) {
+    throw new Error(`Unknown workspace '${cliOptions.workspace}'. Valid options: ${workspaces.map((ws) => ws.name).join(', ')}`);
+  }
+
+  return [match];
+}
+
+function serialiseReportPayload(payload) {
+  if (cliOptions.format === 'json') {
+    return JSON.stringify(payload, null, 2);
+  }
+
+  if (cliOptions.format === 'ndjson') {
+    return (
+      payload.packages
+        .map((pkg) => JSON.stringify({ workspace: payload.workspace, generatedAt: payload.generatedAt, ...pkg }))
+        .join('\n') + '\n'
+    );
+  }
+
+  throw new Error(`Unsupported output format '${cliOptions.format}'. Expected json or ndjson.`);
 }
 
 async function main() {
@@ -85,8 +139,17 @@ async function main() {
   };
   const bannedFindings = [];
 
-  for (const workspace of workspaces) {
-    const report = await createLicenseReport(workspace.location);
+  const selectedWorkspaces = selectWorkspaces();
+
+  for (const workspace of selectedWorkspaces) {
+    console.log(`\n🔍 Auditing licenses for ${workspace.name} (${path.relative(repoRoot, workspace.location)})`);
+
+    let report;
+    try {
+      report = await createLicenseReport(workspace.location);
+    } catch (error) {
+      throw new Error(`Failed to generate license inventory for ${workspace.name}: ${error.message}`);
+    }
     const packages = Object.entries(report).map(([pkg, metadata]) => ({
       package: pkg,
       licenses: normaliseLicense(metadata.licenses),
@@ -101,7 +164,11 @@ async function main() {
       }
     }
 
-    const outputPath = await writeReport(workspace.name, packages);
+    const outputPath = await writeReport(workspace.name, {
+      generatedAt: new Date().toISOString(),
+      workspace: workspace.name,
+      packages
+    });
     summary.reports.push({
       workspace: workspace.name,
       packageCount: packages.length,
@@ -110,7 +177,10 @@ async function main() {
   }
 
   summary.bannedFindings = bannedFindings;
-  await fs.writeFile(path.join(reportsDir, 'summary.json'), JSON.stringify(summary, null, 2));
+  await fs.writeFile(
+    path.join(reportsDir, 'summary.json'),
+    JSON.stringify(summary, null, 2)
+  );
 
   if (bannedFindings.length > 0) {
     console.error('\n⚠️  Disallowed licenses detected. Review reports in reports/licenses for details.');
@@ -122,13 +192,15 @@ async function main() {
   }
 
   console.log('\n✅ License reports generated without banned licenses.');
-  console.table(
-    summary.reports.map((report) => ({
-      workspace: report.workspace,
-      packages: report.packageCount,
-      report: report.reportPath
-    }))
-  );
+  if (summary.reports.length) {
+    console.table(
+      summary.reports.map((report) => ({
+        workspace: report.workspace,
+        packages: report.packageCount,
+        report: report.reportPath
+      }))
+    );
+  }
 }
 
 main().catch((error) => {
