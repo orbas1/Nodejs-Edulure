@@ -45,26 +45,26 @@
 40. `backend-nodejs/scripts/wait-for-db.js:391:12` – unused `error` catch variable.
 
 #### Group 3 (Items 41-60)
-41. `backend-nodejs/scripts/wait-for-db.js:590:46` – unused `env` argument.
-42. `backend-nodejs/seeds/001_bootstrap.js:3338:11` – undefined `trx`.
-43. `backend-nodejs/seeds/001_bootstrap.js:3340:18` – undefined `adminId`.
-44. `backend-nodejs/seeds/001_bootstrap.js:3346:22` – undefined `trx`.
-45. `backend-nodejs/seeds/001_bootstrap.js:3347:23` – undefined `trx`.
-46. `backend-nodejs/seeds/001_bootstrap.js:3352:18` – undefined `instructorId`.
-47. `backend-nodejs/seeds/001_bootstrap.js:3358:22` – undefined `trx`.
-48. `backend-nodejs/seeds/001_bootstrap.js:3359:23` – undefined `trx`.
-49. `backend-nodejs/seeds/001_bootstrap.js:3364:18` – undefined `learnerId`.
-50. `backend-nodejs/seeds/001_bootstrap.js:3370:22` – undefined `trx`.
-51. `backend-nodejs/seeds/001_bootstrap.js:3371:23` – undefined `trx`.
-52. `backend-nodejs/seeds/001_bootstrap.js:3377:11` – undefined `trx`.
-53. `backend-nodejs/seeds/001_bootstrap.js:3382:24` – undefined `trx`.
-54. `backend-nodejs/seeds/001_bootstrap.js:3390:24` – undefined `trx`.
-55. `backend-nodejs/seeds/001_bootstrap.js:3441:11` – undefined `trx`.
-56. `backend-nodejs/seeds/001_bootstrap.js:3456:36` – undefined `trx`.
-57. `backend-nodejs/seeds/001_bootstrap.js:3457:35` – undefined `trx`.
-58. `backend-nodejs/seeds/001_bootstrap.js:3473:36` – undefined `trx`.
-59. `backend-nodejs/seeds/001_bootstrap.js:3474:35` – undefined `trx`.
-60. `backend-nodejs/seeds/001_bootstrap.js:3490:36` – undefined `trx`.
+41. ✓ `backend-nodejs/scripts/wait-for-db.js:590:46` – unused `env` argument.
+42. ✓ `backend-nodejs/seeds/001_bootstrap.js:3338:11` – undefined `trx`.
+43. ✓ `backend-nodejs/seeds/001_bootstrap.js:3340:18` – undefined `adminId`.
+44. ✓ `backend-nodejs/seeds/001_bootstrap.js:3346:22` – undefined `trx`.
+45. ✓ `backend-nodejs/seeds/001_bootstrap.js:3347:23` – undefined `trx`.
+46. ✓ `backend-nodejs/seeds/001_bootstrap.js:3352:18` – undefined `instructorId`.
+47. ✓ `backend-nodejs/seeds/001_bootstrap.js:3358:22` – undefined `trx`.
+48. ✓ `backend-nodejs/seeds/001_bootstrap.js:3359:23` – undefined `trx`.
+49. ✓ `backend-nodejs/seeds/001_bootstrap.js:3364:18` – undefined `learnerId`.
+50. ✓ `backend-nodejs/seeds/001_bootstrap.js:3370:22` – undefined `trx`.
+51. ✓ `backend-nodejs/seeds/001_bootstrap.js:3371:23` – undefined `trx`.
+52. ✓ `backend-nodejs/seeds/001_bootstrap.js:3377:11` – undefined `trx`.
+53. ✓ `backend-nodejs/seeds/001_bootstrap.js:3382:24` – undefined `trx`.
+54. ✓ `backend-nodejs/seeds/001_bootstrap.js:3390:24` – undefined `trx`.
+55. ✓ `backend-nodejs/seeds/001_bootstrap.js:3441:11` – undefined `trx`.
+56. ✓ `backend-nodejs/seeds/001_bootstrap.js:3456:36` – undefined `trx`.
+57. ✓ `backend-nodejs/seeds/001_bootstrap.js:3457:35` – undefined `trx`.
+58. ✓ `backend-nodejs/seeds/001_bootstrap.js:3473:36` – undefined `trx`.
+59. ✓ `backend-nodejs/seeds/001_bootstrap.js:3474:35` – undefined `trx`.
+60. ✓ `backend-nodejs/seeds/001_bootstrap.js:3490:36` – undefined `trx`.
 
 #### Group 4 (Items 61-80)
 61. `backend-nodejs/seeds/001_bootstrap.js:3491:35` – undefined `trx`.
