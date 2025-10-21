@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
-import fs from 'node:fs';
-import { promises as fsPromises } from 'node:fs';
+import { existsSync, promises as fs } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -17,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '..');
 
 const envPath = path.resolve(projectRoot, '.env');
-if (fs.existsSync(envPath)) {
+if (existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
 
@@ -139,7 +138,7 @@ function buildPlantUml(domainConfig, metadata) {
 }
 
 async function ensureOutputDirectory(filePath) {
-  await fsPromises.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
 }
 
 async function generateDiagram(domain, { outputOverride, schemaName } = {}) {
@@ -150,7 +149,7 @@ async function generateDiagram(domain, { outputOverride, schemaName } = {}) {
     const metadata = await fetchSchemaMetadata(knex, { ...domainConfig, schemaName });
     const diagram = buildPlantUml(domainConfig, metadata);
     await ensureOutputDirectory(domainConfig.output);
-    await fsPromises.writeFile(domainConfig.output, `${diagram}\n`, 'utf8');
+    await fs.writeFile(domainConfig.output, `${diagram}\n`, 'utf8');
     console.log(`ERD generated for domain "${domain}" at ${domainConfig.output}`);
   } finally {
     await knex.destroy();

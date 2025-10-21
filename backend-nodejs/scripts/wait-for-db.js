@@ -388,7 +388,7 @@ export function parseDatabaseUrl(urlString, { env = process.env, tls: tlsOverrid
   let parsed;
   try {
     parsed = new URL(urlString);
-  } catch (error) {
+  } catch {
     throw new Error('DATABASE_URL must be a valid connection string');
   }
 
@@ -587,7 +587,7 @@ export async function waitForDatabase(overrides = {}, env = process.env) {
   throw timeoutError;
 }
 
-export function parseCliArguments(argv = [], env = process.env) {
+export function parseCliArguments(argv = []) {
   const args = Array.from(argv);
   const result = {
     url: undefined,
@@ -766,7 +766,7 @@ export async function runCli(argv = process.argv.slice(2), {
   stderr = process.stderr,
   wait = waitForDatabase
 } = {}) {
-  const parsed = parseCliArguments(argv, env);
+  const parsed = parseCliArguments(argv);
   if (parsed.errors.length > 0) {
     for (const message of parsed.errors) {
       stderr.write(`${message}\n`);

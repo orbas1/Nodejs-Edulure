@@ -3333,8 +3333,6 @@ export async function seed(knex) {
       token_hash: makeHash('learner-email-token'),
       expires_at: new Date(timelineNow.getTime() + 24 * 60 * 60 * 1000)
     });
-  });
-}
     await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert([
       {
         user_id: adminId,
@@ -3850,3 +3848,5 @@ export async function seed(knex) {
       input: JSON.stringify({ source: 'telemetry_events', range: 'seed' }),
       output: JSON.stringify({ recordsProcessed: 0, checksum: 'seed-init' })
     });
+  });
+}
