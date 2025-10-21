@@ -3333,7 +3333,6 @@ export async function seed(knex) {
       token_hash: makeHash('learner-email-token'),
       expires_at: new Date(timelineNow.getTime() + 24 * 60 * 60 * 1000)
     });
-
     await trx(TELEMETRY_TABLES.CONSENT_LEDGER).insert([
       {
         user_id: adminId,
