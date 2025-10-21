@@ -67,26 +67,26 @@
 60. `backend-nodejs/seeds/001_bootstrap.js:3490:36` – undefined `trx`.
 
 #### Group 4 (Items 61-80)
-61. `backend-nodejs/seeds/001_bootstrap.js:3491:35` – undefined `trx`.
-62. `backend-nodejs/seeds/001_bootstrap.js:3495:39` – undefined `trx`.
-63. `backend-nodejs/seeds/001_bootstrap.js:3499:31` – undefined `trx`.
-64. `backend-nodejs/seeds/001_bootstrap.js:3504:11` – undefined `trx`.
-65. `backend-nodejs/seeds/001_bootstrap.js:3565:11` – undefined `trx`.
-66. `backend-nodejs/seeds/001_bootstrap.js:3610:11` – undefined `trx`.
-67. `backend-nodejs/seeds/001_bootstrap.js:3717:11` – undefined `trx`.
-68. `backend-nodejs/seeds/001_bootstrap.js:3753:11` – undefined `trx`.
-69. `backend-nodejs/seeds/001_bootstrap.js:3760:21` – undefined `trx`.
-70. `backend-nodejs/seeds/001_bootstrap.js:3761:19` – undefined `trx`.
-71. `backend-nodejs/seeds/001_bootstrap.js:3770:30` – undefined `trx`.
-72. `backend-nodejs/seeds/001_bootstrap.js:3775:40` – undefined `trx`.
-73. `backend-nodejs/seeds/001_bootstrap.js:3781:11` – undefined `trx`.
-74. `backend-nodejs/seeds/001_bootstrap.js:3792:28` – undefined `trx`.
-75. `backend-nodejs/seeds/001_bootstrap.js:3804:28` – undefined `trx`.
-76. `backend-nodejs/seeds/001_bootstrap.js:3816:28` – undefined `trx`.
-77. `backend-nodejs/seeds/001_bootstrap.js:3840:28` – undefined `trx`.
-78. `backend-nodejs/seeds/001_bootstrap.js:3844:11` – undefined `trx`.
-79. `backend-nodejs/seeds/001_bootstrap.js:3848:19` – undefined `trx`.
-80. `backend-nodejs/seeds/001_bootstrap.js:3849:21` – undefined `trx`.
+61. ✅ `backend-nodejs/seeds/001_bootstrap.js:3491:35` – undefined `trx`.
+62. ✅ `backend-nodejs/seeds/001_bootstrap.js:3495:39` – undefined `trx`.
+63. ✅ `backend-nodejs/seeds/001_bootstrap.js:3499:31` – undefined `trx`.
+64. ✅ `backend-nodejs/seeds/001_bootstrap.js:3504:11` – undefined `trx`.
+65. ✅ `backend-nodejs/seeds/001_bootstrap.js:3565:11` – undefined `trx`.
+66. ✅ `backend-nodejs/seeds/001_bootstrap.js:3610:11` – undefined `trx`.
+67. ✅ `backend-nodejs/seeds/001_bootstrap.js:3717:11` – undefined `trx`.
+68. ✅ `backend-nodejs/seeds/001_bootstrap.js:3753:11` – undefined `trx`.
+69. ✅ `backend-nodejs/seeds/001_bootstrap.js:3760:21` – undefined `trx`.
+70. ✅ `backend-nodejs/seeds/001_bootstrap.js:3761:19` – undefined `trx`.
+71. ✅ `backend-nodejs/seeds/001_bootstrap.js:3770:30` – undefined `trx`.
+72. ✅ `backend-nodejs/seeds/001_bootstrap.js:3775:40` – undefined `trx`.
+73. ✅ `backend-nodejs/seeds/001_bootstrap.js:3781:11` – undefined `trx`.
+74. ✅ `backend-nodejs/seeds/001_bootstrap.js:3792:28` – undefined `trx`.
+75. ✅ `backend-nodejs/seeds/001_bootstrap.js:3804:28` – undefined `trx`.
+76. ✅ `backend-nodejs/seeds/001_bootstrap.js:3816:28` – undefined `trx`.
+77. ✅ `backend-nodejs/seeds/001_bootstrap.js:3840:28` – undefined `trx`.
+78. ✅ `backend-nodejs/seeds/001_bootstrap.js:3844:11` – undefined `trx`.
+79. ✅ `backend-nodejs/seeds/001_bootstrap.js:3848:19` – undefined `trx`.
+80. ✅ `backend-nodejs/seeds/001_bootstrap.js:3849:21` – undefined `trx`.
 
 #### Group 5 (Items 81-100)
 81. `backend-nodejs/src/controllers/AdminSettingsController.js:3:37` – `PlatformSettingsService` parse error.
