@@ -7,7 +7,7 @@ const menuStates = {
 };
 
 export default function SkewedMenu({ activeState = 'all', onSelect, activeItem }) {
-  const items = menuStates[activeState];
+  const items = menuStates[activeState] ?? menuStates.all;
 
   return (
     <div className="relative overflow-hidden rounded-3xl bg-white/70">
@@ -37,4 +37,10 @@ SkewedMenu.propTypes = {
   activeState: PropTypes.oneOf(Object.keys(menuStates)),
   onSelect: PropTypes.func,
   activeItem: PropTypes.string
+};
+
+SkewedMenu.defaultProps = {
+  activeState: 'all',
+  onSelect: undefined,
+  activeItem: undefined
 };
