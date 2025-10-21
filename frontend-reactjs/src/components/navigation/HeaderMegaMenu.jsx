@@ -382,7 +382,7 @@ export default function HeaderMegaMenu({ item }) {
             leaveFrom="opacity-100 translate-y-0"
             leaveTo="opacity-0 translate-y-1"
           >
-            <Popover.Panel className="absolute left-1/2 z-50 mt-6 w-[min(100vw-3rem,960px)] -translate-x-1/2 overflow-hidden rounded-4xl border border-slate-200 bg-white/95 shadow-2xl ring-1 ring-black/5 backdrop-blur">
+            <Popover.Panel className="absolute left-0 z-50 mt-6 w-[min(100vw-3rem,960px)] origin-top overflow-hidden rounded-4xl border border-slate-200 bg-white/95 shadow-2xl ring-1 ring-black/5 backdrop-blur 2xl:left-1/2 2xl:-translate-x-1/2">
               <div className="grid gap-8 p-8 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
                 <div className="space-y-6">
                   <div className="space-y-2">

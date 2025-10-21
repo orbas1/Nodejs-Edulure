@@ -1,6 +1,5 @@
 import HomeHero from '../components/home/HomeHero.jsx';
 import CommunitySpotlight from '../components/home/CommunitySpotlight.jsx';
-import FeatureGrid from '../components/FeatureGrid.jsx';
 import PerksGrid from '../components/home/PerksGrid.jsx';
 import InsidePreviewTabs from '../components/home/InsidePreviewTabs.jsx';
 import MembershipSnapshot from '../components/home/MembershipSnapshot.jsx';
@@ -28,7 +27,6 @@ export default function Home() {
     <div className="bg-slate-50 text-slate-900">
       <HomeHero />
       <CommunitySpotlight />
-      <FeatureGrid />
       <PerksGrid />
       {/* Tutor spotlight section renders above this component when available. */}
       <InsidePreviewTabs />
