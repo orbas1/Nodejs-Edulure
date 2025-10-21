@@ -67,26 +67,26 @@
 60. ✓ `backend-nodejs/seeds/001_bootstrap.js:3490:36` – undefined `trx`.
 
 #### Group 4 (Items 61-80)
-61. `backend-nodejs/seeds/001_bootstrap.js:3491:35` – undefined `trx`.
-62. `backend-nodejs/seeds/001_bootstrap.js:3495:39` – undefined `trx`.
-63. `backend-nodejs/seeds/001_bootstrap.js:3499:31` – undefined `trx`.
-64. `backend-nodejs/seeds/001_bootstrap.js:3504:11` – undefined `trx`.
-65. `backend-nodejs/seeds/001_bootstrap.js:3565:11` – undefined `trx`.
-66. `backend-nodejs/seeds/001_bootstrap.js:3610:11` – undefined `trx`.
-67. `backend-nodejs/seeds/001_bootstrap.js:3717:11` – undefined `trx`.
-68. `backend-nodejs/seeds/001_bootstrap.js:3753:11` – undefined `trx`.
-69. `backend-nodejs/seeds/001_bootstrap.js:3760:21` – undefined `trx`.
-70. `backend-nodejs/seeds/001_bootstrap.js:3761:19` – undefined `trx`.
-71. `backend-nodejs/seeds/001_bootstrap.js:3770:30` – undefined `trx`.
-72. `backend-nodejs/seeds/001_bootstrap.js:3775:40` – undefined `trx`.
-73. `backend-nodejs/seeds/001_bootstrap.js:3781:11` – undefined `trx`.
-74. `backend-nodejs/seeds/001_bootstrap.js:3792:28` – undefined `trx`.
-75. `backend-nodejs/seeds/001_bootstrap.js:3804:28` – undefined `trx`.
-76. `backend-nodejs/seeds/001_bootstrap.js:3816:28` – undefined `trx`.
-77. `backend-nodejs/seeds/001_bootstrap.js:3840:28` – undefined `trx`.
-78. `backend-nodejs/seeds/001_bootstrap.js:3844:11` – undefined `trx`.
-79. `backend-nodejs/seeds/001_bootstrap.js:3848:19` – undefined `trx`.
-80. `backend-nodejs/seeds/001_bootstrap.js:3849:21` – undefined `trx`.
+61. ✅ `backend-nodejs/seeds/001_bootstrap.js:3491:35` – undefined `trx`.
+62. ✅ `backend-nodejs/seeds/001_bootstrap.js:3495:39` – undefined `trx`.
+63. ✅ `backend-nodejs/seeds/001_bootstrap.js:3499:31` – undefined `trx`.
+64. ✅ `backend-nodejs/seeds/001_bootstrap.js:3504:11` – undefined `trx`.
+65. ✅ `backend-nodejs/seeds/001_bootstrap.js:3565:11` – undefined `trx`.
+66. ✅ `backend-nodejs/seeds/001_bootstrap.js:3610:11` – undefined `trx`.
+67. ✅ `backend-nodejs/seeds/001_bootstrap.js:3717:11` – undefined `trx`.
+68. ✅ `backend-nodejs/seeds/001_bootstrap.js:3753:11` – undefined `trx`.
+69. ✅ `backend-nodejs/seeds/001_bootstrap.js:3760:21` – undefined `trx`.
+70. ✅ `backend-nodejs/seeds/001_bootstrap.js:3761:19` – undefined `trx`.
+71. ✅ `backend-nodejs/seeds/001_bootstrap.js:3770:30` – undefined `trx`.
+72. ✅ `backend-nodejs/seeds/001_bootstrap.js:3775:40` – undefined `trx`.
+73. ✅ `backend-nodejs/seeds/001_bootstrap.js:3781:11` – undefined `trx`.
+74. ✅ `backend-nodejs/seeds/001_bootstrap.js:3792:28` – undefined `trx`.
+75. ✅ `backend-nodejs/seeds/001_bootstrap.js:3804:28` – undefined `trx`.
+76. ✅ `backend-nodejs/seeds/001_bootstrap.js:3816:28` – undefined `trx`.
+77. ✅ `backend-nodejs/seeds/001_bootstrap.js:3840:28` – undefined `trx`.
+78. ✅ `backend-nodejs/seeds/001_bootstrap.js:3844:11` – undefined `trx`.
+79. ✅ `backend-nodejs/seeds/001_bootstrap.js:3848:19` – undefined `trx`.
+80. ✅ `backend-nodejs/seeds/001_bootstrap.js:3849:21` – undefined `trx`.
 
 #### Group 5 (Items 81-100)
 81. `backend-nodejs/src/controllers/AdminSettingsController.js:3:37` – `PlatformSettingsService` parse error.
@@ -133,11 +133,11 @@
 120. `backend-nodejs/src/services/UserService.js:408:13` – unused `before`.
 
 #### Group 7 (Items 121-128)
-121. `backend-nodejs/src/utils/geo.js:551:9` – unused `centerLng`.
-122. `backend-nodejs/test/dashboardService.test.js:11:8` – `DashboardService` parse error.
-123. `backend-nodejs/test/dashboardService.test.js:13:67` – `PlatformSettingsService` parse error.
-124. `backend-nodejs/test/group14Controllers.test.js:321:8` – unused `IdentityVerificationController`.
-125. `backend-nodejs/test/openapiBuilder.test.js:2:1` – duplicate `fs` import.
-126. `backend-nodejs/test/platformSettingsAdminSettings.test.js:9:8` – `PlatformSettingsService` parse error.
-127. `backend-nodejs/test/platformSettingsService.test.js:3:67` – `PlatformSettingsService` parse error.
-128. `npm ls` validation – `ipaddr.js@1.9.1` installed but `package.json` requires `^2.2.0`.
+121. ✅ `backend-nodejs/src/utils/geo.js:551:9` – unused `centerLng`.
+122. ✅ `backend-nodejs/test/dashboardService.test.js:11:8` – `DashboardService` parse error.
+123. ✅ `backend-nodejs/test/dashboardService.test.js:13:67` – `PlatformSettingsService` parse error.
+124. ✅ `backend-nodejs/test/group14Controllers.test.js:321:8` – unused `IdentityVerificationController`.
+125. ✅ `backend-nodejs/test/openapiBuilder.test.js:2:1` – duplicate `fs` import.
+126. ✅ `backend-nodejs/test/platformSettingsAdminSettings.test.js:9:8` – `PlatformSettingsService` parse error.
+127. ✅ `backend-nodejs/test/platformSettingsService.test.js:3:67` – `PlatformSettingsService` parse error.
+128. ✅ `npm ls` validation – `ipaddr.js@1.9.1` installed but `package.json` requires `^2.2.0`.

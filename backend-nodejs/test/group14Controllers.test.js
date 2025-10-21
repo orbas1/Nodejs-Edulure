@@ -318,9 +318,7 @@ import EnvironmentParityController from '../src/controllers/EnvironmentParityCon
 import ExplorerController from '../src/controllers/ExplorerController.js';
 import FeedController from '../src/controllers/FeedController.js';
 import GovernanceController from '../src/controllers/GovernanceController.js';
-import IdentityVerificationController, {
-  reviewVerification as reviewVerificationHandler
-} from '../src/controllers/IdentityVerificationController.js';
+import { reviewVerification as reviewVerificationHandler } from '../src/controllers/IdentityVerificationController.js';
 import InstructorBookingController from '../src/controllers/InstructorBookingController.js';
 import InstructorOrchestrationController from '../src/controllers/InstructorOrchestrationController.js';
 import InstructorSchedulingController from '../src/controllers/InstructorSchedulingController.js';
