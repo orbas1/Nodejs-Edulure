@@ -10,6 +10,7 @@ import { createPaymentIntent } from '../api/paymentsApi.js';
 import { requestMediaUpload } from '../api/mediaApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 import { computeFileChecksum } from '../utils/uploads.js';
 
@@ -904,6 +905,50 @@ export default function Courses() {
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutHistory, setCheckoutHistory] = useState([]);
   const [uploadState, setUploadState] = useState({});
+
+  const featuredCourse = useMemo(() => highlightCourses[0] ?? null, [highlightCourses]);
+  const courseKeywords = useMemo(() => {
+    if (!featuredCourse) {
+      return [];
+    }
+    const keywords = new Set();
+    (featuredCourse.skills ?? []).forEach((skill) => {
+      if (typeof skill === 'string') {
+        keywords.add(skill);
+      }
+    });
+    if (featuredCourse.level) {
+      keywords.add(featuredCourse.level);
+    }
+    if (featuredCourse.deliveryFormat) {
+      keywords.add(featuredCourse.deliveryFormat);
+    }
+    return Array.from(keywords);
+  }, [featuredCourse]);
+
+  const coursesMetaDescription = useMemo(() => {
+    if (featuredCourse?.description) {
+      return featuredCourse.description;
+    }
+    if (featuredCourse?.title) {
+      return `Explore ${featuredCourse.title} and other Edulure courses with verified instructors, structured cohorts, and actionable outcomes.`;
+    }
+    return 'Discover Edulure courses for operators, instructors, and community teams. Compare live cohorts, async paths, and enterprise-ready programmes.';
+  }, [featuredCourse]);
+
+  usePageMetadata({
+    title: featuredCourse?.title ? `${featuredCourse.title} · Edulure courses` : 'Edulure courses and cohorts',
+    description: coursesMetaDescription,
+    canonicalPath: featuredCourse?.slug ? `/courses/${featuredCourse.slug}` : '/courses',
+    image: featuredCourse?.heroImageUrl ?? featuredCourse?.thumbnailUrl ?? undefined,
+    keywords: courseKeywords,
+    analytics: {
+      page_type: 'courses',
+      highlight_count: highlightCourses.length,
+      catalogue_count: catalogueCourses.length,
+      live_count: liveCourses.length
+    }
+  });
 
   const updateUploadState = useCallback((field, patch) => {
     setUploadState((current) => ({

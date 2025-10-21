@@ -9,8 +9,21 @@ import ClosingCtaBanner from '../components/home/ClosingCtaBanner.jsx';
 import TutorArcade from '../components/home/TutorArcade.jsx';
 import CoursesAdventure from '../components/home/CoursesAdventure.jsx';
 import EbookShowcase from '../components/home/EbookShowcase.jsx';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 export default function Home() {
+  usePageMetadata({
+    title: 'Edulure · Education operating system for community-led learning',
+    description:
+      'Operate your education business with live classrooms, cohort management, content studios, and analytics inside one secure workspace built for operators.',
+    canonicalPath: '/',
+    image: 'https://www.edulure.com/assets/og/edulure-home.jpg',
+    keywords: ['community-led learning', 'education operations', 'cohort management', 'live classrooms', 'content studio'],
+    analytics: {
+      page_type: 'home'
+    }
+  });
+
   return (
     <div className="bg-slate-50 text-slate-900">
       <HomeHero />

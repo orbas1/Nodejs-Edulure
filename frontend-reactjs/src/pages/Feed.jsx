@@ -25,6 +25,7 @@ import CommunityHero from '../components/CommunityHero.jsx';
 import CommunityResourceEditor from '../components/community/CommunityResourceEditor.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const ALL_COMMUNITIES_NODE = {
   id: 'all',
@@ -185,6 +186,41 @@ export default function Feed() {
   const [isSavingResource, setIsSavingResource] = useState(false);
   const [deletingResourceId, setDeletingResourceId] = useState(null);
   const [resourceNotice, setResourceNotice] = useState(null);
+
+  const activeCommunity = useMemo(() => {
+    if (communityDetail) {
+      return communityDetail;
+    }
+    if (selectedCommunity?.id && selectedCommunity.id !== ALL_COMMUNITIES_NODE.id) {
+      return selectedCommunity;
+    }
+    return null;
+  }, [communityDetail, selectedCommunity]);
+
+  const feedMetaDescription = useMemo(() => {
+    if (activeCommunity?.description) {
+      return activeCommunity.description;
+    }
+    if (activeCommunity?.name) {
+      return `Monitor the ${activeCommunity.name} activity feed, resources, and sponsorships with live moderation controls and analytics.`;
+    }
+    return 'Stay ahead of community activity with the Edulure feed. Moderate posts, launch campaigns, and surface resources with role-aware controls.';
+  }, [activeCommunity]);
+
+  usePageMetadata({
+    title: activeCommunity?.name ? `${activeCommunity.name} feed` : 'Edulure community feed',
+    description: feedMetaDescription,
+    canonicalPath: activeCommunity?.slug ? `/feed/${activeCommunity.slug}` : '/feed',
+    image: activeCommunity?.coverImageUrl ?? undefined,
+    keywords: activeCommunity?.metadata?.focus ? [activeCommunity.metadata.focus] : undefined,
+    analytics: {
+      page_type: 'feed',
+      community_id: activeCommunity?.id ?? 'all',
+      feed_range: feedRange,
+      can_post: canPostToCommunities,
+      can_join: canJoinCommunities
+    }
+  });
 
   const updatePostActionState = useCallback((postId, updates) => {
     setPostActions((prev) => {

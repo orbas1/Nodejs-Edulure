@@ -43,6 +43,7 @@ describe('<Profile /> consent ledger', () => {
     expect(screen.getByText('Privacy & consent ledger')).toBeInTheDocument();
     expect(screen.getByText('Marketing communications')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Revoke' })).toBeEnabled();
+    expect(document.title).toContain('Alex Morgan');
 
     await userEvent.click(screen.getByRole('button', { name: 'Revoke' }));
 
