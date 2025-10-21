@@ -24,6 +24,34 @@ function serialiseMessages(messages) {
   return [...messages].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 }
 
+export function filterThreadEntries(entries, { term = '', filter = 'all', currentUserId } = {}) {
+  const list = Array.isArray(entries) ? entries : [];
+  const normalisedTerm = term.trim().toLowerCase();
+
+  return list.filter((entry) => {
+    if (!entry?.thread?.id) {
+      return false;
+    }
+
+    if (filter === 'unread' && (entry.unreadCount ?? 0) === 0) {
+      return false;
+    }
+
+    if (!normalisedTerm) {
+      return true;
+    }
+
+    const participantNames = (entry.participants ?? [])
+      .filter((participant) => participant.userId !== currentUserId)
+      .map((participant) => formatName(participant.user).toLowerCase());
+
+    const subject = (entry.thread?.subject ?? '').toLowerCase();
+    const preview = (entry.latestMessage?.body ?? '').toLowerCase();
+    const haystack = [subject, preview, ...participantNames].join(' ');
+    return haystack.includes(normalisedTerm);
+  });
+}
+
 export default function DashboardInbox() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
@@ -39,8 +67,40 @@ export default function DashboardInbox() {
   const [messagesError, setMessagesError] = useState(null);
   const [composer, setComposer] = useState('');
   const [sendInFlight, setSendInFlight] = useState(false);
+  const [threadSearch, setThreadSearch] = useState('');
+  const [threadStatusFilter, setThreadStatusFilter] = useState('all');
+  const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
   const messagesEndRef = useRef(null);
+
+  const filteredThreads = useMemo(
+    () => filterThreadEntries(threads, { term: threadSearch, filter: threadStatusFilter, currentUserId }),
+    [threads, threadSearch, threadStatusFilter, currentUserId]
+  );
+
+  const unreadThreadCount = useMemo(
+    () => threads.reduce((total, entry) => total + ((entry.unreadCount ?? 0) > 0 ? 1 : 0), 0),
+    [threads]
+  );
+
+  const connectionTone = offline
+    ? 'bg-rose-100 text-rose-600'
+    : connected
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-slate-200 text-slate-500';
+  const connectionLabel = offline ? 'Offline' : connected ? 'Live' : 'Reconnecting…';
+
+  useEffect(() => {
+    if (!filteredThreads.length) {
+      if (selectedThreadId !== null) {
+        setSelectedThreadId(null);
+      }
+      return;
+    }
+    if (!filteredThreads.some((entry) => entry.thread.id === selectedThreadId)) {
+      setSelectedThreadId(filteredThreads[0]?.thread?.id ?? null);
+    }
+  }, [filteredThreads, selectedThreadId]);
 
   const loadThreads = useCallback(async () => {
     if (!token) {
@@ -48,6 +108,13 @@ export default function DashboardInbox() {
       setSelectedThreadId(null);
       return;
     }
+
+    if (offline) {
+      setThreadsError('You are offline. Conversations will refresh when connectivity returns.');
+      setThreadsLoading(false);
+      return;
+    }
+
     setThreadsLoading(true);
     setThreadsError(null);
     try {
@@ -65,16 +132,36 @@ export default function DashboardInbox() {
     } finally {
       setThreadsLoading(false);
     }
-  }, [token]);
+  }, [offline, token]);
 
   useEffect(() => {
     loadThreads();
   }, [loadThreads]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+    const handleOnline = () => setOffline(false);
+    const handleOffline = () => setOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!token || !selectedThreadId) {
       setMessages([]);
       setMessagesError(null);
+      return;
+    }
+
+    if (offline) {
+      setMessagesError('You are offline. Messages will load when connectivity returns.');
+      setMessagesLoading(false);
       return;
     }
 
@@ -107,7 +194,7 @@ export default function DashboardInbox() {
     return () => {
       cancelled = true;
     };
-  }, [token, selectedThreadId]);
+  }, [offline, selectedThreadId, token]);
 
   useEffect(() => {
     if (!socket || !selectedThreadId) return undefined;
@@ -200,6 +287,10 @@ export default function DashboardInbox() {
   const handleSendMessage = async () => {
     const trimmed = composer.trim();
     if (!trimmed || !token || !selectedThreadId) return;
+    if (offline) {
+      setMessagesError('Reconnect to send messages.');
+      return;
+    }
     setSendInFlight(true);
     try {
       const response = await sendThreadMessage(selectedThreadId, { body: trimmed }, { token });
@@ -239,11 +330,11 @@ export default function DashboardInbox() {
         <span
           className={classNames(
             'inline-flex items-center gap-2 rounded-full px-4 py-1 text-xs font-semibold uppercase tracking-wide',
-            connected ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
+            connectionTone
           )}
         >
-          <span className="inline-block h-2 w-2 rounded-full bg-current" />
-          {connected ? 'Live' : 'Reconnecting…'}
+          <span className={`inline-block h-2 w-2 rounded-full ${offline ? 'bg-rose-500' : 'bg-current'}`} />
+          {connectionLabel}
         </span>
       </div>
 
@@ -254,10 +345,72 @@ export default function DashboardInbox() {
             <button
               type="button"
               onClick={loadThreads}
-              className="text-xs font-semibold text-primary hover:underline"
+              disabled={offline}
+              title={offline ? 'Reconnect to refresh threads' : undefined}
+              className="text-xs font-semibold text-primary hover:underline disabled:cursor-not-allowed disabled:opacity-60"
             >
               Refresh
             </button>
+          </div>
+          <div className="space-y-3">
+            <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              Search conversations
+              <div className="relative">
+                <input
+                  value={threadSearch}
+                  onChange={(event) => setThreadSearch(event.target.value)}
+                  placeholder="Search by name, subject, or message"
+                  className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                {threadSearch ? (
+                  <button
+                    type="button"
+                    onClick={() => setThreadSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-600"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setThreadStatusFilter('all')}
+                className={classNames(
+                  'rounded-full border px-3 py-1 text-xs font-semibold transition',
+                  threadStatusFilter === 'all'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-primary/40'
+                )}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setThreadStatusFilter('unread')}
+                className={classNames(
+                  'rounded-full border px-3 py-1 text-xs font-semibold transition',
+                  threadStatusFilter === 'unread'
+                    ? 'border-primary bg-primary/10 text-primary'
+                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-primary/40'
+                )}
+              >
+                Unread ({unreadThreadCount})
+              </button>
+              {(threadSearch || threadStatusFilter !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setThreadSearch('');
+                    setThreadStatusFilter('all');
+                  }}
+                  className="text-[11px] font-semibold text-primary hover:underline"
+                >
+                  Reset filters
+                </button>
+              )}
+            </div>
           </div>
           {threadsLoading && <p className="text-xs text-slate-400">Loading threads…</p>}
           {threadsError && (
@@ -266,7 +419,7 @@ export default function DashboardInbox() {
             </p>
           )}
           <div className="mt-3 space-y-2">
-            {threads.map((entry) => {
+            {filteredThreads.map((entry) => {
               const isActive = entry.thread.id === selectedThreadId;
               const unread = entry.unreadCount ?? 0;
               const preview = entry.latestMessage?.body ?? 'No messages yet';
@@ -297,9 +450,11 @@ export default function DashboardInbox() {
                 </button>
               );
             })}
-            {!threadsLoading && !threads.length && !threadsError && (
+            {!threadsLoading && !filteredThreads.length && !threadsError && (
               <p className="rounded-2xl border border-dashed border-slate-200 p-4 text-xs text-slate-500">
-                Start a conversation by inviting teammates into a thread from the communities view.
+                {threadSearch || threadStatusFilter !== 'all'
+                  ? 'No conversations match your current filters. Adjust the search or reset filters to continue.'
+                  : 'Start a conversation by inviting teammates into a thread from the communities view.'}
               </p>
             )}
           </div>
@@ -356,11 +511,14 @@ export default function DashboardInbox() {
                 rows={3}
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
-              <div className="flex items-center justify-end gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className={classNames('text-xs', offline ? 'font-semibold text-amber-600' : 'text-slate-400')}>
+                  {offline ? 'Offline — reconnect to send messages.' : 'Press Enter to send'}
+                </span>
                 <button
                   type="button"
                   onClick={handleSendMessage}
-                  disabled={!composer.trim() || sendInFlight || !selectedThreadId}
+                  disabled={!composer.trim() || sendInFlight || !selectedThreadId || offline}
                   className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-white shadow transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {sendInFlight ? 'Sending…' : 'Send'}

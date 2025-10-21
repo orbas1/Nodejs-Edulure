@@ -104,6 +104,6 @@ describe('Dashboard role switches', () => {
 
     mockUseOutletContext.mockReturnValue({ role: 'community', refresh: vi.fn() });
     rerender(<DashboardEbooksSwitch />);
-    expect(screen.getByText('E-book Learnspace unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Operational Learnspaces do not host e-books')).toBeInTheDocument();
   });
 });
