@@ -4,6 +4,7 @@ import { ZodError, z } from 'zod';
 import telemetryIngestionService from '../services/TelemetryIngestionService.js';
 import telemetryWarehouseService from '../services/TelemetryWarehouseService.js';
 import TelemetryFreshnessMonitorModel from '../models/TelemetryFreshnessMonitorModel.js';
+import { recordConsentMutationOutcome } from '../observability/metrics.js';
 
 const consentRequestSchema = z.object({
   consentScope: z.string().min(1, 'consentScope is required'),
@@ -92,14 +93,17 @@ export default class TelemetryController {
   }
 
   static async recordConsentDecision(req, res, next) {
+    const operationKey = 'telemetry.record_consent';
+    let tenantId = resolveTenantId(req, req.body?.tenantId);
     try {
       const parsed = parseConsentRequest(req.body ?? {});
-      const tenantId = resolveTenantId(req, parsed.tenantId);
+      tenantId = resolveTenantId(req, parsed.tenantId);
       const userId = parsed.userId ?? req.user?.id;
 
       if (!userId) {
         const error = new Error('userId is required to record telemetry consent');
         error.status = 400;
+        error.metricReason = 'missing_user_id';
         throw error;
       }
 
@@ -115,8 +119,20 @@ export default class TelemetryController {
         evidence: parsed.evidence ?? {}
       });
 
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: true
+      });
+
       return res.status(201).json({ consent: record });
     } catch (error) {
+      recordConsentMutationOutcome({
+        operation: operationKey,
+        tenantId,
+        success: false,
+        reason: error?.metricReason ?? error?.code ?? error?.status ?? error?.message ?? 'error'
+      });
       if (error instanceof ZodError) {
         error.status = 422;
         error.details = error.errors.map((issue) => issue.message);
