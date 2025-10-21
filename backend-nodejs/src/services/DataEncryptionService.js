@@ -90,7 +90,7 @@ function attemptLegacyStructuredParse(serialized) {
   const normalised = serialized
     .replace(/":\s*,/g, '":null,')
     .replace(/":\s*}/g, '":null}')
-    .replace(/":\s*([A-Za-z@_:\/\-][A-Za-z0-9@._:\/\-]*)(?=[,}\]])/g, '":"$1"');
+    .replace(/":\s*([A-Za-z@_:/-][A-Za-z0-9@._:/-]*)(?=[,}\]])/g, '":"$1"');
 
   try {
     return JSON.parse(normalised);

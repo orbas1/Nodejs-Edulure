@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 import db from '../config/database.js';
@@ -403,9 +403,6 @@ export default class UserService {
         error.status = 404;
         throw error;
       }
-
-      const existingProfile = await UserProfileModel.findByUserId(id, trx);
-      const before = composeUser(existing, existingProfile);
 
       const updates = {};
       if (payload.firstName !== undefined) {

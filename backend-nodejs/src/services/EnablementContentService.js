@@ -11,10 +11,10 @@ const defaultContentDirectory = path.resolve(__dirname, '../enablement/content')
 const serviceLogger = logger.child({ module: 'enablement-content-service' });
 
 const markdownCandidates = [
-  markedModule?.marked,
-  markedModule?.default,
-  markedModule
-].filter(Boolean);
+  typeof markedModule.marked === 'function' ? markedModule.marked : null,
+  typeof markedModule.parse === 'function' ? markedModule.parse : null,
+  typeof markedModule === 'function' ? markedModule : null
+].filter((candidate, index, array) => typeof candidate === 'function' && array.indexOf(candidate) === index);
 
 function escapeHtml(value) {
   return String(value)
