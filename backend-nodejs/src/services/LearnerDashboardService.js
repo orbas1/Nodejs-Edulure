@@ -216,6 +216,31 @@ function formatSubscription(subscription, communityMap, tierMap) {
   };
 }
 
+function clampScore(value) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.max(0, Math.min(100, Math.round(numeric)));
+}
+
+function computeEngagementScore({
+  bookings = [],
+  libraryEntries = [],
+  supportCases = [],
+  subscriptions = [],
+  growthExperiments = []
+} = {}) {
+  const bookingScore = Math.min(bookings.length * 8, 30);
+  const libraryScore = Math.min(libraryEntries.length * 4, 20);
+  const subscriptionScore = subscriptions.some((subscription) => subscription.status === 'active') ? 20 : 0;
+  const supportScore = Math.max(0, 15 - Math.min(supportCases.length * 3, 15));
+  const growthScore = Math.min(growthExperiments.length * 5, 15);
+
+  const total = bookingScore + libraryScore + subscriptionScore + supportScore + growthScore;
+  return clampScore(total);
+}
+
 const DEFAULT_SYSTEM_PREFERENCES = Object.freeze({
   language: 'en',
   region: 'US',
@@ -1787,5 +1812,56 @@ export default class LearnerDashboardService {
     }
     log.info({ userId, ticketId }, 'Learner closed support ticket');
     return ticket;
+  }
+
+  static async getEngagementOverview(userId) {
+    if (!userId) {
+      return {
+        score: 0,
+        breakdown: {
+          bookings: 0,
+          libraryEntries: 0,
+          openSupportTickets: 0,
+          subscriptions: 0,
+          growthExperiments: 0
+        },
+        generatedAt: new Date().toISOString()
+      };
+    }
+
+    const [bookings, libraryEntries, supportCases, subscriptions, initiatives] = await Promise.all([
+      TutorBookingModel.listByLearnerId(userId, { limit: 50 }, db),
+      LearnerLibraryEntryModel.listByUserId(userId, db),
+      LearnerSupportRepository.listCases(userId),
+      CommunitySubscriptionModel.listByUser(userId),
+      LearnerGrowthInitiativeModel.listByUserId(userId, { status: ['active', 'monitoring'] }, db)
+    ]);
+
+    const experimentLists = await Promise.all(
+      initiatives.slice(0, 5).map((initiative) => LearnerGrowthExperimentModel.listByInitiativeId(initiative.id, db))
+    );
+    const experiments = experimentLists.flat();
+
+    const breakdown = {
+      bookings: bookings.length,
+      libraryEntries: libraryEntries.length,
+      openSupportTickets: supportCases.filter((supportCase) => supportCase?.status !== 'resolved').length,
+      subscriptions: subscriptions.filter((subscription) => subscription?.status === 'active').length,
+      growthExperiments: experiments.length
+    };
+
+    const score = computeEngagementScore({
+      bookings,
+      libraryEntries,
+      supportCases,
+      subscriptions,
+      growthExperiments: experiments
+    });
+
+    return {
+      score,
+      breakdown,
+      generatedAt: new Date().toISOString()
+    };
   }
 }

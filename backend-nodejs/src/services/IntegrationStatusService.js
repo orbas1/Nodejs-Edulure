@@ -297,6 +297,52 @@ export class IntegrationStatusService {
 
     return this.callAuditModel.summarise(integration, { since });
   }
+
+  async getHealthSnapshot(integration, environment = 'production') {
+    if (!integration) {
+      throw new Error('Integration is required');
+    }
+
+    const status = await this.statusModel.findByIntegration(integration, environment, this.db);
+    if (!status) {
+      return null;
+    }
+
+    const recentEvents = await this.statusEventModel.listRecent(
+      integration,
+      { limit: 5, environment },
+      this.db
+    );
+
+    const calls = await this.callAuditModel.summariseCalls(integration, environment, this.db);
+    const metadata = status.metadata ?? {};
+
+    return {
+      integration,
+      environment,
+      status: status.status,
+      statusSummary: status.statusSummary,
+      lastSuccessAt: status.lastSuccessAt ? status.lastSuccessAt.toISOString() : null,
+      lastFailureAt: status.lastFailureAt ? status.lastFailureAt.toISOString() : null,
+      consecutiveFailures: status.consecutiveFailures,
+      openIncidentCount: status.openIncidentCount,
+      metadata,
+      events: recentEvents.map((event) => ({
+        id: event.id,
+        status: event.status,
+        summary: event.summary,
+        occurredAt: event.occurredAt ? event.occurredAt.toISOString() : null
+      })),
+      callSummary: calls
+        ? {
+            total: Number(calls.total ?? 0),
+            success: Number(calls.success ?? 0),
+            degraded: Number(calls.degraded ?? 0),
+            failure: Number(calls.failure ?? 0)
+          }
+        : null
+    };
+  }
 }
 
 const integrationStatusService = new IntegrationStatusService();

@@ -188,6 +188,15 @@ function sum(array, accessor) {
   return array.reduce((total, item) => total + (Number(accessor(item)) || 0), 0);
 }
 
+function deriveOperationalScore({ incidents, integrations, storageUsage }) {
+  const incidentPenalty = Math.min(incidents.active * 12 + incidents.critical * 20, 60);
+  const integrationBonus = Math.min(integrations.operational * 5, 25);
+  const storagePenalty = storageUsage.usedPercentage > 85 ? 10 : storageUsage.usedPercentage > 70 ? 5 : 0;
+
+  const baseline = 100 - incidentPenalty - storagePenalty + integrationBonus;
+  return Math.max(0, Math.min(100, Math.round(baseline)));
+}
+
 export function summariseIncidentQueue(incidents, { now = new Date() } = {}) {
   const severityCounts = { critical: 0, high: 0, medium: 0, low: 0 };
   const ackMinutes = [];
@@ -945,12 +954,48 @@ export default class OperatorDashboardService {
       resolvedIncidents
     });
 
+    const integrationList = Array.isArray(integrationSnapshot?.integrations)
+      ? integrationSnapshot.integrations
+      : [];
+
+    const integrationStats = {
+      operational: integrationList.filter((integration) => integration.health === 'operational').length,
+      degraded: integrationList.filter((integration) => integration.health === 'warning').length,
+      critical: integrationList.filter((integration) => integration.health === 'critical').length,
+      total: integrationList.length
+    };
+
+    const evidenceUsageBytes = (complianceSnapshot.evidence?.exports ?? []).reduce(
+      (total, archive) => total + Number(archive.byteSize ?? 0),
+      0
+    );
+    const assumedCapacityBytes = Math.max(Number(env.storage?.maxUploadBytes ?? 500 * 1024 * 1024) * 200, 1);
+    const storageUsage = {
+      usedBytes: evidenceUsageBytes,
+      totalBytes: assumedCapacityBytes,
+      usedPercentage: Math.min(100, Math.round((evidenceUsageBytes / assumedCapacityBytes) * 100)),
+      formattedUsed: formatBytes(evidenceUsageBytes),
+      formattedTotal: formatBytes(assumedCapacityBytes)
+    };
+
+    const incidentStats = {
+      active: queueSummary.totalOpen,
+      critical: queueSummary.severityCounts?.critical ?? 0
+    };
+
+    const operationalScore = deriveOperationalScore({
+      incidents: incidentStats,
+      integrations: integrationStats,
+      storageUsage
+    });
+
     return {
       dashboard: {
         meta: {
           generatedAt: now.toISOString(),
           tenantId,
-          manifestGeneratedAt: serviceHealth.summary.manifestGeneratedAt
+          manifestGeneratedAt: serviceHealth.summary.manifestGeneratedAt,
+          operationalScore
         },
         metrics: {
           serviceHealth: serviceHealth.summary,
@@ -959,8 +1004,10 @@ export default class OperatorDashboardService {
           compliance: {
             kycQueue: complianceSnapshot.queue.length,
             dsarOutstanding: complianceSnapshot.gdpr?.dsar?.overdue ?? 0,
-            attestationCoverage: complianceSnapshot.attestations.totals.coverage ?? 100
-          }
+            attestationCoverage: complianceSnapshot.attestations.totals.coverage ?? 100,
+            storageUsage
+          },
+          integrations: integrationStats
         },
         serviceHealth,
         incidents: {

@@ -426,6 +426,33 @@ class ReleaseOrchestrationService {
     };
   }
 
+  async summariseReadiness({ environment } = {}) {
+    const filters = environment ? { environment: sanitiseEnvironment(environment) } : {};
+    const runs = await ReleaseRunModel.list({ ...filters }, { limit: 25 });
+    const totals = { ready: 0, blocked: 0, in_progress: 0, scheduled: 0 };
+    const readinessScores = [];
+
+    runs.items.forEach((run) => {
+      if (totals[run.status] !== undefined) {
+        totals[run.status] += 1;
+      }
+      if (Number.isFinite(run.metadata?.readinessScore)) {
+        readinessScores.push(Number(run.metadata.readinessScore));
+      }
+    });
+
+    const averageScore = readinessScores.length
+      ? Number((readinessScores.reduce((sum, score) => sum + score, 0) / readinessScores.length).toFixed(2))
+      : null;
+
+    return {
+      environment: filters.environment ?? 'all',
+      totals,
+      averageReadinessScore: averageScore,
+      evaluatedAt: new Date().toISOString()
+    };
+  }
+
   async getDashboard(filters = {}) {
     const environment = filters.environment ? sanitiseEnvironment(filters.environment) : null;
     const runFilters = environment ? { environment } : {};
