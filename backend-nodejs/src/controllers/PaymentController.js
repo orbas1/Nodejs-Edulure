@@ -62,13 +62,23 @@ const paymentIntentSchema = Joi.object({
 
 const refundSchema = Joi.object({
   amount: Joi.number().integer().min(1).optional(),
-  reason: Joi.string().max(180).allow('', null).optional()
+  reason: Joi.string().trim().max(180).allow('', null).optional()
 });
 
 const summarySchema = Joi.object({
   currency: Joi.string().length(3).uppercase().optional(),
   startDate: Joi.date().iso().optional(),
-  endDate: Joi.date().iso().optional()
+  endDate: Joi.date().iso().min(Joi.ref('startDate')).optional()
+});
+
+const paymentIdSchema = Joi.object({
+  paymentId: Joi.string()
+    .trim()
+    .pattern(/^[a-z0-9][a-z0-9._-]{1,120}$/i)
+    .required()
+    .messages({
+      'string.pattern.base': 'paymentId must contain only URL-safe characters'
+    })
 });
 
 export default class PaymentController {
@@ -100,8 +110,17 @@ export default class PaymentController {
 
   static async capturePayPal(req, res, next) {
     try {
-      const { paymentId } = req.params;
-      const intent = await PaymentService.capturePayPalOrder(paymentId);
+      const { value, error } = paymentIdSchema.validate(req.params, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (error) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+        throw error;
+      }
+
+      const intent = await PaymentService.capturePayPalOrder(value.paymentId);
       return success(res, {
         data: intent,
         message: 'PayPal order captured'
@@ -113,14 +132,22 @@ export default class PaymentController {
 
   static async issueRefund(req, res, next) {
     try {
-      const { paymentId } = req.params;
+      const { value: params, error: paramError } = paymentIdSchema.validate(req.params, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (paramError) {
+        paramError.status = 422;
+        paramError.details = paramError.details.map((detail) => detail.message);
+        throw paramError;
+      }
       const payload = await refundSchema.validateAsync(req.body ?? {}, {
         abortEarly: false,
         stripUnknown: true
       });
 
       const intent = await PaymentService.issueRefund({
-        paymentPublicId: paymentId,
+        paymentPublicId: params.paymentId,
         amount: payload.amount,
         reason: payload.reason ?? undefined,
         requesterId: req.user?.id ?? null

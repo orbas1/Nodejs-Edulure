@@ -12,7 +12,8 @@ const tutorBookingModelMock = vi.hoisted(() => ({
   create: vi.fn(),
   findByPublicId: vi.fn(),
   updateByPublicId: vi.fn(),
-  deleteByPublicId: vi.fn()
+  deleteByPublicId: vi.fn(),
+  findConflictingBookings: vi.fn()
 }));
 
 const userModelMock = vi.hoisted(() => ({
@@ -48,6 +49,7 @@ describe('InstructorBookingService', () => {
     Object.values(tutorProfileModelMock).forEach((fn) => fn.mockReset());
     Object.values(tutorBookingModelMock).forEach((fn) => fn.mockReset());
     Object.values(userModelMock).forEach((fn) => fn.mockReset());
+    vi.useRealTimers();
   });
 
   it('lists bookings with aggregated stats', async () => {
@@ -93,6 +95,7 @@ describe('InstructorBookingService', () => {
     userModelMock.forUpdateByEmail.mockResolvedValue({ id: 55 });
     userModelMock.updateById.mockResolvedValue({ id: 55 });
     tutorBookingModelMock.create.mockImplementation(async (payload) => ({ ...payload, id: 10 }));
+    tutorBookingModelMock.findConflictingBookings.mockResolvedValue([]);
 
     const created = await InstructorBookingService.createBooking(3, {
       learnerEmail: 'learner@example.com',
@@ -111,6 +114,7 @@ describe('InstructorBookingService', () => {
     userModelMock.forUpdateByEmail.mockResolvedValue(null);
     userModelMock.create.mockResolvedValue({ id: 88 });
     tutorBookingModelMock.create.mockImplementation(async (payload) => ({ ...payload, id: 11 }));
+    tutorBookingModelMock.findConflictingBookings.mockResolvedValue([]);
 
     await InstructorBookingService.createBooking(3, {
       learnerEmail: 'new@example.com',
@@ -196,6 +200,20 @@ describe('InstructorBookingService', () => {
     ).rejects.toMatchObject({ status: 422 });
 
     expect(tutorBookingModelMock.create).not.toHaveBeenCalled();
+  });
+
+  it('prevents creating bookings that conflict with existing ones', async () => {
+    tutorProfileModelMock.findByUserId.mockResolvedValue({ id: 4, hourlyRateCurrency: 'USD' });
+    userModelMock.forUpdateByEmail.mockResolvedValue({ id: 12 });
+    tutorBookingModelMock.findConflictingBookings.mockResolvedValue([{ publicId: 'existing' }]);
+
+    await expect(
+      InstructorBookingService.createBooking(9, {
+        learnerEmail: 'conflict@example.com',
+        scheduledStart: '2024-11-05T15:00:00Z',
+        scheduledEnd: '2024-11-05T16:00:00Z'
+      })
+    ).rejects.toMatchObject({ status: 409 });
   });
 
   it('prevents updates for bookings owned by other tutors', async () => {
