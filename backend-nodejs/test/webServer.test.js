@@ -53,7 +53,10 @@ describe('startWebServer', () => {
       child: vi.fn(() => logger)
     };
 
-    vi.doMock('node:http', () => ({ createServer }));
+    vi.doMock('node:http', () => ({
+      default: { createServer },
+      createServer
+    }));
     vi.doMock('../src/app.js', () => ({
       default: vi.fn(),
       registerReadinessProbe
