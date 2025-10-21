@@ -57,9 +57,13 @@ const paymentServiceMock = vi.hoisted(() => ({
   createPaymentIntent: vi.fn()
 }));
 
-vi.mock('node:crypto', () => ({
-  randomUUID: () => 'uuid-seed'
-}));
+vi.mock('node:crypto', async () => {
+  const actual = await vi.importActual('node:crypto');
+  return {
+    ...actual,
+    randomUUID: () => 'uuid-seed'
+  };
+});
 
 vi.mock('../src/config/database.js', () => ({
   default: {
