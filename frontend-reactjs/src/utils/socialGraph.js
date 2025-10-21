@@ -110,3 +110,18 @@ export function computeTrustIndicator(seed) {
 export function resolveRelationshipTagline(metadata) {
   return normaliseMetadataTagline(metadata);
 }
+
+export function summariseNetworkMetrics({ followers, recommendations }) {
+  const followerEntries = Array.isArray(followers) ? followers : [];
+  const recommendationEntries = Array.isArray(recommendations) ? recommendations : [];
+
+  const pendingFollowers = followerEntries.filter(
+    (entry) => entry?.relationship?.status === 'pending'
+  ).length;
+
+  return {
+    followerCount: followerEntries.length,
+    recommendationCount: recommendationEntries.length,
+    pendingFollowers
+  };
+}

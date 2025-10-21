@@ -4,11 +4,14 @@ import clsx from 'clsx';
 import MetricCard from '../../../../components/dashboard/MetricCard.jsx';
 
 export default function LearnerMetricsSection({ metrics, className }) {
-  if (!Array.isArray(metrics) || metrics.length === 0) return null;
+  const safeMetrics = Array.isArray(metrics)
+    ? metrics.filter((metric) => metric?.label && metric?.value !== undefined)
+    : [];
+  if (safeMetrics.length === 0) return null;
 
   return (
     <section className={clsx('grid gap-5 md:grid-cols-2 xl:grid-cols-4', className)}>
-      {metrics.map((metric) => (
+      {safeMetrics.map((metric) => (
         <MetricCard key={metric.label} metric={metric} />
       ))}
     </section>

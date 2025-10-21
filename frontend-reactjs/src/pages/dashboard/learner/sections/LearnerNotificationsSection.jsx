@@ -49,6 +49,12 @@ NotificationRow.propTypes = {
 };
 
 export default function LearnerNotificationsSection({ notifications, total, onRefresh, className }) {
+  const handleRefresh = () => {
+    if (typeof onRefresh === 'function') {
+      onRefresh();
+    }
+  };
+
   if (!Array.isArray(notifications) || notifications.length === 0) {
     return (
       <section className={clsx('dashboard-section h-full', className)}>
@@ -57,8 +63,9 @@ export default function LearnerNotificationsSection({ notifications, total, onRe
         <p className="mt-2 text-sm text-slate-600">We&rsquo;ll surface classroom, community, and messaging alerts here as soon as they arrive.</p>
         <button
           type="button"
-          onClick={onRefresh}
-          className="mt-6 inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark"
+          onClick={handleRefresh}
+          className="mt-6 inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={typeof onRefresh !== 'function'}
         >
           Refresh feed
         </button>
@@ -84,13 +91,15 @@ export default function LearnerNotificationsSection({ notifications, total, onRe
       </ul>
       <div className="mt-6 flex items-center justify-between text-xs text-slate-500">
         <span>Alerts sync every 5 minutes with enterprise-grade webhooks.</span>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="text-xs font-semibold text-primary transition hover:text-primary-dark"
-        >
-          Refresh now
-        </button>
+        {typeof onRefresh === 'function' ? (
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="text-xs font-semibold text-primary transition hover:text-primary-dark"
+          >
+            Refresh now
+          </button>
+        ) : null}
       </div>
     </section>
   );
