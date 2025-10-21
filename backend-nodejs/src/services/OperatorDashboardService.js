@@ -8,14 +8,123 @@ import ComplianceService from './ComplianceService.js';
 import AuditEventService from './AuditEventService.js';
 import dataPartitionService from './DataPartitionService.js';
 import storageService from './StorageService.js';
-import PlatformSettingsService, {
-  normaliseAdminProfile,
-  normalisePaymentSettings,
-  normaliseEmailSettings,
-  normaliseSecuritySettings,
-  normaliseFinanceSettings,
-  normaliseMonetization
-} from './PlatformSettingsService.js';
+import * as PlatformSettingsModule from './PlatformSettingsService.js';
+
+const PlatformSettingsService =
+  PlatformSettingsModule.default ?? PlatformSettingsModule.PlatformSettingsService ?? PlatformSettingsModule;
+
+const mergeWithDefaults = (defaults, payload) => {
+  const base = structuredClone(defaults);
+  if (!payload || typeof payload !== 'object') {
+    return base;
+  }
+
+  return Object.entries(payload).reduce((acc, [key, value]) => {
+    if (value === undefined) {
+      return acc;
+    }
+    if (Array.isArray(value)) {
+      acc[key] = value.map((entry) => (typeof entry === 'object' && entry !== null ? { ...entry } : entry));
+      return acc;
+    }
+    if (value && typeof value === 'object') {
+      acc[key] = mergeWithDefaults(acc[key] ?? {}, value);
+      return acc;
+    }
+    acc[key] = value;
+    return acc;
+  }, base);
+};
+
+const DEFAULT_ADMIN_PROFILE_FALLBACK = Object.freeze({
+  organisation: {
+    name: '',
+    mission: '',
+    tagline: '',
+    headquarters: '',
+    established: '',
+    statement: '',
+    heroVideoUrl: '',
+    heroPosterUrl: ''
+  },
+  leadership: [],
+  supportChannels: [],
+  runbooks: [],
+  media: [],
+  onCall: {
+    rotation: '',
+    timezone: 'UTC',
+    currentPrimary: '',
+    backup: '',
+    escalationChannel: ''
+  }
+});
+
+const DEFAULT_PAYMENT_SETTINGS_FALLBACK = Object.freeze({
+  processors: [],
+  payoutRules: {
+    schedule: 'weekly',
+    dayOfWeek: 'monday',
+    minimumPayoutCents: 0,
+    reservePercentage: 0,
+    autoApproveRefunds: false,
+    riskThreshold: 'medium'
+  },
+  bankAccounts: [],
+  webhooks: []
+});
+
+const DEFAULT_EMAIL_SETTINGS_FALLBACK = Object.freeze({
+  branding: {
+    supportSignature: '',
+    replyTo: '',
+    senderName: ''
+  },
+  notifications: {},
+  templates: {}
+});
+
+const DEFAULT_SECURITY_SETTINGS_FALLBACK = Object.freeze({
+  mfa: { enforcedRoles: [], gracePeriodHours: 0 },
+  passwordPolicy: {
+    minLength: 12,
+    requireNumbers: true,
+    requireSymbols: true,
+    rotationDays: 180
+  },
+  sessionManagement: { maxConcurrentSessions: 5, idleTimeoutMinutes: 30 },
+  ipAllowlist: [],
+  alerting: { channels: [] }
+});
+
+const DEFAULT_FINANCE_SETTINGS_FALLBACK = Object.freeze({
+  approvals: { required: false, thresholdCents: 0 },
+  tax: { defaultRateBps: 0, registrationNumber: '' },
+  integrations: []
+});
+
+const DEFAULT_MONETIZATION_SETTINGS_FALLBACK = Object.freeze({
+  commissions: {
+    enabled: false,
+    default: { rateBps: 0, affiliateShare: 0 },
+    categories: {}
+  },
+  subscriptions: { plans: [] },
+  upsells: []
+});
+
+const normaliseAdminProfile =
+  PlatformSettingsModule.normaliseAdminProfile ?? ((payload) => mergeWithDefaults(DEFAULT_ADMIN_PROFILE_FALLBACK, payload));
+const normalisePaymentSettings =
+  PlatformSettingsModule.normalisePaymentSettings ?? ((payload) => mergeWithDefaults(DEFAULT_PAYMENT_SETTINGS_FALLBACK, payload));
+const normaliseEmailSettings =
+  PlatformSettingsModule.normaliseEmailSettings ?? ((payload) => mergeWithDefaults(DEFAULT_EMAIL_SETTINGS_FALLBACK, payload));
+const normaliseSecuritySettings =
+  PlatformSettingsModule.normaliseSecuritySettings ?? ((payload) => mergeWithDefaults(DEFAULT_SECURITY_SETTINGS_FALLBACK, payload));
+const normaliseFinanceSettings =
+  PlatformSettingsModule.normaliseFinanceSettings ?? ((payload) => mergeWithDefaults(DEFAULT_FINANCE_SETTINGS_FALLBACK, payload));
+const normaliseMonetization =
+  PlatformSettingsModule.normaliseMonetization ?? ((payload) => mergeWithDefaults(DEFAULT_MONETIZATION_SETTINGS_FALLBACK, payload));
 
 const SEVERITY_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
 const INCIDENT_SEVERITIES = ['critical', 'high', 'medium', 'low'];

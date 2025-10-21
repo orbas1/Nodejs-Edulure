@@ -5,7 +5,16 @@ import ContentAssetModel from '../models/ContentAssetModel.js';
 import EbookModel from '../models/EbookModel.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
 import PaymentService from './PaymentService.js';
-import { formatCurrency } from './DashboardService.js';
+
+function formatCurrency(amountCents, currency = 'USD') {
+  const amount = Number(amountCents ?? 0) / 100;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(amount);
+}
 
 async function ensureUniqueSlug(title, connection = db) {
   const base = title ?? randomUUID();

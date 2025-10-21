@@ -404,9 +404,6 @@ export default class UserService {
         throw error;
       }
 
-      const existingProfile = await UserProfileModel.findByUserId(id, trx);
-      const before = composeUser(existing, existingProfile);
-
       const updates = {};
       if (payload.firstName !== undefined) {
         updates.firstName = normaliseString(payload.firstName);

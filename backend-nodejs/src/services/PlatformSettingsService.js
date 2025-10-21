@@ -104,6 +104,23 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
   credentials: []
 });
 
+function deepMergeLimited(base, patch) {
+  if (!patch || typeof patch !== 'object') {
+    return { ...base };
+  }
+
+  const result = Array.isArray(base) ? [...base] : { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (Array.isArray(value)) {
+      result[key] = value.slice(0, 20);
+    } else if (value && typeof value === 'object') {
+      result[key] = deepMergeLimited(base?.[key] ?? {}, value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
 
 const DEFAULT_ADMIN_PROFILE = Object.freeze({
   organisation: {
@@ -425,7 +442,7 @@ function dedupeById(entries) {
 }
 
 function normaliseAppearance(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_APPEARANCE);
+  const result = deepMergeLimited({}, DEFAULT_APPEARANCE);
 
   if (rawSettings.branding && typeof rawSettings.branding === 'object') {
     result.branding.primaryColor = normaliseHexColour(
@@ -510,7 +527,7 @@ function normaliseAppearance(rawSettings = {}) {
 }
 
 function normalisePreferences(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_PREFERENCES);
+  const result = deepMergeLimited({}, DEFAULT_PREFERENCES);
 
   if (rawSettings.localisation && typeof rawSettings.localisation === 'object') {
     result.localisation.defaultLanguage = normaliseText(rawSettings.localisation.defaultLanguage, {
@@ -571,7 +588,7 @@ function normalisePreferences(rawSettings = {}) {
 }
 
 function normaliseSystem(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_SYSTEM);
+  const result = deepMergeLimited({}, DEFAULT_SYSTEM);
 
   if (rawSettings.maintenanceMode && typeof rawSettings.maintenanceMode === 'object') {
     result.maintenanceMode.enabled = Boolean(rawSettings.maintenanceMode.enabled);
@@ -632,7 +649,7 @@ function normaliseSystem(rawSettings = {}) {
 }
 
 function normaliseIntegrations(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_INTEGRATIONS);
+  const result = deepMergeLimited({}, DEFAULT_INTEGRATIONS);
 
   if (Array.isArray(rawSettings.webhooks)) {
     result.webhooks = dedupeById(
@@ -669,7 +686,7 @@ function normaliseIntegrations(rawSettings = {}) {
 }
 
 function normaliseThirdParty(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_THIRD_PARTY);
+  const result = deepMergeLimited({}, DEFAULT_THIRD_PARTY);
 
   if (Array.isArray(rawSettings.credentials)) {
     const allowedStatus = new Set(['active', 'disabled', 'revoked']);
@@ -705,7 +722,7 @@ function normaliseThirdParty(rawSettings = {}) {
 }
 
 function normaliseAdminProfile(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_ADMIN_PROFILE);
+  const result = deepMergeLimited({}, DEFAULT_ADMIN_PROFILE);
 
   if (rawSettings.organisation && typeof rawSettings.organisation === 'object') {
     result.organisation = {
@@ -816,7 +833,7 @@ function normaliseAdminProfile(rawSettings = {}) {
 }
 
 function normalisePaymentSettings(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_PAYMENT_SETTINGS);
+  const result = deepMergeLimited({}, DEFAULT_PAYMENT_SETTINGS);
   const statusSet = new Set(['active', 'paused', 'error', 'testing']);
   const scheduleSet = new Set(['daily', 'weekly', 'biweekly', 'monthly', 'adhoc']);
   const daySet = new Set(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']);
@@ -907,7 +924,7 @@ function normalisePaymentSettings(rawSettings = {}) {
 }
 
 function normaliseEmailSettings(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_EMAIL_SETTINGS);
+  const result = deepMergeLimited({}, DEFAULT_EMAIL_SETTINGS);
 
   if (rawSettings.branding && typeof rawSettings.branding === 'object') {
     result.branding = {
@@ -972,7 +989,7 @@ function normaliseEmailSettings(rawSettings = {}) {
 }
 
 function normaliseSecuritySettings(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_SECURITY_SETTINGS);
+  const result = deepMergeLimited({}, DEFAULT_SECURITY_SETTINGS);
   const methodTypes = new Set(['totp', 'sms', 'webauthn', 'email']);
 
   if (rawSettings.enforcement && typeof rawSettings.enforcement === 'object') {
@@ -1042,7 +1059,7 @@ function normaliseSecuritySettings(rawSettings = {}) {
 }
 
 function normaliseFinanceSettings(rawSettings = {}) {
-  const result = deepMerge({}, DEFAULT_FINANCE_SETTINGS);
+  const result = deepMergeLimited({}, DEFAULT_FINANCE_SETTINGS);
   const adjustmentStatus = new Set(['draft', 'scheduled', 'processing', 'processed', 'cancelled']);
 
   if (rawSettings.policies && typeof rawSettings.policies === 'object') {

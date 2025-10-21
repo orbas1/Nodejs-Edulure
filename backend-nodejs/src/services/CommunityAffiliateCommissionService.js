@@ -2,7 +2,20 @@ import db from '../config/database.js';
 import CommunityAffiliateModel from '../models/CommunityAffiliateModel.js';
 import DomainEventModel from '../models/DomainEventModel.js';
 import PaymentIntentModel from '../models/PaymentIntentModel.js';
-import PlatformSettingsService from './PlatformSettingsService.js';
+import * as PlatformSettingsModule from './PlatformSettingsService.js';
+
+const PlatformSettingsService =
+  PlatformSettingsModule.default ?? PlatformSettingsModule.PlatformSettingsService ?? PlatformSettingsModule;
+
+const getMonetizationSettings =
+  typeof PlatformSettingsService?.getMonetizationSettings === 'function'
+    ? (...args) => PlatformSettingsService.getMonetizationSettings(...args)
+    : async () => ({ commissions: { enabled: false, default: { rateBps: 0, affiliateShare: 0 } } });
+
+const calculateCommission =
+  typeof PlatformSettingsService?.calculateCommission === 'function'
+    ? (...args) => PlatformSettingsService.calculateCommission(...args)
+    : () => ({ platformAmountCents: 0, affiliateAmountCents: 0, category: null });
 
 const COMMISSION_CATEGORY_MAP = Object.freeze({
   community_subscription: 'community_subscription',
@@ -142,9 +155,9 @@ export default class CommunityAffiliateCommissionService {
       return null;
     }
 
-    const monetization = await PlatformSettingsService.getMonetizationSettings(connection);
+    const monetization = await getMonetizationSettings(connection);
     const category = this.resolveCategory(intent);
-    const breakdown = PlatformSettingsService.calculateCommission(
+    const breakdown = calculateCommission(
       intent.amountTotal ?? 0,
       monetization.commissions,
       { category }

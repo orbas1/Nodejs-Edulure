@@ -1029,8 +1029,6 @@ class PaymentService {
     const charge = paymentIntentPayload.charges?.data?.[0];
 
     await db.transaction(async (trx) => {
-      const financeConnection = resolveFinanceConnection(trx);
-
       const intent = await PaymentIntentModel.findByProviderIntentId(providerIntentId, trx);
       if (!intent) {
         logger.warn({ providerIntentId }, 'Received success webhook for unknown payment intent');
@@ -1105,13 +1103,11 @@ class PaymentService {
     });
   }
 
-  static async handleStripePaymentFailed(paymentIntentPayload) {
-    const providerIntentId = paymentIntentPayload.id;
-    const failure = paymentIntentPayload.last_payment_error;
+    static async handleStripePaymentFailed(paymentIntentPayload) {
+      const providerIntentId = paymentIntentPayload.id;
+      const failure = paymentIntentPayload.last_payment_error;
 
-    await db.transaction(async (trx) => {
-      const financeConnection = resolveFinanceConnection(trx);
-
+      await db.transaction(async (trx) => {
       const intent = await PaymentIntentModel.findByProviderIntentId(providerIntentId, trx);
       if (!intent) {
         logger.warn({ providerIntentId }, 'Received failure webhook for unknown payment intent');

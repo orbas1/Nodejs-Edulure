@@ -111,26 +111,26 @@
 100. ✅ `backend-nodejs/src/routes/routeMetadata.js:98:78` – unnecessary escape.
 
 #### Group 6 (Items 101-120)
-101. `backend-nodejs/src/routes/routeMetadata.js:98:84` – unnecessary escape.
-102. `backend-nodejs/src/routes/routeMetadata.js:98:94` – unnecessary escape.
-103. `backend-nodejs/src/routes/routeMetadata.js:162:30` – unused `name` parameter.
-104. `backend-nodejs/src/services/CommunityAffiliateCommissionService.js:5:37` – `PlatformSettingsService` parse error.
-105. `backend-nodejs/src/services/CommunityAffiliateCommissionService.js:5:37` – default import parse error.
-106. `backend-nodejs/src/services/DashboardService.js:1339:9` – `adsSection` redeclared.
-107. `backend-nodejs/src/services/DataEncryptionService.js:93:31` – unnecessary escape.
-108. `backend-nodejs/src/services/DataEncryptionService.js:93:33` – unnecessary escape.
-109. `backend-nodejs/src/services/DataEncryptionService.js:93:50` – unnecessary escape.
-110. `backend-nodejs/src/services/DataEncryptionService.js:93:52` – unnecessary escape.
-111. `backend-nodejs/src/services/EbookService.js:8:32` – `DashboardService` parse error.
-112. `backend-nodejs/src/services/EnablementContentService.js:15:17` – missing default export from `markedModule`.
-113. `backend-nodejs/src/services/OperatorDashboardService.js:18:8` – `PlatformSettingsService` parse error.
-114. `backend-nodejs/src/services/OperatorDashboardService.js:18:8` – default import parse error.
-115. `backend-nodejs/src/services/PaymentService.js:21:37` – `PlatformSettingsService` parse error.
-116. `backend-nodejs/src/services/PaymentService.js:21:37` – default import parse error.
-117. `backend-nodejs/src/services/PaymentService.js:1113:13` – unused `financeConnection`.
-118. `backend-nodejs/src/services/PlatformSettingsService.js:1324:10` – `deepMerge` redeclared.
-119. `backend-nodejs/src/services/UserService.js:1:20` – missing `bcrypt`.
-120. `backend-nodejs/src/services/UserService.js:408:13` – unused `before`.
+101. ✅ `backend-nodejs/src/routes/routeMetadata.js:98:84` – unnecessary escape.
+102. ✅ `backend-nodejs/src/routes/routeMetadata.js:98:94` – unnecessary escape.
+103. ✅ `backend-nodejs/src/routes/routeMetadata.js:162:30` – unused `name` parameter.
+104. ✅ `backend-nodejs/src/services/CommunityAffiliateCommissionService.js:5:37` – `PlatformSettingsService` parse error.
+105. ✅ `backend-nodejs/src/services/CommunityAffiliateCommissionService.js:5:37` – default import parse error.
+106. ✅ `backend-nodejs/src/services/DashboardService.js:1339:9` – `adsSection` redeclared.
+107. ✅ `backend-nodejs/src/services/DataEncryptionService.js:93:31` – unnecessary escape.
+108. ✅ `backend-nodejs/src/services/DataEncryptionService.js:93:33` – unnecessary escape.
+109. ✅ `backend-nodejs/src/services/DataEncryptionService.js:93:50` – unnecessary escape.
+110. ✅ `backend-nodejs/src/services/DataEncryptionService.js:93:52` – unnecessary escape.
+111. ✅ `backend-nodejs/src/services/EbookService.js:8:32` – `DashboardService` parse error.
+112. ✅ `backend-nodejs/src/services/EnablementContentService.js:15:17` – missing default export from `markedModule`.
+113. ✅ `backend-nodejs/src/services/OperatorDashboardService.js:18:8` – `PlatformSettingsService` parse error.
+114. ✅ `backend-nodejs/src/services/OperatorDashboardService.js:18:8` – default import parse error.
+115. ✅ `backend-nodejs/src/services/PaymentService.js:21:37` – `PlatformSettingsService` parse error.
+116. ✅ `backend-nodejs/src/services/PaymentService.js:21:37` – default import parse error.
+117. ✅ `backend-nodejs/src/services/PaymentService.js:1113:13` – unused `financeConnection`.
+118. ✅ `backend-nodejs/src/services/PlatformSettingsService.js:1324:10` – `deepMerge` redeclared.
+119. ✅ `backend-nodejs/src/services/UserService.js:1:20` – missing `bcrypt`.
+120. ✅ `backend-nodejs/src/services/UserService.js:408:13` – unused `before`.
 
 #### Group 7 (Items 121-128)
 121. ✅ `backend-nodejs/src/utils/geo.js:551:9` – unused `centerLng`.

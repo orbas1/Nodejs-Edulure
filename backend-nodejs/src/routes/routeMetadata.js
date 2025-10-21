@@ -159,7 +159,7 @@ function normaliseMethods(methods) {
   return Array.from(new Set(values));
 }
 
-function normaliseCors(cors, name) {
+function normaliseCors(cors) {
   const policy =
     typeof cors?.policy === 'string' && cors.policy.trim().length > 0 ? cors.policy.trim() : 'environment-managed';
   const allowedOrigins = ensureArray(cors?.allowedOrigins, {
@@ -321,7 +321,7 @@ function defineRoute({
     serviceTier: normalisedServiceTier,
     tags: deepFreeze(normalisedTags),
     rbac: normaliseRbac(rbac, normalisedName, normalisedAudience),
-    cors: normaliseCors(cors, normalisedName),
+    cors: normaliseCors(cors),
     statusPageComponent:
       typeof statusPageComponent === 'string' && statusPageComponent.trim().length > 0
         ? statusPageComponent.trim()
