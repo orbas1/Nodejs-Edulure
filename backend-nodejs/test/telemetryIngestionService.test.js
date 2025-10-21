@@ -59,6 +59,19 @@ describe('TelemetryIngestionService', () => {
     vi.restoreAllMocks();
   });
 
+  it('rejects invalid event payload with structured validation errors', async () => {
+    await expect(
+      service.ingestEvent({ eventSource: 'web' })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: 'INVALID_TELEMETRY_EVENT',
+      details: expect.arrayContaining([
+        expect.objectContaining({ path: 'eventName' })
+      ])
+    });
+    expect(eventModel.create).not.toHaveBeenCalled();
+  });
+
   it('ingests events when consent is granted', async () => {
     const consentRecord = {
       status: 'granted',
@@ -168,6 +181,30 @@ describe('TelemetryIngestionService', () => {
     await expect(
       service.ingestEvent({ eventName: 'app.launch', eventSource: 'mobile' })
     ).rejects.toMatchObject({ status: 403 });
+    expect(eventModel.create).not.toHaveBeenCalled();
+  });
+
+  it('surfaces service unavailability when ingestion is disabled', async () => {
+    service = new TelemetryIngestionService({
+      consentModel,
+      eventModel,
+      freshnessModel,
+      loggerInstance: loggerStub,
+      config: {
+        ingestion: {
+          enabled: false,
+          defaultScope: 'product.analytics',
+          allowedSources: [],
+          strictSourceEnforcement: false,
+          consent: { hardBlockWithoutConsent: true, defaultVersion: 'v1' }
+        },
+        freshness: { ingestionThresholdMinutes: 15 }
+      }
+    });
+
+    await expect(
+      service.ingestEvent({ eventName: 'app.launch', eventSource: 'web' })
+    ).rejects.toMatchObject({ status: 503 });
     expect(eventModel.create).not.toHaveBeenCalled();
   });
 });

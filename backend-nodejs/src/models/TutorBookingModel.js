@@ -166,6 +166,27 @@ export default class TutorBookingModel {
     return Number(result?.total ?? 0);
   }
 
+  static async findConflictingBookings(
+    tutorId,
+    start,
+    end,
+    { excludePublicId } = {},
+    connection = db
+  ) {
+    if (!tutorId || !start || !end) return [];
+    const query = buildBaseQuery(connection)
+      .where('tb.tutor_id', tutorId)
+      .whereIn('tb.status', ['requested', 'confirmed'])
+      .andWhere('tb.scheduled_start', '<', end)
+      .andWhere('tb.scheduled_end', '>', start)
+      .orderBy('tb.scheduled_start', 'asc');
+    if (excludePublicId) {
+      query.andWhereNot('tb.public_id', excludePublicId);
+    }
+    const rows = await query;
+    return rows.map((row) => deserialize(row));
+  }
+
   static async findByPublicId(publicId, connection = db) {
     if (!publicId) return null;
     const row = await buildBaseQuery(connection).where('tb.public_id', publicId).first();

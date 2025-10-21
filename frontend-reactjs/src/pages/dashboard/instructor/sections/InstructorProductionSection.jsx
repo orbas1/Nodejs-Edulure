@@ -9,9 +9,25 @@ const productionItemPropType = PropTypes.shape({
   workspaceUrl: PropTypes.string
 });
 
+function resolveWorkspaceUrl(url) {
+  if (typeof url !== 'string' || url.trim().length === 0) {
+    return null;
+  }
+  try {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.edulure.com';
+    const parsed = new URL(url, origin);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
 function ProductionCard({ asset }) {
-  const workspaceUrl = typeof asset.workspaceUrl === 'string' ? asset.workspaceUrl : null;
-  const canOpenWorkspace = workspaceUrl && workspaceUrl !== '#';
+  const workspaceUrl = resolveWorkspaceUrl(asset.workspaceUrl);
+  const canOpenWorkspace = Boolean(workspaceUrl);
 
   return (
     <li className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-sm ring-1 ring-inset ring-slate-100">

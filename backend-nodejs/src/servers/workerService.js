@@ -14,6 +14,7 @@ import monetizationReconciliationJob from '../jobs/monetizationReconciliationJob
 import integrationOrchestratorService from '../services/IntegrationOrchestratorService.js';
 import webhookEventBusService from '../services/WebhookEventBusService.js';
 import domainEventDispatcherService from '../services/DomainEventDispatcherService.js';
+import { createProcessSignalRegistry } from './processSignalRegistry.js';
 
 const serviceLogger = logger.child({ service: 'worker-service' });
 
@@ -35,134 +36,48 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     'probe-server'
   ]);
 
+  const cleanupTasks = [];
+  const registerCleanup = (name, fn) => {
+    cleanupTasks.push({ name, fn });
+  };
+
+  const stopBackgroundRunners = async () => {
+    for (const { name, fn } of [...cleanupTasks].reverse()) {
+      try {
+        await Promise.resolve(fn());
+        serviceLogger.info({ component: name }, 'Background worker stopped');
+      } catch (error) {
+        serviceLogger.error({ component: name, err: error }, 'Failed to stop background worker cleanly');
+      }
+    }
+    cleanupTasks.length = 0;
+  };
+
+  const registry = createProcessSignalRegistry();
   let databaseHandle = null;
   try {
     databaseHandle = await ensureDatabaseConnection({ runMigrations: false, readiness });
   } catch (error) {
     serviceLogger.error({ err: error }, 'Failed to connect to database');
     readiness.markFailed('database', error);
+    registry.cleanup();
+    throw error;
   }
 
-  const infrastructure = await startCoreInfrastructure({ readiness });
-
-  readiness.markPending('asset-ingestion', 'Starting asset ingestion poller');
+  let infrastructure;
   try {
-    assetIngestionService.start();
-    if (!env.integrations.cloudConvertApiKey) {
-      readiness.markDegraded(
-        'asset-ingestion',
-        'Running without CloudConvert – PowerPoint conversions will queue until configured'
-      );
-      serviceLogger.warn('Asset ingestion running without CloudConvert API key; conversions will be retried later.');
-    } else {
-      readiness.markReady('asset-ingestion', 'Asset ingestion poller active');
+    infrastructure = await startCoreInfrastructure({ readiness });
+  } catch (error) {
+    serviceLogger.error({ err: error }, 'Failed to start core infrastructure services');
+    if (databaseHandle) {
+      try {
+        await databaseHandle.close();
+      } catch (closeError) {
+        serviceLogger.error({ err: closeError }, 'Error closing database connection after infrastructure failure');
+      }
     }
-  } catch (error) {
-    readiness.markFailed('asset-ingestion', error);
-    serviceLogger.error({ err: error }, 'Failed to start asset ingestion service');
-  }
-
-  readiness.markPending('data-retention', 'Starting data retention scheduler');
-  try {
-    dataRetentionJob.start();
-    if (!env.retention.enabled) {
-      readiness.markDegraded('data-retention', 'Data retention scheduler disabled by configuration');
-    } else {
-      readiness.markReady('data-retention', 'Data retention scheduler active');
-    }
-  } catch (error) {
-    readiness.markFailed('data-retention', error);
-    serviceLogger.error({ err: error }, 'Failed to start data retention job');
-  }
-
-  readiness.markPending('data-partitioning', 'Starting data partition scheduler');
-  try {
-    dataPartitionJob.start();
-    if (!env.partitioning.enabled) {
-      readiness.markDegraded('data-partitioning', 'Data partition scheduler disabled by configuration');
-    } else {
-      readiness.markReady('data-partitioning', 'Data partition scheduler active');
-    }
-  } catch (error) {
-    readiness.markFailed('data-partitioning', error);
-    serviceLogger.error({ err: error }, 'Failed to start data partition job');
-  }
-
-  readiness.markPending('community-reminder', 'Starting community reminder scheduler');
-  try {
-    communityReminderJob.start();
-    if (!env.engagement.reminders.enabled) {
-      readiness.markDegraded('community-reminder', 'Community reminders disabled by configuration');
-    } else {
-      readiness.markReady('community-reminder', 'Community reminders scheduler active');
-    }
-  } catch (error) {
-    readiness.markFailed('community-reminder', error);
-    serviceLogger.error({ err: error }, 'Failed to start community reminder job');
-  }
-
-  readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
-  try {
-    telemetryWarehouseJob.start();
-    if (!env.telemetry.export.enabled) {
-      readiness.markDegraded('telemetry-warehouse', 'Telemetry export scheduler disabled by configuration');
-    } else {
-      readiness.markReady('telemetry-warehouse', 'Telemetry export scheduler active');
-    }
-  } catch (error) {
-    readiness.markFailed('telemetry-warehouse', error);
-    serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
-  }
-
-  readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
-  try {
-    monetizationReconciliationJob.start();
-    if (!env.monetization.reconciliation.enabled) {
-      readiness.markDegraded('monetization-reconciliation', 'Monetization reconciliation disabled by configuration');
-    } else {
-      readiness.markReady('monetization-reconciliation', 'Monetization reconciliation scheduler active');
-    }
-  } catch (error) {
-    readiness.markFailed('monetization-reconciliation', error);
-    serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
-  }
-
-  readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
-  try {
-    integrationOrchestratorService.start();
-    readiness.markReady('integration-orchestrator', 'Integration orchestrator scheduled');
-  } catch (error) {
-    readiness.markFailed('integration-orchestrator', error);
-    serviceLogger.error({ err: error }, 'Failed to start integration orchestrator');
-  }
-
-  readiness.markPending('webhook-event-bus', 'Starting webhook dispatcher');
-  try {
-    webhookEventBusService.start();
-    if (!webhookEventBusService.enabled) {
-      readiness.markDegraded('webhook-event-bus', 'Webhook dispatcher disabled by configuration');
-    } else {
-      readiness.markReady('webhook-event-bus', 'Webhook dispatcher active');
-    }
-  } catch (error) {
-    readiness.markFailed('webhook-event-bus', error);
-    serviceLogger.error({ err: error }, 'Failed to start webhook dispatcher');
-  }
-
-  readiness.markPending('domain-event-dispatcher', 'Starting domain event dispatcher');
-  try {
-    domainEventDispatcherService.start();
-    if (!domainEventDispatcherService.enabled) {
-      readiness.markDegraded(
-        'domain-event-dispatcher',
-        'Domain event dispatcher disabled by configuration'
-      );
-    } else {
-      readiness.markReady('domain-event-dispatcher', 'Domain event dispatcher active');
-    }
-  } catch (error) {
-    readiness.markFailed('domain-event-dispatcher', error);
-    serviceLogger.error({ err: error }, 'Failed to start domain event dispatcher');
+    registry.cleanup();
+    throw error;
   }
 
   const probeApp = createProbeApp({
@@ -172,19 +87,195 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
   });
 
   const probeServer = http.createServer(probeApp);
+  let probeServerPending = false;
 
-  await new Promise((resolve, reject) => {
-    probeServer.once('error', (error) => {
+  try {
+    readiness.markPending('asset-ingestion', 'Starting asset ingestion poller');
+    try {
+      assetIngestionService.start();
+      registerCleanup('asset-ingestion', () => assetIngestionService.stop());
+      if (!env.integrations.cloudConvertApiKey) {
+        readiness.markDegraded(
+          'asset-ingestion',
+          'Running without CloudConvert – PowerPoint conversions will queue until configured'
+        );
+        serviceLogger.warn('Asset ingestion running without CloudConvert API key; conversions will be retried later.');
+      } else {
+        readiness.markReady('asset-ingestion', 'Asset ingestion poller active');
+      }
+    } catch (error) {
+      readiness.markFailed('asset-ingestion', error);
+      serviceLogger.error({ err: error }, 'Failed to start asset ingestion service');
+      throw error;
+    }
+
+    readiness.markPending('data-retention', 'Starting data retention scheduler');
+    try {
+      dataRetentionJob.start();
+      registerCleanup('data-retention', () => dataRetentionJob.stop());
+      if (!env.retention.enabled) {
+        readiness.markDegraded('data-retention', 'Data retention scheduler disabled by configuration');
+      } else {
+        readiness.markReady('data-retention', 'Data retention scheduler active');
+      }
+    } catch (error) {
+      readiness.markFailed('data-retention', error);
+      serviceLogger.error({ err: error }, 'Failed to start data retention job');
+      throw error;
+    }
+
+    readiness.markPending('data-partitioning', 'Starting data partition scheduler');
+    try {
+      dataPartitionJob.start();
+      registerCleanup('data-partitioning', () => dataPartitionJob.stop());
+      if (!env.partitioning.enabled) {
+        readiness.markDegraded('data-partitioning', 'Data partition scheduler disabled by configuration');
+      } else {
+        readiness.markReady('data-partitioning', 'Data partition scheduler active');
+      }
+    } catch (error) {
+      readiness.markFailed('data-partitioning', error);
+      serviceLogger.error({ err: error }, 'Failed to start data partition job');
+      throw error;
+    }
+
+    readiness.markPending('community-reminder', 'Starting community reminder scheduler');
+    try {
+      communityReminderJob.start();
+      registerCleanup('community-reminder', () => communityReminderJob.stop());
+      if (!env.engagement.reminders.enabled) {
+        readiness.markDegraded('community-reminder', 'Community reminders disabled by configuration');
+      } else {
+        readiness.markReady('community-reminder', 'Community reminders scheduler active');
+      }
+    } catch (error) {
+      readiness.markFailed('community-reminder', error);
+      serviceLogger.error({ err: error }, 'Failed to start community reminder job');
+      throw error;
+    }
+
+    readiness.markPending('telemetry-warehouse', 'Starting telemetry warehouse scheduler');
+    try {
+      telemetryWarehouseJob.start();
+      registerCleanup('telemetry-warehouse', () => telemetryWarehouseJob.stop());
+      if (!env.telemetry.export.enabled) {
+        readiness.markDegraded('telemetry-warehouse', 'Telemetry export scheduler disabled by configuration');
+      } else {
+        readiness.markReady('telemetry-warehouse', 'Telemetry export scheduler active');
+      }
+    } catch (error) {
+      readiness.markFailed('telemetry-warehouse', error);
+      serviceLogger.error({ err: error }, 'Failed to start telemetry warehouse job');
+      throw error;
+    }
+
+    readiness.markPending('monetization-reconciliation', 'Starting monetization reconciliation scheduler');
+    try {
+      monetizationReconciliationJob.start();
+      registerCleanup('monetization-reconciliation', () => monetizationReconciliationJob.stop());
+      if (!env.monetization.reconciliation.enabled) {
+        readiness.markDegraded('monetization-reconciliation', 'Monetization reconciliation disabled by configuration');
+      } else {
+        readiness.markReady('monetization-reconciliation', 'Monetization reconciliation scheduler active');
+      }
+    } catch (error) {
+      readiness.markFailed('monetization-reconciliation', error);
+      serviceLogger.error({ err: error }, 'Failed to start monetization reconciliation job');
+      throw error;
+    }
+
+    readiness.markPending('integration-orchestrator', 'Starting integration orchestrator scheduler');
+    try {
+      integrationOrchestratorService.start();
+      registerCleanup('integration-orchestrator', () => integrationOrchestratorService.stop());
+      readiness.markReady('integration-orchestrator', 'Integration orchestrator scheduled');
+    } catch (error) {
+      readiness.markFailed('integration-orchestrator', error);
+      serviceLogger.error({ err: error }, 'Failed to start integration orchestrator');
+      throw error;
+    }
+
+    readiness.markPending('webhook-event-bus', 'Starting webhook dispatcher');
+    try {
+      webhookEventBusService.start();
+      registerCleanup('webhook-event-bus', () => webhookEventBusService.stop());
+      if (!webhookEventBusService.enabled) {
+        readiness.markDegraded('webhook-event-bus', 'Webhook dispatcher disabled by configuration');
+      } else {
+        readiness.markReady('webhook-event-bus', 'Webhook dispatcher active');
+      }
+    } catch (error) {
+      readiness.markFailed('webhook-event-bus', error);
+      serviceLogger.error({ err: error }, 'Failed to start webhook dispatcher');
+      throw error;
+    }
+
+    readiness.markPending('domain-event-dispatcher', 'Starting domain event dispatcher');
+    try {
+      domainEventDispatcherService.start();
+      registerCleanup('domain-event-dispatcher', () => domainEventDispatcherService.stop());
+      if (!domainEventDispatcherService.enabled) {
+        readiness.markDegraded(
+          'domain-event-dispatcher',
+          'Domain event dispatcher disabled by configuration'
+        );
+      } else {
+        readiness.markReady('domain-event-dispatcher', 'Domain event dispatcher active');
+      }
+    } catch (error) {
+      readiness.markFailed('domain-event-dispatcher', error);
+      serviceLogger.error({ err: error }, 'Failed to start domain event dispatcher');
+      throw error;
+    }
+
+    readiness.markPending('probe-server', 'Starting probe server');
+    probeServerPending = true;
+    await new Promise((resolve, reject) => {
+      probeServer.once('error', (error) => {
+        readiness.markFailed('probe-server', error);
+        reject(error);
+      });
+
+      probeServer.listen(env.services.worker.probePort, () => {
+        readiness.markReady('probe-server', `Listening on port ${env.services.worker.probePort}`);
+        serviceLogger.info({ port: env.services.worker.probePort }, 'Worker probe server listening');
+        probeServerPending = false;
+        resolve();
+      });
+    });
+  } catch (error) {
+    if (probeServerPending) {
       readiness.markFailed('probe-server', error);
-      reject(error);
-    });
+    }
 
-    probeServer.listen(env.services.worker.probePort, () => {
-      readiness.markReady('probe-server', `Listening on port ${env.services.worker.probePort}`);
-      serviceLogger.info({ port: env.services.worker.probePort }, 'Worker probe server listening');
-      resolve();
-    });
-  });
+    serviceLogger.error({ err: error }, 'Worker service failed to complete startup; initiating rollback');
+
+    await new Promise((resolve) => {
+      if (!probeServer.listening) {
+        resolve();
+        return;
+      }
+
+      probeServer.close(() => resolve());
+    }).catch(() => {});
+
+    await stopBackgroundRunners();
+
+    if (infrastructure) {
+      await infrastructure.stop().catch((infraError) => {
+        serviceLogger.error({ err: infraError }, 'Error stopping infrastructure after worker failure');
+      });
+    }
+
+    if (databaseHandle) {
+      await databaseHandle.close().catch((closeError) => {
+        serviceLogger.error({ err: closeError }, 'Error closing database connection after worker failure');
+      });
+    }
+
+    registry.cleanup();
+    throw error;
+  }
 
   let isShuttingDown = false;
 
@@ -194,24 +285,17 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
     }
 
     isShuttingDown = true;
+    registry.cleanup();
     readiness.markPending('probe-server', `Shutting down (${signal})`);
 
     await new Promise((resolve) => {
-    probeServer.close(() => {
-      readiness.markDegraded('probe-server', 'Stopped');
-      resolve();
+      probeServer.close(() => {
+        readiness.markDegraded('probe-server', 'Stopped');
+        resolve();
+      });
     });
-  });
 
-  assetIngestionService.stop();
-  dataRetentionJob.stop();
-  dataPartitionJob.stop();
-  communityReminderJob.stop();
-  telemetryWarehouseJob.stop();
-  monetizationReconciliationJob.stop();
-  integrationOrchestratorService.stop();
-  webhookEventBusService.stop();
-  domainEventDispatcherService.stop();
+    await stopBackgroundRunners();
 
     await infrastructure.stop();
 
@@ -237,14 +321,14 @@ export async function startWorkerService({ withSignalHandlers = true } = {}) {
       });
     };
 
-    process.on('SIGINT', terminate);
-    process.on('SIGTERM', terminate);
+    registry.add('SIGINT', terminate, { once: true });
+    registry.add('SIGTERM', terminate, { once: true });
 
-    process.on('unhandledRejection', (reason) => {
+    registry.add('unhandledRejection', (reason) => {
       serviceLogger.error({ err: reason }, 'Unhandled promise rejection');
     });
 
-    process.on('uncaughtException', (error) => {
+    registry.add('uncaughtException', (error) => {
       serviceLogger.fatal({ err: error }, 'Uncaught exception');
       readiness.markFailed('probe-server', error);
       shutdown('uncaughtException', { exitProcess: true, exitCode: 1 }).catch(() => {

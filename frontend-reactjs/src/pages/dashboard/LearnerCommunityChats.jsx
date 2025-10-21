@@ -37,6 +37,7 @@ import {
   updateCommunityChatPresence
 } from '../../api/communityApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 const channelDefaults = {
   name: '',
@@ -198,6 +199,7 @@ export default function LearnerCommunityChats() {
     liveSessions: []
   });
   const [presenceError, setPresenceError] = useState(null);
+  const mounted = useMountedRef();
   const [presenceSaving, setPresenceSaving] = useState(false);
 
   const selectedCommunity = useMemo(
@@ -217,6 +219,9 @@ export default function LearnerCommunityChats() {
     try {
       const response = await fetchCommunities(token);
       const data = Array.isArray(response.data) ? response.data : [];
+      if (!mounted.current) {
+        return;
+      }
       setCommunities(data);
       setSelectedCommunityId((prev) => {
         if (prev && data.some((community) => String(community.id) === String(prev))) {
@@ -226,11 +231,15 @@ export default function LearnerCommunityChats() {
         return firstId === null ? null : String(firstId);
       });
     } catch (error) {
-      setCommunitiesError(error?.message ?? 'Unable to load communities.');
+      if (mounted.current) {
+        setCommunitiesError(error?.message ?? 'Unable to load communities.');
+      }
     } finally {
-      setCommunitiesLoading(false);
+      if (mounted.current) {
+        setCommunitiesLoading(false);
+      }
     }
-  }, [token]);
+  }, [mounted, token]);
 
   const loadChannels = useCallback(async () => {
     if (!token || !selectedCommunityId) {
@@ -244,6 +253,9 @@ export default function LearnerCommunityChats() {
     try {
       const response = await fetchCommunityChatChannels({ communityId: selectedCommunityId, token });
       const data = Array.isArray(response.data) ? response.data : [];
+      if (!mounted.current) {
+        return;
+      }
       setChannels(data);
       setSelectedChannelId((prev) => {
         if (prev && data.some((entry) => String(entry.channel?.id) === String(prev))) {
@@ -253,11 +265,15 @@ export default function LearnerCommunityChats() {
         return firstId === null ? null : String(firstId);
       });
     } catch (error) {
-      setChannelsError(error?.message ?? 'Unable to load community chat channels.');
+      if (mounted.current) {
+        setChannelsError(error?.message ?? 'Unable to load community chat channels.');
+      }
     } finally {
-      setChannelsLoading(false);
+      if (mounted.current) {
+        setChannelsLoading(false);
+      }
     }
-  }, [selectedCommunityId, token]);
+  }, [mounted, selectedCommunityId, token]);
 
   const loadMembers = useCallback(async () => {
     if (!token || !selectedCommunityId || !selectedChannelId) {
@@ -272,13 +288,20 @@ export default function LearnerCommunityChats() {
         channelId: selectedChannelId,
         token
       });
+      if (!mounted.current) {
+        return;
+      }
       setMembers(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
-      setMembersError(error?.message ?? 'Unable to load channel members.');
+      if (mounted.current) {
+        setMembersError(error?.message ?? 'Unable to load channel members.');
+      }
     } finally {
-      setMembersLoading(false);
+      if (mounted.current) {
+        setMembersLoading(false);
+      }
     }
-  }, [selectedChannelId, selectedCommunityId, token]);
+  }, [mounted, selectedChannelId, selectedCommunityId, token]);
 
   const loadMessages = useCallback(async () => {
     if (!token || !selectedCommunityId || !selectedChannelId) {
@@ -295,13 +318,20 @@ export default function LearnerCommunityChats() {
         params: { limit: 50 }
       });
       const data = Array.isArray(response.data) ? response.data : [];
+      if (!mounted.current) {
+        return;
+      }
       setMessages(data);
     } catch (error) {
-      setMessagesError(error?.message ?? 'Unable to load channel messages.');
+      if (mounted.current) {
+        setMessagesError(error?.message ?? 'Unable to load channel messages.');
+      }
     } finally {
-      setMessagesLoading(false);
+      if (mounted.current) {
+        setMessagesLoading(false);
+      }
     }
-  }, [selectedChannelId, selectedCommunityId, token]);
+  }, [mounted, selectedChannelId, selectedCommunityId, token]);
 
   const loadPresence = useCallback(async () => {
     if (!token || !selectedCommunityId) {
@@ -311,6 +341,9 @@ export default function LearnerCommunityChats() {
     try {
       const response = await fetchCommunityChatPresence({ communityId: selectedCommunityId, token });
       const data = response.data ?? {};
+      if (!mounted.current) {
+        return;
+      }
       setPresence({
         status: data.status ?? 'offline',
         onlineMembers: Array.isArray(data.onlineMembers) ? data.onlineMembers : [],
@@ -318,9 +351,11 @@ export default function LearnerCommunityChats() {
       });
       setPresenceError(null);
     } catch (error) {
-      setPresenceError(error?.message ?? 'Unable to load presence data.');
+      if (mounted.current) {
+        setPresenceError(error?.message ?? 'Unable to load presence data.');
+      }
     }
-  }, [selectedCommunityId, token]);
+  }, [mounted, selectedCommunityId, token]);
 
   useEffect(() => {
     loadCommunities();
@@ -427,20 +462,30 @@ export default function LearnerCommunityChats() {
             token,
             payload
           });
-          setChannelFormStatus({ type: 'success', message: 'Channel updated.' });
+          if (mounted.current) {
+            setChannelFormStatus({ type: 'success', message: 'Channel updated.' });
+          }
         } else {
           await createCommunityChatChannel({ communityId: selectedCommunityId, token, payload });
-          setChannelFormStatus({ type: 'success', message: 'Channel created.' });
+          if (mounted.current) {
+            setChannelFormStatus({ type: 'success', message: 'Channel created.' });
+          }
         }
         await loadChannels();
-        resetChannelForm();
+        if (mounted.current) {
+          resetChannelForm();
+        }
       } catch (error) {
-        setChannelFormStatus({ type: 'error', message: error?.message ?? 'Unable to save channel.' });
+        if (mounted.current) {
+          setChannelFormStatus({ type: 'error', message: error?.message ?? 'Unable to save channel.' });
+        }
       } finally {
-        setChannelFormSaving(false);
+        if (mounted.current) {
+          setChannelFormSaving(false);
+        }
       }
     },
-    [channelEditingId, channelForm, loadChannels, resetChannelForm, selectedCommunityId, token]
+    [channelEditingId, channelForm, loadChannels, mounted, resetChannelForm, selectedCommunityId, token]
   );
 
   const handleDeleteChannel = useCallback(
@@ -449,15 +494,17 @@ export default function LearnerCommunityChats() {
       if (!window.confirm('Delete this channel? This cannot be undone.')) return;
       try {
         await deleteCommunityChatChannel({ communityId: selectedCommunityId, channelId, token });
-        if (channelEditingId === channelId) {
+        if (mounted.current && channelEditingId === channelId) {
           resetChannelForm();
         }
         await loadChannels();
       } catch (error) {
-        setChannelFormStatus({ type: 'error', message: error?.message ?? 'Unable to delete channel.' });
+        if (mounted.current) {
+          setChannelFormStatus({ type: 'error', message: error?.message ?? 'Unable to delete channel.' });
+        }
       }
     },
-    [channelEditingId, loadChannels, resetChannelForm, selectedCommunityId, token]
+    [channelEditingId, loadChannels, mounted, resetChannelForm, selectedCommunityId, token]
   );
 
   const submitMemberForm = useCallback(
@@ -479,14 +526,18 @@ export default function LearnerCommunityChats() {
             metadata: { addedBy: userId }
           }
         });
-        setMemberFormStatus({ type: 'success', message: 'Member updated.' });
-        setMemberForm({ userId: '', role: 'member', notificationsEnabled: true });
+        if (mounted.current) {
+          setMemberFormStatus({ type: 'success', message: 'Member updated.' });
+          setMemberForm({ userId: '', role: 'member', notificationsEnabled: true });
+        }
         await loadMembers();
       } catch (error) {
-        setMemberFormStatus({ type: 'error', message: error?.message ?? 'Unable to update member.' });
+        if (mounted.current) {
+          setMemberFormStatus({ type: 'error', message: error?.message ?? 'Unable to update member.' });
+        }
       }
     },
-    [loadMembers, memberForm, selectedChannelId, selectedCommunityId, token, userId]
+    [loadMembers, memberForm, mounted, selectedChannelId, selectedCommunityId, token, userId]
   );
 
   const handleRemoveMember = useCallback(
@@ -504,10 +555,12 @@ export default function LearnerCommunityChats() {
         });
         await loadMembers();
       } catch (error) {
-        setMemberFormStatus({ type: 'error', message: error?.message ?? 'Unable to remove member.' });
+        if (mounted.current) {
+          setMemberFormStatus({ type: 'error', message: error?.message ?? 'Unable to remove member.' });
+        }
       }
     },
-    [loadMembers, selectedChannelId, selectedCommunityId, token]
+    [loadMembers, mounted, selectedChannelId, selectedCommunityId, token]
   );
 
   const updateComposerAttachment = useCallback((index, field, value) => {
@@ -567,16 +620,22 @@ export default function LearnerCommunityChats() {
           token,
           payload
         });
-        setComposerStatus({ type: 'success', message: 'Message delivered.' });
-        setComposer({ body: '', messageType: 'text', attachments: [] });
+        if (mounted.current) {
+          setComposerStatus({ type: 'success', message: 'Message delivered.' });
+          setComposer({ body: '', messageType: 'text', attachments: [] });
+        }
         await loadMessages();
       } catch (error) {
-        setComposerStatus({ type: 'error', message: error?.message ?? 'Unable to send message.' });
+        if (mounted.current) {
+          setComposerStatus({ type: 'error', message: error?.message ?? 'Unable to send message.' });
+        }
       } finally {
-        setComposerSending(false);
+        if (mounted.current) {
+          setComposerSending(false);
+        }
       }
     },
-    [composer, loadMessages, selectedChannelId, selectedCommunityId, token, userId]
+    [composer, loadMessages, mounted, selectedChannelId, selectedCommunityId, token, userId]
   );
 
   const handleReaction = useCallback(
@@ -602,10 +661,12 @@ export default function LearnerCommunityChats() {
         }
         await loadMessages();
       } catch (error) {
-        setMessagesError(error?.message ?? 'Unable to update reactions.');
+        if (mounted.current) {
+          setMessagesError(error?.message ?? 'Unable to update reactions.');
+        }
       }
     },
-    [loadMessages, selectedChannelId, selectedCommunityId, token]
+    [loadMessages, mounted, selectedChannelId, selectedCommunityId, token]
   );
 
   const handlePresenceUpdate = useCallback(
@@ -620,12 +681,16 @@ export default function LearnerCommunityChats() {
         });
         await loadPresence();
       } catch (error) {
-        setPresenceError(error?.message ?? 'Unable to update presence.');
+        if (mounted.current) {
+          setPresenceError(error?.message ?? 'Unable to update presence.');
+        }
       } finally {
-        setPresenceSaving(false);
+        if (mounted.current) {
+          setPresenceSaving(false);
+        }
       }
     },
-    [loadPresence, selectedCommunityId, token]
+    [loadPresence, mounted, selectedCommunityId, token]
   );
 
   const handleStartLiveSession = useCallback(() => {

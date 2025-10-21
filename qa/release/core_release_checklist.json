@@ -1,47 +1,71 @@
 {
-  "version": "1.0.0",
-  "title": "Version 1.00 release readiness checklist",
-  "updatedAt": "2024-11-29T19:30:00.000Z",
+  "version": "1.1.0",
+  "title": "Platform release readiness checklist",
+  "updatedAt": "2025-01-15T10:00:00.000Z",
   "items": [
     {
       "id": "cab-approval",
       "description": "Change Advisory Board approved the production release window and assigned rollback ownership.",
       "owner": "operations",
       "status": "complete",
-      "evidence": ["cab/2024-11-27-minutes.pdf"],
-      "lastVerifiedAt": "2024-11-29T17:00:00.000Z"
+      "evidence": ["cab/2025-01-12-minutes.pdf"],
+      "lastVerifiedAt": "2025-01-13T17:00:00.000Z"
     },
     {
       "id": "runbook-signoff",
       "description": "Incident, rollback, and smoke-test runbooks reviewed with on-call engineering and support leads.",
       "owner": "site-reliability",
       "status": "complete",
-      "evidence": ["runbooks/2024-11-release-readiness.md"],
-      "lastVerifiedAt": "2024-11-29T17:30:00.000Z"
+      "evidence": ["runbooks/2025-01-release-readiness.md"],
+      "lastVerifiedAt": "2025-01-13T17:30:00.000Z"
     },
     {
       "id": "data-migration-validated",
       "description": "All database migrations executed against staging with integrity checks, anonymised backups, and rollback scripts captured.",
       "owner": "database",
       "status": "complete",
-      "evidence": ["db/migration-2024-11-validation.log", "db/migration-rollback-plan.md"],
-      "lastVerifiedAt": "2024-11-29T18:15:00.000Z"
+      "evidence": ["db/migration-2025-01-validation.log", "db/migration-rollback-plan.md"],
+      "lastVerifiedAt": "2025-01-13T18:15:00.000Z"
+    },
+    {
+      "id": "rbac-regression-suite",
+      "description": "End-to-end RBAC matrix regression suite passed for instructor, learner, and operator personas across web and mobile.",
+      "owner": "security",
+      "status": "complete",
+      "evidence": ["security/rbac-coverage-report-2025-01.pdf"],
+      "lastVerifiedAt": "2025-01-14T09:45:00.000Z"
+    },
+    {
+      "id": "cors-policy-reviewed",
+      "description": "Reviewed and validated CORS allow-list for production domains with CDN and identity teams; non-production origins remain blocked.",
+      "owner": "platform",
+      "status": "complete",
+      "evidence": ["platform/cors-approval-2025-01.md"],
+      "lastVerifiedAt": "2025-01-14T10:15:00.000Z"
+    },
+    {
+      "id": "observability-slo",
+      "description": "Telemetry dashboards updated with release build identifiers and alert SLOs tuned for new automation surface area.",
+      "owner": "observability",
+      "status": "complete",
+      "evidence": ["telemetry/slo-calibration-2025-01.json"],
+      "lastVerifiedAt": "2025-01-14T11:00:00.000Z"
     },
     {
       "id": "support-playbook-updated",
       "description": "Support and customer success teams briefed on operator dashboard changes with updated escalation playbooks and macros.",
       "owner": "support",
       "status": "complete",
-      "evidence": ["support/2024-11-29-operator-briefing.pptx"],
-      "lastVerifiedAt": "2024-11-29T18:45:00.000Z"
+      "evidence": ["support/2025-01-14-operator-briefing.pptx"],
+      "lastVerifiedAt": "2025-01-14T11:30:00.000Z"
     },
     {
       "id": "compliance-attestation",
       "description": "Security and compliance leads uploaded SOC2/ISO control attestations covering new automation, telemetry, and vendor updates.",
       "owner": "compliance",
       "status": "complete",
-      "evidence": ["compliance/2024-iso-soc-attestation.zip"],
-      "lastVerifiedAt": "2024-11-29T19:00:00.000Z"
+      "evidence": ["compliance/2025-iso-soc-attestation.zip"],
+      "lastVerifiedAt": "2025-01-14T12:00:00.000Z"
     }
   ]
 }

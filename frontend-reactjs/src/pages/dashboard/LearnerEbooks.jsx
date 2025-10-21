@@ -13,6 +13,7 @@ import {
 } from '../../api/learnerDashboardApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useLearnerDashboardSection } from '../../hooks/useLearnerDashboard.js';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 function normaliseTags(tags) {
   if (!tags) return [];
@@ -95,6 +96,7 @@ export default function LearnerEbooks() {
   const { isLearner, section: ebooks, refresh, loading, error } = useLearnerDashboardSection('ebooks');
   const { session } = useAuth();
   const token = session?.tokens?.accessToken ?? null;
+  const mounted = useMountedRef();
 
   const [activeTab, setActiveTab] = useState('library');
   const [marketplace, setMarketplace] = useState([]);
@@ -449,17 +451,23 @@ export default function LearnerEbooks() {
             coverUrl: entry.coverUrl ?? payload.coverUrl,
             tags: entry.tags ?? payload.tags ?? []
           };
-          setLibraryEntries((current) => [newEntry, ...current]);
-          setLibraryStatus({ type: 'success', message: `${newEntry.title} added to your library.` });
-          closeLibraryForm();
+          if (mounted.current) {
+            setLibraryEntries((current) => [newEntry, ...current]);
+            setLibraryStatus({ type: 'success', message: `${newEntry.title} added to your library.` });
+            closeLibraryForm();
+          }
         } catch (createError) {
-          setLibraryStatus({
-            type: 'error',
-            message:
-              createError instanceof Error ? createError.message : 'We were unable to add the new resource.'
-          });
+          if (mounted.current) {
+            setLibraryStatus({
+              type: 'error',
+              message:
+                createError instanceof Error ? createError.message : 'We were unable to add the new resource.'
+            });
+          }
         } finally {
-          setPendingLibraryId(null);
+          if (mounted.current) {
+            setPendingLibraryId(null);
+          }
         }
         return;
       }
@@ -468,6 +476,9 @@ export default function LearnerEbooks() {
       setLibraryStatus({ type: 'pending', message: `Updating ${payload.title}…` });
       try {
         await updateLearnerLibraryEntry({ token, ebookId: editingLibraryId, payload });
+        if (!mounted.current) {
+          return;
+        }
         setLibraryEntries((current) =>
           current.map((entry) =>
             entry.id === editingLibraryId
@@ -490,12 +501,16 @@ export default function LearnerEbooks() {
         setLibraryStatus({ type: 'success', message: `${payload.title} updated.` });
         closeLibraryForm();
       } catch (updateError) {
-        setLibraryStatus({
-          type: 'error',
-          message: updateError instanceof Error ? updateError.message : 'We were unable to update the resource.'
-        });
+        if (mounted.current) {
+          setLibraryStatus({
+            type: 'error',
+            message: updateError instanceof Error ? updateError.message : 'We were unable to update the resource.'
+          });
+        }
       } finally {
-        setPendingLibraryId(null);
+        if (mounted.current) {
+          setPendingLibraryId(null);
+        }
       }
     },
     [
@@ -504,6 +519,7 @@ export default function LearnerEbooks() {
       editingLibraryId,
       libraryForm,
       libraryFormMode,
+      mounted,
       setLibraryEntries,
       token,
       updateLearnerLibraryEntry,
@@ -521,19 +537,26 @@ export default function LearnerEbooks() {
       setLibraryStatus({ type: 'pending', message: `Removing ${entry.title} from your library…` });
       try {
         await deleteLearnerLibraryEntry({ token, ebookId: entry.id });
+        if (!mounted.current) {
+          return;
+        }
         setLibraryEntries((current) => current.filter((item) => item.id !== entry.id));
         setLibraryStatus({ type: 'success', message: `${entry.title} removed from your library.` });
       } catch (removeError) {
-        setLibraryStatus({
-          type: 'error',
-          message:
-            removeError instanceof Error ? removeError.message : 'We were unable to remove the resource.'
-        });
+        if (mounted.current) {
+          setLibraryStatus({
+            type: 'error',
+            message:
+              removeError instanceof Error ? removeError.message : 'We were unable to remove the resource.'
+          });
+        }
       } finally {
-        setPendingLibraryId(null);
+        if (mounted.current) {
+          setPendingLibraryId(null);
+        }
       }
     },
-    [deleteLearnerLibraryEntry, setLibraryEntries, token]
+    [deleteLearnerLibraryEntry, mounted, setLibraryEntries, token]
   );
 
   const handleCompleteLibraryEntry = useCallback(
@@ -551,6 +574,9 @@ export default function LearnerEbooks() {
       try {
         await updateLearnerLibraryEntry({ token, ebookId: entry.id, payload });
         const readableDate = new Date(payload.lastOpened).toLocaleDateString();
+        if (!mounted.current) {
+          return;
+        }
         setLibraryEntries((current) =>
           current.map((item) =>
             item.id === entry.id
@@ -565,18 +591,57 @@ export default function LearnerEbooks() {
         );
         setLibraryStatus({ type: 'success', message: `${entry.title} marked as completed.` });
       } catch (completeError) {
-        setLibraryStatus({
-          type: 'error',
-          message:
-            completeError instanceof Error
-              ? completeError.message
-              : 'We were unable to update the reading progress.'
-        });
+        if (mounted.current) {
+          setLibraryStatus({
+            type: 'error',
+            message:
+              completeError instanceof Error
+                ? completeError.message
+                : 'We were unable to update the reading progress.'
+          });
+        }
       } finally {
-        setPendingLibraryId(null);
+        if (mounted.current) {
+          setPendingLibraryId(null);
+        }
       }
     },
-    [setLibraryEntries, setLibraryStatus, token, updateLearnerLibraryEntry]
+    [mounted, setLibraryEntries, setLibraryStatus, token, updateLearnerLibraryEntry]
+  );
+
+  const handleResumeLibraryEntry = useCallback(
+    async (entry) => {
+      if (!token) {
+        setLibraryStatus({ type: 'error', message: 'Sign in again to resume your reading session.' });
+        return;
+      }
+      setPendingLibraryId(entry.id);
+      setLibraryStatus({ type: 'pending', message: `Reopening ${entry.title}…` });
+      try {
+        const response = await resumeEbook({ token, ebookId: entry.id });
+        if (mounted.current) {
+          setLibraryStatus({
+            type: 'success',
+            message: response?.message ?? `${entry.title} is ready to continue.`
+          });
+        }
+      } catch (resumeError) {
+        if (mounted.current) {
+          setLibraryStatus({
+            type: 'error',
+            message:
+              resumeError instanceof Error
+                ? resumeError.message
+                : 'We were unable to resume your e-book.'
+          });
+        }
+      } finally {
+        if (mounted.current) {
+          setPendingLibraryId(null);
+        }
+      }
+    },
+    [mounted, resumeEbook, setLibraryStatus, setPendingLibraryId, token]
   );
 
   const closeAudioPreview = useCallback(() => {
@@ -660,21 +725,35 @@ export default function LearnerEbooks() {
           recipients
         };
         const response = await shareEbookHighlight({ token, ebookId: highlightEntryId, payload });
-        setLibraryStatus({
-          type: 'success',
-          message: response?.message ?? 'Highlight shared with your selected contacts.'
-        });
-        closeHighlightForm();
+        if (mounted.current) {
+          setLibraryStatus({
+            type: 'success',
+            message: response?.message ?? 'Highlight shared with your selected contacts.'
+          });
+          closeHighlightForm();
+        }
       } catch (shareError) {
-        setLibraryStatus({
-          type: 'error',
-          message: shareError instanceof Error ? shareError.message : 'We were unable to share your highlight.'
-        });
+        if (mounted.current) {
+          setLibraryStatus({
+            type: 'error',
+            message: shareError instanceof Error ? shareError.message : 'We were unable to share your highlight.'
+          });
+        }
       } finally {
-        setHighlightPending(false);
+        if (mounted.current) {
+          setHighlightPending(false);
+        }
       }
     },
-    [closeHighlightForm, highlightEntryId, highlightForm, shareEbookHighlight, token, validateHighlightForm]
+    [
+      closeHighlightForm,
+      highlightEntryId,
+      highlightForm,
+      mounted,
+      shareEbookHighlight,
+      token,
+      validateHighlightForm
+    ]
   );
 
   const handlePurchase = useCallback(
@@ -697,20 +776,28 @@ export default function LearnerEbooks() {
           approvalUrl || clientSecret
             ? `Use the ${approvalUrl ? 'provided approval link' : 'Stripe client secret'} to complete payment.`
             : 'Proceed to checkout using the supplied payment ID.';
-        setPurchaseStatus({
-          type: 'success',
-          message: `Secure checkout created for ${ebook.title}. Reference ${payload.payment?.paymentId ?? 'N/A'}. ${nextSteps}`
-        });
+        if (mounted.current) {
+          setPurchaseStatus({
+            type: 'success',
+            message: `Secure checkout created for ${ebook.title}. Reference ${
+              payload.payment?.paymentId ?? 'N/A'
+            }. ${nextSteps}`
+          });
+        }
       } catch (error) {
-        setPurchaseStatus({
-          type: 'error',
-          message: error instanceof Error ? error.message : 'Payment initialisation failed.'
-        });
+        if (mounted.current) {
+          setPurchaseStatus({
+            type: 'error',
+            message: error instanceof Error ? error.message : 'Payment initialisation failed.'
+          });
+        }
       } finally {
-        setPendingPurchaseId(null);
+        if (mounted.current) {
+          setPendingPurchaseId(null);
+        }
       }
     },
-    [token]
+    [mounted, token]
   );
 
   if (!isLearner) {
@@ -960,34 +1047,7 @@ export default function LearnerEbooks() {
                       <button
                         type="button"
                         className="dashboard-pill px-3 py-1"
-                        onClick={async () => {
-                          if (!token) {
-                            setLibraryStatus({
-                              type: 'error',
-                              message: 'Sign in again to resume your reading session.'
-                            });
-                            return;
-                          }
-                          setPendingLibraryId(ebook.id);
-                          setLibraryStatus({ type: 'pending', message: `Reopening ${ebook.title}…` });
-                          try {
-                            const response = await resumeEbook({ token, ebookId: ebook.id });
-                            setLibraryStatus({
-                              type: 'success',
-                              message: response?.message ?? `${ebook.title} is ready to continue.`
-                            });
-                          } catch (resumeError) {
-                            setLibraryStatus({
-                              type: 'error',
-                              message:
-                                resumeError instanceof Error
-                                  ? resumeError.message
-                                  : 'We were unable to resume your e-book.'
-                            });
-                          } finally {
-                            setPendingLibraryId(null);
-                          }
-                        }}
+                        onClick={() => handleResumeLibraryEntry(ebook)}
                         disabled={pendingLibraryId === ebook.id}
                       >
                         {pendingLibraryId === ebook.id ? 'Resuming…' : 'Continue reading'}

@@ -11,16 +11,19 @@ const highlightPropType = PropTypes.shape({
 });
 
 function HighlightCard({ highlight }) {
+  const tagsText = highlight.tags.length > 0 ? highlight.tags.join(' • ') : 'Activity';
+  const reactions = Number.isFinite(Number(highlight.reactions)) ? Number(highlight.reactions) : 0;
+  const comments = Number.isFinite(Number(highlight.comments)) ? Number(highlight.comments) : 0;
   return (
     <li className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm transition hover:border-primary/40 hover:shadow-md">
       <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-slate-500">
         <span>{highlight.time}</span>
-        <span className="truncate text-right">{highlight.tags.join(' • ')}</span>
+        <span className="truncate text-right">{tagsText}</span>
       </div>
       <p className="mt-3 text-sm font-semibold text-slate-900">{highlight.headline}</p>
       <div className="mt-4 flex items-center gap-4 text-xs text-slate-500">
-        <span aria-label="Reactions">❤️ {highlight.reactions}</span>
-        <span aria-label="Comments">💬 {highlight.comments}</span>
+        <span aria-label="Reactions">❤️ {reactions}</span>
+        <span aria-label="Comments">💬 {comments}</span>
       </div>
     </li>
   );

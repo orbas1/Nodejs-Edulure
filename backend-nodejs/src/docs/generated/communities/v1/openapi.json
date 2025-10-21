@@ -119,120 +119,6 @@
         }
       }
     },
-    "/communities/feed": {
-      "get": {
-        "summary": "Aggregated community feed",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "perPage",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 10
-            }
-          },
-          {
-            "name": "postType",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "update",
-                "event",
-                "resource",
-                "classroom",
-                "poll"
-              ]
-            },
-            "required": false
-          },
-          {
-            "name": "visibility",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "public",
-                "members",
-                "admins"
-              ]
-            },
-            "required": false
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Feed retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/CommunityPost"
-                          }
-                        },
-                        "meta": {
-                          "type": "object",
-                          "properties": {
-                            "pagination": {
-                              "type": "object",
-                              "properties": {
-                                "page": {
-                                  "type": "integer"
-                                },
-                                "perPage": {
-                                  "type": "integer"
-                                },
-                                "total": {
-                                  "type": "integer"
-                                },
-                                "pageCount": {
-                                  "type": "integer"
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "422": {
-            "description": "Validation error"
-          }
-        }
-      }
-    },
     "/communities/{communityId}": {
       "get": {
         "summary": "Community detail",
@@ -282,6 +168,2136 @@
           },
           "404": {
             "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/affiliates": {
+      "get": {
+        "summary": "List community affiliates",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Affiliates fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CommunityAffiliate"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/affiliates/{affiliateId}": {
+      "patch": {
+        "summary": "Update community affiliate",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "commissionRateBasisPoints": {
+                    "type": "integer"
+                  },
+                  "referralCode": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Affiliate updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityAffiliate"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/affiliates/{affiliateId}/payouts": {
+      "post": {
+        "summary": "Record affiliate payout",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "affiliateId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "amountCents": {
+                    "type": "integer"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "payoutReference": {
+                    "type": "string"
+                  },
+                  "scheduledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "processedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "failureReason": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "amountCents"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payout recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityAffiliatePayout"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/affiliates/apply": {
+      "post": {
+        "summary": "Apply to community affiliate program",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "referralCode": {
+                    "type": "string"
+                  },
+                  "commissionRateBasisPoints": {
+                    "type": "integer"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Affiliate application created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityAffiliate"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/calendar": {
+      "get": {
+        "summary": "Community calendar",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 12
+            }
+          },
+          {
+            "name": "year",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 2020,
+              "maximum": 2100
+            }
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "members",
+                "admins",
+                "owners"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Calendar compiled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityCalendar"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/chat/channels": {
+      "get": {
+        "summary": "List community chat channels",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat channels fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityChatChannelSummary"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community access denied"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/chat/channels/{channelId}/messages": {
+      "get": {
+        "summary": "List channel messages",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "threadRootId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Set to true to include moderator-hidden messages alongside visible posts."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Messages fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityChatMessageExtended"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer"
+                                },
+                                "before": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "after": {
+                                  "type": "string",
+                                  "format": "date-time"
+                                },
+                                "count": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Channel not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Post channel message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCommunityChatMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatMessage"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Channel not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/moderate": {
+      "post": {
+        "summary": "Moderate a community message",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatModerationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Moderation applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatModerationResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Message not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/reactions": {
+      "post": {
+        "summary": "Add message reaction",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatReactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reaction added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatReactionSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Message not found"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove message reaction",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "messageId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatReactionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reaction removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChatReactionSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Message not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/chat/channels/{channelId}/read": {
+      "post": {
+        "summary": "Mark channel as read",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "channelId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityChatReadReceiptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Read receipt stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityChannelMembership"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Channel access denied"
+          },
+          "404": {
+            "description": "Channel not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/chat/presence": {
+      "get": {
+        "summary": "List active presence sessions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Presence fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/PresenceSession"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community access denied"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Update presence state",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresenceUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Presence updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PresenceSession"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/engagement/leaderboard": {
+      "get": {
+        "summary": "Community leaderboard",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "points",
+                "lifetime",
+                "streak",
+                "attendance"
+              ],
+              "default": "points"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard calculated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityLeaderboardEntry"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/engagement/points": {
+      "post": {
+        "summary": "Award community points",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "points": {
+                    "type": "integer",
+                    "minimum": -10000,
+                    "maximum": 10000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 240
+                  },
+                  "source": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "referenceId": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "contributesToStreak": {
+                    "type": "boolean"
+                  },
+                  "activityAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "userId",
+                  "points"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Points awarded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityPointAwardResult"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/engagement/progress": {
+      "get": {
+        "summary": "Member engagement progress",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Engagement progress retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEngagementProgress"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Community is private"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/engagement/streaks/check-in": {
+      "post": {
+        "summary": "Record streak activity",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activityAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Streak updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityStreak"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/events": {
+      "get": {
+        "summary": "List community events",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "scheduled",
+                "cancelled",
+                "completed"
+              ]
+            }
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "members",
+                "admins",
+                "owners"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Community events returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityEventDetail"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Community not found"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create community event",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "slug": {
+                    "type": "string"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "startAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "endAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "timezone": {
+                    "type": "string"
+                  },
+                  "visibility": {
+                    "type": "string",
+                    "enum": [
+                      "members",
+                      "admins",
+                      "owners"
+                    ],
+                    "default": "members"
+                  },
+                  "attendanceLimit": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "requiresRsvp": {
+                    "type": "boolean"
+                  },
+                  "isOnline": {
+                    "type": "boolean"
+                  },
+                  "meetingUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "locationName": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "locationAddress": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "locationLatitude": {
+                    "type": "number"
+                  },
+                  "locationLongitude": {
+                    "type": "number"
+                  },
+                  "coverImageUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "recurrenceRule": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "title",
+                  "startAt",
+                  "endAt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Event created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEventDetail"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Insufficient permissions"
+          },
+          "404": {
+            "description": "Community not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/events/{eventId}/reminders": {
+      "post": {
+        "summary": "Schedule event reminder",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "remindAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "channel": {
+                    "type": "string",
+                    "enum": [
+                      "email",
+                      "push",
+                      "sms"
+                    ]
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "remindAt"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Reminder scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEventReminder"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Event not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/events/{eventId}/rsvp": {
+      "post": {
+        "summary": "RSVP to community event",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "going",
+                      "interested",
+                      "waitlisted",
+                      "declined",
+                      "checked_in"
+                    ]
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "RSVP stored",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CommunityEventParticipant"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Event not found"
+          },
+          "422": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/members/{userId}/role": {
+      "patch": {
+        "summary": "Assign community member role",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roleKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "roleKey"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityRoleAssignment"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/paywall/checkout": {
+      "post": {
+        "summary": "Start subscription checkout",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tierId": {
+                    "type": "integer"
+                  },
+                  "provider": {
+                    "type": "string"
+                  },
+                  "couponCode": {
+                    "type": "string"
+                  },
+                  "tax": {
+                    "type": "object"
+                  },
+                  "receiptEmail": {
+                    "type": "string"
+                  },
+                  "affiliateCode": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tierId",
+                  "provider"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Checkout started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunitySubscriptionCheckoutResponse"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/paywall/tiers": {
+      "get": {
+        "summary": "List community paywall tiers",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeInactive",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paywall tiers fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CommunityPaywallTier"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create paywall tier",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityPaywallTierInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tier created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityPaywallTier"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/communities/{communityId}/paywall/tiers/{tierId}": {
+      "patch": {
+        "summary": "Update paywall tier",
+        "tags": [
+          "Communities"
+        ],
+        "parameters": [
+          {
+            "name": "communityId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tierId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommunityPaywallTierUpdateInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tier updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CommunityPaywallTier"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
           }
         }
       }
@@ -762,1524 +2778,6 @@
         }
       }
     },
-    "/communities/{communityId}/chat/channels": {
-      "get": {
-        "summary": "List community chat channels",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Chat channels fetched",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/CommunityChatChannelSummary"
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Community access denied"
-          },
-          "404": {
-            "description": "Community not found"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/chat/channels/{channelId}/messages": {
-      "get": {
-        "summary": "List channel messages",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channelId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 50
-            }
-          },
-          {
-            "name": "before",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "after",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "threadRootId",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            }
-          },
-          {
-            "name": "includeHidden",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": false
-            },
-            "description": "Set to true to include moderator-hidden messages alongside visible posts."
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Messages fetched",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/CommunityChatMessageExtended"
-                          }
-                        },
-                        "meta": {
-                          "type": "object",
-                          "properties": {
-                            "pagination": {
-                              "type": "object",
-                              "properties": {
-                                "limit": {
-                                  "type": "integer"
-                                },
-                                "before": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "after": {
-                                  "type": "string",
-                                  "format": "date-time"
-                                },
-                                "count": {
-                                  "type": "integer"
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Channel access denied"
-          },
-          "404": {
-            "description": "Channel not found"
-          }
-        }
-      },
-      "post": {
-        "summary": "Post channel message",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channelId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateCommunityChatMessageRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Message created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityChatMessage"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Channel access denied"
-          },
-          "404": {
-            "description": "Channel not found"
-          },
-          "422": {
-            "description": "Validation error"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/chat/channels/{channelId}/read": {
-      "post": {
-        "summary": "Mark channel as read",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channelId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityChatReadReceiptRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Read receipt stored",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityChannelMembership"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Channel access denied"
-          },
-          "404": {
-            "description": "Channel not found"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/reactions": {
-      "post": {
-        "summary": "Add message reaction",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channelId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "messageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityChatReactionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Reaction added",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityChatReactionSummary"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Channel access denied"
-          },
-          "404": {
-            "description": "Message not found"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Remove message reaction",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channelId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "messageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityChatReactionRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Reaction removed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityChatReactionSummary"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Channel access denied"
-          },
-          "404": {
-            "description": "Message not found"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/chat/channels/{channelId}/messages/{messageId}/moderate": {
-      "post": {
-        "summary": "Moderate a community message",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "channelId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "messageId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityChatModerationRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Moderation applied",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityChatModerationResult"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Insufficient permissions"
-          },
-          "404": {
-            "description": "Message not found"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/chat/presence": {
-      "get": {
-        "summary": "List active presence sessions",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Presence fetched",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/PresenceSession"
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Community access denied"
-          },
-          "404": {
-            "description": "Community not found"
-          }
-        }
-      },
-      "post": {
-        "summary": "Update presence state",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PresenceUpdateRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Presence updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/PresenceSession"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/engagement/progress": {
-      "get": {
-        "summary": "Member engagement progress",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Engagement progress retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityEngagementProgress"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Community is private"
-          },
-          "404": {
-            "description": "Community not found"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/engagement/points": {
-      "post": {
-        "summary": "Award community points",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "userId": {
-                    "type": "integer",
-                    "minimum": 1
-                  },
-                  "points": {
-                    "type": "integer",
-                    "minimum": -10000,
-                    "maximum": 10000
-                  },
-                  "reason": {
-                    "type": "string",
-                    "maxLength": 240
-                  },
-                  "source": {
-                    "type": "string",
-                    "maxLength": 120
-                  },
-                  "referenceId": {
-                    "type": "string",
-                    "maxLength": 120
-                  },
-                  "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                  },
-                  "contributesToStreak": {
-                    "type": "boolean"
-                  },
-                  "activityAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "timezone": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "userId",
-                  "points"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Points awarded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityPointAwardResult"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Insufficient permissions"
-          },
-          "404": {
-            "description": "Community not found"
-          },
-          "422": {
-            "description": "Validation error"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/engagement/streaks/check-in": {
-      "post": {
-        "summary": "Record streak activity",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "activityAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "timezone": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Streak updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityStreak"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Community not found"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/engagement/leaderboard": {
-      "get": {
-        "summary": "Community leaderboard",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "points",
-                "lifetime",
-                "streak",
-                "attendance"
-              ],
-              "default": "points"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 20
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Leaderboard calculated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/CommunityLeaderboardEntry"
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Community not found"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/events": {
-      "get": {
-        "summary": "List community events",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "from",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "to",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "format": "date-time"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "scheduled",
-                "cancelled",
-                "completed"
-              ]
-            }
-          },
-          {
-            "name": "visibility",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "members",
-                "admins",
-                "owners"
-              ]
-            }
-          },
-          {
-            "name": "order",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "asc",
-                "desc"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Community events returned",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/CommunityEventDetail"
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Community not found"
-          }
-        }
-      },
-      "post": {
-        "summary": "Create community event",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "slug": {
-                    "type": "string"
-                  },
-                  "summary": {
-                    "type": "string",
-                    "maxLength": 500
-                  },
-                  "description": {
-                    "type": "string",
-                    "maxLength": 8000
-                  },
-                  "startAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "endAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "timezone": {
-                    "type": "string"
-                  },
-                  "visibility": {
-                    "type": "string",
-                    "enum": [
-                      "members",
-                      "admins",
-                      "owners"
-                    ],
-                    "default": "members"
-                  },
-                  "attendanceLimit": {
-                    "type": "integer",
-                    "minimum": 1
-                  },
-                  "requiresRsvp": {
-                    "type": "boolean"
-                  },
-                  "isOnline": {
-                    "type": "boolean"
-                  },
-                  "meetingUrl": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "locationName": {
-                    "type": "string",
-                    "maxLength": 200
-                  },
-                  "locationAddress": {
-                    "type": "string",
-                    "maxLength": 500
-                  },
-                  "locationLatitude": {
-                    "type": "number"
-                  },
-                  "locationLongitude": {
-                    "type": "number"
-                  },
-                  "coverImageUrl": {
-                    "type": "string",
-                    "format": "uri"
-                  },
-                  "recurrenceRule": {
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                  }
-                },
-                "required": [
-                  "title",
-                  "startAt",
-                  "endAt"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Event created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityEventDetail"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "403": {
-            "description": "Insufficient permissions"
-          },
-          "404": {
-            "description": "Community not found"
-          },
-          "422": {
-            "description": "Validation error"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/events/{eventId}/rsvp": {
-      "post": {
-        "summary": "RSVP to community event",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "eventId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "going",
-                      "interested",
-                      "waitlisted",
-                      "declined",
-                      "checked_in"
-                    ]
-                  },
-                  "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "RSVP stored",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityEventParticipant"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Event not found"
-          },
-          "422": {
-            "description": "Validation error"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/events/{eventId}/reminders": {
-      "post": {
-        "summary": "Schedule event reminder",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "eventId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "remindAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "channel": {
-                    "type": "string",
-                    "enum": [
-                      "email",
-                      "push",
-                      "sms"
-                    ]
-                  },
-                  "metadata": {
-                    "type": "object",
-                    "additionalProperties": true
-                  }
-                },
-                "required": [
-                  "remindAt"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Reminder scheduled",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityEventReminder"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Event not found"
-          },
-          "422": {
-            "description": "Validation error"
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/calendar": {
-      "get": {
-        "summary": "Community calendar",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "month",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 12
-            }
-          },
-          {
-            "name": "year",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 2020,
-              "maximum": 2100
-            }
-          },
-          {
-            "name": "visibility",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "members",
-                "admins",
-                "owners"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Calendar compiled",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CommunityCalendar"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Community not found"
-          }
-        }
-      }
-    },
     "/communities/{communityId}/roles": {
       "get": {
         "summary": "List community roles",
@@ -2398,376 +2896,6 @@
         }
       }
     },
-    "/communities/{communityId}/members/{userId}/role": {
-      "patch": {
-        "summary": "Assign community member role",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "roleKey": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "roleKey"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Role updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/CommunityRoleAssignment"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/paywall/tiers": {
-      "get": {
-        "summary": "List community paywall tiers",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "includeInactive",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paywall tiers fetched",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/CommunityPaywallTier"
-                      }
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "summary": "Create paywall tier",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityPaywallTierInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Tier created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/CommunityPaywallTier"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/paywall/tiers/{tierId}": {
-      "patch": {
-        "summary": "Update paywall tier",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "tierId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommunityPaywallTierUpdateInput"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Tier updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/CommunityPaywallTier"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/paywall/checkout": {
-      "post": {
-        "summary": "Start subscription checkout",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "tierId": {
-                    "type": "integer"
-                  },
-                  "provider": {
-                    "type": "string"
-                  },
-                  "couponCode": {
-                    "type": "string"
-                  },
-                  "tax": {
-                    "type": "object"
-                  },
-                  "receiptEmail": {
-                    "type": "string"
-                  },
-                  "affiliateCode": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "tierId",
-                  "provider"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Checkout started",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/CommunitySubscriptionCheckoutResponse"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/subscriptions/me": {
-      "get": {
-        "summary": "List my community subscriptions",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Subscriptions fetched",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/CommunitySubscription"
-                      }
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/communities/{communityId}/subscriptions/{subscriptionId}/cancel": {
       "post": {
         "summary": "Cancel community subscription",
@@ -2836,9 +2964,9 @@
         }
       }
     },
-    "/communities/{communityId}/affiliates": {
+    "/communities/{communityId}/subscriptions/me": {
       "get": {
-        "summary": "List community affiliates",
+        "summary": "List my community subscriptions",
         "tags": [
           "Communities"
         ],
@@ -2850,19 +2978,11 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Affiliates fetched",
+            "description": "Subscriptions fetched",
             "content": {
               "application/json": {
                 "schema": {
@@ -2874,7 +2994,7 @@
                     "data": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/components/schemas/CommunityAffiliate"
+                        "$ref": "#/components/schemas/CommunitySubscription"
                       }
                     },
                     "message": {
@@ -2892,236 +3012,116 @@
         }
       }
     },
-    "/communities/{communityId}/affiliates/apply": {
-      "post": {
-        "summary": "Apply to community affiliate program",
-        "tags": [
-          "Communities"
+    "/communities/feed": {
+      "get": {
+        "summary": "Aggregated community feed",
+        "security": [
+          {
+            "bearerAuth": []
+          }
         ],
         "parameters": [
           {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
+            "name": "page",
+            "in": "query",
             "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "referralCode": {
-                    "type": "string"
-                  },
-                  "commissionRateBasisPoints": {
-                    "type": "integer"
-                  },
-                  "metadata": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Affiliate application created",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/CommunityAffiliate"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/affiliates/{affiliateId}": {
-      "patch": {
-        "summary": "Update community affiliate",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
             }
           },
           {
-            "name": "affiliateId",
-            "in": "path",
-            "required": true,
+            "name": "perPage",
+            "in": "query",
             "schema": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 10
             }
+          },
+          {
+            "name": "postType",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "update",
+                "event",
+                "resource",
+                "classroom",
+                "poll"
+              ]
+            },
+            "required": false
+          },
+          {
+            "name": "visibility",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "public",
+                "members",
+                "admins"
+              ]
+            },
+            "required": false
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "status": {
-                    "type": "string"
-                  },
-                  "commissionRateBasisPoints": {
-                    "type": "integer"
-                  },
-                  "referralCode": {
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "type": "object"
-                  }
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "Affiliate updated",
+            "description": "Feed retrieved",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
                     },
-                    "data": {
-                      "$ref": "#/components/schemas/CommunityAffiliate"
-                    },
-                    "message": {
-                      "type": "string"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/CommunityPost"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "page": {
+                                  "type": "integer"
+                                },
+                                "perPage": {
+                                  "type": "integer"
+                                },
+                                "total": {
+                                  "type": "integer"
+                                },
+                                "pageCount": {
+                                  "type": "integer"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
                     }
-                  },
-                  "required": [
-                    "success",
-                    "data"
                   ]
                 }
               }
-            }
-          }
-        }
-      }
-    },
-    "/communities/{communityId}/affiliates/{affiliateId}/payouts": {
-      "post": {
-        "summary": "Record affiliate payout",
-        "tags": [
-          "Communities"
-        ],
-        "parameters": [
-          {
-            "name": "communityId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
             }
           },
-          {
-            "name": "affiliateId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "amountCents": {
-                    "type": "integer"
-                  },
-                  "status": {
-                    "type": "string"
-                  },
-                  "payoutReference": {
-                    "type": "string"
-                  },
-                  "scheduledAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "processedAt": {
-                    "type": "string",
-                    "format": "date-time"
-                  },
-                  "failureReason": {
-                    "type": "string"
-                  },
-                  "metadata": {
-                    "type": "object"
-                  }
-                },
-                "required": [
-                  "amountCents"
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Payout recorded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/CommunityAffiliatePayout"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success",
-                    "data"
-                  ]
-                }
-              }
-            }
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "422": {
+            "description": "Validation error"
           }
         }
       }
@@ -3129,129 +3129,6 @@
   },
   "components": {
     "schemas": {
-      "CommunityAffiliatePayout": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "affiliateId": {
-            "type": "integer"
-          },
-          "amountCents": {
-            "type": "integer"
-          },
-          "status": {
-            "type": "string"
-          },
-          "payoutReference": {
-            "type": "string",
-            "nullable": true
-          },
-          "scheduledAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "processedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "failureReason": {
-            "type": "string",
-            "nullable": true
-          },
-          "metadata": {
-            "type": "object"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "affiliateId",
-          "amountCents",
-          "status",
-          "metadata",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "CommunityAffiliate": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "communityId": {
-            "type": "integer"
-          },
-          "userId": {
-            "type": "integer"
-          },
-          "status": {
-            "type": "string"
-          },
-          "referralCode": {
-            "type": "string"
-          },
-          "commissionRateBasisPoints": {
-            "type": "integer"
-          },
-          "totalEarnedCents": {
-            "type": "integer"
-          },
-          "totalPaidCents": {
-            "type": "integer"
-          },
-          "metadata": {
-            "type": "object"
-          },
-          "approvedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "suspendedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "revokedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "communityId",
-          "userId",
-          "status",
-          "referralCode",
-          "commissionRateBasisPoints",
-          "totalEarnedCents",
-          "totalPaidCents",
-          "metadata",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
       "CommunitySubscription": {
         "type": "object",
         "properties": {
@@ -3350,82 +3227,369 @@
           "updatedAt"
         ]
       },
-      "CommunitySubscriptionCheckoutResponse": {
+      "CommunityRoleDefinition": {
         "type": "object",
         "properties": {
-          "payment": {
-            "$ref": "#/components/schemas/PaymentIntentCreateResponse"
+          "id": {
+            "type": "integer"
           },
-          "subscription": {
-            "$ref": "#/components/schemas/CommunitySubscription"
+          "communityId": {
+            "type": "integer"
+          },
+          "roleKey": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "permissions": {
+            "type": "object"
+          },
+          "isDefaultAssignable": {
+            "type": "boolean"
+          },
+          "createdBy": {
+            "type": "integer",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
-          "payment",
-          "subscription"
+          "id",
+          "communityId",
+          "roleKey",
+          "name",
+          "permissions",
+          "isDefaultAssignable",
+          "createdAt",
+          "updatedAt"
         ]
       },
-      "PaymentIntentCreateResponse": {
+      "CommunityRoleCollection": {
         "type": "object",
         "properties": {
-          "provider": {
-            "type": "string",
-            "enum": [
-              "stripe",
-              "paypal"
-            ]
+          "definitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityRoleDefinition"
+            }
           },
-          "paymentId": {
+          "assignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityRoleAssignment"
+            }
+          }
+        },
+        "required": [
+          "definitions",
+          "assignments"
+        ]
+      },
+      "CommunityRoleAssignment": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer"
+          },
+          "role": {
             "type": "string"
           },
           "status": {
             "type": "string"
           },
-          "clientSecret": {
+          "metadata": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "userId",
+          "role",
+          "status",
+          "metadata"
+        ]
+      },
+      "CommunityResource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "communityId": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
             "type": "string",
             "nullable": true
           },
-          "approvalUrl": {
+          "resourceType": {
+            "type": "string"
+          },
+          "assetId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "asset": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "publicId": {
+                "type": "string"
+              },
+              "filename": {
+                "type": "string"
+              }
+            }
+          },
+          "linkUrl": {
             "type": "string",
             "format": "uri",
             "nullable": true
           },
-          "totals": {
-            "$ref": "#/components/schemas/PaymentTotals"
+          "classroomReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdBy": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string",
+                "nullable": true
+              },
+              "avatarUrl": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "avatarUrl"
+            ]
           }
         },
         "required": [
-          "provider",
-          "paymentId",
+          "id",
+          "communityId",
+          "title",
+          "resourceType",
+          "tags",
+          "visibility",
           "status",
-          "totals"
+          "metadata",
+          "createdAt",
+          "updatedAt",
+          "createdBy"
         ]
       },
-      "PaymentTotals": {
+      "CommunityPost": {
         "type": "object",
         "properties": {
-          "subtotal": {
-            "type": "integer",
-            "description": "Subtotal before discounts and taxes, expressed in cents."
+          "id": {
+            "type": "integer"
           },
-          "discount": {
-            "type": "integer",
-            "description": "Discount amount applied in cents."
+          "type": {
+            "type": "string"
           },
-          "tax": {
-            "type": "integer",
-            "description": "Tax amount applied in cents."
+          "title": {
+            "type": "string",
+            "nullable": true
           },
-          "total": {
-            "type": "integer",
-            "description": "Total payable amount in cents."
+          "body": {
+            "type": "string"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "channel": {
+            "$ref": "#/components/schemas/CommunityChannel",
+            "nullable": true
+          },
+          "community": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              }
+            }
+          },
+          "author": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "avatarUrl": {
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "avatarUrl"
+            ]
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "reactions": {
+                "type": "integer"
+              },
+              "reactionBreakdown": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "comments": {
+                "type": "integer"
+              }
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
           }
         },
         "required": [
-          "subtotal",
-          "discount",
-          "tax",
-          "total"
+          "id",
+          "type",
+          "body",
+          "visibility",
+          "status",
+          "tags",
+          "author",
+          "stats",
+          "metadata"
+        ]
+      },
+      "CommunityChannel": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "isDefault": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "type",
+          "isDefault",
+          "metadata",
+          "createdAt",
+          "updatedAt"
         ]
       },
       "CommunityPaywallTierUpdateInput": {
@@ -3598,207 +3762,125 @@
           "updatedAt"
         ]
       },
-      "CommunityRoleAssignment": {
+      "CommunitySubscriptionCheckoutResponse": {
         "type": "object",
         "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/PaymentIntentCreateResponse"
+          },
+          "subscription": {
+            "$ref": "#/components/schemas/CommunitySubscription"
+          }
+        },
+        "required": [
+          "payment",
+          "subscription"
+        ]
+      },
+      "PaymentIntentCreateResponse": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "stripe",
+              "paypal"
+            ]
+          },
+          "paymentId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "clientSecret": {
+            "type": "string",
+            "nullable": true
+          },
+          "approvalUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PaymentTotals"
+          }
+        },
+        "required": [
+          "provider",
+          "paymentId",
+          "status",
+          "totals"
+        ]
+      },
+      "PaymentTotals": {
+        "type": "object",
+        "properties": {
+          "subtotal": {
+            "type": "integer",
+            "description": "Subtotal before discounts and taxes, expressed in cents."
+          },
+          "discount": {
+            "type": "integer",
+            "description": "Discount amount applied in cents."
+          },
+          "tax": {
+            "type": "integer",
+            "description": "Tax amount applied in cents."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Total payable amount in cents."
+          }
+        },
+        "required": [
+          "subtotal",
+          "discount",
+          "tax",
+          "total"
+        ]
+      },
+      "CommunityEventParticipant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "integer"
+          },
           "userId": {
             "type": "integer"
           },
-          "role": {
-            "type": "string"
-          },
           "status": {
             "type": "string"
+          },
+          "rsvpAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "checkInAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "reminderScheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           },
           "metadata": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": true
           }
         },
         "required": [
+          "id",
+          "eventId",
           "userId",
-          "role",
           "status",
+          "rsvpAt",
           "metadata"
-        ]
-      },
-      "CommunityRoleDefinition": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "communityId": {
-            "type": "integer"
-          },
-          "roleKey": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "permissions": {
-            "type": "object"
-          },
-          "isDefaultAssignable": {
-            "type": "boolean"
-          },
-          "createdBy": {
-            "type": "integer",
-            "nullable": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "communityId",
-          "roleKey",
-          "name",
-          "permissions",
-          "isDefaultAssignable",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "CommunityRoleCollection": {
-        "type": "object",
-        "properties": {
-          "definitions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CommunityRoleDefinition"
-            }
-          },
-          "assignments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CommunityRoleAssignment"
-            }
-          }
-        },
-        "required": [
-          "definitions",
-          "assignments"
-        ]
-      },
-      "CommunityCalendar": {
-        "type": "object",
-        "properties": {
-          "month": {
-            "type": "integer"
-          },
-          "year": {
-            "type": "integer"
-          },
-          "eventsByDate": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "$ref": "#/components/schemas/CommunityCalendarEvent"
-              }
-            }
-          }
-        },
-        "required": [
-          "month",
-          "year",
-          "eventsByDate"
-        ]
-      },
-      "CommunityCalendarEvent": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "title": {
-            "type": "string"
-          },
-          "startAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "endAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "timezone": {
-            "type": "string"
-          },
-          "visibility": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "map": {
-            "$ref": "#/components/schemas/CommunityEventMap"
-          }
-        },
-        "required": [
-          "id",
-          "title",
-          "startAt",
-          "endAt",
-          "timezone",
-          "visibility",
-          "status"
-        ]
-      },
-      "CommunityEventMap": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string"
-          },
-          "provider": {
-            "type": "string",
-            "nullable": true
-          },
-          "coordinates": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "latitude": {
-                "type": "number"
-              },
-              "longitude": {
-                "type": "number"
-              }
-            }
-          },
-          "locationName": {
-            "type": "string",
-            "nullable": true
-          },
-          "locationAddress": {
-            "type": "string",
-            "nullable": true
-          },
-          "meetingUrl": {
-            "type": "string",
-            "format": "uri",
-            "nullable": true
-          },
-          "shareUrl": {
-            "type": "string",
-            "format": "uri",
-            "nullable": true
-          }
-        },
-        "required": [
-          "type"
         ]
       },
       "CommunityEventReminder": {
@@ -3856,49 +3938,6 @@
           "metadata"
         ]
       },
-      "CommunityEventParticipant": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "eventId": {
-            "type": "integer"
-          },
-          "userId": {
-            "type": "integer"
-          },
-          "status": {
-            "type": "string"
-          },
-          "rsvpAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "checkInAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "reminderScheduledAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "required": [
-          "id",
-          "eventId",
-          "userId",
-          "status",
-          "rsvpAt",
-          "metadata"
-        ]
-      },
       "CommunityEventDetail": {
         "allOf": [
           {
@@ -3933,6 +3972,51 @@
               }
             }
           }
+        ]
+      },
+      "CommunityEventMap": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "coordinates": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              }
+            }
+          },
+          "locationName": {
+            "type": "string",
+            "nullable": true
+          },
+          "locationAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "meetingUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "shareUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          }
+        },
+        "required": [
+          "type"
         ]
       },
       "CommunityEvent": {
@@ -4057,54 +4141,6 @@
           "updatedAt"
         ]
       },
-      "CommunityLeaderboardEntry": {
-        "type": "object",
-        "properties": {
-          "userId": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "points": {
-            "type": "integer",
-            "nullable": true
-          },
-          "lifetimePoints": {
-            "type": "integer",
-            "nullable": true
-          },
-          "tier": {
-            "type": "string",
-            "nullable": true
-          },
-          "currentStreakDays": {
-            "type": "integer",
-            "nullable": true
-          },
-          "longestStreakDays": {
-            "type": "integer",
-            "nullable": true
-          },
-          "lastActiveOn": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "attendedEvents": {
-            "type": "integer",
-            "nullable": true
-          },
-          "waitlistedEvents": {
-            "type": "integer",
-            "nullable": true
-          }
-        },
-        "required": [
-          "userId",
-          "name"
-        ]
-      },
       "CommunityStreak": {
         "type": "object",
         "properties": {
@@ -4143,19 +4179,74 @@
           "metadata"
         ]
       },
-      "CommunityPointAwardResult": {
+      "CommunityEngagementProgress": {
         "type": "object",
         "properties": {
-          "summary": {
+          "membership": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "communityId": {
+                "type": "integer"
+              },
+              "userId": {
+                "type": "integer"
+              },
+              "role": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "joinedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "leftAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": true
+              },
+              "metadata": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "id",
+              "communityId",
+              "userId",
+              "role",
+              "status",
+              "metadata"
+            ]
+          },
+          "points": {
             "$ref": "#/components/schemas/CommunityPointSummary"
           },
-          "transaction": {
-            "$ref": "#/components/schemas/CommunityPointTransaction"
+          "streak": {
+            "$ref": "#/components/schemas/CommunityStreak"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CommunityPointTransaction"
+            }
           }
         },
         "required": [
-          "summary",
-          "transaction"
+          "membership",
+          "points",
+          "streak",
+          "transactions"
         ]
       },
       "CommunityPointTransaction": {
@@ -4248,74 +4339,67 @@
           "tier"
         ]
       },
-      "CommunityEngagementProgress": {
+      "CommunityPointAwardResult": {
         "type": "object",
         "properties": {
-          "membership": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "communityId": {
-                "type": "integer"
-              },
-              "userId": {
-                "type": "integer"
-              },
-              "role": {
-                "type": "string"
-              },
-              "status": {
-                "type": "string"
-              },
-              "joinedAt": {
-                "type": "string",
-                "format": "date-time",
-                "nullable": true
-              },
-              "updatedAt": {
-                "type": "string",
-                "format": "date-time",
-                "nullable": true
-              },
-              "leftAt": {
-                "type": "string",
-                "format": "date-time",
-                "nullable": true
-              },
-              "metadata": {
-                "type": "object",
-                "additionalProperties": true
-              }
-            },
-            "required": [
-              "id",
-              "communityId",
-              "userId",
-              "role",
-              "status",
-              "metadata"
-            ]
-          },
-          "points": {
+          "summary": {
             "$ref": "#/components/schemas/CommunityPointSummary"
           },
-          "streak": {
-            "$ref": "#/components/schemas/CommunityStreak"
-          },
-          "transactions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CommunityPointTransaction"
-            }
+          "transaction": {
+            "$ref": "#/components/schemas/CommunityPointTransaction"
           }
         },
         "required": [
-          "membership",
-          "points",
-          "streak",
-          "transactions"
+          "summary",
+          "transaction"
+        ]
+      },
+      "CommunityLeaderboardEntry": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "points": {
+            "type": "integer",
+            "nullable": true
+          },
+          "lifetimePoints": {
+            "type": "integer",
+            "nullable": true
+          },
+          "tier": {
+            "type": "string",
+            "nullable": true
+          },
+          "currentStreakDays": {
+            "type": "integer",
+            "nullable": true
+          },
+          "longestStreakDays": {
+            "type": "integer",
+            "nullable": true
+          },
+          "lastActiveOn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "attendedEvents": {
+            "type": "integer",
+            "nullable": true
+          },
+          "waitlistedEvents": {
+            "type": "integer",
+            "nullable": true
+          }
+        },
+        "required": [
+          "userId",
+          "name"
         ]
       },
       "PresenceUpdateRequest": {
@@ -4412,6 +4496,121 @@
           "connectedAt",
           "lastSeenAt",
           "metadata"
+        ]
+      },
+      "CommunityChannelMembership": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "channelId": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "notificationsEnabled": {
+            "type": "boolean"
+          },
+          "muteUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastReadMessageId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "channelId",
+          "userId",
+          "role",
+          "notificationsEnabled",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityChatReadReceiptRequest": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "CommunityChatReactionSummary": {
+        "type": "object",
+        "properties": {
+          "messageId": {
+            "type": "integer"
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "emoji": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "viewerReactions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "messageId",
+          "reactions",
+          "viewerReactions"
+        ]
+      },
+      "CommunityChatReactionRequest": {
+        "type": "object",
+        "properties": {
+          "emoji": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "emoji"
         ]
       },
       "CommunityChatModerationResult": {
@@ -4601,121 +4800,6 @@
           "action"
         ]
       },
-      "CommunityChatReactionSummary": {
-        "type": "object",
-        "properties": {
-          "messageId": {
-            "type": "integer"
-          },
-          "reactions": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "emoji": {
-                  "type": "string"
-                },
-                "count": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
-          "viewerReactions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "messageId",
-          "reactions",
-          "viewerReactions"
-        ]
-      },
-      "CommunityChatReactionRequest": {
-        "type": "object",
-        "properties": {
-          "emoji": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 40
-          }
-        },
-        "required": [
-          "emoji"
-        ]
-      },
-      "CommunityChannelMembership": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "channelId": {
-            "type": "integer"
-          },
-          "userId": {
-            "type": "integer"
-          },
-          "role": {
-            "type": "string"
-          },
-          "notificationsEnabled": {
-            "type": "boolean"
-          },
-          "muteUntil": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "lastReadAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "lastReadMessageId": {
-            "type": "integer",
-            "nullable": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "channelId",
-          "userId",
-          "role",
-          "notificationsEnabled",
-          "metadata",
-          "createdAt",
-          "updatedAt"
-        ]
-      },
-      "CommunityChatReadReceiptRequest": {
-        "type": "object",
-        "properties": {
-          "messageId": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
       "CreateCommunityChatMessageRequest": {
         "type": "object",
         "properties": {
@@ -4863,7 +4947,127 @@
           "updatedAt"
         ]
       },
-      "CommunityResource": {
+      "CommunityCalendar": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "integer"
+          },
+          "year": {
+            "type": "integer"
+          },
+          "eventsByDate": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CommunityCalendarEvent"
+              }
+            }
+          }
+        },
+        "required": [
+          "month",
+          "year",
+          "eventsByDate"
+        ]
+      },
+      "CommunityCalendarEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "startAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "map": {
+            "$ref": "#/components/schemas/CommunityEventMap"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "startAt",
+          "endAt",
+          "timezone",
+          "visibility",
+          "status"
+        ]
+      },
+      "CommunityAffiliatePayout": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "affiliateId": {
+            "type": "integer"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "payoutReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "processedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "failureReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "affiliateId",
+          "amountCents",
+          "status",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CommunityAffiliate": {
         "type": "object",
         "properties": {
           "id": {
@@ -4872,58 +5076,38 @@
           "communityId": {
             "type": "integer"
           },
-          "title": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "resourceType": {
-            "type": "string"
-          },
-          "assetId": {
-            "type": "integer",
-            "nullable": true
-          },
-          "asset": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "publicId": {
-                "type": "string"
-              },
-              "filename": {
-                "type": "string"
-              }
-            }
-          },
-          "linkUrl": {
-            "type": "string",
-            "format": "uri",
-            "nullable": true
-          },
-          "classroomReference": {
-            "type": "string",
-            "nullable": true
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "visibility": {
-            "type": "string"
+          "userId": {
+            "type": "integer"
           },
           "status": {
             "type": "string"
           },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
+          "referralCode": {
+            "type": "string"
           },
-          "publishedAt": {
+          "commissionRateBasisPoints": {
+            "type": "integer"
+          },
+          "totalEarnedCents": {
+            "type": "integer"
+          },
+          "totalPaidCents": {
+            "type": "integer"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "suspendedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "revokedAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
@@ -4935,44 +5119,20 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "createdBy": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "name": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string",
-                "nullable": true
-              },
-              "avatarUrl": {
-                "type": "string",
-                "format": "uri"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "avatarUrl"
-            ]
           }
         },
         "required": [
           "id",
           "communityId",
-          "title",
-          "resourceType",
-          "tags",
-          "visibility",
+          "userId",
           "status",
+          "referralCode",
+          "commissionRateBasisPoints",
+          "totalEarnedCents",
+          "totalPaidCents",
           "metadata",
           "createdAt",
-          "updatedAt",
-          "createdBy"
+          "updatedAt"
         ]
       },
       "CommunityDetail": {
@@ -4991,52 +5151,6 @@
               }
             }
           }
-        ]
-      },
-      "CommunityChannel": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
-          },
-          "slug": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string",
-            "nullable": true
-          },
-          "isDefault": {
-            "type": "boolean"
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "name",
-          "slug",
-          "type",
-          "isDefault",
-          "metadata",
-          "createdAt",
-          "updatedAt"
         ]
       },
       "Community": {
@@ -5127,120 +5241,6 @@
           "stats",
           "createdAt",
           "updatedAt"
-        ]
-      },
-      "CommunityPost": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "type": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string",
-            "nullable": true
-          },
-          "body": {
-            "type": "string"
-          },
-          "publishedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "scheduledAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "visibility": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "tags": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "channel": {
-            "$ref": "#/components/schemas/CommunityChannel",
-            "nullable": true
-          },
-          "community": {
-            "type": "object",
-            "nullable": true,
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "name": {
-                "type": "string"
-              },
-              "slug": {
-                "type": "string"
-              }
-            }
-          },
-          "author": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "integer"
-              },
-              "name": {
-                "type": "string"
-              },
-              "role": {
-                "type": "string"
-              },
-              "avatarUrl": {
-                "type": "string",
-                "format": "uri"
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "avatarUrl"
-            ]
-          },
-          "stats": {
-            "type": "object",
-            "properties": {
-              "reactions": {
-                "type": "integer"
-              },
-              "reactionBreakdown": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": "integer"
-                }
-              },
-              "comments": {
-                "type": "integer"
-              }
-            }
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        },
-        "required": [
-          "id",
-          "type",
-          "body",
-          "visibility",
-          "status",
-          "tags",
-          "author",
-          "stats",
-          "metadata"
         ]
       },
       "StandardResponse": {

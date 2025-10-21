@@ -1,4 +1,14 @@
-<svg width="560" height="360" viewBox="0 0 560 360" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg
+  width="560"
+  height="360"
+  viewBox="0 0 560 360"
+  fill="none"
+  xmlns="http://www.w3.org/2000/svg"
+  role="img"
+  aria-labelledby="coursesPreviewTitle coursesPreviewDescription"
+>
+  <title id="coursesPreviewTitle">Course module preview</title>
+  <desc id="coursesPreviewDescription">Stylised course card with module thumbnail and progress bars from the Edulure platform.</desc>
   <defs>
     <linearGradient id="coursesGradient" x1="80" y1="40" x2="460" y2="320" gradientUnits="userSpaceOnUse">
       <stop stop-color="#6366f1" />

@@ -86,6 +86,16 @@ const DEFAULT_SUPPORT_CONTACTS = [
   }
 ];
 
+const DEFAULT_SUPPORT_METRICS = {
+  open: 0,
+  waiting: 0,
+  resolved: 0,
+  closed: 0,
+  awaitingLearner: 0,
+  averageResponseMinutes: 0,
+  latestUpdatedAt: null
+};
+
 const DEFAULT_SYSTEM_SETTINGS = Object.freeze({
   language: 'en',
   region: 'US',
@@ -497,6 +507,8 @@ export function buildLearnerDashboard({
   ebooks = new Map(),
   invoices = [],
   paymentIntents = [],
+  paymentMethodsRaw = [],
+  billingContactsRaw = [],
   ebookRecommendations = [],
   communityMemberships = [],
   communityEvents = [],
@@ -2875,6 +2887,67 @@ function determineRiskLevel(enrollment, stats, now) {
   return 'low';
 }
 
+function normaliseEnrollment(enrollment = {}, collaboratorDirectory = new Map()) {
+  const metadata = safeJsonParse(enrollment.metadata, {});
+  const userObject = typeof enrollment.user === 'object' && enrollment.user ? enrollment.user : null;
+  const learnerMeta =
+    (metadata && (metadata.learner ?? metadata.user ?? metadata.profile ?? {})) || {};
+
+  const derivedUserId =
+    enrollment.userId ??
+    userObject?.id ??
+    learnerMeta?.id ??
+    learnerMeta?.userId ??
+    learnerMeta?.learnerId ??
+    metadata.userId ??
+    metadata.learnerId ??
+    null;
+
+  const directoryUser = derivedUserId ? collaboratorDirectory.get?.(derivedUserId) : null;
+
+  const firstName =
+    enrollment.firstName ??
+    learnerMeta?.firstName ??
+    learnerMeta?.givenName ??
+    metadata.firstName ??
+    metadata.givenName ??
+    userObject?.firstName ??
+    directoryUser?.firstName ??
+    null;
+
+  const lastName =
+    enrollment.lastName ??
+    learnerMeta?.lastName ??
+    learnerMeta?.familyName ??
+    metadata.lastName ??
+    metadata.familyName ??
+    userObject?.lastName ??
+    directoryUser?.lastName ??
+    null;
+
+  const email =
+    enrollment.email ??
+    learnerMeta?.email ??
+    learnerMeta?.emailAddress ??
+    metadata.email ??
+    metadata.contactEmail ??
+    userObject?.email ??
+    directoryUser?.email ??
+    null;
+
+  return {
+    ...enrollment,
+    metadata,
+    userId: derivedUserId ?? enrollment.userId ?? null,
+    resolvedLearner: {
+      id: derivedUserId ?? directoryUser?.id ?? null,
+      firstName,
+      lastName,
+      email
+    }
+  };
+}
+
 function buildCourseWorkspace({
   courses = [],
   modules = [],
@@ -2908,6 +2981,10 @@ function buildCourseWorkspace({
   if (!courses.length) {
     return workspace;
   }
+
+  const enrollmentRecords = enrollments.map((enrollment) =>
+    normaliseEnrollment(enrollment, collaboratorDirectory)
+  );
 
   const languageLabel = createLanguageDisplay();
   const courseById = new Map();
@@ -2950,9 +3027,9 @@ function buildCourseWorkspace({
   });
 
   const enrollmentsByCourse = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const list = enrollmentsByCourse.get(enrollment.courseId) ?? [];
-    list.push({ ...enrollment, metadata: safeJsonParse(enrollment.metadata, {}) });
+    list.push(enrollment);
     enrollmentsByCourse.set(enrollment.courseId, list);
   });
 
@@ -2987,6 +3064,7 @@ function buildCourseWorkspace({
   });
 
   const catalogue = courses.map((course) => {
+    const courseRecord = courseById.get(course.id) ?? { ...course, metadata: safeJsonParse(course.metadata, {}) };
     const modulesForCourse = modulesByCourse.get(course.id) ?? [];
     const lessonsForCourse = lessonsByCourse.get(course.id) ?? [];
     const courseEnrollments = enrollmentsByCourse.get(course.id) ?? [];
@@ -2999,9 +3077,9 @@ function buildCourseWorkspace({
             totalEnrollments
         )
       : 0;
-    const languages = Array.isArray(course.languages) ? course.languages : [];
-    const publishedLocales = Array.isArray(course.metadata?.publishedLocales)
-      ? course.metadata.publishedLocales
+    const languages = Array.isArray(courseRecord.languages) ? courseRecord.languages : [];
+    const publishedLocales = Array.isArray(courseRecord.metadata?.publishedLocales)
+      ? courseRecord.metadata.publishedLocales
       : [];
 
     const languageEntries = languages.map((code) => {
@@ -3019,24 +3097,24 @@ function buildCourseWorkspace({
     const updatedAtDate = normaliseDate(course.updatedAt);
 
     return {
-      id: course.publicId ?? `course-${course.id}`,
+      id: courseRecord.publicId ?? `course-${course.id}`,
       courseId: course.id,
-      title: course.title,
-      summary: course.summary,
-      status: course.status,
-      format: course.deliveryFormat ?? course.metadata?.format ?? 'cohort',
+      title: courseRecord.title,
+      summary: courseRecord.summary,
+      status: courseRecord.status,
+      format: courseRecord.deliveryFormat ?? courseRecord.metadata?.format ?? 'cohort',
       languages: languageEntries,
       price: {
-        currency: course.priceCurrency,
-        amountCents: Number(course.priceAmount ?? 0),
-        formatted: formatCurrency(course.priceAmount ?? 0, course.priceCurrency)
+        currency: courseRecord.priceCurrency,
+        amountCents: Number(courseRecord.priceAmount ?? 0),
+        formatted: formatCurrency(courseRecord.priceAmount ?? 0, courseRecord.priceCurrency)
       },
       rating: {
-        average: Number(course.ratingAverage ?? 0),
-        count: Number(course.ratingCount ?? 0)
+        average: Number(courseRecord.ratingAverage ?? 0),
+        count: Number(courseRecord.ratingCount ?? 0)
       },
       learners: {
-        total: Number(course.enrolmentCount ?? totalEnrollments),
+        total: Number(courseRecord.enrolmentCount ?? totalEnrollments),
         active: activeEnrollments.length,
         completed: completedEnrollments.length
       },
@@ -3050,15 +3128,17 @@ function buildCourseWorkspace({
         published: languageEntries.filter((entry) => entry.published).length,
         missing: languageEntries.filter((entry) => !entry.published).map((entry) => entry.code)
       },
-      automation: course.metadata?.dripCampaign ?? null,
-      refresherLessons: Array.isArray(course.metadata?.refresherLessons) ? course.metadata.refresherLessons : []
+      automation: courseRecord.metadata?.dripCampaign ?? null,
+      refresherLessons: Array.isArray(courseRecord.metadata?.refresherLessons)
+        ? courseRecord.metadata.refresherLessons
+        : []
     };
   });
 
   workspace.catalogue = catalogue;
 
   const cohortMap = new Map();
-  enrollments.forEach((enrollment) => {
+  enrollmentRecords.forEach((enrollment) => {
     const course = courseById.get(enrollment.courseId);
     if (!course) return;
     const cohortLabel = enrollment.metadata?.cohort ?? 'General';
@@ -3319,16 +3399,15 @@ function buildCourseWorkspace({
     }
   };
 
-  const roster = enrollments.map((enrollment) => {
+  const roster = enrollmentRecords.map((enrollment) => {
     const stats = progressByEnrollment.get(enrollment.id) ?? { completionRatio: 0, lastCompletedAt: null };
     const course = courseById.get(enrollment.courseId);
-    const user = collaboratorDirectory.get(enrollment.userId);
     const lessonsForCourse = lessonsByCourse.get(enrollment.courseId) ?? [];
     const enrollmentMetadata = safeJsonParse(enrollment.metadata, {});
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
-      learnerId: enrollment.userId,
-      name: user ? resolveName(user.firstName, user.lastName, user.email) : `Learner ${enrollment.userId}`,
+      learnerId: identity.id ?? enrollment.userId ?? directoryUser?.id ?? null,
+      name: displayName,
       courseId: enrollment.courseId,
       courseTitle: course?.title ?? 'Course',
       status: enrollment.status,

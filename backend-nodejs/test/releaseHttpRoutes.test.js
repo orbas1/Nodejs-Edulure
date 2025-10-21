@@ -109,4 +109,24 @@ describe('Release HTTP routes', () => {
     expect(response.body.data.recommendedStatus).toBe('ready');
     expect(releaseOrchestrationService.evaluateRun).toHaveBeenCalledWith('rel-1');
   });
+
+  it('rejects release runs with invalid environments', async () => {
+    const response = await request(app)
+      .post('/api/v1/release/runs')
+      .set('Authorization', 'Bearer token')
+      .send({ versionTag: 'v1.0.0', environment: 'Prod Env', initiatedByEmail: 'ops@example.com' });
+
+    expect(response.status).toBe(422);
+    expect(releaseOrchestrationService.scheduleReleaseRun).not.toHaveBeenCalled();
+  });
+
+  it('validates gate evaluation identifiers', async () => {
+    const response = await request(app)
+      .post('/api/v1/release/runs/invalid id/gates/%20/evaluations')
+      .set('Authorization', 'Bearer token')
+      .send({ status: 'pass' });
+
+    expect(response.status).toBe(422);
+    expect(releaseOrchestrationService.recordGateEvaluation).not.toHaveBeenCalled();
+  });
 });

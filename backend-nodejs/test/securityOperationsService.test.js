@@ -251,20 +251,86 @@ describe('SecurityOperationsService', () => {
       riskId: 77,
       tenantId: 'tenant-ops',
       actor: { id: 'admin-1', role: 'admin', type: 'user' },
-      requestContext: { requestId: 'req-risk-delete' }
+      requestContext: { requestId: 'req-risk-delete' },
+      reason: 'Consolidated with centralised certificate automation'
     });
 
     expect(repository.deleteRisk).toHaveBeenCalledWith(77);
     expect(auditLogger.record).toHaveBeenCalledWith(
       expect.objectContaining({
         eventType: 'risk.register.deleted',
-        metadata: expect.objectContaining({ title: 'Expired TLS certificates', residualRiskScore: 9 })
+        metadata: expect.objectContaining({
+          title: 'Expired TLS certificates',
+          residualRiskScore: 9,
+          reason: null
+        })
       })
     );
     expect(changeDataCapture.recordEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ entityName: 'security_risk_register', operation: 'DELETE' })
+      expect.objectContaining({
+        entityName: 'security_risk_register',
+        operation: 'DELETE',
+        payload: expect.objectContaining({ reason: null })
+      })
     );
-    expect(result).toEqual({ success: true });
+    expect(result).toEqual({
+      success: true,
+      deleted: {
+        riskId: 77,
+        riskUuid: 'risk-uuid-77',
+        tenantId: 'tenant-ops',
+        status: 'identified'
+      }
+    });
+  });
+
+  it('normalises delete reasons and persists them for observability', async () => {
+    const risk = {
+      id: 88,
+      riskUuid: 'risk-uuid-88',
+      tenantId: 'tenant-ops',
+      title: 'Legacy IAM policies',
+      status: 'accepted',
+      residualRiskScore: 4
+    };
+
+    repository.getRiskById.mockResolvedValue(risk);
+
+    await service.deleteRisk({
+      riskId: 88,
+      tenantId: 'tenant-ops',
+      reason: '   Migrated to least privilege policies   ',
+      actor: { id: 'admin-2', role: 'admin', type: 'user' },
+      requestContext: { requestId: 'req-risk-delete' }
+    });
+
+    expect(auditLogger.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ reason: 'Migrated to least privilege policies' })
+      })
+    );
+    expect(changeDataCapture.recordEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ reason: 'Migrated to least privilege policies' })
+      })
+    );
+  });
+
+  it('rejects invalid risk identifiers with a validation status', async () => {
+    await expect(() => service.deleteRisk({ riskId: 0 })).rejects.toMatchObject({
+      status: 422,
+      message: 'A positive integer riskId is required to delete a risk'
+    });
+  });
+
+  it('propagates a not found status when the risk is missing', async () => {
+    repository.getRiskById.mockResolvedValue(null);
+
+    await expect(() => service.deleteRisk({ riskId: 999 })).rejects.toMatchObject({
+      status: 404,
+      message: 'Risk 999 was not found'
+    });
+    expect(repository.deleteRisk).not.toHaveBeenCalled();
   });
 
   it('records audit evidence with normalised sources and timestamps', async () => {

@@ -1,6 +1,7 @@
 import PropTypes from 'prop-types';
 
 const numberFormatter = new Intl.NumberFormat('en-US');
+const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:']);
 
 const METADATA_LABELS = {
   focus: 'Strategic Focus',
@@ -47,6 +48,19 @@ function formatMetadataValue(value) {
   return String(value);
 }
 
+function getSafeUrl(url) {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url, 'https://app.edulure.com');
+    if (!SAFE_URL_PROTOCOLS.has(parsed.protocol)) {
+      return null;
+    }
+    return parsed.toString();
+  } catch (error) {
+    return null;
+  }
+}
+
 export default function CommunityProfile({
   community,
   isAggregate,
@@ -65,7 +79,8 @@ export default function CommunityProfile({
   onDeleteResource,
   isManagingResource = false,
   resourceNotice,
-  resourceActionId
+  resourceActionId,
+  resourceEmptyCta
 }) {
   if (isAggregate) {
     return (
@@ -104,7 +119,9 @@ export default function CommunityProfile({
   }
 
   const stats = community.stats ?? {};
-  const metadataEntries = Object.entries(community.metadata ?? {});
+  const metadataEntries = Object.entries(community.metadata ?? {}).sort(([a], [b]) =>
+    String(a).localeCompare(String(b))
+  );
   const resourceItems = resources ?? [];
   const totalResources = resourcesMeta?.total ?? resourceItems.length;
   const showLoadMore = typeof onLoadMoreResources === 'function';
@@ -114,6 +131,10 @@ export default function CommunityProfile({
       (community.membership?.role &&
         ['owner', 'admin', 'moderator'].includes(community.membership.role))
   );
+
+  const hubUrl = community.links?.hub ?? `https://app.edulure.com/communities/${community.slug}`;
+
+  const hasLoadedAll = totalResources !== undefined && showingCount >= totalResources;
 
   return (
     <div className="space-y-6">
@@ -157,7 +178,7 @@ export default function CommunityProfile({
             </div>
           </div>
           <a
-            href={`https://app.edulure.com/communities/${community.slug}`}
+            href={hubUrl}
             className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-primary-dark"
           >
             Visit Community Hub
@@ -196,7 +217,10 @@ export default function CommunityProfile({
         {isLoadingResources && resourceItems.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">Loading resource library…</p>
         ) : resourceItems.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">No resources published yet. Share your first playbook from the composer.</p>
+          <div className="mt-3 space-y-2 text-sm text-slate-500">
+            <p>No resources published yet. Share your first playbook from the composer.</p>
+            {resourceEmptyCta}
+          </div>
         ) : (
           <>
             <ul className="mt-4 space-y-3 text-sm text-slate-600">
@@ -216,39 +240,54 @@ export default function CommunityProfile({
                             </span>
                           ))}
                       </div>
-                      {resource.metadata?.embedUrl && (
-                        <div className="aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-900/5">
-                          <iframe
-                            title={`${resource.title} preview`}
-                            src={resource.metadata.embedUrl}
-                            className="h-full w-full"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                            loading="lazy"
-                            referrerPolicy="strict-origin-when-cross-origin"
-                            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
-                            allowFullScreen
-                          />
-                        </div>
-                      )}
+                      {(() => {
+                        const embedUrl = getSafeUrl(resource.metadata?.embedUrl);
+                        if (!embedUrl) return null;
+                        return (
+                          <div className="aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-slate-900/5">
+                            <iframe
+                              title={`${resource.title} preview`}
+                              src={embedUrl}
+                              className="h-full w-full"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                              loading="lazy"
+                              referrerPolicy="strict-origin-when-cross-origin"
+                              sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+                              allowFullScreen
+                            />
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      {resource.linkUrl && (
-                        <a
-                          href={resource.linkUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
-                        >
-                          Open link
-                        </a>
-                      )}
+                      {(() => {
+                        const safeLink = getSafeUrl(resource.linkUrl);
+                        if (!safeLink) return null;
+                        const hostLabel = (() => {
+                          try {
+                            return new URL(safeLink).hostname.replace(/^www\./, '');
+                          } catch (error) {
+                            return 'resource';
+                          }
+                        })();
+                        return (
+                          <a
+                            href={safeLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-primary transition hover:border-primary hover:bg-primary/5"
+                          >
+                            Visit {hostLabel}
+                          </a>
+                        );
+                      })()}
                       {canManageResources && (
                         <div className="flex gap-2">
                           {typeof onEditResource === 'function' && (
                             <button
                               type="button"
                               onClick={() => onEditResource(resource)}
-                              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-white"
+                              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={isManagingResource}
                             >
                               Edit
@@ -258,7 +297,7 @@ export default function CommunityProfile({
                             <button
                               type="button"
                               onClick={() => onDeleteResource(resource)}
-                              className="inline-flex items-center justify-center rounded-full border border-rose-200 px-3 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-50"
+                              className="inline-flex items-center justify-center rounded-full border border-rose-200 px-3 py-1 text-[11px] font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                               disabled={isManagingResource}
                             >
                               {resourceActionId === resource.id && isManagingResource ? 'Removing…' : 'Remove'}
@@ -275,7 +314,7 @@ export default function CommunityProfile({
               <p>
                 Showing {numberFormatter.format(showingCount)} of {numberFormatter.format(totalResources)} items.
               </p>
-              {showLoadMore && (
+              {showLoadMore && !hasLoadedAll && (
                 <button
                   type="button"
                   onClick={onLoadMoreResources}
@@ -284,6 +323,9 @@ export default function CommunityProfile({
                 >
                   {isLoadingResources ? 'Loading more resources…' : 'Load more resources'}
                 </button>
+              )}
+              {showLoadMore && hasLoadedAll && (
+                <p>All resources loaded.</p>
               )}
             </div>
           </>
@@ -327,7 +369,10 @@ CommunityProfile.propTypes = {
       role: PropTypes.string,
       status: PropTypes.string
     }),
-    metadata: PropTypes.object
+    metadata: PropTypes.object,
+    links: PropTypes.shape({
+      hub: PropTypes.string
+    })
   }),
   isAggregate: PropTypes.bool,
   resources: PropTypes.arrayOf(
@@ -358,5 +403,28 @@ CommunityProfile.propTypes = {
   onDeleteResource: PropTypes.func,
   isManagingResource: PropTypes.bool,
   resourceNotice: PropTypes.string,
-  resourceActionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  resourceActionId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  resourceEmptyCta: PropTypes.node
+};
+
+CommunityProfile.defaultProps = {
+  community: undefined,
+  isAggregate: false,
+  resources: undefined,
+  resourcesMeta: undefined,
+  isLoadingDetail: false,
+  isLoadingResources: false,
+  error: undefined,
+  resourcesError: undefined,
+  onLoadMoreResources: undefined,
+  onLeave: undefined,
+  isLeaving: false,
+  canLeave: false,
+  onAddResource: undefined,
+  onEditResource: undefined,
+  onDeleteResource: undefined,
+  isManagingResource: false,
+  resourceNotice: undefined,
+  resourceActionId: undefined,
+  resourceEmptyCta: null
 };

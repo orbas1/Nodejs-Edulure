@@ -25,6 +25,33 @@ const MESSAGE_PAGE_SIZE = 30;
 
 const emptyCollection = { items: [], loading: false, error: null };
 
+const DEFAULT_CAPABILITIES = {
+  post: false,
+  broadcast: false,
+  moderate: false,
+  manageRoles: false,
+  manageResources: false,
+  scheduleEvents: false,
+  hostVoice: false
+};
+
+const DEFAULT_ROLE_PERMISSIONS = {
+  post: true,
+  broadcast: false,
+  moderate: false,
+  manageRoles: false,
+  manageResources: false,
+  scheduleEvents: false,
+  hostVoice: false
+};
+
+function mergePermissions(base, override = {}) {
+  return Object.keys({ ...base, ...override }).reduce((acc, key) => {
+    acc[key] = Boolean(override[key] ?? base[key]);
+    return acc;
+  }, {});
+}
+
 const normaliseChannelEntry = (entry) => {
   const channel = entry?.channel ?? entry ?? {};
   return {
@@ -80,6 +107,81 @@ const normalisePresence = (session) => ({
   metadata: session?.metadata ?? {}
 });
 
+const normaliseRoleDefinition = (role) => {
+  if (!role) return null;
+  const roleKey = role.roleKey ?? role.key ?? role.name ?? '';
+  if (!roleKey) return null;
+  return {
+    ...role,
+    roleKey,
+    name: role.name ?? role.label ?? roleKey,
+    permissions: mergePermissions(DEFAULT_ROLE_PERMISSIONS, role.permissions)
+  };
+};
+
+const normaliseRoleAssignment = (assignment) => {
+  if (!assignment) return null;
+  const roleKey =
+    assignment.roleKey ??
+    assignment.role ??
+    assignment.role_id ??
+    assignment.roleId ??
+    (typeof assignment === 'string' ? assignment : '');
+  if (!roleKey) return null;
+  return {
+    ...assignment,
+    roleKey: String(roleKey).trim(),
+    userId: assignment.userId ?? assignment.memberId ?? assignment.user_id ?? null,
+    isViewer: Boolean(assignment.isViewer ?? assignment.viewer ?? assignment.isSelf)
+  };
+};
+
+const deriveViewerCapabilities = (definitions, assignments) => {
+  if (!Array.isArray(definitions) || !Array.isArray(assignments)) {
+    return { ...DEFAULT_CAPABILITIES };
+  }
+  const roleMap = new Map(definitions.map((definition) => [definition.roleKey, definition.permissions]));
+  const capabilityAccumulator = { ...DEFAULT_CAPABILITIES };
+  const viewerAssignments = assignments.filter((assignment) => assignment?.isViewer || assignment?.userId === 'self');
+  if (viewerAssignments.length === 0) {
+    return capabilityAccumulator;
+  }
+  viewerAssignments.forEach((assignment) => {
+    const permissions = roleMap.get(assignment.roleKey) ?? DEFAULT_ROLE_PERMISSIONS;
+    Object.entries(permissions).forEach(([key, enabled]) => {
+      if (enabled) {
+        capabilityAccumulator[key] = true;
+      }
+    });
+  });
+  return capabilityAccumulator;
+};
+
+function extractWorkspaceError(error, fallbackMessage) {
+  if (error?.response?.data?.message) {
+    return {
+      message: fallbackMessage ?? 'Request failed',
+      detail: error.response.data.message
+    };
+  }
+  if (typeof error?.message === 'string') {
+    return {
+      message: fallbackMessage ?? error.message,
+      detail: error.message
+    };
+  }
+  if (error?.name === 'TypeError') {
+    return {
+      message: fallbackMessage ?? 'Network request blocked',
+      detail: 'Confirm the API CORS policy allows this origin.'
+    };
+  }
+  return {
+    message: fallbackMessage ?? 'Unexpected error',
+    detail: 'Try again or contact support.'
+  };
+}
+
 export default function useCommunityChatWorkspace({ communityId, token }) {
   const interactive = Boolean(communityId && token);
   const lastCommunityRef = useRef(null);
@@ -92,6 +194,7 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
   const [rolesState, setRolesState] = useState({ ...emptyCollection, assignments: [] });
   const [eventsState, setEventsState] = useState(emptyCollection);
   const [resourcesState, setResourcesState] = useState(emptyCollection);
+  const [capabilities, setCapabilities] = useState(DEFAULT_CAPABILITIES);
   const [workspaceNotice, setWorkspaceNotice] = useState(null);
 
   useEffect(() => {
@@ -105,6 +208,7 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       setRolesState({ ...emptyCollection, assignments: [] });
       setEventsState(emptyCollection);
       setResourcesState(emptyCollection);
+      setCapabilities(DEFAULT_CAPABILITIES);
       setWorkspaceNotice(null);
     }
   }, [communityId]);
@@ -137,9 +241,10 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       } catch (error) {
         if (signal?.aborted) return;
         setChannelsState((prev) => ({ ...prev, loading: false, error }));
+        publishErrorNotice(error, 'Unable to load channels');
       }
     },
-    [communityId, interactive, token]
+    [communityId, interactive, token, publishErrorNotice]
   );
 
   const loadMessages = useCallback(
@@ -204,9 +309,10 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
             }
           };
         });
+        publishErrorNotice(error, 'Unable to load channel history');
       }
     },
-    [activeChannelId, communityId, interactive, token]
+    [activeChannelId, communityId, interactive, token, publishErrorNotice]
   );
 
   const loadPresence = useCallback(
@@ -223,29 +329,38 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       } catch (error) {
         if (signal?.aborted) return;
         setPresenceState((prev) => ({ ...prev, loading: false, error }));
+        publishErrorNotice(error, 'Unable to load presence data');
       }
     },
-    [communityId, interactive, token]
+    [communityId, interactive, token, publishErrorNotice]
   );
 
   const loadRoles = useCallback(
     async (signal) => {
       if (!interactive) {
         setRolesState({ ...emptyCollection, assignments: [] });
+        setCapabilities(DEFAULT_CAPABILITIES);
         return;
       }
       setRolesState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const { data } = await listCommunityRoles({ communityId, token, signal });
-        const definitions = Array.isArray(data?.definitions) ? data.definitions : [];
-        const assignments = Array.isArray(data?.assignments) ? data.assignments : [];
+        const definitions = Array.isArray(data?.definitions)
+          ? data.definitions.map((definition) => normaliseRoleDefinition(definition)).filter(Boolean)
+          : [];
+        const assignments = Array.isArray(data?.assignments)
+          ? data.assignments.map((assignment) => normaliseRoleAssignment(assignment)).filter(Boolean)
+          : [];
         setRolesState({ items: definitions, assignments, loading: false, error: null });
+        setCapabilities(deriveViewerCapabilities(definitions, assignments));
       } catch (error) {
         if (signal?.aborted) return;
         setRolesState((prev) => ({ ...prev, loading: false, error }));
+        setCapabilities(DEFAULT_CAPABILITIES);
+        publishErrorNotice(error, 'Unable to load community roles');
       }
     },
-    [communityId, interactive, token]
+    [communityId, interactive, token, publishErrorNotice]
   );
 
   const loadEvents = useCallback(
@@ -262,9 +377,10 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       } catch (error) {
         if (signal?.aborted) return;
         setEventsState((prev) => ({ ...prev, loading: false, error }));
+        publishErrorNotice(error, 'Unable to load events');
       }
     },
-    [communityId, interactive, token]
+    [communityId, interactive, token, publishErrorNotice]
   );
 
   const loadResources = useCallback(
@@ -281,9 +397,10 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       } catch (error) {
         if (signal?.aborted) return;
         setResourcesState((prev) => ({ ...prev, loading: false, error }));
+        publishErrorNotice(error, 'Unable to load resources');
       }
     },
-    [communityId, interactive, token]
+    [communityId, interactive, token, publishErrorNotice]
   );
 
   const refreshWorkspace = useCallback(() => {
@@ -314,6 +431,27 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
     return () => controller.abort();
   }, [activeChannelId, interactive, loadMessages]);
 
+  const ensureCapability = useCallback(
+    (keys, fallbackMessage) => {
+      const required = Array.isArray(keys) ? keys : [keys];
+      const permitted = required.some((key) => capabilities[key]);
+      if (permitted) return;
+      const message = fallbackMessage ?? 'Insufficient permissions to perform this action.';
+      setWorkspaceNotice({
+        tone: 'error',
+        message,
+        detail: 'Contact a community moderator to request additional access.'
+      });
+      throw new Error(message);
+    },
+    [capabilities]
+  );
+
+  const publishErrorNotice = useCallback((error, fallbackMessage) => {
+    const { message, detail } = extractWorkspaceError(error, fallbackMessage);
+    setWorkspaceNotice({ tone: 'error', message, detail });
+  }, []);
+
   const appendMessage = useCallback((channelId, message) => {
     if (!channelId || !message) return;
     setMessageCache((prev) => {
@@ -327,6 +465,16 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       };
     });
   }, []);
+
+  useEffect(() => {
+    const nextCapabilities = deriveViewerCapabilities(rolesState.items ?? [], rolesState.assignments ?? []);
+    setCapabilities((current) => {
+      const hasChanged = Object.keys({ ...current, ...nextCapabilities }).some(
+        (key) => current[key] !== nextCapabilities[key]
+      );
+      return hasChanged ? nextCapabilities : current;
+    });
+  }, [rolesState.assignments, rolesState.items]);
 
   const updateMessage = useCallback((channelId, messageId, updater) => {
     if (!channelId || !messageId || typeof updater !== 'function') return;
@@ -347,23 +495,29 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       if (!interactive || !communityId || !targetChannelId) {
         throw new Error('Select a channel before sending messages.');
       }
+      ensureCapability(['post', 'broadcast'], 'You do not have permission to publish messages.');
       const payload = {
         messageType: messageType ?? 'text',
         body,
         attachments,
         metadata
       };
-      const { data } = await postCommunityMessage({ communityId, channelId: targetChannelId, token, payload });
-      const message = normaliseMessage(data);
-      appendMessage(targetChannelId, message);
-      setWorkspaceNotice({
-        tone: 'success',
-        message: 'Message delivered',
-        detail: 'Your update has been published to the channel.'
-      });
-      return message;
+      try {
+        const { data } = await postCommunityMessage({ communityId, channelId: targetChannelId, token, payload });
+        const message = normaliseMessage(data);
+        appendMessage(targetChannelId, message);
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Message delivered',
+          detail: 'Your update has been published to the channel.'
+        });
+        return message;
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to send message');
+        throw error;
+      }
     },
-    [activeChannelId, appendMessage, communityId, interactive, token]
+    [activeChannelId, appendMessage, communityId, ensureCapability, interactive, publishErrorNotice, token]
   );
 
   const reactToMessage = useCallback(
@@ -371,22 +525,27 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       if (!interactive || !communityId) return;
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!targetChannelId || !messageId || !emoji) return;
-      await addCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
-      updateMessage(targetChannelId, messageId, (message) => {
-        const reactions = Array.isArray(message.reactions) ? [...message.reactions] : [];
-        const existing = reactions.find((reaction) => reaction.emoji === emoji);
-        if (existing) {
-          existing.count = Number(existing.count ?? 0) + 1;
-        } else {
-          reactions.push({ emoji, count: 1 });
-        }
-        const viewerReactions = Array.isArray(message.viewerReactions)
-          ? Array.from(new Set([...message.viewerReactions, emoji]))
-          : [emoji];
-        return { ...message, reactions, viewerReactions };
-      });
+      ensureCapability(['post', 'broadcast'], 'You do not have permission to react to messages.');
+      try {
+        await addCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
+        updateMessage(targetChannelId, messageId, (message) => {
+          const reactions = Array.isArray(message.reactions) ? [...message.reactions] : [];
+          const existing = reactions.find((reaction) => reaction.emoji === emoji);
+          if (existing) {
+            existing.count = Number(existing.count ?? 0) + 1;
+          } else {
+            reactions.push({ emoji, count: 1 });
+          }
+          const viewerReactions = Array.isArray(message.viewerReactions)
+            ? Array.from(new Set([...message.viewerReactions, emoji]))
+            : [emoji];
+          return { ...message, reactions, viewerReactions };
+        });
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to react to message');
+      }
     },
-    [activeChannelId, communityId, interactive, token, updateMessage]
+    [activeChannelId, communityId, ensureCapability, interactive, publishErrorNotice, token, updateMessage]
   );
 
   const removeReaction = useCallback(
@@ -394,18 +553,23 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       if (!interactive || !communityId) return;
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!targetChannelId || !messageId || !emoji) return;
-      await removeCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
-      updateMessage(targetChannelId, messageId, (message) => {
-        const reactions = Array.isArray(message.reactions)
-          ? message.reactions.filter((reaction) => reaction.emoji !== emoji)
-          : [];
-        const viewerReactions = Array.isArray(message.viewerReactions)
-          ? message.viewerReactions.filter((reaction) => reaction !== emoji)
-          : [];
-        return { ...message, reactions, viewerReactions };
-      });
+      ensureCapability(['post', 'broadcast'], 'You do not have permission to modify reactions.');
+      try {
+        await removeCommunityMessageReaction({ communityId, channelId: targetChannelId, messageId, token, emoji });
+        updateMessage(targetChannelId, messageId, (message) => {
+          const reactions = Array.isArray(message.reactions)
+            ? message.reactions.filter((reaction) => reaction.emoji !== emoji)
+            : [];
+          const viewerReactions = Array.isArray(message.viewerReactions)
+            ? message.viewerReactions.filter((reaction) => reaction !== emoji)
+            : [];
+          return { ...message, reactions, viewerReactions };
+        });
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to update reactions');
+      }
     },
-    [activeChannelId, communityId, interactive, token, updateMessage]
+    [activeChannelId, communityId, ensureCapability, interactive, publishErrorNotice, token, updateMessage]
   );
 
   const moderateMessage = useCallback(
@@ -413,24 +577,30 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
       if (!interactive || !communityId) return;
       const targetChannelId = String(channelId ?? activeChannelId ?? '');
       if (!targetChannelId || !messageId || !action) return;
-      const { data } = await moderateCommunityMessage({
-        communityId,
-        channelId: targetChannelId,
-        messageId,
-        token,
-        payload: { action, reason }
-      });
-      const updated = normaliseMessage(data?.message ?? data);
-      if (updated) {
-        updateMessage(targetChannelId, messageId, () => updated);
+      ensureCapability('moderate', 'You do not have permission to moderate messages.');
+      try {
+        const { data } = await moderateCommunityMessage({
+          communityId,
+          channelId: targetChannelId,
+          messageId,
+          token,
+          payload: { action, reason }
+        });
+        const updated = normaliseMessage(data?.message ?? data);
+        if (updated) {
+          updateMessage(targetChannelId, messageId, () => updated);
+        }
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Message moderation updated',
+          detail: 'The message visibility has been updated.'
+        });
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to update moderation');
+        throw error;
       }
-      setWorkspaceNotice({
-        tone: 'success',
-        message: 'Message moderation updated',
-        detail: 'The message visibility has been updated.'
-      });
     },
-    [activeChannelId, communityId, interactive, token, updateMessage]
+    [activeChannelId, communityId, ensureCapability, interactive, publishErrorNotice, token, updateMessage]
   );
 
   const updatePresenceStatus = useCallback(
@@ -442,84 +612,116 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
         ttlMinutes: Number(ttlMinutes ?? 15),
         metadata: metadata ?? {}
       };
-      const { data } = await updateCommunityPresence({ communityId, token, payload });
-      const session = normalisePresence(data);
-      setPresenceState((prev) => {
-        const items = prev.items.some((item) => item.sessionId === session.sessionId)
-          ? prev.items.map((item) => (item.sessionId === session.sessionId ? session : item))
-          : [...prev.items, session];
-        return { ...prev, items };
-      });
-      setWorkspaceNotice({
-        tone: 'success',
-        message: 'Presence updated',
-        detail: 'Your availability has been broadcast to the community.'
-      });
-      return session;
+      try {
+        const { data } = await updateCommunityPresence({ communityId, token, payload });
+        const session = normalisePresence(data);
+        setPresenceState((prev) => {
+          const items = prev.items.some((item) => item.sessionId === session.sessionId)
+            ? prev.items.map((item) => (item.sessionId === session.sessionId ? session : item))
+            : [...prev.items, session];
+          return { ...prev, items };
+        });
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Presence updated',
+          detail: 'Your availability has been broadcast to the community.'
+        });
+        return session;
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to update presence');
+        throw error;
+      }
     },
-    [communityId, interactive, token]
+    [communityId, interactive, publishErrorNotice, token]
   );
 
   const createRoleEntry = useCallback(
     async (payload) => {
       if (!interactive || !communityId) return null;
-      const { data } = await createCommunityRole({ communityId, token, payload });
-      setRolesState((prev) => ({
-        ...prev,
-        items: [...prev.items, data]
-      }));
-      setWorkspaceNotice({
-        tone: 'success',
-        message: 'Role created',
-        detail: 'New role definition available for assignment.'
-      });
-      return data;
+      ensureCapability('manageRoles', 'You do not have permission to manage roles.');
+      try {
+        const { data } = await createCommunityRole({ communityId, token, payload });
+        const definition = normaliseRoleDefinition(data);
+        const nextItems = [...rolesState.items, definition].filter(Boolean);
+        setRolesState((prev) => ({
+          ...prev,
+          items: nextItems
+        }));
+        setCapabilities(deriveViewerCapabilities(nextItems, rolesState.assignments));
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Role created',
+          detail: 'New role definition available for assignment.'
+        });
+        return data;
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to create role');
+        throw error;
+      }
     },
-    [communityId, interactive, token]
+    [communityId, ensureCapability, interactive, publishErrorNotice, rolesState.assignments, rolesState.items, token]
   );
 
   const assignRoleToMember = useCallback(
     async ({ userId, roleKey }) => {
       if (!interactive || !communityId || !userId || !roleKey) return;
-      await assignCommunityRole({ communityId, userId, token, payload: { roleKey } });
-      setWorkspaceNotice({
-        tone: 'success',
-        message: 'Member role updated',
-        detail: 'Assignment saved successfully.'
-      });
-      loadRoles();
+      ensureCapability('manageRoles', 'You do not have permission to assign roles.');
+      try {
+        await assignCommunityRole({ communityId, userId, token, payload: { roleKey } });
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Member role updated',
+          detail: 'Assignment saved successfully.'
+        });
+        loadRoles();
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to update member role');
+        throw error;
+      }
     },
-    [communityId, interactive, loadRoles, token]
+    [communityId, ensureCapability, interactive, loadRoles, publishErrorNotice, token]
   );
 
   const createEventEntry = useCallback(
     async (payload) => {
       if (!interactive || !communityId) return null;
-      const { data } = await createCommunityEvent({ communityId, token, payload });
-      setEventsState((prev) => ({ ...prev, items: [data, ...prev.items] }));
-      setWorkspaceNotice({
-        tone: 'success',
-        message: 'Event scheduled',
-        detail: 'Community members will be notified.'
-      });
-      return data;
+      ensureCapability('scheduleEvents', 'You do not have permission to schedule events.');
+      try {
+        const { data } = await createCommunityEvent({ communityId, token, payload });
+        setEventsState((prev) => ({ ...prev, items: [data, ...prev.items] }));
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Event scheduled',
+          detail: 'Community members will be notified.'
+        });
+        return data;
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to schedule event');
+        throw error;
+      }
     },
-    [communityId, interactive, token]
+    [communityId, ensureCapability, interactive, publishErrorNotice, token]
   );
 
   const createResourceEntry = useCallback(
     async (payload) => {
       if (!interactive || !communityId) return null;
-      const { data } = await createCommunityResource({ communityId, token, payload });
-      setResourcesState((prev) => ({ ...prev, items: [data, ...prev.items] }));
-      setWorkspaceNotice({
-        tone: 'success',
-        message: 'Resource published',
-        detail: 'Resource is now available in the library.'
-      });
-      return data;
+      ensureCapability('manageResources', 'You do not have permission to manage resources.');
+      try {
+        const { data } = await createCommunityResource({ communityId, token, payload });
+        setResourcesState((prev) => ({ ...prev, items: [data, ...prev.items] }));
+        setWorkspaceNotice({
+          tone: 'success',
+          message: 'Resource published',
+          detail: 'Resource is now available in the library.'
+        });
+        return data;
+      } catch (error) {
+        publishErrorNotice(error, 'Unable to publish resource');
+        throw error;
+      }
     },
-    [communityId, interactive, token]
+    [communityId, ensureCapability, interactive, publishErrorNotice, token]
   );
 
   const activeChannel = useMemo(
@@ -540,6 +742,7 @@ export default function useCommunityChatWorkspace({ communityId, token }) {
 
   return {
     interactive,
+    capabilities,
     channelsState,
     activeChannelId,
     activeChannel,

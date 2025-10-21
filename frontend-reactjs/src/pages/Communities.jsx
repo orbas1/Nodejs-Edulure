@@ -26,6 +26,7 @@ import CommunityMap from '../components/community/CommunityMap.jsx';
 import CommunityAboutPanel from '../components/community/CommunityAboutPanel.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useAuthorization } from '../hooks/useAuthorization.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 
 const ALL_COMMUNITIES_NODE = {
@@ -395,6 +396,82 @@ export default function Communities() {
   const [subscriptionCheckouts, setSubscriptionCheckouts] = useState([]);
 
   const selectedCommunityId = selectedCommunity?.id ?? null;
+
+  const activeCommunity = useMemo(() => {
+    if (communityDetail) {
+      return communityDetail;
+    }
+    if (selectedCommunity?.id && selectedCommunity.id !== ALL_COMMUNITIES_NODE.id) {
+      return selectedCommunity;
+    }
+    return null;
+  }, [communityDetail, selectedCommunity]);
+
+  const communityKeywords = useMemo(() => {
+    const keywords = new Set();
+    const tags = Array.isArray(activeCommunity?.tags) ? activeCommunity.tags : [];
+    tags.forEach((tag) => {
+      if (typeof tag?.name === 'string') {
+        keywords.add(tag.name);
+      } else if (typeof tag === 'string') {
+        keywords.add(tag);
+      }
+    });
+    if (typeof activeCommunity?.metadata?.focus === 'string') {
+      keywords.add(activeCommunity.metadata.focus);
+    }
+    if (typeof activeCommunity?.metadata?.defaultChannel === 'string') {
+      keywords.add(activeCommunity.metadata.defaultChannel.replace(/^#/, ''));
+    }
+    return Array.from(keywords);
+  }, [activeCommunity]);
+
+  const communityMetaDescription = useMemo(() => {
+    if (activeCommunity?.description) {
+      return activeCommunity.description;
+    }
+    if (activeCommunity?.stats?.members) {
+      return `Join ${activeCommunity.name} on Edulure to collaborate with ${activeCommunity.stats.members.toLocaleString()} operators across live classrooms, async labs, and curated resources.`;
+    }
+    return 'Discover and operate thriving Edulure communities with live classrooms, async resources, monetisation tools, and secure collaboration features.';
+  }, [activeCommunity]);
+
+  const communityCanonicalPath = activeCommunity?.slug ? `/communities/${activeCommunity.slug}` : '/communities';
+
+  const communityStructuredData = useMemo(() => {
+    if (!activeCommunity) {
+      return null;
+    }
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      name: activeCommunity.name,
+      description: communityMetaDescription,
+      url: activeCommunity.metadata?.registrationUrl ?? undefined,
+      image: activeCommunity.coverImageUrl ?? undefined,
+      memberCount: activeCommunity.stats?.members ?? undefined,
+      areaServed: activeCommunity.membershipMap?.totalCountries
+        ? `${activeCommunity.membershipMap.totalCountries} global regions`
+        : undefined
+    };
+  }, [activeCommunity, communityMetaDescription]);
+
+  usePageMetadata({
+    title: activeCommunity?.name ? `${activeCommunity.name} community hub` : 'Edulure communities directory',
+    description: communityMetaDescription,
+    canonicalPath: communityCanonicalPath,
+    image: activeCommunity?.coverImageUrl ?? undefined,
+    keywords: communityKeywords,
+    structuredData: communityStructuredData,
+    analytics: {
+      page_type: 'community_hub',
+      community_id: activeCommunity?.id ?? 'all',
+      community_role: role,
+      base_role: baseRole,
+      feed_access: canAccessCommunityFeed,
+      moderation_access: canModerateCommunities
+    }
+  });
 
   useEffect(() => {
     setSubscriptionForm((current) => ({

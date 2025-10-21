@@ -2,6 +2,45 @@ import axios from 'axios';
 
 import { responseCache } from './cache.js';
 
+const DEFAULT_TIMEOUT = 15_000;
+
+let authTokenResolver = null;
+
+function setAuthTokenResolver(resolver) {
+  if (resolver !== null && resolver !== undefined && typeof resolver !== 'function') {
+    throw new Error('authTokenResolver must be a function returning a token string');
+  }
+
+  authTokenResolver = resolver ?? null;
+}
+
+function clearAuthTokenResolver() {
+  authTokenResolver = null;
+}
+
+async function resolveAuthToken(explicitToken) {
+  if (explicitToken) {
+    return explicitToken;
+  }
+
+  if (!authTokenResolver) {
+    return undefined;
+  }
+
+  try {
+    const resolved = await authTokenResolver();
+    if (!resolved) {
+      return undefined;
+    }
+
+    const token = typeof resolved === 'string' ? resolved.trim() : resolved;
+    return token || undefined;
+  } catch (error) {
+    console.warn('Failed to resolve auth token', error);
+    return undefined;
+  }
+}
+
 function sanitizeBaseUrl(value) {
   if (!value) {
     return null;
@@ -69,14 +108,49 @@ function resolveDefaultApiBaseUrl() {
 
 const API_BASE_URL = sanitizeBaseUrl(resolveConfiguredApiBaseUrl() ?? resolveDefaultApiBaseUrl());
 
+const defaultParamsSerializer = (params = {}) => {
+  const search = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item !== undefined && item !== null) {
+          search.append(key, item);
+        }
+      });
+      return;
+    }
+
+    search.append(key, value);
+  });
+
+  return search.toString();
+};
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: DEFAULT_TIMEOUT,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }
 });
+
+function setDefaultHeaders(headers = {}) {
+  Object.entries(headers).forEach(([key, value]) => {
+    if (value === null || value === undefined || value === '') {
+      delete apiClient.defaults.headers.common[key];
+      delete apiClient.defaults.headers[key];
+      return;
+    }
+
+    apiClient.defaults.headers.common[key] = value;
+  });
+}
 
 apiClient.interceptors.response.use(
   (response) => response,
@@ -106,6 +180,20 @@ const normaliseHeaders = (headers = {}) => {
   return result;
 };
 
+const toArray = (value) => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (!value && value !== 0) {
+    return [];
+  }
+  return [value];
+};
+
+const normaliseTagList = (tags) => [...new Set(toArray(tags).filter(Boolean))];
+
+const mergeTagLists = (...sources) => normaliseTagList(sources.flatMap((source) => toArray(source)));
+
 const pickHeaders = (headers = {}, varyBy = []) => {
   if (!varyBy.length) {
     return undefined;
@@ -124,41 +212,67 @@ const pickHeaders = (headers = {}, varyBy = []) => {
 
 const normaliseCacheOptions = (cache) => {
   if (cache === undefined) {
-    return { enabled: true };
+    return { enabled: true, tags: [] };
   }
 
   if (cache === false) {
-    return { enabled: false };
+    return { enabled: false, tags: [] };
   }
 
   if (cache === true) {
-    return { enabled: true };
+    return { enabled: true, tags: [] };
   }
 
-  return { enabled: cache.enabled ?? true, ...cache };
+  const varyByHeaders = normaliseTagList(cache.varyByHeaders ?? []);
+  return {
+    ...cache,
+    enabled: cache.enabled ?? true,
+    tags: normaliseTagList(cache.tags ?? []),
+    varyByHeaders
+  };
 };
 
 async function request(
   path,
-  { method = 'GET', headers, body, params, token, signal, onUploadProgress, cache, invalidateTags } = {}
+  {
+    method = 'GET',
+    headers,
+    body,
+    data,
+    params,
+    token,
+    signal,
+    onUploadProgress,
+    onDownloadProgress,
+    responseType,
+    cache,
+    invalidateTags,
+    ...axiosOverrides
+  } = {}
 ) {
-  const finalHeaders = normaliseHeaders(headers);
-  if (token) {
-    finalHeaders.Authorization = `Bearer ${token}`;
+  if (!path || typeof path !== 'string' || !path.trim()) {
+    throw new Error('A request path must be provided to httpClient.request');
   }
 
-  const methodUpper = method.toUpperCase();
+  const methodUpper = (method ?? 'GET').toString().toUpperCase();
   const cacheOptions = normaliseCacheOptions(cache);
-  const useCache = methodUpper === 'GET' && cacheOptions.enabled;
 
+  const finalHeaders = normaliseHeaders(headers);
+  const resolvedToken = await resolveAuthToken(token);
+  const tokenForHeaders = resolvedToken ? resolvedToken.trim() : undefined;
+  if (tokenForHeaders) {
+    finalHeaders.Authorization = `Bearer ${tokenForHeaders}`;
+  }
+
+  const useCache = methodUpper === 'GET' && cacheOptions.enabled;
   const varyByToken = cacheOptions.varyByToken ?? true;
   const varyByHeaders = cacheOptions.varyByHeaders ?? [];
   const cacheKey = useCache
     ? responseCache.createKey({
         method: methodUpper,
-        path,
+        path: path.trim(),
         params,
-        token: varyByToken ? token : undefined,
+        token: varyByToken ? tokenForHeaders : undefined,
         headers: pickHeaders(finalHeaders, varyByHeaders)
       })
     : null;
@@ -170,30 +284,41 @@ async function request(
     }
   }
 
+  const finalBody = body !== undefined ? body : data;
+
+  if (typeof FormData !== 'undefined' && finalBody instanceof FormData) {
+    delete finalHeaders['Content-Type'];
+  }
+
   const config = {
-    url: path,
+    url: path.trim(),
     method: methodUpper,
     headers: finalHeaders,
-    data: body,
+    data: finalBody,
     params,
     signal,
-    onUploadProgress
+    onUploadProgress,
+    onDownloadProgress,
+    responseType,
+    paramsSerializer: axiosOverrides.paramsSerializer ?? defaultParamsSerializer,
+    ...axiosOverrides
   };
 
   const response = await apiClient.request(config);
-  const data = response.data;
+  const responseData = response.data;
 
   if (useCache) {
-    const ttl = typeof cacheOptions.ttl === 'number' ? cacheOptions.ttl : undefined;
-    responseCache.set(cacheKey, data, { ttl, tags: cacheOptions.tags });
+    const ttlNumber = Number(cacheOptions.ttl);
+    const ttl = Number.isFinite(ttlNumber) && ttlNumber > 0 ? ttlNumber : undefined;
+    responseCache.set(cacheKey, responseData, { ttl, tags: cacheOptions.tags });
   }
 
-  const tagsToInvalidate = cacheOptions.invalidateTags ?? invalidateTags;
-  if (methodUpper !== 'GET' && tagsToInvalidate) {
+  const tagsToInvalidate = mergeTagLists(cacheOptions.invalidateTags, invalidateTags);
+  if (methodUpper !== 'GET' && tagsToInvalidate.length) {
     responseCache.invalidateTags(tagsToInvalidate);
   }
 
-  return data;
+  return responseData;
 }
 
 function get(path, options = {}) {
@@ -217,4 +342,12 @@ function del(path, options = {}) {
 }
 
 export const httpClient = { get, post, put, patch, delete: del, request };
-export { API_BASE_URL, apiClient, request, responseCache };
+export {
+  API_BASE_URL,
+  apiClient,
+  request,
+  responseCache,
+  setAuthTokenResolver,
+  clearAuthTokenResolver,
+  setDefaultHeaders
+};

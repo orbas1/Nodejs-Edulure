@@ -1,0 +1,920 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Administrative controls, policy enforcement, and guardrail APIs.",
+    "version": "1.50.0",
+    "description": "Administrative controls, policy enforcement, and guardrail APIs. (Capability: administration-tools)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/admin/monetization/catalog": {
+      "get": {
+        "summary": "List monetization catalog items",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "global"
+            },
+            "description": "Tenant scope for catalog lookup"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional status filter"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            },
+            "description": "Maximum number of records to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            },
+            "description": "Offset for pagination"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog items fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MonetizationCatalogItem"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "tenantId": {
+                          "type": "string"
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "offset": {
+                              "type": "integer"
+                            },
+                            "count": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create or update a monetization catalog item",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tenantId": {
+                    "type": "string",
+                    "default": "global"
+                  },
+                  "productCode": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "pricingModel": {
+                    "type": "string"
+                  },
+                  "billingInterval": {
+                    "type": "string"
+                  },
+                  "revenueRecognitionMethod": {
+                    "type": "string"
+                  },
+                  "recognitionDurationDays": {
+                    "type": "integer"
+                  },
+                  "unitAmountCents": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  },
+                  "usageMetric": {
+                    "type": "string"
+                  },
+                  "revenueAccount": {
+                    "type": "string"
+                  },
+                  "deferredRevenueAccount": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "productCode",
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catalog item persisted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MonetizationCatalogItem"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          }
+        }
+      }
+    },
+    "/admin/monetization/reconciliations": {
+      "get": {
+        "summary": "List reconciliation runs",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "global"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reconciliation runs fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MonetizationReconciliationRun"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "tenantId": {
+                          "type": "string"
+                        }
+                      },
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/monetization/reconciliations/run": {
+      "post": {
+        "summary": "Trigger monetization reconciliation",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tenantId": {
+                    "type": "string",
+                    "default": "global"
+                  },
+                  "start": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "end": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Reconciliation run accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MonetizationReconciliationRun"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/monetization/revenue-schedules": {
+      "get": {
+        "summary": "List revenue schedules",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tenantId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "global"
+            }
+          },
+          {
+            "name": "paymentIntentId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revenue schedules fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MonetizationRevenueSchedule"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "tenantId": {
+                          "type": "string"
+                        },
+                        "pagination": {
+                          "type": "object",
+                          "properties": {
+                            "limit": {
+                              "type": "integer"
+                            },
+                            "offset": {
+                              "type": "integer"
+                            },
+                            "count": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/monetization/usage": {
+      "post": {
+        "summary": "Record monetization usage",
+        "tags": [
+          "Admin Monetization"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tenantId": {
+                    "type": "string",
+                    "default": "global"
+                  },
+                  "productCode": {
+                    "type": "string"
+                  },
+                  "accountReference": {
+                    "type": "string"
+                  },
+                  "userId": {
+                    "type": "integer"
+                  },
+                  "quantity": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "unitAmountCents": {
+                    "type": "integer"
+                  },
+                  "amountCents": {
+                    "type": "integer"
+                  },
+                  "currency": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "usageDate": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "externalReference": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "productCode",
+                  "accountReference",
+                  "quantity"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usage recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MonetizationUsageRecord"
+                    },
+                    "meta": {
+                      "type": "object",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MonetizationUsageRecord": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "catalogItemId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "accountReference": {
+            "type": "string"
+          },
+          "userId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "usageDate": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitAmountCents": {
+            "type": "integer"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "externalReference": {
+            "type": "string",
+            "nullable": true
+          },
+          "paymentIntentId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "processedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "tenantId",
+          "productCode",
+          "accountReference",
+          "usageDate",
+          "quantity",
+          "unitAmountCents",
+          "amountCents",
+          "currency",
+          "source",
+          "metadata",
+          "recordedAt"
+        ]
+      },
+      "MonetizationRevenueSchedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "paymentIntentId": {
+            "type": "integer"
+          },
+          "catalogItemId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "usageRecordId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "productCode": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "recognitionMethod": {
+            "type": "string"
+          },
+          "recognitionStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "recognitionEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "amountCents": {
+            "type": "integer"
+          },
+          "recognizedAmountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "revenueAccount": {
+            "type": "string"
+          },
+          "deferredRevenueAccount": {
+            "type": "string"
+          },
+          "recognizedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "paymentIntentId",
+          "status",
+          "recognitionMethod",
+          "recognitionStart",
+          "recognitionEnd",
+          "amountCents",
+          "recognizedAmountCents",
+          "currency",
+          "revenueAccount",
+          "deferredRevenueAccount",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MonetizationReconciliationRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "windowStart": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "windowEnd": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "invoicedCents": {
+            "type": "integer"
+          },
+          "usageCents": {
+            "type": "integer"
+          },
+          "recognizedCents": {
+            "type": "integer"
+          },
+          "deferredCents": {
+            "type": "integer"
+          },
+          "varianceCents": {
+            "type": "integer"
+          },
+          "varianceRatio": {
+            "type": "number"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "windowStart",
+          "windowEnd",
+          "status",
+          "invoicedCents",
+          "usageCents",
+          "recognizedCents",
+          "deferredCents",
+          "varianceCents",
+          "varianceRatio",
+          "metadata",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "MonetizationCatalogItem": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "pricingModel": {
+            "type": "string"
+          },
+          "billingInterval": {
+            "type": "string"
+          },
+          "revenueRecognitionMethod": {
+            "type": "string"
+          },
+          "recognitionDurationDays": {
+            "type": "integer"
+          },
+          "unitAmountCents": {
+            "type": "integer"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "usageMetric": {
+            "type": "string",
+            "nullable": true
+          },
+          "revenueAccount": {
+            "type": "string"
+          },
+          "deferredRevenueAccount": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "status": {
+            "type": "string"
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveTo": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "tenantId",
+          "productCode",
+          "name",
+          "pricingModel",
+          "billingInterval",
+          "revenueRecognitionMethod",
+          "unitAmountCents",
+          "currency",
+          "metadata",
+          "status",
+          "effectiveFrom",
+          "createdAt",
+          "updatedAt"
+        ]
+      }
+    }
+  }
+}

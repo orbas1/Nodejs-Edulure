@@ -191,7 +191,23 @@ export default function CommunityCrudManager() {
   const { session } = useAuth();
   const token = session?.tokens?.accessToken;
   const role = String(session?.user?.role ?? '').toLowerCase();
-  const isAdmin = role === 'admin';
+  const isAdmin = ['admin', 'superadmin', 'super-admin'].includes(role);
+  const permissions = Array.isArray(session?.user?.permissions) ? session.user.permissions : [];
+  const canManageCommunities = useMemo(
+    () =>
+      isAdmin ||
+      permissions.some((permission) => {
+        if (!permission) return false;
+        const normalised = String(permission).toLowerCase();
+        return (
+          normalised === 'communities:manage' ||
+          normalised === 'admin:communities' ||
+          normalised === 'admin:*' ||
+          normalised === 'platform:superadmin'
+        );
+      }),
+    [isAdmin, permissions]
+  );
 
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -204,7 +220,7 @@ export default function CommunityCrudManager() {
   const [submitting, setSubmitting] = useState(false);
 
   const loadCommunities = useCallback(async () => {
-    if (!isAdmin || !token) return;
+    if (!canManageCommunities || !token) return;
     setLoading(true);
     setError(null);
     try {
@@ -215,7 +231,7 @@ export default function CommunityCrudManager() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin, token]);
+  }, [canManageCommunities, token]);
 
   useEffect(() => {
     loadCommunities();
@@ -244,7 +260,7 @@ export default function CommunityCrudManager() {
   };
 
   const handleDelete = async (communityId) => {
-    if (!isAdmin || !token) return;
+    if (!canManageCommunities || !token) return;
     if (!window.confirm('Delete this community?')) return;
     try {
       await adminControlApi.deleteCommunity({ token, id: communityId });
@@ -258,7 +274,7 @@ export default function CommunityCrudManager() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    if (!isAdmin || !token) return;
+    if (!canManageCommunities || !token) return;
     setSubmitting(true);
     setError(null);
     try {
@@ -289,12 +305,13 @@ export default function CommunityCrudManager() {
   };
 
   const content = useMemo(() => {
-    if (!isAdmin) {
+    if (!canManageCommunities) {
       return (
         <div className="rounded-3xl border border-slate-200 bg-white/80 p-6 text-sm text-slate-600">
           <p className="text-lg font-semibold text-slate-900">Community admin console locked</p>
           <p className="mt-2 text-sm text-slate-600">
-            Only administrators can create or update communities from the public site. Use the dashboard or request elevated permissions to make changes.
+            Only authorised operators can create or update communities from the public site. Request elevated permissions or sign
+            in with an administrator account to manage communities.
           </p>
         </div>
       );
@@ -375,7 +392,7 @@ export default function CommunityCrudManager() {
       </div>
     );
   }, [
-    isAdmin,
+    canManageCommunities,
     mode,
     form,
     submitting,
@@ -390,7 +407,7 @@ export default function CommunityCrudManager() {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
           <BuildingLibraryIcon className="h-6 w-6" />
         </div>

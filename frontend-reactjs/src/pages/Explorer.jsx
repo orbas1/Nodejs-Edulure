@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   AcademicCapIcon,
   ArrowTrendingUpIcon,
@@ -11,6 +12,7 @@ import {
 import { Link } from 'react-router-dom';
 import ExplorerSearchSection from '../components/search/ExplorerSearchSection.jsx';
 import BlogSearchSection from '../components/search/BlogSearchSection.jsx';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const SECTION_CONFIG = [
   {
@@ -347,6 +349,35 @@ function CommunityAccessPanel() {
 }
 
 export default function Explorer() {
+  const keywords = useMemo(() => {
+    const result = new Set();
+    SECTION_CONFIG.forEach((section) => {
+      result.add(section.entityType);
+      section.filterDefinitions?.forEach((filter) => {
+        if (Array.isArray(filter.options)) {
+          filter.options.forEach((option) => {
+            if (typeof option.label === 'string') {
+              result.add(option.label);
+            }
+          });
+        }
+      });
+    });
+    return Array.from(result);
+  }, []);
+
+  usePageMetadata({
+    title: 'Explorer · Unified search across Edulure',
+    description:
+      'Search communities, courses, e-books, tutors, and profiles in a single interface. Combine filters, saved views, and analytics to steer high-signal discovery.',
+    canonicalPath: '/explorer',
+    keywords,
+    analytics: {
+      page_type: 'explorer',
+      section_count: SECTION_CONFIG.length
+    }
+  });
+
   return (
     <div className="bg-slate-100 pb-24">
       <div className="mx-auto flex max-w-7xl flex-col gap-16 px-6 py-16">

@@ -8,7 +8,19 @@ function formatPercent(value) {
 }
 
 export default function CohortAnalyticsSection({ analytics }) {
-  const cohorts = useMemo(() => (Array.isArray(analytics?.cohortHealth) ? analytics.cohortHealth : []), [analytics]);
+  const cohorts = useMemo(
+    () =>
+      Array.isArray(analytics?.cohortHealth)
+        ? analytics.cohortHealth.map((cohort) => ({
+            ...cohort,
+            activeLearners: cohort.activeLearners ?? 0,
+            atRiskLearners: cohort.atRiskLearners ?? 0,
+            completionRate: cohort.completionRate ?? 0,
+            averageProgress: cohort.averageProgress ?? 0
+          }))
+        : [],
+    [analytics]
+  );
 
   if (cohorts.length === 0) {
     return null;
@@ -17,6 +29,15 @@ export default function CohortAnalyticsSection({ analytics }) {
   const totalAtRisk = cohorts.reduce((sum, cohort) => sum + Number(cohort.atRiskLearners ?? 0), 0);
   const averageCompletion = analytics?.velocity?.averageCompletion ?? 0;
   const trending = Array.isArray(analytics?.velocity?.trending) ? analytics.velocity.trending : [];
+
+  const handleCohortSelect = (cohort) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('edulure:cohort-analytics', {
+        detail: { cohortId: cohort.id, courseTitle: cohort.courseTitle }
+      })
+    );
+  };
 
   return (
     <section className="dashboard-section">
@@ -55,7 +76,11 @@ export default function CohortAnalyticsSection({ analytics }) {
           </thead>
           <tbody className="divide-y divide-slate-200">
             {cohorts.map((cohort) => (
-              <tr key={cohort.id} className="hover:bg-primary/5">
+              <tr
+                key={cohort.id}
+                className="hover:bg-primary/5 cursor-pointer"
+                onClick={() => handleCohortSelect(cohort)}
+              >
                 <td className="py-3 font-semibold text-slate-900">
                   <span className="block text-sm">{cohort.courseTitle}</span>
                   <span className="text-xs text-slate-500">{cohort.cohort}</span>

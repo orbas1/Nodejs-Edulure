@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../context/AuthContext.jsx';
 import { listPublicLiveClassrooms } from '../api/catalogueApi.js';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 
 const EXPLORER_CONFIG = {
@@ -522,6 +523,45 @@ export default function LiveClassrooms() {
   const [editingId, setEditingId] = useState(null);
   const [currentStep, setCurrentStep] = useState('basics');
   const [submitting, setSubmitting] = useState(false);
+
+  const featuredLiveClass = useMemo(() => liveClassrooms[0] ?? null, [liveClassrooms]);
+  const liveKeywords = useMemo(() => {
+    if (!featuredLiveClass) {
+      return [];
+    }
+    const tags = new Set();
+    if (featuredLiveClass.topic) {
+      tags.add(featuredLiveClass.topic);
+    }
+    (featuredLiveClass.tags ?? []).forEach((tag) => {
+      if (typeof tag === 'string') {
+        tags.add(tag);
+      }
+    });
+    return Array.from(tags);
+  }, [featuredLiveClass]);
+
+  const liveMetaDescription = useMemo(() => {
+    if (featuredLiveClass?.description) {
+      return featuredLiveClass.description;
+    }
+    if (featuredLiveClass?.title) {
+      return `Join ${featuredLiveClass.title} and other Edulure live classrooms with secure check-ins, waitlists, and instructor analytics.`;
+    }
+    return 'Host and attend Edulure live classrooms with secure streaming, attendance tracking, and multi-role collaboration tools.';
+  }, [featuredLiveClass]);
+
+  usePageMetadata({
+    title: featuredLiveClass?.title ? `${featuredLiveClass.title} · Live classrooms` : 'Edulure live classrooms',
+    description: liveMetaDescription,
+    canonicalPath: featuredLiveClass?.slug ? `/live/${featuredLiveClass.slug}` : '/live',
+    image: featuredLiveClass?.heroImageUrl ?? undefined,
+    keywords: liveKeywords,
+    analytics: {
+      page_type: 'live_classrooms',
+      session_count: liveClassrooms.length
+    }
+  });
 
   const loadLiveClassrooms = useCallback(
     async ({ signal } = {}) => {

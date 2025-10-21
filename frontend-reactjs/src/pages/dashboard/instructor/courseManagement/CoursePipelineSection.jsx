@@ -1,15 +1,32 @@
 import PropTypes from 'prop-types';
 
 export default function CoursePipelineSection({ pipeline }) {
-  if (!pipeline.length) {
+  const rows = Array.isArray(pipeline)
+    ? pipeline.map((cohort) => ({
+        ...cohort,
+        startDate: cohort.startDate ?? 'TBD',
+        learners: cohort.learners ?? 0
+      }))
+    : [];
+
+  if (rows.length === 0) {
     return null;
   }
+
+  const handleCohortAction = (cohort, action) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('edulure:pipeline-action', {
+        detail: { cohortId: cohort.id, action }
+      })
+    );
+  };
 
   return (
     <section className="dashboard-section">
       <h2 className="text-lg font-semibold text-slate-900">Cohort pipeline</h2>
       <div className="mt-5 grid gap-4 md:grid-cols-2">
-        {pipeline.map((cohort) => (
+        {rows.map((cohort) => (
           <div key={cohort.id} className="dashboard-card-muted p-5">
             <div className="flex items-center justify-between text-xs text-slate-500">
               <span>{cohort.stage}</span>
@@ -18,10 +35,18 @@ export default function CoursePipelineSection({ pipeline }) {
             <h3 className="mt-2 text-lg font-semibold text-slate-900">{cohort.name}</h3>
             <p className="text-sm text-slate-600">{cohort.learners} learners in pipeline</p>
             <div className="mt-4 flex gap-3 text-xs text-slate-600">
-              <button type="button" className="dashboard-pill px-3 py-1 hover:border-primary/50">
+              <button
+                type="button"
+                className="dashboard-pill px-3 py-1 hover:border-primary/50"
+                onClick={() => handleCohortAction(cohort, 'review')}
+              >
                 Review funnel
               </button>
-              <button type="button" className="dashboard-pill px-3 py-1 hover:border-primary/50">
+              <button
+                type="button"
+                className="dashboard-pill px-3 py-1 hover:border-primary/50"
+                onClick={() => handleCohortAction(cohort, 'assign')}
+              >
                 Assign tutors
               </button>
             </div>

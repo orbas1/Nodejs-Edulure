@@ -121,30 +121,54 @@ SummaryCard.defaultProps = {
   helper: undefined
 };
 
+const isAbortError = (error) => error?.name === 'AbortError' || error?.code === 'ERR_CANCELED';
+
 export default function AdminGrowthSection({ sectionId, token }) {
   const [metrics, setMetrics] = useState(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [metricsError, setMetricsError] = useState(null);
 
-  const fetchMetrics = useCallback(async () => {
-    if (!token) {
-      setMetrics(null);
-      return;
-    }
-    setLoadingMetrics(true);
-    setMetricsError(null);
-    try {
-      const payload = await adminGrowthApi.getGrowthMetrics({ token });
-      setMetrics(payload ?? {});
-    } catch (error) {
-      setMetricsError(error instanceof Error ? error : new Error('Failed to load growth metrics'));
-    } finally {
-      setLoadingMetrics(false);
-    }
-  }, [token]);
+  const fetchMetrics = useCallback(
+    async ({ signal, showLoading = true } = {}) => {
+      if (!token) {
+        setMetrics(null);
+        setLoadingMetrics(false);
+        setMetricsError(null);
+        return;
+      }
+
+      if (showLoading) {
+        setLoadingMetrics(true);
+      }
+      setMetricsError(null);
+
+      try {
+        const request = signal ? { token, signal } : { token };
+        const payload = await adminGrowthApi.getGrowthMetrics(request);
+        if (signal?.aborted) {
+          return;
+        }
+        setMetrics(payload ?? {});
+      } catch (error) {
+        if (signal?.aborted || isAbortError(error)) {
+          return;
+        }
+        setMetricsError(error instanceof Error ? error : new Error('Failed to load growth metrics'));
+      } finally {
+        if (!signal?.aborted) {
+          setLoadingMetrics(false);
+        }
+      }
+    },
+    [token]
+  );
 
   useEffect(() => {
-    fetchMetrics();
+    const controller = new AbortController();
+    fetchMetrics({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
   }, [fetchMetrics]);
 
   const summaryCards = useMemo(() => {

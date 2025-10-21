@@ -1,0 +1,1086 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Release readiness checklists, gate evaluations, and deployment dashboard APIs for platform operators.",
+    "version": "1.50.0",
+    "description": "Release readiness checklists, gate evaluations, and deployment dashboard APIs for platform operators. (Capability: release-management-automation)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Release",
+      "description": "Release readiness orchestration APIs."
+    }
+  ],
+  "paths": {
+    "/release/checklist": {
+      "get": {
+        "summary": "List release readiness checklist items",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "description": "Filter by checklist category (comma separated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of items to return (1-200).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset into the result set.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Checklist items retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseChecklistListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/release/dashboard": {
+      "get": {
+        "summary": "Summarise release readiness dashboard data",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environment",
+            "in": "query",
+            "description": "Optional environment filter (e.g., production, staging).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release dashboard summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseDashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/release/runs": {
+      "get": {
+        "summary": "List release runs",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environment",
+            "in": "query",
+            "description": "Filter by deployment environment (comma separated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by release status (comma separated).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionTag",
+            "in": "query",
+            "description": "Filter by version tag prefix.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of runs to return (1-200).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 25
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset into the result set.",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release runs retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      },
+      "post": {
+        "summary": "Schedule a release run",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "versionTag": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "type": "string"
+                  },
+                  "initiatedByEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "initiatedByName": {
+                    "type": "string"
+                  },
+                  "changeWindowStart": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "changeWindowEnd": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "summaryNotes": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "changeTicket": {
+                    "type": "string"
+                  },
+                  "scheduledAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "initialGates": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string"
+                        },
+                        "ownerEmail": {
+                          "type": "string",
+                          "format": "email"
+                        },
+                        "metrics": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "notes": {
+                          "type": "string"
+                        },
+                        "evidenceUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "lastEvaluatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "versionTag",
+                  "environment",
+                  "initiatedByEmail"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Release run scheduled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunCreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid release payload"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          }
+        }
+      }
+    },
+    "/release/runs/{publicId}": {
+      "get": {
+        "summary": "Retrieve release run detail",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "Release run identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Release run detail retrieved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          },
+          "404": {
+            "description": "Release run not found"
+          }
+        }
+      }
+    },
+    "/release/runs/{publicId}/evaluate": {
+      "post": {
+        "summary": "Evaluate release readiness",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "Release run identifier.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Readiness evaluation complete.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseRunEvaluationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          },
+          "404": {
+            "description": "Release run not found"
+          }
+        }
+      }
+    },
+    "/release/runs/{publicId}/gates/{gateKey}/evaluations": {
+      "post": {
+        "summary": "Record release gate evaluation",
+        "tags": [
+          "Release"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "publicId",
+            "in": "path",
+            "required": true,
+            "description": "Release run identifier.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gateKey",
+            "in": "path",
+            "required": true,
+            "description": "Gate key from the release checklist.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string"
+                  },
+                  "ownerEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "notes": {
+                    "type": "string"
+                  },
+                  "evidenceUrl": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "lastEvaluatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gate evaluation recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReleaseGateEvaluationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "403": {
+            "description": "Release APIs disabled for this role"
+          },
+          "404": {
+            "description": "Release run not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ReleaseGateEvaluationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ReleaseGateResult"
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseGateResult": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "gateKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "pass",
+              "fail",
+              "waived"
+            ]
+          },
+          "ownerEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "lastEvaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "publicId",
+          "gateKey",
+          "status",
+          "metrics"
+        ]
+      },
+      "ReleaseRunEvaluationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "run": {
+                "$ref": "#/components/schemas/ReleaseRun"
+              },
+              "readinessScore": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "blockingGates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "gateKey": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "ownerEmail": {
+                      "type": "string",
+                      "format": "email",
+                      "nullable": true
+                    },
+                    "notes": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "gateKey",
+                    "status"
+                  ]
+                }
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseGateWithSnapshot"
+                }
+              },
+              "requiredGates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "recommendedStatus": {
+                "type": "string",
+                "enum": [
+                  "ready",
+                  "in_progress",
+                  "blocked"
+                ]
+              }
+            },
+            "required": [
+              "run",
+              "readinessScore",
+              "blockingGates",
+              "gates",
+              "requiredGates",
+              "recommendedStatus"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseGateWithSnapshot": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "gateKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "in_progress",
+              "pass",
+              "fail",
+              "waived"
+            ]
+          },
+          "ownerEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "metrics": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "evidenceUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "lastEvaluatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "snapshot": {
+            "$ref": "#/components/schemas/ReleaseChecklistItem"
+          }
+        },
+        "required": [
+          "publicId",
+          "gateKey",
+          "status",
+          "metrics"
+        ]
+      },
+      "ReleaseChecklistItem": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "example": "quality-verification"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "quality",
+              "security",
+              "observability",
+              "compliance",
+              "change_management"
+            ],
+            "example": "quality"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "autoEvaluated": {
+            "type": "boolean"
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "defaultOwnerEmail": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "successCriteria": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "slug",
+          "category",
+          "title",
+          "description",
+          "autoEvaluated",
+          "weight",
+          "successCriteria"
+        ]
+      },
+      "ReleaseRun": {
+        "type": "object",
+        "properties": {
+          "publicId": {
+            "type": "string"
+          },
+          "versionTag": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "scheduled",
+              "in_progress",
+              "ready",
+              "blocked",
+              "cancelled",
+              "completed"
+            ]
+          },
+          "initiatedByEmail": {
+            "type": "string",
+            "format": "email"
+          },
+          "initiatedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "changeWindowStart": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "changeWindowEnd": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "summaryNotes": {
+            "type": "string",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "publicId",
+          "versionTag",
+          "environment",
+          "status",
+          "initiatedByEmail",
+          "scheduledAt",
+          "metadata"
+        ]
+      },
+      "ReleaseRunDetailResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "run": {
+                "$ref": "#/components/schemas/ReleaseRun"
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseGateWithSnapshot"
+                }
+              }
+            },
+            "required": [
+              "run",
+              "gates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseRunCreateResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "run": {
+                "$ref": "#/components/schemas/ReleaseRun"
+              },
+              "gates": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseGateResult"
+                }
+              }
+            },
+            "required": [
+              "run",
+              "gates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseRunListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseRun"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "limit",
+              "offset",
+              "items"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseDashboardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "breakdown": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "upcoming": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "publicId": {
+                      "type": "string"
+                    },
+                    "versionTag": {
+                      "type": "string"
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "changeWindowStart": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "changeWindowEnd": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
+                    "readinessScore": {
+                      "type": "integer",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "publicId",
+                    "versionTag",
+                    "environment",
+                    "status"
+                  ]
+                }
+              },
+              "recent": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseRun"
+                }
+              },
+              "requiredGates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "breakdown",
+              "upcoming",
+              "recent",
+              "requiredGates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      },
+      "ReleaseChecklistListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "limit": {
+                "type": "integer"
+              },
+              "offset": {
+                "type": "integer"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ReleaseChecklistItem"
+                }
+              },
+              "thresholds": {
+                "type": "object",
+                "properties": {
+                  "minCoverage": {
+                    "type": "number",
+                    "format": "float"
+                  },
+                  "maxTestFailureRate": {
+                    "type": "number",
+                    "format": "float"
+                  },
+                  "maxCriticalVulnerabilities": {
+                    "type": "integer"
+                  },
+                  "maxHighVulnerabilities": {
+                    "type": "integer"
+                  },
+                  "maxOpenIncidents": {
+                    "type": "integer"
+                  },
+                  "maxErrorRate": {
+                    "type": "number",
+                    "format": "float"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "requiredGates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "total",
+              "limit",
+              "offset",
+              "items",
+              "thresholds",
+              "requiredGates"
+            ]
+          }
+        },
+        "required": [
+          "success",
+          "data"
+        ]
+      }
+    }
+  }
+}
