@@ -1,10 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
 import { axe, toHaveNoViolations } from 'jest-axe';
 
 import ServiceHealthBanner from '../../src/components/status/ServiceHealthBanner.jsx';
 
 const refreshSpy = vi.fn();
+const originalConsoleError = console.error;
+let consoleErrorSpy;
 
 vi.mock('../../src/context/ServiceHealthContext.jsx', () => ({
   useServiceHealth: () => ({
@@ -42,13 +46,21 @@ describe('Release accessibility guardrails', () => {
 
   beforeEach(() => {
     refreshSpy.mockClear();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((message, ...args) => {
+      if (typeof message === 'string' && message.includes('ReactDOMTestUtils.act')) {
+        return;
+      }
+      originalConsoleError.call(console, message, ...args);
+    });
   });
 
   afterEach(() => {
+    consoleErrorSpy?.mockRestore();
     vi.clearAllMocks();
   });
 
   it('renders service health escalations accessibly and keeps interactions keyboard safe', async () => {
+    const user = userEvent.setup();
     const { container } = render(<ServiceHealthBanner maxAlerts={2} />);
 
     const outageAlert = screen.getByRole('alert');
@@ -56,13 +68,16 @@ describe('Release accessibility guardrails', () => {
     expect(outageAlert).toHaveAttribute('aria-live', 'assertive');
 
     const refreshButton = screen.getByRole('button', { name: /refresh status/i });
-    fireEvent.click(refreshButton);
+    await user.click(refreshButton);
     expect(refreshSpy).toHaveBeenCalledTimes(1);
 
-    const accessibilityScan = await axe(container, {
-      rules: {
-        region: { enabled: false }
-      }
+    let accessibilityScan;
+    await act(async () => {
+      accessibilityScan = await axe(container, {
+        rules: {
+          region: { enabled: false }
+        }
+      });
     });
     expect(accessibilityScan).toHaveNoViolations();
   });

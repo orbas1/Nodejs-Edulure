@@ -139,6 +139,12 @@ variable "enable_alb_deletion_protection" {
   default     = true
 }
 
+variable "assign_public_ip" {
+  type        = bool
+  description = "Assign public IPs to ECS tasks (should remain false in production)."
+  default     = false
+}
+
 variable "database_username" {
   type        = string
   description = "Master username for Postgres."

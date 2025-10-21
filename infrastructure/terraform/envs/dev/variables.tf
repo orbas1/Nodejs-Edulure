@@ -48,7 +48,7 @@ variable "availability_zones" {
 variable "create_nat_gateway" {
   type        = bool
   description = "Provision a NAT gateway for private subnets."
-  default     = false
+  default     = true
 }
 
 variable "container_image" {
@@ -134,6 +134,12 @@ variable "healthcheck_interval" {
 variable "enable_alb_deletion_protection" {
   type        = bool
   description = "Enable ALB deletion protection."
+  default     = false
+}
+
+variable "assign_public_ip" {
+  type        = bool
+  description = "Assign public IPs to ECS tasks (set true only when NAT is disabled)."
   default     = false
 }
 

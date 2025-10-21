@@ -39,6 +39,15 @@ resource "aws_security_group" "alb" {
   vpc_id      = module.networking.vpc_id
 
   ingress {
+    description      = "Allow HTTP"
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    cidr_blocks      = ["0.0.0.0/0"]
+    ipv6_cidr_blocks = ["::/0"]
+  }
+
+  ingress {
     description      = "Allow HTTPS"
     from_port        = 443
     to_port          = 443
@@ -79,6 +88,7 @@ module "backend" {
   healthcheck_interval             = var.healthcheck_interval
   enable_alb_deletion_protection   = var.enable_alb_deletion_protection
   cpu_architecture                 = var.cpu_architecture
+  assign_public_ip                 = var.assign_public_ip
   tags                             = var.tags
 }
 

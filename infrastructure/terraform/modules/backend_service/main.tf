@@ -10,6 +10,18 @@ terraform {
 
 locals {
   service_name = "${var.project}-${var.environment}-api"
+  container_environment = [
+    for key, value in var.environment_variables : {
+      name  = key
+      value = value
+    }
+  ]
+  container_secrets = [
+    for item in var.secret_environment_variables : {
+      name      = item.name
+      valueFrom = item.arn
+    }
+  ]
 }
 
 resource "aws_security_group" "service" {
@@ -108,8 +120,9 @@ resource "aws_iam_role" "task" {
 }
 
 resource "aws_iam_role_policy" "task_secrets" {
-  name = "${local.service_name}-secrets"
-  role = aws_iam_role.task.id
+  count = length(var.secret_arns) > 0 ? 1 : 0
+  name  = "${local.service_name}-secrets"
+  role  = aws_iam_role.task.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -179,45 +192,37 @@ resource "aws_ecs_task_definition" "this" {
   task_role_arn            = aws_iam_role.task.arn
 
   container_definitions = jsonencode([
-    {
-      name      = "api"
-      image     = var.container_image
-      essential = true
-      portMappings = [
-        {
-          containerPort = var.container_port
-          hostPort      = var.container_port
-          protocol      = "tcp"
+    merge(
+      {
+        name      = "api"
+        image     = var.container_image
+        essential = true
+        portMappings = [
+          {
+            containerPort = var.container_port
+            hostPort      = var.container_port
+            protocol      = "tcp"
+          }
+        ]
+        environment     = local.container_environment
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            awslogs-group         = aws_cloudwatch_log_group.service.name
+            awslogs-region        = var.region
+            awslogs-stream-prefix = "ecs"
+          }
         }
-      ]
-      environment = [
-        for key, value in var.environment_variables : {
-          name  = key
-          value = value
+        healthCheck = {
+          command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.healthcheck_path} || exit 1"]
+          interval    = 30
+          retries     = 3
+          startPeriod = 10
+          timeout     = 5
         }
-      ]
-      secrets = [
-        for item in var.secret_environment_variables : {
-          name      = item.name
-          valueFrom = item.arn
-        }
-      ]
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = aws_cloudwatch_log_group.service.name
-          awslogs-region        = var.region
-          awslogs-stream-prefix = "ecs"
-        }
-      }
-      healthCheck = {
-        command     = ["CMD-SHELL", "curl -f http://localhost:${var.container_port}${var.healthcheck_path} || exit 1"]
-        interval    = 30
-        retries     = 3
-        startPeriod = 10
-        timeout     = 5
-      }
-    }
+      },
+      length(local.container_secrets) > 0 ? { secrets = local.container_secrets } : {}
+    )
   ])
 
   runtime_platform {
@@ -237,7 +242,7 @@ resource "aws_ecs_service" "this" {
   network_configuration {
     security_groups  = [aws_security_group.service.id]
     subnets          = var.private_subnet_ids
-    assign_public_ip = false
+    assign_public_ip = var.assign_public_ip
   }
 
   load_balancer {

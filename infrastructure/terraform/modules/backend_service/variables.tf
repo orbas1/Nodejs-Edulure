@@ -101,6 +101,12 @@ variable "secret_arns" {
   default     = []
 }
 
+variable "assign_public_ip" {
+  type        = bool
+  description = "Assign a public IP to ECS tasks (only for environments without NAT)."
+  default     = false
+}
+
 variable "healthcheck_path" {
   type        = string
   description = "Path used by load balancer and container health checks."
