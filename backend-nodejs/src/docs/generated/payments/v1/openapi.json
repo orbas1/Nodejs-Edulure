@@ -85,62 +85,6 @@
         }
       }
     },
-    "/payments/paypal/{paymentId}/capture": {
-      "post": {
-        "summary": "Capture an approved PayPal order",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "paymentId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "PayPal capture completed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/PaymentIntentRecord"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Capture not allowed for current status"
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Payment intent not found"
-          },
-          "502": {
-            "description": "PayPal returned an error"
-          }
-        }
-      }
-    },
     "/payments/{paymentId}/refunds": {
       "post": {
         "summary": "Issue a Stripe or PayPal refund",
@@ -206,6 +150,115 @@
           },
           "502": {
             "description": "Payment provider error"
+          }
+        }
+      }
+    },
+    "/payments/coupons/{code}": {
+      "get": {
+        "summary": "Retrieve coupon details",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coupon fetched",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/CouponPublic"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Coupon not found"
+          },
+          "422": {
+            "description": "Invalid coupon code"
+          }
+        }
+      }
+    },
+    "/payments/paypal/{paymentId}/capture": {
+      "post": {
+        "summary": "Capture an approved PayPal order",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "paymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "PayPal capture completed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/PaymentIntentRecord"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Capture not allowed for current status"
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "404": {
+            "description": "Payment intent not found"
+          },
+          "502": {
+            "description": "PayPal returned an error"
           }
         }
       }
@@ -285,59 +338,6 @@
         }
       }
     },
-    "/payments/coupons/{code}": {
-      "get": {
-        "summary": "Retrieve coupon details",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Coupon fetched",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/CouponPublic"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          },
-          "404": {
-            "description": "Coupon not found"
-          },
-          "422": {
-            "description": "Invalid coupon code"
-          }
-        }
-      }
-    },
     "/payments/webhooks/stripe": {
       "post": {
         "summary": "Stripe webhook receiver",
@@ -380,6 +380,41 @@
   },
   "components": {
     "schemas": {
+      "PaymentSummaryEntry": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "gross": {
+            "type": "integer"
+          },
+          "discount": {
+            "type": "integer"
+          },
+          "net": {
+            "type": "integer"
+          },
+          "tax": {
+            "type": "integer"
+          },
+          "refunded": {
+            "type": "integer"
+          },
+          "captured": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "currency",
+          "gross",
+          "discount",
+          "net",
+          "tax",
+          "refunded",
+          "captured"
+        ]
+      },
       "CouponPublic": {
         "type": "object",
         "properties": {
@@ -440,55 +475,6 @@
           "status",
           "timesRedeemed"
         ]
-      },
-      "PaymentSummaryEntry": {
-        "type": "object",
-        "properties": {
-          "currency": {
-            "type": "string"
-          },
-          "gross": {
-            "type": "integer"
-          },
-          "discount": {
-            "type": "integer"
-          },
-          "net": {
-            "type": "integer"
-          },
-          "tax": {
-            "type": "integer"
-          },
-          "refunded": {
-            "type": "integer"
-          },
-          "captured": {
-            "type": "integer"
-          }
-        },
-        "required": [
-          "currency",
-          "gross",
-          "discount",
-          "net",
-          "tax",
-          "refunded",
-          "captured"
-        ]
-      },
-      "PaymentRefundRequest": {
-        "type": "object",
-        "properties": {
-          "amount": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Optional refund amount expressed in cents."
-          },
-          "reason": {
-            "type": "string",
-            "nullable": true
-          }
-        }
       },
       "PaymentIntentRecord": {
         "type": "object",
@@ -589,6 +575,20 @@
           "createdAt",
           "updatedAt"
         ]
+      },
+      "PaymentRefundRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Optional refund amount expressed in cents."
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        }
       },
       "PaymentIntentCreateResponse": {
         "type": "object",

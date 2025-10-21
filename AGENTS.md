@@ -559,7 +559,7 @@
 - `backend-nodejs/src/models/TelemetryFreshnessMonitorModel.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)
 - `backend-nodejs/src/models/TelemetryLineageRunModel.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)
 - `backend-nodejs/src/models/TutorAvailabilitySlotModel.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)
-- `backend-nodejs/src/models/TutorBookingModel.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)
+- `backend-nodejs/src/models/TutorBookingModel.js` (Syntax:95 | Functionality:95 | Real World Ready:95 | Live Data:95 | Error:95 | Logic Flow:95 | Release Readiness:95 | Tests:95 | Overall:95)
 - `backend-nodejs/src/models/TutorProfileModel.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)
 - `backend-nodejs/src/models/UserBlockModel.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)
 - `backend-nodejs/src/models/UserFollowModel.js` (Syntax:100 | Functionality:100 | Real World Ready:100 | Live Data:100 | Error:100 | Logic Flow:100 | Release Readiness:100 | Tests:100 | Overall:100)

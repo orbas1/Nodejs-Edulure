@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { ZodError } from 'zod';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ingestionMock = {
@@ -172,6 +173,29 @@ describe('Telemetry HTTP routes', () => {
     expect(response.status).toBe(202);
     expect(response.body.exportedEvents).toBe(2500);
     expect(warehouseMock.exportPendingEvents).toHaveBeenCalledWith({ trigger: 'api' });
+  });
+
+  it('returns validation errors for malformed telemetry events', async () => {
+    ingestionMock.ingestEvent.mockRejectedValueOnce(
+      new ZodError([{ code: 'invalid_type', message: 'Required', path: ['eventName'] }])
+    );
+
+    const response = await request(app)
+      .post('/api/v1/telemetry/events')
+      .set('Authorization', 'Bearer token')
+      .send({ eventSource: 'web' });
+
+    expect(response.status).toBe(422);
+    expect(response.body.errors).toEqual(expect.arrayContaining(['Required']));
+  });
+
+  it('validates telemetry freshness query parameters', async () => {
+    const response = await request(app)
+      .get('/api/v1/telemetry/freshness?limit=not-a-number')
+      .set('Authorization', 'Bearer token');
+
+    expect(response.status).toBe(422);
+    expect(freshnessMock.listSnapshots).not.toHaveBeenCalled();
   });
 });
 

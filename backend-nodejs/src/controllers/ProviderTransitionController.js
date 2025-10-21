@@ -4,8 +4,15 @@ import ProviderTransitionService from '../services/ProviderTransitionService.js'
 import { success } from '../utils/httpResponse.js';
 
 const listQuerySchema = Joi.object({
-  tenantId: Joi.string().trim().max(120).allow(null, ''),
-  includeDetails: Joi.boolean().default(false)
+  tenantId: Joi.string()
+    .trim()
+    .pattern(/^[a-z0-9-]{2,120}$/i)
+    .allow(null, '')
+    .messages({ 'string.pattern.base': 'tenantId may only include letters, numbers, or hyphens' }),
+  includeDetails: Joi.boolean()
+    .truthy(['true', '1', 'yes', 'on'])
+    .falsy(['false', '0', 'no', 'off'])
+    .default(false)
 });
 
 const acknowledgementSchema = Joi.object({
@@ -27,6 +34,14 @@ const statusUpdateSchema = Joi.object({
     .required(),
   notes: Joi.string().trim().max(2000).allow(null, ''),
   recordedAt: Joi.date().optional()
+});
+
+const slugSchema = Joi.object({
+  slug: Joi.string()
+    .trim()
+    .pattern(/^[a-z0-9][a-z0-9-]{2,120}$/i)
+    .required()
+    .messages({ 'string.pattern.base': 'slug must include only url-safe characters' })
 });
 
 function resolveTenantScope(req, fallback) {
@@ -76,8 +91,18 @@ export default class ProviderTransitionController {
 
   static async show(req, res, next) {
     try {
+      const { value: params, error } = slugSchema.validate(req.params, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (error) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+        throw error;
+      }
+
       const tenantScope = resolveTenantScope(req);
-      const detail = await ProviderTransitionController.service.getAnnouncementDetail(req.params.slug, {
+      const detail = await ProviderTransitionController.service.getAnnouncementDetail(params.slug, {
         tenantScope
       });
       return success(res, {
@@ -91,13 +116,22 @@ export default class ProviderTransitionController {
 
   static async acknowledge(req, res, next) {
     try {
+      const { value: params, error: paramError } = slugSchema.validate(req.params, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (paramError) {
+        paramError.status = 422;
+        paramError.details = paramError.details.map((detail) => detail.message);
+        throw paramError;
+      }
       const payload = await acknowledgementSchema.validateAsync(req.body, {
         abortEarly: false,
         stripUnknown: true
       });
       const tenantScope = resolveTenantScope(req);
       const acknowledgement = await ProviderTransitionController.service.recordAcknowledgement(
-        req.params.slug,
+        params.slug,
         payload,
         { tenantScope }
       );
@@ -117,13 +151,22 @@ export default class ProviderTransitionController {
 
   static async recordStatus(req, res, next) {
     try {
+      const { value: params, error: paramError } = slugSchema.validate(req.params, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (paramError) {
+        paramError.status = 422;
+        paramError.details = paramError.details.map((detail) => detail.message);
+        throw paramError;
+      }
       const payload = await statusUpdateSchema.validateAsync(req.body, {
         abortEarly: false,
         stripUnknown: true
       });
       const tenantScope = resolveTenantScope(req);
       const update = await ProviderTransitionController.service.recordStatusUpdate(
-        req.params.slug,
+        params.slug,
         payload,
         { tenantScope }
       );

@@ -313,30 +313,54 @@ function normaliseNumber(value) {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+const isAbortError = (error) => error?.name === 'AbortError' || error?.code === 'ERR_CANCELED';
+
 export default function AdminAdsManagementSection({ sectionId, token }) {
   const [summary, setSummary] = useState(null);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [summaryError, setSummaryError] = useState(null);
 
-  const fetchSummary = useCallback(async () => {
-    if (!token) {
-      setSummary(null);
-      return;
-    }
-    setLoadingSummary(true);
-    setSummaryError(null);
-    try {
-      const payload = await adminAdsApi.getAdsSummary({ token });
-      setSummary(payload ?? {});
-    } catch (error) {
-      setSummaryError(error instanceof Error ? error : new Error('Failed to load ad metrics'));
-    } finally {
-      setLoadingSummary(false);
-    }
-  }, [token]);
+  const fetchSummary = useCallback(
+    async ({ signal, showLoading = true } = {}) => {
+      if (!token) {
+        setSummary(null);
+        setSummaryError(null);
+        setLoadingSummary(false);
+        return;
+      }
+
+      if (showLoading) {
+        setLoadingSummary(true);
+      }
+      setSummaryError(null);
+
+      try {
+        const request = signal ? { token, signal } : { token };
+        const payload = await adminAdsApi.getAdsSummary(request);
+        if (signal?.aborted) {
+          return;
+        }
+        setSummary(payload ?? {});
+      } catch (error) {
+        if (signal?.aborted || isAbortError(error)) {
+          return;
+        }
+        setSummaryError(error instanceof Error ? error : new Error('Failed to load ad metrics'));
+      } finally {
+        if (!signal?.aborted) {
+          setLoadingSummary(false);
+        }
+      }
+    },
+    [token]
+  );
 
   useEffect(() => {
-    fetchSummary();
+    const controller = new AbortController();
+    fetchSummary({ signal: controller.signal });
+    return () => {
+      controller.abort();
+    };
   }, [fetchSummary]);
 
   const summaryCards = useMemo(() => {

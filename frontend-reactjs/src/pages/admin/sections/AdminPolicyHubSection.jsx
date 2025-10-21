@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import PropTypes from 'prop-types';
+
+import { coerceNumber, ensureString } from '../utils.js';
 
 export default function AdminPolicyHubSection({
   sectionId,
@@ -9,7 +12,21 @@ export default function AdminPolicyHubSection({
   slaHours,
   policyHubUrl
 }) {
-  const safeContactLabel = contact?.startsWith('mailto:') ? contact.replace('mailto:', '') : contact;
+  const safeContact = ensureString(contact);
+  const safeContactLabel = useMemo(() => {
+    if (!safeContact) return 'Contact owner';
+    if (safeContact.startsWith('mailto:')) {
+      return safeContact.replace('mailto:', '');
+    }
+    return safeContact;
+  }, [safeContact]);
+
+  const safeStatus = ensureString(status, 'Operational');
+  const safeOwner = ensureString(owner, 'Operations');
+  const safeLastReviewed = ensureString(lastReviewed, 'Awaiting review');
+  const safePolicyUrl = ensureString(policyHubUrl, '#');
+  const safeContactHref = safeContact ? safeContact : '#';
+  const safeSlaHours = coerceNumber(slaHours, { min: 0, fallback: 0, precision: 0 });
 
   return (
     <section id={sectionId} className="dashboard-section">
@@ -21,7 +38,7 @@ export default function AdminPolicyHubSection({
           </p>
         </div>
         <a
-          href={policyHubUrl}
+          href={safePolicyUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="dashboard-pill inline-flex items-center justify-center gap-2 px-5 py-2 text-sm"
@@ -35,22 +52,22 @@ export default function AdminPolicyHubSection({
           <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current status</dt>
           <dd className="mt-3 flex flex-col gap-2 text-sm text-slate-600">
             <span className="inline-flex w-fit items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
-              {status}
+              {safeStatus}
             </span>
             <span className="text-xs text-slate-500">
-              SLA response within <strong className="font-semibold text-slate-900">{slaHours} hours</strong>
+              SLA response within <strong className="font-semibold text-slate-900">{safeSlaHours} hours</strong>
             </span>
           </dd>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Policy owner</dt>
           <dd className="mt-3 space-y-2 text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">{owner}</p>
+            <p className="font-semibold text-slate-900">{safeOwner}</p>
             <a
-              href={contact}
+              href={safeContactHref}
               className="text-sm font-semibold text-primary hover:text-primary-dark"
-              target={contact?.startsWith('http') ? '_blank' : undefined}
-              rel={contact?.startsWith('http') ? 'noopener noreferrer' : undefined}
+              target={safeContactHref.startsWith('http') ? '_blank' : undefined}
+              rel={safeContactHref.startsWith('http') ? 'noopener noreferrer' : undefined}
             >
               {safeContactLabel}
             </a>
@@ -58,7 +75,7 @@ export default function AdminPolicyHubSection({
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Last reviewed</dt>
-          <dd className="mt-3 text-sm text-slate-600">{lastReviewed}</dd>
+          <dd className="mt-3 text-sm text-slate-600">{safeLastReviewed}</dd>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
           <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">Next actions</dt>

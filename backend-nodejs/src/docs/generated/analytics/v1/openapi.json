@@ -1,9 +1,9 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "Edulure Platform API – Reporting, dashboards, and analytics export APIs.",
+    "title": "Edulure Platform API – Reporting, dashboards, and analytics export APIs including executive BI overviews.",
     "version": "1.50.0",
-    "description": "Reporting, dashboards, and analytics export APIs. (Capability: analytics-insights)."
+    "description": "Reporting, dashboards, and analytics export APIs including executive BI overviews. (Capability: analytics-insights)."
   },
   "servers": [
     {
@@ -22,12 +22,13 @@
   ],
   "tags": [],
   "paths": {
-    "/analytics/explorer/summary": {
+    "/analytics/bi/executive-overview": {
       "get": {
+        "summary": "Executive analytics overview",
+        "description": "Returns aggregated KPIs, trends, and telemetry health indicators for the executive dashboard.",
         "tags": [
           "Analytics"
         ],
-        "summary": "Retrieve explorer analytics summary",
         "security": [
           {
             "bearerAuth": []
@@ -37,22 +38,22 @@
           {
             "name": "range",
             "in": "query",
-            "description": "Rolling time window (7d, 14d, or 30d)",
-            "required": false,
             "schema": {
               "type": "string",
               "enum": [
                 "7d",
                 "14d",
-                "30d"
+                "30d",
+                "90d"
               ],
-              "default": "7d"
-            }
+              "default": "30d"
+            },
+            "description": "Time window used when calculating KPI deltas and trend lines."
           }
         ],
         "responses": {
           "200": {
-            "description": "Explorer analytics summary returned",
+            "description": "Executive overview generated",
             "content": {
               "application/json": {
                 "schema": {
@@ -64,7 +65,7 @@
                       "type": "object",
                       "properties": {
                         "data": {
-                          "$ref": "#/components/schemas/ExplorerAnalyticsSummary"
+                          "$ref": "#/components/schemas/BiExecutiveOverview"
                         }
                       }
                     }
@@ -74,17 +75,10 @@
             }
           },
           "401": {
-            "description": "Authentication required"
+            "description": "Missing or invalid token"
           },
-          "422": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
+          "403": {
+            "description": "Insufficient permissions"
           }
         }
       }
@@ -207,122 +201,77 @@
           }
         }
       }
+    },
+    "/analytics/explorer/summary": {
+      "get": {
+        "tags": [
+          "Analytics"
+        ],
+        "summary": "Retrieve explorer analytics summary",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "range",
+            "in": "query",
+            "description": "Rolling time window (7d, 14d, or 30d)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "7d",
+                "14d",
+                "30d"
+              ],
+              "default": "7d"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Explorer analytics summary returned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/ExplorerAnalyticsSummary"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "422": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
-      "ExplorerInteractionRecord": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "eventId": {
-            "type": "integer"
-          },
-          "entityType": {
-            "type": "string"
-          },
-          "resultId": {
-            "type": "string"
-          },
-          "interactionType": {
-            "type": "string"
-          },
-          "position": {
-            "type": "integer",
-            "nullable": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        },
-        "required": [
-          "id",
-          "eventId",
-          "entityType",
-          "resultId",
-          "interactionType",
-          "createdAt"
-        ]
-      },
-      "ExplorerInteractionRequest": {
-        "type": "object",
-        "properties": {
-          "searchEventId": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "entityType": {
-            "type": "string",
-            "example": "courses"
-          },
-          "resultId": {
-            "type": "string",
-            "example": "automation-masterclass"
-          },
-          "interactionType": {
-            "type": "string",
-            "enum": [
-              "click",
-              "detail_view",
-              "bookmark"
-            ],
-            "default": "click"
-          },
-          "position": {
-            "type": "integer",
-            "minimum": 0,
-            "nullable": true
-          }
-        },
-        "required": [
-          "searchEventId",
-          "entityType",
-          "resultId"
-        ]
-      },
-      "ExplorerAnalyticsAlert": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer"
-          },
-          "alertCode": {
-            "type": "string"
-          },
-          "severity": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          },
-          "detectedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "resolvedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          }
-        },
-        "required": [
-          "alertCode",
-          "severity",
-          "message",
-          "detectedAt"
-        ]
-      },
       "ExplorerAnalyticsSummary": {
         "type": "object",
         "properties": {
@@ -398,6 +347,42 @@
           "ads",
           "forecasts",
           "alerts"
+        ]
+      },
+      "ExplorerAnalyticsAlert": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "alertCode": {
+            "type": "string"
+          },
+          "severity": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "detectedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resolvedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "alertCode",
+          "severity",
+          "message",
+          "detectedAt"
         ]
       },
       "ExplorerAnalyticsForecastEntry": {
@@ -632,6 +617,380 @@
           "end",
           "days"
         ]
+      },
+      "ExplorerInteractionRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "eventId": {
+            "type": "integer"
+          },
+          "entityType": {
+            "type": "string"
+          },
+          "resultId": {
+            "type": "string"
+          },
+          "interactionType": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "eventId",
+          "entityType",
+          "resultId",
+          "interactionType",
+          "createdAt"
+        ]
+      },
+      "ExplorerInteractionRequest": {
+        "type": "object",
+        "properties": {
+          "searchEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "entityType": {
+            "type": "string",
+            "example": "courses"
+          },
+          "resultId": {
+            "type": "string",
+            "example": "automation-masterclass"
+          },
+          "interactionType": {
+            "type": "string",
+            "enum": [
+              "click",
+              "detail_view",
+              "bookmark"
+            ],
+            "default": "click"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          }
+        },
+        "required": [
+          "searchEventId",
+          "entityType",
+          "resultId"
+        ]
+      },
+      "BiExecutiveOverview": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "timeframe": {
+            "type": "object",
+            "properties": {
+              "range": {
+                "type": "string"
+              },
+              "days": {
+                "type": "integer"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "comparisonStart": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "comparisonEnd": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "scorecard": {
+            "type": "object",
+            "properties": {
+              "enrollments": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "completionRate": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "recognisedRevenue": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "netRevenue": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "averageProgressPercent": {
+                "$ref": "#/components/schemas/ScorecardMetric"
+              },
+              "communityEngagement": {
+                "type": "object",
+                "properties": {
+                  "posts": {
+                    "$ref": "#/components/schemas/ScorecardMetric"
+                  },
+                  "comments": {
+                    "$ref": "#/components/schemas/ScorecardMetric"
+                  },
+                  "events": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "enrollmentTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "enrollments": {
+                  "type": "integer"
+                },
+                "completions": {
+                  "type": "integer"
+                },
+                "recognisedRevenueCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "revenueTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "grossVolumeCents": {
+                  "type": "integer"
+                },
+                "recognisedVolumeCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "revenueByCurrency": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string"
+                },
+                "grossVolumeCents": {
+                  "type": "integer"
+                },
+                "recognisedVolumeCents": {
+                  "type": "integer"
+                },
+                "discountCents": {
+                  "type": "integer"
+                },
+                "taxCents": {
+                  "type": "integer"
+                },
+                "refundedCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "communityTrends": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "posts": {
+                  "type": "integer"
+                },
+                "comments": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "topCommunities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "communityId": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "posts": {
+                  "type": "integer"
+                },
+                "comments": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "categoryBreakdown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "deliveryFormat": {
+                  "type": "string"
+                },
+                "level": {
+                  "type": "string"
+                },
+                "enrollments": {
+                  "type": "integer"
+                },
+                "completions": {
+                  "type": "integer"
+                },
+                "recognisedRevenueCents": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "experiments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "experimentId": {
+                  "type": "string",
+                  "nullable": true
+                },
+                "name": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "rolloutPercentage": {
+                  "type": "number"
+                },
+                "owner": {
+                  "type": "string",
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "dataQuality": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "pipelines": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TelemetryFreshnessMonitor"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TelemetryFreshnessMonitor": {
+        "type": "object",
+        "properties": {
+          "pipelineKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "noop"
+            ]
+          },
+          "lagSeconds": {
+            "type": "integer"
+          },
+          "thresholdMinutes": {
+            "type": "integer"
+          },
+          "lastEventAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "ScorecardMetric": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number"
+          },
+          "value": {
+            "type": "number",
+            "nullable": true
+          },
+          "cents": {
+            "type": "integer",
+            "nullable": true
+          },
+          "change": {
+            "type": "object",
+            "properties": {
+              "absolute": {
+                "type": "number"
+              },
+              "percentage": {
+                "type": "number"
+              }
+            }
+          }
+        }
       },
       "StandardResponse": {
         "type": "object",

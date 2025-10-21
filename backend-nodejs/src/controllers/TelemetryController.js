@@ -1,4 +1,5 @@
-import { z } from 'zod';
+import Joi from 'joi';
+import { ZodError, z } from 'zod';
 
 import telemetryIngestionService from '../services/TelemetryIngestionService.js';
 import telemetryWarehouseService from '../services/TelemetryWarehouseService.js';
@@ -13,6 +14,10 @@ const consentRequestSchema = z.object({
   expiresAt: z.coerce.date().optional(),
   metadata: z.record(z.any()).optional(),
   evidence: z.record(z.any()).optional()
+});
+
+const freshnessQuerySchema = Joi.object({
+  limit: Joi.number().integer().min(1).max(200).default(50)
 });
 
 function resolveTenantId(req, explicitTenantId) {
@@ -62,6 +67,10 @@ export default class TelemetryController {
         event: sanitiseEventResponse(result.event)
       });
     } catch (error) {
+      if (error instanceof ZodError) {
+        error.status = 422;
+        error.details = error.errors.map((issue) => issue.message);
+      }
       return next(error);
     }
   }
@@ -92,14 +101,27 @@ export default class TelemetryController {
 
       return res.status(201).json({ consent: record });
     } catch (error) {
+      if (error instanceof ZodError) {
+        error.status = 422;
+        error.details = error.errors.map((issue) => issue.message);
+      }
       return next(error);
     }
   }
 
   static async listFreshness(req, res, next) {
     try {
-      const limit = Math.max(1, Math.min(200, Number(req.query.limit ?? 50)));
-      const monitors = await TelemetryFreshnessMonitorModel.listSnapshots({ limit });
+      const { value, error } = freshnessQuerySchema.validate(req.query ?? {}, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      if (error) {
+        error.status = 422;
+        error.details = error.details.map((detail) => detail.message);
+        throw error;
+      }
+
+      const monitors = await TelemetryFreshnessMonitorModel.listSnapshots({ limit: value.limit });
       return res.json({ monitors });
     } catch (error) {
       return next(error);

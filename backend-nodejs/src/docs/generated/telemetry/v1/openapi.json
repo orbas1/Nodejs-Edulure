@@ -1,0 +1,497 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Telemetry ingestion, consent governance, and warehouse export endpoints for platform services.",
+    "version": "1.50.0",
+    "description": "Telemetry ingestion, consent governance, and warehouse export endpoints for platform services. (Capability: telemetry-pipeline)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/telemetry/consents": {
+      "post": {
+        "summary": "Record telemetry consent decision",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryConsentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Consent decision recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "consent": {
+                      "$ref": "#/components/schemas/TelemetryConsentRecord"
+                    }
+                  },
+                  "required": [
+                    "consent"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User context missing"
+          },
+          "422": {
+            "description": "Invalid consent payload"
+          }
+        }
+      }
+    },
+    "/telemetry/events": {
+      "post": {
+        "summary": "Ingest telemetry event",
+        "description": "Registers a telemetry event for downstream export while enforcing consent and deduplication policies.",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetryEventIngestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Duplicate telemetry event acknowledged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryEventIngestResponse"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Telemetry event accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryEventIngestResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Telemetry source not authorised"
+          },
+          "422": {
+            "description": "Invalid telemetry payload"
+          },
+          "503": {
+            "description": "Telemetry pipeline disabled"
+          }
+        }
+      }
+    },
+    "/telemetry/export": {
+      "post": {
+        "summary": "Trigger telemetry warehouse export",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "No telemetry events pending export",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryExportSummary"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Telemetry export started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryExportSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          },
+          "503": {
+            "description": "Telemetry export disabled"
+          }
+        }
+      }
+    },
+    "/telemetry/freshness": {
+      "get": {
+        "summary": "List telemetry freshness monitors",
+        "tags": [
+          "Telemetry"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Maximum number of freshness monitors to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Telemetry freshness monitors retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "monitors": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TelemetryFreshnessMonitor"
+                      }
+                    }
+                  },
+                  "required": [
+                    "monitors"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TelemetryFreshnessMonitor": {
+        "type": "object",
+        "properties": {
+          "pipelineKey": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "noop"
+            ]
+          },
+          "lagSeconds": {
+            "type": "integer"
+          },
+          "thresholdMinutes": {
+            "type": "integer"
+          },
+          "lastEventAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          }
+        }
+      },
+      "TelemetryExportSummary": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "exported",
+              "noop",
+              "disabled"
+            ]
+          },
+          "exported": {
+            "type": "integer"
+          },
+          "batchId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "fileKey": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TelemetryEventIngestResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "duplicate": {
+            "type": "boolean"
+          },
+          "suppressed": {
+            "type": "boolean"
+          },
+          "consentStatus": {
+            "type": "string"
+          },
+          "event": {
+            "type": "object",
+            "properties": {
+              "eventUuid": {
+                "type": "string"
+              },
+              "eventName": {
+                "type": "string"
+              },
+              "eventSource": {
+                "type": "string"
+              },
+              "consentScope": {
+                "type": "string"
+              },
+              "consentStatus": {
+                "type": "string"
+              },
+              "ingestionStatus": {
+                "type": "string"
+              },
+              "occurredAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "receivedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "required": [
+          "status",
+          "duplicate",
+          "suppressed",
+          "consentStatus",
+          "event"
+        ]
+      },
+      "TelemetryEventIngestRequest": {
+        "type": "object",
+        "properties": {
+          "eventName": {
+            "type": "string"
+          },
+          "eventVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "eventSource": {
+            "type": "string"
+          },
+          "schemaVersion": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "tenantId": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "sessionId": {
+            "type": "string",
+            "nullable": true
+          },
+          "deviceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          },
+          "consentScope": {
+            "type": "string",
+            "nullable": true
+          },
+          "payload": {
+            "type": "object"
+          },
+          "context": {
+            "type": "object"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "eventName",
+          "eventSource"
+        ]
+      },
+      "TelemetryConsentRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "userId": {
+            "type": "integer"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "consentScope": {
+            "type": "string"
+          },
+          "consentVersion": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effectiveAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "evidence": {
+            "type": "object"
+          }
+        }
+      },
+      "TelemetryConsentRequest": {
+        "type": "object",
+        "properties": {
+          "consentScope": {
+            "type": "string"
+          },
+          "consentVersion": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "revoked",
+              "expired"
+            ]
+          },
+          "tenantId": {
+            "type": "string",
+            "nullable": true
+          },
+          "userId": {
+            "type": "integer",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "nullable": true
+          },
+          "evidence": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "consentScope"
+        ]
+      }
+    }
+  }
+}

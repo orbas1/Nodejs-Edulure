@@ -1,0 +1,324 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Edulure Platform API – Environment health, parity, and drift detection endpoints for infrastructure operators.",
+    "version": "1.50.0",
+    "description": "Environment health, parity, and drift detection endpoints for infrastructure operators. (Capability: environment-parity)."
+  },
+  "servers": [
+    {
+      "url": "https://api.edulure.com/api/v1",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:{port}/api/v1",
+      "description": "Local development",
+      "variables": {
+        "port": {
+          "default": "4000"
+        }
+      }
+    }
+  ],
+  "tags": [],
+  "paths": {
+    "/environment/health": {
+      "get": {
+        "summary": "Environment parity report",
+        "description": "Returns the latest infrastructure parity evaluation, including manifest drift and dependency status.",
+        "operationId": "getEnvironmentParityReport",
+        "tags": [
+          "Environment"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Environment parity report generated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentParityResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Parity drift detected or dependency check failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvironmentParityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "EnvironmentParityResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "$ref": "#/components/schemas/EnvironmentParityReport"
+              }
+            }
+          }
+        ]
+      },
+      "EnvironmentParityReport": {
+        "type": "object",
+        "properties": {
+          "environment": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "tier": {
+                "type": "string"
+              },
+              "deploymentStrategy": {
+                "type": "string"
+              },
+              "parityBudgetMinutes": {
+                "type": "integer"
+              },
+              "infrastructureOwner": {
+                "type": "string"
+              },
+              "gitSha": {
+                "type": "string",
+                "nullable": true
+              },
+              "releaseChannel": {
+                "type": "string"
+              },
+              "host": {
+                "type": "string"
+              },
+              "manifestVersion": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "name",
+              "provider",
+              "region",
+              "tier",
+              "deploymentStrategy",
+              "parityBudgetMinutes",
+              "infrastructureOwner",
+              "releaseChannel",
+              "host",
+              "manifestVersion"
+            ]
+          },
+          "dependencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentDependencyCheck"
+            }
+          },
+          "manifest": {
+            "type": "object",
+            "properties": {
+              "expected": {
+                "$ref": "#/components/schemas/EnvironmentParityManifest"
+              },
+              "observed": {
+                "$ref": "#/components/schemas/EnvironmentParityManifest"
+              }
+            },
+            "required": [
+              "expected",
+              "observed"
+            ]
+          },
+          "mismatches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EnvironmentParityMismatch"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "drifted",
+              "degraded"
+            ]
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "environment",
+          "dependencies",
+          "manifest",
+          "mismatches",
+          "status",
+          "generatedAt"
+        ]
+      },
+      "EnvironmentParityMismatch": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "missing",
+              "drifted",
+              "relocated",
+              "unexpected"
+            ]
+          },
+          "expected": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+              }
+            ],
+            "nullable": true
+          },
+          "observed": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+              }
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "component",
+          "status"
+        ]
+      },
+      "EnvironmentParityManifestEntry": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Relative path to the artefact that was hashed."
+          },
+          "hash": {
+            "type": "string",
+            "description": "SHA-256 fingerprint of the artefact.",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "path",
+          "hash"
+        ]
+      },
+      "EnvironmentParityManifest": {
+        "type": "object",
+        "properties": {
+          "modules": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "environments": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "docker": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "scripts": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          },
+          "root": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EnvironmentParityManifestEntry"
+            }
+          }
+        },
+        "required": [
+          "modules",
+          "environments",
+          "docker",
+          "scripts",
+          "root"
+        ]
+      },
+      "EnvironmentDependencyCheck": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string",
+            "description": "Name of the dependency that was evaluated."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "failed",
+              "skipped"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "component",
+          "status"
+        ]
+      },
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {},
+          "meta": {
+            "type": "object",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

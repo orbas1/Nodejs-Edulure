@@ -26,9 +26,9 @@
     }
   ],
   "paths": {
-    "/social/followers": {
-      "get": {
-        "summary": "Followers for current user",
+    "/social/blocks/{userId}": {
+      "post": {
+        "summary": "Block a user",
         "security": [
           {
             "bearerAuth": []
@@ -36,46 +36,27 @@
         ],
         "parameters": [
           {
-            "name": "limit",
-            "in": "query",
-            "description": "Maximum records to return",
+            "name": "userId",
+            "in": "path",
+            "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 500
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "pending",
-                "accepted",
-                "declined"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
+              "type": "integer"
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockRequest"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": {
-            "description": "Followers retrieved",
+          "201": {
+            "description": "User blocked",
             "content": {
               "application/json": {
                 "schema": {
@@ -87,33 +68,19 @@
                       "type": "object",
                       "properties": {
                         "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/FollowListItem"
-                          }
-                        },
-                        "meta": {
                           "type": "object",
                           "properties": {
-                            "pagination": {
-                              "type": "object",
-                              "properties": {
-                                "limit": {
-                                  "type": "integer",
-                                  "example": 25
-                                },
-                                "offset": {
-                                  "type": "integer",
-                                  "example": 0
-                                },
-                                "total": {
-                                  "type": "integer",
-                                  "example": 120
-                                }
-                              }
+                            "userId": {
+                              "type": "integer",
+                              "example": 42
                             },
-                            "viewerContext": {
-                              "$ref": "#/components/schemas/FollowViewerContext"
+                            "blockedUserId": {
+                              "type": "integer",
+                              "example": 91
+                            },
+                            "blockedAt": {
+                              "type": "string",
+                              "format": "date-time"
                             }
                           }
                         }
@@ -128,11 +95,9 @@
             "description": "Missing or invalid token"
           }
         }
-      }
-    },
-    "/social/users/{userId}/followers": {
-      "get": {
-        "summary": "Followers for specified user",
+      },
+      "delete": {
+        "summary": "Unblock a user",
         "security": [
           {
             "bearerAuth": []
@@ -146,7 +111,34 @@
             "schema": {
               "type": "integer"
             }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User unblocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
           },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/social/followers": {
+      "get": {
+        "summary": "Followers for current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
           {
             "name": "limit",
             "in": "query",
@@ -346,169 +338,6 @@
         }
       }
     },
-    "/social/users/{userId}/following": {
-      "get": {
-        "summary": "Accounts a specific user follows",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "description": "Maximum records to return",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 500
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "pending",
-                "accepted",
-                "declined"
-              ]
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Following retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/FollowListItem"
-                          }
-                        },
-                        "meta": {
-                          "type": "object",
-                          "properties": {
-                            "pagination": {
-                              "type": "object",
-                              "properties": {
-                                "limit": {
-                                  "type": "integer",
-                                  "example": 25
-                                },
-                                "offset": {
-                                  "type": "integer",
-                                  "example": 0
-                                },
-                                "total": {
-                                  "type": "integer",
-                                  "example": 120
-                                }
-                              }
-                            },
-                            "viewerContext": {
-                              "$ref": "#/components/schemas/FollowViewerContext"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      }
-    },
-    "/social/recommendations": {
-      "get": {
-        "summary": "Recommended accounts to follow",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Recommendations generated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "array",
-                          "items": {
-                            "$ref": "#/components/schemas/FollowRecommendationItem"
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      }
-    },
     "/social/follows/{userId}": {
       "post": {
         "summary": "Follow a user",
@@ -611,6 +440,356 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/social/mutes/{userId}": {
+      "post": {
+        "summary": "Mute notifications from a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mute applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "userId": {
+                              "type": "integer",
+                              "example": 42
+                            },
+                            "mutedUserId": {
+                              "type": "integer",
+                              "example": 91
+                            },
+                            "mutedUntil": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove mute for a user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mute removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/social/privacy": {
+      "get": {
+        "summary": "Get privacy settings for current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Privacy settings retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SocialPrivacySettings"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update privacy settings for current user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SocialPrivacyUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Privacy settings retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/SocialPrivacySettings"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/social/recommendations": {
+      "get": {
+        "summary": "Recommended accounts to follow",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recommendations generated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowRecommendationItem"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid token"
+          }
+        }
+      }
+    },
+    "/social/users/{userId}/followers": {
+      "get": {
+        "summary": "Followers for specified user",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Followers retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/StandardResponse"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowListItem"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer",
+                                  "example": 25
+                                },
+                                "offset": {
+                                  "type": "integer",
+                                  "example": 0
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "example": 120
+                                }
+                              }
+                            },
+                            "viewerContext": {
+                              "$ref": "#/components/schemas/FollowViewerContext"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
                 }
               }
             }
@@ -731,271 +910,64 @@
         }
       }
     },
-    "/social/mutes/{userId}": {
-      "post": {
-        "summary": "Mute notifications from a user",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MuteRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Mute applied",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "object",
-                          "properties": {
-                            "userId": {
-                              "type": "integer",
-                              "example": 42
-                            },
-                            "mutedUserId": {
-                              "type": "integer",
-                              "example": 91
-                            },
-                            "mutedUntil": {
-                              "type": "string",
-                              "format": "date-time",
-                              "nullable": true
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Remove mute for a user",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Mute removed",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      }
-    },
-    "/social/blocks/{userId}": {
-      "post": {
-        "summary": "Block a user",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BlockRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "User blocked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "type": "object",
-                          "properties": {
-                            "userId": {
-                              "type": "integer",
-                              "example": 42
-                            },
-                            "blockedUserId": {
-                              "type": "integer",
-                              "example": 91
-                            },
-                            "blockedAt": {
-                              "type": "string",
-                              "format": "date-time"
-                            }
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      },
-      "delete": {
-        "summary": "Unblock a user",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "User unblocked",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StandardResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      }
-    },
-    "/social/privacy": {
+    "/social/users/{userId}/following": {
       "get": {
-        "summary": "Get privacy settings for current user",
+        "summary": "Accounts a specific user follows",
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "responses": {
-          "200": {
-            "description": "Privacy settings retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    {
-                      "$ref": "#/components/schemas/StandardResponse"
-                    },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "data": {
-                          "$ref": "#/components/schemas/SocialPrivacySettings"
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
             }
           },
-          "401": {
-            "description": "Missing or invalid token"
-          }
-        }
-      },
-      "put": {
-        "summary": "Update privacy settings for current user",
-        "security": [
           {
-            "bearerAuth": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SocialPrivacyUpdateRequest"
-              }
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "accepted",
+                "declined"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
-        },
+        ],
         "responses": {
           "200": {
-            "description": "Privacy settings retrieved",
+            "description": "Following retrieved",
             "content": {
               "application/json": {
                 "schema": {
@@ -1007,7 +979,35 @@
                       "type": "object",
                       "properties": {
                         "data": {
-                          "$ref": "#/components/schemas/SocialPrivacySettings"
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/FollowListItem"
+                          }
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "pagination": {
+                              "type": "object",
+                              "properties": {
+                                "limit": {
+                                  "type": "integer",
+                                  "example": 25
+                                },
+                                "offset": {
+                                  "type": "integer",
+                                  "example": 0
+                                },
+                                "total": {
+                                  "type": "integer",
+                                  "example": 120
+                                }
+                              }
+                            },
+                            "viewerContext": {
+                              "$ref": "#/components/schemas/FollowViewerContext"
+                            }
+                          }
                         }
                       }
                     }
@@ -1127,6 +1127,78 @@
   },
   "components": {
     "schemas": {
+      "FollowRecommendationItem": {
+        "type": "object",
+        "properties": {
+          "recommendation": {
+            "type": "object",
+            "properties": {
+              "score": {
+                "type": "number",
+                "format": "float",
+                "example": 87.5
+              },
+              "mutualFollowersCount": {
+                "type": "integer",
+                "example": 2
+              },
+              "reasonCode": {
+                "type": "string",
+                "example": "mutual_followers"
+              },
+              "generatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "score",
+              "mutualFollowersCount",
+              "reasonCode"
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/SocialUserSummary"
+          }
+        }
+      },
+      "SocialUserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 91
+          },
+          "firstName": {
+            "type": "string",
+            "example": "Nova"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Rahman"
+          },
+          "role": {
+            "type": "string",
+            "example": "user"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "nova.rahman@example.com"
+          },
+          "mutualFollowers": {
+            "type": "integer",
+            "example": 3
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "role",
+          "email"
+        ]
+      },
       "SocialPrivacyUpdateRequest": {
         "$ref": "#/components/schemas/SocialPrivacySettings"
       },
@@ -1170,25 +1242,6 @@
           "messagePermission",
           "shareActivity"
         ]
-      },
-      "BlockRequest": {
-        "type": "object",
-        "properties": {
-          "reason": {
-            "type": "string",
-            "maxLength": 240,
-            "nullable": true
-          },
-          "expiresAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "metadata": {
-            "type": "object",
-            "additionalProperties": true
-          }
-        }
       },
       "MuteRequest": {
         "type": "object",
@@ -1286,78 +1339,6 @@
           }
         }
       },
-      "FollowRecommendationItem": {
-        "type": "object",
-        "properties": {
-          "recommendation": {
-            "type": "object",
-            "properties": {
-              "score": {
-                "type": "number",
-                "format": "float",
-                "example": 87.5
-              },
-              "mutualFollowersCount": {
-                "type": "integer",
-                "example": 2
-              },
-              "reasonCode": {
-                "type": "string",
-                "example": "mutual_followers"
-              },
-              "generatedAt": {
-                "type": "string",
-                "format": "date-time"
-              }
-            },
-            "required": [
-              "score",
-              "mutualFollowersCount",
-              "reasonCode"
-            ]
-          },
-          "user": {
-            "$ref": "#/components/schemas/SocialUserSummary"
-          }
-        }
-      },
-      "SocialUserSummary": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "example": 91
-          },
-          "firstName": {
-            "type": "string",
-            "example": "Nova"
-          },
-          "lastName": {
-            "type": "string",
-            "example": "Rahman"
-          },
-          "role": {
-            "type": "string",
-            "example": "user"
-          },
-          "email": {
-            "type": "string",
-            "format": "email",
-            "example": "nova.rahman@example.com"
-          },
-          "mutualFollowers": {
-            "type": "integer",
-            "example": 3
-          }
-        },
-        "required": [
-          "id",
-          "firstName",
-          "lastName",
-          "role",
-          "email"
-        ]
-      },
       "FollowViewerContext": {
         "type": "object",
         "properties": {
@@ -1396,6 +1377,25 @@
           "meta": {
             "type": "object",
             "nullable": true
+          }
+        }
+      },
+      "BlockRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 240,
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
           }
         }
       }

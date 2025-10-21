@@ -8,6 +8,7 @@ import {
 
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
 import DashboardActionFeedback from '../../components/dashboard/DashboardActionFeedback.jsx';
+import useMountedRef from '../../hooks/useMountedRef.js';
 
 const severityStyles = {
   success: {
@@ -39,6 +40,7 @@ export default function InstructorTutorManagement() {
   const { role, dashboard, refresh, instructorOrchestration } = useOutletContext();
   const [pendingAction, setPendingAction] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const mounted = useMountedRef();
 
   if (role !== 'instructor') {
     return (
@@ -81,21 +83,27 @@ export default function InstructorTutorManagement() {
         name: roster[0]?.name ?? 'New Mentor'
       };
       const result = await instructorOrchestration.inviteMentor(payload);
-      setFeedback({
-        tone: 'success',
-        message: 'Mentor invite sent.',
-        detail: result?.summary ?? 'We emailed the mentor with next steps.'
-      });
+      if (mounted.current) {
+        setFeedback({
+          tone: 'success',
+          message: 'Mentor invite sent.',
+          detail: result?.summary ?? 'We emailed the mentor with next steps.'
+        });
+      }
       await refresh?.();
     } catch (error) {
-      setFeedback({
-        tone: 'error',
-        message: error.message ?? 'Unable to send mentor invite.'
-      });
+      if (mounted.current) {
+        setFeedback({
+          tone: 'error',
+          message: error.message ?? 'Unable to send mentor invite.'
+        });
+      }
     } finally {
-      setPendingAction(null);
+      if (mounted.current) {
+        setPendingAction(null);
+      }
     }
-  }, [instructorOrchestration, refresh, roster]);
+  }, [instructorOrchestration, mounted, refresh, roster]);
 
   const handleRouting = useCallback(async () => {
     if (!instructorOrchestration?.routeTutorRequest) {
@@ -109,21 +117,27 @@ export default function InstructorTutorManagement() {
         rulesetId: dashboard?.tutors?.activeRuleset
       };
       const result = await instructorOrchestration.routeTutorRequest(payload);
-      setFeedback({
-        tone: 'success',
-        message: 'Tutor routing recalibrated.',
-        detail: result?.summary ?? 'Routing updates will propagate to mentor pods.'
-      });
+      if (mounted.current) {
+        setFeedback({
+          tone: 'success',
+          message: 'Tutor routing recalibrated.',
+          detail: result?.summary ?? 'Routing updates will propagate to mentor pods.'
+        });
+      }
       await refresh?.();
     } catch (error) {
-      setFeedback({
-        tone: 'error',
-        message: error.message ?? 'Unable to open routing rules.'
-      });
+      if (mounted.current) {
+        setFeedback({
+          tone: 'error',
+          message: error.message ?? 'Unable to open routing rules.'
+        });
+      }
     } finally {
-      setPendingAction(null);
+      if (mounted.current) {
+        setPendingAction(null);
+      }
     }
-  }, [dashboard, instructorOrchestration, notifications, refresh]);
+  }, [dashboard, instructorOrchestration, mounted, notifications, refresh]);
 
   if (roster.length === 0 && availability.length === 0) {
     return (
