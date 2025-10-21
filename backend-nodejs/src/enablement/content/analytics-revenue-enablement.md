@@ -7,7 +7,7 @@
   "products": ["analytics-warehouse", "monetisation-suite", "executive-dashboards"],
   "tags": ["analytics", "revenue", "training", "curriculum"],
   "capabilities": ["Task 5"],
-  "lastUpdated": "2025-03-04",
+  "lastUpdated": "2025-10-20",
   "owner": "Revenue Operations",
   "timeToCompleteMinutes": 240,
   "deliverables": [
@@ -56,3 +56,8 @@ This curriculum serves revenue operations, finance analysts, product managers, a
 
 ## Change management
 Whenever warehouse models or monetisation logic changes, the owner creates a curriculum change request, attaches sample datasets, updates this entry, and notifies stakeholders via the governance and communications hub. The enablement API provides a capability matrix endpoint used by the roadmap communications to spot gaps and trigger additional training material.
+
+## API documentation sync
+- Reference the refreshed OpenAPI catalogue published at `https://docs.edulure.com/apis/payments/v1` and `https://docs.edulure.com/apis/analytics/v1` during live exercises so analysts practice with the exact payload contracts.
+- Confirm that checksum hashes listed in the service registry match the documents downloaded for workshops; mismatches indicate a caching issue and require coordination with the platform team before the session proceeds.
+- Update lab workbooks with the new JWT bearer security scheme requirements surfaced in the documentation to reinforce secure access patterns during practicum assessments.

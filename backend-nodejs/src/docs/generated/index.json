@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2025-10-15T15:32:04.126Z",
+  "generatedAt": "2025-10-20T23:52:56.000Z",
   "baseSpec": "../openapi.json",
   "services": [
     {
@@ -9,7 +9,10 @@
       "version": "v1",
       "description": "User registration, login, session lifecycle, and verification endpoints.",
       "basePath": "/auth",
-      "file": "./auth/v1/openapi.json"
+      "file": "./auth/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/auth/v1",
+      "checksum": "fc7778c0ef6ce01e13509fb934a38164d5f8633d10972fe702277dda65900ff6"
     },
     {
       "service": "users",
@@ -18,7 +21,10 @@
       "version": "v1",
       "description": "Account profile, preferences, and administrative management endpoints.",
       "basePath": "/users",
-      "file": "./users/v1/openapi.json"
+      "file": "./users/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/users/v1",
+      "checksum": "655cfc3840b2bbade378fb3e26b098b48f56f8bc68036a7cd5de8ac819824881"
     },
     {
       "service": "communities",
@@ -27,7 +33,10 @@
       "version": "v1",
       "description": "Community creation, membership, and scheduling APIs.",
       "basePath": "/communities",
-      "file": "./communities/v1/openapi.json"
+      "file": "./communities/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/communities/v1",
+      "checksum": "d863070076fc2bf6deea578e3c7cb82664e03933d20f5168f95589cc891baa6c"
     },
     {
       "service": "content",
@@ -36,7 +45,10 @@
       "version": "v1",
       "description": "Content ingestion, cataloguing, and lifecycle management endpoints.",
       "basePath": "/content",
-      "file": "./content/v1/openapi.json"
+      "file": "./content/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/content/v1",
+      "checksum": "8c967e2ece6bb2a3fd2b8430c3a4a0750562a3796627909b4280e0894a5fc1c3"
     },
     {
       "service": "runtime-config",
@@ -45,7 +57,10 @@
       "version": "v1",
       "description": "Runtime configuration and capability manifest endpoints consumed by clients.",
       "basePath": "/runtime",
-      "file": "./runtime-config/v1/openapi.json"
+      "file": "./runtime-config/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/runtime-config/v1",
+      "checksum": "edc5048b18e8ef3f25197b4235b37ea839d6cf39cf8e7adc3f60a85d49225d5e"
     },
     {
       "service": "payments",
@@ -54,7 +69,10 @@
       "version": "v1",
       "description": "Payments, escrow, and billing orchestration endpoints.",
       "basePath": "/payments",
-      "file": "./payments/v1/openapi.json"
+      "file": "./payments/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/payments/v1",
+      "checksum": "87f792ffc8ff0312b0d17c7a896224c67e6b763ef0133310ddcb08b5971b8425"
     },
     {
       "service": "chat",
@@ -63,7 +81,10 @@
       "version": "v1",
       "description": "Realtime chat messaging, channel presence, and DM APIs.",
       "basePath": "/chat",
-      "file": "./chat/v1/openapi.json"
+      "file": "./chat/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/chat/v1",
+      "checksum": "0b42306d6e4cfcac09ee40d1a34d40dbf54a12f01dd036d226a6da0c8e6b6b63"
     },
     {
       "service": "social",
@@ -72,7 +93,10 @@
       "version": "v1",
       "description": "Follows, recommendations, and user engagement APIs.",
       "basePath": "/social",
-      "file": "./social/v1/openapi.json"
+      "file": "./social/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/social/v1",
+      "checksum": "3cb1a54588f48fbbb274c490643adce070ff64d2753a2c3c4bd9e9d8b9bdf1db"
     },
     {
       "service": "feed",
@@ -81,7 +105,10 @@
       "version": "v1",
       "description": "Live feed aggregation, ad placements, and analytics query endpoints.",
       "basePath": "/feed",
-      "file": "./feed/v1/openapi.json"
+      "file": "./feed/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/feed/v1",
+      "checksum": "e0d94b981cd63973d2cebc62a68d33963751b5bce3fd2fb7f1e89f7bddef4a67"
     },
     {
       "service": "explorer",
@@ -90,7 +117,10 @@
       "version": "v1",
       "description": "Explorer search, browse, and recommendation endpoints.",
       "basePath": "/explorer",
-      "file": "./explorer/v1/openapi.json"
+      "file": "./explorer/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/explorer/v1",
+      "checksum": "29c6b2d524b58c2f74199b437a30d4572dfbe1391d4c9e3653dd1e1c67369840"
     },
     {
       "service": "ads",
@@ -99,7 +129,10 @@
       "version": "v1",
       "description": "Advertising campaign management and insights APIs.",
       "basePath": "/ads",
-      "file": "./ads/v1/openapi.json"
+      "file": "./ads/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/ads/v1",
+      "checksum": "26d74cf4256209b0e35c58bc4bd235bb127295c8e8f1ec8d9b38169442cdbc98"
     },
     {
       "service": "analytics",
@@ -108,7 +141,10 @@
       "version": "v1",
       "description": "Reporting, dashboards, and analytics export APIs.",
       "basePath": "/analytics",
-      "file": "./analytics/v1/openapi.json"
+      "file": "./analytics/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/analytics/v1",
+      "checksum": "718be8281eee6da80adbee470a3c4f65dc41f76f1da762fea76dda123ae53fb4"
     },
     {
       "service": "dashboard",
@@ -117,7 +153,10 @@
       "version": "v1",
       "description": "Operational dashboards, incident insights, and governance endpoints.",
       "basePath": "/dashboard",
-      "file": "./dashboard/v1/openapi.json"
+      "file": "./dashboard/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/dashboard/v1",
+      "checksum": "c541f5e07f2f46cf6c2a5462fcb708bb4c0c370771189576537f5b38b36c39e0"
     },
     {
       "service": "verification",
@@ -126,7 +165,10 @@
       "version": "v1",
       "description": "Identity verification, KYC, and trust signals APIs.",
       "basePath": "/verification",
-      "file": "./verification/v1/openapi.json"
+      "file": "./verification/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/verification/v1",
+      "checksum": "d6f6e303030c0f5166b7b6715b8e383d18e352f494e028bf7a0ee4ef2d6edf05"
     },
     {
       "service": "ebooks",
@@ -135,7 +177,10 @@
       "version": "v1",
       "description": "E-book catalogue and DRM-controlled delivery endpoints.",
       "basePath": "/ebooks",
-      "file": "./ebooks/v1/openapi.json"
+      "file": "./ebooks/v1/openapi.json",
+      "lastUpdated": "2025-10-20T23:52:56.000Z",
+      "documentationUrl": "https://docs.edulure.com/apis/ebooks/v1",
+      "checksum": "8127cc5559d57078e8079ba9574a70d3100008307c02c6645f558da2f753d051"
     }
   ]
 }
