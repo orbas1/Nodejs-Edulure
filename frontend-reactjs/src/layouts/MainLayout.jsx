@@ -943,13 +943,12 @@ export default function MainLayout() {
           {isAuthenticated ? (
             <div className="grid gap-12 lg:grid-cols-[minmax(0,1.75fr)_minmax(0,1fr)]">
               <div className="space-y-6">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center">
                   <img
                     src="https://i.ibb.co/twQyCm1N/Edulure-Logo.png"
                     alt="Edulure logo"
                     className="h-10 w-auto"
                   />
-                  <span className="text-base font-semibold text-white">Edulure</span>
                 </div>
                 <p className="text-sm leading-relaxed text-slate-300">
                   Keep your learning organisation running around the clock with communities, curriculum, live operations
@@ -988,13 +987,12 @@ export default function MainLayout() {
           ) : (
             <div className="grid gap-10 text-sm text-slate-500 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
               <div className="space-y-6">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center">
                   <img
                     src="https://i.ibb.co/twQyCm1N/Edulure-Logo.png"
                     alt="Edulure logo"
                     className="h-10 w-auto"
                   />
-                  <span className="text-base font-semibold text-slate-800">Edulure</span>
                 </div>
                 <p className="text-sm leading-relaxed">
                   Build thriving learning communities with collaborative classrooms, live cohorts and deep analytics powered
