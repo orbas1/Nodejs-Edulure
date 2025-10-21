@@ -15,6 +15,7 @@ import { listPublicTutors } from '../api/catalogueApi.js';
 import { createPaymentIntent } from '../api/paymentsApi.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import useAutoDismissMessage from '../hooks/useAutoDismissMessage.js';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 import { isAbortError } from '../utils/errors.js';
 
 const EXPLORER_CONFIG = {
@@ -464,6 +465,52 @@ export default function TutorProfile() {
     }
   });
   const [bookingPayments, setBookingPayments] = useState([]);
+
+  const spotlightTutor = useMemo(() => highlightTutors[0] ?? featuredTutors[0] ?? null, [highlightTutors, featuredTutors]);
+  const tutorKeywords = useMemo(() => {
+    if (!spotlightTutor) {
+      return [];
+    }
+    const keywords = new Set();
+    (spotlightTutor.skills ?? []).forEach((skill) => {
+      if (typeof skill === 'string') {
+        keywords.add(skill);
+      }
+    });
+    (spotlightTutor.languages ?? []).forEach((language) => {
+      if (typeof language === 'string') {
+        keywords.add(language);
+      }
+    });
+    if (spotlightTutor.rate?.hourly) {
+      keywords.add('hourly rate');
+    }
+    return Array.from(keywords);
+  }, [spotlightTutor]);
+
+  const tutorMetaDescription = useMemo(() => {
+    if (spotlightTutor?.bio) {
+      const condensed = spotlightTutor.bio.replace(/\s+/g, ' ').trim();
+      return condensed.length > 200 ? `${condensed.slice(0, 197)}…` : condensed;
+    }
+    if (spotlightTutor?.headline) {
+      return spotlightTutor.headline;
+    }
+    return 'Book verified Edulure tutors for live sessions, cohort support, and async mentorship with transparent pricing and response times.';
+  }, [spotlightTutor]);
+
+  usePageMetadata({
+    title: spotlightTutor?.displayName ? `${spotlightTutor.displayName} · Edulure tutor` : 'Edulure tutors and mentors',
+    description: tutorMetaDescription,
+    canonicalPath: spotlightTutor?.slug ? `/tutors/${spotlightTutor.slug}` : '/tutors',
+    image: spotlightTutor?.avatarUrl ?? undefined,
+    keywords: tutorKeywords,
+    analytics: {
+      page_type: 'tutor_profile',
+      highlight_count: highlightTutors.length,
+      featured_count: featuredTutors.length
+    }
+  });
 
   useEffect(() => {
     let active = true;

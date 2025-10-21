@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import PageHero from '../components/PageHero.jsx';
+import usePageMetadata from '../hooks/usePageMetadata.js';
 
 const companyProfile = {
   name: 'Blackwellen Ltd',
@@ -263,6 +264,26 @@ const termsSections = [
 export default function Terms() {
   const { hash } = useLocation();
   const [activeSection, setActiveSection] = useState(termsSections[0].id);
+
+  usePageMetadata({
+    title: 'Terms & Conditions · Edulure',
+    description: `Read the contractual terms governing access to the Edulure platform operated by ${companyProfile.name}.`,
+    canonicalPath: '/terms',
+    structuredData: {
+      '@context': 'https://schema.org',
+      '@type': 'TermsOfService',
+      name: 'Edulure Terms & Conditions',
+      provider: {
+        '@type': 'Organization',
+        name: companyProfile.name,
+        url: 'https://www.edulure.com'
+      },
+      dateModified: lastUpdatedDate
+    },
+    analytics: {
+      page_type: 'terms_notice'
+    }
+  });
 
   const sectionIds = useMemo(() => termsSections.map((section) => section.id), []);
 
