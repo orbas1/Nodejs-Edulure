@@ -38,3 +38,10 @@ export function deletePersistentState(key) {
     console.warn('Failed to remove persistent state', { key, error });
   }
 }
+
+export function updatePersistentState(key, updater, fallback) {
+  const current = loadPersistentState(key, fallback);
+  const next = typeof updater === 'function' ? updater(current) : updater;
+  savePersistentState(key, next);
+  return next;
+}
