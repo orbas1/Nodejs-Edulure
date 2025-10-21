@@ -103,6 +103,24 @@ const DEFAULT_THIRD_PARTY = Object.freeze({
   credentials: []
 });
 
+function deepMerge(base, patch) {
+  if (!patch || typeof patch !== 'object') {
+    return { ...base };
+  }
+
+  const result = Array.isArray(base) ? [...base] : { ...base };
+  for (const [key, value] of Object.entries(patch)) {
+    if (Array.isArray(value)) {
+      result[key] = value.slice(0, 20);
+    } else if (value && typeof value === 'object') {
+      result[key] = deepMerge(base?.[key] ?? {}, value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 const DEFAULT_ADMIN_PROFILE = Object.freeze({
   organisation: {
     name: 'Edulure Operations',
@@ -2049,6 +2067,25 @@ export default class PlatformSettingsService {
     }, connection);
 
     return merged;
+  }
+
+  static async getOperationalSnapshot(connection = db) {
+    const [profile, security, finance, monetization, integrations] = await Promise.all([
+      this.getAdminProfileSettings(connection),
+      this.getSecuritySettings(connection),
+      this.getFinanceSettings(connection),
+      this.getMonetizationSettings(connection),
+      this.getIntegrationsSettings(connection)
+    ]);
+
+    return {
+      profile: deepMerge(DEFAULT_ADMIN_PROFILE, profile ?? {}),
+      security: deepMerge(DEFAULT_SYSTEM.security, security?.security ?? {}),
+      finance: deepMerge(DEFAULT_SYSTEM.operations, finance ?? {}),
+      monetization: deepMerge(DEFAULT_MONETIZATION, monetization ?? {}),
+      integrations: deepMerge(DEFAULT_INTEGRATIONS, integrations ?? {}),
+      generatedAt: new Date().toISOString()
+    };
   }
 
   static calculateCommission(amountCents, commissionConfig, { category } = {}) {

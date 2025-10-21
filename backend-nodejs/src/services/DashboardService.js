@@ -120,11 +120,142 @@ const DEFAULT_FINANCE_ALERTS = Object.freeze({
   notifyThresholdPercent: 80
 });
 
+const MESSAGE_PERMISSION_CANONICAL = new Map([
+  ['everyone', 'everyone'],
+  ['public', 'everyone'],
+  ['all', 'everyone'],
+  ['followers', 'followers'],
+  ['followers_only', 'followers'],
+  ['friends', 'followers'],
+  ['connections', 'followers'],
+  ['no-one', 'none'],
+  ['no_one', 'none'],
+  ['none', 'none'],
+  ['private', 'none']
+]);
+
+const MESSAGE_PERMISSION_DEFAULT = 'followers';
+
 function getOperatorDashboardService() {
   if (!operatorDashboardService) {
     operatorDashboardService = new OperatorDashboardService();
   }
   return operatorDashboardService;
+}
+
+function toPositiveInteger(value, { round = true } = {}) {
+  const numeric = Number(value ?? 0);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 0;
+  }
+  return round ? Math.round(numeric) : numeric;
+}
+
+function normaliseSupportMetrics(input) {
+  const source = input && typeof input === 'object' ? input : {};
+  const latestUpdatedAtDate = normaliseDate(source.latestUpdatedAt);
+  const averageResponseMinutes = toPositiveInteger(source.averageResponseMinutes);
+  const firstResponseMinutes = toPositiveInteger(
+    source.firstResponseMinutes ?? source.firstResponse ?? averageResponseMinutes
+  );
+
+  return {
+    open: toPositiveInteger(source.open),
+    waiting: toPositiveInteger(source.waiting),
+    resolved: toPositiveInteger(source.resolved),
+    closed: toPositiveInteger(source.closed),
+    awaitingLearner: toPositiveInteger(source.awaitingLearner),
+    averageResponseMinutes,
+    firstResponseMinutes,
+    latestUpdatedAt: latestUpdatedAtDate ? latestUpdatedAtDate.toISOString() : null
+  };
+}
+
+function normaliseSystemPreferences(preferences) {
+  const source = preferences && typeof preferences === 'object' ? preferences : {};
+  const nestedPrefs = source.preferences && typeof source.preferences === 'object' ? source.preferences : {};
+  const updatedAt = normaliseDate(source.updatedAt);
+
+  return {
+    language: typeof source.language === 'string' && source.language ? source.language : DEFAULT_SYSTEM_SETTINGS.language,
+    region: typeof source.region === 'string' && source.region ? source.region : DEFAULT_SYSTEM_SETTINGS.region,
+    timezone:
+      typeof source.timezone === 'string' && source.timezone ? source.timezone : DEFAULT_SYSTEM_SETTINGS.timezone,
+    notificationsEnabled:
+      typeof source.notificationsEnabled === 'boolean'
+        ? source.notificationsEnabled
+        : DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
+    digestEnabled:
+      typeof source.digestEnabled === 'boolean' ? source.digestEnabled : DEFAULT_SYSTEM_SETTINGS.digestEnabled,
+    autoPlayMedia:
+      typeof source.autoPlayMedia === 'boolean' ? source.autoPlayMedia : DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
+    highContrast:
+      typeof source.highContrast === 'boolean' ? source.highContrast : DEFAULT_SYSTEM_SETTINGS.highContrast,
+    reducedMotion:
+      typeof source.reducedMotion === 'boolean' ? source.reducedMotion : DEFAULT_SYSTEM_SETTINGS.reducedMotion,
+    preferences: {
+      interfaceDensity:
+        typeof nestedPrefs.interfaceDensity === 'string' && nestedPrefs.interfaceDensity
+          ? nestedPrefs.interfaceDensity
+          : DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
+      analyticsOptIn:
+        typeof nestedPrefs.analyticsOptIn === 'boolean'
+          ? nestedPrefs.analyticsOptIn
+          : DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
+      subtitleLanguage:
+        typeof nestedPrefs.subtitleLanguage === 'string' && nestedPrefs.subtitleLanguage
+          ? nestedPrefs.subtitleLanguage
+          : typeof source.language === 'string' && source.language
+            ? source.language
+            : DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
+      audioDescription:
+        typeof nestedPrefs.audioDescription === 'boolean'
+          ? nestedPrefs.audioDescription
+          : DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
+    },
+    updatedAt: updatedAt ? updatedAt.toISOString() : null
+  };
+}
+
+function normalisePrivacySettings(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const visibilityRaw = typeof source.profileVisibility === 'string' ? source.profileVisibility.toLowerCase() : '';
+  const visibility = ['public', 'private', 'connections'].includes(visibilityRaw) ? visibilityRaw : 'public';
+
+  const messagePermissionRaw =
+    typeof source.messagePermission === 'string' ? source.messagePermission.toLowerCase() : '';
+  const messagePermission =
+    MESSAGE_PERMISSION_CANONICAL.get(messagePermissionRaw) ?? MESSAGE_PERMISSION_DEFAULT;
+
+  return {
+    visibility,
+    followApprovalRequired: Boolean(source.followApprovalRequired),
+    shareActivity: source.shareActivity !== false,
+    messagePermission
+  };
+}
+
+function normaliseNotifications(notifications) {
+  if (!Array.isArray(notifications)) {
+    return [];
+  }
+
+  return notifications
+    .filter((item) => item && (item.id || item.title))
+    .map((item) => ({
+      id: item.id ?? `notification-${crypto.randomUUID()}`,
+      title: item.title ?? 'Notification',
+      type: item.type ?? 'system',
+      timestamp: (() => {
+        const parsed = normaliseDate(item.timestamp);
+        if (parsed) {
+          return parsed.toISOString();
+        }
+        return item.timestamp ?? null;
+      })(),
+      read: item.read ?? false,
+      cta: item.cta ?? null
+    }));
 }
 
 export function formatCurrency(amountCents, currency = 'USD') {
@@ -390,17 +521,19 @@ export function buildLearnerDashboard({
   libraryEntries = [],
   fieldServiceWorkspace = null,
   financialProfile = null,
+  paymentMethods: paymentMethodsRaw = [],
+  billingContacts: billingContactsRaw = [],
   financePurchases = [],
   financeSubscriptions = [],
-  systemPreferences = null,
-  growthInitiativesRaw = [],
-  growthExperimentsByInitiative = new Map(),
-  affiliateChannelsRaw = [],
-  affiliatePayoutsRaw = [],
-  adCampaignsRaw = [],
-  instructorApplicationRaw = null,
+  growthInitiatives: growthInitiativesRaw = [],
+  growthExperimentsByInitiative: growthExperimentsByInitiativeRaw = new Map(),
+  affiliateChannels: affiliateChannelsRaw = [],
+  affiliatePayouts: affiliatePayoutsRaw = [],
+  adCampaigns: adCampaignsRaw = [],
+  instructorApplication: instructorApplicationRaw = null,
   supportCases = [],
-  supportMetrics = DEFAULT_SUPPORT_METRICS
+  supportMetrics: supportMetricsInput = {},
+  systemPreferences = null
 } = {}) {
   const hasSignals =
     enrollments.length ||
@@ -786,26 +919,62 @@ export function buildLearnerDashboard({
     date: invoice.date ? formatDateTime(invoice.date, { dateStyle: 'medium', timeStyle: undefined }) : null
   }));
 
-  const paymentMethods = Array.isArray(paymentMethodsRaw)
-    ? paymentMethodsRaw.map((method) => ({
-        id: method.id,
-        label: method.label ?? method.nickname ?? 'Payment method',
-        brand: method.brand ?? method.cardBrand ?? null,
-        last4: method.last4 ?? method.cardLast4 ?? null,
-        expiry: method.expiry ?? method.cardExpiry ?? null,
-        primary: Boolean(method.primary ?? method.isDefault)
-      }))
-    : [];
+  const paymentMethods = (Array.isArray(paymentMethodsRaw) ? paymentMethodsRaw : [])
+    .filter(Boolean)
+    .map((method) => {
+      const brand = method.brand ?? 'Card';
+      const last4 = method.last4 ? String(method.last4).slice(-4) : null;
+      return {
+        id: method.id ?? `payment-method-${crypto.randomUUID()}`,
+        label:
+          method.label ?? (last4 ? `${brand} ending ${last4}` : `${brand} payment method`),
+        brand,
+        last4,
+        expiry: method.expiry ?? null,
+        primary: Boolean(method.primary)
+      };
+    });
 
-  const billingContacts = Array.isArray(billingContactsRaw)
-    ? billingContactsRaw.map((contact) => ({
-        id: contact.id,
-        name: contact.name ?? contact.fullName ?? null,
-        email: contact.email ?? null,
-        phone: contact.phone ?? contact.phoneNumber ?? null,
-        company: contact.company ?? contact.organisation ?? null
-      }))
-    : [];
+  const billingContacts = (Array.isArray(billingContactsRaw) ? billingContactsRaw : []).map((contact) => ({
+    id: contact.id,
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    company: contact.company
+  }));
+
+  const supportCasesList = Array.isArray(supportCases) ? supportCases.filter(Boolean) : [];
+  const supportDerived = supportCasesList.reduce(
+    (acc, supportCase) => {
+      const status = String(supportCase?.status ?? supportCase?.state ?? '').toLowerCase();
+      if (supportCase?.awaitingLearner === true) {
+        acc.awaitingLearner += 1;
+      }
+
+      if (status.includes('wait') || status.includes('pend')) {
+        acc.waiting += 1;
+      } else if (status.includes('close')) {
+        acc.closed += 1;
+      } else if (status.includes('resolve')) {
+        acc.resolved += 1;
+      } else {
+        acc.open += 1;
+      }
+
+      const updatedAt = normaliseDate(supportCase?.updatedAt ?? supportCase?.lastUpdatedAt);
+      if (!acc.latestUpdatedAt || (updatedAt && updatedAt > acc.latestUpdatedAt)) {
+        acc.latestUpdatedAt = updatedAt;
+      }
+      return acc;
+    },
+    { open: 0, waiting: 0, resolved: 0, closed: 0, awaitingLearner: 0, latestUpdatedAt: null }
+  );
+
+  const supportMetrics = normaliseSupportMetrics({
+    ...supportDerived,
+    latestUpdatedAt: supportDerived.latestUpdatedAt,
+    ...supportMetricsInput
+  });
 
   const financePreferencesRaw =
     financialProfile?.preferences && typeof financialProfile.preferences === 'object'
@@ -813,17 +982,32 @@ export function buildLearnerDashboard({
       : {};
   const financialPreferences = {
     autoPay: { enabled: Boolean(financialProfile?.autoPayEnabled) },
-    reserveTarget: Math.round(Number(financialProfile?.reserveTargetCents ?? 0) / 100),
-    reserveTargetCents: Number(financialProfile?.reserveTargetCents ?? 0),
-    currency: financePreferencesRaw.currency ?? 'USD',
-    invoiceDelivery: financePreferencesRaw.invoiceDelivery ?? 'email',
-    payoutSchedule: financePreferencesRaw.payoutSchedule ?? 'monthly',
+    reserveTargetCents: Math.max(0, Number(financialProfile?.reserveTargetCents ?? 0)),
+    reserveTarget: Math.round(Math.max(0, Number(financialProfile?.reserveTargetCents ?? 0)) / 100),
+    currency:
+      typeof financePreferencesRaw.currency === 'string' && financePreferencesRaw.currency
+        ? financePreferencesRaw.currency
+        : 'USD',
+    invoiceDelivery:
+      typeof financePreferencesRaw.invoiceDelivery === 'string' && financePreferencesRaw.invoiceDelivery
+        ? financePreferencesRaw.invoiceDelivery
+        : 'email',
+    payoutSchedule:
+      typeof financePreferencesRaw.payoutSchedule === 'string' && financePreferencesRaw.payoutSchedule
+        ? financePreferencesRaw.payoutSchedule
+        : 'monthly',
     taxId: financePreferencesRaw.taxId ?? null,
     alerts: {
-      sendEmail: financePreferencesRaw.alerts?.sendEmail ?? true,
-      sendSms: financePreferencesRaw.alerts?.sendSms ?? false,
-      escalationEmail: financePreferencesRaw.alerts?.escalationEmail ?? null,
-      notifyThresholdPercent: financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80
+      sendEmail: financePreferencesRaw.alerts?.sendEmail !== false,
+      sendSms: financePreferencesRaw.alerts?.sendSms === true,
+      escalationEmail:
+        typeof financePreferencesRaw.alerts?.escalationEmail === 'string'
+          ? financePreferencesRaw.alerts.escalationEmail
+          : null,
+      notifyThresholdPercent: Math.min(
+        100,
+        Math.max(0, Number(financePreferencesRaw.alerts?.notifyThresholdPercent ?? 80))
+      )
     },
     documents: Array.isArray(financePreferencesRaw.documents) ? financePreferencesRaw.documents : [],
     reimbursements:
@@ -893,35 +1077,9 @@ export function buildLearnerDashboard({
     reimbursements: financialPreferences.reimbursements ?? { enabled: false, instructions: null }
   };
 
-      const systemSettings = {
-        language: systemPreferences?.language ?? DEFAULT_SYSTEM_SETTINGS.language,
-        region: systemPreferences?.region ?? DEFAULT_SYSTEM_SETTINGS.region,
-        timezone: systemPreferences?.timezone ?? DEFAULT_SYSTEM_SETTINGS.timezone,
-        notificationsEnabled:
-          systemPreferences?.notificationsEnabled ?? DEFAULT_SYSTEM_SETTINGS.notificationsEnabled,
-        digestEnabled: systemPreferences?.digestEnabled ?? DEFAULT_SYSTEM_SETTINGS.digestEnabled,
-        autoPlayMedia: systemPreferences?.autoPlayMedia ?? DEFAULT_SYSTEM_SETTINGS.autoPlayMedia,
-        highContrast: systemPreferences?.highContrast ?? DEFAULT_SYSTEM_SETTINGS.highContrast,
-        reducedMotion: systemPreferences?.reducedMotion ?? DEFAULT_SYSTEM_SETTINGS.reducedMotion,
-        preferences: {
-          interfaceDensity:
-            systemPreferences?.preferences?.interfaceDensity ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.interfaceDensity,
-          analyticsOptIn:
-            systemPreferences?.preferences?.analyticsOptIn ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.analyticsOptIn,
-          subtitleLanguage:
-            systemPreferences?.preferences?.subtitleLanguage ??
-            systemPreferences?.language ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.subtitleLanguage,
-          audioDescription:
-            systemPreferences?.preferences?.audioDescription ??
-            DEFAULT_SYSTEM_SETTINGS.preferences.audioDescription
-        },
-        updatedAt: systemPreferences?.updatedAt ?? null
-      };
+  const systemSettings = normaliseSystemPreferences(systemPreferences);
 
-  const notificationsList = [...notifications];
+  const notificationsList = normaliseNotifications(notifications);
   activeTutorBookings.forEach((booking) => {
     notificationsList.push({
       id: `notification-booking-${booking.id}`,
@@ -947,264 +1105,252 @@ export function buildLearnerDashboard({
     ? fieldServiceWorkspace.searchIndex.filter((entry) => entry.role === 'learner')
     : [];
 
-  const supportMetricsSource = supportMetrics && typeof supportMetrics === 'object' ? supportMetrics : {};
-  const normalisedSupportMetrics = {
-    ...DEFAULT_SUPPORT_METRICS,
-    ...supportMetricsSource
+  const growthExperimentsMap =
+    growthExperimentsByInitiativeRaw instanceof Map ? growthExperimentsByInitiativeRaw : new Map();
+
+  const growthInitiatives = (Array.isArray(growthInitiativesRaw) ? growthInitiativesRaw : []).map((initiative) => ({
+    id: initiative.id,
+    slug: initiative.slug,
+    title: initiative.title,
+    status: initiative.status,
+    objective: initiative.objective,
+    primaryMetric: initiative.primaryMetric,
+    baselineValue: initiative.baselineValue,
+    targetValue: initiative.targetValue,
+    currentValue: initiative.currentValue,
+    startAt: initiative.startAt,
+    endAt: initiative.endAt,
+    tags: initiative.tags,
+    experiments: (growthExperimentsMap.get(initiative.id) ?? []).map((experiment) => ({
+      id: experiment.id,
+      name: experiment.name,
+      status: experiment.status,
+      hypothesis: experiment.hypothesis,
+      metric: experiment.metric,
+      baselineValue: experiment.baselineValue,
+      targetValue: experiment.targetValue,
+      resultValue: experiment.resultValue,
+      startAt: experiment.startAt,
+      endAt: experiment.endAt,
+      segments: experiment.segments
+    }))
+  }));
+
+  const totalGrowthExperiments = growthInitiatives.reduce(
+    (count, initiative) => count + (initiative.experiments?.length ?? 0),
+    0
+  );
+
+  const growthSection = {
+    initiatives: growthInitiatives,
+    metrics: [
+      { label: 'Active initiatives', value: growthInitiatives.filter((item) => item.status === 'active').length },
+      { label: 'Experiments running', value: totalGrowthExperiments },
+      {
+        label: 'Targets hitting',
+        value: growthInitiatives.filter(
+          (initiative) =>
+            initiative.currentValue != null &&
+            initiative.targetValue != null &&
+            Number(initiative.currentValue) >= Number(initiative.targetValue)
+        ).length
+      }
+    ]
   };
-  const metricsUpdatedAt = normalisedSupportMetrics.latestUpdatedAt
-    ? normaliseDate(normalisedSupportMetrics.latestUpdatedAt)
-    : null;
-  const supportMetricsDisplay = {
-    open: Number(normalisedSupportMetrics.open ?? 0),
-    waiting: Number(normalisedSupportMetrics.waiting ?? 0),
-    resolved: Number(normalisedSupportMetrics.resolved ?? 0),
-    closed: Number(normalisedSupportMetrics.closed ?? 0),
-    awaitingLearner: Number(normalisedSupportMetrics.awaitingLearner ?? 0),
-    averageResponseMinutes: Number(normalisedSupportMetrics.averageResponseMinutes ?? 0),
-    latestUpdatedAt: metricsUpdatedAt ? metricsUpdatedAt.toISOString() : null,
-    firstResponseMinutes:
-      Number(
-        normalisedSupportMetrics.firstResponseMinutes ?? normalisedSupportMetrics.averageResponseMinutes ?? 0
-      ) || 42
-  };
 
-      const growthInitiatives = growthInitiativesRaw.map((initiative) => ({
-        id: initiative.id,
-        slug: initiative.slug,
-        title: initiative.title,
-        status: initiative.status,
-        objective: initiative.objective,
-        primaryMetric: initiative.primaryMetric,
-        baselineValue: initiative.baselineValue,
-        targetValue: initiative.targetValue,
-        currentValue: initiative.currentValue,
-        startAt: initiative.startAt,
-        endAt: initiative.endAt,
-        tags: initiative.tags,
-        experiments: (growthExperimentsByInitiative.get(initiative.id) ?? []).map((experiment) => ({
-          id: experiment.id,
-          name: experiment.name,
-          status: experiment.status,
-          hypothesis: experiment.hypothesis,
-          metric: experiment.metric,
-          baselineValue: experiment.baselineValue,
-          targetValue: experiment.targetValue,
-          resultValue: experiment.resultValue,
-          startAt: experiment.startAt,
-          endAt: experiment.endAt,
-          segments: experiment.segments
-        }))
-      }));
+  const affiliateChannelsList = Array.isArray(affiliateChannelsRaw) ? affiliateChannelsRaw : [];
+  const affiliatePayoutsList = Array.isArray(affiliatePayoutsRaw) ? affiliatePayoutsRaw : [];
 
-      const totalGrowthExperiments = growthInitiatives.reduce(
-        (count, initiative) => count + (initiative.experiments?.length ?? 0),
-        0
-      );
-
-      const growthSection = {
-        initiatives: growthInitiatives,
-        metrics: [
-          { label: 'Active initiatives', value: growthInitiatives.filter((item) => item.status === 'active').length },
-          { label: 'Experiments running', value: totalGrowthExperiments },
-          {
-            label: 'Targets hitting',
-            value: growthInitiatives.filter(
-              (initiative) =>
-                initiative.currentValue != null &&
-                initiative.targetValue != null &&
-                Number(initiative.currentValue) >= Number(initiative.targetValue)
-            ).length
-          }
-        ]
-      };
-
-      const affiliateChannels = affiliateChannelsRaw.map((channel) => {
-        const payouts = affiliatePayoutsRaw.filter((payout) => payout.channelId === channel.id);
-        const outstandingCents = Math.max(0, channel.totalEarningsCents - channel.totalPaidCents);
-        const nextPayout = payouts
-          .filter((payout) => payout.status === 'scheduled' || payout.status === 'processing')
-          .sort((a, b) => {
-            const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
-            const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
-            return aTime - bTime;
-          })[0];
-        return {
-          id: channel.id,
-          platform: channel.platform,
-          handle: channel.handle,
-          referralCode: channel.referralCode,
-          trackingUrl: channel.trackingUrl,
-          status: channel.status,
-          commissionRateBps: channel.commissionRateBps,
-          totalEarningsFormatted: formatCurrency(channel.totalEarningsCents),
-          totalPaidFormatted: formatCurrency(channel.totalPaidCents),
-          outstandingFormatted: formatCurrency(outstandingCents),
-          notes: channel.notes,
-          performance: channel.performance,
-          nextPayout: nextPayout
-            ? {
-                amount: formatCurrency(nextPayout.amountCents, nextPayout.currency),
-                scheduledAt: nextPayout.scheduledAt,
-                status: nextPayout.status
-              }
-            : null
-        };
-      });
-
-      const affiliateSection = {
-        channels: affiliateChannels,
-        payouts: affiliatePayoutsRaw.map((payout) => ({
-          id: payout.id,
-          channelId: payout.channelId,
-          amount: formatCurrency(payout.amountCents, payout.currency),
-          status: payout.status,
-          scheduledAt: payout.scheduledAt,
-          processedAt: payout.processedAt,
-          reference: payout.reference
-        })),
-        summary: {
-          totalChannels: affiliateChannels.length,
-          activeChannels: affiliateChannels.filter((channel) => channel.status === 'active').length,
-          outstanding: formatCurrency(
-            affiliateChannelsRaw.reduce(
-              (total, channel) => total + Math.max(0, channel.totalEarningsCents - channel.totalPaidCents),
-              0
-            )
-          )
-        }
-      };
-
-      const adCampaigns = adCampaignsRaw.map((campaign) => {
-        const metrics = campaign.metrics && typeof campaign.metrics === 'object' ? campaign.metrics : {};
-        const targeting = campaign.targeting && typeof campaign.targeting === 'object' ? campaign.targeting : {};
-        return {
-          id: campaign.id,
-          name: campaign.name,
-          status: campaign.status,
-          objective: campaign.objective,
-          dailyBudget: formatCurrency(campaign.dailyBudgetCents),
-          dailyBudgetCents: Number(campaign.dailyBudgetCents ?? 0),
-          totalSpend: formatCurrency(campaign.totalSpendCents),
-          totalSpendCents: Number(campaign.totalSpendCents ?? 0),
-          startAt: campaign.startAt,
-          endAt: campaign.endAt,
-          lastSyncedAt: campaign.lastSyncedAt,
-          metrics: {
-            impressions: Number(metrics.impressions ?? metrics.totals?.impressions ?? 0),
-            clicks: Number(metrics.clicks ?? metrics.totals?.clicks ?? 0),
-            conversions: Number(metrics.conversions ?? metrics.totals?.conversions ?? 0),
-            spendCents: Number(metrics.spendCents ?? metrics.totals?.spendCents ?? 0),
-            revenueCents: Number(metrics.revenueCents ?? metrics.totals?.revenueCents ?? 0),
-            ctr: metrics.ctr ?? metrics.averageCtr ?? null,
-            cpc: metrics.cpc ?? metrics.cpcCents ?? null,
-            cpa: metrics.cpa ?? metrics.cpaCents ?? null,
-            roas: metrics.roas ?? null,
-            lastSyncedAt: metrics.lastSyncedAt ?? campaign.lastSyncedAt ?? null
-          },
-          targeting: {
-            keywords: Array.isArray(targeting.keywords) ? targeting.keywords : [],
-            audiences: Array.isArray(targeting.audiences) ? targeting.audiences : [],
-            locations: Array.isArray(targeting.locations) ? targeting.locations : [],
-            languages: Array.isArray(targeting.languages) ? targeting.languages : [],
-            summary: targeting.summary ?? ''
-          },
-          creative: campaign.creative && typeof campaign.creative === 'object'
-            ? {
-                headline: campaign.creative.headline ?? 'Untitled creative',
-                description: campaign.creative.description ?? '',
-                url: campaign.creative.url ?? null
-              }
-            : { headline: 'Untitled creative', description: '', url: null },
-          placements: Array.isArray(campaign.placements) ? campaign.placements : []
-        };
-      });
-
-      const adsSection = {
-        campaigns: adCampaigns,
-        summary: {
-          activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
-          totalSpend: formatCurrency(
-            adCampaignsRaw.reduce((total, campaign) => total + (campaign.totalSpendCents ?? 0), 0)
-          ),
-          averageDailyBudget: adCampaignsRaw.length
-            ? formatCurrency(
-                Math.round(
-                  adCampaignsRaw.reduce((total, campaign) => total + (campaign.dailyBudgetCents ?? 0), 0) /
-                    adCampaignsRaw.length
-                )
-              )
-            : formatCurrency(0)
-        }
-      };
-
-      const instructorApplication = instructorApplicationRaw
+  const affiliateChannels = affiliateChannelsList.map((channel) => {
+    const payouts = affiliatePayoutsList.filter((payout) => payout.channelId === channel.id);
+    const outstandingCents = Math.max(0, Number(channel.totalEarningsCents ?? 0) - Number(channel.totalPaidCents ?? 0));
+    const nextPayout = payouts
+      .filter((payout) => payout.status === 'scheduled' || payout.status === 'processing')
+      .sort((a, b) => {
+        const aTime = a.scheduledAt ? new Date(a.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+        const bTime = b.scheduledAt ? new Date(b.scheduledAt).getTime() : Number.POSITIVE_INFINITY;
+        return aTime - bTime;
+      })[0];
+    const currency = channel.currency ?? 'USD';
+    return {
+      id: channel.id,
+      platform: channel.platform,
+      handle: channel.handle,
+      referralCode: channel.referralCode,
+      trackingUrl: channel.trackingUrl,
+      status: channel.status,
+      commissionRateBps: channel.commissionRateBps,
+      totalEarningsFormatted: formatCurrency(channel.totalEarningsCents, currency),
+      totalPaidFormatted: formatCurrency(channel.totalPaidCents, currency),
+      outstandingFormatted: formatCurrency(outstandingCents, currency),
+      notes: channel.notes,
+      performance: channel.performance,
+      nextPayout: nextPayout
         ? {
-            id: instructorApplicationRaw.id,
-            status: instructorApplicationRaw.status,
-            stage: instructorApplicationRaw.stage,
-            motivation: instructorApplicationRaw.motivation,
-            portfolioUrl: instructorApplicationRaw.portfolioUrl,
-            experienceYears: instructorApplicationRaw.experienceYears,
-            teachingFocus: instructorApplicationRaw.teachingFocus,
-            availability: instructorApplicationRaw.availability,
-            marketingAssets: instructorApplicationRaw.marketingAssets,
-            submittedAt: instructorApplicationRaw.submittedAt,
-            reviewedAt: instructorApplicationRaw.reviewedAt,
-            decisionNote: instructorApplicationRaw.decisionNote
+            amount: formatCurrency(nextPayout.amountCents, nextPayout.currency),
+            scheduledAt: nextPayout.scheduledAt,
+            status: nextPayout.status
           }
-        : null;
+        : null
+    };
+  });
 
-      const teachSection = {
-        application: instructorApplication,
-        status: instructorApplication?.status ?? 'draft',
-        nextSteps: (() => {
-          if (!instructorApplication) {
-            return [
-              'Complete your instructor application to access cohort production resources.',
-              'Prepare a portfolio link that highlights flagship teaching moments.'
-            ];
-          }
-          if (instructorApplication.status === 'submitted') {
-            return [
-              'Our partnerships team is reviewing your submission.',
-              'Expect an interview scheduling link within 48 hours.'
-            ];
-          }
-          if (instructorApplication.status === 'interview') {
-            return [
-              'Confirm your cohort launch availability and desired curriculum focus.',
-              'Upload marketing assets to accelerate go-to-market planning.'
-            ];
-          }
-          if (instructorApplication.status === 'approved') {
-            return [
-              'Schedule onboarding workshop with curriculum producers.',
-              'Share campaign creative for Edulure Ads placement.'
-            ];
-          }
-          if (instructorApplication.status === 'rejected') {
-            return [
-              'Review decision notes and request feedback from the instructor partnerships team.'
-            ];
-          }
-          return [
-            'Document your teaching motivation and curriculum outcomes.',
-            'Add marketing assets to strengthen your application.'
-          ];
-        })()
-      };
-
-      const privacy = {
-        visibility: privacySettings?.profileVisibility ?? 'public',
-        followApprovalRequired: Boolean(privacySettings?.followApprovalRequired),
-        shareActivity: privacySettings?.shareActivity ?? true,
-    messagePermission: privacySettings?.messagePermission ?? 'followers'
+  const affiliateSection = {
+    channels: affiliateChannels,
+    payouts: affiliatePayoutsList.map((payout) => ({
+      id: payout.id,
+      channelId: payout.channelId,
+      amount: formatCurrency(payout.amountCents, payout.currency),
+      status: payout.status,
+      scheduledAt: payout.scheduledAt,
+      processedAt: payout.processedAt,
+      reference: payout.reference
+    })),
+    summary: {
+      totalChannels: affiliateChannels.length,
+      activeChannels: affiliateChannels.filter((channel) => channel.status === 'active').length,
+      outstanding: formatCurrency(
+        affiliateChannelsList.reduce(
+          (total, channel) => total + Math.max(0, Number(channel.totalEarningsCents ?? 0) - Number(channel.totalPaidCents ?? 0)),
+          0
+        ),
+        affiliateChannelsList.find((channel) => channel?.currency)?.currency ?? 'USD'
+      )
+    }
   };
+
+  const adCampaignsList = Array.isArray(adCampaignsRaw) ? adCampaignsRaw : [];
+
+  const adCampaigns = adCampaignsList.map((campaign) => {
+    const metrics = campaign.metrics && typeof campaign.metrics === 'object' ? campaign.metrics : {};
+    const targeting = campaign.targeting && typeof campaign.targeting === 'object' ? campaign.targeting : {};
+    const currency = campaign.currency ?? 'USD';
+    return {
+      id: campaign.id,
+      name: campaign.name,
+      status: campaign.status,
+      objective: campaign.objective,
+      dailyBudget: formatCurrency(campaign.dailyBudgetCents, currency),
+      dailyBudgetCents: Number(campaign.dailyBudgetCents ?? 0),
+      totalSpend: formatCurrency(campaign.totalSpendCents, currency),
+      totalSpendCents: Number(campaign.totalSpendCents ?? 0),
+      startAt: campaign.startAt,
+      endAt: campaign.endAt,
+      lastSyncedAt: campaign.lastSyncedAt,
+      metrics: {
+        impressions: Number(metrics.impressions ?? metrics.totals?.impressions ?? 0),
+        clicks: Number(metrics.clicks ?? metrics.totals?.clicks ?? 0),
+        conversions: Number(metrics.conversions ?? metrics.totals?.conversions ?? 0),
+        spendCents: Number(metrics.spendCents ?? metrics.totals?.spendCents ?? 0),
+        revenueCents: Number(metrics.revenueCents ?? metrics.totals?.revenueCents ?? 0),
+        ctr: metrics.ctr ?? metrics.averageCtr ?? null,
+        cpc: metrics.cpc ?? metrics.cpcCents ?? null,
+        cpa: metrics.cpa ?? metrics.cpaCents ?? null,
+        roas: metrics.roas ?? null,
+        lastSyncedAt: metrics.lastSyncedAt ?? campaign.lastSyncedAt ?? null
+      },
+      targeting: {
+        keywords: Array.isArray(targeting.keywords) ? targeting.keywords : [],
+        audiences: Array.isArray(targeting.audiences) ? targeting.audiences : [],
+        locations: Array.isArray(targeting.locations) ? targeting.locations : [],
+        languages: Array.isArray(targeting.languages) ? targeting.languages : [],
+        summary: targeting.summary ?? ''
+      },
+      creative: campaign.creative && typeof campaign.creative === 'object'
+        ? {
+            headline: campaign.creative.headline ?? 'Untitled creative',
+            description: campaign.creative.description ?? '',
+            url: campaign.creative.url ?? null
+          }
+        : { headline: 'Untitled creative', description: '', url: null },
+      placements: Array.isArray(campaign.placements) ? campaign.placements : []
+    };
+  });
+
+  const adsCurrency = adCampaignsList.find((campaign) => campaign?.currency)?.currency ?? 'USD';
+
+  const adsSection = {
+    campaigns: adCampaigns,
+    summary: {
+      activeCampaigns: adCampaigns.filter((campaign) => campaign.status === 'active').length,
+      totalSpend: formatCurrency(
+        adCampaignsList.reduce((total, campaign) => total + Number(campaign.totalSpendCents ?? 0), 0),
+        adsCurrency
+      ),
+      averageDailyBudget: adCampaignsList.length
+        ? formatCurrency(
+            Math.round(
+              adCampaignsList.reduce((total, campaign) => total + Number(campaign.dailyBudgetCents ?? 0), 0) /
+                adCampaignsList.length
+            ),
+            adsCurrency
+          )
+        : formatCurrency(0, adsCurrency)
+    }
+  };
+
+  const instructorApplication = instructorApplicationRaw
+    ? {
+        id: instructorApplicationRaw.id,
+        status: instructorApplicationRaw.status,
+        stage: instructorApplicationRaw.stage,
+        motivation: instructorApplicationRaw.motivation,
+        portfolioUrl: instructorApplicationRaw.portfolioUrl,
+        experienceYears: instructorApplicationRaw.experienceYears,
+        teachingFocus: instructorApplicationRaw.teachingFocus,
+        availability: instructorApplicationRaw.availability,
+        marketingAssets: instructorApplicationRaw.marketingAssets,
+        submittedAt: instructorApplicationRaw.submittedAt,
+        reviewedAt: instructorApplicationRaw.reviewedAt,
+        decisionNote: instructorApplicationRaw.decisionNote
+      }
+    : null;
+
+  const teachSection = {
+    application: instructorApplication,
+    status: instructorApplication?.status ?? 'draft',
+    nextSteps: (() => {
+      if (!instructorApplication) {
+        return [
+          'Complete your instructor application to access cohort production resources.',
+          'Prepare a portfolio link that highlights flagship teaching moments.'
+        ];
+      }
+      if (instructorApplication.status === 'submitted') {
+        return [
+          'Our partnerships team is reviewing your submission.',
+          'Expect an interview scheduling link within 48 hours.'
+        ];
+      }
+      if (instructorApplication.status === 'interview') {
+        return [
+          'Confirm your cohort launch availability and desired curriculum focus.',
+          'Upload marketing assets to accelerate go-to-market planning.'
+        ];
+      }
+      if (instructorApplication.status === 'approved') {
+        return [
+          'Schedule onboarding workshop with curriculum producers.',
+          'Share campaign creative for Edulure Ads placement.'
+        ];
+      }
+      if (instructorApplication.status === 'rejected') {
+        return [
+          'Review decision notes and request feedback from the instructor partnerships team.'
+        ];
+      }
+      return [
+        'Document your teaching motivation and curriculum outcomes.',
+        'Add marketing assets to strengthen your application.'
+      ];
+    })()
+  };
+
+  const privacy = normalisePrivacySettings(privacySettings);
 
   const messaging = {
-    unreadThreads: messagingSummary?.unreadThreads ?? 0,
-    notificationsEnabled: messagingSummary?.notificationsEnabled ?? true
+    unreadThreads: toPositiveInteger(messagingSummary?.unreadThreads),
+    notificationsEnabled: messagingSummary?.notificationsEnabled !== false
   };
 
   const communityNameMap = new Map();
@@ -1843,11 +1989,21 @@ export function buildLearnerDashboard({
     assessments: assessmentsSection,
     liveClassrooms: liveDashboard,
     support: {
-      cases: supportCases,
+      cases: supportCasesList,
       knowledgeBase: DEFAULT_SUPPORT_KB,
       contacts: DEFAULT_SUPPORT_CONTACTS,
       serviceWindow: '24/7 global support',
-      metrics: supportMetricsDisplay
+      metrics: {
+        open: supportMetrics.open,
+        waiting: supportMetrics.waiting,
+        resolved: supportMetrics.resolved,
+        closed: supportMetrics.closed,
+        awaitingLearner: supportMetrics.awaitingLearner,
+        averageResponseMinutes: supportMetrics.averageResponseMinutes,
+        latestUpdatedAt: supportMetrics.latestUpdatedAt,
+        firstResponseMinutes:
+          supportMetrics.firstResponseMinutes ?? supportMetrics.averageResponseMinutes ?? 42
+      }
     },
     followers: followerSection,
     settings: {
@@ -2836,14 +2992,7 @@ function buildCourseWorkspace({
     const metadata = safeJsonParse(course.metadata, {});
     const releaseAt = normaliseDate(course.releaseAt);
     const updatedAt = normaliseDate(course.updatedAt);
-    const createdAt = normaliseDate(course.createdAt);
-    courseById.set(course.id, {
-      ...course,
-      metadata,
-      releaseAt,
-      updatedAt,
-      createdAt
-    });
+    courseById.set(course.id, { ...course, metadata, releaseAt, updatedAt });
   });
 
   const modulesByCourse = new Map();
@@ -2944,6 +3093,9 @@ function buildCourseWorkspace({
       };
     });
 
+    const releaseAtDate = normaliseDate(course.releaseAt);
+    const updatedAtDate = normaliseDate(course.updatedAt);
+
     return {
       id: courseRecord.publicId ?? `course-${course.id}`,
       courseId: course.id,
@@ -2969,8 +3121,8 @@ function buildCourseWorkspace({
       modules: modulesForCourse.length,
       lessons: lessonsForCourse.length,
       averageProgress,
-      releaseAt: courseRecord.releaseAt ? courseRecord.releaseAt.toISOString() : null,
-      updatedAt: courseRecord.updatedAt ? courseRecord.updatedAt.toISOString() : null,
+      releaseAt: releaseAtDate ? releaseAtDate.toISOString() : null,
+      updatedAt: updatedAtDate ? updatedAtDate.toISOString() : null,
       localisation: {
         totalLanguages: languageEntries.length,
         published: languageEntries.filter((entry) => entry.published).length,
@@ -2993,6 +3145,7 @@ function buildCourseWorkspace({
     const key = `${enrollment.courseId}:${cohortLabel}`;
     let record = cohortMap.get(key);
     if (!record) {
+      const releaseAtDate = normaliseDate(course?.releaseAt);
       record = {
         id: `cohort-${enrollment.courseId}-${cohortLabel}`.replace(/[^a-zA-Z0-9-]/g, '-').toLowerCase(),
         courseId: enrollment.courseId,
@@ -3000,15 +3153,15 @@ function buildCourseWorkspace({
         label: cohortLabel,
         enrollments: [],
         firstStartAt: null,
-        releaseAt: course.releaseAt ?? null
+        releaseAt: releaseAtDate ?? null
       };
       cohortMap.set(key, record);
     }
     record.enrollments.push(enrollment);
-    if (enrollment.startedAt) {
-      const startedAt = normaliseDate(enrollment.startedAt);
-      if (startedAt && (!record.firstStartAt || startedAt < record.firstStartAt)) {
-        record.firstStartAt = startedAt;
+    const enrollmentStart = normaliseDate(enrollment.startedAt);
+    if (enrollmentStart) {
+      if (!record.firstStartAt || enrollmentStart < record.firstStartAt) {
+        record.firstStartAt = enrollmentStart;
       }
     }
   });
@@ -3250,15 +3403,7 @@ function buildCourseWorkspace({
     const stats = progressByEnrollment.get(enrollment.id) ?? { completionRatio: 0, lastCompletedAt: null };
     const course = courseById.get(enrollment.courseId);
     const lessonsForCourse = lessonsByCourse.get(enrollment.courseId) ?? [];
-    const directoryUser = enrollment.userId ? collaboratorDirectory.get?.(enrollment.userId) : null;
-    const identity = enrollment.resolvedLearner ?? {};
-    const fallbackLabel = enrollment.userId ? `Learner ${enrollment.userId}` : 'Learner';
-    const displayName =
-      resolveName(
-        identity.firstName ?? directoryUser?.firstName ?? enrollment.firstName,
-        identity.lastName ?? directoryUser?.lastName ?? enrollment.lastName,
-        identity.email ?? directoryUser?.email ?? enrollment.email ?? fallbackLabel
-      ) ?? fallbackLabel;
+    const enrollmentMetadata = safeJsonParse(enrollment.metadata, {});
     return {
       id: enrollment.publicId ?? `enrollment-${enrollment.id}`,
       learnerId: identity.id ?? enrollment.userId ?? directoryUser?.id ?? null,
@@ -3269,11 +3414,11 @@ function buildCourseWorkspace({
       progressPercent: Number.isFinite(Number(enrollment.progressPercent))
         ? Number(enrollment.progressPercent)
         : Math.round((stats.completionRatio ?? 0) * 100),
-      cohort: enrollment.metadata?.cohort ?? 'General',
+      cohort: enrollmentMetadata.cohort ?? 'General',
       lastActivityAt: stats.lastCompletedAt ? stats.lastCompletedAt.toISOString() : null,
       nextLesson: resolveNextLesson(lessonsForCourse, stats),
       riskLevel: determineRiskLevel(enrollment, stats, now),
-      notes: stats.notes ?? [],
+      notes: Array.isArray(stats.notes) ? stats.notes : Array.isArray(enrollmentMetadata.notes) ? enrollmentMetadata.notes : [],
       lastLocation: stats.lastLocation ?? null
     };
   });
@@ -4299,6 +4444,8 @@ export default class DashboardService {
           libraryEntries,
           fieldServiceWorkspace,
           financialProfile,
+          paymentMethods: paymentMethodsRaw,
+          billingContacts: billingContactsRaw,
           financePurchases: financePurchasesRaw,
           financeSubscriptions: financeSubscriptionsDetailed,
           systemPreferences: systemPreferencesRaw

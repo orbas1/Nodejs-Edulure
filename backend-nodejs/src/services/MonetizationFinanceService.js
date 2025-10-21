@@ -171,6 +171,44 @@ function deriveRecognitionStrategy(catalogItem, itemMetadata = {}) {
   };
 }
 
+function calculateRevenueSummary(entries = []) {
+  const summary = {
+    grossCents: 0,
+    netCents: 0,
+    discountsCents: 0,
+    refundsCents: 0,
+    taxesCents: 0,
+    feesCents: 0
+  };
+
+  for (const entry of entries) {
+    const amount = coercePositiveInteger(entry.amountCents ?? entry.amount ?? 0);
+    switch (entry.type) {
+      case 'charge':
+      case 'invoice':
+        summary.grossCents += amount;
+        break;
+      case 'discount':
+        summary.discountsCents += amount;
+        break;
+      case 'tax':
+        summary.taxesCents += amount;
+        break;
+      case 'fee':
+        summary.feesCents += amount;
+        break;
+      case 'refund':
+        summary.refundsCents += amount;
+        break;
+      default:
+        summary.netCents += entry.direction === 'credit' ? amount : -amount;
+    }
+  }
+
+  summary.netCents += summary.grossCents - summary.discountsCents - summary.refundsCents - summary.feesCents;
+  return summary;
+}
+
 async function refreshCatalogMetrics(connection = db) {
   const { connection: targetConnection } = resolveModelConnection(connection);
   if (!targetConnection) {
@@ -1013,6 +1051,57 @@ class MonetizationFinanceService {
     updateDeferredRevenueBalance({ tenantId: normalizedTenant, balanceCents: deferredCents });
 
     return run;
+  }
+
+  static async getRevenueOverview({ tenantId = 'global', since, until, connection } = {}) {
+    const { connection: targetConnection } = resolveModelConnection(connection);
+    if (!targetConnection) {
+      return {
+        tenantId: normaliseTenantId(tenantId),
+        summary: calculateRevenueSummary(),
+        deferredRevenueCents: 0,
+        recognizedRevenueCents: 0,
+        generatedAt: new Date().toISOString()
+      };
+    }
+
+    const ledgerQuery = targetConnection('payment_ledger_entries as ple')
+      .leftJoin('payment_intents as pi', 'pi.id', 'ple.payment_intent_id')
+      .select({
+        type: 'ple.entry_type',
+        amountCents: 'ple.amount',
+        recordedAt: 'ple.recorded_at',
+        currency: 'ple.currency',
+        metadata: 'pi.metadata'
+      });
+
+    if (since) {
+      ledgerQuery.where('ple.recorded_at', '>=', since);
+    }
+    if (until) {
+      ledgerQuery.where('ple.recorded_at', '<=', until);
+    }
+
+    applyTenantMetadataScope(ledgerQuery, tenantId, targetConnection);
+
+    const ledgerRows = await ledgerQuery;
+    const summary = calculateRevenueSummary(ledgerRows);
+
+    const [deferredRevenueCents, recognizedRevenueCents] = await Promise.all([
+      MonetizationRevenueScheduleModel.sumDeferredBalance({ tenantId }, targetConnection),
+      MonetizationRevenueScheduleModel.sumRecognizedForWindow(
+        { tenantId, start: since ?? null, end: until ?? null },
+        targetConnection
+      )
+    ]);
+
+    return {
+      tenantId: normaliseTenantId(tenantId),
+      summary,
+      deferredRevenueCents,
+      recognizedRevenueCents,
+      generatedAt: new Date().toISOString()
+    };
   }
 
   static async listRevenueSchedules({ paymentIntentId, tenantId, status, limit = 50, offset = 0 } = {}) {

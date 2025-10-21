@@ -466,6 +466,24 @@ export class SecurityOperationsService {
     };
   }
 
+  async summariseRiskHeatmap(tenantId = 'global') {
+    const { records } = await this.repository.listRisks({ tenantId, limit: 1000, includeClosed: false });
+    const heatmap = new Map();
+
+    for (const risk of records) {
+      const severity = (risk.severity ?? 'moderate').toLowerCase();
+      const likelihood = (risk.likelihood ?? 'possible').toLowerCase();
+      const key = `${severity}:${likelihood}`;
+      heatmap.set(key, (heatmap.get(key) ?? 0) + 1);
+    }
+
+    return {
+      tenantId,
+      buckets: Array.from(heatmap.entries()).map(([bucket, count]) => ({ bucket, count })),
+      generatedAt: new Date().toISOString()
+    };
+  }
+
   async listAuditEvidence(params = {}) {
     return this.repository.listEvidence(params);
   }

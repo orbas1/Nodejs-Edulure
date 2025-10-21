@@ -21,6 +21,33 @@ function getTransporter() {
   return sharedTransporter;
 }
 
+function validateEmailAddress(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return trimmed;
+    }
+  }
+
+  throw Object.assign(new Error('A valid recipient email address is required'), { status: 422 });
+}
+
+function sanitizeHeaders(headers = {}) {
+  return Object.entries(headers).reduce((acc, [key, value]) => {
+    if (!key || value === undefined || value === null) {
+      return acc;
+    }
+    const safeKey = String(key)
+      .replace(/[^a-zA-Z0-9-]/g, '')
+      .trim();
+    if (!safeKey) {
+      return acc;
+    }
+    acc[safeKey] = String(value).slice(0, 1024);
+    return acc;
+  }, {});
+}
+
 function buildVerificationHtml({ name, verificationUrl, expiresAt }) {
   return `<!DOCTYPE html>
   <html lang="en">
@@ -73,6 +100,24 @@ export class MailService {
       ...message
     };
 
+    if (mail.to) {
+      if (Array.isArray(mail.to)) {
+        mail.to = mail.to.map((recipient) =>
+          typeof recipient === 'string'
+            ? validateEmailAddress(recipient)
+            : { ...recipient, address: validateEmailAddress(recipient.address) }
+        );
+      } else if (typeof mail.to === 'string') {
+        mail.to = validateEmailAddress(mail.to);
+      } else if (mail.to?.address) {
+        mail.to = { ...mail.to, address: validateEmailAddress(mail.to.address) };
+      }
+    }
+
+    if (mail.headers) {
+      mail.headers = sanitizeHeaders(mail.headers);
+    }
+
     const info = await this.transporter.sendMail(mail);
     logger.info({ messageId: info.messageId, to: message.to }, 'Email dispatched');
     return info;
@@ -86,8 +131,27 @@ export class MailService {
       to,
       subject: 'Confirm your Edulure account',
       html: buildVerificationHtml({ name, verificationUrl: verificationUrl.toString(), expiresAt }),
-      text: buildVerificationText({ verificationUrl: verificationUrl.toString(), expiresAt })
+      text: buildVerificationText({ verificationUrl: verificationUrl.toString(), expiresAt }),
+      headers: sanitizeHeaders({ 'X-Edulure-Template': 'email-verification' })
     });
+  }
+
+  async sendTemplatedMail({ to, subject, templateId, variables = {}, headers = {} }) {
+    const payload = {
+      to: validateEmailAddress(to),
+      subject,
+      headers: sanitizeHeaders({ ...headers, 'X-Edulure-Template': templateId })
+    };
+
+    if (!templateId) {
+      throw Object.assign(new Error('Template identifier is required'), { status: 422 });
+    }
+
+    const body = JSON.stringify({ templateId, variables });
+    payload.text = body;
+    payload.html = `<pre>${body.replace(/</g, '&lt;')}</pre>`;
+
+    return this.sendMail(payload);
   }
 }
 

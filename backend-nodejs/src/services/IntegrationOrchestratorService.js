@@ -115,6 +115,33 @@ function compactObject(source) {
     }), {});
 }
 
+function normaliseIntegrationId(id) {
+  if (!id) {
+    return null;
+  }
+
+  const value = String(id).toLowerCase();
+  if (value === 'hubspot' || value === 'salesforce') {
+    return value;
+  }
+
+  return null;
+}
+
+function ensureIntegrationEnabled(service, integrationId) {
+  if (integrationId === 'hubspot' && !service.hubspotEnabled) {
+    const error = new Error('HubSpot integration is disabled');
+    error.status = 409;
+    throw error;
+  }
+
+  if (integrationId === 'salesforce' && !service.salesforceEnabled) {
+    const error = new Error('Salesforce integration is disabled');
+    error.status = 409;
+    throw error;
+  }
+}
+
 function mapProjectStatusToLeadStatus(status) {
   switch (status) {
     case 'draft':
@@ -295,6 +322,42 @@ export class IntegrationOrchestratorService {
       this.activeRuns.delete(key);
       this.concurrentJobs = Math.max(0, this.concurrentJobs - 1);
     }
+  }
+
+  async queueManualRun(integration, { trigger = 'manual-api', windowStartAt, windowEndAt } = {}) {
+    const id = normaliseIntegrationId(integration);
+    if (!id) {
+      const error = new Error('Unsupported integration');
+      error.status = 400;
+      throw error;
+    }
+
+    ensureIntegrationEnabled(this, id);
+
+    const active = this.activeRuns.has(id);
+    if (active) {
+      const error = new Error('Integration sync already running');
+      error.status = 409;
+      throw error;
+    }
+
+    const handler = id === 'hubspot'
+      ? () => this.runHubSpotSync({ trigger, windowStartAt, windowEndAt })
+      : () => this.runSalesforceSync({ trigger, windowStartAt, windowEndAt });
+
+    const result = await this.executeJob(id, handler);
+    if (!result) {
+      const error = new Error('Integration orchestrator at capacity');
+      error.status = 429;
+      throw error;
+    }
+
+    return {
+      integration: id,
+      run: result.run ?? null,
+      queuedAt: new Date().toISOString(),
+      trigger
+    };
   }
 
   async runHubSpotSync({ trigger = 'manual', windowStartAt, windowEndAt } = {}) {

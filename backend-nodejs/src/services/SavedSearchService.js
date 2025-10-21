@@ -79,6 +79,22 @@ export class SavedSearchService {
     }
     return search;
   }
+
+  async getUsageSummary(userId) {
+    const searches = await this.model.listByUser(userId, this.db);
+    const total = searches.length;
+    const recent = searches
+      .filter((search) => search.lastUsedAt)
+      .sort((a, b) => new Date(b.lastUsedAt) - new Date(a.lastUsedAt))
+      .slice(0, 5);
+
+    return {
+      total,
+      lastUsedAt: recent[0]?.lastUsedAt ?? null,
+      recent,
+      generatedAt: new Date().toISOString()
+    };
+  }
 }
 
 export const savedSearchService = new SavedSearchService();

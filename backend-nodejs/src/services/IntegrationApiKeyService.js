@@ -10,6 +10,7 @@ export const PROVIDER_CATALOGUE = {
 };
 
 const ALLOWED_ENVIRONMENTS = new Set(['production', 'staging', 'sandbox']);
+const SENSITIVE_EMAIL_DOMAINS = new Set(['gmail.com', 'yahoo.com', 'hotmail.com']);
 export const MIN_ROTATION_DAYS = 30;
 export const MAX_ROTATION_DAYS = 365;
 export const ROTATION_WARNING_DAYS = 14;
@@ -46,6 +47,56 @@ export function isValidEmail(value) {
   const trimmed = value.trim();
   if (!trimmed) return false;
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+}
+
+function ensureOwnerEmailDomain(email) {
+  if (!isValidEmail(email)) {
+    throw Object.assign(new Error('Owner email is invalid'), { status: 422 });
+  }
+
+  const [, domain] = email.trim().toLowerCase().split('@');
+  if (!domain) {
+    throw Object.assign(new Error('Owner email domain is required'), { status: 422 });
+  }
+
+  if (SENSITIVE_EMAIL_DOMAINS.has(domain)) {
+    throw Object.assign(new Error('Personal email domains are not permitted for integration keys'), { status: 422 });
+  }
+
+  return email.trim();
+}
+
+function sanitizeNotes(value) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const text = String(value).trim();
+  return text.length ? text.slice(0, 500) : null;
+}
+
+function buildAuditFingerprint(record) {
+  if (!record) return null;
+  return [record.provider, record.environment, record.alias, record.lastFour].filter(Boolean).join('::');
+}
+
+function deriveRiskLevel({ rotationIntervalDays, status, metadata }) {
+  if (status === 'disabled') {
+    return 'inactive';
+  }
+
+  const interval = Number(rotationIntervalDays ?? 0);
+  const rotationCount = Array.isArray(metadata?.rotationHistory) ? metadata.rotationHistory.length : 0;
+
+  if (!interval || interval > 180) {
+    return 'high';
+  }
+
+  if (rotationCount <= 1 || interval > 120) {
+    return 'elevated';
+  }
+
+  return 'normal';
 }
 
 export function requireString(value, field, { min = 1, max = 255 } = {}) {
@@ -198,9 +249,7 @@ export default class IntegrationApiKeyService {
 
     const resolvedAlias = requireString(alias, 'Alias', { min: 3, max: 128 });
 
-    if (!isValidEmail(ownerEmail)) {
-      throw Object.assign(new Error('Owner email is invalid'), { status: 422 });
-    }
+    const ownerEmailAddress = ensureOwnerEmailDomain(ownerEmail);
 
     const trimmedKey = requireString(keyValue, 'API key', { min: MIN_KEY_LENGTH, max: 512 });
 
@@ -241,16 +290,18 @@ export default class IntegrationApiKeyService {
     const lastFour = trimmedKey.slice(-4);
     const nextRotationAt = addDays(now, rotationDays);
 
+    const noteText = sanitizeNotes(notes);
+
     const metadata = {
       rotationHistory: [
         {
           rotatedAt: now.toISOString(),
-          rotatedBy: createdBy ?? ownerEmail,
+          rotatedBy: createdBy ?? ownerEmailAddress,
           reason: 'initial-provision'
         }
       ],
-      lastRotatedBy: createdBy ?? ownerEmail,
-      notes: notes ?? null
+      lastRotatedBy: createdBy ?? ownerEmailAddress,
+      notes: noteText
     };
 
     const createArgs = [
@@ -258,7 +309,7 @@ export default class IntegrationApiKeyService {
         provider: normalisedProvider,
         environment: normalisedEnvironment,
         alias: resolvedAlias,
-        ownerEmail: ownerEmail.trim(),
+        ownerEmail: ownerEmailAddress,
         lastFour,
         keyHash,
         encryptedKey: encrypted.ciphertext,
@@ -270,8 +321,8 @@ export default class IntegrationApiKeyService {
         expiresAt: expiresDate,
         status: 'active',
         metadata,
-        createdBy: createdBy ?? ownerEmail.trim(),
-        updatedBy: createdBy ?? ownerEmail.trim()
+        createdBy: createdBy ?? ownerEmailAddress,
+        updatedBy: createdBy ?? ownerEmailAddress
       }
     ];
 
@@ -396,6 +447,66 @@ export default class IntegrationApiKeyService {
     const updated = await this.model.updateById(...disableArgs);
 
     return this.sanitize(updated);
+  }
+
+  summarizeForAudit(record, { includeSecret = false } = {}) {
+    const sanitized = this.sanitize(record);
+    if (!sanitized) {
+      return null;
+    }
+
+    return {
+      id: sanitized.id,
+      provider: sanitized.provider,
+      environment: sanitized.environment,
+      alias: sanitized.alias,
+      ownerEmail: sanitized.ownerEmail,
+      lastFour: sanitized.lastFour,
+      status: sanitized.status,
+      rotationStatus: sanitized.rotationStatus,
+      nextRotationAt: sanitized.nextRotationAt,
+      expiresAt: sanitized.expiresAt,
+      fingerprint: buildAuditFingerprint(sanitized),
+      riskLevel: deriveRiskLevel(sanitized),
+      rotationCount: sanitized.metadata.rotationCount,
+      notes: sanitized.metadata.notes,
+      ...(includeSecret ? { encryptedKey: record?.encryptedKey ?? null } : {})
+    };
+  }
+
+  buildRotationPlan(record) {
+    const sanitized = this.sanitize(record);
+    if (!sanitized) {
+      return null;
+    }
+
+    const history = Array.isArray(record?.metadata?.rotationHistory)
+      ? record.metadata.rotationHistory
+      : [];
+
+    const lastRotation = history[0] ?? null;
+    const previousRotation = history[1] ?? null;
+
+    return {
+      keyId: sanitized.id,
+      provider: sanitized.provider,
+      environment: sanitized.environment,
+      rotationIntervalDays: sanitized.rotationIntervalDays,
+      status: sanitized.status,
+      rotationStatus: sanitized.rotationStatus,
+      lastRotation,
+      previousRotation,
+      nextRotationAt: sanitized.nextRotationAt,
+      suggestedRotationAt: sanitized.nextRotationAt,
+      riskLevel: deriveRiskLevel(sanitized)
+    };
+  }
+
+  async generateAuditReport({ filters = {}, includeDisabled = false } = {}) {
+    const records = await this.model.list(filters);
+    return records
+      .filter((record) => includeDisabled || !record.disabledAt)
+      .map((record) => this.summarizeForAudit(record));
   }
 }
 
