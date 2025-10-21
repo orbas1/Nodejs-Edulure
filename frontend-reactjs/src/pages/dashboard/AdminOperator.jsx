@@ -23,6 +23,7 @@ import {
   fetchContinuityExercises,
   logContinuityExercise
 } from '../../api/securityOperationsApi.js';
+import { formatRelativeTime } from '../admin/utils.js';
 
 const STAT_TONES = {
   critical: 'bg-rose-100 text-rose-700 border-rose-200',
@@ -157,12 +158,18 @@ export default function AdminOperator() {
   const [continuityStatus, setContinuityStatus] = useState('idle');
   const [continuityMessage, setContinuityMessage] = useState('');
   const [continuityDraft, setContinuityDraft] = useState(CONTINUITY_DRAFT_DEFAULT);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRiskUpdated, setLastRiskUpdated] = useState(null);
 
   const statusTotals = useMemo(() => riskSummary.statusTotals ?? {}, [riskSummary]);
   const activeRiskTotal = useMemo(
     () => toCount(statusTotals.open) + toCount(statusTotals.in_review),
     [statusTotals]
   );
+  const riskUpdatedLabel = useMemo(() => {
+    if (!lastRiskUpdated) return null;
+    return formatRelativeTime(lastRiskUpdated) ?? lastRiskUpdated.toLocaleTimeString();
+  }, [lastRiskUpdated]);
 
   if (!isAdmin) {
     return (
@@ -191,6 +198,7 @@ export default function AdminOperator() {
         if (!isMounted) return;
         setRiskRecords(Array.isArray(payload?.items) ? payload.items : payload?.data ?? []);
         setRiskSummary(normalizeRiskSummary(payload?.summary));
+        setLastRiskUpdated(new Date());
       })
       .catch((err) => {
         if (!isMounted && (err?.name === 'AbortError' || err?.message === 'canceled')) {
@@ -208,6 +216,14 @@ export default function AdminOperator() {
       controller.abort();
     };
   }, [token, riskFilters.status, riskFilters.severity, isAdmin]);
+
+  useEffect(() => {
+    if (!autoRefresh || !token || !isAdmin) return undefined;
+    const interval = setInterval(() => {
+      refreshRiskRegister();
+    }, 120_000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, token, isAdmin, refreshRiskRegister]);
 
   useEffect(() => {
     if (!token || !isAdmin) return;
@@ -228,22 +244,29 @@ export default function AdminOperator() {
     };
   }, [token, isAdmin]);
 
-  const refreshRiskRegister = async () => {
-    if (!token || !isAdmin) return;
-    try {
-      const params = {
-        limit: 20,
-        offset: 0,
-        status: riskFilters.status !== 'all' ? riskFilters.status : undefined,
-        severity: riskFilters.severity !== 'all' ? riskFilters.severity : undefined
-      };
-      const payload = await fetchRiskRegister({ token, params });
-      setRiskRecords(Array.isArray(payload?.items) ? payload.items : payload?.data ?? []);
-      setRiskSummary(normalizeRiskSummary(payload?.summary));
-    } catch (err) {
-      setRiskError(err instanceof Error ? err : new Error('Failed to refresh risk register'));
-    }
-  };
+  const refreshRiskRegister = useCallback(
+    async ({ showSpinner = false } = {}) => {
+      if (!token || !isAdmin) return;
+      if (showSpinner) setRiskLoading(true);
+      try {
+        const params = {
+          limit: 20,
+          offset: 0,
+          status: riskFilters.status !== 'all' ? riskFilters.status : undefined,
+          severity: riskFilters.severity !== 'all' ? riskFilters.severity : undefined
+        };
+        const payload = await fetchRiskRegister({ token, params });
+        setRiskRecords(Array.isArray(payload?.items) ? payload.items : payload?.data ?? []);
+        setRiskSummary(normalizeRiskSummary(payload?.summary));
+        setLastRiskUpdated(new Date());
+      } catch (err) {
+        setRiskError(err instanceof Error ? err : new Error('Failed to refresh risk register'));
+      } finally {
+        if (showSpinner) setRiskLoading(false);
+      }
+    },
+    [token, isAdmin, riskFilters.status, riskFilters.severity]
+  );
 
   const refreshContinuity = async () => {
     if (!token || !isAdmin) return;
@@ -789,8 +812,10 @@ export default function AdminOperator() {
               ))}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <select
+          <div className="flex flex-col items-start gap-2 lg:items-end">
+            <div className="flex flex-wrap items-center gap-3">
+              <select
+                aria-label="Filter risks by status"
               value={riskFilters.status}
               onChange={(event) => setRiskFilters((prev) => ({ ...prev, status: event.target.value }))}
               className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
@@ -803,7 +828,8 @@ export default function AdminOperator() {
               <option value="treated">Treated</option>
               <option value="closed">Closed</option>
             </select>
-            <select
+              <select
+                aria-label="Filter risks by severity"
               value={riskFilters.severity}
               onChange={(event) => setRiskFilters((prev) => ({ ...prev, severity: event.target.value }))}
               className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200"
@@ -814,13 +840,23 @@ export default function AdminOperator() {
               <option value="high">High</option>
               <option value="critical">Critical</option>
             </select>
-            <button
-              type="button"
-              onClick={refreshRiskRegister}
-              className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-            >
-              Refresh
-            </button>
+              <button
+                type="button"
+                onClick={() => refreshRiskRegister({ showSpinner: true })}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+              >
+                Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => setAutoRefresh((state) => !state)}
+                className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+                aria-pressed={autoRefresh}
+              >
+                {autoRefresh ? 'Auto-refresh on' : 'Auto-refresh off'}
+              </button>
+            </div>
+            {riskUpdatedLabel ? <span className="text-xs text-slate-500">Last refreshed {riskUpdatedLabel}</span> : null}
           </div>
         </div>
 

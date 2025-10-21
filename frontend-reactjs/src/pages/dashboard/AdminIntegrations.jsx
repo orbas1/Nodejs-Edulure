@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowPathIcon,
   BoltIcon,
@@ -24,6 +24,7 @@ import {
 } from '../../api/integrationAdminApi.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import DashboardStateMessage from '../../components/dashboard/DashboardStateMessage.jsx';
+import { formatRelativeTime } from '../admin/utils.js';
 
 const HEALTH_THEME = {
   operational: {
@@ -929,7 +930,6 @@ export default function AdminIntegrations() {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [refreshToken, setRefreshToken] = useState(0);
   const [actionState, setActionState] = useState({ integration: null, status: 'idle', message: null });
   const [apiKeys, setApiKeys] = useState([]);
   const [apiKeysLoading, setApiKeysLoading] = useState(true);
@@ -939,6 +939,8 @@ export default function AdminIntegrations() {
   const [invitesLoading, setInvitesLoading] = useState(true);
   const [invitesError, setInvitesError] = useState(null);
   const [inviteRefreshToken, setInviteRefreshToken] = useState(0);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [createForm, setCreateForm] = useState({
     provider: 'openai',
     environment: 'production',
@@ -955,6 +957,9 @@ export default function AdminIntegrations() {
   const [rotationDraft, setRotationDraft] = useState(null);
   const [disableState, setDisableState] = useState({});
   const [inviteToast, setInviteToast] = useState(null);
+  const dashboardAbortRef = useRef(null);
+  const mountedRef = useRef(false);
+  const spinnerControllerRef = useRef(null);
 
   if (!isAdmin) {
     return (
@@ -966,27 +971,86 @@ export default function AdminIntegrations() {
     );
   }
 
-  useEffect(() => {
-    if (!token || !isAdmin) return undefined;
-    const controller = new AbortController();
-    setLoading(true);
-    fetchIntegrationDashboard({ token, signal: controller.signal })
-      .then((payload) => {
+  const loadDashboard = useCallback(
+    async ({ showSpinner = true } = {}) => {
+      if (!token || !isAdmin) return;
+
+      const controller = new AbortController();
+      const previousController = dashboardAbortRef.current;
+      const previousSpinnerOwner = spinnerControllerRef.current === previousController;
+      if (previousController) {
+        previousController.abort();
+      }
+      dashboardAbortRef.current = controller;
+
+      if (showSpinner) {
+        spinnerControllerRef.current = controller;
+      } else if (previousSpinnerOwner) {
+        spinnerControllerRef.current = controller;
+      }
+
+      if (spinnerControllerRef.current === controller && mountedRef.current) {
+        setLoading(true);
+      }
+
+      try {
+        const payload = await fetchIntegrationDashboard({ token, signal: controller.signal });
+        if (controller.signal.aborted || !mountedRef.current) {
+          return;
+        }
         setDashboard(payload ?? {});
         setError(null);
-      })
-      .catch((err) => {
-        if (err?.name === 'AbortError' || err?.message === 'canceled') {
+        setLastUpdated(new Date());
+      } catch (err) {
+        if (controller.signal.aborted || err?.name === 'AbortError' || err?.message === 'canceled' || !mountedRef.current) {
           return;
         }
         setError(err instanceof Error ? err : new Error('Failed to load integration dashboard'));
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        const isCurrent = dashboardAbortRef.current === controller;
+        if (isCurrent) {
+          dashboardAbortRef.current = null;
+        }
+        if (spinnerControllerRef.current === controller) {
+          spinnerControllerRef.current = null;
+          if (mountedRef.current) {
+            setLoading(false);
+          }
+        }
+      }
+    },
+    [token, isAdmin]
+  );
 
+  useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      controller.abort();
+      mountedRef.current = false;
+      if (dashboardAbortRef.current) {
+        dashboardAbortRef.current.abort();
+        dashboardAbortRef.current = null;
+      }
+      spinnerControllerRef.current = null;
     };
-  }, [token, refreshToken, isAdmin]);
+  }, []);
+
+  useEffect(() => {
+    if (!token || !isAdmin) return undefined;
+    loadDashboard({ showSpinner: true });
+    return () => {
+      if (dashboardAbortRef.current) {
+        dashboardAbortRef.current.abort();
+      }
+    };
+  }, [token, isAdmin, loadDashboard]);
+
+  useEffect(() => {
+    if (!autoRefresh || !token || !isAdmin) return undefined;
+    const interval = setInterval(() => {
+      loadDashboard({ showSpinner: false });
+    }, 120_000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadDashboard, token, isAdmin]);
 
   useEffect(() => {
     if (!token || !isAdmin) return undefined;
@@ -1083,7 +1147,7 @@ export default function AdminIntegrations() {
   }, [inviteToast]);
 
   const handleRefresh = () => {
-    setRefreshToken((value) => value + 1);
+    loadDashboard({ showSpinner: true });
   };
 
   const handleManualSync = async (integration) => {
@@ -1092,7 +1156,7 @@ export default function AdminIntegrations() {
     try {
       await triggerIntegrationRun({ token, integration });
       setActionState({ integration, status: 'success', message: 'Sync triggered successfully' });
-      setRefreshToken((value) => value + 1);
+      await loadDashboard({ showSpinner: false });
     } catch (err) {
       setActionState({
         integration,
@@ -1453,6 +1517,11 @@ export default function AdminIntegrations() {
     ];
   }, [apiKeys, invites]);
 
+  const lastUpdatedLabel = useMemo(() => {
+    if (!lastUpdated) return null;
+    return formatRelativeTime(lastUpdated) ?? lastUpdated.toLocaleTimeString();
+  }, [lastUpdated]);
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -1462,14 +1531,25 @@ export default function AdminIntegrations() {
             Monitor CRM sync health, reconcile mismatches, and trigger manual retries with full telemetry coverage.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleRefresh}
-            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
-          >
-            <ArrowPathIcon className="h-4 w-4" /> Refresh snapshot
-          </button>
+        <div className="flex flex-col items-start gap-2 text-xs text-slate-500 lg:items-end">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
+            >
+              <ArrowPathIcon className="h-4 w-4" /> Refresh snapshot
+            </button>
+            <button
+              type="button"
+              onClick={() => setAutoRefresh((state) => !state)}
+              className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-primary hover:text-primary"
+              aria-pressed={autoRefresh}
+            >
+              {autoRefresh ? 'Auto-refresh on' : 'Auto-refresh off'}
+            </button>
+          </div>
+          {lastUpdatedLabel ? <span>Last refreshed {lastUpdatedLabel}</span> : null}
         </div>
       </div>
 

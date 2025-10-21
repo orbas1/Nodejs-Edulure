@@ -1,4 +1,7 @@
+import { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
+
+import { buildToolingViewModel } from '../utils.js';
 
 function SummaryCards({ cards, meta }) {
   if (!Array.isArray(cards) || cards.length === 0) {
@@ -19,6 +22,11 @@ function SummaryCards({ cards, meta }) {
           >
             <p className="text-xs font-semibold uppercase tracking-wide text-primary/80">{card.label}</p>
             <p className="mt-3 text-2xl font-semibold text-slate-900">{card.value ?? '—'}</p>
+            {card.trend ? (
+              <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                {card.trend}
+              </span>
+            ) : null}
             {card.helper ? <p className="mt-2 text-xs text-slate-500">{card.helper}</p> : null}
           </article>
         ))}
@@ -33,6 +41,11 @@ function SummaryCards({ cards, meta }) {
           {meta.occupancy ? (
             <span>
               Occupancy <span className="text-slate-900">{meta.occupancy}</span>
+            </span>
+          ) : null}
+          {meta.inventory ? (
+            <span>
+              Inventory <span className="text-slate-900">{meta.inventory}</span>
             </span>
           ) : null}
           {meta.lastAudit ? (
@@ -67,11 +80,43 @@ SummaryCards.defaultProps = {
   meta: null
 };
 
-function ToolsListing({ listing }) {
+function getStatusBadgeClasses(status) {
+  const tone = (status ?? '').toLowerCase();
+  switch (tone) {
+    case 'active':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'maintenance':
+    case 'paused':
+      return 'bg-amber-100 text-amber-700';
+    case 'sunset':
+    case 'retiring':
+      return 'bg-rose-100 text-rose-700';
+    default:
+      return 'bg-slate-100 text-slate-600';
+  }
+}
+
+function getStageBadgeClasses(stage) {
+  const tone = (stage ?? '').toLowerCase();
+  if (tone.includes('pilot') || tone.includes('beta')) {
+    return 'bg-sky-100 text-sky-700';
+  }
+  if (tone.includes('retire') || tone.includes('final')) {
+    return 'bg-rose-100 text-rose-700';
+  }
+  if (tone.includes('scale') || tone.includes('expansion')) {
+    return 'bg-emerald-100 text-emerald-700';
+  }
+  return 'bg-slate-100 text-slate-600';
+}
+
+function ToolsListing({ listing, isFiltered }) {
   if (!Array.isArray(listing) || listing.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-6 py-8 text-center text-sm text-slate-500">
-        No tooling suites require attention. Listings will populate as communities onboard.
+        {isFiltered
+          ? 'No tooling suites match the current filters. Adjust filters to see additional inventory.'
+          : 'No tooling suites require attention. Listings will populate as communities onboard.'}
       </div>
     );
   }
@@ -87,10 +132,14 @@ function ToolsListing({ listing }) {
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-lg font-semibold text-slate-900">{tool.name ?? 'Untitled tool'}</h3>
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${getStatusBadgeClasses(tool.status)}`}
+                >
                   {tool.status ?? 'Planned'}
                 </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${getStageBadgeClasses(tool.lifecycleStage)}`}
+                >
                   {tool.lifecycleStage ?? 'Unassigned'}
                 </span>
               </div>
@@ -98,7 +147,7 @@ function ToolsListing({ listing }) {
                 {(tool.category ?? 'Platform tooling')} • Stewarded by{' '}
                 <span className="font-semibold text-slate-700">{tool.owner ?? 'TBC'}</span>
               </p>
-              {tool.ownerEmail ? <p className="text-xs text-slate-400">{tool.ownerEmail}</p> : null}
+              {tool.ownerEmail ? <p className="text-xs text-slate-400" title={tool.ownerEmail}>{tool.ownerEmail}</p> : null}
             </div>
             <div className="text-right">
               <p className="text-sm font-semibold text-slate-900">{tool.utilisation ?? '—'}</p>
@@ -159,36 +208,36 @@ ToolsListing.propTypes = {
       rentalContracts: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
       value: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
     })
-  )
+  ),
+  isFiltered: PropTypes.bool
 };
 
 ToolsListing.defaultProps = {
-  listing: []
+  listing: [],
+  isFiltered: false
 };
 
 function SalesInsights({ sales }) {
-  const metrics = sales?.metrics ?? {};
+  const metrics = Array.isArray(sales?.metrics) ? sales.metrics : [];
   const pipeline = Array.isArray(sales?.pipeline) ? sales.pipeline : [];
   const forecast = sales?.forecast ?? {};
 
-  const metricEntries = [
-    { id: 'pipelineValue', label: 'Pipeline value', value: metrics.pipelineValue },
-    { id: 'winRate', label: 'Win rate', value: metrics.winRate },
-    { id: 'averageDealSize', label: 'Avg. deal size', value: metrics.averageDealSize },
-    { id: 'cycleTime', label: 'Sales cycle', value: metrics.cycleTime },
-    { id: 'renewalRate', label: 'Renewal rate', value: metrics.renewalRate }
-  ].filter((entry) => entry.value !== undefined && entry.value !== null && entry.value !== '');
-
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2">
-        {metricEntries.map((metric) => (
-          <article key={metric.id} className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{metric.label}</p>
-            <p className="mt-2 text-lg font-semibold text-slate-900">{metric.value}</p>
-          </article>
-        ))}
-      </div>
+      {metrics.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {metrics.map((metric) => (
+            <article key={metric.id} className="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary/70">{metric.label}</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">{metric.value ?? '—'}</p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500">
+          Sales metrics will appear once live opportunities are tracked.
+        </div>
+      )}
       <div>
         <h4 className="text-sm font-semibold text-slate-700">Revenue pipeline</h4>
         <ul className="mt-3 space-y-3">
@@ -205,7 +254,7 @@ function SalesInsights({ sales }) {
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{stage.stage ?? 'Stage pending'}</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {stage.deals ? `${stage.deals} deals` : 'No active deals'} • {stage.velocity ?? 'Velocity TBC'}
+                    {stage.deals ?? 'No active deals'} • {stage.velocity ?? 'Velocity TBC'}
                   </p>
                 </div>
                 <div className="text-right">
@@ -561,12 +610,77 @@ FinalisationPanel.defaultProps = {
 };
 
 export default function AdminToolsSection({ sectionId, tools }) {
-  const summary = tools?.summary ?? {};
-  const listing = tools?.listing ?? [];
-  const sales = tools?.sales ?? null;
-  const rental = tools?.rental ?? null;
-  const management = tools?.management ?? null;
-  const finalisation = tools?.finalisation ?? null;
+  const tooling = useMemo(() => buildToolingViewModel(tools), [tools]);
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [stageFilter, setStageFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const statuses = tooling.filters.statuses ?? [];
+  const stages = tooling.filters.stages ?? [];
+
+  useEffect(() => {
+    if (statusFilter === 'all') return;
+    const hasStatus = statuses.some((status) => status.toLowerCase() === statusFilter);
+    if (!hasStatus) {
+      setStatusFilter('all');
+    }
+  }, [statuses, statusFilter]);
+
+  useEffect(() => {
+    if (stageFilter === 'all') return;
+    const hasStage = stages.some((stage) => stage.toLowerCase() === stageFilter);
+    if (!hasStage) {
+      setStageFilter('all');
+    }
+  }, [stages, stageFilter]);
+
+  const filteredListing = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return tooling.listing.filter((entry) => {
+      const statusMatch =
+        statusFilter === 'all' || (entry.status ?? '').toLowerCase() === statusFilter;
+      const stageMatch =
+        stageFilter === 'all' || (entry.lifecycleStage ?? '').toLowerCase() === stageFilter;
+      const searchMatch = query === '' || entry.searchText.includes(query);
+      return statusMatch && stageMatch && searchMatch;
+    });
+  }, [tooling.listing, statusFilter, stageFilter, searchTerm]);
+
+  const inventoryStats = useMemo(
+    () =>
+      tooling.listing.reduce(
+        (acc, entry) => {
+          acc.total += 1;
+          const status = (entry.status ?? '').toLowerCase();
+          const stage = (entry.lifecycleStage ?? '').toLowerCase();
+          if (status === 'active') acc.active += 1;
+          if (status === 'maintenance' || status === 'paused') acc.maintenance += 1;
+          if (stage.includes('pilot') || stage.includes('beta')) acc.pilots += 1;
+          if (stage.includes('retire') || stage.includes('final')) acc.retiring += 1;
+          return acc;
+        },
+        { total: 0, active: 0, maintenance: 0, pilots: 0, retiring: 0 }
+      ),
+    [tooling.listing]
+  );
+
+  const summaryMeta = useMemo(() => {
+    const meta = tooling.summary.meta ?? {};
+    const inventoryParts = [];
+    if (inventoryStats.total > 0) inventoryParts.push(`${inventoryStats.total} total`);
+    if (inventoryStats.active > 0) inventoryParts.push(`${inventoryStats.active} active`);
+    if (inventoryStats.pilots > 0) inventoryParts.push(`${inventoryStats.pilots} pilots`);
+    if (inventoryStats.retiring > 0) inventoryParts.push(`${inventoryStats.retiring} retiring`);
+    if (inventoryStats.maintenance > 0) inventoryParts.push(`${inventoryStats.maintenance} maintenance`);
+
+    return {
+      ...meta,
+      inventory: inventoryParts.length > 0 ? inventoryParts.join(' • ') : null
+    };
+  }, [tooling.summary.meta, inventoryStats]);
+
+  const filterActive =
+    statusFilter !== 'all' || stageFilter !== 'all' || searchTerm.trim().length > 0;
 
   return (
     <section id={sectionId} className="space-y-6">
@@ -578,35 +692,76 @@ export default function AdminToolsSection({ sectionId, tools }) {
             Govern listings, sales velocity, rentals, and decommission flows with enterprise-grade telemetry.
           </p>
         </div>
-        {summary?.occupancyRate ? (
+        {summaryMeta?.occupancy ? (
           <span className="inline-flex items-center rounded-full bg-primary/10 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-primary">
-            Occupancy {summary.occupancyRate}
+            Occupancy {summaryMeta.occupancy}
           </span>
         ) : null}
       </header>
       <div className="grid gap-5 lg:grid-cols-12">
         <div className="dashboard-section lg:col-span-12">
-          <SummaryCards cards={summary.cards ?? []} meta={summary.meta ?? null} />
+          <SummaryCards cards={tooling.summary.cards ?? []} meta={summaryMeta} />
         </div>
         <div className="dashboard-section space-y-5 lg:col-span-7">
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white/60 px-4 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                aria-label="Filter by status"
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="all">All statuses</option>
+                {statuses.map((status) => (
+                  <option key={status} value={status.toLowerCase()}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label="Filter by lifecycle stage"
+                value={stageFilter}
+                onChange={(event) => setStageFilter(event.target.value)}
+                className="rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="all">All lifecycle stages</option>
+                {stages.map((stage) => (
+                  <option key={stage} value={stage.toLowerCase()}>
+                    {stage}
+                  </option>
+                ))}
+              </select>
+              <input
+                type="search"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search tooling"
+                aria-label="Search tooling suites"
+                className="w-full rounded-full border border-slate-200 px-3 py-2 text-xs text-slate-600 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 sm:w-56"
+              />
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              {inventoryStats.total} suites · {inventoryStats.active} active · {inventoryStats.retiring} retiring
+            </div>
+          </div>
           <h3 className="text-lg font-semibold text-slate-900">Tool suite listings</h3>
-          <ToolsListing listing={listing} />
+          <ToolsListing listing={filteredListing} isFiltered={filterActive} />
         </div>
         <div className="dashboard-section space-y-5 lg:col-span-5">
           <h3 className="text-lg font-semibold text-slate-900">Sales &amp; revenue insights</h3>
-          <SalesInsights sales={sales} />
+          <SalesInsights sales={tooling.sales} />
         </div>
         <div className="dashboard-section space-y-5 lg:col-span-7">
           <h3 className="text-lg font-semibold text-slate-900">Rental operations</h3>
-          <RentalOverview rental={rental} />
+          <RentalOverview rental={tooling.rental} />
         </div>
         <div className="dashboard-section space-y-5 lg:col-span-5">
           <h3 className="text-lg font-semibold text-slate-900">Management &amp; governance</h3>
-          <ManagementPanel management={management} />
+          <ManagementPanel management={tooling.management} />
         </div>
         <div className="dashboard-section space-y-5 lg:col-span-12">
           <h3 className="text-lg font-semibold text-slate-900">Finalisation readiness</h3>
-          <FinalisationPanel finalisation={finalisation} />
+          <FinalisationPanel finalisation={tooling.finalisation} />
         </div>
       </div>
     </section>
