@@ -49,7 +49,7 @@
     },
     "waitForDb": {
       "path": "backend-nodejs/scripts/wait-for-db.js",
-      "hash": "b8413f811fa5639048b7d23ff93b0e4863a28c80072e3d834ea37dc493a2880f"
+      "hash": "f1743a0cdc312aa6eea27caef9bcf0174d53c632328d78a6e4c4fa6427477599"
     }
   },
   "root": {
